@@ -165,11 +165,11 @@ namespace scidb
         Address addr(desc.getId(), attId, inputChunk.getFirstPosition(false));
         chunk.initialize(this, &desc, addr, inputChunk.getCompressionMethod());
         chunk.setBitmapChunk((Chunk*)&inputChunk);
-        boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+        boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|ChunkIterator::IGNORE_EMPTY_CELLS);
         boost::shared_ptr<Query> emptyQuery;
         boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(emptyQuery,
-                                                                 (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0));
-        bool vectorMode = src->supportsVectorMode();
+                                                                 (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
+        bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
         src->setVectorMode(vectorMode);
         dst->setVectorMode(vectorMode);
         size_t count = 0;

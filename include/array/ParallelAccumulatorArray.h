@@ -29,12 +29,14 @@
 #define PARALLEL_ACCUMULATOR_ARRAY_H_
 
 #include <vector>
+#include <boost/enable_shared_from_this.hpp>
 
 #include "array/MemArray.h"
 #include "util/JobQueue.h"
 #include "util/Semaphore.h"
 #include "util/ThreadPool.h"
 #include "array/StreamArray.h"
+
 
 namespace scidb
 {
@@ -44,7 +46,7 @@ namespace scidb
     //
     // Array implementation materializing current chunk
     //
-    class ParallelAccumulatorArray : public StreamArray
+    class ParallelAccumulatorArray : public StreamArray, public boost::enable_shared_from_this<ParallelAccumulatorArray>
     {
       public:
         static boost::shared_ptr<JobQueue>  getQueue();
@@ -64,7 +66,7 @@ namespace scidb
 #endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_ACCEPT_PROTECTED_BASE_CLASSES
         {
           private:
-            ParallelAccumulatorArray& acc;
+            boost::weak_ptr<ParallelAccumulatorArray> _arrayLink;
             Coordinates pos;
             AttributeID attrId;
             MemChunk accChunk;
@@ -72,7 +74,8 @@ namespace scidb
             boost::shared_ptr<ConstArrayIterator> iterator;
 
           public:
-            ChunkPrefetchJob(ParallelAccumulatorArray& array, AttributeID attr, const boost::shared_ptr<Query>& query);
+            ChunkPrefetchJob(const boost::shared_ptr<ParallelAccumulatorArray>& array,
+                             AttributeID attr, const boost::shared_ptr<Query>& query);
 
             void setPosition(Coordinates const& coord) {
                 resultChunk = NULL;

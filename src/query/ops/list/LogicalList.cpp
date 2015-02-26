@@ -147,11 +147,11 @@ public:
             attributes.push_back(AttributeDesc(4, "error",  TID_STRING, 0, 0));
             attributes.push_back(AttributeDesc(5, "idle",  TID_BOOL, 0, 0));
             size = Query::getQueries().size();
-        } else if (what == "nodes") {
-            boost::shared_ptr<const NodeLiveness> queryLiveness(query->getCoordinatorLiveness());
-            size = queryLiveness->getNumNodes();
+        } else if (what == "instances") {
+            boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
+            size = queryLiveness->getNumInstances();
             attributes.push_back(AttributeDesc(1, "port",  TID_UINT16, 0, 0));
-            attributes.push_back(AttributeDesc(2, "node_id",  TID_UINT64, 0, 0));
+            attributes.push_back(AttributeDesc(2, "instance_id",  TID_UINT64, 0, 0));
             attributes.push_back(AttributeDesc(3, "online_since",  TID_STRING, 0, 0));
         } else {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LIST_ERROR1,

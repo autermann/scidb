@@ -28,13 +28,14 @@
  */
 
 #include "query/Operator.h"
+#include <smgr/io/Storage.h>
 
 
 namespace scidb
 {
 
 /**
- * SCATTER/GATHER distributes array chunks over every node of cluster.
+ * SCATTER/GATHER distributes array chunks over every instance of cluster.
  * It has one input and outputs a local part of array after redistribution.
  * It's only operator uses the network manager.
  * Logical operator for SG must not be presented in logical plan and will be
@@ -94,7 +95,6 @@ public:
                 resultArrayName = suppliedResultName;
             }
         }
-
         return ArrayDesc(resultArrayName, desc.getAttributes(), desc.getDimensions());
     }
 
@@ -125,10 +125,9 @@ public:
         if (storeResult)
         {
             assert(resultArrayName.find('@') == std::string::npos);
-            string baseName = resultArrayName.substr(0, resultArrayName.find('@'));
-            boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(baseName,
+            boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(resultArrayName,
                                                                                          query->getQueryID(),
-                                                                                         Cluster::getInstance()->getLocalNodeId(),
+                                                                                         Cluster::getInstance()->getLocalInstanceId(),
                                                                                          SystemCatalog::LockDesc::COORD,
                                                                                          SystemCatalog::LockDesc::WR));
             boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);

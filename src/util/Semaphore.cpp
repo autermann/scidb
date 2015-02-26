@@ -72,18 +72,20 @@ void Semaphore::enter()
 
 bool Semaphore::enter(ErrorChecker& errorChecker)
 {
-   if (errorChecker && !errorChecker()) {
-      return false;
-   }
+    if (errorChecker && !errorChecker()) {
+        return false;
+    }
+    const time_t TIMEOUT_SEC = 10;
 
     timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+    }
+    ts.tv_sec += TIMEOUT_SEC;
+
     while (true)
     {
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-            printf("error in clock get time\n");
-            assert(false);
-        }
-        ts.tv_sec += 10;
         if (sem_timedwait(_sem, &ts) == 0) {
             return true;
         }
@@ -93,10 +95,14 @@ bool Semaphore::enter(ErrorChecker& errorChecker)
         if (errno != ETIMEDOUT) {
            throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_THREAD_SEMAPHORE_ERROR) << errno;
         }
-
         if (errorChecker && !errorChecker()) {
            return false;
         }
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+            assert(false);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+        }
+        ts.tv_sec += TIMEOUT_SEC;
     }
 }
 

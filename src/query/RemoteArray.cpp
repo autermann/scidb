@@ -49,16 +49,16 @@ namespace scidb
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc.operator"));
 
 
-boost::shared_ptr<RemoteArray> RemoteArray::create(const ArrayDesc& arrayDesc, QueryID queryId, NodeID nodeID)
+boost::shared_ptr<RemoteArray> RemoteArray::create(const ArrayDesc& arrayDesc, QueryID queryId, InstanceID instanceID)
 {
     boost::shared_ptr<Query> query = Query::getQueryByID(queryId);
-    boost::shared_ptr<RemoteArray> array = boost::shared_ptr<RemoteArray>(new RemoteArray(arrayDesc, queryId, nodeID));
-    query->setRemoteArray(nodeID, array);
+    boost::shared_ptr<RemoteArray> array = boost::shared_ptr<RemoteArray>(new RemoteArray(arrayDesc, queryId, instanceID));
+    query->setRemoteArray(instanceID, array);
     return array;
 }
 
-RemoteArray::RemoteArray(const ArrayDesc& arrayDesc, QueryID queryId, NodeID nodeID)
-: StreamArray(arrayDesc), _queryId(queryId), _nodeID(nodeID),
+RemoteArray::RemoteArray(const ArrayDesc& arrayDesc, QueryID queryId, InstanceID instanceID)
+: StreamArray(arrayDesc), _queryId(queryId), _instanceID(instanceID),
   _received(arrayDesc.getAttributes().size()),
   _messages(arrayDesc.getAttributes().size()),
   _requested(arrayDesc.getAttributes().size())
@@ -74,7 +74,7 @@ void RemoteArray::requestNextChunk(AttributeID attId)
     fetchRecord->set_attribute_id(attId);
     fetchRecord->set_position_only(false);
     fetchRecord->set_obj_type(0);
-    NetworkManager::getInstance()->send(_nodeID, fetchDesc);
+    NetworkManager::getInstance()->send(_instanceID, fetchDesc);
 }
 
 
@@ -147,7 +147,7 @@ ConstChunk const* RemoteArray::nextChunk(AttributeID attId, MemChunk& chunk)
 /** R E M O T E   M E R G E D   A R R A Y */
 
 RemoteMergedArray::RemoteMergedArray(const ArrayDesc& arrayDesc, QueryID queryId, Statistics& statistics):
-        MultiStreamArray(Query::getQueryByID(queryId)->getNodesCount(), arrayDesc),
+        MultiStreamArray(Query::getQueryByID(queryId)->getInstancesCount(), arrayDesc),
         _queryId(queryId),
         _received(arrayDesc.getAttributes().size(), vector<Semaphore>(getStreamsCount())),
         _messages(arrayDesc.getAttributes().size(), vector< boost::shared_ptr<MessageDesc> >(getStreamsCount())),
@@ -173,7 +173,7 @@ void RemoteMergedArray::handleChunkMsg(boost::shared_ptr< MessageDesc> chunkDesc
     boost::shared_ptr<Query> query = Query::getQueryByID(_queryId);
     boost::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
     AttributeID attId = chunkMsg->attribute_id();
-    size_t stream = size_t(query->mapPhysicalToLogical(chunkDesc->getSourceNodeID()));
+    size_t stream = size_t(query->mapPhysicalToLogical(chunkDesc->getSourceInstanceID()));
 
     if (chunkMsg->warnings_size())
     {
@@ -269,7 +269,7 @@ void RemoteMergedArray::requestNextChunk(size_t stream, AttributeID attId, bool 
 bool RemoteMergedArray::fetchChunk(size_t stream, AttributeID attId, MemChunk* chunk)
 {
    boost::shared_ptr<Query> query = Query::getQueryByID(_queryId);
-   if (query->getNodeID() != stream) {
+   if (query->getInstanceID() != stream) {
        if (!_hasPositions[attId][stream]) {
            requestNextChunk(stream, attId, chunk == NULL);
        }
@@ -278,7 +278,7 @@ bool RemoteMergedArray::fetchChunk(size_t stream, AttributeID attId, MemChunk* c
        _hasPositions[attId][stream] = true;
        return proceedChunkMsg(stream, attId, chunk);
    } else {
-       // We get chunk body from the current result array on local node
+       // We get chunk body from the current result array on local instance
        bool result = false;
        if (chunk) {
            if (!_localArray->getConstIterator(attId)->end()) {

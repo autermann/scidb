@@ -57,12 +57,12 @@ class PhysicalCross: public  PhysicalOperator{
 		assert(inputArrays.size() == 2);
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
-        if ( query->getNodesCount() > 1) { 
+        if ( query->getInstancesCount() > 1) { 
 #ifdef CENTRALIZED_CROSS
-            uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getNodeID() : query->getCoordinatorID();
-            left = redistribute(left, query, psLocalNode, "", coordinatorID);
-            right = redistribute(right, query, psLocalNode, "", coordinatorID);
-            if (query->getNodeID() != coordinatorID) { 
+            uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getInstanceID() : query->getCoordinatorID();
+            left = redistribute(left, query, psLocalInstance, "", coordinatorID);
+            right = redistribute(right, query, psLocalInstance, "", coordinatorID);
+            if (query->getInstanceID() != coordinatorID) { 
                 return boost::shared_ptr<Array>(new MemArray(_schema));
             }
 #else

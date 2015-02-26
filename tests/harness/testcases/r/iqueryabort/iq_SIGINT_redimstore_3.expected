@@ -1,9 +1,13 @@
+SCIDB QUERY : <create empty array ABR1 <a:float,b:float>[x=0:3000,3,0]>
 Query was executed successfully
 
+SCIDB QUERY : <create empty array ABR2 <a:float>[x=0:3000,3,0]>
 Query was executed successfully
 
+SCIDB QUERY : <create empty array ABR3 <b:float>[a(float)=4000,1,0]>
 Query was executed successfully
 
+SCIDB QUERY : <store(join(build_sparse(ABR2, x+1.321 ,1),build_sparse(ABR2, x+1.123, 1)),ABR1)>
 [{0}(1.321,1.123),{1}(2.321,2.123),{2}(3.321,3.123)];
 [{3}(4.321,4.123),{4}(5.321,5.123),{5}(6.321,6.123)];
 [{6}(7.321,7.123),{7}(8.321,8.123),{8}(9.321,9.123)];
@@ -1007,14 +1011,17 @@ Query was executed successfully
 [{3000}(3001.32,3001.12)]
 
 "issuing redim"
+SCIDB QUERY : <../utils/killquery.sh -afl 2 2 'redimension_store(ABR1, ABR3)'>
 Attempting  to kill (-2) iquery command after 2 seconds...
 
 SUCCESS: kill returned code: 0
 
 "should be empty..."
+SCIDB QUERY : <scan(ABR3)>
 []
 
 "should be no mapping arrays..."
+SCIDB QUERY : <list('arrays')>
 [("ABR1"),("ABR2"),("ABR3")]
 
 Query was executed successfully

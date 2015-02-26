@@ -198,8 +198,9 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			{
 				bfs::remove (queryoutput_file);
 				_errStream << "Error while opening of the file " << queryoutput_file;
-				if(queryResult.queryID && _dbconnection)
+				if(queryResult.queryID && _dbconnection) {
 					_scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                                }
 				throw SystemError (FILE_LINE_FUNCTION, _errStream.str ());
 			}
 
@@ -216,8 +217,9 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			{
 				bfs::remove (queryoutput_file);
 				_errStream << "Error while opening of the file " << queryoutput_file;
-				if(queryResult.queryID && _dbconnection)
+				if(queryResult.queryID && _dbconnection) {
 					_scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                                }
 				throw SystemError (FILE_LINE_FUNCTION, _errStream.str ());
 			}
 
@@ -242,9 +244,9 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
             _resultfileStream << endl;
         }
 
-		if(queryResult.queryID && _dbconnection)
-			_scidb.cancelQuery(queryResult.queryID, _dbconnection);
-	
+        if(queryResult.queryID && _dbconnection) {
+            _scidb.completeQuery(queryResult.queryID, _dbconnection);
+	}
 		/* appending the output stored in the file ".out.queryoutput" to the ".out" file */
 		int fd = Open (queryoutput_file.c_str(), O_RDONLY);
 
@@ -297,19 +299,20 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		{
 			_resultfileStream << "[An error expected at this place for the query \"" << queryString << "\".";
 			_resultfileStream << " And it failed with";
-			if (errorInfo->_expected_errorcode != "")
-			    _resultfileStream << " error code = " << e.getStringifiedErrorId();
-            if (errorInfo->_expected_errorcode2 != "")
-                _resultfileStream << " error code2 = " << e.getErrorId();
-            if (errorInfo->_expected_errns != "")
-                _resultfileStream << " error namespace = " << e.getErrorsNamespace();
-            if (errorInfo->_expected_errshort != int32_t(~0))
-                _resultfileStream << " short code = " << e.getShortErrorCode();
-            if (errorInfo->_expected_errlong != int32_t(~0))
-                _resultfileStream << " long code = " << e.getLongErrorCode();
+			_resultfileStream << " error code = " << e.getStringifiedErrorId();
+			if (errorInfo->_expected_errorcode2 != "")
+				_resultfileStream << " error code2 = " << e.getErrorId();
+			if (errorInfo->_expected_errns != "")
+				_resultfileStream << " error namespace = " << e.getErrorsNamespace();
+			if (errorInfo->_expected_errshort != int32_t(~0))
+				_resultfileStream << " short code = " << e.getShortErrorCode();
+			if (errorInfo->_expected_errlong != int32_t(~0))
+				_resultfileStream << " long code = " << e.getLongErrorCode();
 			_resultfileStream << ".";
 
-			_resultfileStream << " Expected";
+			if (errorInfo->_expected_errorcode != "" || errorInfo->_expected_errorcode2 != "" || errorInfo->_expected_errns != "" || errorInfo->_expected_errshort != int32_t(~0) || errorInfo->_expected_errlong != int32_t(~0))
+				_resultfileStream << " Expected";
+
             stringstream expectedTmp;
 			if (errorInfo->_expected_errorcode != "")
 			    expectedTmp << " error code = " << errorInfo->_expected_errorcode;
@@ -321,7 +324,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
                 expectedTmp << " short code = " <<  errorInfo->_expected_errshort;
             if (errorInfo->_expected_errlong != int32_t(~0))
                 expectedTmp << " long code = " <<  errorInfo->_expected_errlong;
-			_resultfileStream << expectedTmp.str() << ".]" << endl << endl;
+            _resultfileStream << expectedTmp.str() << ".]" << endl << endl;
 
 			/* compare actual and expected error codes */
 			if (
@@ -335,14 +338,18 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 				LOG4CXX_INFO (_logger, "Actual Error code (" << e.getErrorId() << " aka "
 				    << e.getStringifiedErrorId() << ") does not match with the Expected Error code ("
 				    << expectedTmp.str() << "). Hence this is a test case failure...");
-				if(queryResult.queryID && _dbconnection)
+				if(queryResult.queryID && _dbconnection) {
 				    _scidb.cancelQuery(queryResult.queryID, _dbconnection);
-				throw ExecutorError (FILE_LINE_FUNCTION, "SciDB query execution failed");
+                                }
+//				throw ExecutorError (FILE_LINE_FUNCTION, "SciDB query execution failed");
+				return SUCCESS;
+// We should now return SUCCESS because we dont want the test to throw EXECUTOR_ERROR if query returns an exception. Instead it will show FILES_DIFFER automatically when it compares the actual and expected output files.
 			}
 
 			LOG4CXX_INFO (_logger, "This was an expected Exception. Hence continuing...");
-			if(queryResult.queryID && _dbconnection)
-				_scidb.cancelQuery(queryResult.queryID, _dbconnection);
+			if(queryResult.queryID && _dbconnection) {
+                            _scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                        }
 			return SUCCESS;
 		}
 
@@ -350,14 +357,15 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		{
 			_resultfileStream << "[SciDB query execution failed. But continuing, as it was intended to just run.]";
 			_resultfileStream << endl << endl;
-			if(queryResult.queryID && _dbconnection)
-				_scidb.cancelQuery(queryResult.queryID, _dbconnection);
+			if(queryResult.queryID && _dbconnection) {
+                            _scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                        }
 			return SUCCESS;
 		}
 
-		if(queryResult.queryID && _dbconnection)
-			_scidb.cancelQuery(queryResult.queryID, _dbconnection);
-
+		if(queryResult.queryID && _dbconnection) {
+                    _scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                }
 		/* for all other queries not mentioned under --error */
 		throw ExecutorError (FILE_LINE_FUNCTION, "SciDB query execution failed");
 	}
@@ -456,11 +464,24 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 	if (sco->_store == true)
 		LOG4CXX_INFO (_logger, "Storing the output in the .out file.");
 
+	if (_queryLogging == true || _ie.log_queries == true)
+	{
+		/* store in the file specified in the --out option */
+		if (sco->_outputFile.length ())
+			_outputfileStream << "SCIDB QUERY : <" <<sco->_command << ">" << "\n";
+
+		/* store in the .out file along with the results of different SciDB queries */
+		if (sco->_store == true)
+			_resultfileStream << "SCIDB QUERY : <" <<sco->_command << ">" << "\n";
+	}
+
+	bool no_output = true;
 	int rbytes, exit_code=FAILURE;
 	char buf[BUFSIZ];
 	FILE *pipe = 0;
 	while ((rbytes = ReadOutputOf (sco->_command, &pipe, buf, sizeof (buf), &exit_code)) > 0)
 	{
+		no_output = false;
 		buf[rbytes] = 0;
 
 		/* store in the file specified in the --out option */
@@ -474,6 +495,17 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 		/* if none of --out, --store is given then log the output to .log file */
 		if (sco->_outputFile.length() == 0 && sco->_store == false)
 			LOG4CXX_INFO (_logger, buf);
+	}
+
+	if (no_output) // add newline incase of no output
+	{
+		 /* store in the file specified in the --out option */
+                if (sco->_outputFile.length ())
+                        _outputfileStream << "\n";
+
+                /* store in the .out file along with the results of different SciDB queries */
+                if (sco->_store == true)
+                        _resultfileStream << "\n";
 	}
 
 	_outputfileStream.close ();
@@ -1441,13 +1473,8 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
 
 		int aql_given = 0;
 		int afl_given = 0;
-		bool code_given = false;
-		if (!vm.empty ())
+        if (!vm.empty ())
 		{
-            if (vm.count("code") || vm.count("shortid") || vm.count("namespace") || vm.count("short")
-                || vm.count("long"))
-                code_given = true;
-
 		    if (vm.count("code"))
 				eco->_expected_errorcode = vm["code"].as<string>();
 
@@ -1485,8 +1512,9 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
 			}
 		}
 
-		if (!code_given)
-			throw (string ("Please specify expected error code for --error command."));
+//		if (!code_given)
+//			throw (string ("Please specify expected error code for --error command."));
+// The above two lines are commented so that it is no longer necessary to specify the expected error code.
 
 		if (eco->_query.empty())
 			throw (string ("Please specify scidb query to be executed."));

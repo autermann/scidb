@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>count</refname>
+    <refpurpose>Count nonempty elements aggregate</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis>AQL% <command>SELECT</command> count(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;
+
+AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...)</optional></synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The count aggregate counts nonempty elements of an array&apos;s attributes. count(attr1), only counts the cells that have values that are NOT NULL. count(*), counts all of the cells present (both NULL and NOT NULL).</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example finds the number of nonempty cells in a 3<symbol role="symbolfont">&times;</symbol>3 matrix.</para>
+      <procedure>
+        <step>
+          <para>Create a matrix m3x3:<programlisting>CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Put values 1 along the diagonal of m3x3 and leave the remaining cells empty:<programlisting>store(build_sparse(m3x3,i=j,1),m3x3);</programlisting></para>
+        </step>
+        <step>
+          <para>Find the number of nonempty cells in the array:<programlisting>aggregate(m3x3,count(val));</programlisting>This query returns:<screen>[(6)]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

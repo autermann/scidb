@@ -40,6 +40,7 @@
 #include "query/Query.h"
 #include "smgr/io/Storage.h"
 #include "system/Resources.h"
+#include <util/Thread.h>
 
 using namespace std;
 using namespace boost;
@@ -50,34 +51,41 @@ namespace scidb
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.network"));
 
 MessageHandleJob::MessageHandleJob(const boost::shared_ptr<MessageDesc>& messageDesc)
-  : Job(boost::shared_ptr<Query>()), _messageDesc(messageDesc),
-    networkManager(*NetworkManager::getInstance()), sourceId(INVALID_NODE), _mustValidateQuery(true)
+: Job(boost::shared_ptr<Query>()), _messageDesc(messageDesc),
+    networkManager(*NetworkManager::getInstance()), sourceId(INVALID_INSTANCE), _mustValidateQuery(true)
 {
-   LOG4CXX_TRACE(logger, "Creating a new job for message of type=" << _messageDesc->getMessageType()
-                 << " from node=" << _messageDesc->getSourceNodeID()
-                 << " for queryID=" << _messageDesc->getQueryID());
+    LOG4CXX_TRACE(logger, "Creating a new job for message of type=" << _messageDesc->getMessageType()
+                  << " from instance=" << _messageDesc->getSourceInstanceID()
+                  << " for queryID=" << _messageDesc->getQueryID());
    
     const QueryID queryID = _messageDesc->getQueryID();
     if (queryID != 0) {
-       bool createIfNotFound = (_messageDesc->getMessageType() == mtPreparePhysicalPlan);
-       _query = Query::getQueryByID(queryID,createIfNotFound);                              
-
+        _query = Query::getQueryByID(queryID, _messageDesc->getMessageType() == mtPreparePhysicalPlan);                              
     } else {
         LOG4CXX_TRACE(logger, "Creating fake query: type=" << _messageDesc->getMessageType()
-                      << ", for message from node=" << _messageDesc->getSourceNodeID());
+                      << ", for message from instance=" << _messageDesc->getSourceInstanceID());
        // create a fake query for the recovery mode
-       boost::shared_ptr<const scidb::NodeLiveness> myLiveness =
-       Cluster::getInstance()->getNodeLiveness();
+       boost::shared_ptr<const scidb::InstanceLiveness> myLiveness =
+       Cluster::getInstance()->getInstanceLiveness();
        assert(myLiveness);
        _query = Query::createDetached();
-       _query->init(0, COORDINATOR_NODE,
-                    Cluster::getInstance()->getLocalNodeId(),
+       _query->init(0, COORDINATOR_INSTANCE,
+                    Cluster::getInstance()->getLocalInstanceId(),
                     myLiveness);
+    }
+    if (_messageDesc->getMessageType() == mtChunkReplica) {
+        NetworkManager::getInstance()->registerMessage(messageDesc, NetworkManager::mqtReplication);
     }
 }
 
 MessageHandleJob::~MessageHandleJob()
 {
+    boost::shared_ptr<MessageDesc> msgDesc(_messageDesc);
+    _messageDesc.reset();
+    assert(msgDesc);
+    if (msgDesc->getMessageType() == mtChunkReplica) {
+        NetworkManager::getInstance()->unregisterMessage(msgDesc, NetworkManager::mqtReplication);
+    }
 }
 
 void MessageHandleJob::handleInvalidMessage()
@@ -142,8 +150,24 @@ MessageHandleJob::MsgHandler MessageHandleJob::_msgHandlers[scidb::mtSystemMax] 
     &MessageHandleJob::handleAbortQuery,
     // mtCommit
     &MessageHandleJob::handleCommitQuery,
+    // mtCompleteQuery
+    &MessageHandleJob::handleInvalidMessage,
     // mtSystemMax // must be last
 };
+
+boost::shared_ptr<WorkQueue>  MessageHandleJob::_replicationQueue;
+boost::shared_ptr<WorkQueue> MessageHandleJob::getReplicationQueue()
+{
+    // synchronization is needed if multi-threaded
+    // so far only dispatch is calling it from NetworkManager
+    if (!_replicationQueue) {
+        uint64_t size = Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE);
+        assert(size>0);
+        size *= 2; // double the size to accomodate overflow due to possibly delayed back pressure
+        _replicationQueue = NetworkManager::getInstance()->createWorkQueue(1, size);
+    }
+    return _replicationQueue;
+}
 
 void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
 {
@@ -152,29 +176,55 @@ void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
 
     const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
     const QueryID queryID = _messageDesc->getQueryID();
+    const InstanceID instanceId = _messageDesc->getSourceInstanceID();
 
     LOG4CXX_TRACE(logger, "Dispatching message of type=" << messageType
                   << ", for queryID=" << queryID
-                  << ", from nodeID=" << _messageDesc->getSourceNodeID());
+                  << ", from instanceID=" << instanceId);
 
     switch (messageType)
     {
+
     case mtChunkReplica:
     {
-        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
         _query->chunkReplicasReqs[sourceId].increment();
+    } // fall through
+    case mtReplicaSyncRequest:
+    {
+        boost::shared_ptr<WorkQueue> q = getReplicationQueue();
+        if (logger->isTraceEnabled() && q) {
+            const uint64_t available = NetworkManager::getInstance()->getAvailable(NetworkManager::mqtReplication);
+            if (available < q->size()) {
+                LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: Replication queue size="<<q->size()
+                              << ", available="<< NetworkManager::getInstance()->getAvailable(NetworkManager::mqtReplication));
+            }
+        }
+        enqueue(q);
+        return;
     }
     break;
     case mtChunk:
     case mtAggregateChunk:
     {
-        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
         _query->chunkReqs[sourceId].increment();
+        boost::shared_ptr<WorkQueue> q = _query->getSGQueue();
+        if (logger->isTraceEnabled() && q) {
+            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: SG queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
+        enqueue(q);
+        return;
     }
     break;
     case mtMPISend:
     {
         boost::shared_ptr<WorkQueue> q = _query->getMpiReceiveQueue();
+        if (logger->isTraceEnabled() && q) { 
+            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: MPISend queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
         enqueue(q);
         return;
     }
@@ -191,6 +241,10 @@ void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
     {
         _mustValidateQuery = false;
         boost::shared_ptr<WorkQueue> q = _query->getErrorQueue();
+        if (logger->isTraceEnabled() && q) {
+            LOG4CXX_TRACE(logger, "Error queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
         enqueue(q);
         return;
     }
@@ -199,9 +253,6 @@ void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
     };
 
     jobQueue->pushJob(shared_from_this());
-    LOG4CXX_TRACE(logger, "Dispatched message of type=" << messageType
-                  << ", for queryID=" << queryID
-                  << ", from nodeID=" << _messageDesc->getSourceNodeID());
     return;
 }
 
@@ -211,7 +262,7 @@ void MessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
     {
         LOG4CXX_TRACE(logger, "Dropping message of type=" <<  _messageDesc->getMessageType()
                       << ", for queryID=" << _messageDesc->getQueryID()
-                      << ", from nodeID=" << _messageDesc->getSourceNodeID()
+                      << ", from instanceID=" << _messageDesc->getSourceInstanceID()
                       << " because the query appears deallocated");
         return;
     }
@@ -219,17 +270,30 @@ void MessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
     try {
         q->enqueue(item);
     } catch (const WorkQueue::OverflowException& e) {
-        LOG4CXX_ERROR(logger, "Overflow exception from the query error message queue: "<<e.what());
+        LOG4CXX_ERROR(logger, "Overflow exception from the message queue (" << q.get()
+                      <<"): "<<e.what());
         // XXX TODO: deal with this exception
         assert(false);
+        throw;
     }
 }
 
+ static void destroyFakeQuery(Query* q)
+ {
+     if (q!=NULL && q->getQueryID() == 0) {
+         try {
+             q->handleAbort();
+         } catch (scidb::Exception&) { }
+     }
+ }
+
 void MessageHandleJob::run()
 {
-    assert(_query);
     assert(_messageDesc);
     assert(_messageDesc->getMessageType() < mtSystemMax);
+    boost::function<void()> func = boost::bind(&destroyFakeQuery, _query.get());
+    Destructor fqd(func);
+
     const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
     LOG4CXX_TRACE(logger, "Starting message handling: type=" << messageType
                   << ", queryID=" << _messageDesc->getQueryID());
@@ -261,25 +325,27 @@ void MessageHandleJob::run()
 
        assert(messageType != mtCancelQuery);
 
-       if (messageType != mtError && messageType != mtAbort)
+       LOG4CXX_ERROR(logger, "Error occurred in message handler: "
+                     << e.what()
+                     << ", messageType = " << messageType
+                     << ", sourceInstance = " << _messageDesc->getSourceInstanceID()
+                     << ", queryID="<<_messageDesc->getQueryID());
+       
+       if (messageType != mtError && messageType != mtAbort && _query->getPhysicalCoordinatorID() != COORDINATOR_INSTANCE) 
        {
-          boost::shared_ptr<MessageDesc> errorMessage =
-              makeErrorMessageFromException(e, _messageDesc->getQueryID());
-          networkManager.broadcast(errorMessage); //_query may not have the node map, so broadcast to all
-          LOG4CXX_DEBUG(logger, "Broadcasted error:" << e.what());
+           boost::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, _messageDesc->getQueryID()); 
+           NetworkManager::getInstance()->sendMessage(_query->getPhysicalCoordinatorID(), errorMessage);
        }
-       if (_query)
-       {
-          LOG4CXX_ERROR(logger, "Error occurred in message handler: "
-                        << e.what()
-                        << ", messageType = " << messageType
-                        << ", queryID="<<_messageDesc->getQueryID());
-
-          if (messageType == mtExecutePhysicalPlan) {
-              _query->done(e.copy());
+       if (_query) {
+          if (messageType == mtExecutePhysicalPlan || messageType == mtPreparePhysicalPlan) {
+              LOG4CXX_DEBUG(logger, "Execution of query " << _messageDesc->getQueryID() << " is aborted on worker");
+             _query->done(e.copy());
           } else {
+              LOG4CXX_DEBUG(logger, "Handle error for query " << _messageDesc->getQueryID());
               _query->handleError(e.copy());
           }
+       } else { 
+           LOG4CXX_DEBUG(logger, "Query " << _messageDesc->getQueryID() << " is already destructed");           
        }
        if (e.getShortErrorCode() == SCIDB_SE_THREAD)
        {
@@ -296,7 +362,7 @@ void MessageHandleJob::handlePreparePhysicalPlan()
     LOG4CXX_DEBUG(logger, "Preparing physical plan: queryID="
                   << _messageDesc->getQueryID() << ", physicalPlan='" << physicalPlan << "'");
 
-    boost::shared_ptr<NodeLiveness> coordinatorLiveness;
+    boost::shared_ptr<InstanceLiveness> coordinatorLiveness;
     bool rc = parseQueryLiveness(coordinatorLiveness, ppMsg);
     if (!rc) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_LIVENESS);
@@ -304,19 +370,19 @@ void MessageHandleJob::handlePreparePhysicalPlan()
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
-    boost::shared_ptr<const scidb::NodeLiveness> myLiveness =
-        Cluster::getInstance()->getNodeLiveness();
+    boost::shared_ptr<const scidb::InstanceLiveness> myLiveness =
+        Cluster::getInstance()->getInstanceLiveness();
     assert(myLiveness);
 
     if (myLiveness->isEqual(*coordinatorLiveness)) {
        _query->init(_messageDesc->getQueryID(),
-                    _messageDesc->getSourceNodeID(),
-                    Cluster::getInstance()->getLocalNodeId(),
+                    _messageDesc->getSourceInstanceID(),
+                    Cluster::getInstance()->getLocalInstanceId(),
                     myLiveness);
     } else {
        _query->init(_messageDesc->getQueryID(),
-                    _messageDesc->getSourceNodeID(),
-                    Cluster::getInstance()->getLocalNodeId(),
+                    _messageDesc->getSourceInstanceID(),
+                    Cluster::getInstance()->getLocalInstanceId(),
                     coordinatorLiveness);
        throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_LIVENESS_MISMATCH);
     }
@@ -328,7 +394,7 @@ void MessageHandleJob::handlePreparePhysicalPlan()
 
     boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtNotify);
     messageDesc->setQueryID(_messageDesc->getQueryID());
-    networkManager.sendMessage(_messageDesc->getSourceNodeID(), messageDesc);
+    networkManager.sendMessage(_messageDesc->getSourceInstanceID(), messageDesc);
     LOG4CXX_DEBUG(logger, "Coordinator is notified about ready for physical plan running")
 }
 
@@ -351,8 +417,8 @@ void MessageHandleJob::handleExecutePhysicalPlan()
       // Creating message with result for sending to client
       boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtQueryResult);
       resultMessage->setQueryID(_query->getQueryID());
-      networkManager.sendMessage(_messageDesc->getSourceNodeID(), resultMessage);
-      LOG4CXX_DEBUG(logger, "Result was sent to node #" << _messageDesc->getSourceNodeID());
+      networkManager.sendMessage(_messageDesc->getSourceInstanceID(), resultMessage);
+      LOG4CXX_DEBUG(logger, "Result was sent to instance #" << _messageDesc->getSourceInstanceID());
    }
    catch (const scidb::Exception& e)
    {
@@ -367,7 +433,7 @@ void MessageHandleJob::handleQueryResult()
 {
     const string arrayName = _messageDesc->getRecord<scidb_msg::QueryResult>()->array_name();
 
-    LOG4CXX_DEBUG(logger, "Received query result from node#" << _messageDesc->getSourceNodeID()
+    LOG4CXX_DEBUG(logger, "Received query result from instance#" << _messageDesc->getSourceInstanceID()
                   << ", queryID=" << _messageDesc->getQueryID() << ", arrayName=" << arrayName)
 
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
@@ -450,12 +516,12 @@ void MessageHandleJob::handleAggregateChunk()
 
 void MessageHandleJob::sgSync()
 {
-    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
     if (_query->chunkReqs[sourceId].decrement()) {
         boost::shared_ptr<MessageDesc> syncMsg = boost::make_shared<MessageDesc>(mtSyncResponse);
         syncMsg->setQueryID(_messageDesc->getQueryID());
-        networkManager.sendMessage(_messageDesc->getSourceNodeID(), syncMsg);
-        LOG4CXX_TRACE(logger, "Sync confirmation was sent to node #" << _messageDesc->getSourceNodeID());
+        networkManager.sendMessage(_messageDesc->getSourceInstanceID(), syncMsg);
+        LOG4CXX_TRACE(logger, "Sync confirmation was sent to instance #" << _messageDesc->getSourceInstanceID());
     }
 }
 
@@ -515,7 +581,7 @@ void MessageHandleJob::handleChunk()
                     for (size_t j = 0; j < decompressedSize; j++) {
                         dst[j] |= src[j];
                     }
-                }
+                } 
                 outChunk->write(_query);
             } else {
                 MemChunk tmpChunk;
@@ -582,16 +648,9 @@ void MessageHandleJob::handleChunk()
             outChunk->setCount(count);
             outChunk->write(_query);
         }
-        Coordinates const& first = outChunk->getFirstPosition(false);
-        Coordinates const& last = outChunk->getLastPosition(false);
-        for (size_t i = 0, n = _query->lowBoundary.size(); i < n; i++) {
-            if (first[i] < _query->lowBoundary[i]) {
-                _query->lowBoundary[i] = first[i];
-            }
-            if (last[i] > _query->highBoundary[i]) {
-                _query->highBoundary[i] = last[i];
-            }
-        }
+        checkChunkMagic(*outChunk);
+
+        checkChunkMagic(*outChunk);
         sgSync();
 
         LOG4CXX_TRACE(logger, "Chunk was stored")
@@ -606,11 +665,11 @@ void MessageHandleJob::handleChunk()
 
 void MessageHandleJob::handleReplicaSyncRequest()
 {
-    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
     if (_query->chunkReplicasReqs[sourceId].test()) {
         boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtReplicaSyncResponse);
         resultMessage->setQueryID(_query->getQueryID());
-        networkManager.sendMessage(_messageDesc->getSourceNodeID(), resultMessage);
+        networkManager.sendMessage(_messageDesc->getSourceInstanceID(), resultMessage);
     }
 }
 
@@ -631,31 +690,33 @@ void MessageHandleJob::handleChunkReplica()
     assert(_query);
     RWLock::ErrorChecker noopEc;
     ScopedRWLockRead shared(_query->queryLock, noopEc);
-    DBArray outputArray(chunkRecord->array_id(), _query);
-    boost::shared_ptr<ArrayIterator> outputIter = outputArray.getIterator(attributeID);
-
     Coordinates coordinates;
     for (int i = 0; i < chunkRecord->coordinates_size(); i++) {
         coordinates.push_back(chunkRecord->coordinates(i));
     }
-    boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(_messageDesc->getBinary());
-    compressedBuffer->setCompressionMethod(compMethod);
-    compressedBuffer->setDecompressedSize(decompressedSize);
-    Chunk& outChunk = outputIter->newChunk(coordinates, compMethod);
-    outChunk.setSparse(chunkRecord->sparse());
-    outChunk.setRLE(chunkRecord->rle());
-    outChunk.decompress(*compressedBuffer); // TODO: it's better avoid decompression. It can be written compressed
-    outChunk.setCount(count);
-    outChunk.write(_query);
-
+    if (decompressedSize == 0) { // clone of replica
+        StorageManager::getInstance().cloneChunk(coordinates, attributeID, chunkRecord->cloned_array_id(), chunkRecord->array_id());
+    } else { 
+        DBArray outputArray(chunkRecord->array_id(), _query);
+        boost::shared_ptr<ArrayIterator> outputIter = outputArray.getIterator(attributeID);
+        boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(_messageDesc->getBinary());
+        compressedBuffer->setCompressionMethod(compMethod);
+        compressedBuffer->setDecompressedSize(decompressedSize);
+        Chunk& outChunk = outputIter->newChunk(coordinates, compMethod);
+        outChunk.setSparse(chunkRecord->sparse());
+        outChunk.setRLE(chunkRecord->rle());
+        outChunk.decompress(*compressedBuffer); // TODO: it's better avoid decompression. It can be written compressed
+        outChunk.setCount(count);
+        outChunk.write(_query);
+    }
     if (static_cast<MessageType>(_messageDesc->getMessageType()) != mtChunkReplica) {
        return;
     }
-    assert(sourceId != INVALID_NODE);
+    assert(sourceId != INVALID_INSTANCE);
     if (_query->chunkReplicasReqs[sourceId].decrement()) {
-       boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtReplicaSyncResponse);
-       resultMessage->setQueryID(_query->getQueryID());
-       networkManager.sendMessage(_messageDesc->getSourceNodeID(), resultMessage);
+        boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtReplicaSyncResponse);
+        resultMessage->setQueryID(_query->getQueryID());
+        networkManager.sendMessage(_messageDesc->getSourceInstanceID(), resultMessage);
     }
 }
 
@@ -665,7 +726,7 @@ void MessageHandleJob::handleRemoteChunk()
     const uint32_t objType = chunkRecord->obj_type();
     assert(_query);
 
-    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
 
     // Network statistics will be updated in remote or merge arrays
     switch(objType)
@@ -785,7 +846,7 @@ void MessageHandleJob::handleFetchChunk()
         LOG4CXX_TRACE(logger, "Prepared message with information that there are no unread chunks")
     }
 
-    networkManager.sendMessage(_messageDesc->getSourceNodeID(), chunkMsg);
+    networkManager.sendMessage(_messageDesc->getSourceInstanceID(), chunkMsg);
 
     LOG4CXX_TRACE(logger, "Remote chunk was sent to client")
 }
@@ -796,13 +857,13 @@ void MessageHandleJob::handleSyncRequest()
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
-    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
     
     if (_query->chunkReqs[sourceId].test()) {
         boost::shared_ptr<MessageDesc> syncMsg = boost::make_shared<MessageDesc>(mtSyncResponse);
         syncMsg->setQueryID(_messageDesc->getQueryID());
-        networkManager.sendMessage(_messageDesc->getSourceNodeID(), syncMsg);
-        LOG4CXX_TRACE(logger, "Sync confirmation was sent to node #" << _messageDesc->getSourceNodeID());
+        networkManager.sendMessage(_messageDesc->getSourceInstanceID(), syncMsg);
+        LOG4CXX_TRACE(logger, "Sync confirmation was sent to instance #" << _messageDesc->getSourceInstanceID());
     }
 }
 
@@ -828,7 +889,6 @@ void MessageHandleJob::handleSyncResponse()
     _query->syncSG.release();
 }
 
-
 void MessageHandleJob::handleError()
 {
     boost::shared_ptr<scidb_msg::Error> errorRecord = _messageDesc->getRecord<scidb_msg::Error>();
@@ -838,28 +898,29 @@ void MessageHandleJob::handleError()
     currentStatistics->receivedMessages++;
 
     LOG4CXX_ERROR(logger, "Error on processing query " << _messageDesc->getQueryID()
-                  << " on node " << _messageDesc->getSourceNodeID()
+                  << " on instance " << _messageDesc->getSourceInstanceID()
                   << ". Message: " << errorText);
 
     assert(_query->getQueryID() == _messageDesc->getQueryID());
 
     shared_ptr<Exception> e = makeExceptionFromErrorMessage(_messageDesc);
-    bool isAbort = false; 
+    bool isAbort = false;
     if (errorCode == SCIDB_LE_QUERY_NOT_FOUND || errorCode == SCIDB_LE_QUERY_NOT_FOUND2)
     {
-        if (_query->getPhysicalCoordinatorID() == _messageDesc->getSourceNodeID()) {
+        if (_query->getPhysicalCoordinatorID() == _messageDesc->getSourceInstanceID()) {
             // The coordinator does not know about this query, we will also abort the query
             isAbort = true;
         }
         else
         {
-            // A remote node did not find the query, it must be out of sync (because of restart?).
+            // A remote instance did not find the query, it must be out of sync (because of restart?).
             e = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_NO_QUORUM);
         }
     }
-    _query->handleError(e);
     if (isAbort) {
-        handleAbortQuery();
+        _query->handleAbort();
+    } else {
+        _query->handleError(e);
     }
 }
 
@@ -868,8 +929,8 @@ void MessageHandleJob::handleAbortQuery()
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
-    if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceNodeID()
-        || _query->getCoordinatorID() == COORDINATOR_NODE) {
+    if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceInstanceID()
+        || _query->getCoordinatorID() == COORDINATOR_INSTANCE) {
         shared_ptr<Exception> e = (SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK,
                                                          SCIDB_LE_UNKNOWN_MESSAGE_TYPE)
                                    << mtAbort);
@@ -883,8 +944,8 @@ void MessageHandleJob::handleCommitQuery()
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
-    if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceNodeID()
-        || _query->getCoordinatorID() == COORDINATOR_NODE) {
+    if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceInstanceID()
+        || _query->getCoordinatorID() == COORDINATOR_INSTANCE) {
         shared_ptr<Exception> e = (SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK,
                                                          SCIDB_LE_UNKNOWN_MESSAGE_TYPE)
                                    << mtCommit);
@@ -898,10 +959,10 @@ void MessageHandleJob::handleNotify()
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
     LOG4CXX_DEBUG(logger, "Notify on processing query "
-                  << _messageDesc->getQueryID() << " from node "
-                  << _messageDesc->getSourceNodeID())
+                  << _messageDesc->getQueryID() << " from instance "
+                  << _messageDesc->getSourceInstanceID())
 
-    assert(_query->getCoordinatorID() == COORDINATOR_NODE);
+    assert(_query->getCoordinatorID() == COORDINATOR_INSTANCE);
 
     _query->results.release();
 }
@@ -913,7 +974,7 @@ void MessageHandleJob::handleWait()
     currentStatistics->receivedMessages++;
     LOG4CXX_DEBUG(logger, "Wait on processing query " << _messageDesc->getQueryID())
 
-    assert(_query->getCoordinatorID() != COORDINATOR_NODE);
+    assert(_query->getCoordinatorID() != COORDINATOR_INSTANCE);
 
     _query->results.release();
 }
@@ -925,7 +986,7 @@ void MessageHandleJob::handleMPISend()
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
     assert(_query);
-    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceNodeID());
+    sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
     {
         ScopedMutexLock mutexLock(_query->_receiveMutex);
         _query->_receiveMessages[sourceId].push_back(_messageDesc);

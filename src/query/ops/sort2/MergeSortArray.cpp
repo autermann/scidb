@@ -33,15 +33,15 @@ namespace scidb
 {
     using namespace std;
 
-inline size_t getArrayLength(DimensionDesc const& dim, size_t nodeId, size_t nNodes)
+inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t nInstances)
     {
         if (dim.getLength() == 0) {
             return 0;
         }
-        uint64_t length = dim.getLength() / (dim.getChunkInterval()*nNodes) * dim.getChunkInterval();
-        uint64_t rest = dim.getLength() % (dim.getChunkInterval()*nNodes);
-        if (rest >= dim.getChunkInterval() * nodeId) {
-            rest -= dim.getChunkInterval() * nodeId;
+        uint64_t length = dim.getLength() / (dim.getChunkInterval()*nInstances) * dim.getChunkInterval();
+        uint64_t rest = dim.getLength() % (dim.getChunkInterval()*nInstances);
+        if (rest >= dim.getChunkInterval() * instanceId) {
+            rest -= dim.getChunkInterval() * instanceId;
             if (rest > dim.getChunkInterval()) {
                 rest = dim.getChunkInterval();
             }
@@ -111,13 +111,13 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t nodeId, size_t nNo
         for (size_t i = 0; i < nAttrs; i++) {
            attributes[i].iterator = boost::shared_ptr<MergeSortArrayIterator>(new MergeSortArrayIterator(*this, i));
         }
-        size_t nNodes = query->getNodesCount();
+        size_t nInstances = query->getInstancesCount();
         for (size_t i = 0, n = streams.size(); i < n; i++) {
             streams[i].inputArrayIterators.resize(nAttrs);
             streams[i].inputChunkIterators.resize(nAttrs);
             streams[i].tuple.resize(nAttrs);
             streams[i].endOfStream = true;
-            streams[i].size = isLocal ? (size_t)-1 : getArrayLength(array.getDimensions()[0], i, nNodes);
+            streams[i].size = isLocal ? (size_t)-1 : getArrayLength(array.getDimensions()[0], i, nInstances);
             if (streams[i].size > 0) {
                 for (size_t j = 0; j < nAttrs; j++) {
                     streams[i].inputArrayIterators[j] = inputArrays[i]->getConstIterator(j);

@@ -56,7 +56,7 @@ public:
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psLocalNode);
+        return ArrayDistribution(psLocalInstance);
     }
 
 	/***
@@ -69,15 +69,15 @@ public:
 		assert(_parameters.size() == 0);
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
-        if ( query->getNodesCount() > 1) { 
-            uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getNodeID() : query->getCoordinatorID();
-            left = redistribute(left, query, psLocalNode, "", coordinatorID);
-            right = redistribute(right, query, psLocalNode, "", coordinatorID);
-            if ( query->getNodeID() != coordinatorID) { 
+        if ( query->getInstancesCount() > 1) { 
+            uint64_t coordinatorID = query->getCoordinatorID() == COORDINATOR_INSTANCE ?  query->getInstanceID() : query->getCoordinatorID();
+            left = redistribute(left, query, psLocalInstance, "", coordinatorID);
+            right = redistribute(right, query, psLocalInstance, "", coordinatorID);
+            if ( query->getInstanceID() != coordinatorID) { 
                 return boost::shared_ptr<Array>(new MemArray(_schema));
             }
         }
-		return boost::shared_ptr<Array>(new LookupArray(_schema, left, right));
+		return boost::shared_ptr<Array>(new LookupArray(_schema, left, right, query));
 	 }
 };
     

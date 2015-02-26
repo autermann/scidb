@@ -46,6 +46,7 @@ namespace scidb
      */
     class DBArray : public Array
     {
+        string getRealName() const;
       public:
         virtual string const& getName() const;
         virtual ArrayID getHandle() const;
@@ -55,12 +56,13 @@ namespace scidb
         virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
         virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
 
+        DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query);
         DBArray(ArrayID id, const boost::shared_ptr<Query>& query);
         DBArray(std::string const& name, const boost::shared_ptr<Query>& query);
         DBArray(const DBArray& other);
 
       private:
-        boost::shared_ptr<ArrayDesc> _desc;
+        ArrayDesc _desc;
         boost::weak_ptr<Query> _query;
     };
 }

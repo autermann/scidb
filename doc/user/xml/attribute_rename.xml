@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>attribute_rename</refname>
+    <refpurpose>Rename an array attribute</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> attribute_rename(<replaceable>array</replaceable>,<replaceable>old_attribute1</replaceable>,<replaceable>new_attribute1</replaceable>
+<optional>, <replaceable>old_attribute2</replaceable>,<replaceable>new_attribute2</replaceable></optional>);</synopsis>
+<synopsis>attribute_rename(<replaceable>array</replaceable>,<replaceable>old_attribute1</replaceable>,<replaceable>new_attribute1</replaceable>
+<optional>, <replaceable>old_attribute2</replaceable>,<replaceable>new_attribute2</replaceable></optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>Changes an attribute name in an array.</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <procedure>
+        <step>
+          <para>Create an array called array1 with an attribute called val:<programlisting>CREATE ARRAY array1 &lt;val:double&gt;[i];</programlisting></para>
+        </step>
+        <step>
+          <para>Rename val to val2:<programlisting>attribute_rename(array1,val,val2);</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

@@ -1,4 +1,5 @@
 --setup
+--start-query-logging
 
 create empty array ABRLOAD <v : int64> [I=0:2000,20,0, J=0:1000,20,0]
 
@@ -11,5 +12,6 @@ count(ABRLOAD)
 
 
 --cleanup
+--stop-query-logging
 remove(ABRLOAD)
 

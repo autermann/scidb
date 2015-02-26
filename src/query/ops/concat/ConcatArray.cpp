@@ -64,7 +64,7 @@ namespace scidb
         DelegateChunk::setInputChunk(inputChunk);
         ConcatArrayIterator const& arrayIterator((ConcatArrayIterator const&)iterator);
         Coordinate shift = arrayIterator.shift;
-        isClone = shift == 0 || !inputChunk.isSparse();
+        isClone = (shift == 0 || !inputChunk.isSparse()) && inputChunk.getArrayDesc().getDimensions()[CONCAT_DIM].getChunkOverlap() == 0;
         direct = true;
 
         firstPos = inputChunk.getFirstPosition(false);
@@ -233,7 +233,7 @@ namespace scidb
 
     ConcatChunkIterator::ConcatChunkIterator(DelegateChunk const* chunk, int iterationMode)
     : DelegateChunkIterator(chunk, iterationMode),
-      mode(iterationMode)
+      mode(iterationMode & ~INTENDED_TILE_MODE)
     {
         reset();
     }
@@ -248,17 +248,30 @@ namespace scidb
     {
         outPos = pos;
         array.getArrayDesc().getChunkPositionFor(outPos);
+        Coordinate lastPos = outPos[CONCAT_DIM] + ((ConcatArray&)array).dims[CONCAT_DIM].getChunkInterval() - 1;
         inPos = outPos;
         chunkInitialized = false;
-        if (outPos[CONCAT_DIM] > lastLeft) { 
-            inputIterator = rightIterator;
-            shift = lastLeft + 1 - firstRight;
-            inPos[CONCAT_DIM] -= shift;
-        } else { 
+        if (outPos[CONCAT_DIM] <= lastLeft) { 
             shift = 0;
             inputIterator = leftIterator;
+            if (inputIterator->setPosition(inPos)) { 
+                return hasCurrent = true;
+            } else if (lastPos <= lastLeft) { 
+                return hasCurrent = false;
+            }
         }
-        return hasCurrent = inputIterator->setPosition(inPos);
+        inputIterator = rightIterator;
+        shift = lastLeft + 1 - firstRight;
+        inPos[CONCAT_DIM] -= shift;
+        ArrayDesc const& rightDesc = ((ConcatArray&)array).rightArray->getArrayDesc();
+        rightDesc.getChunkPositionFor(inPos);
+        while (!inputIterator->setPosition(inPos)) { 
+            inPos[CONCAT_DIM] += rightDesc.getDimensions()[CONCAT_DIM].getChunkInterval();
+            if (inPos[CONCAT_DIM] + shift > lastPos) { 
+                return hasCurrent = false;
+            }
+        }
+        return hasCurrent = true;
     }
 
     ConstChunk const& ConcatArrayIterator::getChunk()

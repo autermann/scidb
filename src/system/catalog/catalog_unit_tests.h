@@ -42,7 +42,7 @@ CPPUNIT_TEST(getArrayByName);
 CPPUNIT_TEST(getArrayByID);
 CPPUNIT_TEST(getArrayAttributes);
 CPPUNIT_TEST(getArrayDimensions);
-CPPUNIT_TEST(addGetUpdateNode);
+CPPUNIT_TEST(addGetUpdateInstance);
 CPPUNIT_TEST(setDefaultCompressionMethod);
 CPPUNIT_TEST(getArrays);
 CPPUNIT_TEST(deleteArrayByName);
@@ -202,73 +202,73 @@ public:
 		 SystemCatalog::getInstance()->deleteArray(id_orig);
 	}
 
-	void addGetUpdateNode()
+	void addGetUpdateInstance()
 	{
 		// add
-		 NodeDesc node1_orig = NodeDesc("host1", 8001, true);
-		 NodeDesc node2_orig = NodeDesc("host2", 8002, false);
-		 NodeID node1_orig_id = SystemCatalog::getInstance()->addNode(node1_orig);
-		 NodeID node2_orig_id = SystemCatalog::getInstance()->addNode(node2_orig);
+		 InstanceDesc instance1_orig = InstanceDesc("host1", 8001, true);
+		 InstanceDesc instance2_orig = InstanceDesc("host2", 8002, false);
+		 InstanceID instance1_orig_id = SystemCatalog::getInstance()->addInstance(instance1_orig);
+		 InstanceID instance2_orig_id = SystemCatalog::getInstance()->addInstance(instance2_orig);
 
-		CPPUNIT_ASSERT(node1_orig_id == 0);
-		CPPUNIT_ASSERT(node2_orig_id == node1_orig_id + 1);
+		CPPUNIT_ASSERT(instance1_orig_id == 0);
+		CPPUNIT_ASSERT(instance2_orig_id == instance1_orig_id + 1);
 
 		// get 1
-		 NodeDesc node1_get, node2_get;
-		 SystemCatalog::getInstance()->getNode(node1_orig_id, node1_get);
-		 SystemCatalog::getInstance()->getNode(node2_orig_id, node2_get);
+		 InstanceDesc instance1_get, instance2_get;
+		 SystemCatalog::getInstance()->getInstance(instance1_orig_id, instance1_get);
+		 SystemCatalog::getInstance()->getInstance(instance2_orig_id, instance2_get);
 
-		CPPUNIT_ASSERT(node1_orig_id == node1_get.getNodeId());
-		CPPUNIT_ASSERT(node1_get.getHost() == "host1");
-		CPPUNIT_ASSERT(node1_get.getPort() == 8001);
-		CPPUNIT_ASSERT(node1_get.isOnline() == true);
+		CPPUNIT_ASSERT(instance1_orig_id == instance1_get.getInstanceId());
+		CPPUNIT_ASSERT(instance1_get.getHost() == "host1");
+		CPPUNIT_ASSERT(instance1_get.getPort() == 8001);
+		CPPUNIT_ASSERT(instance1_get.isOnline() == true);
 
-		CPPUNIT_ASSERT(node2_orig_id == node2_get.getNodeId());
-		CPPUNIT_ASSERT(node2_get.getHost() == "host2");
-		CPPUNIT_ASSERT(node2_get.getPort() == 8002);
-		CPPUNIT_ASSERT(node2_get.isOnline() == false);
+		CPPUNIT_ASSERT(instance2_orig_id == instance2_get.getInstanceId());
+		CPPUNIT_ASSERT(instance2_get.getHost() == "host2");
+		CPPUNIT_ASSERT(instance2_get.getPort() == 8002);
+		CPPUNIT_ASSERT(instance2_get.isOnline() == false);
 
 		// get 2
-		 Nodes nodes;
-		 SystemCatalog::getInstance()->getNodes(nodes);
+		 Instances instances;
+		 SystemCatalog::getInstance()->getInstances(instances);
 
-		CPPUNIT_ASSERT(node1_orig_id == nodes[0].getNodeId());
-		CPPUNIT_ASSERT(nodes[0].getHost() == "host1");
-		CPPUNIT_ASSERT(nodes[0].getPort() == 8001);
-		CPPUNIT_ASSERT(nodes[0].isOnline() == true);
+		CPPUNIT_ASSERT(instance1_orig_id == instances[0].getInstanceId());
+		CPPUNIT_ASSERT(instances[0].getHost() == "host1");
+		CPPUNIT_ASSERT(instances[0].getPort() == 8001);
+		CPPUNIT_ASSERT(instances[0].isOnline() == true);
 
-		CPPUNIT_ASSERT(node2_orig_id == nodes[1].getNodeId());
-		CPPUNIT_ASSERT(nodes[1].getHost() == "host2");
-		CPPUNIT_ASSERT(nodes[1].getPort() == 8002);
-		CPPUNIT_ASSERT(nodes[1].isOnline() == false);
+		CPPUNIT_ASSERT(instance2_orig_id == instances[1].getInstanceId());
+		CPPUNIT_ASSERT(instances[1].getHost() == "host2");
+		CPPUNIT_ASSERT(instances[1].getPort() == 8002);
+		CPPUNIT_ASSERT(instances[1].isOnline() == false);
 
 		// update 1
-		 NodeDesc node1_update = NodeDesc(node1_orig_id, "host3", 8003, false);
-		 SystemCatalog::getInstance()->updateNode(node1_update);
+		 InstanceDesc instance1_update = InstanceDesc(instance1_orig_id, "host3", 8003, false);
+		 SystemCatalog::getInstance()->updateInstance(instance1_update);
 
-		 SystemCatalog::getInstance()->getNode(node1_orig_id, node1_get);
-		CPPUNIT_ASSERT(node1_orig_id == node1_get.getNodeId());
-		CPPUNIT_ASSERT(node1_get.getHost() == "host3");
-		CPPUNIT_ASSERT(node1_get.getPort() == 8003);
-		CPPUNIT_ASSERT(node1_get.isOnline() == false);
+		 SystemCatalog::getInstance()->getInstance(instance1_orig_id, instance1_get);
+		CPPUNIT_ASSERT(instance1_orig_id == instance1_get.getInstanceId());
+		CPPUNIT_ASSERT(instance1_get.getHost() == "host3");
+		CPPUNIT_ASSERT(instance1_get.getPort() == 8003);
+		CPPUNIT_ASSERT(instance1_get.isOnline() == false);
 
 		// update 2
-		 SystemCatalog::getInstance()->markNodeOnline(node1_orig_id, "host4", 8004);
+		 SystemCatalog::getInstance()->markInstanceOnline(instance1_orig_id, "host4", 8004);
 
-		 SystemCatalog::getInstance()->getNode(node1_orig_id, node1_get);
-		CPPUNIT_ASSERT(node1_orig_id == node1_get.getNodeId());
-		CPPUNIT_ASSERT(node1_get.getHost() == "host4");
-		CPPUNIT_ASSERT(node1_get.getPort() == 8004);
-		CPPUNIT_ASSERT(node1_get.isOnline() == true);
+		 SystemCatalog::getInstance()->getInstance(instance1_orig_id, instance1_get);
+		CPPUNIT_ASSERT(instance1_orig_id == instance1_get.getInstanceId());
+		CPPUNIT_ASSERT(instance1_get.getHost() == "host4");
+		CPPUNIT_ASSERT(instance1_get.getPort() == 8004);
+		CPPUNIT_ASSERT(instance1_get.isOnline() == true);
 
 		// update 3
-		 SystemCatalog::getInstance()->markNodeOffline(node1_orig_id);
+		 SystemCatalog::getInstance()->markInstanceOffline(instance1_orig_id);
 
-		 SystemCatalog::getInstance()->getNode(node1_orig_id, node1_get);
-		CPPUNIT_ASSERT(node1_orig_id == node1_get.getNodeId());
-		CPPUNIT_ASSERT(node1_get.getHost() == "host4");
-		CPPUNIT_ASSERT(node1_get.getPort() == 8004);
-		CPPUNIT_ASSERT(node1_get.isOnline() == false);
+		 SystemCatalog::getInstance()->getInstance(instance1_orig_id, instance1_get);
+		CPPUNIT_ASSERT(instance1_orig_id == instance1_get.getInstanceId());
+		CPPUNIT_ASSERT(instance1_get.getHost() == "host4");
+		CPPUNIT_ASSERT(instance1_get.getPort() == 8004);
+		CPPUNIT_ASSERT(instance1_get.isOnline() == false);
 	}
 
 	void setDefaultCompressionMethod()

@@ -164,8 +164,7 @@ SCIDB QUERY : <select * into Ts_be from build_sparse(Ts,x,x=0 or x=3)>
 [[{3,0}(3),{3,1}(3),{3,2}(3)]]
 
 SCIDB QUERY : <select * into Ts_z from build_sparse(Ts,x,x=-1)>
-[[{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]];
-[[]]
+[[{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]]
 
 SCIDB QUERY : <select * into Ts_bz from build_sparse(Ts,x,x=9)>
 [[]]
@@ -194,8 +193,7 @@ SCIDB QUERY : <select * into Ts_be from Ts_ns>
 [[{2,0}(2),{2,1}(2),{2,2}(2),{3,0}(3),{3,1}(3),{3,2}(3)]]
 
 SCIDB QUERY : <select * into Ts_bz from Ts_z>
-[[{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]];
-[[]]
+[[{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]]
 
 SCIDB QUERY : <select * into Ts_nf from Ts_be>
 [[{-2,0}(-2),{-2,1}(-2),{-2,2}(-2),{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]];
@@ -361,8 +359,7 @@ SCIDB QUERY : <select * into dTs_be from build_sparse(dTs,x,x=0 or x=3)>
 [[{3,0}(3),{3,1}(3),{3,2}(3)]]
 
 SCIDB QUERY : <select * into dTs_z from build_sparse(dTs,x,x=-1)>
-[[{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]];
-[[]]
+[[{-1,0}(-1),{-1,1}(-1),{-1,2}(-1)]]
 
 SCIDB QUERY : <select * into dTs_bz from build_sparse(dTs,x,x=9)>
 [[]]

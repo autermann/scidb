@@ -71,6 +71,7 @@ ERRCODE(SCIDB_SE_IMPORT_ERROR,                      24); //Import error
 ERRCODE(SCIDB_SE_MERGE,                             25); //Merge error
 ERRCODE(SCIDB_SE_REDISTRIBUTE,                      26); //Error during redistribute
 ERRCODE(SCIDB_SE_TYPE_CONVERSION,                   27); //Type conversion error
+ERRCODE(SCIDB_SE_REPLICATION,                       28); // Replication error
 //Next short ERRCODE
 
 /*
@@ -98,7 +99,7 @@ ERRCODE(SCIDB_LE_OPERATOR_NOT_FOUND,                19); //Operator '%1%' not fo
 ERRCODE(SCIDB_LE_ARRAY_DOESNT_EXIST,                20); //Array '%1%' does not exist
 ERRCODE(SCIDB_LE_ARRAYID_DOESNT_EXIST,              21); //Array with id '%1%' does not exist
 ERRCODE(SCIDB_LE_CANT_OPEN_FILE,                    22); //Can not open file '%1%'
-ERRCODE(SCIDB_LE_NODE_DOESNT_EXIST,                 23); //Node with id %1% does not exist
+ERRCODE(SCIDB_LE_INSTANCE_DOESNT_EXIST,             23); //Instance with id %1% does not exist
 ERRCODE(SCIDB_LE_ATTRIBUTE_DOESNT_EXIST,            24); //Attribute with id %1% does not exist in array '%2%'
 ERRCODE(SCIDB_LE_DUPLICATE_ATTRIBUTE_NAME,          25); //Can not create attribute '%1%'; name collides with existing object;
 ERRCODE(SCIDB_LE_ILLEGAL_OPERATION,                 26); //Illegal operation: %1%
@@ -136,7 +137,7 @@ ERRCODE(SCIDB_LE_PHYSICAL_OP_DOESNT_EXIST,          59); //Physical operator '%1
 ERRCODE(SCIDB_LE_LOGICAL_OP_ALREADY_REGISTERED,     60); //Logical operator '%1%' already registered
 ERRCODE(SCIDB_LE_PHYSICAL_OP_ALREADY_REGISTERED,    61); //Physical operator '%1%' for logical operator '%2%' already registered
 ERRCODE(SCIDB_LE_QUERY_CANCELLED,                    62); //Query %1% was cancelled
-ERRCODE(SCIDB_LE_NO_QUORUM,                         63); //Node liveness has changed
+ERRCODE(SCIDB_LE_NO_QUORUM,                         63); //Instance liveness has changed
 ERRCODE(SCIDB_LE_QUERY_NOT_FOUND,                   64); //Query %1% not found
 ERRCODE(SCIDB_LE_QUERY_NOT_FOUND2,                  65); //Query already deallocated/cancelled
 ERRCODE(SCIDB_LE_QUERY_WAS_EXECUTED,                66); //Query was executed previously
@@ -187,7 +188,7 @@ ERRCODE(SCIDB_LE_ERRNS_CAN_NOT_BE_UNREGISTERED,     110); //Errors namespace '%1
 ERRCODE(SCIDB_LE_STORAGE_CLOSE_FAILED,              111); //Storage closed with errors
 ERRCODE(SCIDB_LE_UNKNOWN_MESSAGE_TYPE,              112); //Unknown/unexpected message type '%1%'
 ERRCODE(SCIDB_LE_IQUERY_PARSER_ERROR,               113); //Iquery parser error: '%1%'
-ERRCODE(SCIDB_LE_STORAGE_ALREADY_REGISTERED,        114); //Node #%1% already registered in system catalog
+ERRCODE(SCIDB_LE_STORAGE_ALREADY_REGISTERED,        114); //Instance #%1% already registered in system catalog
 ERRCODE(SCIDB_LE_STORAGE_NOT_REGISTERED,            115); //Storage is not registered in system catalog
 ERRCODE(SCIDB_LE_CANT_ACCEPT_CONNECTION,            116); //Error #%1% (%2%) when accepting connection
 ERRCODE(SCIDB_LE_UNKNOWN_MESSAGE_TYPE2,             117); //Invalid message type for ID
@@ -219,7 +220,7 @@ ERRCODE(SCIDB_LE_SUBSTITUTE_ERROR5,                 142); //Input attribute '%1%
 ERRCODE(SCIDB_LE_LOGICAL_JOIN_ERROR1,               143); //Join must be applied to arrays of same dimensionality
 ERRCODE(SCIDB_LE_LOGICAL_JOIN_ERROR2,               144); //Joined arrays has different schemas
 ERRCODE(SCIDB_LE_OP_MULTIPLY_ERROR1,                145); //Multiply only defined for double, float, int64, int32 and int16
-ERRCODE(SCIDB_LE_LIST_ERROR1,                       146); //Parameter of 'list' operator can be 'aggregates', 'arrays', 'operators', 'types', 'functions', 'queries', 'libraries', 'nodes'
+ERRCODE(SCIDB_LE_LIST_ERROR1,                       146); //Parameter of 'list' operator can be 'aggregates', 'arrays', 'operators', 'types', 'functions', 'queries', 'libraries', 'instances'
 ERRCODE(SCIDB_LE_PATH_IS_EMPTY,                     147); //Given dir path is empty
 ERRCODE(SCIDB_LE_CANT_CREATE_DIRECTORY,             148); //Can not create directory '%1%'
 ERRCODE(SCIDB_LE_EXPLAIN_ERROR1,                    149); //Operator 'explain_physical' accepts 1 or 2 parameters only
@@ -266,7 +267,7 @@ ERRCODE(SCIDB_LE_NO_DATA_FOR_INITIALIZE,            189); //Nothing to initializ
 ERRCODE(SCIDB_LE_COMPRESSION_DESTINATION_BITMAP_NOT_EMPTY,190); //Compression destination bitmap not empty
 ERRCODE(SCIDB_LE_OP_SAMPLE_ERROR1,                  191); //Seed should be positive
 ERRCODE(SCIDB_LE_OP_SAMPLE_ERROR2,                  192); //Probability should belong to (0..1] interval
-ERRCODE(SCIDB_LE_INVALID_NODE_ID,                   193); //Invalid node ID: '%1%'
+ERRCODE(SCIDB_LE_INVALID_INSTANCE_ID,                   193); //Invalid instance ID: '%1%'
 ERRCODE(SCIDB_LE_ARRAYS_NOT_CONFORMANT,             194); //Arrays are not conformant
 ERRCODE(SCIDB_LE_UNTERMINATED_CHARACTER_CONSTANT,   195); //Unterminated character constant
 ERRCODE(SCIDB_LE_UNTERMINATED_STRING_LITERAL,       196); //Unterminated string literal
@@ -276,8 +277,8 @@ ERRCODE(SCIDB_LE_OP_REDIMENSION_ERROR1,             199); //Destination for REDI
 ERRCODE(SCIDB_LE_NO_MEMORY_TO_ALLOCATE_MATRIX,      200); //Not enough memory to allocate matrix
 ERRCODE(SCIDB_LE_NO_MEMORY_TO_ALLOCATE_VECTOR,      201); //Not enough memory to allocate vector
 ERRCODE(SCIDB_LE_CANT_UPDATE_CHUNK,                 202); //Can not update disk chunk
-ERRCODE(SCIDB_LE_INVALID_REDUNDANCY,                203); //Redundancy should be smaller than number of nodes
-ERRCODE(SCIDB_LE_NODE_OFFLINE,                      204); //Node #%1% is offline
+ERRCODE(SCIDB_LE_INVALID_REDUNDANCY,                203); //Redundancy should be smaller than number of instances
+ERRCODE(SCIDB_LE_INSTANCE_OFFLINE,                      204); //Instance #%1% is offline
 ERRCODE(SCIDB_LE_DIVISION_BY_ZERO,                  205); //Division by zero
 ERRCODE(SCIDB_LE_FAILED_PARSE_STRING,               206); //Failed to parse string
 ERRCODE(SCIDB_LE_DIMENSION_EXPECTED,                207); //Dimension has to be specified
@@ -289,7 +290,7 @@ ERRCODE(SCIDB_LE_TOO_MANY_COORDINATES,              212); //Too much coordinate 
 ERRCODE(SCIDB_LE_CANT_REDIMENSION_NULL,             213); //Null can not be redimensioned
 ERRCODE(SCIDB_LE_INVALID_SPECIFIED_DATE,            214); //Specified date is not valid
 ERRCODE(SCIDB_LE_CANT_CONVERT_NULL,                 215); //Can not convert NULL value
-ERRCODE(SCIDB_LE_NO_QUORUM2,                        216); //Query can not be executed since there is not enough online nodes
+ERRCODE(SCIDB_LE_NO_QUORUM2,                        216); //Query can not be executed since there is not enough online instances
 ERRCODE(SCIDB_LE_OP_REGRID_ERROR1,                  217); //Regrid interval should be positive
 ERRCODE(SCIDB_LE_OP_WINDOW_ERROR1,                  218); //Window size should be positive
 ERRCODE(SCIDB_LE_OP_WINDOW_ERROR2,                  219); //Window doesn't fit in overlap area
@@ -365,7 +366,7 @@ ERRCODE(SCIDB_LE_OP_SORT_ERROR1,                    288); //Can sort only one di
 ERRCODE(SCIDB_LE_OP_SORT_ERROR2,                    289); //Column index is out of range
 ERRCODE(SCIDB_LE_OP_SORT_ERROR3,                    290); //Can not jump on more than one chunk forward
 ERRCODE(SCIDB_LE_OP_SORT_ERROR4,                    291); //Chunk out of window
-ERRCODE(SCIDB_LE_OP_THIN_ERROR1,                    292); //Step must be divider of chunk length
+ERRCODE(SCIDB_LE_OP_THIN_ERROR1,                    292); //Step must be divider of chunk size
 ERRCODE(SCIDB_LE_OP_THIN_ERROR2,                    293); //Starting position is out of bounds
 ERRCODE(SCIDB_LE_OP_THIN_ERROR3,                    294); //Starting offset must be smaller than step
 ERRCODE(SCIDB_LE_OP_THIN_ERROR4,                    295); //Step must be smaller than chunk size
@@ -409,8 +410,8 @@ ERRCODE(SCIDB_LE_INVALID_USER_ERROR_CODE,           333); //Can not register err
 ERRCODE(SCIDB_LE_ATTRIBUTES_MISMATCH,               334); //Attributes mismatch
 ERRCODE(SCIDB_LE_INVALID_FUNCTION_ARGUMENT,         335); //Invalid function argument: %1%
 ERRCODE(SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE,      336); //Chunk size should not exceed 2^64
-ERRCODE(SCIDB_W_FILE_NOT_FOUND_ON_NODES,            337); //File '%1%' not found on node(s) %2%
-ERRCODE(SCIDB_LE_FILE_IMPORT_FAILED,                338); //Import from file '%1%' (node %2%) to array '%3%' failed at line %4%, column %5%, offset %6%, value='%7%': %8%
+ERRCODE(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES,            337); //File '%1%' not found on instance(s) %2%
+ERRCODE(SCIDB_LE_FILE_IMPORT_FAILED,                338); //Import from file '%1%' (instance %2%) to array '%3%' failed at line %4%, column %5%, offset %6%, value='%7%': %8%
 ERRCODE(SCIDB_LE_ACCESS_TO_RAW_CHUNK,               339); //Failed to fetch chunk body
 ERRCODE(SCIDB_LE_INVALID_COMMIT_STATE,              340); //'%2' request for query (%1) is invalid in the current state
 ERRCODE(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST2,       341); //Array '%1%' is immutable and dont has versions
@@ -423,8 +424,22 @@ ERRCODE(SCIDB_LE_CANT_UNLOAD_MODULE,                347); //Can not unload modul
 ERRCODE(SCIDB_LE_OP_REDIMENSION_STORE_ERROR6,       348); //Aggregate '%1%' doesn't match with any attribute
 ERRCODE(SCIDB_LE_SUBSTITUTE_FAILED,                 349); //Failed to substitute missing reason '%1%'
 ERRCODE(SCIDB_LE_REMOVE_NOT_POSSIBLE,               350); //Remove of array is not possible because it is still in use
+ERRCODE(SCIDB_LE_TRUNCATION,                        351); //Varying size type with length %1% can not be converted to fixed size type %2% 
+ERRCODE(SCIDB_LE_LOOKUP_BAD_PARAM,                  352); //Number of attributes in pattern array of LOOKUP smatch number of dimensions in source array 
 ERRCODE(SCIDB_LE_INVALID_STORAGE_HEADER,            353); //Invalid storage header format
 ERRCODE(SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION, 354); //Mismatched storage format version: %1% instead of %2% required
+ERRCODE(SCIDB_LE_OP_CROSSJOIN_ERROR2,               355); //Joined dimensions should be specified for both arrays
+ERRCODE(SCIDB_LE_OP_NORMALIZE_ERROR3,               356); //Attribute must be of double type
+ERRCODE(SCIDB_LE_EXPLICIT_EMPTY_FLAG_NOT_ALLOWED,   357); //Explicit empty flag attribute not allowed. Use EMPTY keyword.
+ERRCODE(SCIDB_LE_OP_CAST_ERROR9,                    358); //Dimension type doesn't match
+ERRCODE(SCIDB_LE_INCONSISTENT_ARRAY_DESC_CACHE,     359); //Array descriptor cache is inconsistent
+ERRCODE(SCIDB_LE_FUNC_MAP_TRANSFORMATION_NOT_POSSIBLE, 360); //Not able to perform requested functional mapping transformation
+ERRCODE(SCIDB_LE_OP_REDIMENSION_STORE_ERROR7,       361); //Too much duplicates for REDIMENSION_STORE with new dimension: increase chunk size
+ERRCODE(SCIDB_LE_QUERY_ALREADY_COMMITED,            362); //Operation not possible because the query (%1%) already commited
+ERRCODE(SCIDB_LE_CAN_NOT_CHANGE_MAPPING,            363); //Can not change coordinates mapping for non-versioned array %1%
+ERRCODE(SCIDB_LE_NETWORK_QUEUE_FULL,                364); //Network queue is full
+ERRCODE(SCIDB_LE_INVALID_MESSAGE_FORMAT,            365); //Invalid message format for type %1%
+
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%

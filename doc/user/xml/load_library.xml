@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>load_library</refname>
+    <refpurpose>Load a plugin</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis>load_library(library_name);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>Load a SciDB plugin. The act of loading a plugin shared library first registers the library in the SciDB system catalogs. Then it
+opens and examines the shared library to store its contents with SciDB&apos;s internal extension management
+subsystem. Shared library module which are registered with the SciDB instance will be loaded at system start
+time.
+</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <programlisting>load_library(&apos;librational&apos;)</programlisting>
+    </informalexample>
+  </refsect1>
+</refentry>

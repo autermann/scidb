@@ -81,7 +81,14 @@ public:
                                        srcDim.getCurrStart(),
                                        srcDim.getCurrEnd(),
                                        srcDim.getEndMax(),
-                                       srcDim.getChunkInterval(), 0);
+                                       srcDim.getChunkInterval(), 
+                                       0,
+                                       srcDim.getType(),
+                                       srcDim.getFlags(),
+                                       srcDim.getMappingArrayName(),
+                                       srcDim.getComment(),
+                                       srcDim.getFuncMapOffset(),
+                                       srcDim.getFuncMapScale());
         }
 
         ArrayDesc output (desc.getName(), Attributes(), aggDims);

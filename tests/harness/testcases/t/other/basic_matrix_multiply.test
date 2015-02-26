@@ -1,0 +1,41 @@
+--setup
+create array M1 <val: double> [I=1:10,5,0, J=1:6,3,0]
+create array M2 <val: double> [I=1:6,3,0, J=1:15,5,0]
+create array M3 <val: double> [I=1:5,3,0]
+create array M4 <val: double> [I=1:5,3,0]
+create array M5 <val: string> [I=1:10,5,0, J=1:6,3,0]
+create array M6 <val: string> [I=1:6,3,0, J=1:15,5,0]
+create array M7 <val: double null> [I=1:10,5,0, J=1:6,3,0]
+create array M8 <val: double> [I=1:6,3,0, J=1:15,5,0]
+create EMPTY array M9 <val: double> [I=1:10,5,0, J=1:6,3,0]
+create EMPTY array M10 <val: double> [I=1:6,3,0, J=1:15,5,0]
+store(build(M1, (I*3)+J), M1)
+store(build(M2, (I*3)+J), M2)
+store(build(M3, (I+1)), M3)
+store(build(M4, (I+1)), M4)
+store(build(M5, (I*3)+J), M5)
+store(build(M6, (I*3)+J), M6)
+load(M7,'../tests/harness/testcases/data/multiply7.txt')
+store(build(M8, (I*3)+J), M8)
+load(M9,'../tests/harness/testcases/data/multiply9.txt')
+load(M10,'../tests/harness/testcases/data/multiply10.txt')
+
+--test
+multiply(M1,M2)
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_MULTIPLY_ERROR3 "multiply(M3, M4)"
+--error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OPERATION_NOT_FOUND "multiply(M5, M6)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_MULTIPLY_ERROR8 "multiply(M7,M8)"
+multiply(M9,M10)
+
+--cleanup
+remove(M1)
+remove(M2)
+remove(M3)
+remove(M4)
+remove(M5)
+remove(M6)
+remove(M7)
+remove(M8)
+remove(M9)
+remove(M10)
+

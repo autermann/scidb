@@ -5,13 +5,10 @@ SCIDB QUERY : <create array B <a:int32 null> [x=0:3,2,1]>
 Query was executed successfully
 
 SCIDB QUERY : <load A from '../tests/harness/testcases/data/null_8.txt'>
-[(null),(null),(null),(?1)]
-
-SCIDB QUERY : <load B from '../tests/harness/testcases/data/null_8.txt'>
-[(null),(null),(null),(null)]
+[(),(null),(),(?1)]
 
 SCIDB QUERY : <select * into B from repart(A,B)>
-[(null),(null),(null),(?1)]
+[(),(null),(),(?1)]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

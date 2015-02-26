@@ -42,77 +42,77 @@ namespace scidb
 typedef uint64_t ViewID;
 
 /**
- * Class that describes the cluster membership, i.e. all physical SciDB nodes.
+ * Class that describes the cluster membership, i.e. all physical SciDB instances.
  */
-class NodeMembership
+class InstanceMembership
 {
  public:
-   NodeMembership(ViewID viewId) : _viewId(viewId){}
-   NodeMembership(ViewID viewId, std::vector<NodeID>& nodes) : _viewId(viewId)
+   InstanceMembership(ViewID viewId) : _viewId(viewId){}
+   InstanceMembership(ViewID viewId, std::vector<InstanceID>& instances) : _viewId(viewId)
    {
-      _nodes.insert(nodes.begin(), nodes.end());
+      _instances.insert(instances.begin(), instances.end());
    }
-   virtual ~NodeMembership() {}
-   const std::set<NodeID>& getNodes() const { return _nodes; }
+   virtual ~InstanceMembership() {}
+   const std::set<InstanceID>& getInstances() const { return _instances; }
    ViewID getViewId() const { return _viewId; }
-   void addNode(NodeID nodeId) { _nodes.insert(nodeId); }
+   void addInstance(InstanceID instanceId) { _instances.insert(instanceId); }
    
-   bool isEqual(const NodeMembership& other) const
+   bool isEqual(const InstanceMembership& other) const
    {
       return ((_viewId == other._viewId) &&
-              (_nodes==other._nodes));
+              (_instances==other._instances));
    }
  private:
-   NodeMembership(const NodeMembership&);
-   NodeMembership& operator=(const NodeMembership&);
+   InstanceMembership(const InstanceMembership&);
+   InstanceMembership& operator=(const InstanceMembership&);
    
    ViewID _viewId;
-   std::set<NodeID> _nodes;
+   std::set<InstanceID> _instances;
 };
 
 /**
- * Class that describes the cluster liveness, i.e. dead/live status of all physical SciDD nodes.
+ * Class that describes the cluster liveness, i.e. dead/live status of all physical SciDD instances.
  * The view ID associated with a particular liveness must correspond to a particular membership.
  * For example, over the lifetime of a given membership with a given view ID there might be many
  * livenesses corresponding to the membership (via the view ID).
  */
  
- class NodeLivenessEntry
+ class InstanceLivenessEntry
  {
    public:
-      NodeLivenessEntry() : _generationId(0), _nodeId(INVALID_NODE), _isDead(false)
+      InstanceLivenessEntry() : _generationId(0), _instanceId(INVALID_INSTANCE), _isDead(false)
       {}
-      NodeLivenessEntry(NodeID nodeId, uint64_t generationId, bool isDead) :
-      _generationId(generationId), _nodeId(nodeId), _isDead(isDead) {}
-      virtual ~NodeLivenessEntry() {}
-      uint64_t getNodeId() const { return _nodeId; }
+      InstanceLivenessEntry(InstanceID instanceId, uint64_t generationId, bool isDead) :
+      _generationId(generationId), _instanceId(instanceId), _isDead(isDead) {}
+      virtual ~InstanceLivenessEntry() {}
+      uint64_t getInstanceId() const { return _instanceId; }
       uint64_t getGenerationId() const { return _generationId; }
       bool isDead() const { return _isDead; }
       void setGenerationId(uint64_t id) {_generationId = id; }
-      void setNodeId(NodeID id) {_nodeId = id; }
+      void setInstanceId(InstanceID id) {_instanceId = id; }
       void setIsDead(bool state) {_isDead = state; }
 
-      bool operator<(const NodeLivenessEntry& other) const {
-         assert(_nodeId != INVALID_NODE);
-         assert(other._nodeId != INVALID_NODE);
-         return (_nodeId < other._nodeId);
+      bool operator<(const InstanceLivenessEntry& other) const {
+         assert(_instanceId != INVALID_INSTANCE);
+         assert(other._instanceId != INVALID_INSTANCE);
+         return (_instanceId < other._instanceId);
       }
-      bool operator==(const NodeLivenessEntry& other) const {
-         assert(_nodeId != INVALID_NODE);
-         assert(other._nodeId != INVALID_NODE);
-         return ((_nodeId != INVALID_NODE) &&
-                 (_nodeId == other._nodeId) &&
+      bool operator==(const InstanceLivenessEntry& other) const {
+         assert(_instanceId != INVALID_INSTANCE);
+         assert(other._instanceId != INVALID_INSTANCE);
+         return ((_instanceId != INVALID_INSTANCE) &&
+                 (_instanceId == other._instanceId) &&
                  (_generationId == other._generationId) &&
                  (_isDead == other._isDead));
       }
-      bool operator!=(const NodeLivenessEntry& other) const {
+      bool operator!=(const InstanceLivenessEntry& other) const {
           return !operator==(other);
       }
    private:
-      NodeLivenessEntry(const NodeLivenessEntry&);
-      NodeLivenessEntry& operator=(const NodeLivenessEntry&);
+      InstanceLivenessEntry(const InstanceLivenessEntry&);
+      InstanceLivenessEntry& operator=(const InstanceLivenessEntry&);
       uint64_t _generationId;
-      NodeID _nodeId;
+      InstanceID _instanceId;
       bool   _isDead;
    };
 
@@ -121,116 +121,116 @@ class NodeMembership
 namespace boost
 {
    template<>
-   bool operator< (boost::shared_ptr<const scidb::NodeLivenessEntry> const& l,
-                   boost::shared_ptr<const scidb::NodeLivenessEntry> const& r);
+   bool operator< (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                   boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
    template<>
-   bool operator== (boost::shared_ptr<const scidb::NodeLivenessEntry> const& l,
-                    boost::shared_ptr<const scidb::NodeLivenessEntry> const& r);
+   bool operator== (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
    template<>
-   bool operator!= (boost::shared_ptr<const scidb::NodeLivenessEntry> const& l,
-                    boost::shared_ptr<const scidb::NodeLivenessEntry> const& r);
+   bool operator!= (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
 } // namespace boost
 
 namespace std
 {
    template<>
-   struct less<boost::shared_ptr<const scidb::NodeLivenessEntry> > :
-   binary_function <const boost::shared_ptr<const scidb::NodeLivenessEntry>,
-                    const boost::shared_ptr<const scidb::NodeLivenessEntry>,bool>
+   struct less<boost::shared_ptr<const scidb::InstanceLivenessEntry> > :
+   binary_function <const boost::shared_ptr<const scidb::InstanceLivenessEntry>,
+                    const boost::shared_ptr<const scidb::InstanceLivenessEntry>,bool>
    {
-      bool operator() (const boost::shared_ptr<const scidb::NodeLivenessEntry>& l,
-                       const boost::shared_ptr<const scidb::NodeLivenessEntry>& r) const ;
+      bool operator() (const boost::shared_ptr<const scidb::InstanceLivenessEntry>& l,
+                       const boost::shared_ptr<const scidb::InstanceLivenessEntry>& r) const ;
    };
 } // namespace std
 
 namespace scidb
 {
-class NodeLiveness
+class InstanceLiveness
 {
  public:
-   typedef boost::shared_ptr<const NodeLivenessEntry> NodePtr;
-   typedef std::set<NodePtr> DeadNodes;
-   typedef std::set<NodePtr> LiveNodes;
+   typedef boost::shared_ptr<const InstanceLivenessEntry> InstancePtr;
+   typedef std::set<InstancePtr> DeadInstances;
+   typedef std::set<InstancePtr> LiveInstances;
 
-   NodeLiveness(ViewID viewId, uint64_t version) : _viewId(viewId), _version(version) {}
-   virtual ~NodeLiveness() {}
-   const LiveNodes& getLiveNodes() const { return _liveNodes; }
-   const DeadNodes& getDeadNodes() const { return _deadNodes; }
+   InstanceLiveness(ViewID viewId, uint64_t version) : _viewId(viewId), _version(version) {}
+   virtual ~InstanceLiveness() {}
+   const LiveInstances& getLiveInstances() const { return _liveInstances; }
+   const DeadInstances& getDeadInstances() const { return _deadInstances; }
    ViewID   getViewId()  const { return _viewId; }
    uint64_t getVersion() const { return _version; }
-   bool     isDead(const NodeID& id) const { return find(_deadNodes, id); }
-   size_t   getNumDead()  const { return _deadNodes.size(); }
-   size_t   getNumLive()  const { return _liveNodes.size(); }
-   size_t   getNumNodes() const { return getNumDead()+getNumLive(); }
+   bool     isDead(const InstanceID& id) const { return find(_deadInstances, id); }
+   size_t   getNumDead()  const { return _deadInstances.size(); }
+   size_t   getNumLive()  const { return _liveInstances.size(); }
+   size_t   getNumInstances() const { return getNumDead()+getNumLive(); }
 
-   bool insert(const NodePtr& key)
+   bool insert(const InstancePtr& key)
    {
       assert(key);
       if (key->isDead()) {
-         if (find(_liveNodes, key)) {
+         if (find(_liveInstances, key)) {
             assert(false);
             return false;
          }
-         return _deadNodes.insert(key).second;
+         return _deadInstances.insert(key).second;
       } else {
-         if (find(_deadNodes, key)) {
+         if (find(_deadInstances, key)) {
             assert(false);
             return false;
          }
-         return _liveNodes.insert(key).second;
+         return _liveInstances.insert(key).second;
       }
       assert(false);
       return false;
    }
 
-   NodePtr find(const NodeID& nodeId) const
+   InstancePtr find(const InstanceID& instanceId) const
    {
-      const NodePtr key(new NodeLivenessEntry(nodeId,0,false));
-      NodePtr val = find(_liveNodes, key);
+      const InstancePtr key(new InstanceLivenessEntry(instanceId,0,false));
+      InstancePtr val = find(_liveInstances, key);
       if (val) {
          assert(!val->isDead());
          return val;
       }
-      val = find(_deadNodes, key);
+      val = find(_deadInstances, key);
       assert(!val || val->isDead());
       return val;
    }
 
-   bool isEqual(const NodeLiveness& other) const
+   bool isEqual(const InstanceLiveness& other) const
    {
       return ((_viewId == other._viewId) &&
-              (_deadNodes==other._deadNodes) &&
-              (_liveNodes==other._liveNodes));
+              (_deadInstances==other._deadInstances) &&
+              (_liveInstances==other._liveInstances));
    }
 
  private:
-   typedef std::set<NodePtr> NodeEntries;
-   NodeLiveness(const NodeLiveness&);
-   NodeLiveness& operator=(const NodeLiveness&);
-   NodePtr find(const NodeEntries& nodes, const NodeID& nodeId) const
+   typedef std::set<InstancePtr> InstanceEntries;
+   InstanceLiveness(const InstanceLiveness&);
+   InstanceLiveness& operator=(const InstanceLiveness&);
+   InstancePtr find(const InstanceEntries& instances, const InstanceID& instanceId) const
    {
-      const NodePtr key(new NodeLivenessEntry(nodeId,0,false));
-      return find(nodes, key);
+      const InstancePtr key(new InstanceLivenessEntry(instanceId,0,false));
+      return find(instances, key);
    }
-   NodePtr find(const NodeEntries& nodes, const NodePtr& key) const
+   InstancePtr find(const InstanceEntries& instances, const InstancePtr& key) const
    {
-      NodePtr found;
-      NodeEntries::const_iterator iter = nodes.find(key);
-      if (iter != nodes.end()) {
+      InstancePtr found;
+      InstanceEntries::const_iterator iter = instances.find(key);
+      if (iter != instances.end()) {
          found = (*iter);
       }
       return found;
    }
    ViewID _viewId;
    uint64_t _version;
-   NodeEntries _liveNodes;
-   NodeEntries _deadNodes;
+   InstanceEntries _liveInstances;
+   InstanceEntries _deadInstances;
 };
    
-typedef Notification<NodeLiveness> NodeLivenessNotification;
+typedef Notification<InstanceLiveness> InstanceLivenessNotification;
  
 class Cluster: public Singleton<Cluster>
 {
@@ -239,22 +239,22 @@ public:
     * Get cluster membership
     * @return current membership
     */ 
-   boost::shared_ptr<const NodeMembership> getNodeMembership();
+   boost::shared_ptr<const InstanceMembership> getInstanceMembership();
 
    /**
     * Get cluster liveness
     * @return current liveness
     */ 
-   boost::shared_ptr<const NodeLiveness> getNodeLiveness();
+   boost::shared_ptr<const InstanceLiveness> getInstanceLiveness();
 
    /**
-    * Get this nodes' ID
+    * Get this instances' ID
     */
-   NodeID getLocalNodeId();
+   InstanceID getLocalInstanceId();
 
 private:
     friend class Singleton<Cluster>;
-    boost::shared_ptr<const NodeMembership> _lastMembership;
+    boost::shared_ptr<const InstanceMembership> _lastMembership;
     Mutex _mutex;
 };
 

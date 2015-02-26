@@ -49,7 +49,6 @@ public:
         size_t nDims = dims.size();
         Coordinates result (nDims);
 
-
         if (_parameters.size() == 0) { 
             for (size_t i = 0; i < nDims; i++)
             {
@@ -215,35 +214,39 @@ public:
          * SubArray is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
          * that overrides the chunkiterator method.
          */
-    boost::shared_ptr< Array> execute(
-                                std::vector< boost::shared_ptr< Array> >& inputArrays,
-                boost::shared_ptr< Query> query)
+    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
+                                      boost::shared_ptr< Query> query)
     {
-         assert(inputArrays.size() == 1);
-         boost::shared_ptr< Array> array = inputArrays[0];
-         ArrayDesc const& desc = array->getArrayDesc();
-         Dimensions const& dims = desc.getDimensions();
-         size_t nDims = dims.size();
-
-         /***
-          * Fetch and calculate the subarray window
-          */
-         Coordinates lowPos = getWindowStart(desc, query);
-         Coordinates highPos = getWindowEnd(desc, query);
-
-         for(size_t i=0; i<nDims; i++)
-         {
-             if (lowPos[i] > highPos[i])
-             {
-                 return boost::shared_ptr<Array>(new MemArray(_schema));
-             }
-          }
-
-         /***
-          * Create an iterator-based array implementation for the operator
-          */
-         boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, inputArrays[0] ));
-         return arr;
+        assert(inputArrays.size() == 1);
+        boost::shared_ptr< Array> array = inputArrays[0];
+        ArrayDesc const& desc = array->getArrayDesc();
+        Dimensions const& srcDims = desc.getDimensions();
+        Dimensions const& dstDims = _schema.getDimensions();
+        size_t nDims = srcDims.size();
+        
+        /***
+         * Fetch and calculate the subarray window
+         */
+        Coordinates lowPos = getWindowStart(desc, query);
+        Coordinates highPos = getWindowEnd(desc, query);
+        for(size_t i=0; i<nDims; i++)
+        {
+            if (lowPos[i] > highPos[i]) {
+                return boost::shared_ptr<Array>(new MemArray(_schema));
+            }
+            if (query->getCoordinatorID() != COORDINATOR_INSTANCE) { 
+                string const& oldMapping = srcDims[i].getMappingArrayName();
+                string const& newMapping = dstDims[i].getMappingArrayName();
+                if (!newMapping.empty() && oldMapping != newMapping) { 
+                    subarrayMappingArray(srcDims[i].getBaseName(), oldMapping, newMapping, lowPos[i], highPos[i], query);
+                }
+            }
+        }
+        /***
+         * Create an iterator-based array implementation for the operator
+         */
+        boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, inputArrays[0] ));
+        return arr;
     }
 };
 

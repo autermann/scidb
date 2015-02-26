@@ -1,0 +1,60 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>bernoulli</refname>
+    <refpurpose>Select random array cells</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> bernoulli(<replaceable>array</replaceable>,<replaceable>probability</replaceable><optional>, <replaceable>seed</replaceable></optional>);</synopsis>
+    <synopsis>bernoulli(<replaceable>array</replaceable>,<replaceable>probability</replaceable><optional>, <replaceable>seed</replaceable></optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The bernoulli operator evaluates each cell by generating a random number and seeing if it lies in the range (0, probability). If it does, the cell is included. </para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example select cells at random from a 4<symbol role="symbolfont">&times;</symbol>4 matrix, and uses a seed value to select the same cells in successive trials.</para>
+      <procedure>
+        <step>
+          <para>Create an array called bernoulli_array:<programlisting>CREATE ARRAY bernoulli_array&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Store values of  0&ndash;15 in bernoulli_array:<programlisting>store(build(bernoulli_array,i*4+j),bernoulli_array);</programlisting><programlisting>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</programlisting></para>
+        </step>
+        <step>
+          <para>Select cells at random with a probability of .5 that a cell will be included. Each successive call to bernoulli will return different results.<programlisting>AFL% bernoulli(bernoulli_array,.5);</programlisting><programlisting>[
+[(),(1),(),(3)],
+[(4),(),(),()],
+[(),(9),(),(11)],
+[(12),(),(14),(15)]
+]</programlisting><programlisting>bernoulli(bernoulli_array,.5);</programlisting><programlisting>[
+[(),(1),(),(3)],
+[(),(5),(6),()],
+[(),(9),(),(11)],
+[(),(13),(14),()]]</programlisting></para>
+        </step>
+        <step>
+          <para>To reproduce  earlier results, use a seed value. Seeds must be an integer on the interval [0, INT_MAX].<programlisting>bernoulli(bernoulli_array,.5,1);</programlisting><screen>[
+[(),(),(2),()],
+[(),(),(6),(7)],
+[(8),(9),(),(11)],
+[(12),(),(),()]
+]</screen><programlisting>AFL% bernoulli(bernoulli_array,.5,1);</programlisting><screen>[
+[(),(),(2),()],
+[(),(),(6),(7)],
+[(8),(9),(),(11)],
+[(12),(),(),()]
+]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

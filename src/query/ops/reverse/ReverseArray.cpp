@@ -89,7 +89,7 @@ namespace scidb
     //
     int ReverseChunkIterator::getMode()
     {
-        return inputIterator->getMode();
+        return mode;
     }
 
     Value& ReverseChunkIterator::getItem()
@@ -127,7 +127,7 @@ namespace scidb
                 }
             }
             array.revert(outPos, inPos);
-            if (!inputChunk->contains(inPos, withOverlaps)) {
+            if (!inputIterator || !inputChunk->contains(inPos, withOverlaps)) {
                 boost::shared_ptr<ConstArrayIterator> inputArrayIterator = chunk.getArrayIterator().getInputIterator();
                 inputIterator.reset();
                 if (inputArrayIterator->setPosition(inPos)) { 
@@ -153,7 +153,7 @@ namespace scidb
     {
         outPos = pos;
         array.revert(outPos, inPos);
-        if (!inputChunk->contains(inPos, (mode & IGNORE_OVERLAPS) == 0)) {
+        if (!inputIterator || !inputChunk->contains(inPos, (mode & IGNORE_OVERLAPS) == 0)) {
             
             boost::shared_ptr<ConstArrayIterator> inputArrayIterator = chunk.getArrayIterator().getInputIterator();
             inputIterator.reset();
@@ -183,11 +183,11 @@ namespace scidb
     : array(aChunk.array),
       chunk(aChunk),
       inputChunk(&aChunk.getInputChunk()),
-      inputIterator(inputChunk->getConstIterator(iterationMode)),
+      inputIterator(inputChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       outPos(array.dims.size()),
       inPos(outPos.size()),
       hasCurrent(false),
-      mode(iterationMode)
+      mode(iterationMode & ~INTENDED_TILE_MODE)
     {
         reset();
     }
@@ -226,9 +226,9 @@ namespace scidb
             return true;
         }
         size_t interval = dims[i].getChunkInterval() - 1;
-        inPos[i] += interval;
-        bool rc = setInputPosition(i+1);
         inPos[i] -= interval;
+        bool rc = setInputPosition(i+1);
+        inPos[i] += interval;
         return rc;
     }
 

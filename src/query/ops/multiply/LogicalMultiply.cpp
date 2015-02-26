@@ -34,7 +34,7 @@ namespace scidb
 
 inline bool hasSingleAttribute(ArrayDesc const& desc)
 {
-    return desc.getAttributes().size() == 1 || (desc.getAttributes().size() == 2 && desc.getAttributes()[1].isEmptyIndicator());
+    return desc.getAttributes(true).size() == 1;
 }
 
 class LogicalMultiply : public  LogicalOperator
@@ -45,8 +45,17 @@ public:
 	{
 		ADD_PARAM_INPUT()
 		ADD_PARAM_INPUT()
+        ADD_PARAM_VARIES()
 	}
 
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
+    {
+        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        res.push_back(PARAM_CONSTANT(TID_STRING));
+        res.push_back(END_OF_VARIES_PARAMS());
+        return res;
+    }
+        
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {
         assert(schemas.size() == 2);
@@ -81,13 +90,38 @@ public:
 
 		Dimensions dims(2);
 		DimensionDesc const& d1 = schemas[0].getDimensions()[0];
-		dims[0] = DimensionDesc(d1.getBaseName(), d1.getNamesAndAliases(), d1.getStartMin(), d1.getCurrStart(), d1.getCurrEnd(), d1.getEndMax(), d1.getChunkInterval(), 0);
+		dims[0] = DimensionDesc(d1.getBaseName(), 
+                                d1.getNamesAndAliases(), 
+                                d1.getStartMin(), 
+                                d1.getCurrStart(), 
+                                d1.getCurrEnd(), 
+                                d1.getEndMax(), 
+                                d1.getChunkInterval(), 
+                                0, 
+                                d1.getType(), 
+                                d1.getFlags(), 
+                                d1.getMappingArrayName(), 
+                                d1.getComment(),
+                                d1.getFuncMapOffset(),
+                                d1.getFuncMapScale());
 
 		DimensionDesc const& d2 = schemas[1].getDimensions()[1];
-		dims[1] = DimensionDesc(d1.getBaseName() == d2.getBaseName() ? d1.getBaseName() + "2" : d2.getBaseName(), d2.getNamesAndAliases(), d2.getStartMin(), d2.getCurrStart(), d2.getCurrEnd(), d2.getEndMax(), d2.getChunkInterval(), 0);
+		dims[1] = DimensionDesc(d1.getBaseName() == d2.getBaseName() ? d1.getBaseName() + "2" : d2.getBaseName(), 
+                                d2.getNamesAndAliases(), 
+                                d2.getStartMin(), 
+                                d2.getCurrStart(), 
+                                d2.getCurrEnd(), 
+                                d2.getEndMax(), 
+                                d2.getChunkInterval(), 
+                                0, 
+                                d2.getType(), 
+                                d2.getFlags(), 
+                                d2.getMappingArrayName(), 
+                                d2.getComment(),
+                                d2.getFuncMapOffset(),
+                                d2.getFuncMapScale());
 
-        ArrayDesc array_desc("Multiply",atts,dims);
-		return array_desc;
+        return ArrayDesc("Multiply",atts,dims);
 	}
 
 };

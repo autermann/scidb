@@ -25,7 +25,8 @@ SCIDB QUERY : <load(catalogue3,'../tests/harness/testcases/data/iquery_4.txt')>
 SCIDB QUERY : <echo ('iquery  -o lcsv+ -aq \'scan ( catalogue )\'')>
 [("iquery  -o lcsv+ -aq 'scan ( catalogue )'")]
 
-id,code,type,price,review,empty_indicator
+SCIDB QUERY : < iquery  -o lcsv+ -aq 'scan ( catalogue )' >
+id,code,type,price,review,EmptyTag
 1,21,"ice cream",50.5,"mango",true
 3,0,"coffee",0,"CCD",true
 5,61,"",10,"nice",true
@@ -36,12 +37,14 @@ id,code,type,price,review,empty_indicator
 SCIDB QUERY : <echo ('iquery  -o lsparse -aq \'scan ( catalogue )\'')>
 [("iquery  -o lsparse -aq 'scan ( catalogue )'")]
 
+SCIDB QUERY : < iquery  -o lsparse -aq 'scan ( catalogue )' >
 {1}[{1}(21,"ice cream",50.5,"mango",true)];{3}[{3}(0,"coffee",0,"CCD",true)];[{5}(61,"",10,"nice",true)];{6}[{6}(0,"true",0,"",true)];[{8}(91,"",90.1,"",true)];{9}[{9}(0,"",100,"Lays",true)]
 
 SCIDB QUERY : <echo ('iquery  -o lcsv+ -aq \'scan ( catalogue1 )\'')>
 [("iquery  -o lcsv+ -aq 'scan ( catalogue1 )'")]
 
-id,code,type,price,review,empty_indicator
+SCIDB QUERY : < iquery  -o lcsv+ -aq 'scan ( catalogue1 )' >
+id,code,type,price,review,EmptyTag
 1,21,"ice cream",50.5,"mango",true
 3,null,"coffee",null,"CCD",true
 5,61,null,10,"nice",true
@@ -52,12 +55,14 @@ id,code,type,price,review,empty_indicator
 SCIDB QUERY : <echo ('iquery  -o lsparse -aq \'scan ( catalogue1 )\'')>
 [("iquery  -o lsparse -aq 'scan ( catalogue1 )'")]
 
+SCIDB QUERY : < iquery  -o lsparse -aq 'scan ( catalogue1 )' >
 {1}[{1}(21,"ice cream",50.5,"mango",true)];{3}[{3}(null,"coffee",null,"CCD",true)];[{5}(61,null,10,"nice",true)];{6}[{6}(null,"true",null,null,true)];[{8}(91,null,90.1,null,true)];{9}[{9}(null,null,100,"Lays",true)]
 
 SCIDB QUERY : <echo ('iquery  -o lcsv+ -aq \'scan ( catalogue2 )\'')>
 [("iquery  -o lcsv+ -aq 'scan ( catalogue2 )'")]
 
-id,code,type,price,review,empty_indicator
+SCIDB QUERY : < iquery  -o lcsv+ -aq 'scan ( catalogue2 )' >
+id,code,type,price,review,EmptyTag
 1,21,"ice cream",50.5,"mango",true
 3,0,"coffee",null,"CCD",true
 5,61,null,10,"nice",true
@@ -68,12 +73,14 @@ id,code,type,price,review,empty_indicator
 SCIDB QUERY : <echo ('iquery  -o lsparse -aq \'scan ( catalogue2 )\'')>
 [("iquery  -o lsparse -aq 'scan ( catalogue2 )'")]
 
+SCIDB QUERY : < iquery  -o lsparse -aq 'scan ( catalogue2 )' >
 {1}[{1}(21,"ice cream",50.5,"mango",true)];{3}[{3}(0,"coffee",null,"CCD",true)];[{5}(61,null,10,"nice",true)];{6}[{6}(0,"true",null,"",true)];[{8}(91,null,90.1,"",true)];{9}[{9}(0,null,100,"Lays",true)]
 
 SCIDB QUERY : <echo ('iquery  -o lcsv+ -aq \'scan ( catalogue3 )\'')>
 [("iquery  -o lcsv+ -aq 'scan ( catalogue3 )'")]
 
-id,code,type,price,review,empty_indicator
+SCIDB QUERY : < iquery  -o lcsv+ -aq 'scan ( catalogue3 )' >
+id,code,type,price,review,EmptyTag
 1,21,"ice cream",50.5,"mango",true
 3,null,"coffee",0,"CCD",true
 5,61,"",10,"nice",true
@@ -84,6 +91,7 @@ id,code,type,price,review,empty_indicator
 SCIDB QUERY : <echo ('iquery  -o lsparse -aq \'scan ( catalogue3 )\'')>
 [("iquery  -o lsparse -aq 'scan ( catalogue3 )'")]
 
+SCIDB QUERY : < iquery  -o lsparse -aq 'scan ( catalogue3 )' >
 {1}[{1}(21,"ice cream",50.5,"mango",true)];{3}[{3}(null,"coffee",0,"CCD",true)];[{5}(61,"",10,"nice",true)];{6}[{6}(null,"true",0,null,true)];[{8}(91,"",90.1,null,true)];{9}[{9}(null,"",100,"Lays",true)]
 
 SCIDB QUERY : <remove(catalogue)>

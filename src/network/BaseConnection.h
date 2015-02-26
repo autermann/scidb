@@ -84,6 +84,8 @@ enum MessageType
     mtResourcesFileExistsResponse,
     mtAbort,
     mtCommit,
+    mtCompleteQuery,
+    mtControl,
     mtSystemMax // must be last
 };
 
@@ -94,7 +96,7 @@ struct MessageHeader
    uint16_t messageType;                        /** < Type of message */
    uint32_t recordSize;                 /** < The size of structured part of message to know what buffer size we must allocate */
    uint32_t binarySize;                 /** < The size of unstructured part of message to know what buffer size we must allocate */
-   NodeID sourceNodeID;            /** < The source node number */
+   InstanceID sourceInstanceID;            /** < The source instance number */
    uint64_t queryID;               /** < Query ID */
 };
 
@@ -114,15 +116,15 @@ public:
    bool parseRecord(size_t bufferSize);
    void prepareBinaryBuffer();
 
-   NodeID getSourceNodeID() {
-      return _messageHeader.sourceNodeID;
+   InstanceID getSourceInstanceID() {
+      return _messageHeader.sourceInstanceID;
    }
 
    /**
     * This method is not part of the public API
     */
-   void setSourceNodeID(const NodeID& nodeId) {
-      _messageHeader.sourceNodeID = nodeId;
+   void setSourceInstanceID(const InstanceID& instanceId) {
+      _messageHeader.sourceInstanceID = instanceId;
    }
 
 template <class Derived>
@@ -156,15 +158,6 @@ template <class Derived>
         _messageHeader.queryID = queryID;
     }
 
-    void waitSent(size_t n = 1) {
-       _sent.enter(n);
-    }
-
-    void releaseSent()
-    {
-       _sent.release();
-    }
-
     void initRecord(MessageID messageType)
     {
        assert( _messageHeader.messageType == mtNone);
@@ -186,7 +179,6 @@ private:
     MessagePtr _record;             /** < Structured part of message */
     boost::shared_ptr< SharedBuffer > _binary;     /** < Buffer for binary data to be transfered */
     boost::asio::streambuf _recordStream; /** < Buffer for serializing Google Protocol Buffers objects */
-    Semaphore _sent; /**< Semaphore for waitong notification about message sent */
 
     static MessagePtr createRecordByType(MessageType messageType);
 

@@ -49,6 +49,8 @@ typedef int64_t Coordinate;
 typedef std::vector<Coordinate> Coordinates;
 
 
+#define USE_STACK_ALLOCATOR_FOR_VALUE_MAP true
+
 #ifdef USE_STACK_ALLOCATOR_FOR_VALUE_MAP
 typedef std::map<position_t, Value, std::less<position_t>, StackAlloc<std::pair<position_t, Value> > > ValueMap;
 #else
@@ -974,6 +976,7 @@ class RLEPayload : public ConstRLEPayload
   public:
     void appendValue(std::vector<char>& varPart, Value const& val, size_t valueIndex);
 
+    void setVarPart(char const* data, size_t size);
     void setVarPart(std::vector<char>& varPart);
 
     friend class RLEPayloadAppender;
@@ -1049,6 +1052,7 @@ class RLEPayload : public ConstRLEPayload
      */
     void assignSegments(const ConstRLEPayload& payload, bool copy = true) 
     {
+
         if (copy) {
             nSegs = payload.nSegments();
             container.resize(nSegs + 1);
@@ -1096,6 +1100,7 @@ class RLEPayload : public ConstRLEPayload
         seg = &container[0];
         data = other.data;
         payload = &data[0];
+        _valuesCount = other._valuesCount;
         return *this;
     }
 

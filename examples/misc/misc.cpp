@@ -81,11 +81,12 @@ public:
         _functionDescs.push_back(FunctionDescription("exitOnNotEqual", list_of(TID_INT64)(TID_INT64), TID_INT64, &exitOnNotEqual));
         _functionDescs.push_back(FunctionDescription("netPauseOnNotEqual", list_of(TID_INT64)(TID_INT64)(TID_INT32), TID_INT64, &netPauseOnNotEqual));
         _functionDescs.push_back(FunctionDescription("injectRemoteError", list_of(TID_INT64)(TID_INT64), TID_INT64, &injectRemoteError));
-        _functionDescs.push_back(FunctionDescription("killNode", list_of(TID_INT64)(TID_INT32)(TID_BOOL), TID_INT64, &killNode));
+        _functionDescs.push_back(FunctionDescription("killInstance", list_of(TID_INT64)(TID_INT32)(TID_BOOL), TID_INT64, &killInstance));
         _functionDescs.push_back(FunctionDescription("postWarning", list_of(TID_INT64), TID_INT64, &postWarning));
+        _functionDescs.push_back(FunctionDescription("injectError", list_of(TID_INT64)(TID_INT64), TID_INT64, &injectError));
 
         _errors[MISC_FUNCTIONS_ERROR1] = "Generating trap to force transaction abort";
-        _errors[MISC_FUNCTIONS_WARNING] = "Posting warning from node '%1%'";
+        _errors[MISC_FUNCTIONS_WARNING] = "Posting warning from instance '%1%'";
         scidb::ErrorsLibrary::getInstance()->registerErrors("misc_functions", &_errors);
     }
 

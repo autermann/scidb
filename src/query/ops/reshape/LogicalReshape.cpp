@@ -67,8 +67,10 @@ namespace scidb
             for (size_t i = 0, n = srcDimensions.size(); i < n; i++)
             {
                 if (srcDimensions[i].getType() != TID_INT64 || srcDimensions[i].getLength() == 0
-                        || (Coordinate)srcDimensions[i].getLength() == MAX_COORDINATE)
+                    || srcDimensions[i].getLength() == INFINITE_LENGTH)
+                {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR1);
+                }
                 srcArraySize *= srcDimensions[i].getLength();
                 if (srcDimensions[i].getChunkOverlap() != 0)
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);
@@ -77,8 +79,10 @@ namespace scidb
             for (size_t i = 0, n = dstDimensions.size(); i < n; i++)
             {
                 if (dstDimensions[i].getType() != TID_INT64 || dstDimensions[i].getLength() == 0
-                        || (Coordinate)dstDimensions[i].getLength() == MAX_COORDINATE)
+                    || dstDimensions[i].getLength() == INFINITE_LENGTH)
+                {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR1);
+                }
                 dstArraySize *= dstDimensions[i].getLength();
                 if (dstDimensions[i].getChunkOverlap() != 0)
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);

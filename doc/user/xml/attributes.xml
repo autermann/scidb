@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>attributes</refname>
+    <refpurpose>List array attributes</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> attributes(<replaceable>named_array</replaceable>);</synopsis>
+<synopsis>attributes(<replaceable>named_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The attributes operator lists all the attributes of an array. The output returns the attribute name, the attribute data type, and a Boolean flag representing whether or not the attribute can be null. The argument <replaceable>named_array</replaceable> must be an array that was previously created and stored in the SciDB namespace.</para>
+  </refsect1>
+</refentry>

@@ -93,11 +93,17 @@ public:
                 //no overlap
                 outDims.push_back(DimensionDesc( inputDims[j].getBaseName(),
                                                  inputDims[j].getStartMin(),
+                                                 inputDims[j].getCurrStart(),
+                                                 inputDims[j].getCurrEnd(),
                                                  inputDims[j].getEndMax(),
                                                  inputDims[j].getChunkInterval(),
                                                  0,
                                                  inputDims[j].getType(),
-                                                 inputDims[j].getSourceArrayName()));
+                                                 inputDims[j].getFlags(),
+                                                 inputDims[j].getMappingArrayName(),
+                                                 inputDims[j].getComment(),
+                                                 inputDims[j].getFuncMapOffset(),
+                                                 inputDims[j].getFuncMapScale()));
                 return;
             }
         }

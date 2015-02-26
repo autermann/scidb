@@ -75,12 +75,12 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 	string scidbtestresultsURL = "scidbtestresults";
 	string revisionURL = "?rev=";
 
-/*	envvalue = getenv ("scidbtestcasesURL");
+	envvalue = getenv ("scidbtestcasesURL");
 	if (envvalue && *envvalue)
 	{
 		scidbtestcasesURL = envvalue;
 	}
-*/
+
 	envvalue = getenv ("scidbtestresultsURL");
 	if (envvalue && *envvalue)
 	{
@@ -94,7 +94,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 	}
 
 	cout << "CdashReportApp :: Using cdashclientip=" << cdashclntip << endl;
-//	cout << "CdashReportApp :: Using scidbtestcasesURL=" << scidbtestcasesURL << endl;
+	cout << "CdashReportApp :: Using scidbtestcasesURL=" << scidbtestcasesURL << endl;
 	cout << "CdashReportApp :: Using scidbtestresultsURL=" << scidbtestresultsURL << endl;
 	cout << "CdashReportApp :: Using revisionURL=" << revisionURL << endl;
 	cout << "INFO : Total TestList Size = [" << tr.v_IndividualTestResult.size() << "]" << endl;
@@ -122,7 +122,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 		/* test case file name */
 		string tmp = tr.v_IndividualTestResult[i].TestcaseFile;
 		string testdir = "/t/";
-        size_t found = tmp.find (testdir);
+	        size_t found = tmp.find (testdir);
 		bool run_tests_basic=false;
 		if (found == string :: npos)
 			run_tests_basic=true;
@@ -134,22 +134,36 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 			throw ConfigError (FILE_LINE_FUNCTION, ss.str());
 		}
 */
-		string url = "";
+
+	string trac_url = "http://trac.scidb.org/browser/trunk/tests/harness/testcases/";
+	char *env_trac = getenv ("trac_url");
+	if (env_trac && *env_trac)
+	  {
+	    trac_url = env_trac;
+	  }
+	else
+	  {
+	    trac_url = "http://trac.scidb.org/browser/trunk/tests/harness/testcases/";
+	  }
+	
+	string url = "";
 	if (!run_tests_basic)
 		{
 		found += 2;
 		tmp.replace (0, found, "");
 
 //		url = "http://" + cdashclntip + "/" + scidbtestcasesURL + "/" + tmp;
-		url = "http://trac.scidb.org/browser/trunk/tests/harness/testcases/t/" + tmp + revisionURL;
+		url = trac_url + "t/" + tmp + revisionURL;
 		}
 	else
-		url = "http://trac.scidb.org/browser/trunk/tests/basic/" + tmp + revisionURL;
+//		url = "http://trac.scidb.org/browser/trunk/tests/basic/" + tmp + revisionURL;
+//		url = trac_url + tmp + revisionURL;
 //		url = "http://" + cdashclntip + "/" + scidbtestresultsURL + "/" + "/tests_basic/" + tmp;
 
-
+	        url = scidbtestcasesURL;
+	
 		os << "<NamedMeasurement type=\"text/string\" name=\"Testcase File\"><Value>&lt;a href=\"" 
-           << url << "\">" << tr.v_IndividualTestResult[i].TestcaseFile << " &lt;/a></Value></NamedMeasurement>" << endl;
+		   << url << "\">" << tr.v_IndividualTestResult[i].TestcaseFile << " &lt;/a></Value></NamedMeasurement>" << endl;
 
 		/* .expected file name */
 		tmp = tr.v_IndividualTestResult[i].TestcaseExpectedResultFile;
@@ -159,10 +173,10 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 			{
 				tmp.replace (0, found, "");
 //				url = "http://" + cdashclntip + "/" + scidbtestresultsURL + "/" + tmp;
-				url = "http://trac.scidb.org/browser/trunk/tests/harness/testcases/r/" + tmp + revisionURL;
+				url = trac_url + "r/" + tmp + revisionURL;
 			}
 			else
-				url = "http://trac.scidb.org/browser/trunk/tests/basic/" + tmp + revisionURL;
+				url = trac_url + tmp + revisionURL;
 //				url = "http://" + cdashclntip + "/" + scidbtestresultsURL + "/tests_basic/" + tmp;
 
 			os << "<NamedMeasurement type=\"text/string\" name=\"Expected Result File\"><Value>&lt;a href=\""

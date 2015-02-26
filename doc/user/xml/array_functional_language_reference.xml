@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter>
+  <title>Array Functional Language Reference</title>
+  <refentry>
+    <refnamediv>
+      <refname>adddim</refname>
+      <refpurpose>Add one dimension to an existing SciDB array</refpurpose>
+    </refnamediv>
+    <refsynopsisdiv>
+      <synopsis>adddim(<replaceable>array</replaceable>,<replaceable>new_dimension:dimension_name</replaceable>)</synopsis>
+    </refsynopsisdiv>
+    <refsection>
+      <title>Summary</title>
+      <para>The adddim operator prepends the existing dimensions for an array with a new dimension, whose name is supplied as the second argument to the operator. The new dimension will have start&nbsp;=&nbsp;0, length&nbsp;=&nbsp;1, chunkSize&nbsp;=&nbsp;1, overlap&nbsp;=&nbsp;0. </para>
+    </refsection>
+    <refsection>
+      <title>Example</title>
+      <procedure>
+        <para>This example creates a one-dimensional array with a single numerical attribute  and adds a  dimension.</para>
+        <step>
+          <para>Create an array adddim_example:<programlisting>create array adddim_example &lt;val:double&gt;[j=0:9,10,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Add a dimension named &apos;i&apos;:<programlisting>adddim(adddim_example,i);</programlisting></para>
+        </step>
+        <step>
+          <para>Show the updated array dimensions with the <function>dimensions</function> operator:<programlisting>dimensions(adddim_example);</programlisting></para>
+        </step>
+        <step>
+          <para>Remove the array adddim_example from the SciDB namespace with the <function>remove</function> operator:<programlisting>remove(adddim_example);</programlisting></para>
+        </step>
+      </procedure>
+    </refsection>
+  </refentry>
+  <refentry>
+    <refnamediv>
+      <refname role="sort">aggregate</refname>
+      <refpurpose>Group array elements and find statistical properties of the group </refpurpose>
+    </refnamediv>
+    <refsynopsisdiv>
+      <synopsis>aggregate(<replaceable>array</replaceable>, <replaceable>aggregate_name_1</replaceable>(<replaceable>attribute</replaceable>)
+<optional>,<replaceable>aggregate_name_2</replaceable>(<replaceable>attribute</replaceable>),... <replaceable>aggregate_name_N</replaceable>(<replaceable>attribute</replaceable>)</optional>
+<optional>, <replaceable>dimension_1</replaceable>, <replaceable>dimension_2</replaceable>,... <replaceable>dimension_M</replaceable></optional>) </synopsis>
+    </refsynopsisdiv>
+    <refsection>
+      <title>Summary</title>
+      <para>The aggregate operator takes an array as input, groups the array by the specified dimension and computes a given statistic for each group. The aggregate operator returns a scalar value for each statistic. The statistics available are: <informaltable frame="all">
+          <tgroup cols="2">
+            <colspec colname="c1"/>
+            <colspec colname="c2"/>
+            <thead>
+              <row>
+                <entry>Aggregate Name</entry>
+                <entry>Operation Performed</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry>avg</entry>
+                <entry>Average value</entry>
+              </row>
+              <row>
+                <entry>count</entry>
+                <entry>Number of nonempty elements </entry>
+              </row>
+              <row>
+                <entry>max</entry>
+                <entry>Largest value </entry>
+              </row>
+              <row>
+                <entry>min</entry>
+                <entry>Smallest value</entry>
+              </row>
+              <row>
+                <entry>sum</entry>
+                <entry>Sum of all elements </entry>
+              </row>
+              <row>
+                <entry>stdev</entry>
+                <entry>Standard deviation </entry>
+              </row>
+              <row>
+                <entry>var</entry>
+                <entry>Variance</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </informaltable></para>
+    </refsection>
+    <refsection>
+      <title>Example</title>
+      <procedure>
+        <para>This example demonstrates how to return the statistical aggregates of an array attribute.</para>
+        <step>
+          <para>Create a 3-by-3 array called m3x3: <programlisting>create array m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Put numerical values of 0&ndash;8 in m3x3:<programlisting>store(build(m3x3, i*3+j),m3x3);</programlisting></para>
+        </step>
+        <step>
+          <para>Find the sum of each column:<programlisting>aggregate(m3x3,sum(val),y);</programlisting><screen>[(9),(12),(15)]</screen></para>
+        </step>
+        <step>
+          <para>Find the average value, number of nonempty elements, largest element, smallest element, sum of all elements, variance, and standard deviation: <programlisting>aggregate(m3x3,avg(val),count(val),max(val),min(val),sum(val),var(val),stdev(val));</programlisting><screen>[(4,9,8,0,36,7.5,2.73861)]</screen></para>
+        </step>
+        <step>
+          <para>Remove the array m3x3 from the current SciDB namespace:<programlisting>remove(m3x3);</programlisting></para>
+        </step>
+      </procedure>
+    </refsection>
+  </refentry>
+  <refentry>
+    <refnamediv>
+      <refname>allversions</refname>
+      <refpurpose>All versions of an array in the current namespace</refpurpose>
+    </refnamediv>
+    <refsection>
+      <title>Summary</title>
+      <para/>
+    </refsection>
+  </refentry>
+</chapter>

@@ -37,6 +37,7 @@ set (util_src
     na.cpp
     naInternal.cpp
     require.cpp
+    InjectedError.cpp
 )
 
 file(GLOB util_include "*.h")

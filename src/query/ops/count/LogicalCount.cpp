@@ -99,11 +99,17 @@ public:
                 DimensionDesc const& srcDim = dims[groupBy[i]]; 
                 aggDims[i] = DimensionDesc(  srcDim.getBaseName(),
                                              srcDim.getStartMin(),
+                                             srcDim.getCurrStart(),
+                                             srcDim.getCurrEnd(),
                                              srcDim.getEndMax(),
                                              i == 0 && groupBy[i] == 0 ? srcDim.getChunkInterval() : srcDim.getCurrLength(),
                                              0,
                                              srcDim.getType(),
-                                             srcDim.getSourceArrayName());
+                                             srcDim.getFlags(),
+                                             srcDim.getMappingArrayName(),
+                                             srcDim.getComment(),
+                                             srcDim.getFuncMapOffset(),
+                                             srcDim.getFuncMapScale());
             }
             return ArrayDesc(desc.getName(), atts, aggDims);
         }

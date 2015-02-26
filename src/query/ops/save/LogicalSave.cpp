@@ -40,7 +40,7 @@ namespace scidb
 {
 
 /**
- * Must be called as SAVE('existing_array_name', '/path/to/file/on/node')
+ * Must be called as SAVE('existing_array_name', '/path/to/file/on/instance')
  */
 class LogicalSave: public LogicalOperator
 {

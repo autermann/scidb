@@ -240,7 +240,7 @@ public:
  * Iterator over items in the chunk. The chunk consists of a number of Value entries with
  * positions in the coordinate space, as well as flags:
  *      NULL - the value is unknown
- *      core - the value is a core value managed by the current node
+ *      core - the value is a core value managed by the current instance
  *      overlap - the value is an overlap value, it can only be used for computation, but
  *              its managed by some other site
  */
@@ -449,8 +449,17 @@ class ConstChunk : public SharedBuffer
     */
    size_t getNumberOfElements(bool withOverlap) const;
 
+    
+    /**
+     * If chunk contains no hgaps in its data: has no overlaps and fully belongs to non-emptyable array.
+     */
+   bool isSolid() const;
+
    virtual Coordinates const& getFirstPosition(bool withOverlap) const = 0;
    virtual Coordinates const& getLastPosition(bool withOverlap) const = 0;
+
+   virtual Coordinates getHighBoundary(bool withOverlap) const;
+   virtual Coordinates getLowBoundary(bool withOverlap) const;
 
    bool contains(Coordinates const& pos, bool withOverlap) const;
 
@@ -541,7 +550,7 @@ class Chunk : public ConstChunk
     */
    virtual void decompress(const CompressedBuffer& buf);
 
-   virtual boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query>& query,
+   virtual boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
                                                         int iterationMode = ChunkIterator::NO_EMPTY_CHECK) = 0;
 
    virtual void merge(ConstChunk const& with,
@@ -555,7 +564,7 @@ class Chunk : public ConstChunk
 };
 
 /**
- * An array const iterator iterates over the chunks of the array available at the local node.
+ * An array const iterator iterates over the chunks of the array available at the local instance.
  * Order of iteration is not specified.
  */
 class ConstArrayIterator : public ConstIterator
@@ -564,7 +573,7 @@ public:
     /**
      * Select chunk which contains element with specified position in main (not overlapped) area
      * @param pos element position
-     * @return true if chunk with containing specified position is present at the local node, false otherwise
+     * @return true if chunk with containing specified position is present at the local instance, false otherwise
      */
     virtual bool setPosition(Coordinates const& pos);
 
@@ -588,14 +597,14 @@ public:
     virtual Chunk& updateChunk();
 
     /**
-     * Create new chunk at the local node using default compression method for this attribute.
+     * Create new chunk at the local instance using default compression method for this attribute.
      * Only one chunk can be created and filled by iterator at each moment of time.
      * @param position of the first element in the created chunk (not including overlaps)
      */
     virtual Chunk& newChunk(Coordinates const& pos) = 0;
 
     /**
-     * Create new chunk at the local node.
+     * Create new chunk at the local instance.
      * Only one chunk can be created and filled by iterator at each moment of time.
      * @param position of the first element in the created chunk (not including overlaps)
      */
@@ -717,22 +726,30 @@ public:
      * @return read-only iterator through chunks of spcified attribute
      */
     virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const = 0;
-        ConstArrayIterator* getConstIteratorPtr(AttributeID attr) const {
+
+    ConstArrayIterator* getConstIteratorPtr(AttributeID attr) const {
 // TODO JHM ; temporary bridge to support concurrent development, to be removed by the end of RQ
 #ifndef NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_SHARED_PTRS
-              return getConstIterator(attr).operator->();
+        return getConstIterator(attr).operator->();
 #else
         assert(false);
         return NULL;
 #endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_SHARED_PTRS
-          }
+    }
 
     /**
      * Get read-only iterator thtough all array elements
      * @param attr attribute ID
      * @param iterationMode chunk iteration mode
      */
-        virtual boost::shared_ptr<ConstItemIterator> getItemIterator(AttributeID attr, int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const;
+    virtual boost::shared_ptr<ConstItemIterator> getItemIterator(AttributeID attr, int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const;
+
+    /**
+     * Convert intgeger coordiantes to original coordinates
+     * @param origCoords [OUT] original coordiantes
+     * @param intCoords [IN] integer coordiantes
+     */
+    virtual void getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()) const;
 };
 
 class PinBuffer {

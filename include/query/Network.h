@@ -39,11 +39,11 @@
 namespace scidb
 {
 
-void Receive(void* ctx, int node, void* data, size_t size);
-void Send(void* ctx, int node, void const* data, size_t size);
+void Receive(void* ctx, int instance, void* data, size_t size);
+void Send(void* ctx, int instance, void const* data, size_t size);
 
-void BufSend(NodeID target, boost::shared_ptr<SharedBuffer> data, boost::shared_ptr< Query> query);
-boost::shared_ptr<SharedBuffer> BufReceive(NodeID source, boost::shared_ptr< Query> query);
+void BufSend(InstanceID target, boost::shared_ptr<SharedBuffer> data, boost::shared_ptr< Query> query);
+boost::shared_ptr<SharedBuffer> BufReceive(InstanceID source, boost::shared_ptr< Query> query);
 
 
 }

@@ -96,7 +96,6 @@ set(ops_lib_src
     multiply/MultiplyArray.cpp
     inverse/LogicalInverse.cpp
     inverse/PhysicalInverse.cpp
-    inverse/InverseArray.cpp
     slice/LogicalSlice.cpp
     slice/PhysicalSlice.cpp
     slice/SliceArray.cpp
@@ -119,6 +118,7 @@ set(ops_lib_src
     unpack/LogicalUnpack.cpp
     unpack/PhysicalUnpack.cpp
     unpack/UnpackArray.cpp
+    unpack/UnpackUnalignedArray.cpp
     build/LogicalBuild.cpp
     build/PhysicalBuild.cpp
     build/BuildArray.cpp
@@ -196,6 +196,8 @@ set(ops_lib_src
     diskinfo/PhysicalDiskInfo.cpp
     materialize/LogicalMaterialize.cpp
     materialize/PhysicalMaterialize.cpp
+    analyze/LogicalAnalyze.cpp
+    analyze/PhysicalAnalyze.cpp
 )
 
 file(GLOB_RECURSE ops_lib_include "*.h")

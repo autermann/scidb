@@ -75,6 +75,9 @@ void ClientMessageHandleJob::run()
     case mtFetch:
         fetchChunk();
         break;
+    case mtCompleteQuery:
+        completeQuery();
+        break;
     case mtCancelQuery:
         cancelQuery();
         break;
@@ -82,7 +85,6 @@ void ClientMessageHandleJob::run()
         LOG4CXX_ERROR(logger, "Unknown message type " << messageType);
         throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE) << messageType;
     }
-
     LOG4CXX_TRACE(logger, "Finishing client message handling: type=" << messageType)
 }
 
@@ -193,7 +195,9 @@ void ClientMessageHandleJob::executeClientQuery()
         queryResultRecord->set_execution_time(queryResult.executionTime);
         queryResultRecord->set_explain_logical(queryResult.explainLogical);
         queryResultRecord->set_explain_physical(queryResult.explainPhysical);
-        queryResultRecord->set_selective(queryResult.selective);
+        queryResultRecord->set_selective(queryResult.selective); 
+        
+        boost::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
         if (queryResult.selective)
         {
             const ArrayDesc& arrayDesc = queryResult.array->getArrayDesc();
@@ -227,11 +231,32 @@ void ClientMessageHandleJob::executeClientQuery()
                 dimension->set_chunk_interval(dimensions[i].getChunkInterval());
                 dimension->set_chunk_overlap(dimensions[i].getChunkOverlap());
                 dimension->set_type_id(dimensions[i].getType());
-                dimension->set_source_array_name(dimensions[i].getSourceArrayName());
+                dimension->set_flags(dimensions[i].getFlags());
+                dimension->set_mapping_array_name(dimensions[i].getMappingArrayName());
+
+                if (dimensions[i].getType() != TID_INT64 && !dimensions[i].getMappingArrayName().empty()) { 
+                    try { 
+                        boost::shared_ptr<Array> mappingArray = query->getArray(dimensions[i].getMappingArrayName());
+                        boost::shared_ptr<ConstArrayIterator> mappingArrayIterator = mappingArray->getConstIterator(0);
+                        if (!mappingArrayIterator->end()) {
+                            dimension->set_coordinates_mapping_size(mappingArray->getArrayDesc().getDimensions()[0].getLength());
+                            ConstChunk const& chunk = mappingArrayIterator->getChunk();
+                            PinBuffer scope(chunk);
+                            dimension->set_coordinates_mapping(string((char*)chunk.getData(), chunk.getSize()));
+                        }
+                    } 
+                    catch (const Exception& e)
+                    {
+                        if (e.getLongErrorCode() != SCIDB_LE_ARRAY_DOESNT_EXIST) 
+                        {
+                            LOG4CXX_ERROR(logger, "Failed to get coordinates mapping array: " << e.what());
+                        }
+                    } 
+                }
             }
         }
 
-        vector<Warning> v = Query::getQueryByID(queryResult.queryID)->getWarnings();
+        vector<Warning> v = query->getWarnings();
         for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
         {
             ::scidb_msg::QueryResult_Warning* warn = queryResultRecord->add_warnings();
@@ -244,7 +269,7 @@ void ClientMessageHandleJob::executeClientQuery()
             warn->set_strings_namespace(it->getStringsNamespace());
             warn->set_stringified_code(it->getStringifiedCode());
         }
-        Query::getQueryByID(queryResult.queryID)->clearWarnings();
+        query->clearWarnings();
 
         for (vector<string>::const_iterator it = queryResult.plugins.begin();
             it != queryResult.plugins.end(); ++it)
@@ -273,6 +298,7 @@ void ClientMessageHandleJob::fetchChunk()
     try
     {
         query = Query::getQueryByID(queryID);
+        Query::validateQueryPtr(query);
         RWLock::ErrorChecker noopEc;
         ScopedRWLockRead shared(query->queryLock, noopEc);
         StatisticsScope sScope(&query->statistics);
@@ -288,6 +314,7 @@ void ClientMessageHandleJob::fetchChunk()
         if (!iter->end())
         {
             const ConstChunk* chunk = &iter->getChunk();
+            checkChunkMagic(*chunk);
             boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
             boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
             chunk->compress(*buffer, emptyBitmap);
@@ -335,6 +362,7 @@ void ClientMessageHandleJob::fetchChunk()
             query->clearWarnings();
         }
 
+        query->validate();
         _connection->sendMessage(chunkMsg);
 
         LOG4CXX_TRACE(logger, "Chunk was sent to client")
@@ -346,7 +374,6 @@ void ClientMessageHandleJob::fetchChunk()
         _connection->sendMessage(makeErrorMessageFromException(e, queryID));
     }
 }
-
 
 void ClientMessageHandleJob::cancelQuery()
 {
@@ -373,5 +400,29 @@ void ClientMessageHandleJob::cancelQuery()
     }
 }
 
+void ClientMessageHandleJob::completeQuery()
+{
+    const scidb::SciDB& scidb = getSciDBExecutor();
+
+    const QueryID queryID = _messageDesc->getQueryID();
+
+    StatisticsScope sScope;
+    try
+    {
+        scidb.completeQuery(queryID);
+        if (_connection) {
+            _connection->stopQuery(queryID);
+            _connection->sendMessage(makeOkMessage(queryID));
+        }
+        LOG4CXX_TRACE(logger, "The query " << queryID << " execution was completed")
+    }
+    catch (const Exception& e)
+    {
+        LOG4CXX_DEBUG(logger, e.what()) ;
+        if (_connection) {
+            _connection->sendMessage(makeErrorMessageFromException(e, queryID));
+        }
+    }
+}
 
 } // namespace

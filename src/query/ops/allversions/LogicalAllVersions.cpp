@@ -60,9 +60,26 @@ public:
 
         size_t nAllVersions = SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId()).size();
         Dimensions const& srcDims = arrayDesc.getDimensions();
-        Dimensions dstDims;
-        dstDims.push_back(DimensionDesc("VersionNo", 1, 1, nAllVersions, nAllVersions, 1, 0));
-        dstDims.insert(dstDims.end(), srcDims.begin(), srcDims.end());
+        size_t nDims = srcDims.size();
+        Dimensions dstDims(nDims+1);
+        dstDims[0] = DimensionDesc("VersionNo", 1, 1, nAllVersions, nAllVersions, 1, 0);
+        for (size_t i = 0; i < nDims; i++) { 
+            DimensionDesc const& dim = srcDims[i];
+            dstDims[i+1] = DimensionDesc(dim.getBaseName(),
+                                         dim.getNamesAndAliases(),
+                                         dim.getStartMin(),
+                                         dim.getCurrStart(), 
+                                         dim.getCurrEnd(), 
+                                         dim.getEndMax(),
+                                         dim.getChunkInterval(), 
+                                         dim.getChunkOverlap(), 
+                                         TID_INT64,
+                                         dim.getFlags(), 
+                                         "",
+                                         dim.getComment(),
+                                         dim.getFuncMapOffset(),
+                                         dim.getFuncMapScale());
+        }
         return ArrayDesc(arrayDesc.getName(), arrayDesc.getAttributes(), dstDims);
 
     }

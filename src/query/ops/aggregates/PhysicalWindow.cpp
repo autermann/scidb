@@ -87,7 +87,13 @@ public:
                                           inDim.getCurrEnd(),
                                           inDim.getEndMax(),
                                           inDim.getChunkInterval(),
-                                          overlap));
+                                          overlap,
+                                          inDim.getType(),
+                                          inDim.getFlags(),
+                                          inDim.getMappingArrayName(),
+                                          inDim.getComment(),
+                                          inDim.getFuncMapOffset(),
+                                          inDim.getFuncMapScale()));
         }
 
         return ArrayDesc(inputSchema.getName(), attrs, dims);

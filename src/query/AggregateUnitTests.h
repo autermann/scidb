@@ -69,11 +69,11 @@ public:
         AggregatePtr sum = al->createAggregate("sum", tInt32);
         CPPUNIT_ASSERT(sum.get() != 0);
 
-        CPPUNIT_ASSERT(sum->getInputType() == TypeLibrary::getType(TID_INT32));
-        CPPUNIT_ASSERT(sum->getStateType() == TypeLibrary::getType(TID_INT64));
+        CPPUNIT_ASSERT(sum->getAggregateType() == TypeLibrary::getType(TID_INT32));
+        CPPUNIT_ASSERT(sum->getStateType() == TypeLibrary::getType(TID_BINARY));
         CPPUNIT_ASSERT(sum->getResultType() == TypeLibrary::getType(TID_INT64));
 
-        Value input(sum->getInputType());
+        Value input(sum->getAggregateType());
         Value state(sum->getStateType());
         Value final(sum->getResultType());
 
@@ -124,11 +124,11 @@ public:
         AggregatePtr sum = al->createAggregate("sum", tFloat);
         CPPUNIT_ASSERT(sum.get() != 0);
 
-        CPPUNIT_ASSERT(sum->getInputType() == TypeLibrary::getType(TID_FLOAT));
-        CPPUNIT_ASSERT(sum->getStateType() == TypeLibrary::getType(TID_DOUBLE));
+        CPPUNIT_ASSERT(sum->getAggregateType() == TypeLibrary::getType(TID_FLOAT));
+        CPPUNIT_ASSERT(sum->getStateType() == TypeLibrary::getType(TID_BINARY));
         CPPUNIT_ASSERT(sum->getResultType() == TypeLibrary::getType(TID_DOUBLE));
 
-        Value input(sum->getInputType());
+        Value input(sum->getAggregateType());
         Value state(sum->getStateType());
         Value final(sum->getResultType());
 
@@ -170,11 +170,11 @@ public:
         AggregatePtr avg = al->createAggregate("avg", tInt32);
         CPPUNIT_ASSERT(avg.get() != 0);
 
-        CPPUNIT_ASSERT(avg->getInputType() == TypeLibrary::getType(TID_INT32));
+        CPPUNIT_ASSERT(avg->getAggregateType() == TypeLibrary::getType(TID_INT32));
 //        CPPUNIT_ASSERT(sum->getStateType() == TypeLibrary::getType(TID_INT64));
         CPPUNIT_ASSERT(avg->getResultType() == TypeLibrary::getType(TID_DOUBLE));
 
-        Value input(avg->getInputType());
+        Value input(avg->getAggregateType());
         Value state(avg->getStateType());
         Value final(avg->getResultType());
 
@@ -200,10 +200,10 @@ public:
         AggregatePtr avg = al->createAggregate("avg", tDouble);
         CPPUNIT_ASSERT(avg.get() != 0);
 
-        CPPUNIT_ASSERT(avg->getInputType() == TypeLibrary::getType(TID_DOUBLE));
+        CPPUNIT_ASSERT(avg->getAggregateType() == TypeLibrary::getType(TID_DOUBLE));
         CPPUNIT_ASSERT(avg->getResultType() == TypeLibrary::getType(TID_DOUBLE));
 
-        Value input(avg->getInputType());
+        Value input(avg->getAggregateType());
         Value state(avg->getStateType());
         Value final(avg->getResultType());
 

@@ -30,6 +30,7 @@
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "UnpackArray.h"
+#include "UnpackUnalignedArray.h"
 
 using namespace std;
 using namespace boost;
@@ -40,12 +41,12 @@ namespace scidb {
 class PhysicalUnpack: public PhysicalOperator
 {
 public:
-        PhysicalUnpack(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-            PhysicalOperator(logicalName, physicalName, parameters, schema)
-        {
-        }
-
-        virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    PhysicalUnpack(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalOperator(logicalName, physicalName, parameters, schema)
+    {
+    }
+    
+    virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
     {
         return false;
     }
@@ -67,15 +68,21 @@ public:
         return inputBoundaries[0].reshape(inputSchemas[0].getDimensions(), _schema.getDimensions());
     }
 
-        /***
-         * Unpack is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-         * that overrides the chunkiterator method.
-         */
-        boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    /***
+     * Unpack is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+     * that overrides the chunkiterator method.
+     */
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-                assert(inputArrays.size() == 1);
-                return boost::shared_ptr<Array>(new UnpackArray(_schema, inputArrays[0], query));
-         }
+        assert(inputArrays.size() == 1);
+        boost::shared_ptr<Array> inputArray = inputArrays[0];
+        Dimensions const& dims = inputArray->getArrayDesc().getDimensions();
+        size_t lastDim = dims.size()-1;
+        bool isAligned = dims[lastDim].getLength() % dims[lastDim].getChunkInterval() == 0;
+        return boost::shared_ptr<Array>(isAligned
+                                        ? (Array*)new UnpackArray(_schema, inputArray, query)
+                                        : (Array*)new UnpackUnalignedArray(_schema, inputArray, query));
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalUnpack, "unpack", "physicalUnpack")

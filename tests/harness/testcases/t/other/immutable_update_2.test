@@ -4,14 +4,16 @@ create immutable array unbounded <a:int64>[x=0:*,5,0]
 load(unbounded,'../tests/harness/testcases/data/unbounded.txt')
 
 --test
+--start-query-logging
 
 
---error --long=165 --aql "update unbounded set a=99 where a is not null"
+--error --aql "update unbounded set a=99 where a is not null"
 
 
 scan(unbounded)  
 
 
+--stop-query-logging
 --cleanup
 
 remove(unbounded) 

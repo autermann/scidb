@@ -6,9 +6,9 @@ create array A <a:int32> [x=0:2,3,0]
 --test
 list()
 --error --code=scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING "store(build_sparse(A,'test',1),B)"
-list()
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST "scan(B)"
 --error --code=scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING "store(build(A,'test'),C)"
-list()
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST "scan(C)"
 
 --cleanup
 remove(A)

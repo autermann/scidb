@@ -65,7 +65,7 @@ protected:
     static boost::shared_ptr<Optimizer> createHabilis();
 
     virtual boost::shared_ptr< LogicalQueryPlanNode> logicalRewriteIfNeeded(const boost::shared_ptr<Query>& query,
-                                                                            boost::shared_ptr< LogicalQueryPlanNode> node);
+                                                                            boost::shared_ptr< LogicalQueryPlanNode> instance);
 
   public:
     virtual ~Optimizer() {}

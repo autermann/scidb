@@ -175,7 +175,7 @@ echo "Granting user $owner_login usage for language C..."
 #echo "Populating database $catalog_name with metadata..."
 #(cat "$METADATA_FILE" | runpsql "$catalog_name" > /dev/null) || die
 
-echo "Done! Now connect to catalog with SciDB initialize and register cluster node."
+echo "Done! Now connect to catalog with SciDB initialize and register cluster instance."
 echo "Sample connection string for connecting to catalog:"
 echo host=$pg_host port=$pg_port dbname="$catalog_name" user="$owner_login" password="$owner_password"
 

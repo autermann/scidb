@@ -231,6 +231,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	 * Parsing command line arguments
 	 */
 	options_description argsDesc;
+	options_description helpDesc;
 
 	BOOST_FOREACH(opt_pair p, _values)
 	{
@@ -250,18 +251,26 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	
 			switch(opt->_type)
 			{
-				case Config::BOOLEAN:
-                  argsDesc.add_options()(arg.c_str(), opt->_description.c_str());
-                    break;
-				default:
-					argsDesc.add_options()
-							(arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
+              case Config::BOOLEAN:
+                helpDesc.add_options()(arg.c_str(), opt->_description.c_str());
+                if (!boost::any_cast<bool>(opt->_value)) { 
+                    argsDesc.add_options()(arg.c_str(), opt->_description.c_str());
+                } else { 
+                    argsDesc.add_options()
+                        (arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
+                }
+                break;
+              default:
+                helpDesc.add_options()
+                    (arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
+                argsDesc.add_options()
+                    (arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
 			}
 		}
 	}
 
 	stringstream desrcStream;
-	desrcStream << argsDesc;
+	desrcStream << helpDesc;
 	_description = desrcStream.str();
 	
 	variables_map cmdLineArgs;
@@ -296,7 +305,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 			switch (opt->_type)
 			{
 				case Config::BOOLEAN:
-					opt->_value = !boost::any_cast<bool>(opt->_value);
+                  opt->_value = !boost::any_cast<bool>(opt->_value) ? true : cmdLineArgs[opt->_long].empty() || cmdLineArgs[opt->_long].as<bool>();
 					break;
 				case Config::STRING:
 					opt->_value = cmdLineArgs[opt->_long].as<string>();
@@ -603,7 +612,7 @@ static value_semantic* optTypeToValSem(Config::ConfigOptionType optionType)
 	switch (optionType)
 	{
 		case Config::BOOLEAN:
-			return value<bool>();
+          return value<bool>()->implicit_value(true)->default_value(true);
 		case Config::STRING:
 			return value<string>();
 		case Config::INTEGER:

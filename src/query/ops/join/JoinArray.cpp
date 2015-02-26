@@ -32,7 +32,6 @@
 #include "array/Array.h"
 #include "JoinArray.h"
 
-
 using namespace std;
 using namespace boost;
 
@@ -91,7 +90,7 @@ namespace scidb
 
     JoinChunkIterator::JoinChunkIterator(JoinEmptyableArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode)
     : DelegateChunkIterator(chunk, iterationMode),
-      joinIterator(arrayIterator.joinIterator->getChunk().getConstIterator(iterationMode)),
+      joinIterator(arrayIterator._joinIterator->getChunk().getConstIterator(iterationMode)),
       mode(iterationMode)
     {
         alignIterators();
@@ -115,22 +114,20 @@ namespace scidb
     bool JoinEmptyableArrayIterator::setPosition(Coordinates const& pos)
     {
         chunkInitialized = false;        
-        hasCurrent = inputIterator->setPosition(pos) && (!joinIterator || joinIterator->setPosition(pos));
-        return hasCurrent;
+        _hasCurrent = inputIterator->setPosition(pos) && _joinIterator->setPosition(pos);
+        return _hasCurrent;
     }
 
     void JoinEmptyableArrayIterator::reset()
     {
         inputIterator->reset();
-        if (joinIterator) { 
-            joinIterator->reset();
-        }
+        _joinIterator->reset();
         alignIterators();
     }
 
     void JoinEmptyableArrayIterator::operator ++()
     {
-        if (!hasCurrent)
+        if (!_hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_POSITION);
         ++(*inputIterator);
         alignIterators();
@@ -138,16 +135,16 @@ namespace scidb
 
     bool JoinEmptyableArrayIterator::end()
     {
-        return !hasCurrent;
+        return !_hasCurrent;
     }
 
     void JoinEmptyableArrayIterator::alignIterators()
     {
-        hasCurrent = false;
+        _hasCurrent = false;
         chunkInitialized = false;
-        while (!inputIterator->end()) { 
-            if (!joinIterator || joinIterator->setPosition(inputIterator->getPosition())) { 
-                hasCurrent = true;
+        while (!inputIterator->end()) {
+            if (_joinIterator->setPosition(inputIterator->getPosition())) {
+                _hasCurrent = true;
                 break;
             }
             ++(*inputIterator);
@@ -156,66 +153,118 @@ namespace scidb
 
     ConstChunk const& JoinEmptyableArrayIterator::getChunk()
     {
-        chunk->overrideClone(!joinIterator);
+        chunk->overrideClone(!_chunkLevelJoin);
         return DelegateArrayIterator::getChunk();
     }
 
-    JoinEmptyableArrayIterator::JoinEmptyableArrayIterator(JoinEmptyableArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, boost::shared_ptr<ConstArrayIterator> join)
+    JoinEmptyableArrayIterator::JoinEmptyableArrayIterator(JoinEmptyableArray const& array,
+                                                           AttributeID attrID,
+                                                           boost::shared_ptr<ConstArrayIterator> input,
+                                                           boost::shared_ptr<ConstArrayIterator> join,
+                                                           bool chunkLevelJoin)
     : DelegateArrayIterator(array, attrID, input),
-      joinIterator(join)
+      _joinIterator(join),
+      _chunkLevelJoin(chunkLevelJoin)
     {
         alignIterators();
     }
-
 
 
     DelegateChunkIterator* JoinEmptyableArray::createChunkIterator(DelegateChunk const* chunk, int iterationMode) const
     {
         JoinEmptyableArrayIterator const& arrayIterator = (JoinEmptyableArrayIterator const&)chunk->getArrayIterator();
         AttributeDesc const& attr = chunk->getAttributeDesc();
-        return arrayIterator.joinIterator
-            ? attr.isEmptyIndicator()
-                ? (DelegateChunkIterator*)new JoinBitmapChunkIterator(arrayIterator, chunk, iterationMode)
-                : (DelegateChunkIterator*)new JoinChunkIterator(arrayIterator, chunk, iterationMode)
-            : new DelegateChunkIterator(chunk, iterationMode);
+        iterationMode &= ~ChunkIterator::INTENDED_TILE_MODE;
+
+        if (!arrayIterator._chunkLevelJoin)
+        {
+            return new DelegateChunkIterator(chunk, iterationMode);
+        }
+        else if (attr.isEmptyIndicator())
+        {
+            return (DelegateChunkIterator*)new JoinBitmapChunkIterator(arrayIterator, chunk, iterationMode);
+        }
+        else
+        {
+            return (DelegateChunkIterator*)new JoinChunkIterator(arrayIterator, chunk, iterationMode);
+        }
     }
 
     DelegateArrayIterator* JoinEmptyableArray::createArrayIterator(AttributeID attrID) const
     {
         boost::shared_ptr<ConstArrayIterator> inputIterator;
         boost::shared_ptr<ConstArrayIterator> joinIterator;
+        bool chunkLevelJoin = true;
         AttributeID inputAttrID = attrID;
 
-        if (leftEmptyTagPosition >= 0) { // left array is emptyable
-            if (rightEmptyTagPosition >= 0) { // right array is also emptyable: ignore left empty-tag attribute
-                if ((int)inputAttrID >= leftEmptyTagPosition) { 
-                    inputAttrID += 1;
-                }
-                if (inputAttrID >= nLeftAttributes) { 
+        /*
+         * There are two 'levels' of join.
+         * First we must ensure that each chunk in LEFT has a matching chunk in RIGHT and vice-versa;
+         * otherwise we must exclude non-matching chunk from output. We ALWAYS perform these array-level
+         * joins of chunks - regardless of whether the two arrays are emptyable or not.
+         *
+         * Once you have two matching chunks, you need to make sure that each value in LEFT has a matching
+         * value in RIGHT. This is what we call "chunkLevelJoin". At this point, there are cases such as
+         * reading an attribute from LEFT and RIGHT is not EMPTYABLE, where we do NOT need to perform a
+         * chunk-level join. We can return the entire chunk from LEFT directly.
+         */
+
+        if (leftEmptyTagPosition >= 0)
+        {   // left array is emptyable
+            if ((int)inputAttrID >= leftEmptyTagPosition)
+            {
+                inputAttrID += 1;
+            }
+            if (rightEmptyTagPosition >= 0)
+            {    // right array is also emptyable: ignore left empty-tag attribute
+                if (inputAttrID >= nLeftAttributes)
+                {
                     inputIterator = right->getConstIterator(inputAttrID - nLeftAttributes);
                     joinIterator = left->getConstIterator(leftEmptyTagPosition);
-                } else { 
+                }
+                else
+                {
                     inputIterator = left->getConstIterator(inputAttrID);
                     joinIterator = right->getConstIterator(rightEmptyTagPosition);
                 }
-            } else { // emptyable array only from left side
-                if (inputAttrID >= nLeftAttributes) { 
+            }
+            else
+            {   // emptyable array only from left side
+                if (attrID == AttributeID(emptyTagPosition))
+                {
+                    inputIterator = left->getConstIterator(leftEmptyTagPosition);
+                    joinIterator = right->getConstIterator(0);
+                    chunkLevelJoin = false;
+                }
+                else if (inputAttrID >= nLeftAttributes)
+                {
                     inputIterator = right->getConstIterator(inputAttrID - nLeftAttributes);
                     joinIterator = left->getConstIterator(leftEmptyTagPosition);
-                } else { 
+                }
+                else
+                {
                     inputIterator = left->getConstIterator(inputAttrID);
-                } 
+                    joinIterator = right->getConstIterator(0);
+                    chunkLevelJoin = false;
+                }
             }
-        } else { // only right array is emptyable
-            assert(rightEmptyTagPosition >= 0); 
-            if (inputAttrID >= nLeftAttributes) { 
+        }
+        else
+        {   // only right array is emptyable
+            assert(rightEmptyTagPosition >= 0);
+            if (inputAttrID >= nLeftAttributes)
+            {
                 inputIterator = right->getConstIterator(inputAttrID - nLeftAttributes);
-            } else { 
+                joinIterator = left->getConstIterator(0);
+                chunkLevelJoin = false;
+            }
+            else
+            {
                 inputIterator = left->getConstIterator(inputAttrID);
                 joinIterator = right->getConstIterator(rightEmptyTagPosition);
-            }             
+            }
         }
-        return new JoinEmptyableArrayIterator(*this, attrID, inputIterator, joinIterator);
+        return new JoinEmptyableArrayIterator(*this, attrID, inputIterator, joinIterator, chunkLevelJoin);
     }
 
     JoinEmptyableArray::JoinEmptyableArray(ArrayDesc const& desc, boost::shared_ptr<Array> leftArr, boost::shared_ptr<Array> rightArr)

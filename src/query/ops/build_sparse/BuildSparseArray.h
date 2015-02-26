@@ -123,13 +123,14 @@ class BuildSparseArrayIterator : public ConstArrayIterator
     BuildSparseArrayIterator(BuildSparseArray& array, AttributeID id);
 
   private:
-    void setPosition(bool nextAvailable = false);
+    void nextChunk();
 
     BuildSparseArray& array;
-    Coordinates currPos;
     bool hasCurrent;
+    bool chunkInitialized;
     BuildSparseChunk chunk;
-    size_t currChunkNo;
+    Dimensions const& dims;
+    Coordinates currPos;
 };
 
 class BuildSparseArray : public Array
@@ -151,8 +152,8 @@ class BuildSparseArray : public Array
     boost::shared_ptr<Expression> _predicate;
     vector<BindInfo> _predicateBindings;
     FunctionPointer _converter;
-    size_t nNodes;
-    size_t nodeID;
+    size_t nInstances;
+    size_t instanceID;
     bool emptyable;
     boost::weak_ptr<Query> _query;
 };

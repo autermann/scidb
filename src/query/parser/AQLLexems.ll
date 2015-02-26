@@ -53,6 +53,7 @@ Whitespace ({Space}+|{OneLineComment})
 IdentifierFirstChar [A-Za-z_\$]
 IdentifierOtherChars [A-Za-z0-9_\$]
 Identifier {IdentifierFirstChar}{IdentifierOtherChars}*
+QuotedIdentifier \"{IdentifierFirstChar}{IdentifierOtherChars}*\"
 
 Digit [0-9]
 Integer    {Digit}+
@@ -101,12 +102,15 @@ Other .
     const AQLKeyword *kw = FindAQLKeyword(yytext);
     if (kw)
     {
-        //yylval->keyword = new std::string(kw->name);
-        //std::cout  << "KEYWORD: " << *yylval->keyword  << std::endl; 
+        yylval->keyword = new std::string(yytext, yyleng);
         return kw->tok;
     }
     yylval->stringVal = new std::string(yytext, yyleng);
-    //std::cout  << "IDENTIFIER: " << *yylval->stringVal << std::endl; 
+    return token::IDENTIFIER;
+}
+
+{QuotedIdentifier} {
+    yylval->stringVal = new std::string(yytext, 1, yyleng - 2);  
     return token::IDENTIFIER;
 }
 

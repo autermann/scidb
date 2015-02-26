@@ -27,7 +27,7 @@
  *
  * @brief The job for handling messages from client.
  *
- * The main difference between handling of messages between nodes is that we must send
+ * The main difference between handling of messages between instances is that we must send
  * response to this message and keep synchronous client connection to do that.
  */
 
@@ -56,16 +56,16 @@ class Connection;
  */
 class ClientMessageHandleJob: public Job
 {
-public:
-	ClientMessageHandleJob(boost::shared_ptr< Connection > connection,
-	        const boost::shared_ptr<MessageDesc>& messageDesc);
+ public:
+    ClientMessageHandleJob(boost::shared_ptr< Connection > connection,
+                           const boost::shared_ptr<MessageDesc>& messageDesc);
 
-	// Implementation of thread job
-	void run();
+    // Implementation of thread job
+    void run();
 
-private:
-	boost::shared_ptr<Connection> _connection;
-	boost::shared_ptr<MessageDesc> _messageDesc;
+ private:
+    boost::shared_ptr<Connection> _connection;
+    boost::shared_ptr<MessageDesc> _messageDesc;
 
     /**
      *  This method process message mtPrepareQuery containing client query string.
@@ -77,17 +77,22 @@ private:
      *  This method process message mtExecuteQuery containing client query string or prepared query ID.
      *  At the end of work it send response to client by _connection.
      */
-	void executeClientQuery();
+    void executeClientQuery();
 
-	/**
-	 * This method sends next chunk to the client.
-	 */
-	void fetchChunk();
+    /**
+     * This method sends next chunk to the client.
+     */
+    void fetchChunk();
 
-	/**
+    /**
      * This method cancels query execution and free context
      */
     void cancelQuery();
+
+    /**
+     * This method completes the query execution, persists the changes, and frees the context
+     */
+    void completeQuery();
 
     /// Helper to deal with exceptions in prepare/executeClientQuery()
     void handleExecuteOrPrepareError(const scidb::Exception& e,

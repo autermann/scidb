@@ -111,11 +111,11 @@ namespace scidb
     : DelegateChunkIterator(chunk, iterationMode),
       array(arr),
       attr(chunk->getAttributeDesc().getId()),
-      mode(iterationMode)
+      mode(iterationMode & ~INTENDED_TILE_MODE)
     {
         MapJoinArrayIterator const& arrayIterator = (MapJoinArrayIterator const&)chunk->getArrayIterator();
         rightArrayIterator = arrayIterator.rightIterator;
-        isEmptyIndicator = !arrayIterator.inputIterator || arrayIterator.inputIterator->getChunk().getAttributeDesc().isEmptyIndicator();
+        isEmptyIndicator = !arrayIterator.inputIterator || arrayIterator.inputIterator->end() || arrayIterator.inputIterator->getChunk().getAttributeDesc().isEmptyIndicator();
         isLeftAttribute = arrayIterator.inputIterator == arrayIterator.leftIterator;
         reset();
     }

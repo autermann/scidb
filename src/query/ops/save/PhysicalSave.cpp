@@ -71,7 +71,7 @@ public:
             const string& format = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
             DBLoader::save(*inputArrays[0], fileName, format);
         } else {
-           DBLoader::save(*inputArrays[0], fileName);
+            DBLoader::save(*inputArrays[0], fileName, "store");
         }
         return inputArrays[0];
     }

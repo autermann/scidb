@@ -8,13 +8,13 @@ SCIDB QUERY : <select * into C from A,B>
 []
 
 SCIDB QUERY : <select * from show(C)>
-[("C<a:string NOT NULL DEFAULT \"test1\",a_2:string NOT NULL DEFAULT \"test2\"> [x=0:2,3,0]")]
+[("C<a:string DEFAULT \"test1\",a_2:string DEFAULT \"test2\"> [x=0:2,3,0]")]
 
 SCIDB QUERY : <select * into D from A,B,C>
 []
 
 SCIDB QUERY : <select * from show(D)>
-[("D<a:string NOT NULL DEFAULT \"test1\",a_2:string NOT NULL DEFAULT \"test2\",a_3:string NOT NULL DEFAULT \"test1\",a_2_2:string NOT NULL DEFAULT \"test2\"> [x=0:2,3,0]")]
+[("D<a:string DEFAULT \"test1\",a_2:string DEFAULT \"test2\",a_3:string DEFAULT \"test1\",a_2_2:string DEFAULT \"test2\"> [x=0:2,3,0]")]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

@@ -176,7 +176,7 @@ void ApplyChunkIterator::setVectorMode(bool enabled)
 }
 
 ApplyChunkIterator::ApplyChunkIterator(ApplyArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode) :
-    DelegateChunkIterator(chunk, iterationMode & ~(IGNORE_NULL_VALUES | IGNORE_DEFAULT_VALUES)),
+    DelegateChunkIterator(chunk, iterationMode & ~(INTENDED_TILE_MODE | IGNORE_NULL_VALUES | IGNORE_DEFAULT_VALUES)),
     _array((ApplyArray&) arrayIterator.array),
     _outAttrId(arrayIterator.attr),
     _bindings(_array._bindingSets[_outAttrId]),

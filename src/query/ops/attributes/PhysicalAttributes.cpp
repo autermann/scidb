@@ -51,7 +51,7 @@ public:
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psLocalNode);
+        return ArrayDistribution(psLocalInstance);
     }
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
@@ -63,7 +63,7 @@ public:
 
         ArrayDesc arrayDesc;
         SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
-        Attributes const& attrs = arrayDesc.getAttributes();
+        Attributes const& attrs = arrayDesc.getAttributes(true);
         
         vector< boost::shared_ptr<Tuple> > tuples(attrs.size());
         for (size_t i = 0; i < attrs.size(); i++) { 

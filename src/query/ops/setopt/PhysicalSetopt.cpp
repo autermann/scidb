@@ -66,7 +66,7 @@ class PhysicalSetopt: public PhysicalOperator
             tuple[0].setString(oldValue.c_str());
             tuples[0] = boost::shared_ptr<Tuple>(&tuple);
         }
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples, Coordinate(query->getNodeID())));
+        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples, Coordinate(query->getInstanceID())));
     }
 };
 

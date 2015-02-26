@@ -65,7 +65,11 @@ private:
 
     pthread_mutex_t _mutex;
 
-public:
+  public:
+    void checkForDeadlock() { 
+        assert(_mutex.__data.__count == 1);
+    }
+    
     Mutex()
     {
         pthread_mutexattr_t __attr;

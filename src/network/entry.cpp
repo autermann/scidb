@@ -44,6 +44,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
+#include <malloc.h>
 
 #include "network/NetworkManager.h"
 #include "system/SciDBConfigOptions.h"
@@ -55,6 +56,8 @@
 #include "query/executor/SciDBExecutor.h"
 #include "util/PluginManager.h"
 #include "smgr/io/Storage.h"
+#include <util/InjectedError.h>
+#include <smgr/io/ReplicationManager.h>
 
 // to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.entry"));
@@ -126,6 +129,18 @@ void runSciDB()
        }
    }
 
+   int largeMemLimit = cfg->getOption<int>(CONFIG_LARGE_MEMALLOC_LIMIT);
+   if (largeMemLimit>0 && (0==mallopt(M_MMAP_MAX, largeMemLimit))) {
+
+       LOG4CXX_WARN(logger, "Failed to set large-memalloc-limit");
+   }
+
+   int smallMemSize = cfg->getOption<int>(CONFIG_SMALL_MEMALLOC_SIZE);
+   if (smallMemSize>0 && (0==mallopt(M_MMAP_THRESHOLD, smallMemSize))) {
+
+       LOG4CXX_WARN(logger, "Failed to set small-memalloc-size");
+   }
+   
    boost::shared_ptr<JobQueue> messagesJobQueue = boost::make_shared<JobQueue>();
 
    // Here we can play with thread number
@@ -160,6 +175,11 @@ void runSciDB()
 
        PluginManager::getInstance()->preLoadLibraries();
 
+       // Pull in the injected error library symbols
+       InjectedErrorLibrary::getLibrary()->getError(0);
+
+       ReplicationManager::getInstance()->start();
+
        messagesThreadPool->start();
        NetworkManager::getInstance()->run(messagesJobQueue);
    }
@@ -175,6 +195,7 @@ void runSciDB()
          messagesThreadPool->stop();
       }
       StorageManager::getInstance().close();
+      ReplicationManager::getInstance()->stop();
    }
    catch (const std::exception &e)
    {

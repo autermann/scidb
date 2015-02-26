@@ -8,7 +8,7 @@ import re
 import glob
 import logging
 import logging.handlers
-# Tested on 2-node cluster
+# Tested on 2-instance cluster
 
 basepath = os.path.realpath(os.path.dirname(sys.argv[0])) 
 dgpath = basepath + "/../data_gen/gen_matrix"

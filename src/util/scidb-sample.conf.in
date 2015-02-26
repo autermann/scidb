@@ -14,7 +14,7 @@
 // Log4cxx properties file.
     "LOG_PROPERTIES": "",
 
-// Option to start coordinator node. It will works on default port or on port specified by port option.
+// Option to start coordinator instance. It will works on default port or on port specified by port option.
     "COORDINATOR": false,
 
 // Set port for server. Default - any free port, but 1239 if coodinator.
@@ -75,7 +75,7 @@
 // Time in seconds to wait before re-connecting to peer(s)
     "RECONNECT_TIMEOUT": 10,
 
-// Time in seconds to wait before decalring a network-silent node dead.
+// Time in seconds to wait before decalring a network-silent instance dead.
     "LIVENESS_TIMEOUT": 30,
 
 // Do not start a watchdog process

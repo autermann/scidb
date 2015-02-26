@@ -68,7 +68,7 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
    };
 
    WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue)
-   : _jobQueue(jobQueue), _maxOutstanding(DEFAULT_MAX_OUTSTANDING), _maxSize(DEFAULT_MAX_SIZE),  _outstanding(0)
+   : _jobQueue(jobQueue), _maxOutstanding(DEFAULT_MAX_OUTSTANDING), _maxSize(DEFAULT_MAX_SIZE),  _outstanding(0), _isStarted(true)
    {
        if (!jobQueue) {
            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "NULL job queue");
@@ -77,7 +77,7 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
 
    WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue,
              uint32_t maxOutstanding, uint32_t maxSize)
-   : _jobQueue(jobQueue), _maxOutstanding(maxOutstanding), _maxSize(maxSize),  _outstanding(0)
+   : _jobQueue(jobQueue), _maxOutstanding(maxOutstanding), _maxSize(maxSize),  _outstanding(0), _isStarted(true)
    {
        if (!jobQueue) {
            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "NULL job queue");
@@ -92,7 +92,7 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
    {
       {
          ScopedMutexLock lock(_mutex);
-         if ((_workQueue.size()+1)>_maxSize) {
+         if ((_size()+1)>_maxSize) {
             throw OverflowException(REL_FILE, __FUNCTION__, __LINE__);
          }
          _workQueue.push_back(work);
@@ -100,7 +100,36 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
       spawn();
    }
 
+   void start()
+   {
+      {
+         ScopedMutexLock lock(_mutex);
+         _isStarted = true;
+      }
+      spawn();
+   }
+
+   void stop()
+   {
+      {
+         ScopedMutexLock lock(_mutex);
+         _isStarted = false;
+      }
+   }
+
+   uint32_t size()
+   {
+       ScopedMutexLock lock(_mutex);
+       return _size();
+   }
+
  private:
+
+   uint32_t _size()
+   {
+       // mutex must be locked
+       return (_outstanding + _workQueue.size());
+   }
 
    void done()
    {
@@ -120,6 +149,10 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
          ScopedMutexLock lock(_mutex);
 
          assert(_outstanding <= _maxOutstanding);
+
+         if (!_isStarted) {
+             return;
+         }
 
          while ((_outstanding < _maxOutstanding) && !_workQueue.empty()) {
             q.push_back(WorkItem());
@@ -186,7 +219,7 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
    WorkQueue& operator=(const WorkQueue&);
 
    const static uint32_t DEFAULT_MAX_OUTSTANDING = 1;
-   const static uint32_t DEFAULT_MAX_SIZE = 10000;
+   const static uint32_t DEFAULT_MAX_SIZE = 1000000;
 
    boost::shared_ptr<JobQueue> _jobQueue;
    std::deque<WorkItem> _workQueue;
@@ -194,6 +227,7 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
    uint32_t _maxSize;
    uint32_t _outstanding;
    Mutex _mutex;
+   bool _isStarted;
  };
 
 } //namespace scidb

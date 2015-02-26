@@ -60,7 +60,7 @@ public:
                 return false;
         }
 
-        int64_t getSourceNodeID() const
+        int64_t getSourceInstanceID() const
         {
         if (_parameters.size() == 3)
         {
@@ -75,15 +75,15 @@ public:
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                     const std::vector< ArrayDesc> & inputSchemas) const
     {
-        int64_t sourceNodeID = getSourceNodeID();
-        if (sourceNodeID == -1 )
+        int64_t sourceInstanceID = getSourceInstanceID();
+        if (sourceInstanceID == -1 )
         {
-            //The file is loaded from multiple nodes - the distribution could be possibly violated - assume the worst
+            //The file is loaded from multiple instances - the distribution could be possibly violated - assume the worst
             return ArrayDistribution(psUndefined);
         }
         else
         {
-            return ArrayDistribution(psLocalNode);
+            return ArrayDistribution(psLocalInstance);
         }
     }
 
@@ -98,17 +98,17 @@ public:
         assert(paramExpr->isConstant());
         const string fileName = paramExpr->getExpression()->evaluate().getString();
 
-        int64_t sourceNodeID = getSourceNodeID() == -2 ? query->getCoordinatorID() : getSourceNodeID();
+        int64_t sourceInstanceID = getSourceInstanceID() == -2 ? query->getCoordinatorID() : getSourceInstanceID();
 
-        if (sourceNodeID < -1 || sourceNodeID >= (int64_t) query->getNodesCount())
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_INVALID_NODE_ID) << sourceNodeID;
+        if (sourceInstanceID < -1 || sourceInstanceID >= (int64_t) query->getInstancesCount())
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_INVALID_INSTANCE_ID) << sourceInstanceID;
 
-        int64_t myNodeID = query->getNodeID();
+        int64_t myInstanceID = query->getInstanceID();
 
         boost::shared_ptr<Array> result;
         try
         {
-            if (sourceNodeID == -1 || sourceNodeID == myNodeID)
+            if (sourceInstanceID == -1 || sourceInstanceID == myInstanceID)
             {
                result = boost::shared_ptr<Array>(new InputArray(_schema, fileName, query));
             }
@@ -119,7 +119,7 @@ public:
         }
         catch(const Exception& e)
         {
-            if (e.getLongErrorCode() != SCIDB_LE_CANT_OPEN_FILE || sourceNodeID == myNodeID )
+            if (e.getLongErrorCode() != SCIDB_LE_CANT_OPEN_FILE || sourceInstanceID == myInstanceID )
             {
                 throw;
             }

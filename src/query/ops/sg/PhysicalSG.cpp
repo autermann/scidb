@@ -37,8 +37,10 @@
 #include "network/MessageUtils.h"
 #include "system/SystemCatalog.h"
 #include "array/DBArray.h"
+#include "array/DelegateArray.h"
 #include "query/QueryProcessor.h"
 #include "query/parser/ParsingContext.h"
+#include <smgr/io/Storage.h>
 
 using namespace boost;
 using namespace std;
@@ -53,7 +55,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.sg"));
 /**
  * Physical implementation of SCATTER/GATHER operator.
  * This physical operator must be inserted into physical plan by optimizer
- * without any logical node in logical plan.
+ * without any logical instance in logical plan.
  */
 class PhysicalSG: public PhysicalOperator
 {
@@ -89,15 +91,16 @@ private:
     void preSingleExecuteForStore(boost::shared_ptr<Query>& query)
     {
         ArrayDesc desc;
-        shared_ptr<const NodeMembership> membership(Cluster::getInstance()->getNodeMembership());
+        shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
         assert(membership);
         if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-            (membership->getNodes().size() != query->getNodesCount())) {
+            (membership->getInstances().size() != query->getInstancesCount())) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
         }
-        _lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(_schema.getName(),
+        string const& arrayName = _schema.getName();
+        _lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(arrayName,
                                                                                        query->getQueryID(),
-                                                                                       Cluster::getInstance()->getLocalNodeId(),
+                                                                                       Cluster::getInstance()->getLocalInstanceId(),
                                                                                        SystemCatalog::LockDesc::COORD,
                                                                                        SystemCatalog::LockDesc::WR));
         shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
@@ -106,30 +109,67 @@ private:
         bool rc = false;
         PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
 
-        if (!SystemCatalog::getInstance()->getArrayDesc(_schema.getName(), desc, false)) {
-
+        Dimensions const& dims =  _schema.getDimensions();        
+        size_t nDims = dims.size();
+        Dimensions newVersionDims(nDims);
+        bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(arrayName, desc, false);
+        VersionID lastVersion = 0;
+        if (!arrayExists) { 
             _lock->setLockMode(SystemCatalog::LockDesc::CRT);
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
-
-            ArrayID newArrayID = SystemCatalog::getInstance()->addArray(_schema, ps);
             desc = _schema;
-            desc.setId(newArrayID); 
+            desc.setId(SystemCatalog::getInstance()->addArray(desc, psRoundRobin));
+        } else { 
+            if (!desc.isImmutable()) { 
+                lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
+            } 
+        }
+ 
+        Dimensions const& dstDims = desc.getDimensions();        
+ 
+        for (size_t i = 0; i < nDims; i++) {
+            DimensionDesc const& dim = dims[i];
+            string const& mappingArrayName = dim.getMappingArrayName();
+            newVersionDims[i] = dim;
+            if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) { 
+                if (arrayExists && desc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName()) { 
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CAN_NOT_CHANGE_MAPPING) << arrayName;
+                }
+                boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(mappingArrayName);
+                if (tmpMappingArray) { 
+                    ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
+                    string newMappingArrayName = desc.createMappingArrayName(i, lastVersion+1);
+                    if (SystemCatalog::getInstance()->containsArray(newMappingArrayName)) { 
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << newMappingArrayName;
+                    }
+                    ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(), tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
+                    ArrayID mappingArrayID = SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
+                    assert(mappingArrayID > 0);
+                    newVersionDims[i] = DimensionDesc(dim.getBaseName(),
+                                                      dim.getNamesAndAliases(),
+                                                      dim.getStartMin(), dim.getCurrStart(),
+                                                      dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(),
+                                                      dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
+                                                      newMappingArrayName,
+                                                      dim.getComment(),
+                                                      dim.getFuncMapOffset(),
+                                                      dim.getFuncMapScale());
+                 }
+            }
         }
         if (desc.isImmutable()) {
             return;
         }
         _updateableArrayID = desc.getId();
 
-        VersionID lastVersion = SystemCatalog::getInstance()->getLastVersion(_updateableArrayID);
-
         _lock->setArrayId(_updateableArrayID);
         _lock->setArrayVersion(lastVersion+1);
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
         assert(rc);
 
-        _schema = ArrayDesc(formArrayNameVersion(desc.getName(),(lastVersion+1)),
-                            desc.getAttributes(), desc.getDimensions());
+        _schema = ArrayDesc(formArrayNameVersion(desc.getName(), (lastVersion+1)),
+                            desc.getAttributes(), newVersionDims);
         
         _arrayID = SystemCatalog::getInstance()->addArray(_schema, ps);
 
@@ -213,10 +253,11 @@ private:
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
             PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
-            int64_t nodeID = -1;
+            int64_t instanceID = -1;
             std::string arrayName = "";
             DimensionVector offsetVector = getOffsetVector(vector<ArrayDesc>());
             DimensionVector shapeVector = getShapeVector(vector<ArrayDesc>());
+            shared_ptr<Array> srcArray = inputArrays[0];
 
             boost::shared_ptr <DistributionMapper> distMapper;
 
@@ -230,7 +271,7 @@ private:
 
             if (_parameters.size() >=2 )
             {
-            	nodeID = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64();
+            	instanceID = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64();
             }
 
             if (_parameters.size() >= 3)
@@ -248,31 +289,42 @@ private:
                 }
             }
 
-            if ((!_lock) && storeResult) {
-               assert(!arrayName.empty());
-               VersionID version(0);
-               string baseArrayName = splitArrayNameVersion(arrayName, version);
+            if (storeResult) {
+                assert(!arrayName.empty());
 
-               _lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(baseArrayName,
-                                                                query->getQueryID(),
-                                                                Cluster::getInstance()->getLocalNodeId(),
-                                                                SystemCatalog::LockDesc::WORKER,
-                                                                SystemCatalog::LockDesc::WR));
-               _lock->setArrayVersion(version);
-               shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
-               query->pushErrorHandler(ptr);
+                VersionID version(0);
+                string baseArrayName = splitArrayNameVersion(arrayName, version);
+                query->exclusiveLock(baseArrayName);
 
-               Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock,
-                                         _lock, _1);
-               query->pushFinalizer(f);
-               SystemCatalog::ErrorChecker errorChecker = bind(&Query::validate, query);
-               bool rc = SystemCatalog::getInstance()->lockArray(_lock, errorChecker);
-               if (!rc) {
-                  throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK)
-                  << baseArrayName;
-               }
+                if (!_lock) {
+                    _lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(baseArrayName,
+                                                                                                   query->getQueryID(),
+                                                                                                   Cluster::getInstance()->getLocalInstanceId(),
+                                                                                                   SystemCatalog::LockDesc::WORKER,
+                                                                                                   SystemCatalog::LockDesc::WR));
+                    _lock->setArrayVersion(version);
+                    shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
+                    query->pushErrorHandler(ptr);
+
+                    Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock,
+                                              _lock, _1);
+                    query->pushFinalizer(f);
+                    SystemCatalog::ErrorChecker errorChecker = bind(&Query::validate, query);
+                    bool rc = SystemCatalog::getInstance()->lockArray(_lock, errorChecker);
+                    if (!rc) {
+                        throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK)
+                            << baseArrayName;
+                    }
+                }
+                if (srcArray->getArrayDesc().getAttributes().size() != _schema.getAttributes().size()) { 
+                    srcArray = boost::shared_ptr<Array>(new NonEmptyableArray(srcArray));
+                } 
             }
-            return redistribute(inputArrays[0], query, ps, arrayName, nodeID, distMapper);
+            boost::shared_ptr<Array> res = redistribute(srcArray, query, ps, arrayName, instanceID, distMapper);
+            if (storeResult) {
+                getInjectedErrorListener().check();
+            }
+            return res;
     }
 };
 

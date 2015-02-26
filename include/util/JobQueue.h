@@ -54,12 +54,22 @@ private:
 public:
 	JobQueue();
 
-	// Add new job to the end of queue
+        size_t getSize()
+        {
+            return _queue.size();
+        }
+
+	/// Add new job to the end of queue
 	void pushJob(boost::shared_ptr<Job> job);
 
-	// Get next job from the beginning of the queue
-	// If there is next element the method waits
-	boost::shared_ptr<Job> popJob();
+	// Add new job to the beginning of queue
+	void pushHighPriorityJob(boost::shared_ptr<Job> job);
+
+        /**
+         * Get next job from the beginning of the queue
+         * If there is next element the method waits
+         */
+        boost::shared_ptr<Job> popJob();
 };
 
 

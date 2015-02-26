@@ -62,7 +62,8 @@ namespace scidb
 #endif // SCIDB_NO_DELTA_COMPRESSION
 
     const uint32_t SCIDB_STORAGE_HEADER_MAGIC = 0xDDDDBBBB;
-    const uint32_t SCIDB_STORAGE_FORMAT_VERSION = 0;
+    const uint32_t SCIDB_STORAGE_FORMAT_VERSION = 3;
+
 
     // Logger for operator. static to prevent visibility of variable outside of file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc"));
@@ -73,8 +74,20 @@ namespace scidb
     const size_t DEFAULT_SEGMENT_SIZE = 1024*1024*1024; // default limit of database partition (in megabytes) used for generated storage descriptor file
     const size_t DEFAULT_TRANS_LOG_LIMIT = 1024; // default limit of transaction log file (in megabytes)
     const size_t MAX_CFG_LINE_LENGTH = 1024;
-    const int PRIME_NUMBER = 1013;
     const int MAX_REDUNDANCY = 8;
+    const int MAX_INSTANCE_BITS = 10; // 2^MAX_INSTANCE_BITS = max number of instances
+/**
+ * Fibonacci hash for a 64 bit key
+ * @param key to hash
+ * @param fib_B = log2(max_num_of_buckets)
+ * @return hash = bucket index
+ */
+uint64_t fibHash64(const uint64_t key, const uint64_t fib_B)
+{
+    assert(fib_B < 64);
+    const uint64_t fib_A64 = (uint64_t)11400714819323198485U;
+    return (key*fib_A64) >> (64-fib_B);
+}
 
     VersionControl* VersionControl::instance;
 
@@ -91,8 +104,8 @@ namespace scidb
 
     HashScatter::HashScatter()
     {
-        this->nDomains = SystemCatalog::getInstance()->getNumberOfNodes();
-        this->domainId = (size_t)StorageManager::getInstance().getNodeId();
+        this->nDomains = SystemCatalog::getInstance()->getNumberOfInstances();
+        this->domainId = (size_t)StorageManager::getInstance().getInstanceId();
     }
 
     void ChunkDescriptor::getAddress(Address& addr) const
@@ -109,47 +122,104 @@ namespace scidb
     // Cached storage methods
     //
 
+    Array const& CachedStorage::getDBArray(ArrayID arrayID) 
+    {
+        ScopedMutexLock cs(mutex);
+        boost::shared_ptr<DBArray>& arr = dbArrayCache[arrayID];
+        if (!arr) { 
+            boost::shared_ptr<Query> emptyQuery;
+            arr = boost::shared_ptr<DBArray>(new DBArray(arrayID, emptyQuery));
+        }
+        return *arr;
+    }
+
+    CachedStorage::CoordinateMapInitializer::~CoordinateMapInitializer()
+    {
+        ScopedMutexLock cs(storage.mutex);
+        cm.raw = false;
+        cm.initialized = initialized;
+        if (cm.waiting) {
+            cm.waiting = false;
+            storage.initEvent.signal(); // wakeup all threads waiting for this chunk
+        }
+    }
+
+    CachedStorage::ChunkInitializer::~ChunkInitializer()
+    {
+        ScopedMutexLock cs(storage.mutex);
+        storage.notifyChunkReady(chunk);
+    }
+
     CachedStorage::CoordinateMap& CachedStorage::getCoordinateMap(string const& indexName,
                                                                   DimensionDesc const& dim,
                                                                   const boost::shared_ptr<Query>& query)
     {
-        ScopedMutexLock cs(mutex);
-        CoordinateMap& cm = _coordinateMap[indexName];
-        if (!cm.coordMap) {
-            cm.attrMap = buildFunctionalMapping(dim);
-            if (!cm.attrMap) {
-                DBArray indexArr(indexName, query);
-                shared_ptr<ConstArrayIterator> ai = indexArr.getConstIterator(0);
-                ConstChunk const& chunk = ai->getChunk();
-                PinBuffer scope(chunk);
-                cm.indexArrayDesc = indexArr.getArrayDesc();
-                TypeId attrType = cm.indexArrayDesc.getAttributes()[0].getType();
-                DimensionDesc const& dim = cm.indexArrayDesc.getDimensions()[0];
-                cm.attrMap = shared_ptr<AttributeMap>(new AttributeMap(attrType, dim.getStart(), (size_t)dim.getLength(),
-                                                                           chunk.getData(), chunk.getSize()));
-                cm.coordMap = shared_ptr<MemoryBuffer>(new MemoryBuffer(chunk.getData(), chunk.getSize()));
-                cm.functionalMapping = false;
-            } else {
-                cm.functionalMapping = true;
+        CoordinateMap* cm;
+        {
+            ScopedMutexLock cs(mutex);
+            mutex.checkForDeadlock();
+            cm = &_coordinateMap[indexName];
+            if (cm->initialized) {
+                assert(!cm->raw);
+                return *cm;
             }
+            if (cm->raw) { 
+                // Some other thread is already constructing this mapping
+                do {
+                    cm->waiting = true;
+                    Event::ErrorChecker noopEc;
+                    initEvent.wait(mutex, noopEc);
+                } while (cm->raw);
+                if (!cm->initialized) { 
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_MAPPING_FOR_COORDINATE);
+                }
+                return *cm;
+            }
+            cm->attrMap = buildFunctionalMapping(dim);
+            if (cm->attrMap) { // functional mapping: do not need to load something from storage
+                if (dim.getFlags() & DimensionDesc::COMPLEX_TRANSFORMATION) { 
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_FUNC_MAP_TRANSFORMATION_NOT_POSSIBLE);
+                }
+                cm->functionalMapping = true;
+                cm->initialized = true;
+                return *cm;
+            }
+            cm->raw = true; 
         }
-        return cm;
+        CoordinateMapInitializer guard(this, cm);
+        boost::shared_ptr<Array> indexArray = query->getArray(indexName);
+        shared_ptr<ConstArrayIterator> ai = indexArray->getConstIterator(0);
+        Coordinates origin(1);
+        origin[0] = dim.getStart();
+        if (!ai->setPosition(origin)) { 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_MAPPING_FOR_COORDINATE);
+        }
+        ConstChunk const& chunk = ai->getChunk();
+        PinBuffer scope(chunk);
+        cm->indexArrayDesc = indexArray->getArrayDesc();
+        TypeId attrType = cm->indexArrayDesc.getAttributes()[0].getType();
+        DimensionDesc const& mapDim = cm->indexArrayDesc.getDimensions()[0];
+        cm->attrMap = shared_ptr<AttributeMultiMap>(new AttributeMultiMap(attrType, mapDim.getStart(), (size_t)mapDim.getLength(),
+                                                                          chunk.getData(), chunk.getSize()));
+        cm->coordMap = shared_ptr<MemoryBuffer>(new MemoryBuffer(chunk.getData(), chunk.getSize()));
+        cm->functionalMapping = false;
+        guard.initialized = true;
+        return *cm;
     }
 
-    void CachedStorage::cleanupCache()
+    void CachedStorage::removeCoordinateMap(string const& indexName)
     {
        ScopedMutexLock cs(mutex);
-       _coordinateMap.clear();
+       _coordinateMap.erase(indexName);
     }
 
-Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc const& dim, Coordinate pos,
-                                          const boost::shared_ptr<Query>& query)
+    Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc const& dim, Coordinate pos,
+                                              const boost::shared_ptr<Query>& query)
     {
-       ScopedMutexLock cs(mutex);
-       CoordinateMap& cm = getCoordinateMap(indexName, dim, query);
+        CoordinateMap& cm = getCoordinateMap(indexName, dim, query);
         if (cm.functionalMapping) {
             Value value;
-            cm.attrMap->getOriginalCoordinate(value, pos);
+            cm.attrMap->getOriginalCoordinate(value, (pos * dim.getFuncMapScale()) + dim.getFuncMapOffset());
             return value;
         }
         uint8_t* src = (uint8_t*)cm.coordMap->getData();
@@ -181,25 +251,33 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
                                             CoordinateMappingMode mode,
                                             const boost::shared_ptr<Query>& query)
     {
-        ScopedMutexLock cs(mutex);
-        Coordinate c = getCoordinateMap(indexName, dim, query).attrMap->get(value, mode);
+        CoordinateMap& cm = getCoordinateMap(indexName, dim, query);
+        Coordinate c = cm.attrMap->get(value, mode);
+        if (cm.functionalMapping) {
+            c = (c - dim.getFuncMapOffset()) / dim.getFuncMapScale();
+        }
         return c;
     }
 
-    void CachedStorage::remove(ArrayID arrId, bool allVersions)
+    void CachedStorage::remove(ArrayID arrId, bool allVersions, uint64_t timestamp)
     {
         Address addr;
         addr.arrId = arrId;
         addr.attId = 0;
-
-         ScopedMutexLock cs(mutex);
-
-         while (true) {
-            map<Address, DBChunk, AddressLess>::iterator i = chunkMap.lower_bound(addr);
+        
+        ScopedMutexLock cs(mutex);
+        
+        while (true) {
+            map<Address, DBChunk, AddressLess>::iterator i = chunkMap.upper_bound(addr);
             if (i == chunkMap.end() || i->first.arrId != arrId) {
                 break;
             }
             DBChunk& chunk = i->second;
+            if (chunk.timestamp <= timestamp) { 
+                addr.attId = chunk.addr.attId;
+                addr.coords = chunk.addr.coords;
+                continue;
+            }
             DBChunk* original = chunk.cloneOf;
             for (size_t j = 0; j < chunk.clones.size(); j++) {
                 DBChunk* clone = chunk.clones[j];
@@ -221,7 +299,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             CachedStorage::freeChunk(chunk);
             chunkMap.erase(i);
         }
-        _coordinateMap.clear();
+        dbArrayCache.erase(arrId);
     }
 
     void CachedStorage::notifyChunkReady(DBChunk& chunk)
@@ -230,7 +308,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         chunk.raw = false;
         if (chunk.waiting) {
             chunk.waiting = false;
-            event.signal(); // wakeup all threads waiting for this chunk
+            loadEvent.signal(); // wakeup all threads waiting for this chunk
         }
     }
 
@@ -239,8 +317,10 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         this->cacheSize = cacheSize;
         this->compressors = compressors;
         cacheUsed = 0;
+        strictCacheLimit = Config::getInstance()->getOption<bool>(CONFIG_STRICT_CACHE_LIMIT);
+        cacheOverflowFlag = false;
         scatter = NULL;
-        timestamp = 0;
+        timestamp = 1;
         lru.prune();
     }
 
@@ -274,12 +354,22 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
 
     void CachedStorage::addChunkToCache(DBChunk& chunk)
     {
-        cacheUsed += chunk.hdr.size;
         // Check amount of memory used by cached chunks and discard least recently used
         // chunks from the cache
-        while (cacheUsed > cacheSize && !lru.isEmpty()) {
+        mutex.checkForDeadlock();
+        while (cacheUsed + chunk.hdr.size > cacheSize) { 
+            if (lru.isEmpty()) {
+                if (strictCacheLimit && cacheUsed != 0) { 
+                    Event::ErrorChecker noopEc;
+                    cacheOverflowFlag = true;
+                    cacheOverflowEvent.wait(mutex, noopEc);
+                } else { 
+                    break;
+                }
+            }
             freeChunk(*lru.prev);
         }
+        cacheUsed += chunk.hdr.size;
     }
 
     RWLock& CachedStorage::getChunkLatch(DBChunk*)
@@ -291,15 +381,27 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     {
         ScopedMutexLock cs(mutex);
         DBChunk& chunk = *(DBChunk*)aChunk;
+        if (chunk.accessCount < 2) { // Access count>=2 means that this chunk is already pinned and loaded by some upper frame so access to it may not cause deadlock */
+            mutex.checkForDeadlock();
+        }
         if (chunk.raw) {
             // Some other thread is already loading the chunk: just wait until it completes
             do {
                 chunk.waiting = true;
-                Event::ErrorChecker noopEc;
-                event.wait(mutex, noopEc);
+                Semaphore::ErrorChecker ec;
+                boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
+                if (query) { 
+                    ec = bind(&Query::validate, query);
+                }
+                loadEvent.wait(mutex, ec);
             } while (chunk.raw);
-        } else {
+
             if (chunk.data == NULL) {
+                chunk.raw = true;
+            }
+        } else {
+            if (chunk.data == NULL) { 
+                mutex.checkForDeadlock();
                 chunk.raw = true;
                 addChunkToCache(chunk);
             }
@@ -321,6 +423,10 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     {
         if (victim.data != NULL && victim.hdr.pos.hdrPos != 0) {
             cacheUsed -= victim.getSize();
+            if (cacheOverflowFlag) { 
+                cacheOverflowFlag = false;
+                cacheOverflowEvent.signal();
+            }
         }
         if (victim.next != NULL) {
             victim.unlink();
@@ -361,6 +467,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         {
             ScopedMutexLock cs(mutex);
             if (!chunk.isRaw() && chunk.data != NULL) {
+                PinBuffer scope(chunk);
                 buf.allocate(chunk.getCompressedSize() != 0 ? chunk.getCompressedSize() : chunk.getSize());
                 size_t compressedSize = compressors[compressionMethod]->compress(buf.getData(), chunk);
                 if (compressedSize == chunk.getSize()) {
@@ -399,6 +506,14 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         return NULL;
     }
 
+    void CachedStorage::cloneChunk(Coordinates const& pos, AttributeID attrID, ArrayID originalArrayID, ArrayID cloneArrayID)
+    {
+        Address addr(originalArrayID, attrID, pos);
+        Chunk* origChunk = readChunk(addr);
+        addr.arrId = cloneArrayID;
+        cloneChunk(addr, *(DBChunk*)origChunk);
+        origChunk->unPin();
+    }
 
     int CachedStorage::chooseCompressionMethod(DBChunk& chunk, void* buf)
     {
@@ -439,48 +554,49 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     {
         ScopedMutexLock cs(mutex);
         Query::validateQueryPtr(query);
-        assert(chunk.hdr.nodeId < size_t(nNodes));
+        assert(chunk.hdr.instanceId < size_t(nInstances));
 
-        if (chunk.hdr.nodeId == hdr.nodeId) {
+        if (chunk.hdr.instanceId == hdr.instanceId) {
             return true;
         }
-        if (!query->isPhysicalNodeDead(chunk.hdr.nodeId))  {
+        if (!query->isPhysicalInstanceDead(chunk.hdr.instanceId))  {
             return false;
         }
-        if (redundancy == 1) { //XXX tigor: curious why this check is correct
+        if (redundancy == 1) {
             return true;
         }
-        NodeID replicas[MAX_REDUNDANCY+1];
-        getReplicasNodeId(replicas, chunk);
+        InstanceID replicas[MAX_REDUNDANCY+1];
+        getReplicasInstanceId(replicas, chunk);
         for (int i = 1; i <= redundancy; i++) {
-            if (replicas[i] == hdr.nodeId) {
+            if (replicas[i] == hdr.instanceId) {
                 return true;
             }
-            if (!query->isPhysicalNodeDead(replicas[i])) {
-               // node with this replica is alive
+            if (!query->isPhysicalInstanceDead(replicas[i])) {
+               // instance with this replica is alive
                return false;
             }
         }
         return false;
     }
 
-    void LocalStorage::remove(ArrayID arrId, bool allVersions)
+    void LocalStorage::remove(ArrayID arrId, bool allVersions, uint64_t timestamp)
     {
         ScopedMutexLock cs(mutex);
         Address addr;
         addr.arrId = arrId;
         addr.attId = 0;
 
-        for (map<Address, DBChunk, AddressLess>::iterator i = chunkMap.lower_bound(addr);
+        for (map<Address, DBChunk, AddressLess>::iterator i = chunkMap.upper_bound(addr);
              i != chunkMap.end() && i->first.arrId == arrId;
              ++i)
         {                
             DBChunk& chunk = i->second; 
-            if (chunk.hdr.pos.hdrPos != 0) {
+            if (chunk.hdr.pos.hdrPos != 0 && chunk.timestamp > timestamp) {
                 chunk.hdr.arrId = 0;
+                LOG4CXX_TRACE(logger, "ChunkDesc: Free chunk descriptor at position " << chunk.hdr.pos.hdrPos);
                 File::writeAll(hd, &chunk.hdr, sizeof(ChunkHeader), chunk.hdr.pos.hdrPos);
                 assert(chunk.hdr.nCoordinates < MAX_COORDINATES);
-                freeHeaders[chunk.hdr.nCoordinates].push(chunk.hdr.pos.hdrPos);
+                freeHeaders.insert(chunk.hdr.pos.hdrPos);
                 
                 if (hdr.clusterSize != 0) 
                 {
@@ -496,7 +612,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         }
         // Update storage header
         File::writeAll(hd, &hdr, HEADER_SIZE, 0);
-        CachedStorage::remove(arrId, allVersions);
+        CachedStorage::remove(arrId, allVersions, timestamp);
     }
 
     void LocalStorage::freeCluster(ClusterID id)
@@ -519,40 +635,49 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         }
         return i;
     }
-    
-    void LocalStorage::getReplicasNodeId(NodeID* replicas, DBChunk const& chunk) const {
-        replicas[0] = chunk.hdr.nodeId;
+
+    void LocalStorage::getReplicasInstanceId(InstanceID* replicas, DBChunk const& chunk) const
+    {
+        replicas[0] = chunk.hdr.instanceId;
         for (int i = 0; i < redundancy; i++) {
-            NodeID nodeId = (chunk.getArrayDesc().getChunkNumber(chunk.addr.coords) + PRIME_NUMBER*(i+1)) % nNodes;
+            // A prime number can be used to smear the replicas as follows
+            // InstanceID instanceId = (chunk.getArrayDesc().getChunkNumber(chunk.addr.coords) + (i+1)) % PRIME_NUMBER % nInstances;
+            // the PRIME_NUMBER needs to be just shy of the number of instances to work, so we would need a table.
+            // For Fibonacci no table is required, and it seems to work OK.
+
+            const uint64_t nReplicas = (redundancy+1);
+            const uint64_t currReplica = (i+1);
+            const uint64_t chunkId = chunk.getArrayDesc().getChunkNumber(chunk.addr.coords)*(nReplicas) + currReplica;
+            InstanceID instanceId = fibHash64(chunkId,MAX_INSTANCE_BITS) % nInstances;
             for (int j = 0; j <= i; j++) {
-                if (replicas[j] == nodeId) {
-                    nodeId = (nodeId + 1) % nNodes;
+                if (replicas[j] == instanceId) {
+                    instanceId = (instanceId + 1) % nInstances;
                     j = -1;
                 }
             }
-            replicas[i+1] = nodeId;
+            replicas[i+1] = instanceId;
         }
     }
 
-    void LocalStorage::recover(NodeID recoveredNode, boost::shared_ptr<Query>& query)
+    void LocalStorage::recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query)
     {
         ScopedMutexLock cs(mutex);
         NetworkManager* networkManager = NetworkManager::getInstance();
         for (map<Address, DBChunk, AddressLess>::iterator i = chunkMap.begin(); i != chunkMap.end(); ++i) {
             DBChunk const& chunk = i->second;
-            if (chunk.hdr.nodeId == recoveredNode || isResponsibleFor(chunk, query)) {
-                if (chunk.hdr.nodeId == hdr.nodeId) {
-                    NodeID replicas[MAX_REDUNDANCY+1];
-                    getReplicasNodeId(replicas, chunk);
-                    replicas[0] = recoveredNode; // barrier
+            if (chunk.hdr.instanceId == recoveredInstance || isResponsibleFor(chunk, query)) {
+                if (chunk.hdr.instanceId == hdr.instanceId) {
+                    InstanceID replicas[MAX_REDUNDANCY+1];
+                    getReplicasInstanceId(replicas, chunk);
+                    replicas[0] = recoveredInstance; // barrier
                     int j = redundancy;
-                    while (replicas[j] != recoveredNode) {
+                    while (replicas[j] != recoveredInstance) {
                         j -= 1;
                     }
                     if (j == 0) {
                         continue;
                     }
-                } else if (chunk.hdr.nodeId != recoveredNode) {
+                } else if (chunk.hdr.instanceId != recoveredInstance) {
                     continue;
                 }
                 size_t compressedSize = chunk.hdr.compressedSize;
@@ -581,31 +706,62 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
                 }
                 LOG4CXX_DEBUG(logger, "Recover chunk of array " << chunk.getArrayDesc().getName() << "(" << chunk.addr.arrId << "), coordinates=" << chunk.addr.coords);
 
-                networkManager->sendMessage(recoveredNode, chunkMsg, true); // wait until message is sent to avoid async queue overflow
+                networkManager->sendMessage(recoveredInstance, chunkMsg); // wait until message is sent to avoid async queue overflow
             }
         }
     }
 
+void LocalStorage::abortReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >* replicasVec)
+{
+    assert(replicasVec);
+    for (size_t i=0; i<replicasVec->size(); ++i) {
+        const boost::shared_ptr<ReplicationManager::Item>& item = (*replicasVec)[i];
+        assert(_replicationManager);
+        _replicationManager->abort(item);
+        assert(item->isDone());
+    }
+}
 
-    void LocalStorage::replicate(Address const& addr, DBChunk& chunk, void const* data, size_t compressedSize, size_t decompressedSize, boost::shared_ptr<Query>& query)
+void LocalStorage::waitForReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >& replicasVec)
+{
+    for (size_t i=0; i<replicasVec.size(); ++i) {
+        const boost::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
+        assert(_replicationManager);
+        _replicationManager->wait(item);
+        assert(item->isDone());
+        assert(item->validate(false));
+    }
+}
+void LocalStorage::replicate(Address const& addr, DBChunk& chunk, void const* data,
+                             size_t compressedSize, size_t decompressedSize,
+                             boost::shared_ptr<Query>& query,
+                             vector<boost::shared_ptr<ReplicationManager::Item> >& replicasVec)
     {
-       ScopedMutexLock cs(mutex);
-       Query::validateQueryPtr(query);
+        ScopedMutexLock cs(mutex);
+        Query::validateQueryPtr(query);
 
-        if (redundancy > 0 && chunk.hdr.nodeId == hdr.nodeId && !chunk.getArrayDesc().isLocal()) { // self chunk
-            NetworkManager* networkManager = NetworkManager::getInstance();
-            NodeID replicas[MAX_REDUNDANCY+1];
-            getReplicasNodeId(replicas, chunk);
+        if (redundancy <= 0 || chunk.hdr.instanceId != hdr.instanceId || chunk.getArrayDesc().isLocal()) { // self chunk
+            return;
+        }
+            replicasVec.reserve(redundancy);
+            InstanceID replicas[MAX_REDUNDANCY+1];
+            getReplicasInstanceId(replicas, chunk);
 
             QueryID queryId = query->getCurrentQueryID();
             assert(queryId != 0);
-            boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
-            buffer->allocate(compressedSize);
-            memcpy(buffer->getData(), data, compressedSize);
-            boost::shared_ptr<MessageDesc> chunkMsg = boost::make_shared<MessageDesc>( mtChunkReplica, buffer);
+            boost::shared_ptr<MessageDesc> chunkMsg;
+            if (data != NULL) { 
+                boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
+                buffer->allocate(compressedSize);
+                memcpy(buffer->getData(), data, compressedSize);
+                chunkMsg = boost::make_shared<MessageDesc>(mtChunkReplica, buffer);
+            } else { 
+                chunkMsg = boost::make_shared<MessageDesc>(mtChunkReplica);
+            }
             boost::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
             chunkRecord->set_eof(false);
             chunkRecord->set_sparse(chunk.isSparse());
+            chunkRecord->set_rle(chunk.isRLE());
             chunkRecord->set_compression_method(chunk.getCompressionMethod());
             chunkRecord->set_attribute_id(addr.attId);
             chunkRecord->set_array_id(addr.arrId);
@@ -613,21 +769,23 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             chunkRecord->set_count(0);
             chunkMsg->setQueryID(queryId);
 
+            LOG4CXX_TRACE(logger, "Replicate chunk of array ID=" << addr.arrId << " attribute ID=" << addr.attId);
+
+            if (data == NULL) { 
+                assert(chunk.cloneOf != NULL);
+                chunkRecord->set_cloned_array_id(chunk.cloneOf->addr.arrId);
+            }
             for (size_t k = 0; k < addr.coords.size(); k++)
             {
                 chunkRecord->add_coordinates(addr.coords[k]);
             }
-            for (int i = 1; i <= redundancy; i++) {
-                networkManager->sendMessage(replicas[i], chunkMsg, syncReplication);
-            }
-        }
-    }
 
-    inline int64_t getTimeNanos()
-    {
-        struct timeval tv;
-        gettimeofday(&tv,0);
-        return ((int64_t) tv.tv_sec) * 1000000000 + ((int64_t) tv.tv_usec) * 1000;
+            for (int i = 1; i <= redundancy; i++) {
+                boost::shared_ptr<ReplicationManager::Item> item(new ReplicationManager::Item(replicas[i], chunkMsg, query));
+                assert(_replicationManager);
+                _replicationManager->send(item);
+                replicasVec.push_back(item);
+            }
     }
 
     inline double getTimeSecs()
@@ -683,6 +841,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     }
 
     DBChunk* LocalStorage::nextChunk(Address& addr, uint64_t timestamp,
+                                     ArrayDesc const& desc, PartitioningSchema ps, 
                                      boost::shared_ptr<Query>& query)
     {
         ScopedMutexLock cs(mutex);
@@ -697,7 +856,8 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             addr.coords = chunk.addr.coords;
             if (isResponsibleFor(chunk, query)
                 && chunk.timestamp <= timestamp
-                && (scatter == NULL || scatter->contains(chunk.getAddress())))
+                && (ps != psReplication || desc.getChunkNumber(addr.coords) % nInstances == hdr.instanceId)
+                && (scatter == NULL || scatter->contains(chunk.addr)))
             {
 #ifdef PIN_CURRENT_CHUNK
                 pinChunk(&chunk);
@@ -803,128 +963,158 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     Chunk* LocalStorage::patchChunk(const Address& addr, ConstChunk const& srcChunk,
                                     boost::shared_ptr<Query>& query)
     {
-        ScopedMutexLock cs(mutex);
-        //XXX TODO: consider locking mutex to avoid writing replica chunks for a rolled-back query
-        Query::validateQueryPtr(query);
-        //
-        // "addr" now specifies address of new chunk (which doesn't exist yet). And we need address of the original version of the chunk.
-        // The fragment of code below is getting address of chunk which should be patched
-        //
-        shared_ptr<ArrayDesc const> newVersionDesc = SystemCatalog::getInstance()->getArrayDesc(addr.arrId);
-        string const& dstName = newVersionDesc->getName();
-        size_t at = dstName.find('@');
-        assert(at != string::npos);
-        VersionID dstVersion = atol(&dstName[at+1]);
-        assert(dstVersion > 1);
+        Chunk* newClone(NULL);
+        vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
+        boost::function<void()> f = boost::bind(&LocalStorage::abortReplicas, this, &replicasVec); 
+        Destructor replicasCleaner(f);
+        {
+            Query::validateQueryPtr(query);
+            //
+            // "addr" now specifies address of new chunk (which doesn't exist yet). And we need address of the original version of the chunk.
+            // The fragment of code below is getting address of chunk which should be patched
+            //
+            ArrayDesc newVersionDesc;
+            SystemCatalog::getInstance()->getArrayDesc(addr.arrId, newVersionDesc);
+            string const& dstName = newVersionDesc.getName();
+            size_t at = dstName.find('@');
+            assert(at != string::npos);
+            VersionID dstVersion = atol(&dstName[at+1]);
+            assert(dstVersion > 1);
 
-        ArrayDesc currVersionDesc;
-        std::stringstream ss;
-        ss << dstName.substr(0, at+1) << (dstVersion-1);
-        SystemCatalog::getInstance()->getArrayDesc(ss.str(), currVersionDesc);
+            ArrayDesc currVersionDesc;
+            std::stringstream ss;
+            ss << dstName.substr(0, at+1) << (dstVersion-1);
+            SystemCatalog::getInstance()->getArrayDesc(ss.str(), currVersionDesc);
 
-        Address currVersionAddress = addr;
-        currVersionAddress.arrId = currVersionDesc.getId();
+            Address currVersionAddress = addr;
+            currVersionAddress.arrId = currVersionDesc.getId();
 
-        DBChunk* dstChunk = CachedStorage::lookupChunk(currVersionAddress, false);
-        if (dstChunk != NULL) {
-            if (srcChunk.getDiskChunk() == dstChunk) {
-                // Original chunk was not changed: just clone it
-                Chunk* clone = cloneChunk(addr, *dstChunk);
-                dstChunk->unPin();
-                return clone;
-            }
-            MemChunk tmpChunk;
-            tmpChunk.initialize(&dstChunk->getArray(), &dstChunk->getArrayDesc(), currVersionAddress, dstChunk->getCompressionMethod());
-            tmpChunk.setSparse(dstChunk->isSparse());
-            tmpChunk.setRLE(dstChunk->isRLE());
-            tmpChunk.allocate(dstChunk->getSize());
-            memcpy(tmpChunk.getData(), dstChunk->getData(), tmpChunk.getSize());
-            PinBuffer scope(srcChunk);
-            if (VersionControl::instance != NULL
-                && VersionControl::instance->newVersion(tmpChunk, srcChunk, dstVersion, dstChunk->isDelta()))
-            {
-                size_t newSize = tmpChunk.getSize();
-                boost::scoped_array<char> buf(new char[newSize]);
-                if (!buf)
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_ALLOCATE_MEMORY);
-                currentStatistics->allocatedSize += newSize;
-                currentStatistics->allocatedChunks++;
-                size_t compressedSize = compressors[chooseCompressionMethod(*dstChunk, buf.get())]->compress(buf.get(), tmpChunk);
-                assert(compressedSize <= newSize);
-                if (compressedSize <= dstChunk->hdr.allocatedSize) {
-                   void* deflated = (compressedSize == newSize) ? tmpChunk.getData() : buf.get();
-
-                    // Update all cloned chunk headers
-                    DBChunk* clone = dstChunk;
-                    ChunkHeader oldHdr;
-                    while (true) {
-                        RWLock::ErrorChecker noopEc;
-                        ScopedRWLockWrite cloneWriter(getChunkLatch(clone), noopEc);
-                        oldHdr = clone->hdr;
-                        if (clone->data != NULL) {
-                            clone->allocate(newSize);
-                            memcpy(clone->data, tmpChunk.getData(), newSize);
-                        }
-                        clone->hdr.compressedSize = compressedSize;
-                        clone->hdr.size = newSize;
-                        clone->hdr.flags |= ChunkHeader::DELTA_CHUNK;
-                        clone->hdr.flags &= ~ChunkHeader::RLE_CHUNK;
-                        if (clone->cloneOf == NULL) {
-                            break;
-                        } else {
-                            clone = clone->cloneOf;
-                        }
-                    }
-                    ChunkDescriptor cloneDesc;
-                    Chunk* newClone = cloneChunk(addr, *dstChunk, cloneDesc);
-
-                    // Write ahead UNDO log
-                    size_t oldChunkSize = oldHdr.compressedSize;
-                    boost::scoped_array<char> transLogRecordBuf(new char[sizeof(TransLogRecord)*2 + oldChunkSize]);
-                    TransLogRecord* transLogRecord = (TransLogRecord*)transLogRecordBuf.get();
-                    ArrayDesc arrayDesc;
-                    SystemCatalog::getInstance()->getArrayDesc(dstName.substr(0, at), arrayDesc);
-                    transLogRecord->array = arrayDesc.getId();
-                    transLogRecord->versionArrayID = addr.arrId;
-                    transLogRecord->version = dstVersion;
-                    transLogRecord->hdr = oldHdr;
-                    transLogRecord->newHdrPos = cloneDesc.hdr.pos.hdrPos;
-                    transLogRecord->oldSize = oldChunkSize;
-                    transLogRecord->hdrCRC = calculateCRC32(transLogRecord, sizeof(TransLogRecordHeader));
-                    readAll(dstChunk->hdr.pos, transLogRecord+1, oldChunkSize);
-                    memset((char*)(transLogRecord+1) + oldChunkSize, 0, sizeof(TransLogRecord)); // end of log marker
-                    transLogRecord->bodyCRC = calculateCRC32(transLogRecord+1, oldChunkSize);
-                    if (logSize + sizeof(TransLogRecord) + oldChunkSize > logSizeLimit) {
-                        logSize = 0;
-                        currLog ^= 1;
-                    }
-                    LOG4CXX_TRACE(logger, "Write in log chunk " << transLogRecord->hdr.pos.offs
-                                  << " size " << oldChunkSize << " at position " << logSize);
-                    
-                    File::writeAll(log[currLog], transLogRecord, sizeof(TransLogRecord)*2 + oldChunkSize, logSize);
-                    logSize += sizeof(TransLogRecord) + oldChunkSize;
-                    transLogRecordBuf.reset();
-
-                    // Save new and updated chunk headers to the disk
-                    assert(cloneDesc.hdr.pos.hdrPos != 0);
-                    File::writeAll(hd, &cloneDesc, sizeof(ChunkHeader) + sizeof(Coordinate)*addr.coords.size(), cloneDesc.hdr.pos.hdrPos);
-                    assert(clone->hdr.pos.hdrPos != 0);
-                    File::writeAll(hd, &clone->hdr, sizeof(ChunkHeader), clone->hdr.pos.hdrPos);
-
-                    replicate(addr, *dstChunk, deflated, compressedSize, newSize, query);
-
-                    // Write chunk data
-                    writeAll(dstChunk->hdr.pos, deflated, compressedSize);
-                    buf.reset();
-
+            DBChunk* dstChunk = CachedStorage::lookupChunk(currVersionAddress, false);
+            if (dstChunk != NULL) {
+                if (srcChunk.getDiskChunk() == dstChunk) {
+                    // Original chunk was not changed: just clone it
+                    newClone = cloneChunk(addr, *dstChunk);
+                    replicate(addr, *(DBChunk*)newClone, NULL, 0, 0, query, replicasVec);
                     dstChunk->unPin();
-                    return newClone;
+                    goto Epilogue;
                 }
-                buf.reset();
+                MemChunk tmpChunk;
+                tmpChunk.initialize(&dstChunk->getArray(), &dstChunk->getArrayDesc(), currVersionAddress, dstChunk->getCompressionMethod());
+                tmpChunk.setSparse(dstChunk->isSparse());
+                tmpChunk.setRLE(dstChunk->isRLE());
+                tmpChunk.allocate(dstChunk->getSize());
+                memcpy(tmpChunk.getData(), dstChunk->getData(), tmpChunk.getSize());
+                PinBuffer scope(srcChunk);
+                if (VersionControl::instance != NULL
+                    && VersionControl::instance->newVersion(tmpChunk, srcChunk, dstVersion, dstChunk->isDelta()))
+                {
+                    size_t newSize = tmpChunk.getSize();
+                    boost::scoped_array<char> buf(new char[newSize]);
+                    if (!buf) {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_ALLOCATE_MEMORY);
+                    }
+                    currentStatistics->allocatedSize += newSize;
+                    currentStatistics->allocatedChunks++;
+                    size_t compressedSize = compressors[chooseCompressionMethod(*dstChunk, buf.get())]->compress(buf.get(), tmpChunk);
+                    assert(compressedSize <= newSize);
+                    if (compressedSize <= dstChunk->hdr.allocatedSize) {
+                        ScopedMutexLock cs(mutex);
+                        void* deflated = (compressedSize == newSize) ? tmpChunk.getData() : buf.get();
+
+                        // Update all cloned chunk headers
+                        DBChunk* clone = dstChunk;
+                        ChunkHeader oldHdr;
+                        while (true) {
+                            RWLock::ErrorChecker noopEc;
+                            ScopedRWLockWrite cloneWriter(getChunkLatch(clone), noopEc);
+                            oldHdr = clone->hdr;
+                            if (clone->data != NULL) {
+                                clone->allocate(newSize);
+                                memcpy(clone->data, tmpChunk.getData(), newSize);
+                            }
+                            clone->hdr.compressedSize = compressedSize;
+                            clone->hdr.size = newSize;
+                            clone->hdr.flags |= ChunkHeader::DELTA_CHUNK;
+                            clone->hdr.flags &= ~ChunkHeader::RLE_CHUNK;
+                            if (clone->cloneOf == NULL) {
+                                break;
+                            } else {
+                                clone = clone->cloneOf;
+                            }
+                        }
+                        ChunkDescriptor cloneDesc;
+                        newClone = cloneChunk(addr, *dstChunk, cloneDesc);
+
+                        // Write ahead UNDO log
+                        size_t oldChunkSize = oldHdr.compressedSize;
+                        boost::scoped_array<char> transLogRecordBuf(new char[sizeof(TransLogRecord)*2 + oldChunkSize]);
+                        TransLogRecord* transLogRecord = (TransLogRecord*)transLogRecordBuf.get();
+                        ArrayDesc arrayDesc;
+                        SystemCatalog::getInstance()->getArrayDesc(dstName.substr(0, at), arrayDesc);
+                        transLogRecord->array = arrayDesc.getId();
+                        transLogRecord->versionArrayID = addr.arrId;
+                        transLogRecord->version = dstVersion;
+                        transLogRecord->hdr = oldHdr;
+                        transLogRecord->newHdrPos = cloneDesc.hdr.pos.hdrPos;
+                        transLogRecord->oldSize = oldChunkSize;
+                        transLogRecord->hdrCRC = calculateCRC32(transLogRecord, sizeof(TransLogRecordHeader));
+                        readAll(dstChunk->hdr.pos, transLogRecord+1, oldChunkSize);
+                        memset((char*)(transLogRecord+1) + oldChunkSize, 0, sizeof(TransLogRecord)); // end of log marker
+                        transLogRecord->bodyCRC = calculateCRC32(transLogRecord+1, oldChunkSize);
+                        if (logSize + sizeof(TransLogRecord) + oldChunkSize > logSizeLimit) {
+                            logSize = 0;
+                            currLog ^= 1;
+                        }
+                        LOG4CXX_TRACE(logger, "ChunkDesc: Write in log chunk " << transLogRecord->hdr.pos.offs
+                                      << " size " << oldChunkSize << " at position " << logSize);
+
+                        File::writeAll(log[currLog], transLogRecord, sizeof(TransLogRecord)*2 + oldChunkSize, logSize);
+                        logSize += sizeof(TransLogRecord) + oldChunkSize;
+                        transLogRecordBuf.reset();
+
+                        // Save new and updated chunk headers to the disk
+                        assert(cloneDesc.hdr.pos.hdrPos != 0);
+                        if (logger->isTraceEnabled()) {
+                            LOG4CXX_TRACE(logger, "ChunkDesc: Create new chunk descriptor clone with size "
+                                          << sizeof(ChunkDescriptor) << " at position " << cloneDesc.hdr.pos.hdrPos);
+                            LOG4CXX_TRACE(logger, "Clone chunk descriptor to write: " << cloneDesc.toString());
+                        }
+                        File::writeAll(hd, &cloneDesc, sizeof(ChunkDescriptor), cloneDesc.hdr.pos.hdrPos);
+                        assert(clone->hdr.pos.hdrPos != 0);
+                        LOG4CXX_TRACE(logger, "ChunkDesc: Update cloned chunk descriptor at position " << clone->hdr.pos.hdrPos);
+                        File::writeAll(hd, &clone->hdr, sizeof(ChunkHeader), clone->hdr.pos.hdrPos);
+
+                        replicate(addr, *dstChunk, deflated, compressedSize, newSize, query, replicasVec);
+
+                        // Write chunk data
+                        writeAll(dstChunk->hdr.pos, deflated, compressedSize);
+                        buf.reset();
+
+                        dstChunk->unPin();
+                    }
+                    if (!newClone) { buf.reset(); }
+                }
+                if (!newClone) { dstChunk->unPin(); }
             }
-            dstChunk->unPin();
         }
-        return NULL;
+      Epilogue:
+        if (newClone) {
+            waitForReplicas(replicasVec);
+            replicasCleaner.disarm();
+        }
+        return newClone;
+    }
+
+    Chunk* LocalStorage::cloneChunk(const Address& addr, DBChunk const& srcChunk, boost::shared_ptr<Query>& query)
+    {
+        vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
+        boost::function<void()> f = boost::bind(&LocalStorage::abortReplicas, this, &replicasVec); 
+        Destructor replicasCleaner(f);
+        Chunk* clone = cloneChunk(addr, srcChunk);
+        replicate(addr, *(DBChunk*)clone, NULL, 0, 0, query, replicasVec);
+        waitForReplicas(replicasVec);
+        replicasCleaner.disarm();
+        return clone;
     }
 
     Chunk* LocalStorage::cloneChunk(const Address& addr, DBChunk const& srcChunk)
@@ -932,7 +1122,8 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         ChunkDescriptor cloneDesc;
         Chunk* clone = cloneChunk(addr, srcChunk, cloneDesc);
         assert(cloneDesc.hdr.pos.hdrPos != 0);
-        File::writeAll(hd, &cloneDesc, sizeof(ChunkHeader) + sizeof(Coordinate)*addr.coords.size(), cloneDesc.hdr.pos.hdrPos);
+        LOG4CXX_TRACE(logger, "ChunkDesc: Create new chunk descriptor clone with size " << sizeof(ChunkDescriptor) << " at position " << cloneDesc.hdr.pos.hdrPos);
+        File::writeAll(hd, &cloneDesc, sizeof(ChunkDescriptor), cloneDesc.hdr.pos.hdrPos);
         return clone;
     }
 
@@ -948,20 +1139,22 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         chunk.hdr = srcChunk.hdr;
         chunk.hdr.arrId = addr.arrId;
         chunk.hdr.attId = addr.attId;
-        if (freeHeaders[nCoordinates].empty()) {
+        if (freeHeaders.empty()) {
             chunk.hdr.pos.hdrPos = hdr.currPos;
-            hdr.currPos += sizeof(ChunkHeader) + sizeof(Coordinate)*nCoordinates;
+            hdr.currPos += sizeof(ChunkDescriptor);
             hdr.nChunks += 1;
             // Update storage header
             File::writeAll(hd, &hdr, HEADER_SIZE, 0);
         } else  {
-            chunk.hdr.pos.hdrPos = freeHeaders[nCoordinates].front();
+            set<uint64_t>::iterator i = freeHeaders.begin();            
+            chunk.hdr.pos.hdrPos = *i;
             assert(chunk.hdr.pos.hdrPos != 0);
-            freeHeaders[nCoordinates].pop();
-        }
+            freeHeaders.erase(i);
+       }
         if (hdr.clusterSize != 0) { 
             liveChunksInCluster[getClusterID(chunk.hdr.pos)] += 1;
         }
+
         chunk.cloneOf = (DBChunk*)&srcChunk;
         chunk.cloneOf->clones.push_back(&chunk);
         cloneDesc.hdr = chunk.hdr;
@@ -992,7 +1185,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         return file[0] == '/' ? file : dir + file;
     }
 
-    LocalStorage::LocalStorage()
+    LocalStorage::LocalStorage() : _replicationManager(NULL)
     {
        hd = -1;
        for (size_t i=0; i < MAX_SEGMENTS; ++i) {
@@ -1004,6 +1197,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     void LocalStorage::open(const string& storageDescriptorFilePath, size_t cacheSize)
     {
         StatisticsScope sScope;
+        InjectedErrorListener<WriteChunkInjectedError>::start();
         char buf[MAX_CFG_LINE_LENGTH];
         char const* descPath = storageDescriptorFilePath.c_str();
         string databasePath = "";
@@ -1053,6 +1247,10 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         }
         fclose(f);
         open(databaseHeader, databaseLog, transLogLimit, segments, cacheSize, CompressorFactory::getInstance().getCompressors());
+
+        _replicationManager = ReplicationManager::getInstance();
+        assert(_replicationManager);
+        assert(_replicationManager->isStarted());
     }
 
     void LocalStorage::rollback(std::map<ArrayID,VersionID> const& undoUpdates)
@@ -1117,11 +1315,13 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
                         buf.reset();
                         // restore first chunk in clones chain
                         assert(transLogRecord.hdr.pos.hdrPos != 0);
+                        LOG4CXX_TRACE(logger, "ChunkDesc: Restore chunk descriptor at position " << transLogRecord.hdr.pos.hdrPos);
                         File::writeAll(hd, &transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
                         transLogRecord.hdr.pos.hdrPos = transLogRecord.newHdrPos;
                     }
                     transLogRecord.hdr.arrId = 0; // mark chunk as free
                     assert(transLogRecord.hdr.pos.hdrPos != 0);
+                    LOG4CXX_TRACE(logger, "ChunkDesc: Undo chunk descriptor creation at position " << transLogRecord.hdr.pos.hdrPos);
                     File::writeAll(hd, &transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
                 }
                 pos += transLogRecord.oldSize;
@@ -1138,7 +1338,6 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     {
         assert(arrsToRollback);
         assert(baseArrayId>0);
-        assert(newArrayId>0);
         (*arrsToRollback.get())[baseArrayId] = lastVersion;
     }
     
@@ -1147,7 +1346,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         list<shared_ptr<SystemCatalog::LockDesc> > coordLocks;
         list<shared_ptr<SystemCatalog::LockDesc> > workerLocks;
 
-        SystemCatalog::getInstance()->readArrayLocks(getNodeId(), coordLocks, workerLocks);
+        SystemCatalog::getInstance()->readArrayLocks(getInstanceId(), coordLocks, workerLocks);
 
         shared_ptr<map<ArrayID,VersionID> > arraysToRollback(new map<ArrayID,VersionID>());
         UpdateErrorHandler::RollbackWork collector = bind(&collectArraysToRollback, arraysToRollback, _1, _2, _3);
@@ -1183,7 +1382,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             }
         }
         rollback(*arraysToRollback.get());
-        SystemCatalog::getInstance()->deleteArrayLocks(getNodeId());
+        SystemCatalog::getInstance()->deleteArrayLocks(getInstanceId());
     }
     
     void LocalStorage::open(const string& headerPath, const string& transactionLogPath,
@@ -1247,8 +1446,8 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         totalAvailable = available;
         readAheadSize = Config::getInstance()->getOption<int>(CONFIG_READ_AHEAD_SIZE);
 
-        nNodes = SystemCatalog::getInstance()->getNumberOfNodes();
-        redundancy = 0; // disable replication during rollback: each node is perfroming rollback locally
+        nInstances = SystemCatalog::getInstance()->getNumberOfInstances();
+        redundancy = 0; // disable replication during rollback: each instance is perfroming rollback locally
 
         if (rc == 0 || hdr.currPos < HEADER_SIZE) {
             // Database is not initialized
@@ -1256,7 +1455,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             hdr.magic = SCIDB_STORAGE_HEADER_MAGIC;
             hdr.version = SCIDB_STORAGE_FORMAT_VERSION;
             hdr.currPos = HEADER_SIZE;
-            hdr.nodeId = INVALID_NODE;
+            hdr.instanceId = INVALID_INSTANCE;
             hdr.nChunks = 0;
             hdr.clusterSize = Config::getInstance()->getOption<int>(CONFIG_CHUNK_CLUSTER_SIZE);
         } else {
@@ -1278,56 +1477,59 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             Address addr;
             map<uint64_t, DBChunk*> clones;
             set<ArrayID> removedArrays;
-            for (size_t i = 0; i < hdr.nChunks; i++) {
-                uint64_t hdrPos = chunkPos;
-                File::readAll(hd, &desc.hdr, sizeof(ChunkHeader), chunkPos);
-                if (desc.hdr.pos.hdrPos != chunkPos) { 
-                    LOG4CXX_ERROR(logger, "Invalid chunk header " << i << " at position " << chunkPos << " desc.hdr.pos.hdrPos=" << desc.hdr.pos.hdrPos << " arrayID=" << desc.hdr.arrId << " hdr.nChunks=" << hdr.nChunks);
+            for (size_t i = 0; i < hdr.nChunks; i++, chunkPos += sizeof(ChunkDescriptor)) { 
+                size_t rc = pread(hd, &desc, sizeof(ChunkDescriptor), chunkPos);
+                if (rc != sizeof(ChunkDescriptor)) { 
+                    LOG4CXX_ERROR(logger, "Inconsistency in storage header: rc=" << rc << ", chunkPos=" << chunkPos << ", i=" << i << ", hdr.nChunks=" << hdr.nChunks << ", hdr.currPos=" << hdr.currPos);
+                    hdr.currPos = chunkPos;
                     hdr.nChunks = i;
                     break;
                 }
-                assert(desc.hdr.nCoordinates < MAX_COORDINATES);
-                chunkPos += sizeof(ChunkHeader);
-                if (desc.hdr.arrId != 0) {
-                    try {
-                        if (removedArrays.count(desc.hdr.arrId) != 0) {
-                            desc.hdr.arrId = 0;
-                            File::writeAll(hd, &desc.hdr, sizeof(ChunkHeader), hdrPos);
-                            assert(desc.hdr.nCoordinates < MAX_COORDINATES);
-                            freeHeaders[desc.hdr.nCoordinates].push(hdrPos);
-                            chunkPos += sizeof(Coordinate)*desc.hdr.nCoordinates;
-                            continue;
+                if (desc.hdr.pos.hdrPos != chunkPos) { 
+                    LOG4CXX_ERROR(logger, "Invalid chunk header " << i << " at position " << chunkPos << " desc.hdr.pos.hdrPos=" << desc.hdr.pos.hdrPos << " arrayID=" << desc.hdr.arrId << " hdr.nChunks=" << hdr.nChunks);
+                    freeHeaders.insert(chunkPos);
+                } else { 
+                    assert(desc.hdr.nCoordinates < MAX_COORDINATES);
+                    if (desc.hdr.arrId != 0) {
+                        try {
+                            if (removedArrays.count(desc.hdr.arrId) != 0) {
+                                desc.hdr.arrId = 0;
+                                LOG4CXX_TRACE(logger, "ChunkDesc: Remove chunk descriptor for unexisted array at position " << chunkPos);
+                                File::writeAll(hd, &desc.hdr, sizeof(ChunkHeader), chunkPos);
+                                assert(desc.hdr.nCoordinates < MAX_COORDINATES);
+                                freeHeaders.insert(chunkPos);
+                                continue;
+                            }
+                            desc.getAddress(addr);
+                            DBChunk& chunk = chunkMap[addr];
+                            chunk.setAddress(desc);
+                            if (hdr.clusterSize != 0) { 
+                                liveChunksInCluster[getClusterID(chunk.hdr.pos)] += 1;
+                            }
+                            DBChunk*& clone = clones[chunk.hdr.pos.offs * MAX_SEGMENTS + chunk.hdr.pos.segmentNo];
+                            chunk.cloneOf = clone;
+                            if (clone != NULL) {
+                                clone->clones.push_back(&chunk);
+                                chunk.hdr.compressedSize = clone->hdr.compressedSize;
+                                chunk.hdr.size = clone->hdr.size;
+                                chunk.hdr.flags = clone->hdr.flags;
+                            }
+                            clone = &chunk;
+                        } catch (SystemException const& x) {
+                            if (x.getLongErrorCode() == SCIDB_LE_ARRAYID_DOESNT_EXIST) {
+                                removedArrays.insert(desc.hdr.arrId);
+                                desc.hdr.arrId = 0;
+                                LOG4CXX_TRACE(logger, "ChunkDesc: Remove chunk descriptor for unexisted array at position " << chunkPos);
+                                File::writeAll(hd, &desc.hdr, sizeof(ChunkHeader), chunkPos);
+                                freeHeaders.insert(chunkPos);                            
+                            } else {
+                                throw;
+                            }
                         }
-                        File::readAll(hd, desc.coords, sizeof(Coordinate)*desc.hdr.nCoordinates, chunkPos);
-                        desc.getAddress(addr);
-                        DBChunk& chunk = chunkMap[addr];
-                        chunk.setAddress(desc);
-                        if (hdr.clusterSize != 0) { 
-                            liveChunksInCluster[getClusterID(chunk.hdr.pos)] += 1;
-                        }
-                        DBChunk*& clone = clones[chunk.hdr.pos.offs * MAX_SEGMENTS + chunk.hdr.pos.segmentNo];
-                        chunk.cloneOf = clone;
-                        if (clone != NULL) {
-                            clone->clones.push_back(&chunk);
-                            chunk.hdr.compressedSize = clone->hdr.compressedSize;
-                            chunk.hdr.size = clone->hdr.size;
-                            chunk.hdr.flags = clone->hdr.flags;
-                        }
-                        clone = &chunk;
-                    } catch (SystemException const& x) {
-                        if (x.getLongErrorCode() == SCIDB_LE_ARRAYID_DOESNT_EXIST) {
-                            removedArrays.insert(desc.hdr.arrId);
-                            desc.hdr.arrId = 0;
-                            File::writeAll(hd, &desc.hdr, sizeof(ChunkHeader), hdrPos);
-                            freeHeaders[desc.hdr.nCoordinates].push(hdrPos);                            
-                        } else {
-                            throw;
-                        }
+                    } else {
+                        freeHeaders.insert(chunkPos);
                     }
-                } else {
-                    freeHeaders[desc.hdr.nCoordinates].push(hdrPos);
                 }
-                chunkPos += sizeof(Coordinate)*desc.hdr.nCoordinates;
             }
             if (chunkPos != hdr.currPos) {
                 LOG4CXX_ERROR(logger, "Storage header is not consistent: " << chunkPos << " vs. " << hdr.currPos);
@@ -1336,7 +1538,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
                     hdr.currPos = chunkPos;
                 }
             }
-
+            
             if (hdr.clusterSize != 0) { 
                 for (size_t i = 0; i < nSegments; i++) {
                     for (uint64_t offs = 0; offs < hdr.segment[i].used; offs += hdr.clusterSize) {
@@ -1356,12 +1558,14 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             {
                 fds.push_back(sd[i]);
             }
+
             BackgroundFileFlusher::getInstance()->start(syncMSeconds, _writeLogThreshold, fds);
-        }   
+        }
     }
 
     void LocalStorage::close()
     {
+        InjectedErrorListener<WriteChunkInjectedError>::stop();
         BackgroundFileFlusher::getInstance()->stop();
         CachedStorage::close();
         std::ostringstream ss;
@@ -1406,6 +1610,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
 
     void LocalStorage::fetchChunk(DBChunk& chunk)
     {
+        ChunkInitializer guard(this, chunk);
         if (chunk.hdr.pos.hdrPos == 0) { 
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_ACCESS_TO_RAW_CHUNK) << chunk.getArrayDesc().getName();
         }
@@ -1427,11 +1632,6 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             buf.reset();
         } else {
             readAll(chunk.hdr.pos, chunk.data, chunkSize);
-        }
-        {
-            // Check if there are some other threads waiting for completion read of this chunk and wake up them
-            ScopedMutexLock cs(mutex);
-            notifyChunkReady(chunk);
         }
     }
 
@@ -1457,9 +1657,9 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
                                 // no more chunks of this array in the local storage
                                 break;
                             }
-                            if (preloadChunk->hdr.pos.segmentNo == pos.segmentNo) {
+                            if (!preloadChunk->raw && preloadChunk->hdr.pos.segmentNo == pos.segmentNo && preloadChunk->hdr.instanceId == hdr.instanceId) {
                                 if (preloadChunk->hdr.pos.offs == pos.offs + clusterSize) {
-                                    if ((clusterSize += preloadChunk->hdr.compressedSize) <= readAheadSize && !preloadChunk->raw && preloadChunk->data == NULL) {
+                                    if (preloadChunk->data == NULL && (clusterSize += preloadChunk->hdr.compressedSize) <= readAheadSize) {
                                         preloadChunk->raw = true;
                                         preloadChunk->beginAccess();
                                         addChunkToCache(*preloadChunk);
@@ -1471,6 +1671,9 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
                                     // subsequent chunk in this disk partition belongs to some other array
                                     break;
                                 }
+                            } else {  
+                                addr = &preloadChunk->addr;
+                                continue;
                             }
                         } else { 
                             break;
@@ -1518,11 +1721,12 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         currentStatistics->allocatedSize += bufSize;
         currentStatistics->allocatedChunks++;
 
-        shared_ptr<ArrayDesc const> versionDesc = SystemCatalog::getInstance()->getArrayDesc(chunk.addr.arrId);
-        string const& versionName = versionDesc->getName();
+        ArrayDesc versionDesc;
+        SystemCatalog::getInstance()->getArrayDesc(chunk.addr.arrId, versionDesc);
+        string const& versionName = versionDesc.getName();
         size_t at = versionName.find('@');
         VersionID dstVersion = 0;
-        if (at != string::npos) {
+        if (at != string::npos && versionName.find(':') == string::npos) {
             dstVersion = atol(&versionName[at+1]);
         }
 
@@ -1535,105 +1739,121 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         if (compressedSize == chunk.getSize()) { // no compression
             deflated = chunk.data;
         }
+        vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
+        boost::function<void()> f = boost::bind(&LocalStorage::abortReplicas, this, &replicasVec); 
+        Destructor replicasCleaner(f);
+        replicate(chunk.addr, chunk, deflated, compressedSize, chunk.getSize(), query, replicasVec);
 
-        replicate(chunk.addr, chunk, deflated, compressedSize, chunk.getSize(), query);
+        {
+            ScopedMutexLock cs(mutex);
+            assert(chunk.isRaw()); // new chunk is raw
+            Query::validateQueryPtr(query);
 
-        ScopedMutexLock cs(mutex);
-        assert(chunk.isRaw()); // new chunk is raw
+            chunk.hdr.compressedSize = compressedSize;
+            size_t reserve = chunk.getAttributeDesc().getReserve();
+            chunk.hdr.allocatedSize = (reserve != 0 && dstVersion > 1) ? compressedSize + compressedSize*reserve/100 : compressedSize;
 
-        chunk.hdr.compressedSize = compressedSize;
-        size_t reserve = chunk.getAttributeDesc().getReserve();
-        chunk.hdr.allocatedSize = (reserve != 0 && dstVersion > 1) ? compressedSize + compressedSize*reserve/100 : compressedSize;
-
-        if (hdr.clusterSize == 0) { // old no-cluster mode
-            chunk.hdr.pos.segmentNo = getRandomSegment();
-            if (hdr.segment[chunk.hdr.pos.segmentNo].used + chunk.hdr.allocatedSize > segments[chunk.hdr.pos.segmentNo].size)
-                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_FREE_SPACE);
-
-            chunk.hdr.pos.offs = hdr.segment[chunk.hdr.pos.segmentNo].used;
-            hdr.segment[chunk.hdr.pos.segmentNo].used += chunk.hdr.allocatedSize;
-        } else {
-            if (chunk.hdr.allocatedSize > hdr.clusterSize)
-                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_SIZE_TOO_LARGE) << chunk.hdr.allocatedSize << hdr.clusterSize;
-
-            // Choose location of the chunk
-            Cluster& cluster = clusters[chunk.addr.arrId];
-            if (cluster.used == 0 || cluster.used + chunk.hdr.allocatedSize > hdr.clusterSize) {
-                cluster.pos.segmentNo = getRandomSegment();
-                cluster.used = 0;
-                if (!freeClusters[cluster.pos.segmentNo].empty()) {
-                    set<uint64_t>::iterator i = freeClusters[cluster.pos.segmentNo].begin();
-                    cluster.pos.offs = *i;
-                    freeClusters[cluster.pos.segmentNo].erase(i);
-                } else {
-                    if (hdr.segment[cluster.pos.segmentNo].used + hdr.clusterSize > segments[cluster.pos.segmentNo].size)
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_FREE_SPACE);
-                    cluster.pos.offs = hdr.segment[cluster.pos.segmentNo].used;
-                    hdr.segment[cluster.pos.segmentNo].used += hdr.clusterSize;
-                    LOG4CXX_DEBUG(logger, "Allocate new chunk segment " << cluster.pos.offs);
+            if (hdr.clusterSize == 0) { // old no-cluster mode
+                chunk.hdr.pos.segmentNo = getRandomSegment();
+                if (hdr.segment[chunk.hdr.pos.segmentNo].used + chunk.hdr.allocatedSize > segments[chunk.hdr.pos.segmentNo].size) {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_FREE_SPACE);
                 }
-                assert(cluster.pos.offs % hdr.clusterSize == 0);
+                chunk.hdr.pos.offs = hdr.segment[chunk.hdr.pos.segmentNo].used;
+                hdr.segment[chunk.hdr.pos.segmentNo].used += chunk.hdr.allocatedSize;
+            } else {
+                if (chunk.hdr.allocatedSize > hdr.clusterSize) {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_SIZE_TOO_LARGE) << chunk.hdr.allocatedSize << hdr.clusterSize;
+                }
+                // Choose location of the chunk
+                Cluster& cluster = clusters[chunk.addr.arrId];
+                if (cluster.used == 0 || cluster.used + chunk.hdr.allocatedSize > hdr.clusterSize) {
+                    cluster.pos.segmentNo = getRandomSegment();
+                    cluster.used = 0;
+                    if (!freeClusters[cluster.pos.segmentNo].empty()) {
+                        set<uint64_t>::iterator i = freeClusters[cluster.pos.segmentNo].begin();
+                        cluster.pos.offs = *i;
+                        freeClusters[cluster.pos.segmentNo].erase(i);
+                    } else {
+                        if (hdr.segment[cluster.pos.segmentNo].used + hdr.clusterSize > segments[cluster.pos.segmentNo].size)
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_FREE_SPACE);
+                        cluster.pos.offs = hdr.segment[cluster.pos.segmentNo].used;
+                        hdr.segment[cluster.pos.segmentNo].used += hdr.clusterSize;
+                        LOG4CXX_DEBUG(logger, "Allocate new chunk segment " << cluster.pos.offs);
+                    }
+                    assert(cluster.pos.offs % hdr.clusterSize == 0);
+                }
+                chunk.hdr.pos.segmentNo = cluster.pos.segmentNo;
+                chunk.hdr.pos.offs = cluster.pos.offs + cluster.used;
+                cluster.used += chunk.hdr.allocatedSize;
+                liveChunksInCluster[getClusterID(chunk.hdr.pos)] += 1;
             }
-            chunk.hdr.pos.segmentNo = cluster.pos.segmentNo;
-            chunk.hdr.pos.offs = cluster.pos.offs + cluster.used;
-            cluster.used += chunk.hdr.allocatedSize;
-            liveChunksInCluster[getClusterID(chunk.hdr.pos)] += 1;
-        }
 
-        if (freeHeaders[nCoordinates].empty()) {
-            chunk.hdr.pos.hdrPos = hdr.currPos;
-            hdr.currPos += sizeof(ChunkHeader) + sizeof(Coordinate)*nCoordinates;
-            hdr.nChunks += 1;
-        } else  {
-            chunk.hdr.pos.hdrPos = freeHeaders[nCoordinates].front();
+            if (freeHeaders.empty()) {
+                chunk.hdr.pos.hdrPos = hdr.currPos;
+                hdr.currPos += sizeof(ChunkDescriptor);
+                hdr.nChunks += 1;
+            } else  {
+                set<uint64_t>::iterator i = freeHeaders.begin();
+                chunk.hdr.pos.hdrPos = *i;
+                assert(chunk.hdr.pos.hdrPos != 0);
+                freeHeaders.erase(i);
+            }
+            
+            // Write ahead UNDO log
+            if (dstVersion != 0) {
+                TransLogRecord transLogRecord[2];
+                ArrayDesc arrayDesc;
+                SystemCatalog::getInstance()->getArrayDesc(versionName.substr(0, at), arrayDesc);
+                transLogRecord->array = arrayDesc.getId();
+                transLogRecord->versionArrayID = chunk.addr.arrId;
+                transLogRecord->version = dstVersion;
+                transLogRecord->hdr = chunk.hdr;
+                transLogRecord->oldSize = 0;
+                transLogRecord->hdrCRC = calculateCRC32(transLogRecord, sizeof(TransLogRecordHeader));
+                memset(&transLogRecord[1], 0, sizeof(TransLogRecord)); // end of log marker
+                
+                if (logSize + sizeof(TransLogRecord) > logSizeLimit) {
+                    logSize = 0;
+                    currLog ^= 1;
+                }
+                LOG4CXX_TRACE(logger, "ChunkDesc: Write in log chunk header " << transLogRecord->hdr.pos.offs << " at position " << logSize);
+                
+                File::writeAll(log[currLog], transLogRecord, sizeof(TransLogRecord)*2, logSize);
+                logSize += sizeof(TransLogRecord);
+            }
+            
+            // Write chunk data
+            writeAll(chunk.hdr.pos, deflated, compressedSize);
+            buf.reset();
+
+            if (--chunk.accessCount == 0) { // newly created chunks has accessCount == 1
+                lru.link(&chunk);
+            }
+            // Write chunk descriptor in storage header
+            ChunkDescriptor desc;
+            desc.hdr = chunk.hdr;
+            for (int i = 0; i < nCoordinates; i++) {
+                desc.coords[i] = chunk.addr.coords[i];
+            }
             assert(chunk.hdr.pos.hdrPos != 0);
-            freeHeaders[nCoordinates].pop();
-        }
 
-        // Write ahead UNDO log
-        if (dstVersion != 0) {
-            TransLogRecord transLogRecord[2];
-            ArrayDesc arrayDesc;
-            SystemCatalog::getInstance()->getArrayDesc(versionName.substr(0, at), arrayDesc);
-            transLogRecord->array = arrayDesc.getId();
-            transLogRecord->versionArrayID = chunk.addr.arrId;
-            transLogRecord->version = dstVersion;
-            transLogRecord->hdr = chunk.hdr;
-            transLogRecord->oldSize = 0;
-            transLogRecord->hdrCRC = calculateCRC32(transLogRecord, sizeof(TransLogRecordHeader));
-            memset(&transLogRecord[1], 0, sizeof(TransLogRecord)); // end of log marker
-
-            if (logSize + sizeof(TransLogRecord) > logSizeLimit) {
-                logSize = 0;
-                currLog ^= 1;
+            LOG4CXX_TRACE(logger, "ChunkDesc: Write chunk descriptor at position " << chunk.hdr.pos.hdrPos);
+            if (logger->isTraceEnabled()) {
+                LOG4CXX_TRACE(logger, "Chunk descriptor to write: " << desc.toString());
             }
-            LOG4CXX_TRACE(logger, "Write in log chunk header " << transLogRecord->hdr.pos.offs << " at position " << logSize);
 
-            File::writeAll(log[currLog], transLogRecord, sizeof(TransLogRecord)*2, logSize);
-            logSize += sizeof(TransLogRecord);
+            File::writeAll(hd, &desc, sizeof(ChunkDescriptor), chunk.hdr.pos.hdrPos);
+
+            // Update storage header
+            File::writeAll(hd, &hdr, HEADER_SIZE, 0);
+
+            InjectedErrorListener<WriteChunkInjectedError>::check();
+
+            notifyChunkReady(chunk);
+            addChunkToCache(chunk);
         }
-
-        // Write chunk data
-        writeAll(chunk.hdr.pos, deflated, compressedSize);
-        buf.reset();
-
-        addChunkToCache(chunk);
-        if (--chunk.accessCount == 0) { // newly created chunks has accessCount == 1
-            lru.link(&chunk);
-        }
-        // Write chunk descriptor in storage header
-        ChunkDescriptor desc;
-        desc.hdr = chunk.hdr;
-        for (int i = 0; i < nCoordinates; i++) {
-            desc.coords[i] = chunk.addr.coords[i];
-        }
-        assert(chunk.hdr.pos.hdrPos != 0);
-        File::writeAll(hd, &desc, sizeof(ChunkHeader) + sizeof(Coordinate)*nCoordinates, chunk.hdr.pos.hdrPos);
-
-        // Update storage header
-        File::writeAll(hd, &hdr, HEADER_SIZE, 0);
-
-        notifyChunkReady(chunk);
+        waitForReplicas(replicasVec);
+        replicasCleaner.disarm();
     }
 
     void LocalStorage::getDiskInfo(DiskInfo& info)
@@ -1647,21 +1867,20 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             info.nFreeClusters += freeClusters[i].size();
         }
     }
-   
 
-    NodeID LocalStorage::getNodeId() const
+    InstanceID LocalStorage::getInstanceId() const
     {
-        return hdr.nodeId;
+        return hdr.instanceId;
     }
 
-    size_t LocalStorage::getNumberOfNodes() const
+    size_t LocalStorage::getNumberOfInstances() const
     {
-        return nNodes;
+        return nInstances;
     }
 
-    void LocalStorage::setNodeId(NodeID id)
+    void LocalStorage::setInstanceId(InstanceID id)
     {
-        hdr.nodeId = id;
+        hdr.instanceId = id;
         File::writeAll(hd, &hdr, HEADER_SIZE, 0);
     }
 
@@ -1850,6 +2069,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         defaultCompressionMethod = attrDesc.getDefaultCompressionMethod();
         version = getVersionID(arrDesc, attId);
         positioned = false;
+        ps = arrDesc.getPartitioningSchema();
     }
 
     LocalStorage::DBArrayIterator::~DBArrayIterator()
@@ -1915,8 +2135,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             chunk->unPin();
 #endif
             boost::shared_ptr<Query> query(getQuery());
-            if (storage->isResponsibleFor(*chunk, query) &&
-                chunk->timestamp <= timestamp) {
+            if (storage->isResponsibleFor(*chunk, query) && chunk->timestamp <= timestamp) {
                 currChunk = chunk;
                 return true;
             }
@@ -1936,7 +2155,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         }
 #endif
         boost::shared_ptr<Query> query(getQuery());
-        currChunk = storage->nextChunk(addr, timestamp, query);
+        currChunk = storage->nextChunk(addr, timestamp, array, ps, query);
     }
 
     void LocalStorage::DBArrayIterator::reset()
@@ -1984,8 +2203,9 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
             if (diskChunk != NULL) {
                 AttributeDesc const& srcAttrDesc = diskChunk->getAttributeDesc();
                 if (diskChunk->hdr.allocatedSize == diskChunk->hdr.compressedSize && attrDesc.isNullable() == srcAttrDesc.isNullable()) {
+                    boost::shared_ptr<Query> query(getQuery());
                     addr.coords = srcChunk.getFirstPosition(false);
-                    Chunk* clone = storage->cloneChunk(addr, *diskChunk);
+                    Chunk* clone = storage->cloneChunk(addr, *diskChunk, query);
                     if (clone != NULL) {
                         return *clone;
                     }
@@ -2004,7 +2224,6 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
 
     DBChunk::~DBChunk() 
     { 
-        delete array;
     }
     
     bool DBChunk::isTemporary() const
@@ -2071,22 +2290,14 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         }
     }
 
-    void DBChunk::updateArrayDescriptor() const
+    void DBChunk::updateArrayDescriptor()
     {
-        // This is a virtual const method, but we are making an update.
-        // See DBChunk::getArrayDesc for an explanation.
-        boost::weak_ptr<const ArrayDesc>* nonConstPtr =
-            (boost::weak_ptr<const ArrayDesc>*)&_arrayDescLink;
-        (*nonConstPtr) =
-            boost::weak_ptr<const ArrayDesc>(SystemCatalog::getInstance()->getArrayDesc(addr.arrId));
-        assert(!_arrayDescLink.expired());
+        _arrayDesc = SystemCatalog::getInstance()->getArrayDesc(addr.arrId);
     }
 
     void DBChunk::truncate(Coordinate lastCoord)
     {
         lastPos[0] = lastPosWithOverlaps[0] = lastCoord;
-        //lastPos[0] = lastCoord - lastPosWithOverlaps[0] + lastPos[0];
-        //lastPosWithOverlaps[0] = lastCoord;
     }
 
     void DBChunk::write(boost::shared_ptr<Query>& query)
@@ -2102,17 +2313,13 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     {
         data = NULL;
         accessCount = 0;
-        array = NULL;
         next = prev = NULL;
+        timestamp = 1;
     }
 
     Array const& DBChunk::getArray() const
     {
-        if (array == NULL) { 
-            boost::shared_ptr<Query> emptyQuery;
-            ((DBChunk*)this)->array = new DBArray(addr.arrId, emptyQuery);
-        }
-        return *array;
+        return storage->getDBArray(addr.arrId);
     }
                    
     void DBChunk::init()
@@ -2125,7 +2332,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         waiting = false;
         next = prev = NULL;
         storage = (InternalStorage*)&StorageManager::getInstance();
-        timestamp = 0;
+        timestamp = 1;
         cloneOf = NULL;
         loader = 0;
     }
@@ -2140,9 +2347,11 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         lastPos = lastPosWithOverlaps = firstPosWithOverlaps = addr.coords;
         updateArrayDescriptor();
         const ArrayDesc& ad = getArrayDesc();
-        hdr.nodeId = ad.isLocal() ? storage->getNodeId() : ad.getChunkNumber(addr.coords) % storage->getNumberOfNodes();
+        hdr.instanceId = ad.isLocal() ? storage->getInstanceId() : ad.getChunkNumber(addr.coords) % storage->getNumberOfInstances();
         const Dimensions& dims = ad.getDimensions();
-        for (size_t i = 0, n = dims.size(); i < n; i++) {
+        size_t n = dims.size(); 
+        assert(addr.coords.size() == n);
+        for (size_t i = 0; i < n; i++) {
             if (firstPosWithOverlaps[i] > dims[i].getStart()) {
                 firstPosWithOverlaps[i] -= dims[i].getChunkOverlap();
             }
@@ -2215,25 +2424,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
 
     const ArrayDesc& DBChunk::getArrayDesc() const
     {
-       boost::shared_ptr<const ArrayDesc> arrayDesc(_arrayDescLink.lock());
-       if (!arrayDesc) {
-            updateArrayDescriptor();
-            arrayDesc = boost::shared_ptr<const ArrayDesc>(_arrayDescLink); // can throw
-       }
-       assert(arrayDesc);
-       /*
-        * HACK ALLERT (tigor):
-        * There is a potential for a dangling reference
-        * because the pointer is weak, but we are assuming that the link
-        * will not expire while a query is using the DB chunk.
-        * Basically, we have to quiesce the system when changing
-        * array metadata. For example, the 'rename' operator locks
-        * all other array operations out, invalidates the local ArrayDesc
-        * cache (kept in SystemCatalog), an only then changes the metadata.
-        * A more robust design seems to require
-        * a change in Chunk interface - some day ...
-        */
-       return *arrayDesc.get();
+        return *_arrayDesc;
     }
 
     const AttributeDesc& DBChunk::getAttributeDesc() const
@@ -2340,7 +2531,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         return iterator;
     }
 
-    boost::shared_ptr<ChunkIterator> DBChunk::getIterator(boost::shared_ptr<Query>& query, int iterationMode)
+    boost::shared_ptr<ChunkIterator> DBChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
     {
         const AttributeDesc* bitmapAttr = getArrayDesc().getEmptyBitmapAttribute();
         Chunk* bitmapChunk = NULL;
@@ -2413,10 +2604,10 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
     //
     // Global storage implemention
     //
-    void GlobalStorage::remove(ArrayID remArrId, bool allVersions)
+    void GlobalStorage::remove(ArrayID remArrId, bool allVersions, uint64_t timestamp)
     {
         ScopedMutexLock cs(mutex);
-        CachedStorage::remove(remArrId, allVersions);
+        CachedStorage::remove(remArrId, allVersions, timestamp);
 
         DIR* arrDir = opendir(dfsDir.c_str());
         struct dirent *arrEntry, *chunkEntry;
@@ -2458,7 +2649,7 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         open(databaseHeaderPath, dfsDir, cacheSize, CompressorFactory::getInstance().getCompressors());
     }
 
-    void GlobalStorage::recover(NodeID recoveredNode, boost::shared_ptr<Query>& query)
+    void GlobalStorage::recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query)
     {
     }
 
@@ -2476,12 +2667,12 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         CachedStorage::open(cacheSize, compressors);
         dfsDir = (rootDir[rootDir.size()-1] == '/') ? rootDir : rootDir + "/";
         headerFilePath = headerPath;
-        nodeId = 0;
-        nNodes = SystemCatalog::getInstance()->getNumberOfNodes();
+        instanceId = 0;
+        nInstances = SystemCatalog::getInstance()->getNumberOfInstances();
         int fd = ::open(headerFilePath.c_str(), O_RDONLY);
         if (fd >= 0) {
-            size_t rc = ::read(fd, &nodeId, sizeof(nodeId));
-            if (rc != 0 && rc != sizeof(nodeId))
+            size_t rc = ::read(fd, &instanceId, sizeof(instanceId));
+            if (rc != 0 && rc != sizeof(instanceId))
                 throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED) << "read";
             ::close(fd);
         }
@@ -2583,7 +2774,6 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
 
     void GlobalStorage::writeChunk(Chunk* newChunk, boost::shared_ptr<Query>& query)
     {
-       //XXX TODO: consider locking mutex to avoid writing replica chunks for a rolled-back query
         ScopedMutexLock cs(mutex);
         Query::validateQueryPtr(query);
         DBChunk& chunk = *(DBChunk*)newChunk;
@@ -2617,23 +2807,23 @@ Value CachedStorage::reverseMapCoordinate(string const& indexName, DimensionDesc
         notifyChunkReady(chunk);
     }
 
-    NodeID GlobalStorage::getNodeId() const
+    InstanceID GlobalStorage::getInstanceId() const
     {
-        return nodeId;
+        return instanceId;
     }
 
-    size_t GlobalStorage::getNumberOfNodes() const
+    size_t GlobalStorage::getNumberOfInstances() const
     {
-        return nNodes;
+        return nInstances;
     }
 
-    void GlobalStorage::setNodeId(NodeID id)
+    void GlobalStorage::setInstanceId(InstanceID id)
     {
-        nodeId = id;
+        instanceId = id;
         int fd = ::open(headerFilePath.c_str(), O_RDWR|O_CREAT, 0777);
         if (fd < 0)
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_FILE) << headerFilePath << errno;
-        File::writeAll(fd, &nodeId, sizeof(nodeId), 0);
+        File::writeAll(fd, &instanceId, sizeof(instanceId), 0);
         ::close(fd);
     }
 

@@ -44,7 +44,7 @@
 
 #include "query/FunctionLibrary.h"
 #include "util/PluginManager.h"
-#include "TileFunctions.h"
+#include "query/TileFunctions.h"
 
 using namespace std;
 using namespace boost;
@@ -120,7 +120,7 @@ void FunctionLibrary::registerBuiltInFunctions()
     addFunction(FunctionDescription("last", list_of(TID_STRING), TypeId(TID_INT64), &last1, (size_t)0));
     addFunction(FunctionDescription("low", list_of(TID_STRING), TypeId(TID_INT64), &low1, (size_t)0));
     addFunction(FunctionDescription("high", list_of(TID_STRING), TypeId(TID_INT64), &high1, (size_t)0));
-    addFunction(FunctionDescription("nodeid", vector<TypeId>(), TypeId(TID_INT64), &nodeId, (size_t)0));
+    addFunction(FunctionDescription("instanceid", vector<TypeId>(), TypeId(TID_INT64), &instanceId, (size_t)0));
 #endif
     addFunction(FunctionDescription("is_null", list_of(TID_VOID), TID_VOID, &isNull, 0, false, false, &inferIsNullArgTypes));
     addFunction(FunctionDescription("is_nan", list_of(TID_DOUBLE), TID_BOOL, &isNan, 0));
@@ -133,6 +133,10 @@ void FunctionLibrary::registerBuiltInFunctions()
     addFunction(FunctionDescription("<>", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strNotEq, (size_t)0));
     addFunction(FunctionDescription("<", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strLess, (size_t)0));
     addFunction(FunctionDescription(">", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strGreater, (size_t)0));
+    addFunction(FunctionDescription("min", list_of(TID_STRING)(TID_STRING), TypeId(TID_STRING), &strMin, (size_t)0));
+    addFunction(FunctionDescription("max", list_of(TID_STRING)(TID_STRING), TypeId(TID_STRING), &strMax, (size_t)0));
+    addFunction(FunctionDescription("min", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &boolMin, (size_t)0));
+    addFunction(FunctionDescription("max", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &boolMax, (size_t)0));
     addFunction(FunctionDescription("<=", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strLessOrEq, (size_t)0));
     addFunction(FunctionDescription(">=", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strGreaterOrEq, (size_t)0));
     addFunction(FunctionDescription("strftime", list_of(TID_DATETIME)(TID_STRING), TypeId(TID_STRING), &strFTime, (size_t)0));
@@ -170,328 +174,328 @@ void FunctionLibrary::registerBuiltInFunctions()
  * Section of new vector functions.
  */
     // TID_CHAR
-    addVFunction(FunctionDescription("=", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Char, Char, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Char, Char, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Char, Char, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Char, Char, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Char, Char, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Char, Char, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Char, Char, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Char, Char, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Char, Char, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Char, Char, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Char, Char, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_CHAR)(TID_CHAR), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Char, Char, Bool>, 0));
 
-    addVConverter(TID_CHAR, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Char, Int8>, 1);
-    addVConverter(TID_CHAR, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Char, Int16>, 2);
-    addVConverter(TID_CHAR, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Char, Int32>, 3);
-    addVConverter(TID_CHAR, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Char, Int64>, 4);
-    addVConverter(TID_CHAR, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Char, Uint8>, 1);
-    addVConverter(TID_CHAR, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Char, Uint16>, 2);
-    addVConverter(TID_CHAR, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Char, Uint32>, 3);
-    addVConverter(TID_CHAR, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Char, Uint64>, 4);
-    addVConverter(TID_CHAR, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Char, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_CHAR, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Char, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_CHAR, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Char, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_CHAR, TID_INT8, &rle_unary_func<UnaryConverter, Char, Int8>, 1);
+    addVConverter(TID_CHAR, TID_INT16, &rle_unary_func<UnaryConverter, Char, Int16>, 2);
+    addVConverter(TID_CHAR, TID_INT32, &rle_unary_func<UnaryConverter, Char, Int32>, 3);
+    addVConverter(TID_CHAR, TID_INT64, &rle_unary_func<UnaryConverter, Char, Int64>, 4);
+    addVConverter(TID_CHAR, TID_UINT8, &rle_unary_func<UnaryConverter, Char, Uint8>, 1);
+    addVConverter(TID_CHAR, TID_UINT16, &rle_unary_func<UnaryConverter, Char, Uint16>, 2);
+    addVConverter(TID_CHAR, TID_UINT32, &rle_unary_func<UnaryConverter, Char, Uint32>, 3);
+    addVConverter(TID_CHAR, TID_UINT64, &rle_unary_func<UnaryConverter, Char, Uint64>, 4);
+    addVConverter(TID_CHAR, TID_FLOAT, &rle_unary_func<UnaryConverter, Char, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_CHAR, TID_DOUBLE, &rle_unary_func<UnaryConverter, Char, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_CHAR, TID_BOOL, &rle_unary_func<UnaryConverter, Char, Bool>, TRANSFORM_CONVERSION_COST);
 
     // TID_INT8
-    addVFunction(FunctionDescription("+", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_fixed_func<BinaryFixedPlus, Int8, Int8, Int8>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_fixed_func<BinaryFixedMinus, Int8, Int8, Int8>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_fixed_func<BinaryFixedMult, Int8, Int8, Int8>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_fixed_func<BinaryFixedDiv, Int8, Int8, Int8>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_fixed_func<BinaryFixedMod, Int8, Int8, Int8>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_func<BinaryPlus, Int8, Int8, Int8>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_func<BinaryMinus, Int8, Int8, Int8>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_func<BinaryMult, Int8, Int8, Int8>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_func<BinaryDiv, Int8, Int8, Int8>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_INT8)(TID_INT8), TypeId(TID_INT8), &rle_binary_func<BinaryMod, Int8, Int8, Int8>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Int8, Int8, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Int8, Int8, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Int8, Int8, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Int8, Int8, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Int8, Int8, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Int8, Int8, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Int8, Int8, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Int8, Int8, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Int8, Int8, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Int8, Int8, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Int8, Int8, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_INT8)(TID_INT8), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Int8, Int8, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_INT8), TypeId(TID_INT8), &rle_unary_fixed_func<UnaryFixedMinus, Int8, Int8>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT8), TypeId(TID_INT8), &rle_unary_func<UnaryMinus, Int8, Int8>, 0));
 
-    addVConverter(TID_INT8, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Int16>, 2);
-    addVConverter(TID_INT8, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Int32>, 3);
-    addVConverter(TID_INT8, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Int64>, 4);
-    addVConverter(TID_INT8, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Uint8>, 1);
-    addVConverter(TID_INT8, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Uint16>, 2);
-    addVConverter(TID_INT8, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Uint32>, 3);
-    addVConverter(TID_INT8, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Uint64>, 4);
-    addVConverter(TID_INT8, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_INT8, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_INT8, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Int8, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT8, TID_INT16, &rle_unary_func<UnaryConverter, Int8, Int16>, 2);
+    addVConverter(TID_INT8, TID_INT32, &rle_unary_func<UnaryConverter, Int8, Int32>, 3);
+    addVConverter(TID_INT8, TID_INT64, &rle_unary_func<UnaryConverter, Int8, Int64>, 4);
+    addVConverter(TID_INT8, TID_UINT8, &rle_unary_func<UnaryConverter, Int8, Uint8>, 1);
+    addVConverter(TID_INT8, TID_UINT16, &rle_unary_func<UnaryConverter, Int8, Uint16>, 2);
+    addVConverter(TID_INT8, TID_UINT32, &rle_unary_func<UnaryConverter, Int8, Uint32>, 3);
+    addVConverter(TID_INT8, TID_UINT64, &rle_unary_func<UnaryConverter, Int8, Uint64>, 4);
+    addVConverter(TID_INT8, TID_FLOAT, &rle_unary_func<UnaryConverter, Int8, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_INT8, TID_DOUBLE, &rle_unary_func<UnaryConverter, Int8, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT8, TID_BOOL, &rle_unary_func<UnaryConverter, Int8, Bool>, TRANSFORM_CONVERSION_COST);
 
     // TID_INT16
-    addVFunction(FunctionDescription("+", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_fixed_func<BinaryFixedPlus, Int16, Int16, Int16>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_fixed_func<BinaryFixedMinus, Int16, Int16, Int16>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_fixed_func<BinaryFixedMult, Int16, Int16, Int16>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_fixed_func<BinaryFixedDiv, Int16, Int16, Int16>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_fixed_func<BinaryFixedMod, Int16, Int16, Int16>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_func<BinaryPlus, Int16, Int16, Int16>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_func<BinaryMinus, Int16, Int16, Int16>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_func<BinaryMult, Int16, Int16, Int16>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_func<BinaryDiv, Int16, Int16, Int16>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_INT16)(TID_INT16), TypeId(TID_INT16), &rle_binary_func<BinaryMod, Int16, Int16, Int16>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Int16, Int16, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Int16, Int16, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Int16, Int16, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Int16, Int16, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Int16, Int16, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Int16, Int16, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Int16, Int16, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Int16, Int16, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Int16, Int16, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Int16, Int16, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Int16, Int16, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_INT16)(TID_INT16), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Int16, Int16, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_INT16), TypeId(TID_INT16), &rle_unary_fixed_func<UnaryFixedMinus, Int16, Int16>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT16), TypeId(TID_INT16), &rle_unary_func<UnaryMinus, Int16, Int16>, 0));
 
-    addVConverter(TID_INT16, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Int8>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT16, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Int32>, 2);
-    addVConverter(TID_INT16, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Int64>, 3);
-    addVConverter(TID_INT16, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Uint8>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT16, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Uint16>, 1);
-    addVConverter(TID_INT16, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Uint32>, 2);
-    addVConverter(TID_INT16, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Uint64>, 3);
-    addVConverter(TID_INT16, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_INT16, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_INT16, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Int16, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT16, TID_INT8, &rle_unary_func<UnaryConverter, Int16, Int8>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT16, TID_INT32, &rle_unary_func<UnaryConverter, Int16, Int32>, 2);
+    addVConverter(TID_INT16, TID_INT64, &rle_unary_func<UnaryConverter, Int16, Int64>, 3);
+    addVConverter(TID_INT16, TID_UINT8, &rle_unary_func<UnaryConverter, Int16, Uint8>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT16, TID_UINT16, &rle_unary_func<UnaryConverter, Int16, Uint16>, 1);
+    addVConverter(TID_INT16, TID_UINT32, &rle_unary_func<UnaryConverter, Int16, Uint32>, 2);
+    addVConverter(TID_INT16, TID_UINT64, &rle_unary_func<UnaryConverter, Int16, Uint64>, 3);
+    addVConverter(TID_INT16, TID_FLOAT, &rle_unary_func<UnaryConverter, Int16, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_INT16, TID_DOUBLE, &rle_unary_func<UnaryConverter, Int16, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT16, TID_BOOL, &rle_unary_func<UnaryConverter, Int16, Bool>, TRANSFORM_CONVERSION_COST);
 
     /* TID_INT32 */
-    addVFunction(FunctionDescription("+", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_fixed_func<BinaryFixedPlus, Int32, Int32, Int32>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_fixed_func<BinaryFixedMinus, Int32, Int32, Int32>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_fixed_func<BinaryFixedMult, Int32, Int32, Int32>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_fixed_func<BinaryFixedDiv, Int32, Int32, Int32>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_fixed_func<BinaryFixedMod, Int32, Int32, Int32>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_func<BinaryPlus, Int32, Int32, Int32>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_func<BinaryMinus, Int32, Int32, Int32>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_func<BinaryMult, Int32, Int32, Int32>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_func<BinaryDiv, Int32, Int32, Int32>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_INT32)(TID_INT32), TypeId(TID_INT32), &rle_binary_func<BinaryMod, Int32, Int32, Int32>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Int32, Int32, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Int32, Int32, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Int32, Int32, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Int32, Int32, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Int32, Int32, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Int32, Int32, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Int32, Int32, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Int32, Int32, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Int32, Int32, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Int32, Int32, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Int32, Int32, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_INT32)(TID_INT32), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Int32, Int32, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_INT32), TypeId(TID_INT32), &rle_unary_fixed_func<UnaryFixedMinus, Int32, Int32>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT32), TypeId(TID_INT32), &rle_unary_func<UnaryMinus, Int32, Int32>, 0));
 
-    addVConverter(TID_INT32, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Int8>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_INT32, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Int16>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT32, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Int64>, 2);
-    addVConverter(TID_INT32, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Uint8>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_INT32, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Uint16>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT32, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Uint32>, 1);
-    addVConverter(TID_INT32, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Uint64>, 2);
-    addVConverter(TID_INT32, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Float>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_INT32, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Double>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT32, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Int32, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT32, TID_INT8, &rle_unary_func<UnaryConverter, Int32, Int8>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_INT32, TID_INT16, &rle_unary_func<UnaryConverter, Int32, Int16>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT32, TID_INT64, &rle_unary_func<UnaryConverter, Int32, Int64>, 2);
+    addVConverter(TID_INT32, TID_UINT8, &rle_unary_func<UnaryConverter, Int32, Uint8>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_INT32, TID_UINT16, &rle_unary_func<UnaryConverter, Int32, Uint16>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT32, TID_UINT32, &rle_unary_func<UnaryConverter, Int32, Uint32>, 1);
+    addVConverter(TID_INT32, TID_UINT64, &rle_unary_func<UnaryConverter, Int32, Uint64>, 2);
+    addVConverter(TID_INT32, TID_FLOAT, &rle_unary_func<UnaryConverter, Int32, Float>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_INT32, TID_DOUBLE, &rle_unary_func<UnaryConverter, Int32, Double>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT32, TID_BOOL, &rle_unary_func<UnaryConverter, Int32, Bool>, TRANSFORM_CONVERSION_COST);
 
     /* TID_INT64 */
-    addVFunction(FunctionDescription("+", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_fixed_func<BinaryFixedPlus, Int64, Int64, Int64>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_fixed_func<BinaryFixedMinus, Int64, Int64, Int64>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_fixed_func<BinaryFixedMult, Int64, Int64, Int64>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_fixed_func<BinaryFixedDiv, Int64, Int64, Int64>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_fixed_func<BinaryFixedMod, Int64, Int64, Int64>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_func<BinaryPlus, Int64, Int64, Int64>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_func<BinaryMinus, Int64, Int64, Int64>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_func<BinaryMult, Int64, Int64, Int64>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_func<BinaryDiv, Int64, Int64, Int64>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_INT64)(TID_INT64), TypeId(TID_INT64), &rle_binary_func<BinaryMod, Int64, Int64, Int64>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Int64, Int64, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Int64, Int64, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Int64, Int64, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Int64, Int64, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Int64, Int64, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Int64, Int64, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Int64, Int64, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Int64, Int64, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Int64, Int64, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Int64, Int64, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Int64, Int64, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_INT64)(TID_INT64), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Int64, Int64, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_INT64), TypeId(TID_INT64), &rle_unary_fixed_func<UnaryFixedMinus, Int64, Int64>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_INT64), TypeId(TID_INT64), &rle_unary_func<UnaryMinus, Int64, Int64>, 0));
 
-    addVConverter(TID_INT64, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Int8>, TRUNCATE_CONVERSION_COST*3);
-    addVConverter(TID_INT64, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Int16>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_INT64, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Int32>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT64, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Uint8>, TRUNCATE_CONVERSION_COST*3);
-    addVConverter(TID_INT64, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Uint16>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_INT64, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Uint32>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_INT64, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Uint64>, 1);
-    addVConverter(TID_INT64, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_INT64, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_INT64, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Int64, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT64, TID_INT8, &rle_unary_func<UnaryConverter, Int64, Int8>, TRUNCATE_CONVERSION_COST*3);
+    addVConverter(TID_INT64, TID_INT16, &rle_unary_func<UnaryConverter, Int64, Int16>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_INT64, TID_INT32, &rle_unary_func<UnaryConverter, Int64, Int32>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT64, TID_UINT8, &rle_unary_func<UnaryConverter, Int64, Uint8>, TRUNCATE_CONVERSION_COST*3);
+    addVConverter(TID_INT64, TID_UINT16, &rle_unary_func<UnaryConverter, Int64, Uint16>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_INT64, TID_UINT32, &rle_unary_func<UnaryConverter, Int64, Uint32>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_INT64, TID_UINT64, &rle_unary_func<UnaryConverter, Int64, Uint64>, 1);
+    addVConverter(TID_INT64, TID_FLOAT, &rle_unary_func<UnaryConverter, Int64, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_INT64, TID_DOUBLE, &rle_unary_func<UnaryConverter, Int64, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_INT64, TID_BOOL, &rle_unary_func<UnaryConverter, Int64, Bool>, TRANSFORM_CONVERSION_COST);
 
     /* TID_DATETIME */
     // DateTime - Int64 = DateTime: means datatime reduced on int64 number seconds
-    addVFunction(FunctionDescription("-", list_of(TID_DATETIME)(TID_INT64), TypeId(TID_DATETIME), &rle_binary_fixed_func<BinaryFixedMinus, DateTime, Int64, DateTime>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_DATETIME)(TID_INT64), TypeId(TID_DATETIME), &rle_binary_func<BinaryMinus, DateTime, Int64, DateTime>, 0));
     // DataTime - DateTime = Int64: means number of seconds between datetimes
-    addVFunction(FunctionDescription("-", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_INT64), &rle_binary_fixed_func<BinaryFixedMinus, DateTime, DateTime, Int64>, 0));
-    addVFunction(FunctionDescription("=", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, DateTime, DateTime, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, DateTime, DateTime, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, DateTime, DateTime, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, DateTime, DateTime, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, DateTime, DateTime, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, DateTime, DateTime, Bool>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_INT64), &rle_binary_func<BinaryMinus, DateTime, DateTime, Int64>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, DateTime, DateTime, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, DateTime, DateTime, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, DateTime, DateTime, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, DateTime, DateTime, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, DateTime, DateTime, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_DATETIME)(TID_DATETIME), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, DateTime, DateTime, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_DATETIME), TypeId(TID_DATETIME), &rle_unary_fixed_func<UnaryFixedMinus, DateTime, DateTime>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_DATETIME), TypeId(TID_DATETIME), &rle_unary_func<UnaryMinus, DateTime, DateTime>, 0));
 
-    addVConverter(TID_DATETIME, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, DateTime, Int64>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DATETIME, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, DateTime, Double>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_INT64, TID_DATETIME, &rle_unary_fixed_func<UnaryFixedConverter, Int64, DateTime>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_DATETIME, &rle_unary_fixed_func<UnaryFixedConverter, Double, DateTime>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DATETIME, TID_INT64, &rle_unary_func<UnaryConverter, DateTime, Int64>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DATETIME, TID_DOUBLE, &rle_unary_func<UnaryConverter, DateTime, Double>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_INT64, TID_DATETIME, &rle_unary_func<UnaryConverter, Int64, DateTime>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_DATETIME, &rle_unary_func<UnaryConverter, Double, DateTime>, EXPLICIT_CONVERSION_COST);
 
     // TID_UINT8
-    addVFunction(FunctionDescription("+", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_fixed_func<BinaryFixedPlus, Uint8, Uint8, Uint8>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_fixed_func<BinaryFixedMinus, Uint8, Uint8, Uint8>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_fixed_func<BinaryFixedMult, Uint8, Uint8, Uint8>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_fixed_func<BinaryFixedDiv, Uint8, Uint8, Uint8>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_fixed_func<BinaryFixedMod, Uint8, Uint8, Uint8>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_func<BinaryPlus, Uint8, Uint8, Uint8>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_func<BinaryMinus, Uint8, Uint8, Uint8>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_func<BinaryMult, Uint8, Uint8, Uint8>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_func<BinaryDiv, Uint8, Uint8, Uint8>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_UINT8), &rle_binary_func<BinaryMod, Uint8, Uint8, Uint8>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Uint8, Uint8, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Uint8, Uint8, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Uint8, Uint8, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Uint8, Uint8, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Uint8, Uint8, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Uint8, Uint8, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Uint8, Uint8, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Uint8, Uint8, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Uint8, Uint8, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Uint8, Uint8, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint8, Uint8, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint8, Uint8, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_UINT8), TypeId(TID_UINT8), &rle_unary_fixed_func<UnaryFixedMinus, Uint8, Uint8>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT8), TypeId(TID_UINT8), &rle_unary_func<UnaryMinus, Uint8, Uint8>, 0));
 
-    addVConverter(TID_UINT8, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Uint16>, 2);
-    addVConverter(TID_UINT8, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Uint32>, 3);
-    addVConverter(TID_UINT8, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Uint64>, 4);
-    addVConverter(TID_UINT8, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Int8>, 1);
-    addVConverter(TID_UINT8, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Int16>, 2);
-    addVConverter(TID_UINT8, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Int32>, 3);
-    addVConverter(TID_UINT8, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Int64>, 4);
-    addVConverter(TID_UINT8, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_UINT8, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_UINT8, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Uint8, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT8, TID_UINT16, &rle_unary_func<UnaryConverter, Uint8, Uint16>, 2);
+    addVConverter(TID_UINT8, TID_UINT32, &rle_unary_func<UnaryConverter, Uint8, Uint32>, 3);
+    addVConverter(TID_UINT8, TID_UINT64, &rle_unary_func<UnaryConverter, Uint8, Uint64>, 4);
+    addVConverter(TID_UINT8, TID_INT8, &rle_unary_func<UnaryConverter, Uint8, Int8>, 1);
+    addVConverter(TID_UINT8, TID_INT16, &rle_unary_func<UnaryConverter, Uint8, Int16>, 2);
+    addVConverter(TID_UINT8, TID_INT32, &rle_unary_func<UnaryConverter, Uint8, Int32>, 3);
+    addVConverter(TID_UINT8, TID_INT64, &rle_unary_func<UnaryConverter, Uint8, Int64>, 4);
+    addVConverter(TID_UINT8, TID_FLOAT, &rle_unary_func<UnaryConverter, Uint8, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_UINT8, TID_DOUBLE, &rle_unary_func<UnaryConverter, Uint8, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT8, TID_BOOL, &rle_unary_func<UnaryConverter, Uint8, Bool>, TRANSFORM_CONVERSION_COST);
 
     // TID_UINT16
-    addVFunction(FunctionDescription("+", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_fixed_func<BinaryFixedPlus, Uint16, Uint16, Uint16>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_fixed_func<BinaryFixedMinus, Uint16, Uint16, Uint16>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_fixed_func<BinaryFixedMult, Uint16, Uint16, Uint16>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_fixed_func<BinaryFixedDiv, Uint16, Uint16, Uint16>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_fixed_func<BinaryFixedMod, Uint16, Uint16, Uint16>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_func<BinaryPlus, Uint16, Uint16, Uint16>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_func<BinaryMinus, Uint16, Uint16, Uint16>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_func<BinaryMult, Uint16, Uint16, Uint16>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_func<BinaryDiv, Uint16, Uint16, Uint16>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_UINT16), &rle_binary_func<BinaryMod, Uint16, Uint16, Uint16>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Uint16, Uint16, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Uint16, Uint16, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Uint16, Uint16, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Uint16, Uint16, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Uint16, Uint16, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Uint16, Uint16, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Uint16, Uint16, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Uint16, Uint16, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Uint16, Uint16, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Uint16, Uint16, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint16, Uint16, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint16, Uint16, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_UINT16), TypeId(TID_UINT16), &rle_unary_fixed_func<UnaryFixedMinus, Uint16, Uint16>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT16), TypeId(TID_UINT16), &rle_unary_func<UnaryMinus, Uint16, Uint16>, 0));
 
-    addVConverter(TID_UINT16, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Uint8>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_UINT16, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Uint32>, 2);
-    addVConverter(TID_UINT16, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Uint64>, 3);
-    addVConverter(TID_UINT16, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Int8>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_UINT16, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Int16>, 1);
-    addVConverter(TID_UINT16, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Int32>, 2);
-    addVConverter(TID_UINT16, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Int64>, 3);
-    addVConverter(TID_UINT16, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_UINT16, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_UINT16, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Uint16, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT16, TID_UINT8, &rle_unary_func<UnaryConverter, Uint16, Uint8>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_UINT16, TID_UINT32, &rle_unary_func<UnaryConverter, Uint16, Uint32>, 2);
+    addVConverter(TID_UINT16, TID_UINT64, &rle_unary_func<UnaryConverter, Uint16, Uint64>, 3);
+    addVConverter(TID_UINT16, TID_INT8, &rle_unary_func<UnaryConverter, Uint16, Int8>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_UINT16, TID_INT16, &rle_unary_func<UnaryConverter, Uint16, Int16>, 1);
+    addVConverter(TID_UINT16, TID_INT32, &rle_unary_func<UnaryConverter, Uint16, Int32>, 2);
+    addVConverter(TID_UINT16, TID_INT64, &rle_unary_func<UnaryConverter, Uint16, Int64>, 3);
+    addVConverter(TID_UINT16, TID_FLOAT, &rle_unary_func<UnaryConverter, Uint16, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_UINT16, TID_DOUBLE, &rle_unary_func<UnaryConverter, Uint16, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT16, TID_BOOL, &rle_unary_func<UnaryConverter, Uint16, Bool>, TRANSFORM_CONVERSION_COST);
 
     // TID_UINT32
-    addVFunction(FunctionDescription("+", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_fixed_func<BinaryFixedPlus, Uint32, Uint32, Uint32>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_fixed_func<BinaryFixedMinus, Uint32, Uint32, Uint32>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_fixed_func<BinaryFixedMult, Uint32, Uint32, Uint32>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_fixed_func<BinaryFixedDiv, Uint32, Uint32, Uint32>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_fixed_func<BinaryFixedMod, Uint32, Uint32, Uint32>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_func<BinaryPlus, Uint32, Uint32, Uint32>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_func<BinaryMinus, Uint32, Uint32, Uint32>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_func<BinaryMult, Uint32, Uint32, Uint32>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_func<BinaryDiv, Uint32, Uint32, Uint32>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_UINT32), &rle_binary_func<BinaryMod, Uint32, Uint32, Uint32>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Uint32, Uint32, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Uint32, Uint32, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Uint32, Uint32, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Uint32, Uint32, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Uint32, Uint32, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Uint32, Uint32, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Uint32, Uint32, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Uint32, Uint32, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Uint32, Uint32, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Uint32, Uint32, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint32, Uint32, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint32, Uint32, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_UINT32), TypeId(TID_UINT32), &rle_unary_fixed_func<UnaryFixedMinus, Uint32, Uint32>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT32), TypeId(TID_UINT32), &rle_unary_func<UnaryMinus, Uint32, Uint32>, 0));
 
-    addVConverter(TID_UINT32, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Uint8>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_UINT32, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Uint16>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_UINT32, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Uint64>, 2);
-    addVConverter(TID_UINT32, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Int8>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_UINT32, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Int16>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_UINT32, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Int32>, 1);
-    addVConverter(TID_UINT32, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Int64>, 2);
-    addVConverter(TID_UINT32, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_UINT32, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_UINT32, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Uint32, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT32, TID_UINT8, &rle_unary_func<UnaryConverter, Uint32, Uint8>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_UINT32, TID_UINT16, &rle_unary_func<UnaryConverter, Uint32, Uint16>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_UINT32, TID_UINT64, &rle_unary_func<UnaryConverter, Uint32, Uint64>, 2);
+    addVConverter(TID_UINT32, TID_INT8, &rle_unary_func<UnaryConverter, Uint32, Int8>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_UINT32, TID_INT16, &rle_unary_func<UnaryConverter, Uint32, Int16>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_UINT32, TID_INT32, &rle_unary_func<UnaryConverter, Uint32, Int32>, 1);
+    addVConverter(TID_UINT32, TID_INT64, &rle_unary_func<UnaryConverter, Uint32, Int64>, 2);
+    addVConverter(TID_UINT32, TID_FLOAT, &rle_unary_func<UnaryConverter, Uint32, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_UINT32, TID_DOUBLE, &rle_unary_func<UnaryConverter, Uint32, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT32, TID_BOOL, &rle_unary_func<UnaryConverter, Uint32, Bool>, TRANSFORM_CONVERSION_COST);
 
     // TID_UINT64
-    addVFunction(FunctionDescription("+", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_fixed_func<BinaryFixedPlus, Uint64, Uint64, Uint64>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_fixed_func<BinaryFixedMinus, Uint64, Uint64, Uint64>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_fixed_func<BinaryFixedMult, Uint64, Uint64, Uint64>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_fixed_func<BinaryFixedDiv, Uint64, Uint64, Uint64>, 0));
-    addVFunction(FunctionDescription("%", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_fixed_func<BinaryFixedMod, Uint64, Uint64, Uint64>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_func<BinaryPlus, Uint64, Uint64, Uint64>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_func<BinaryMinus, Uint64, Uint64, Uint64>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_func<BinaryMult, Uint64, Uint64, Uint64>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_func<BinaryDiv, Uint64, Uint64, Uint64>, 0));
+    addVFunction(FunctionDescription("%", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_UINT64), &rle_binary_func<BinaryMod, Uint64, Uint64, Uint64>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Uint64, Uint64, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Uint64, Uint64, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Uint64, Uint64, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Uint64, Uint64, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Uint64, Uint64, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Uint64, Uint64, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Uint64, Uint64, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Uint64, Uint64, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Uint64, Uint64, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Uint64, Uint64, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint64, Uint64, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint64, Uint64, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_UINT64), TypeId(TID_UINT64), &rle_unary_fixed_func<UnaryFixedMinus, Uint64, Uint64>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_UINT64), TypeId(TID_UINT64), &rle_unary_func<UnaryMinus, Uint64, Uint64>, 0));
 
-    addVConverter(TID_UINT64, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Uint8>, TRUNCATE_CONVERSION_COST*3);
-    addVConverter(TID_UINT64, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Uint16>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_UINT64, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Uint32>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_UINT64, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Int8>, TRUNCATE_CONVERSION_COST*3);
-    addVConverter(TID_UINT64, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Int16>, TRUNCATE_CONVERSION_COST*2);
-    addVConverter(TID_UINT64, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Int32>, TRUNCATE_CONVERSION_COST);
-    addVConverter(TID_UINT64, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Int64>, 1);
-    addVConverter(TID_UINT64, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Float>, TRANSFORM_CONVERSION_COST*2);
-    addVConverter(TID_UINT64, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Double>, TRANSFORM_CONVERSION_COST);
-    addVConverter(TID_UINT64, TID_BOOL, &rle_unary_fixed_func<UnaryFixedConverter, Uint64, Bool>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT64, TID_UINT8, &rle_unary_func<UnaryConverter, Uint64, Uint8>, TRUNCATE_CONVERSION_COST*3);
+    addVConverter(TID_UINT64, TID_UINT16, &rle_unary_func<UnaryConverter, Uint64, Uint16>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_UINT64, TID_UINT32, &rle_unary_func<UnaryConverter, Uint64, Uint32>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_UINT64, TID_INT8, &rle_unary_func<UnaryConverter, Uint64, Int8>, TRUNCATE_CONVERSION_COST*3);
+    addVConverter(TID_UINT64, TID_INT16, &rle_unary_func<UnaryConverter, Uint64, Int16>, TRUNCATE_CONVERSION_COST*2);
+    addVConverter(TID_UINT64, TID_INT32, &rle_unary_func<UnaryConverter, Uint64, Int32>, TRUNCATE_CONVERSION_COST);
+    addVConverter(TID_UINT64, TID_INT64, &rle_unary_func<UnaryConverter, Uint64, Int64>, 1);
+    addVConverter(TID_UINT64, TID_FLOAT, &rle_unary_func<UnaryConverter, Uint64, Float>, TRANSFORM_CONVERSION_COST*2);
+    addVConverter(TID_UINT64, TID_DOUBLE, &rle_unary_func<UnaryConverter, Uint64, Double>, TRANSFORM_CONVERSION_COST);
+    addVConverter(TID_UINT64, TID_BOOL, &rle_unary_func<UnaryConverter, Uint64, Bool>, TRANSFORM_CONVERSION_COST);
 
     /* TID_FLOAT */
-    addVFunction(FunctionDescription("+", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_fixed_func<BinaryFixedPlus, Float, Float, Float>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_fixed_func<BinaryFixedMinus, Float, Float, Float>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_fixed_func<BinaryFixedMult, Float, Float, Float>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_fixed_func<BinaryFixedDiv, Float, Float, Float>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_func<BinaryPlus, Float, Float, Float>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_func<BinaryMinus, Float, Float, Float>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_func<BinaryMult, Float, Float, Float>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT), &rle_binary_func<BinaryDiv, Float, Float, Float>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Float, Float, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Float, Float, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Float, Float, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Float, Float, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Float, Float, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Float, Float, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Float, Float, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Float, Float, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Float, Float, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Float, Float, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Float, Float, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Float, Float, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_FLOAT), TypeId(TID_FLOAT), &rle_unary_fixed_func<UnaryFixedMinus, Float, Float>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_FLOAT), TypeId(TID_FLOAT), &rle_unary_func<UnaryMinus, Float, Float>, 0));
 
-    addVConverter(TID_FLOAT, TID_DOUBLE, &rle_unary_fixed_func<UnaryFixedConverter, Float, Double>, 1);
-    addVConverter(TID_FLOAT, TID_CHAR, &rle_unary_fixed_func<UnaryFixedConverter, Float, Char>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Float, Int8>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Float, Int16>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Float, Int32>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Float, Int64>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Float, Uint8>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Float, Uint16>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Float, Uint32>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_FLOAT, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Float, Uint64>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_DOUBLE, &rle_unary_func<UnaryConverter, Float, Double>, 1);
+    addVConverter(TID_FLOAT, TID_CHAR, &rle_unary_func<UnaryConverter, Float, Char>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_INT8, &rle_unary_func<UnaryConverter, Float, Int8>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_INT16, &rle_unary_func<UnaryConverter, Float, Int16>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_INT32, &rle_unary_func<UnaryConverter, Float, Int32>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_INT64, &rle_unary_func<UnaryConverter, Float, Int64>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_UINT8, &rle_unary_func<UnaryConverter, Float, Uint8>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_UINT16, &rle_unary_func<UnaryConverter, Float, Uint16>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_UINT32, &rle_unary_func<UnaryConverter, Float, Uint32>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_FLOAT, TID_UINT64, &rle_unary_func<UnaryConverter, Float, Uint64>, EXPLICIT_CONVERSION_COST);
 
     /* TID_DOUBLE */
-    addVFunction(FunctionDescription("+", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_fixed_func<BinaryFixedPlus, Double, Double, Double>, 0));
-    addVFunction(FunctionDescription("-", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_fixed_func<BinaryFixedMinus, Double, Double, Double>, 0));
-    addVFunction(FunctionDescription("*", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_fixed_func<BinaryFixedMult, Double, Double, Double>, 0));
-    addVFunction(FunctionDescription("/", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_fixed_func<BinaryFixedDiv, Double, Double, Double>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_func<BinaryPlus, Double, Double, Double>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_func<BinaryMinus, Double, Double, Double>, 0));
+    addVFunction(FunctionDescription("*", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_func<BinaryMult, Double, Double, Double>, 0));
+    addVFunction(FunctionDescription("/", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_binary_func<BinaryDiv, Double, Double, Double>, 0));
 
-    addVFunction(FunctionDescription("=", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Double, Double, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Double, Double, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Double, Double, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Double, Double, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Double, Double, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Double, Double, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Double, Double, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Double, Double, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Double, Double, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Double, Double, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Double, Double, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Double, Double, Bool>, 0));
 
-    addVFunction(FunctionDescription("-", list_of(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_unary_fixed_func<UnaryFixedMinus, Double, Double>, 0));
+    addVFunction(FunctionDescription("-", list_of(TID_DOUBLE), TypeId(TID_DOUBLE), &rle_unary_func<UnaryMinus, Double, Double>, 0));
 
-    addVConverter(TID_DOUBLE, TID_FLOAT, &rle_unary_fixed_func<UnaryFixedConverter, Double, Float>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_CHAR, &rle_unary_fixed_func<UnaryFixedConverter, Double, Char>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_INT8, &rle_unary_fixed_func<UnaryFixedConverter, Double, Int8>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_INT16, &rle_unary_fixed_func<UnaryFixedConverter, Double, Int16>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_INT32, &rle_unary_fixed_func<UnaryFixedConverter, Double, Int32>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_INT64, &rle_unary_fixed_func<UnaryFixedConverter, Double, Int64>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_UINT8, &rle_unary_fixed_func<UnaryFixedConverter, Double, Uint8>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_UINT16, &rle_unary_fixed_func<UnaryFixedConverter, Double, Uint16>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_UINT32, &rle_unary_fixed_func<UnaryFixedConverter, Double, Uint32>, EXPLICIT_CONVERSION_COST);
-    addVConverter(TID_DOUBLE, TID_UINT64, &rle_unary_fixed_func<UnaryFixedConverter, Double, Uint64>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_FLOAT, &rle_unary_func<UnaryConverter, Double, Float>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_CHAR, &rle_unary_func<UnaryConverter, Double, Char>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_INT8, &rle_unary_func<UnaryConverter, Double, Int8>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_INT16, &rle_unary_func<UnaryConverter, Double, Int16>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_INT32, &rle_unary_func<UnaryConverter, Double, Int32>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_INT64, &rle_unary_func<UnaryConverter, Double, Int64>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_UINT8, &rle_unary_func<UnaryConverter, Double, Uint8>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_UINT16, &rle_unary_func<UnaryConverter, Double, Uint16>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_UINT32, &rle_unary_func<UnaryConverter, Double, Uint32>, EXPLICIT_CONVERSION_COST);
+    addVConverter(TID_DOUBLE, TID_UINT64, &rle_unary_func<UnaryConverter, Double, Uint64>, EXPLICIT_CONVERSION_COST);
 
     /* TID_BOOL */
     // TODO: Boolean operations can be implemented in more efficient way by using bit operations.
-    addVFunction(FunctionDescription("=", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedEq, Bool, Bool, Bool>, 0));
-    addVFunction(FunctionDescription("<", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLess, Bool, Bool, Bool>, 0));
-    addVFunction(FunctionDescription("<=", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedLessOrEq, Bool, Bool, Bool>, 0));
-    addVFunction(FunctionDescription("<>", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedNotEq, Bool, Bool, Bool>, 0));
-    addVFunction(FunctionDescription(">=", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreaterOrEq, Bool, Bool, Bool>, 0));
-    addVFunction(FunctionDescription(">", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedGreater, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription("=", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryEq, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription("<", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryLess, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription("<=", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryLessOrEq, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription("<>", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryNotEq, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription(">=", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription(">", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Bool, Bool, Bool>, 0));
     // TODO: and/or operations may require specific processing of NULL operands, so maybe it's better to implement separate functions for them instead of using template
-    addVFunction(FunctionDescription("and", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedAnd, Bool, Bool, Bool>, 0));
-    addVFunction(FunctionDescription("or", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_fixed_func<BinaryFixedOr, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription("and", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryAnd, Bool, Bool, Bool>, 0));
+    addVFunction(FunctionDescription("or", list_of(TID_BOOL)(TID_BOOL), TypeId(TID_BOOL), &rle_binary_func<BinaryOr, Bool, Bool, Bool>, 0));
 
     addVFunction(FunctionDescription("not", list_of(TID_BOOL), TypeId(TID_BOOL), &rle_unary_bool_not, 0));
 
     /* TID_STRING */
-    addVFunction(FunctionDescription("+", list_of(TID_STRING)(TID_STRING), TypeId(TID_STRING), &rle_binary_fixed_func<BinaryStringPlus, VarValue, VarValue, VarValue>, 0));
+    addVFunction(FunctionDescription("+", list_of(TID_STRING)(TID_STRING), TypeId(TID_STRING), &rle_binary_func<BinaryStringPlus, VarValue, VarValue, VarValue>, 0));
 
     /* Cconvertors to/from string */
 //    CONVERTOR_TO_STR(TID_INT8, Int8)
@@ -519,116 +523,64 @@ void FunctionLibrary::registerBuiltInFunctions()
 
     /* FUNCTIONS with 1 agrument */
     addVFunction(FunctionDescription("sin", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&sin>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&sin>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("sin", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&sin>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&sin>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("cos", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&cos>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&cos>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("cos", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&cos>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&cos>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("tan", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&tan>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&tan>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("tan", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&tan>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&tan>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("asin", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&asin>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&asin>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("asin", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&asin>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&asin>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("acos", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&acos>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&acos>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("acos", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&acos>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&acos>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("atan", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&atan>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&atan>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("atan", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&atan>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&atan>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("sqrt", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&sqrt>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&sqrt>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("sqrt", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&sqrt>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&sqrt>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("log", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&log>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&log>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("log", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&log>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&log>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("log10", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&log10>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&log10>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("log10", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&log10>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&log10>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("exp", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&exp>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&exp>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("exp", list_of(TID_FLOAT), TypeId(TID_FLOAT),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Float, Float>::Function<&exp>::Op, Float, Float>, 0));
+            &rle_unary_func<UnaryFunctionCall<Float, Float>::Function<&exp>::Op, Float, Float>, 0));
     addVFunction(FunctionDescription("ceil", list_of(TID_DOUBLE), TypeId(TID_INT64),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&ceil>::Op, Double, Int64>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&ceil>::Op, Double, Int64>, 0));
     addVFunction(FunctionDescription("floor", list_of(TID_DOUBLE), TypeId(TID_INT64),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&floor>::Op, Double, Int64>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&floor>::Op, Double, Int64>, 0));
     addVFunction(FunctionDescription("abs", list_of(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Double, Double>::Function<&abs>::Op, Double, Double>, 0));
+            &rle_unary_func<UnaryFunctionCall<Double, Double>::Function<&abs>::Op, Double, Double>, 0));
     addVFunction(FunctionDescription("abs", list_of(TID_INT32), TypeId(TID_INT32),
-            &rle_unary_fixed_func<UnaryFixedFunctionCall<Int32, Int32>::Function<&abs>::Op, Int32, Int32>, 0));
+            &rle_unary_func<UnaryFunctionCall<Int32, Int32>::Function<&abs>::Op, Int32, Int32>, 0));
 
     /* FUNCTIONS with 2 agruments */
+    addVFunction(FunctionDescription("atan2", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE),
+            &rle_binary_func<BinaryFunctionCall<Double, Double, Double>::Function<&atan2>::Op, Double, Double, Double>, 0));
+    addVFunction(FunctionDescription("atan2", list_of(TID_FLOAT)(TID_FLOAT), TypeId(TID_FLOAT),
+            &rle_binary_func<BinaryFunctionCall<Float, Float, Float>::Function<&atan2>::Op, Float, Float, Float>, 0));
     addVFunction(FunctionDescription("pow", list_of(TID_DOUBLE)(TID_DOUBLE), TypeId(TID_DOUBLE),
-            &rle_binary_fixed_func<BinaryFixedFunctionCall<Double, Double, Double>::Function<&pow>::Op, Double, Double, Double>, 0));
+            &rle_binary_func<BinaryFunctionCall<Double, Double, Double>::Function<&pow>::Op, Double, Double, Double>, 0));
 
     /* Polymorphic functions */
     addVFunction(FunctionDescription("is_null", list_of(TID_VOID), TID_VOID, &rle_unary_bool_is_null, 0, false, false, &inferIsNullArgTypes));
-
-    /* Aggregate (Tile -> Scalar) functions */
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_INT8), TID_INT64, &rle_tile_to_scalar<TileToSum, Int8, Int64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_INT16), TID_INT64, &rle_tile_to_scalar<TileToSum, Int16, Int64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_INT32), TID_INT64, &rle_tile_to_scalar<TileToSum, Int32, Int64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_INT64), TID_INT64, &rle_tile_to_scalar<TileToSum, Int64, Int64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_UINT8), TID_UINT64, &rle_tile_to_scalar<TileToSum, Uint8, Uint64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_UINT16), TID_UINT64, &rle_tile_to_scalar<TileToSum, Uint16, Uint64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_UINT32), TID_UINT64, &rle_tile_to_scalar<TileToSum, Uint32, Uint64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_UINT64), TID_UINT64, &rle_tile_to_scalar<TileToSum, Uint64, Uint64>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_FLOAT), TID_FLOAT, &rle_tile_to_scalar<TileToSum, Float, Float>));
-    addAggregateFunction(FunctionDescription("sum", list_of(TID_DOUBLE), TID_DOUBLE, &rle_tile_to_scalar<TileToSum, Double, Double>));
-
-    addAggregateFunction(FunctionDescription("count", list_of(TID_INT8), TID_INT64, &rle_tile_to_scalar<TileToCount, Int8, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_INT16), TID_INT64, &rle_tile_to_scalar<TileToCount, Int16, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_INT32), TID_INT64, &rle_tile_to_scalar<TileToCount, Int32, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_INT64), TID_INT64, &rle_tile_to_scalar<TileToCount, Int64, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_UINT8), TID_UINT64, &rle_tile_to_scalar<TileToCount, Uint8, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_UINT16), TID_UINT64, &rle_tile_to_scalar<TileToCount, Uint16, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_UINT32), TID_UINT64, &rle_tile_to_scalar<TileToCount, Uint32, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_UINT64), TID_UINT64, &rle_tile_to_scalar<TileToCount, Uint64, Uint64>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_FLOAT), TID_FLOAT, &rle_tile_to_scalar<TileToCount, Float, Float>));
-    addAggregateFunction(FunctionDescription("count", list_of(TID_DOUBLE), TID_DOUBLE, &rle_tile_to_scalar<TileToCount, Double, Double>));
-
-    addAggregateFunction(FunctionDescription("min", list_of(TID_INT8), TID_INT8, &rle_tile_to_scalar<TileToMin, Int8, Int8>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_INT16), TID_INT16, &rle_tile_to_scalar<TileToMin, Int16, Int16>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_INT32), TID_INT32, &rle_tile_to_scalar<TileToMin, Int32, Int32>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_INT64), TID_INT64, &rle_tile_to_scalar<TileToMin, Int64, Int64>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_UINT8), TID_UINT8, &rle_tile_to_scalar<TileToMin, Uint8, Uint8>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_UINT16), TID_UINT16, &rle_tile_to_scalar<TileToMin, Uint16, Uint16>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_UINT32), TID_UINT32, &rle_tile_to_scalar<TileToMin, Uint32, Uint32>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_UINT64), TID_UINT64, &rle_tile_to_scalar<TileToMin, Uint64, Uint64>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_FLOAT), TID_FLOAT, &rle_tile_to_scalar<TileToMin, Float, Float>));
-    addAggregateFunction(FunctionDescription("min", list_of(TID_DOUBLE), TID_DOUBLE, &rle_tile_to_scalar<TileToMin, Double, Double>));
-
-    addAggregateFunction(FunctionDescription("max", list_of(TID_INT8), TID_INT8, &rle_tile_to_scalar<TileToMax, Int8, Int8>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_INT16), TID_INT16, &rle_tile_to_scalar<TileToMax, Int16, Int16>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_INT32), TID_INT32, &rle_tile_to_scalar<TileToMax, Int32, Int32>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_INT64), TID_INT64, &rle_tile_to_scalar<TileToMax, Int64, Int64>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_UINT8), TID_UINT8, &rle_tile_to_scalar<TileToMax, Uint8, Uint8>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_UINT16), TID_UINT16, &rle_tile_to_scalar<TileToMax, Uint16, Uint16>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_UINT32), TID_UINT32, &rle_tile_to_scalar<TileToMax, Uint32, Uint32>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_UINT64), TID_UINT64, &rle_tile_to_scalar<TileToMax, Uint64, Uint64>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_FLOAT), TID_FLOAT, &rle_tile_to_scalar<TileToMax, Float, Float>));
-    addAggregateFunction(FunctionDescription("max", list_of(TID_DOUBLE), TID_DOUBLE, &rle_tile_to_scalar<TileToMax, Double, Double>));
-
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_INT8), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Int8, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_INT16), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Int16, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_INT32), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Int32, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_INT64), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Int64, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_UINT8), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Uint8, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_UINT16), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Uint16, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_UINT32), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Uint32, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_UINT64), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Uint64, Double>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_FLOAT), TID_FLOAT, &rle_tile_to_scalar<TileToAvg, Float, Float>));
-    addAggregateFunction(FunctionDescription("avg", list_of(TID_DOUBLE), TID_DOUBLE, &rle_tile_to_scalar<TileToAvg, Double, Double>));
 }
 
 bool FunctionLibrary::_findFunction(const std::string& name,
@@ -949,24 +901,6 @@ void FunctionLibrary::addVConverter( TypeId srcType,
     Converter& cnv = _vConverterMap[srcType][destType];
     cnv.func = func;
     cnv.cost = cost;
-}
-
-
-void FunctionLibrary::addAggregateFunction(const FunctionDescription& functionDesc)
-{
-    assert(functionDesc.getInputArgs().size() == 1);
-    _aggregateFunctionMap[pair<string, TypeId>(functionDesc.getName(), functionDesc.getInputArgs()[0])] = functionDesc;
-    _functionLibraries.addObject(string("aggregate: ") + functionDesc.getMangleName());
-}
-
-bool FunctionLibrary::findAggregateFunction(const std::string& name, const TypeId& typeId, FunctionDescription& functionDesc)
-{
-    map<pair<string, TypeId>, FunctionDescription >::const_iterator i = _aggregateFunctionMap.find(pair<string, TypeId>(name, typeId));
-    if (i == _aggregateFunctionMap.end()) {
-        return false;
-    }
-    functionDesc = i->second;
-    return true;
 }
 
 

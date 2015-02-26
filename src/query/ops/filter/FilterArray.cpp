@@ -131,11 +131,10 @@ namespace scidb {
             Value& value = inputIterator->getItem();
             RLEPayload* inputPayload = value.getTile();
             RLEPayload::iterator vi(inputPayload);
-            RLEPayload* result;
 
             if (newEmptyBitmap->count() == INFINITE_LENGTH) {
                 assert(newEmptyBitmap->nSegments() == 1);
-                if (ei.checkBit()) { 
+                if (ei.isNull() == false && ei.checkBit()) {
                     // empty bitmap containing all ones: just return original value
                     return value;
                 }
@@ -145,7 +144,7 @@ namespace scidb {
                 Value v;
                 while (!ei.end()) {
                     uint64_t count = ei.getRepeatCount();
-                    if (ei.checkBit()) { 
+                    if (ei.isNull() == false && ei.checkBit()) {
                         count = appender.add(vi, count);
                     } else { 
                         vi += count;
@@ -247,7 +246,7 @@ namespace scidb {
             uint64_t count;
             if (ei.checkBit()) { 
                 count = min(vi.getRepeatCount(), ei.getRepeatCount());
-                appender.add(vi.checkBit() ? trueVal : falseVal, count);
+                appender.add((vi.isNull()==false && vi.checkBit()) ? trueVal : falseVal, count);
                 vi += count;
             } else { 
                 count = ei.getRepeatCount();
@@ -441,6 +440,7 @@ namespace scidb {
         } else { 
             iterationMode &= ~ChunkIterator::TILE_MODE;
         }
+        iterationMode &= ~ChunkIterator::INTENDED_TILE_MODE;
         return attr.isEmptyIndicator()
             ? (attr.getId() >= inputArray->getArrayDesc().getAttributes().size())
                 ? (DelegateChunkIterator*)new NewBitmapChunkIterator(arrayIterator, chunk, iterationMode)

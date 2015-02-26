@@ -36,6 +36,8 @@
 #include "query/FunctionDescription.h"
 #include "query/TypeSystem.h"
 #include "system/ErrorsLibrary.h"
+#include "query/TileFunctions.h"
+#include "query/Aggregate.h"
 
 using namespace std;
 using namespace scidb;
@@ -71,6 +73,12 @@ EXPORTED_FUNCTION const vector<FunctionDescription>& GetFunctions()
     return _functionDescs;
 }
 
+vector<AggregatePtr> _aggregates;
+EXPORTED_FUNCTION const vector<AggregatePtr>& GetAggregates()
+{
+    return _aggregates;
+}
+
 /**
  * Class for registering/unregistering user defined objects
  */
@@ -92,7 +100,8 @@ public:
 		//      objects defined within the module: here, for example.
 		//   c) The third argument is the size, in bits, of the data 
 		//      in the type. 
-        _types.push_back(Type("rational", sizeof(SciDB_Rational) * 8));
+        Type rationalType("rational", sizeof(SciDB_Rational) * 8);
+        _types.push_back(rationalType);
 
 		//
 		// The FunctionDescription constructor takes: 
@@ -127,6 +136,13 @@ public:
         _functionDescs.push_back(FunctionDescription("=", list_of("rational")("rational"), TID_BOOL, &rationalEQ));
         _functionDescs.push_back(FunctionDescription(">=", list_of("rational")("rational"), TID_BOOL, &rationalGTEQ));
         _functionDescs.push_back(FunctionDescription(">", list_of("rational")("rational"), TID_BOOL, &rationalGT));
+
+        // Aggregates
+//        _aggregates.push_back(AggregatePtr(new BaseAggregate<AggSum, SciDB_Rational, SciDB_Rational>("sum", rationalType, rationalType)));
+        _aggregates.push_back(AggregatePtr(new BaseAggregate<AggAvg, SciDB_Rational, SciDB_Rational>("avg", rationalType, rationalType)));
+        _aggregates.push_back(AggregatePtr(new BaseAggregateInitByFirst<AggMin, SciDB_Rational, SciDB_Rational>("min", rationalType, rationalType)));
+        _aggregates.push_back(AggregatePtr(new BaseAggregateInitByFirst<AggMax, SciDB_Rational, SciDB_Rational>("max", rationalType, rationalType)));
+        _aggregates.push_back(AggregatePtr(new BaseAggregate<AggVar, SciDB_Rational, SciDB_Rational>("var", rationalType, rationalType)));
 
         _errors[RATIONAL_E_CANT_CONVERT_TO_RATIONAL] = "Can't convert '%1%' to rational, expected '( int / int )'";
         scidb::ErrorsLibrary::getInstance()->registerErrors("librational", &_errors);

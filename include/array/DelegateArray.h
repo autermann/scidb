@@ -82,9 +82,7 @@ class DelegateChunk : public ConstChunk
         isClone = clone;
     }
 
-    virtual void overrideTileMode(bool enabled) {
-        tileMode = enabled;
-    }
+    virtual void overrideTileMode(bool enabled);
   
     bool inTileMode() const { 
         return tileMode;
@@ -209,6 +207,14 @@ class NonEmptyableArray : public DelegateArray
       private:
         Value _true;
     };
+    class DummyBitmapArrayIterator : public DelegateArrayIterator
+    {
+      public:
+        ConstChunk const& getChunk();
+        DummyBitmapArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
+      private:
+        MemChunk shapeChunk;
+    };
   public:
 	NonEmptyableArray(boost::shared_ptr<Array> input);
 
@@ -218,6 +224,7 @@ class NonEmptyableArray : public DelegateArray
 
   private:
     AttributeID emptyTagID;
+    bool rle;
 };
 
 /**

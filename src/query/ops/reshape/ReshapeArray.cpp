@@ -139,7 +139,7 @@ namespace scidb {
       first(chunk.getFirstPosition(!(iterationMode & IGNORE_OVERLAPS))),
       last(chunk.getLastPosition(!(iterationMode & IGNORE_OVERLAPS))),
       arrayIterator(chunk.getArrayIterator().getInputIterator()),
-      mode(iterationMode)
+      mode(iterationMode & ~INTENDED_TILE_MODE)
     {
         reset();
     }

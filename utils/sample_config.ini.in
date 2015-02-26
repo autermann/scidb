@@ -1,5 +1,5 @@
 [SingleInstance]
-node-0=localhost,0
+server-0=localhost,0
 db_user=singleinstance
 db_passwd=singleinstance
 install_root=@CMAKE_INSTALL_PREFIX@
@@ -11,7 +11,7 @@ base-port=1239
 interface=eth0
 
 [DualInstance]
-node-0=localhost,1
+server-0=localhost,1
 db_user=dualinstance
 db_passwd=dualinstance
 install_root=@CMAKE_INSTALL_PREFIX@

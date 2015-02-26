@@ -1,4 +1,4 @@
-# Tested on 2-node cluster
+# Tested on 2-instance cluster
 
 function tiq() {
     cmd=$1
@@ -24,7 +24,7 @@ tiq "count(scan(Test_100_100))"
 tiq "sg(scan(Test_100_100), Test_100_100_sg, 1)"
 tiq "count(scan(Test_100_100_sg))"
 ls -lh /tmp/Array.data.100_100
-ls -lh ~/src/trunk/bin/storage.data1; pdsh -w node2 "ls -lh bin/storage.data1"
+ls -lh ~/src/trunk/bin/storage.data1; pdsh -w instance2 "ls -lh bin/storage.data1"
 exit
 
 rm -f /tmp/Array.data.1000_100
@@ -52,7 +52,7 @@ tiq "count(scan(Test_1000_100))"
 tiq "sg(scan(Test_1000_100), Test_1000_100_sg, 1)" 
 tiq "count(scan(Test_1000_100_sg))"
 ls -lh /tmp/Array.data.1000_100 
-ls -lh ~/src/trunk/bin/storage.data1; pdsh -w node2 "ls -lh bin/storage.data1"
+ls -lh ~/src/trunk/bin/storage.data1; pdsh -w instance2 "ls -lh bin/storage.data1"
 
 # 2-d array 1000x1000 elements (int32, double) 
 
@@ -64,7 +64,7 @@ tiq "count(scan(Test_1000_1000))"
 tiq "sg(scan(Test_1000_1000), Test_1000_1000_sg, 1)"
 tiq "count(scan(Test_1000_1000_sg))" 
 ls -lh /tmp/Array.data.1000_1000
-ls -lh ~/src/trunk/bin/storage.data1; pdsh -w node2 "ls -lh bin/storage.data1"
+ls -lh ~/src/trunk/bin/storage.data1; pdsh -w instance2 "ls -lh bin/storage.data1"
 
 
 # 2-d array 10000x10000 elements (int32, double) 
@@ -76,7 +76,7 @@ tiq "count(scan(Test_10000_10000))"
 tiq "sg(scan(Test_10000_10000), Test_10000_10000_sg, 1)" 
 tiq "count(scan(Test_10000_10000_sg))"
 ls -lh /tmp/Array.data.10000_10000
-ls -lh ~/src/trunk/bin/storage.data1; pdsh -w node2 "ls -lh bin/storage.data1"
+ls -lh ~/src/trunk/bin/storage.data1; pdsh -w instance2 "ls -lh bin/storage.data1"
 
 
 tiq "remove('Test_20000_20000)"
@@ -87,7 +87,7 @@ tiq "count(scan(Test_20000_20000))"
 tiq "sg(scan(Test_20000_20000), Test_20000_20000_sg, 1)" 
 tiq "count(scan(Test_20000_20000_sg))"
 ls -lh /tmp/Array.data.20000_20000
-ls -lh ~/src/trunk/bin/storage.data1; pdsh -w node2 "ls -lh bin/storage.data1"
+ls -lh ~/src/trunk/bin/storage.data1; pdsh -w instance2 "ls -lh bin/storage.data1"
 
 
 tiq "remove(Test_30000_30000)"
@@ -98,7 +98,7 @@ tiq "count(scan(Test_30000_30000))"
 tiq "sg(scan(Test_30000_30000), Test_30000_30000_sg, 1)" 
 tiq "count(scan(Test_30000_30000_sg))"
 ls -lh /tmp/Array.data.30000_30000
-ls -lh ~/src/trunk/bin/storage.data1; pdsh -w node2 "ls -lh bin/storage.data1"
+ls -lh ~/src/trunk/bin/storage.data1; pdsh -w instance2 "ls -lh bin/storage.data1"
 
 done 
 

@@ -188,56 +188,109 @@ namespace scidb {
     //
     Coordinates const& OrderedTransposeArrayIterator::getPosition()
     {
-        return pos;
+        if (!hasCurrent) {             
+            buildSetOfChunks();
+            if (!hasCurrent) { 
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+            }
+        }
+        return outPos;
     }
 
-    void OrderedTransposeArrayIterator::moveNext()
+    bool OrderedTransposeArrayIterator::setPosition(Coordinates const& pos)
     {
-        do { 
-            int i = dims.size()-1;
-            while ((pos[i] += dims[i].getChunkInterval()) > lastPos[i]) { 
-                if (i == 0) { 
-                    hasCurrent = false;
-                    return;
+        hasCurrent = UnorderedTransposeArrayIterator::setPosition(pos);
+        if (hasCurrent) { 
+            outPos = pos;
+            array.getArrayDesc().getChunkPositionFor(outPos);
+            if (setConstructed) {
+                currPos = chunks.find(outPos);
+                if (currPos == chunks.end()) { 
+                    return false;
                 }
-                pos[i] = firstPos[i];
-                i -= 1;
             }
-            invert(pos, inPos);
-        } while (!inputIterator->setPosition(inPos));
+            return true;
+        }
+        return false;
+    }
 
-        hasCurrent = true;
+
+    inline void OrderedTransposeArrayIterator::setFirst()
+    {
+        currPos = chunks.begin();
+        if (currPos != chunks.end()) { 
+            hasCurrent = true;
+            outPos = *currPos;
+            invert(outPos, inPos);
+            if (!inputIterator->setPosition(inPos)) { 
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+            }
+        } else { 
+            hasCurrent = false;
+        }
+    }
+
+    bool OrderedTransposeArrayIterator::buildSetOfChunks()
+    {
+        if (!setConstructed) {
+            inputIterator->reset();
+            while (!inputIterator->end()) {
+                invert(inputIterator->getPosition(), outPos);
+                chunks.insert(outPos);                    
+                ++(*inputIterator);
+            }
+            setConstructed = true;
+            if (hasCurrent) { 
+                currPos = chunks.find(outPos);
+                if (currPos == chunks.end()) { 
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+                }
+            } else { 
+                setFirst();
+            }                
+            return true;
+        }
+        return false;
     }
 
     void OrderedTransposeArrayIterator::operator ++()
     {
-        moveNext();
+        buildSetOfChunks();
+        if (!hasCurrent) { 
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+        }
+        ++currPos;
+        if (currPos != chunks.end()) { 
+            outPos = *currPos;
+            invert(outPos, inPos);
+            if (!inputIterator->setPosition(inPos)) { 
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+            }
+        } else { 
+            hasCurrent = false;
+        }
     }
 
     bool OrderedTransposeArrayIterator::end()
     {
+        if (!hasCurrent) { 
+            buildSetOfChunks();
+        }
         return !hasCurrent;
     }
 
     void OrderedTransposeArrayIterator::reset()
     {
-        pos = firstPos;
-        pos[pos.size()-1] -= dims[pos.size()-1].getChunkInterval();
-        moveNext();            
+        hasCurrent = false;
+        if (!buildSetOfChunks()) { 
+            setFirst();
+        }
     }
 
 	OrderedTransposeArrayIterator::OrderedTransposeArrayIterator(OrderedTransposeArray const& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator)
     :  UnorderedTransposeArrayIterator(arr, attrID, inputIterator),
-       dims(array.getArrayDesc().getDimensions()),
-       firstPos(dims.size()),
-       lastPos(dims.size()),
-       inPos(dims.size())
+       hasCurrent(false), setConstructed(false)
     {
-        for (size_t i = 0, n = firstPos.size(); i < n; i++) { 
-            firstPos[i] = dims[i].getStart();
-            lastPos[i] = firstPos[i] + dims[i].getLength() - 1;
-        }
-        reset();
     }         
     
     //

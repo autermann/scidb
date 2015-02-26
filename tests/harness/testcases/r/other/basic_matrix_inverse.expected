@@ -1,0 +1,32 @@
+Query was executed successfully
+
+[[(0),(1)],[(1),(2)]];[[(2),(3)],[(3),(4)]];[[(4)],[(5)]];[[(2),(3)],[(3),(4)]];[[(4),(5)],[(5),(6)]];[[(6)],[(7)]];[[(4),(5)]];[[(6),(7)]];[[(8)]]
+
+Query was executed successfully
+
+[[(1),(0.5),(0.333333)],[(0.5),(0.333333),(0.25)],[(0.333333),(0.25),(0.2)]]
+
+Query was executed successfully
+
+[[(5),(6),(7)],[(6),(7),(8)],[(7),(8),(9)]];[[(8),(9),(10)],[(9),(10),(11)],[(10),(11),(12)]];[[(8),(9),(10)],[(9),(10),(11)],[(10),(11),(12)]];[[(11),(12),(13)],[(12),(13),(14)],[(13),(14),(15)]]
+
+Query was executed successfully
+
+[[(1),(0.5),(0.333333),(0.25)],[(0.5),(0.333333),(0.25),(0.2)],[(0.333333),(0.25),(0.2),(0.166667)]]
+
+[[(9),(-36),(30)],[(-36),(192),(-180)],[(30),(-180),(180)]]
+
+[An error expected at this place for the query "inverse(I1)". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_INVERSE_ERROR2. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_INVERSE_ERROR2.]
+
+[An error expected at this place for the query "inverse(I3)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3.]
+
+[An error expected at this place for the query "inverse(I4)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR6. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR6.]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

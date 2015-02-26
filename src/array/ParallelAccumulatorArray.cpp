@@ -54,8 +54,10 @@ namespace scidb
         iterator.reset();
     }
 
-    ParallelAccumulatorArray::ChunkPrefetchJob::ChunkPrefetchJob(ParallelAccumulatorArray& array, AttributeID attr, const boost::shared_ptr<Query>& query)
-        : Job(query), acc(array), attrId(attr), resultChunk(NULL), iterator(acc.pipe->getConstIterator(attrId)) {}
+    ParallelAccumulatorArray::ChunkPrefetchJob::ChunkPrefetchJob(const boost::shared_ptr<ParallelAccumulatorArray>& array,
+                                                                 AttributeID attr,
+                                                                 const boost::shared_ptr<Query>& query)
+        : Job(query), _arrayLink(array), attrId(attr), resultChunk(NULL), iterator(array->pipe->getConstIterator(attrId)) {}
 
 
     void ParallelAccumulatorArray::ChunkPrefetchJob::run()
@@ -63,6 +65,11 @@ namespace scidb
         static int pass = 0; // DEBUG ONLY
         pass++;
         StatisticsScope sScope(_statistics);
+        boost::shared_ptr<ParallelAccumulatorArray> arrayPtr = _arrayLink.lock();
+        if (!arrayPtr) {
+            return;
+        }
+        ParallelAccumulatorArray& acc = *arrayPtr;
         try {
             if (iterator->setPosition(pos)) {
                 ConstChunk const& inputChunk = iterator->getChunk();
@@ -72,9 +79,9 @@ namespace scidb
                     Address addr(acc.desc.getId(), attrId, inputChunk.getFirstPosition(false));
                     accChunk.initialize(&acc, &acc.desc, addr, inputChunk.getCompressionMethod());
                     accChunk.setBitmapChunk((Chunk*)&inputChunk);
-                    boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
-                    boost::shared_ptr<ChunkIterator> dst = accChunk.getIterator(_query, (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0));
-                    bool vectorMode = src->supportsVectorMode();
+                    boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|ChunkIterator::IGNORE_EMPTY_CELLS);
+                    boost::shared_ptr<ChunkIterator> dst = accChunk.getIterator(_query, (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
+                    bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
                     src->setVectorMode(vectorMode);
                     dst->setVectorMode(vectorMode);
                     size_t count = 0;
@@ -134,7 +141,7 @@ void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
     int nPrefetchedChunks = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
     do {
        for (int i = 0; i < nAttrs; i++) {
-          doNewJob(boost::shared_ptr<ChunkPrefetchJob>(new ChunkPrefetchJob(*this, i, query)));
+          doNewJob(boost::shared_ptr<ChunkPrefetchJob>(new ChunkPrefetchJob(shared_from_this(), i, query)));
        }
     } while ((nPrefetchedChunks -= nAttrs) > 0);
  }
@@ -145,18 +152,6 @@ void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
             list< shared_ptr<ChunkPrefetchJob> >& jobs = activeJobs[i];
             for (list< shared_ptr<ChunkPrefetchJob> >::iterator j = jobs.begin(); j != jobs.end(); ++j) {
                 (*j)->skip();
-            }
-        }
-        for (size_t i = 0; i < activeJobs.size(); i++) {
-            list< shared_ptr<ChunkPrefetchJob> >& jobs = activeJobs[i];
-            for (list< shared_ptr<ChunkPrefetchJob> >::iterator j = jobs.begin(); j != jobs.end(); ++j) {
-                (*j)->wait(false, false);
-                (*j)->cleanup();
-            }
-        }
-        for (size_t i = 0; i < completedJobs.size(); i++) {
-            if (completedJobs[i]) { 
-                completedJobs[i]->cleanup();
             }
         }
     }

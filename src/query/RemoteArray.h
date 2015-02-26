@@ -44,23 +44,23 @@ namespace scidb
 class Statistics;
 
 /**
- * Class implement fetching chunks from current result array of remote node.
+ * Class implement fetching chunks from current result array of remote instance.
  */
 class RemoteArray: public StreamArray
 {
 public:
     void handleChunkMsg(boost::shared_ptr< MessageDesc> chunkDesc);
 
-    static boost::shared_ptr<RemoteArray> create(const ArrayDesc& arrayDesc, QueryID queryId, NodeID nodeID);
+    static boost::shared_ptr<RemoteArray> create(const ArrayDesc& arrayDesc, QueryID queryId, InstanceID instanceID);
 
 private:
     bool proceedChunkMsg(AttributeID attId, MemChunk& chunk);
     void requestNextChunk(AttributeID attId);
 
-    RemoteArray(const ArrayDesc& arrayDesc, QueryID queryId, NodeID nodeID);
+    RemoteArray(const ArrayDesc& arrayDesc, QueryID queryId, InstanceID instanceID);
 
     QueryID _queryId;
-    NodeID _nodeID;
+    InstanceID _instanceID;
     std::vector<Semaphore> _received;
     std::vector<boost::shared_ptr<MessageDesc> > _messages;
     std::vector<bool> _requested;

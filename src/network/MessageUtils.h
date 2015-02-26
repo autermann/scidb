@@ -47,10 +47,10 @@ boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID = 0);
 boost::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID);
 boost::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID);
 
-bool parseQueryLiveness(boost::shared_ptr<NodeLiveness>& queryLiveness,
+bool parseQueryLiveness(boost::shared_ptr<InstanceLiveness>& queryLiveness,
                         boost::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);
 
-bool serializeQueryLiveness(boost::shared_ptr<const NodeLiveness>& queryLiveness,
+bool serializeQueryLiveness(boost::shared_ptr<const InstanceLiveness>& queryLiveness,
                             boost::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);
 
 #endif //SCIDB_CLIENT

@@ -1,4 +1,4 @@
-########################################
+######################################
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
@@ -21,6 +21,7 @@
 ########################################
 
 add_subdirectory("findstars")
+add_subdirectory("groupstars")
 #
 #  PGB: Adding this to help me to build a couple of fast and dirty examples
 #       of how things like the UDF SDK would work.

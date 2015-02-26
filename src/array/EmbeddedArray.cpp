@@ -150,7 +150,7 @@ namespace scidb
         return withOverlap ? lastPosWithOverlaps : lastPos;
     }
 
-    boost::shared_ptr<ChunkIterator> EmbeddedChunk::getIterator(boost::shared_ptr<Query>& query, int iterationMode)
+    boost::shared_ptr<ChunkIterator> EmbeddedChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
     {
        return boost::shared_ptr<ChunkIterator>(new EmbeddedChunkIterator(array, this, chunk->getIterator(query, iterationMode)));
     }

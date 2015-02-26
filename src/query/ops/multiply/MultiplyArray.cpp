@@ -40,6 +40,8 @@ namespace scidb
     const int ROW = 0;
     const int COL = 1;
 
+    const size_t SPARSE_MULTIPLICATION_THRESHOLD = 10;
+
     // Logger for operator. static to prevent visibility of variable outside of file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.multiply"));
 
@@ -187,7 +189,7 @@ namespace scidb
         map<Coordinates, boost::shared_ptr<ChunkIterator>, CoordinatesLess> chunkIterators;
         Coordinates pos(2);
         size_t iterNo = 0;
-        NodeID neighborNode = (nodeId + 1) % nNodes;
+        InstanceID neighborInstance = (instanceId + 1) % nInstances;
         timeval begin, end;
         time_t delta;
         boost::shared_ptr<Query> query(_query.lock());
@@ -231,10 +233,10 @@ namespace scidb
                 gettimeofday(&end, NULL);
                 delta = (end.tv_sec - begin.tv_sec)*1000000 + (end.tv_usec - begin.tv_usec);
                 LOG4CXX_DEBUG(logger, "Iteration " << (iterNo+1) << ": " << delta << " microseconds; multiplied "<<numMultipliedChunks<<" chunk pairs");
-                if (++iterNo == nNodes) {
+                if (++iterNo == nInstances) {
                     break;
                 }
-                leftArray = redistribute(leftArray, query, psLocalNode, "", neighborNode);
+                leftArray = redistribute(leftArray, query, psLocalInstance, "", neighborInstance);
             }
         } else { // Shift right matrix
             while (true) {
@@ -274,10 +276,10 @@ namespace scidb
                 gettimeofday(&end, NULL);
                 delta = (end.tv_sec - begin.tv_sec)*1000000 + (end.tv_usec - begin.tv_usec);
                 LOG4CXX_DEBUG(logger, "Iteration " << (iterNo+1) << ": " << delta << " microseconds; multiplied "<<numMultipliedChunks<<" chunk pairs");
-                if (++iterNo == nNodes) {
+                if (++iterNo == nInstances) {
                     break;
                 }
-                rightArray = redistribute(rightArray, query, psLocalNode, "", neighborNode);
+                rightArray = redistribute(rightArray, query, psLocalInstance, "", neighborInstance);
             }
         }
         leftArray.reset();
@@ -306,12 +308,85 @@ namespace scidb
     {
         ConstChunk const* leftChunk = &rowArrayIter->getChunk();
         ConstChunk const* rightChunk = &colArrayIter->getChunk();
+        if (isBuiltinType(attrType) && leftChunk->getSize()*SPARSE_MULTIPLICATION_THRESHOLD < leftChunk->getNumberOfElements(false)*sizeof(double)
+            && rightChunk->getSize()*SPARSE_MULTIPLICATION_THRESHOLD < rightChunk->getNumberOfElements(false)*sizeof(double))
+        {
+            SparseRowMatrix left(ci, iChunkLen);
+            { 
+                boost::shared_ptr<ConstChunkIterator> chunkIterator = leftChunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS|ChunkIterator::IGNORE_DEFAULT_VALUES); 
+                while (!chunkIterator->end()) { 
+                    Value const& v = chunkIterator->getItem();
+                    if (!v.isZero()) {                         
+                        Coordinates const& pos = chunkIterator->getPosition();
+                        left.add(pos[ROW], pos[COL], ValueToDouble(attrType, v));
+                    }
+                    ++(*chunkIterator);
+                }
+            }
+            SparseColumnMatrix right(cj, jChunkLen);
+            { 
+                boost::shared_ptr<ConstChunkIterator> chunkIterator = rightChunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS|ChunkIterator::IGNORE_DEFAULT_VALUES); 
+                while (!chunkIterator->end()) { 
+                    Value const& v = chunkIterator->getItem();
+                    if (!v.isZero()) {                         
+                        Coordinates const& pos = chunkIterator->getPosition();
+                        right.add(pos[ROW], pos[COL], ValueToDouble(attrType, v));
+                    }
+                    ++(*chunkIterator);
+                }
+            }
+            Coordinate iUpper = Coordinate(ci+iChunkLen) < Coordinate(iStart + iLength) ? ci+iChunkLen : iStart + iLength;
+            Coordinate jUpper = Coordinate(cj+jChunkLen) < Coordinate(jStart + jLength) ? cj+jChunkLen : jStart + jLength;
+            Coordinates outCoords(2);
+            Value value(TypeLibrary::getType(attrType));
+            
+            for (Coordinate i=ci; i<iUpper; i++)
+            {
+                for (Coordinate j=cj; j<jUpper; j++)
+                {
+                    SparseMatrixCell* row = left[i];
+                    SparseMatrixCell* col = right[j];
+                    double partialProd = 0.0;
+                    if (row != NULL && col != NULL) {
+                        while (true) {
+                            if (col->coord > row->coord) {
+                                if ((col = col->next) == NULL) {
+                                    break;
+                                }
+                            } else if (col->coord < row->coord) {
+                                if ((row = row->next) == NULL) {
+                                    break;
+                                }
+                            } else {
+                                partialProd += row->value * col->value;
+                                if ((col = col->next) == NULL || (row = row->next) == NULL) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (partialProd != 0) {
+                        outCoords[ROW] = i;
+                        outCoords[COL] = j;
+                        bool rc = outIter->setPosition(outCoords);
+                        assert(rc);
+                        if (!outIter->isEmpty()) { 
+                            Value& v = outIter->getItem();
+                            partialProd += ValueToDouble(attrType, v);
+                        }
+                        DoubleToValue(attrType, partialProd, value);
+                        outIter->writeItem(value);
+                    }
+                }
+            }
+            return;
+        }    
         MemChunk leftMatChunk, rightMatChunk;
-        if (leftChunk->isRLE() || !leftChunk->isMaterialized()) {
+        if (!leftChunk->isMaterialized()) {
             MaterializedArray::materialize(leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
             leftChunk = &leftMatChunk;
         }
-        if (rightChunk->isRLE() || !rightChunk->isMaterialized()) {
+        if (!rightChunk->isMaterialized()) {
             MaterializedArray::materialize(rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
             rightChunk = &rightMatChunk;
         }
@@ -320,11 +395,47 @@ namespace scidb
         if (true)
         {
             vector< boost::shared_ptr<MultiplyJob> > jobs(nCPUs);
-            PinBuffer s1(*leftChunk);
-            PinBuffer s2(*rightChunk);
-            void* leftData = leftChunk->getData();
-            void* rightData = rightChunk->getData();
+
             void* resultData = outIter->getChunk().getData();
+
+            PinBuffer s1(*leftChunk);
+            void* leftData = leftChunk->getData();
+            if (leftChunk->isRLE()) { 
+                ConstRLEPayload leftPayload((char const*)leftData);
+                if (leftPayload.nSegments() != 1 || leftPayload.getSegment(0).same || leftPayload.getSegment(0).length() != iChunkLen*kChunkLen) { 
+                    if (leftPayload.nSegments() == 1 && leftPayload.getSegment(0).same) { 
+                        Value val;
+                        leftPayload.getValueByIndex(val, leftPayload.getSegment(0).valueIndex);
+                        if (val.isZero()) { // result is 0
+                            return;
+                        }
+                    }
+                    MaterializedArray::materialize(leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
+                    leftData = leftMatChunk.getData();
+                } else { 
+                    leftData = leftPayload.getRawValue(leftPayload.getSegment(0).valueIndex);
+                }
+            }
+
+            PinBuffer s2(*rightChunk);
+            void* rightData = rightChunk->getData();
+            if (rightChunk->isRLE()) { 
+                ConstRLEPayload rightPayload((char const*)rightData);
+                if (rightPayload.nSegments() != 1 || rightPayload.getSegment(0).same || rightPayload.getSegment(0).length() != jChunkLen*kChunkLen) {
+                    if (rightPayload.nSegments() == 1 && rightPayload.getSegment(0).same) { 
+                        Value val;
+                        rightPayload.getValueByIndex(val, rightPayload.getSegment(0).valueIndex);
+                        if (val.isZero()) { // result is 0
+                            return;
+                        }
+                    }
+                    MaterializedArray::materialize(rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
+                    rightData = rightMatChunk.getData();
+                } else { 
+                    rightData = rightPayload.getRawValue(rightPayload.getSegment(0).valueIndex);
+                }
+            }
+ 
             for (int i = 0; i < nCPUs; i++) {
                jobs[i] = boost::shared_ptr<MultiplyJob>(new MultiplyJob(*this, leftData, rightData, resultData, ci, cj, ck, i, query));
                 queue->pushJob(jobs[i]);
@@ -615,10 +726,10 @@ namespace scidb
     }
 
     MultiplyArray::MultiplyArray(ArrayDesc aDesc, boost::shared_ptr<Array> const& leftInputArray,
-        boost::shared_ptr<Array> const& rightInputArray, const boost::shared_ptr<Query>& query):
-        desc(aDesc),
-        dims(desc.getDimensions()),
-        _query(query)
+                                 boost::shared_ptr<Array> const& rightInputArray, const boost::shared_ptr<Query>& query, Algorithm algorithm)
+        : desc(aDesc),
+          dims(desc.getDimensions()),
+          _query(query)
     {
         nCPUs = Sysinfo::getNumberOfCPUs();
         queue = boost::shared_ptr<JobQueue>(new JobQueue());
@@ -640,8 +751,8 @@ namespace scidb
         iStart = leftDims[ROW].getStart();
         jStart = rightDims[COL].getStart();
         NetworkManager& netMgr = *NetworkManager::getInstance();
-        nodeId = query->getNodeID();
-        nNodes = query->getNodesCount();
+        instanceId = query->getInstanceID();
+        nInstances = query->getInstancesCount();
         boost::shared_ptr<ConstArrayIterator> leftIterator = leftInputArray->getConstIterator(0);
         attrType = desc.getAttributes()[0].getType();
 
@@ -663,14 +774,16 @@ namespace scidb
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_NOT_FOUND) << "+" << attrType;
         add = functionDesc.getFuncPtr();
         isSparse = isBuiltinType(attrType)
-            && !leftIterator->end() && leftIterator->getChunk().isSparse()
-            && leftInputArray->getArrayDesc().getAttributes()[0].getDefaultValue().isZero()
-            && rightInputArray->getArrayDesc().getAttributes()[0].getDefaultValue().isZero();
-        if (nNodes > 1) {
-            if (nodeId == 0) {
-                for (NodeID node = 0; node < nNodes; node++) {
-                    if (node != nodeId) {
-                        netMgr.send(node, shared_ptr<SharedBuffer>(new MemoryBuffer(&isSparse, sizeof isSparse)), query);
+            && (algorithm == Sparse 
+                || (algorithm == Auto
+                    && !leftIterator->end() && leftIterator->getChunk().isSparse()
+                    && leftInputArray->getArrayDesc().getAttributes()[0].getDefaultValue().isZero()
+                    && rightInputArray->getArrayDesc().getAttributes()[0].getDefaultValue().isZero()));
+        if (nInstances > 1) {
+            if (instanceId == 0) {
+                for (InstanceID instance = 0; instance < nInstances; instance++) {
+                    if (instance != instanceId) {
+                        netMgr.send(instance, shared_ptr<SharedBuffer>(new MemoryBuffer(&isSparse, sizeof isSparse)), query);
                     }
                 }
             } else {
@@ -678,10 +791,10 @@ namespace scidb
                 isSparse = *(bool*)sb->getData();
             }
         }
-        if (!isSparse && nNodes > 1) {
+        if (!isSparse && nInstances > 1 && algorithm != Dense) {
             size_t minOperandSize = (iLength < jLength ? iLength : jLength)*kLength;
-            size_t resultSize = iLength*jLength / nNodes;
-            if (minOperandSize >= resultSize*2 && minOperandSize > incrementalMultiplyThreshold)
+            size_t resultSize = iLength*jLength / nInstances;
+            if (algorithm == Iterative || (algorithm == Auto && minOperandSize >= resultSize*2 && minOperandSize > incrementalMultiplyThreshold))
             {
                 leftArray = redistribute(leftInputArray, query, psByRow);
                 rightArray = redistribute(rightInputArray, query, psByCol);
@@ -780,8 +893,11 @@ namespace scidb
                 {
                     boost::shared_ptr<ConstChunkIterator> chunkIterator = arrayIterator->getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS|ChunkIterator::IGNORE_DEFAULT_VALUES);
                     while (!chunkIterator->end()) {
-                        Coordinates const& pos = chunkIterator->getPosition();
-                        left.add(pos[ROW], pos[COL], ValueToDouble(attrType, chunkIterator->getItem()));
+                        Value const& v = chunkIterator->getItem();
+                        if (!v.isZero()) {                         
+                            Coordinates const& pos = chunkIterator->getPosition();
+                            left.add(pos[ROW], pos[COL], ValueToDouble(attrType, v));
+                        }
                         ++(*chunkIterator);
                     }
                 }
@@ -794,8 +910,11 @@ namespace scidb
                 {
                     boost::shared_ptr<ConstChunkIterator> chunkIterator = arrayIterator->getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS|ChunkIterator::IGNORE_DEFAULT_VALUES);
                     while (!chunkIterator->end()) {
-                        Coordinates const& pos = chunkIterator->getPosition();
-                        right.add(pos[ROW], pos[COL], ValueToDouble(attrType, chunkIterator->getItem()));
+                        Value const& v = chunkIterator->getItem();
+                        if (!v.isZero()) {                         
+                            Coordinates const& pos = chunkIterator->getPosition();
+                            right.add(pos[ROW], pos[COL], ValueToDouble(attrType, v));
+                        }
                         ++(*chunkIterator);
                     }
                 }
@@ -811,8 +930,8 @@ namespace scidb
 
     bool MultiplyArray::isSelfChunk(Coordinates const& pos) const
     {
-        return NodeID((pos[rangePartitionBy] - dims[rangePartitionBy].getStart()) / dims[rangePartitionBy].getChunkInterval()
-                      / ((( dims[rangePartitionBy].getLength() + dims[rangePartitionBy].getChunkInterval() - 1) / dims[rangePartitionBy].getChunkInterval() + nNodes - 1) / nNodes)) == nodeId;
+        return InstanceID((pos[rangePartitionBy] - dims[rangePartitionBy].getStart()) / dims[rangePartitionBy].getChunkInterval()
+                      / ((( dims[rangePartitionBy].getLength() + dims[rangePartitionBy].getChunkInterval() - 1) / dims[rangePartitionBy].getChunkInterval() + nInstances - 1) / nInstances)) == instanceId;
     }
 
 

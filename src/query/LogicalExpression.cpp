@@ -24,7 +24,7 @@
 /**
  * @file LogicalExpression.cpp
  *
- * @brief Nodes of logical expressions
+ * @brief Instances of logical expressions
  *
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  * @author roman.simakov@gmail.com

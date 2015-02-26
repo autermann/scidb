@@ -25,11 +25,11 @@ import subprocess
 import sys
 import traceback
 sys.path.append(os.getcwd()) # NOCHECKIN 
-sys.path.append('/opt/scidb/11.12/lib')
+sys.path.append('/opt/scidb/12.3/lib')
 import scidbapi as scidb
 
 
-# Start the single node server. 
+# Start the single instance server. 
 
 def handleException(inst, exitWhenDone, op=None):
     traceback.print_exc()

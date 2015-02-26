@@ -75,6 +75,7 @@ message Chunk
 	repeated int64 next_coordinates = 10;
 	optional uint32 obj_type = 11; // 0 - for remote array; 1 - for merged array. Should be copy from Fetch message field.
     optional uint32 count  = 12;
+	optional uint64 cloned_array_id = 13;
 
     message Warning
     {
@@ -87,7 +88,7 @@ message Chunk
         required string strings_namespace = 7;
     }
 
-    repeated Warning warnings = 13;//warnings posted during execution
+    repeated Warning warnings = 14;//warnings posted during execution
 }
 
 /**
@@ -116,7 +117,10 @@ message QueryResult
 		required uint32 chunk_interval = 6;
 		required uint32 chunk_overlap = 7;
 		required string type_id = 8;
-		required string source_array_name = 9;
+		required int32 flags = 9;
+		required string mapping_array_name = 10;
+      	optional int64 coordinates_mapping_size = 11;
+    	optional bytes coordinates_mapping = 12;
 	}
 
     message Warning
@@ -143,23 +147,23 @@ message QueryResult
 }
 
 /**
- * Physical plan for execution by every node
+ * Physical plan for execution by every instance
  */
 message PhysicalPlan
 {
 	required string physical_plan = 2;
         required uint64 view_id = 3;
-        message NodeListEntry
+        message InstanceListEntry
         { 
-          required uint64 node_id = 2;
+          required uint64 instance_id = 2;
           required uint64 gen_id = 3; 
         }
-        message NodeList
+        message InstanceList
         { 
-          repeated NodeListEntry node_entry = 2;
+          repeated InstanceListEntry instance_entry = 2;
         }
-        required NodeList dead_list = 4;
-        required NodeList live_list = 5;
+        required InstanceList dead_list = 4;
+        required InstanceList live_list = 5;
 } 
 
 /**
@@ -217,4 +221,18 @@ message ResourcesFileExistsResponse
 {
     required uint64 resource_request_id = 1;
     required bool exits_flag = 2;
+}
+
+message Control
+{
+  message Channel
+  {
+    required uint32 id = 1;
+    required uint64 available = 2;
+    required uint64 local_sn = 3;
+    required uint64 remote_sn = 4;
+  }
+  required uint64 local_gen_id = 1;
+  required uint64 remote_gen_id = 2; 
+  repeated Channel channels = 3;
 }

@@ -45,7 +45,7 @@ public:
         assert(schemas.size() == 1);
         assert(_parameters.size() == 0);
 
-        if (schemas[0].getAttributes().size() != 1)
+        if (schemas[0].getAttributes(true).size() != 1)
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_INVERSE_ERROR3);
         if (schemas[0].getAttributes()[0].getType() != TID_DOUBLE)
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_INVERSE_ERROR3);
@@ -68,8 +68,7 @@ public:
         dims.push_back(DimensionDesc(d1.getBaseName(), d1.getNamesAndAliases(), d1.getStartMin(), d1.getCurrStart(), d1.getCurrEnd(), d1.getEndMax(), d1.getChunkInterval(), 0));
         dims.push_back(DimensionDesc(d2.getBaseName(), d2.getNamesAndAliases(), d1.getStartMin(), d1.getCurrStart(), d2.getCurrEnd(), d2.getEndMax(), d2.getChunkInterval(), 0));
 
-		 ArrayDesc array_desc("inverse",atts,dims);
-		return array_desc;
+        return ArrayDesc("inverse", atts, dims);
 	}
 
 };

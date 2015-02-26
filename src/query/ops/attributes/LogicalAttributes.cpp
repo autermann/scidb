@@ -59,7 +59,7 @@ public:
         ArrayDesc arrayDesc;
         SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
 
-        size_t nAttrs = arrayDesc.getAttributes().size();
+        size_t nAttrs = arrayDesc.getAttributes(true).size();
         Attributes attributes(3);
         attributes[0] = AttributeDesc((AttributeID)0, "name", TID_STRING, 0, 0);
         attributes[1] = AttributeDesc((AttributeID)1, "type_id", TID_STRING, 0, 0);

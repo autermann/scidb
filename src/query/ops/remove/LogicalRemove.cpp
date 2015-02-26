@@ -54,6 +54,8 @@ public:
 
         const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
+        //query->exclusiveLock(arrayName);
+
         ArrayDesc desc;
         SystemCatalog::getInstance()->getArrayDesc(arrayName, desc);
 
@@ -67,10 +69,9 @@ public:
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
         const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         assert(arrayName.find('@') == std::string::npos);
-        string baseName = arrayName.substr(0, arrayName.find('@'));
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(baseName,
+        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
                                                                                      query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalNodeId(),
+                                                                                     Cluster::getInstance()->getLocalInstanceId(),
                                                                                      SystemCatalog::LockDesc::COORD,
                                                                                      SystemCatalog::LockDesc::RM));
         boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);

@@ -51,7 +51,6 @@ PhysicalFindStars(const std::string& logicalName, const std::string& physicalNam
 
 boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,boost::shared_ptr< Query> query)
 {
-  //cout << "hello world!" << endl; flush(cout);
   boost::shared_ptr<Array> inputArray = inputArrays[0];
   const ArrayDesc &arrayDesc = inputArray->getArrayDesc();
   DimensionDesc xDim= arrayDesc.getDimensions()[2];
@@ -60,7 +59,6 @@ boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inpu
   AttributeID aid = 0; // default attribute pix
   TypeId attType = TID_INT32;
   int32_t threshold = 1000; // default threashold
-  //FIXME check the input overlap
   Value value = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate();
   if (!value.isNull())
   {
@@ -72,26 +70,17 @@ boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inpu
   attType = attributes[aid].getType();
 
   boost::shared_ptr<ConstArrayIterator> aItr = inputArray->getConstIterator(aid);
-  //FIXME Nomral iteration with overlaps.
     
-  //cout << "[start]" << endl;
-  //flush(cout);
   boost::shared_ptr<MemArray> outputArray = boost::shared_ptr<MemArray>(new MemArray(_schema));
   ImageProvider provider(aItr, outputArray, aid);
-  //cout << "Create the Provider" << endl; flush(cout);
   Cook cook(provider, threshold);
-  //cout << "Trying to process" << endl;flush(cout);
   while(!aItr->end())
   {
-    //cout << "Cooking " << aItr->getPosition()[0] << endl; flush(cout);
     cook.cookRawImage();
     LOG4CXX_DEBUG(logger, "Cooking image: " << aItr->getPosition()[0]);
     ++(*aItr);
-    //cout << " .. Done " << endl;
   }
-  //cout << "[All Done]" << endl;
   provider.onFinalize();
-  //cout << "-->Finalizing" << endl;
   return outputArray;
 }
 };

@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>between</refname>
+    <refpurpose>Select array data from specified region</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> between(<replaceable>array</replaceable>,<replaceable>low_coord1</replaceable><optional>,<replaceable>low_coord2</replaceable>,...</optional>,
+<replaceable>high_coord1</replaceable><optional>,<replaceable>high_coord2</replaceable>,...</optional>);</synopsis>
+    <synopsis>between(<replaceable>array</replaceable>,<replaceable>low_coord1</replaceable><optional>,<replaceable>low_coord2</replaceable>,...</optional>,
+<replaceable>high_coord1</replaceable><optional>,<replaceable>high_coord2</replaceable>,...</optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The between operator accepts an input array and a set of coordinates specifying a region within the array. The number of coordinate pairs in the input must be equal to the number of dimensions in the array. The output is an array of the same shape as input, where all cells outside of the given region are marked empty. </para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example selects 4 elements from a 16-element array.</para>
+      <procedure>
+        <step>
+          <para>Create a 4<symbol role="symbolfont">&times;</symbol>4 array called between_array:<programlisting>CREATE ARRAY between_array &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];</programlisting></para>
+        </step>
+        <step>
+          <para><programlisting>store(build(between_array,i*4+j),between_array);</programlisting><screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen></para>
+        </step>
+        <step>
+          <para>Select all values from the last two rows and last two columns from between_array:<programlisting>between(between_array,2,2,3,3);</programlisting>This query outputs:<screen>[
+[(),(),(),()],
+[(),(),(),()],
+[(),(),(10),(11)],
+[(),(),(14),(15)]
+]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

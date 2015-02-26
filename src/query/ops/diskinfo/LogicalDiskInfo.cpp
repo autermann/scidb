@@ -56,8 +56,8 @@ public:
         attributes[3] = AttributeDesc((AttributeID)3, "nFreeClusters",  TID_UINT64, 0, 0);
         attributes[4] = AttributeDesc((AttributeID)4, "nSegments",  TID_UINT64, 0, 0);
         vector<DimensionDesc> dimensions(1);
-        size_t nNodes = query->getNodesCount();
-        dimensions[0] = DimensionDesc("Node", 0, 0, nNodes-1, nNodes-1, 1, 0);
+        size_t nInstances = query->getInstancesCount();
+        dimensions[0] = DimensionDesc("Instance", 0, 0, nInstances-1, nInstances-1, 1, 0);
         return ArrayDesc("DiskInfo", attributes, dimensions);
 	}
 };

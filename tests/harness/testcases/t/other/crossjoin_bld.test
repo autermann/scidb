@@ -1,2 +1,0 @@
---test
-cross_join ( build ( < val : double > [I=0:9,10,0], 0), transpose ( build ( < val : double > [J=0:9,10,0], 0)))

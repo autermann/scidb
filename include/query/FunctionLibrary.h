@@ -205,16 +205,6 @@ public:
      */
     void addVFunction(const FunctionDescription& functionDesc);
 
-    /**
-     * Adds new aggregate (tile->scalar) function into library.
-     */
-    void addAggregateFunction(const FunctionDescription& functionDesc);
-
-    /**
-     * Search aggregate function in function library using name and type of argument
-     */
-    bool findAggregateFunction(const std::string& name, const TypeId& typeId, FunctionDescription& functionDesc);
-
     /*
 	** Get a handle to the map of function names -> { argtypes } -> 
 	** FunctionDescriptions
@@ -229,7 +219,6 @@ public:
      */
     std::map<std::string, std::map<std::vector<TypeId>,  FunctionDescription>, __lesscasecmp> _sFunctionMap;
     std::map<std::string, std::map<std::vector<TypeId>,  FunctionDescription>, __lesscasecmp> _vFunctionMap;
-    std::map<std::pair<std::string, TypeId>, FunctionDescription > _aggregateFunctionMap;
 
     std::map<std::string, std::map<std::vector<TypeId>,  FunctionDescription>, __lesscasecmp>& getFunctionMap(bool tile)
     {

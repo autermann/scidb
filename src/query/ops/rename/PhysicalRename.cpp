@@ -84,7 +84,7 @@ public:
             boost::shared_ptr<SystemCatalog::LockDesc>
             lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(oldArrayName,
                                                                                            query->getQueryID(),
-                                                                                           Cluster::getInstance()->getLocalNodeId(),
+                                                                                           Cluster::getInstance()->getLocalInstanceId(),
                                                                                            SystemCatalog::LockDesc::WORKER,
                                                                                            SystemCatalog::LockDesc::RNF));
             Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock, lock, _1);
@@ -96,16 +96,17 @@ public:
                 << oldArrayName;
             }
         }
-        SystemCatalog::getInstance()->deleteAllArrayVersionsFromCacheByName(oldArrayName);
+        SystemCatalog::getInstance()->invalidateArrayCache(oldArrayName);
+        getInjectedErrorListener().check();
         return boost::shared_ptr<Array>();
     }
 
    void preSingleExecute(shared_ptr<Query> query)
    {
-       shared_ptr<const NodeMembership> membership(Cluster::getInstance()->getNodeMembership());
+       shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
        assert(membership);
        if (((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-            (membership->getNodes().size() != query->getNodesCount()))) {
+            (membership->getInstances().size() != query->getInstancesCount()))) {
            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
        }
       const string& oldArrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();

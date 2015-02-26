@@ -60,7 +60,7 @@ rename(C1,C)
 
 --cleanup
 remove(A)
+remove(T)
 remove(B)
 remove(C)
-remove(T)
 --stop-query-logging

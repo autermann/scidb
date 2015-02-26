@@ -1,6 +1,7 @@
 --setup
 
 --test
+--start-query-logging
 
 create immutable empty array imtest <a:int64>[x=0:*,10,0, y=0:*,10,0]
 
@@ -10,6 +11,7 @@ dimensions(imtest)
 
 attributes(imtest)
 
+--stop-query-logging
 --cleanup
 
 remove(imtest)

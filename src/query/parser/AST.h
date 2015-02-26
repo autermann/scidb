@@ -70,6 +70,7 @@ typedef enum
     attributeName,
     attributeTypeName,
     attributeIsNullable,
+    distinct,
     dimension,
     nonIntegerDimension,
     dimensionsList,
@@ -117,6 +118,7 @@ typedef enum
     indexClause,
     exprList,
     loadStatement,
+    saveStatement,
     insertStatement,
     updateStatement,
     updateList,
@@ -169,6 +171,7 @@ typedef enum
     dimensionArgCount,
 
     nIdimensionArgName              = 0,
+    nIdimensionArgDistinct,
     nIdimensionArgTypeName,
     nIdimensionArgBoundary,
     nIdimensionArgChunkInterval,
@@ -244,8 +247,16 @@ typedef enum
 
     // loadStatement
     loadStatementArgArrayName = 0,
+    loadStatementArgInstanceId,
     loadStatementArgFileName,
     loadStatementArgCount,
+
+    // saveStatement
+    saveStatementArgArrayName = 0,
+    saveStatementArgInstanceId,
+    saveStatementArgFileName,
+    saveStatementArgFormat,
+    saveStatementArgCount,
 
     // sequencionalArrayAccess
     sequencionalArrayAccessArgReference = 0,

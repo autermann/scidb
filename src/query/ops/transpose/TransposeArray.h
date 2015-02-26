@@ -32,6 +32,7 @@
 #define TRANSPOSE_ARRAY_H
 
 #include "array/DelegateArray.h"
+#include <map>
 
 namespace scidb {
 
@@ -72,6 +73,7 @@ class UnorderedTransposeChunk : public DelegateChunk
 
 class UnorderedTransposeArrayIterator : public DelegateArrayIterator
 {
+  protected:
     Coordinates inPos;
     Coordinates outPos;
 
@@ -118,20 +120,21 @@ class OrderedTransposeChunkIterator : public UnorderedTransposeChunkIterator
 
 class OrderedTransposeArrayIterator : public UnorderedTransposeArrayIterator
 {
-    Dimensions const& dims;
-    Coordinates firstPos;
-    Coordinates lastPos;
     Coordinates pos;
-    Coordinates inPos;
     bool hasCurrent;
+    bool setConstructed;
+    set<Coordinates, CoordinatesLess> chunks;
+    set<Coordinates, CoordinatesLess>::const_iterator currPos;
 
-    void moveNext();
+    bool buildSetOfChunks();
+    void setFirst();
 
   public:
     virtual void operator ++();
     virtual bool end();
     virtual void reset();
     virtual Coordinates const& getPosition();
+    virtual bool setPosition(Coordinates const& pos);
 
 	OrderedTransposeArrayIterator(OrderedTransposeArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
 };

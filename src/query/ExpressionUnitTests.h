@@ -51,11 +51,11 @@ class ExpressionTests: public CppUnit::TestFixture
 {
 CPPUNIT_TEST_SUITE(ExpressionTests);
 CPPUNIT_TEST(evlVectorIsNull);
-CPPUNIT_TEST(evlAggregateSum);
 CPPUNIT_TEST(evlVectorAPlusB);
 CPPUNIT_TEST(evlVectorDenseMinusInt32);
 CPPUNIT_TEST(evlVectorRLEMinusInt32);
 CPPUNIT_TEST(evlVectorDenseBinaryPlusInt32);
+CPPUNIT_TEST(evlVectorDenseBinaryAndBool);
 CPPUNIT_TEST(evlVectorRLEBinaryPlusInt32);
 CPPUNIT_TEST(evlVectorMixBinaryPlusInt32);
 CPPUNIT_TEST(evlInt32PlusInt32);
@@ -73,11 +73,11 @@ CPPUNIT_TEST(evliif1);
 CPPUNIT_TEST(evlor_lazy);
 CPPUNIT_TEST(evland_lazy);
 CPPUNIT_TEST(evland_lazy2);
-CPPUNIT_TEST(evlPerfExp);
-CPPUNIT_TEST(evlPerfCPP);
+//CPPUNIT_TEST(evlPerfExp);
+//CPPUNIT_TEST(evlPerfCPP);
 CPPUNIT_TEST(evlBinaryCompileIntPlusDouble);
 CPPUNIT_TEST(evlSerialization);
-CPPUNIT_TEST(evlNodeId);
+CPPUNIT_TEST(evlInstanceId);
 CPPUNIT_TEST(evlInt8PlusInt16);
 CPPUNIT_TEST(evlAPlusB);
 CPPUNIT_TEST(evlIsNull);
@@ -128,45 +128,6 @@ public:
         // Checking
         CPPUNIT_ASSERT(resTile.getTile()->nSegments() == 2);
         CPPUNIT_ASSERT(*resTile.getTile()->getRawValue(0) == 2);
-    }
-
-    void evlAggregateSum()
-    {
-        FunctionDescription func;
-        CPPUNIT_ASSERT(FunctionLibrary::getInstance()->findAggregateFunction("sum", TID_INT32, func));
-        Value inTile(TypeLibrary::getType(TID_INT32), true);
-        RLEPayload::Segment inSeg;
-
-        // Adding 10 same values into tile 0
-        inSeg.pPosition = 0;
-        inSeg.same = true;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile.getTile()->addRawValues();
-        inTile.getTile()->addSegment(inSeg);
-        int32_t* p = (int32_t*)inTile.getTile()->getRawValue(inSeg.valueIndex);
-        *p = 5;
-
-        // Adding 20 different values into tile 0
-        inSeg.pPosition = 10;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile.getTile()->addRawValues(20);
-        inTile.getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile.getTile()->getRawValue(inSeg.valueIndex);
-        for (int i = 0; i < 20; i++)
-            *p++ = i;
-
-        inTile.getTile()->flush(30);
-
-        Value resTile(TypeLibrary::getType(TID_INT32), true);
-        const Value* v = &inTile;
-        func.getFuncPtr()(&v, &resTile, NULL);
-
-        // Checking
-        CPPUNIT_ASSERT(resTile.getTile()->nSegments() == 1);
-        CPPUNIT_ASSERT(resTile.getTile()->getSegment(0).length() == 1);
-        p = (int32_t*)resTile.getTile()->getRawValue(0);
-        CPPUNIT_ASSERT(*p == 240);
     }
 
     void evlVectorAPlusB()
@@ -296,6 +257,41 @@ public:
         for (int i = 0; i < 32; i++) {
             CPPUNIT_ASSERT(*p0++ == 0);
         }
+    }
+
+    void evlVectorDenseBinaryAndBool()
+    {
+        std::vector<FunctionPointer> convs;
+        FunctionDescription func;
+        FunctionLibrary::getInstance()->findFunction("and", boost::assign::list_of(TID_BOOL)(TID_BOOL), func, convs, true);
+        CPPUNIT_ASSERT(func.getFuncPtr());
+        Value inTile[2] = {Value(TypeLibrary::getType(TID_BOOL), true), Value(TypeLibrary::getType(TID_BOOL), true)};
+        RLEPayload::Segment inSeg;
+        inSeg.pPosition = 0;
+        inSeg.same = false;
+        inSeg.null = false;
+        inSeg.valueIndex = inTile[0].getTile()->addRawValues(32);
+        inTile[1].getTile()->addRawValues(32);
+
+        inTile[0].getTile()->addSegment(inSeg);
+        inTile[0].getTile()->flush(32);
+
+        inTile[1].getTile()->addSegment(inSeg);
+        inTile[1].getTile()->flush(32);
+
+        int32_t* p0 = (int32_t*)inTile[0].getTile()->getRawValue(0);
+        int32_t* p1 = (int32_t*)inTile[1].getTile()->getRawValue(0);
+        *p0 = 0xF0F0F0F0;
+        *p1 = 0x0F0F0F0F;
+
+        Value resTile(TypeLibrary::getType(TID_BOOL), true);
+        const Value* v[2] = {&inTile[0], &inTile[1]};
+        func.getFuncPtr()(v, &resTile, NULL);
+
+        // Checking
+        CPPUNIT_ASSERT(resTile.getTile()->nSegments() == 1);
+        p0 = (int32_t*)resTile.getTile()->getRawValue(0);
+        CPPUNIT_ASSERT(*p0 == 0);
     }
 
     void evlVectorRLEBinaryPlusInt32()
@@ -614,10 +610,10 @@ public:
 
     void evlSerialization()
     {
-         Expression e;
+        Expression e;
         e.compile("+", false, TID_INT32, TID_DOUBLE);
         CPPUNIT_ASSERT(e.getType() == TID_DOUBLE);
-         ExpressionContext c(e);
+        ExpressionContext c(e);
         c[0].setInt32(10);
         c[1].setDouble(20);
         CPPUNIT_ASSERT(e.evaluate(c).getDouble() == 30);
@@ -625,21 +621,21 @@ public:
         std::stringstream ss;
         boost::archive::text_oarchive oa(ss);
         oa & e;
-        std::cout << ss.str();
+//        std::cout << ss.str();
 
-         Expression r;
+        Expression r;
         boost::archive::text_iarchive ia(ss);
         ia & r;
-         ExpressionContext c1(e);
+        ExpressionContext c1(e);
         c1[0].setInt32(10);
         c1[1].setDouble(20);
         CPPUNIT_ASSERT(r.getType() ==  TID_DOUBLE);
         CPPUNIT_ASSERT(r.evaluate(c1).getDouble() == 30);
     }
 
-    void evlNodeId()
+    void evlInstanceId()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("nodeid()");
+        boost::shared_ptr< LogicalExpression> le = parse("instanceid()");
          Expression e;
 
         boost::shared_ptr<scidb::Query> emptyQuery;
@@ -647,13 +643,13 @@ public:
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
 
         //we can't really evaluate this one because it requires a running network manager.
-        //I tried creating a fake network manager, and overriding nodeId, but then we need to be in the same namespace - not worth it.
+        //I tried creating a fake network manager, and overriding instanceId, but then we need to be in the same namespace - not worth it.
     }
 
     void evlInt8PlusInt16()
     {
         boost::shared_ptr< LogicalExpression> le = parse("int8(8)+int16(-8)");
-         Expression e;
+        Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT16);
@@ -662,20 +658,24 @@ public:
 
     void evlAPlusB()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("a*x*x+b*x+c");
+        vector<string> names;
+        names.push_back("a");
+        names.push_back("b");
+        names.push_back("c");
+        names.push_back("x");
+        vector<TypeId> types;
+        types.push_back(TID_INT64);
+        types.push_back(TID_INT64);
+        types.push_back(TID_INT64);
+        types.push_back(TID_INT64);
         Expression e;
-        e.addVariableInfo("a", TID_INT64);
-        e.addVariableInfo("b", TID_INT64);
-        e.addVariableInfo("c", TID_INT64);
-        e.addVariableInfo("x", TID_INT64);
-        boost::shared_ptr<scidb::Query> emptyQuery;
-        e.compile(le, emptyQuery, false);
+        e.compile("a*x*x+b*x+c", names, types);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         ExpressionContext ec(e);
-        ec[0].setInt8(5);
-        ec[1].setInt8(10);
-        ec[2].setInt8(15);
-        ec[3].setInt8(10);
+        ec[0].setInt64(5);
+        ec[1].setInt64(10);
+        ec[2].setInt64(15);
+        ec[3].setInt64(10);
         CPPUNIT_ASSERT(e.evaluate(ec).getInt64() == 615);
     }
 

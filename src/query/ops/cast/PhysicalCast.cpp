@@ -59,14 +59,18 @@ public:
 	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
-
-		if ( Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT) )
+        boost::shared_ptr<Array> inputArray = inputArrays[0];
+        if (_schema.getAttributes().size() != inputArray->getArrayDesc().getAttributes().size()) 
+        { 
+            inputArray = boost::shared_ptr<Array>(new NonEmptyableArray(inputArray));
+        }
+		if (Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT) )
 		{
-		    return boost::shared_ptr<Array>(new ShallowDelegateArray(_schema, inputArrays[0]));
+		    return boost::shared_ptr<Array>(new ShallowDelegateArray(_schema, inputArray));
 		}
 		else
 		{
-		    return boost::shared_ptr<Array>(new DelegateArray(_schema, inputArrays[0], false));
+		    return boost::shared_ptr<Array>(new DelegateArray(_schema, inputArray, false));
 		}
 	 }
 };

@@ -155,6 +155,29 @@ public:
             _noWriter.signal();
         }
     }
+   
+    int getNumberOfReaders() const
+    {
+        return _readers;
+    }
+
+    void unLock()
+    {
+        ScopedMutexLock mutexLock(_mutex);
+
+        if (_nested != 0) { 
+            _nested -= 1;
+        } else {
+            if (_readers > 0) { 
+                if (--_readers == 0) { 
+                    _noReaders.signal();
+                } 
+            } else { 
+                _currentWriter = (pthread_t)0;
+                _noWriter.signal();
+            }
+        }
+    }
 };
 
 class ScopedRWLockRead

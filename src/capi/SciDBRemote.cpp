@@ -26,7 +26,7 @@
  * @author roman.simakov@gmail.com
  * @author smirnoffjr@gmail.com
  *
- * @brief SciDB API implementation to communicate with node by network
+ * @brief SciDB API implementation to communicate with instance by network
  */
 
 #include <stdlib.h>
@@ -106,8 +106,35 @@ boost::asio::io_service ioService;
 class ClientArray: public StreamArray
 {
 public:
-    ClientArray( BaseConnection* connection, const ArrayDesc& arrayDesc, QueryID queryID):
-        StreamArray(arrayDesc), _connection(connection), _queryID(queryID) {
+    ClientArray( BaseConnection* connection, const ArrayDesc& arrayDesc, QueryID queryID, QueryResult& queryResult):
+    StreamArray(arrayDesc), _connection(connection), _queryID(queryID), _queryResult(queryResult) 
+    {
+    }
+    
+    virtual void getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()) const
+    {
+        size_t nDims = intCoords.size();
+        origCoords.resize(nDims);
+        Coordinates pos(1);
+        Dimensions const& dims = desc.getDimensions();
+        for (size_t i = 0; i < nDims; i++) { 
+            if (_queryResult.mappingArrays[i]) { 
+                boost::shared_ptr<ConstArrayIterator> ai = _queryResult.mappingArrays[i]->getConstIterator(0);
+                boost::shared_ptr<ConstChunkIterator> ci = ai->getChunk().getConstIterator();
+                pos[0] = intCoords[i];
+                if (ci->setPosition(pos)) {                 
+                    origCoords[i] = ci->getItem();
+                } else { 
+                    origCoords[i].setNull();
+                }
+            } else { 
+                if (dims[i].getType() == TID_INT64) { 
+                    origCoords[i].setInt64(intCoords[i]);
+                } else { 
+                    origCoords[i].setNull();
+                }
+            }
+        }
     }
 
 protected:
@@ -115,8 +142,9 @@ protected:
     ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
 
 private:
-     BaseConnection* _connection;
+    BaseConnection* _connection;
     QueryID _queryID;
+    QueryResult& _queryResult;
 };
 
 /**
@@ -137,7 +165,11 @@ public:
     void disconnect(void* connection) const
     {
         StatisticsScope sScope;
-        delete ( BaseConnection*)connection;
+        BaseConnection* bc =  (BaseConnection*)connection;
+        if (bc) {
+            bc->disconnect();
+            delete bc;
+        }
     }
 
     void prepareQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
@@ -226,6 +258,13 @@ public:
         queryResult.selective = queryResultRecord->selective();
         if (queryResult.selective)
         {
+            queryResult.plugins.resize(queryResultRecord->plugins_size());
+            for (int i = 0; i < queryResultRecord->plugins_size(); i++)
+            {
+                queryResult.plugins[i] = queryResultRecord->plugins(i);
+                PluginManager::getInstance()->loadLibrary(queryResult.plugins[i], false);
+            }
+
             Attributes attributes;
             for (int i = 0; i < queryResultRecord->attributes_size(); i++)
             {
@@ -245,10 +284,12 @@ public:
                         0, &defaultValue)
                 );
             }
+            queryResult.mappingArrays.resize(queryResultRecord->dimensions_size());
+
             Dimensions dimensions;
             for (int i = 0; i < queryResultRecord->dimensions_size(); i++)
             {
-                dimensions.push_back(DimensionDesc(
+                DimensionDesc dim(
                         queryResultRecord->dimensions(i).name(),
                         queryResultRecord->dimensions(i).start_min(),
                         queryResultRecord->dimensions(i).curr_start(),
@@ -257,8 +298,27 @@ public:
                         queryResultRecord->dimensions(i).chunk_interval(),
                         queryResultRecord->dimensions(i).chunk_overlap(),
                         queryResultRecord->dimensions(i).type_id(),
-                        queryResultRecord->dimensions(i).source_array_name())
-                );
+                        queryResultRecord->dimensions(i).flags(),
+                        queryResultRecord->dimensions(i).mapping_array_name());
+                dimensions.push_back(dim);
+                size_t dimMapSize = queryResultRecord->dimensions(i).coordinates_mapping_size();
+                if (dim.getType() != TID_INT64 && !dim.getMappingArrayName().empty() && dimMapSize != 0) { 
+                    Attributes mapAttrs(1);
+                    mapAttrs[0] = AttributeDesc(0, "value", dim.getType(), 0, 0);
+                    Dimensions mapDims(1);
+                    mapDims[0] = DimensionDesc("no", dim.getStart(), dim.getStart(), dim.getStart() + dimMapSize-1, dim.getStart() + dimMapSize-1, dimMapSize, 0);                    
+                    ArrayDesc mapArrayDesc(dim.getBaseName(), mapAttrs, mapDims);
+                    boost::shared_ptr<Array> mapArray = boost::shared_ptr<Array>(new MemArray(mapArrayDesc));
+                    boost::shared_ptr<ArrayIterator> mapArrayIterator = mapArray->getIterator(0);
+                    Coordinates mapPos(1, dim.getStart());
+                    Chunk& newChunk = mapArrayIterator->newChunk(mapPos, 0);
+                    newChunk.setRLE(false);
+                    newChunk.allocate(queryResultRecord->dimensions(i).coordinates_mapping().size());
+                    memcpy(newChunk.getData(), queryResultRecord->dimensions(i).coordinates_mapping().data(), queryResultRecord->dimensions(i).coordinates_mapping().size());
+                    boost::shared_ptr<Query> dummyQuery;
+                    newChunk.write(dummyQuery);
+                    queryResult.mappingArrays[i] = mapArray;
+                }
             }
 
             SciDBWarnings::getInstance()->associateWarnings(resultMessage->getQueryID(), &queryResult);
@@ -278,13 +338,6 @@ public:
                             );
             }
 
-            queryResult.plugins.resize(queryResultRecord->plugins_size());
-            for (int i = 0; i < queryResultRecord->plugins_size(); i++)
-            {
-                queryResult.plugins[i] = queryResultRecord->plugins(i);
-                PluginManager::getInstance()->loadLibrary(queryResult.plugins[i], false);
-            }
-
             queryResult.executionTime = queryResultRecord->execution_time();
             queryResult.explainLogical = queryResultRecord->explain_logical();
             queryResult.explainPhysical = queryResultRecord->explain_physical();
@@ -292,7 +345,7 @@ public:
             const ArrayDesc arrayDesc(queryResultRecord->array_name(), attributes, dimensions);
 
             queryResult.array = boost::shared_ptr<Array>(new ClientArray(( BaseConnection*)connection,
-                    arrayDesc, queryResult.queryID));
+                                                                         arrayDesc, queryResult.queryID, queryResult));
         }
     }
 
@@ -315,6 +368,26 @@ public:
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_MESSAGE_TYPE2) << resultMessage->getMessageType();
         }
     }
+
+    void completeQuery(QueryID queryID, void* connection) const
+    {
+        StatisticsScope sScope;
+        boost::shared_ptr<MessageDesc> completeQueryMessage = boost::make_shared<MessageDesc>(mtCompleteQuery);
+        completeQueryMessage->setQueryID(queryID);
+
+        LOG4CXX_TRACE(logger, "Completing query for execution " << queryID);
+
+        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage(completeQueryMessage);
+
+        if (resultMessage->getMessageType() == mtError) {
+            boost::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
+            if (error->short_error_code() != SCIDB_E_NO_ERROR)
+                makeExceptionFromErrorMessageAndThrow(resultMessage);
+        } else {
+            throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_MESSAGE_TYPE2) << resultMessage->getMessageType();
+        }
+    }
+
 } _sciDB;
 
 

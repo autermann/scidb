@@ -1,7 +1,7 @@
 #
 #  This script illustrates how we might set the range of 
 # environment variables needed by scidb.py to initialize, 
-# start and stop SciDB compute node instances. The idea is 
+# start and stop SciDB compute instance instances. The idea is 
 # that SciDB (currently) uses a Postgres DBMS instance to 
 # manage all of the meta-data. And these details are needed
 # to connecto to that server. 

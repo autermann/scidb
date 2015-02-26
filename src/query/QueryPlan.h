@@ -45,7 +45,7 @@ namespace scidb
 
 
 /**
- * Node of logical plan of query. Logical node keeps logical operator to
+ * Instance of logical plan of query. Logical instance keeps logical operator to
  * perform inferring result type and validate types.
  */
 class LogicalQueryPlanNode
@@ -56,16 +56,16 @@ public:
 
     LogicalQueryPlanNode(const boost::shared_ptr<ParsingContext>& parsingContext,
     	const boost::shared_ptr<LogicalOperator>& logicalOperator,
-    	const std::vector<boost::shared_ptr<LogicalQueryPlanNode> > &childNodes);
+    	const std::vector<boost::shared_ptr<LogicalQueryPlanNode> > &childInstances);
 
 	void addChild(const boost::shared_ptr<LogicalQueryPlanNode>& child)
 	{
-		_childNodes.push_back(child);
+		_childInstances.push_back(child);
 	}
 
 	bool isLeaf() const
 	{
-		return _childNodes.size();
+		return _childInstances.size();
 	}
 
 	boost::shared_ptr<LogicalOperator> getLogicalOperator(){
@@ -73,7 +73,7 @@ public:
 	}
 
 	std::vector<boost::shared_ptr<LogicalQueryPlanNode> >& getChildren(){
-		return _childNodes;
+		return _childInstances;
 	}
 
 	bool isDdl() const
@@ -110,19 +110,19 @@ public:
 			str<<">";
 		}
 
-		str<<"[lNode] children "<<_childNodes.size()<<"\n";
+		str<<"[lInstance] children "<<_childInstances.size()<<"\n";
 		_logicalOperator->toString(str,indent+1);
 
-		for (size_t i = 0; i< _childNodes.size(); i++)
+		for (size_t i = 0; i< _childInstances.size(); i++)
 		{
-			_childNodes[i]->toString(str, indent+1);
+			_childInstances[i]->toString(str, indent+1);
 		}
 	}
 
 private:
     boost::shared_ptr<LogicalOperator> _logicalOperator;
 
-    std::vector<boost::shared_ptr<LogicalQueryPlanNode> > _childNodes;
+    std::vector<boost::shared_ptr<LogicalQueryPlanNode> > _childInstances;
 
     boost::shared_ptr<ParsingContext> _parsingContext;
 };
@@ -130,7 +130,7 @@ private:
 
 typedef boost::shared_ptr<PhysicalOperator> PhysOpPtr;
 class PhysicalQueryPlanNode;
-typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
+typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysInstancePtr;
 
 
 /*
@@ -145,49 +145,49 @@ public:
     PhysicalQueryPlanNode(const PhysOpPtr & physicalOperator, bool agg, bool ddl, bool tile);
 
     PhysicalQueryPlanNode(const PhysOpPtr & PhysicalOperator,
-    		const std::vector<PhysNodePtr > &childNodes,
+    		const std::vector<PhysInstancePtr > &childInstances,
                           bool agg, bool ddl, bool tile);
 
     virtual ~PhysicalQueryPlanNode()
     {}
 
-    void addChild(const PhysNodePtr & child)
+    void addChild(const PhysInstancePtr & child)
     {
-        _childNodes.push_back(child);
+        _childInstances.push_back(child);
     }
 
     /**
-     * Removes node pointed to by targetChild from children.
-     * @param targetChild node to remove. Must be in children.
+     * Removes instance pointed to by targetChild from children.
+     * @param targetChild instance to remove. Must be in children.
      */
-    void removeChild(const PhysNodePtr & targetChild)
+    void removeChild(const PhysInstancePtr & targetChild)
     {
-        std::vector<PhysNodePtr> newChildren;
-        for(size_t i = 0; i < _childNodes.size(); i++)
+        std::vector<PhysInstancePtr> newChildren;
+        for(size_t i = 0; i < _childInstances.size(); i++)
         {
-                if (_childNodes[i] != targetChild)
+                if (_childInstances[i] != targetChild)
                 {
-                        newChildren.push_back(_childNodes[i]);
+                        newChildren.push_back(_childInstances[i]);
                 }
         }
-        assert(_childNodes.size() > newChildren.size());
-        _childNodes = newChildren;
+        assert(_childInstances.size() > newChildren.size());
+        _childInstances = newChildren;
     }
 
     /**
      * Replaces targetChild with newChild in children.
-     * @param targetChild node to remove. Must be in children.
-     * @param newChild node to insert. Must be in children.
+     * @param targetChild instance to remove. Must be in children.
+     * @param newChild instance to insert. Must be in children.
      */
-    void replaceChild(const PhysNodePtr & targetChild, const PhysNodePtr & newChild)
+    void replaceChild(const PhysInstancePtr & targetChild, const PhysInstancePtr & newChild)
     {
         bool removed = false;
-    	std::vector<PhysNodePtr> newChildren;
-    	for(size_t i = 0; i < _childNodes.size(); i++)
+    	std::vector<PhysInstancePtr> newChildren;
+    	for(size_t i = 0; i < _childInstances.size(); i++)
     	{
-    		if (_childNodes[i] != targetChild)
+    		if (_childInstances[i] != targetChild)
     		{
-    			newChildren.push_back(_childNodes[i]);
+    			newChildren.push_back(_childInstances[i]);
     		}
     		else
     		{
@@ -195,7 +195,7 @@ public:
     			removed = true;
     		}
     	}
-    	_childNodes = newChildren;
+    	_childInstances = newChildren;
         assert(removed); removed = removed; // Eliminate warnings
     }
 
@@ -203,8 +203,8 @@ public:
 		return _physicalOperator;
 	}
 
-	std::vector<PhysNodePtr>& getChildren() {
-		return _childNodes;
+	std::vector<PhysInstancePtr>& getChildren() {
+		return _childInstances;
 	}
 
 	bool hasParent() const
@@ -212,7 +212,7 @@ public:
 		return _parent.lock().get() != NULL;
 	}
 
-	void setParent (const PhysNodePtr& parent)
+	void setParent (const PhysInstancePtr& parent)
 	{
 		_parent = parent;
 	}
@@ -222,7 +222,7 @@ public:
 		_parent.reset();
 	}
 
-	const PhysNodePtr getParent()
+	const PhysInstancePtr getParent()
 	{
 		return _parent.lock();
 	}
@@ -260,7 +260,7 @@ public:
 			str<<">";
 		}
 
-		str<<"[pNode] "<<_physicalOperator->getPhysicalName()<<" agg "<<isAgg()<<" ddl "<<isDdl()<<" tile "<<supportsTileMode()<<" children "<<_childNodes.size()<<"\n";
+		str<<"[pInstance] "<<_physicalOperator->getPhysicalName()<<" agg "<<isAgg()<<" ddl "<<isDdl()<<" tile "<<supportsTileMode()<<" children "<<_childInstances.size()<<"\n";
 		_physicalOperator->toString(str,indent+1);
 
 		for (int i = 0; i<indent+1; i++)
@@ -295,30 +295,30 @@ public:
 		    str <<" [improperly initialized]\n";
 		}
 
-		for (size_t i = 0; i< _childNodes.size(); i++)
+		for (size_t i = 0; i< _childInstances.size(); i++)
 		{
-			_childNodes[i]->toString(str, indent+1);
+			_childInstances[i]->toString(str, indent+1);
 		}
 	}
 
 	/**
      * Retrieve an ordered list of the shapes of the arrays to be input to this
-     * node.
+     * instance.
      */
 	std::vector < ArrayDesc> getChildSchemas() const
 	{
 		std::vector < ArrayDesc> result;
-		for (size_t i = 0; i < _childNodes.size(); i++ )
+		for (size_t i = 0; i < _childInstances.size(); i++ )
 		{
-			result.push_back(_childNodes[i]->getPhysicalOperator()->getSchema());
+			result.push_back(_childInstances[i]->getPhysicalOperator()->getSchema());
 		}
 		return result;
 	}
 	/**
-     * Determine if this node is for the PhysicalSG operator.
+     * Determine if this instance is for the PhysicalSG operator.
      * @return true if physicalOperator is PhysicalSG. False otherwise.
      */
-	bool isSgNode() const
+	bool isSgInstance() const
 	{
 	    return _physicalOperator.get() != NULL && _physicalOperator->getPhysicalName() == "impl_sg";
 	}
@@ -386,7 +386,7 @@ public:
 	}
 
 	/**
-	 * @return the number of attributes emitted by the node.
+	 * @return the number of attributes emitted by the instance.
 	 */
 	double getDataWidth()
 	{
@@ -394,7 +394,7 @@ public:
 	}
 
     /**
-     * @return stats about distribution of node output
+     * @return stats about distribution of instance output
      */
     const ArrayDistribution& getDistribution() const
     {
@@ -402,19 +402,19 @@ public:
     }
 
 	/**
-	 * Calculate information about distribution of node output, using
-	 * the distribution stats of the child nodes, plus
+	 * Calculate information about distribution of instance output, using
+	 * the distribution stats of the child instances, plus
 	 * the data provided from the PhysicalOperator. Sets distribution
-	 * stats of node to the result.
-     * @param prev distribution stats of previous node's output
-     * @return new distribution stats for this node's output
+	 * stats of instance to the result.
+     * @param prev distribution stats of previous instance's output
+     * @return new distribution stats for this instance's output
      */
 	const ArrayDistribution& inferDistribution ()
 	{
 	    std::vector<ArrayDistribution> childDistros;
-	    for (size_t i =0; i<_childNodes.size(); i++)
+	    for (size_t i =0; i<_childInstances.size(); i++)
 	    {
-	        childDistros.push_back(_childNodes[i]->getDistribution());
+	        childDistros.push_back(_childInstances[i]->getDistribution());
 	    }
 	    _distribution = _physicalOperator->getOutputDistribution(childDistros, getChildSchemas());
 	    return _distribution;
@@ -429,9 +429,9 @@ public:
 	const PhysicalBoundaries& inferBoundaries()
 	{
 	    std::vector<PhysicalBoundaries> childBoundaries;
-	    for (size_t i =0; i<_childNodes.size(); i++)
+	    for (size_t i =0; i<_childInstances.size(); i++)
 	    {
-	        childBoundaries.push_back(_childNodes[i]->getBoundaries());
+	        childBoundaries.push_back(_childInstances[i]->getBoundaries());
 	    }
 	    _boundaries = _physicalOperator->getOutputBoundaries(childBoundaries, getChildSchemas());
 	    return _boundaries;
@@ -440,7 +440,7 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)
 	{
-		ar & _childNodes;
+		ar & _childInstances;
 		ar & _agg;
 		ar & _ddl;
 		ar & _tile;
@@ -497,13 +497,13 @@ private:
     //
     // What we should probably have is:
     // a vector<PhysicalQueryPlanNode*> internally
-    // make the planNode immutable after creation
+    // make the planInstance immutable after creation
     // return const-pointers for access, return copies for creation
     // walkers create a new plan tree from subtrees.
     // destructor takes care of eveything.
     // </RANT> ap
 
-    std::vector< PhysNodePtr > _childNodes;
+    std::vector< PhysInstancePtr > _childInstances;
     boost::weak_ptr <PhysicalQueryPlanNode> _parent;
 
     bool _agg;
@@ -572,7 +572,7 @@ private:
 
 /**
  * The PhysicalPlan is produced by Optimizer or in simple cases directly by query processor (DDL).
- * It has ready to execution operator nodes and will be passed to an executor.
+ * It has ready to execution operator instances and will be passed to an executor.
  */
 class PhysicalPlan
 {

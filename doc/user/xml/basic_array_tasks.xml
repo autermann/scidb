@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter>
+  <title>Basic Array Tasks</title>
+  <sect1>
+    <title>Selecting Data From an Array</title>
+    <para>AQL&apos;s Data Manipulation Language (DML) provides queries to access and operate on array data. The basis for selecting data from a SciDB array is the AQL <code><command>SELECT</command></code> statement with <code><command>INTO</command></code>, 
+<code><command>FROM</command></code>, and <code><command>WHERE</command></code> clauses. The syntax of the <code><command>SELECT</command></code> statement is:<synopsis><command>SELECT</command> <replaceable>list</replaceable> | * 
+   [<command>INTO</command> <replaceable>target_array</replaceable>]
+    <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
+   [<command>WHERE</command> <replaceable>expression</replaceable>]
+</synopsis>
+The arguments for the statement are:<variablelist>
+        <varlistentry>
+          <term><replaceable>list</replaceable> | *</term>
+          <listitem>
+            <para><code><command>SELECT</command></code> <replaceable>list</replaceable>  can select individual attributes and dimensions, as well as constants and expressions. The wildcard character * means select all attributes.</para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>
+            <replaceable>target_array</replaceable>
+          </term>
+          <listitem>
+            <para>The <code>
+                <command>INTO</command>
+              </code> clause can create an array to store the output of the query. The target array may also be a pre-existing array in the current SciDB  </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term><replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable></term>
+          <listitem>
+            <para>The <code>
+                <command>FROM</command>
+              </code> clause takes a SciDB array as argument. The  <replaceable>array_expression</replaceable> argument is an expression or subquery that returns an array result. The <replaceable>source_array</replaceable> is an array in the current SciDB namespace from which data is being selected. </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>
+            <replaceable>expression</replaceable>
+          </term>
+          <listitem>
+            <para>The <replaceable>expression</replaceable> argument of the <code><command>WHERE</command></code> clause allows to you specify parameter that filter the query.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist></para>
+    <sect2>
+      <title>The SELECT Statement</title>
+      <para>AQL expressions in the <code>
+          <command>SELECT</command>
+        </code> list or the <code>
+          <command>WHERE</command>
+        </code> clause are standard expressions over the attributes and dimensions of the array. The simplest <code>
+          <command>SELECT</command>
+        </code> statement is <code><command>SELECT</command> *</code>, which selects all data from a specified array or array result. Consider two arrays, <code>A</code> and <code>B</code>:<programlisting>AQL% <command>CREATE ARRAY</command> A &lt;val_a:double&gt;[i=0:9,10,0];
+AQL% <command>CREATE ARRAY</command> B &lt;val_b:double&gt;[j=0:9,10,0];</programlisting>These arrays contain  data. To see all the data in the array, you can use a <code><command>SELECT</command> *</code> statement with the <code>scan</code> command. The <code>scan(A)</code> command  returns a SciDB array result containing the values of the array data in A. By using<code> scan(A)</code> with a <code><command>SELECT</command> *</code> statement, the query will return the entire array result of <code>scan(A)</code>:<programlisting>AQL% <command>SELECT</command> * <command>FROM</command> scan(A);</programlisting><screen>[(1),(2),(3),(4),(5),(6),(7),(8),(9),(10)]</screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> scan(B);</programlisting><screen>[(101),(102),(103),(104),(105),
+(106),(107),(108),(109),(110)]</screen>The <code>show</code> command returns an array result containing an array&apos;s schema. To see the entire schema, use a <code><command>SELECT</command> *</code> statement with the <code>show</code> command:<programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(A);</programlisting><screen>[(&quot;A&lt;val_a:double&gt; [i=0:9,10,0]&quot;)]</screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(B);</programlisting><screen>[(&quot;B&lt;val_b:double&gt; [j=0:9,10,0]&quot;)]</screen></para>
+      <para>To refine the result of the  <code>SELECT</code> statement, use an argument that specifies part of an array result. <code>SELECT</code> can take array  dimensions or attributes as  arguments:<programlisting>SELECT j FROM B;
+SELECT val_b FROM B;</programlisting>The <code>SELECT</code> statement can also take an expression as an argument. For example, you can scale attribute values by a certain amount:</para>
+      <programlisting>AQL% <command>SELECT</command> val_b/10 <command>FROM</command> B;</programlisting>
+      <programlisting>[(10.1),(10.2),(10.3),(10.4),(10.5),
+(10.6),(10.7),(10.8),(10.9),(11)]</programlisting>
+      <para>The <code>
+          <command>WHERE</command>
+        </code> clause can also use built-in functions to create  expressions. For example, you can choose just the middle three cells of array B with the greater-than and less-than functions with the <code>and</code> operator:<programlisting><command>SELECT</command> j <command>FROM</command> B <command>WHERE</command> j &gt; 3 and j &lt; 7;</programlisting><screen>[(),(),(),(),(4),(5),(6),(),(),()]</screen>You can also select an expression of the attribute values for the middle three cells of B by providing an expression for the argument of both <code>
+          <command>SELECT</command>
+        </code> and <code>
+          <command>WHERE</command>
+        </code>. For example, this statement returns the square root of the middle three cells of array <code>B</code>:<programlisting><command>SELECT</command> sqrt(val_b) <command>FROM</command> B <command>WHERE</command> j&gt;3 and j&lt;7;</programlisting><screen>[(),(),(),(),(10.247),(10.2956),(10.3441),(),(),()]</screen>The <code>
+          <command>FROM</command>
+        </code> clause can take an array or any operation that outputs an array as an argument. The <code>
+          <command>INTO</command>
+        </code> clause stores the output of a query. </para>
+    </sect2>
+  </sect1>
+  <sect1>
+    <title>Array Joins</title>
+    <para>A join combines two or more arrays typically as a preprocessing step for subsequent operations. The simplest type of join is for two arrays with the same number of dimensions, same dimension starting coordinates, and same chunk size.</para>
+    <para>The syntax of a simple join statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable> <command>INTO</command> <replaceable>target_array</replaceable> <command>FROM</command> <replaceable>src_array</replaceable></synopsis></para>
+    <para>The natural join of these arrays joins the attributes:<programlisting><command>SELECT</command> * <command>FROM</command> A,B;</programlisting>This join produces:<programlisting>[(1,101),(2,102),(3,103),(4,104),(5,105),
+(6,106),(7,107),(8,108),(9,109),(10,110)]</programlisting></para>
+    <para>You can store the output using the <code><command>INTO</command></code> clause. For example, this code will store the attribute-attribute join of A and B in array C:<programlisting>AQL% <command>SELECT</command> * <command>INTO</command> C <command>FROM</command> A,B;</programlisting>Arrays do not need to have the same number of attributes to be compatible as long as the dimension starting indices, chunk sizes, and chunk overlaps are the same. For example, you can join the two-attribute array C with the one-attribute array B:<programlisting>AQL% <command>SELECT</command> * <command>INTO</command> D <command>FROM</command> C,B;</programlisting>This produces array D with the following schema:<screen>[(&quot;D&lt;val_a:double,
+val_b:double,
+val_b_2:double&gt;
+[i=0:9,10,0]&quot;)]</screen></para>
+    <para>If two arrays have an attribute with the same name, you can select the attributes to use with array dot notation:<programlisting>AQL% <command>SELECT</command> C.val_b + D.val_b <command>FROM</command> C,D;</programlisting></para>
+    <para>The <code>
+        <command>JOIN ... ON</command>
+      </code> predicate calculates the multidimensional join of two arrays after
+applying the constraints specified in the
+<command><code>ON</code></command> clause. The <command><code>ON</code></command> clause lists one or more constraints in the form of
+equality predicates on dimensions or attributes. The syntax is:
+<synopsis><command>SELECT</command> <replaceable>list</replaceable> | * 
+   <optional><command>INTO</command> <replaceable>target_array</replaceable></optional>
+     <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
+    <command> JOIN</command> <replaceable>expression</replaceable> | <replaceable>attribute</replaceable><command> ON</command> <replaceable>dimension</replaceable> | <replaceable>attribute</replaceable></synopsis></para>
+    <para>
+A dimension-dimension equality predicate matches two compatible
+dimensions, one from each input. The result of this join
+is an array with higher number of dimensions&mdash;combining the
+dimensions of both its inputs, less the
+matched dimensions. If no  predicate is specified, the result
+is the full cross product array.
+
+</para>
+    <para>An attribute predicate in the <code><command>ON</command></code> clause is used to filter the output
+of the multidimensional array.</para>
+    <para>For example, consider a 2-dimensional array <code>m3x3</code>schema and attributes values:<screen>[(&quot;m3x3&lt;a:double&gt; [i=1:3,3,0,j=1:3,3,0]&quot;)]
+[
+[(4),(5),(6)],
+[(7),(8),(9)],
+[(10),(11),(12)]
+]</screen>Now consider also a
+1-dimensional array <code>vector3</code> schema and attribute values:<screen>[(&quot;vector3&lt;b:double&gt; [k=1:3,3,0]&quot;)]
+[(21),(20.5),(20.3333)]</screen></para>
+    <para>A dimension join returns a  2-dimensional array with coordinates <code>{i,j}</code> in which the cell at
+coordinate <code>{i,j}</code> combines the cell at <code>{i,j}</code> of <code>m3x3</code> with the cell at
+coordinate <code>{k=j}</code>
+of <code>vector3</code>:<programlisting>AQL% <command>SELECT</command> * <command>FROM</command> m3x3 <command>JOIN</command> vector3 <command>ON</command> m3x3.j = vector3.k;</programlisting><screen>[
+[(4,21),(5,20.5),(6,20.3333)],
+[(7,21),(8,20.5),(9,20.3333)],
+[(10,21),(11,20.5),(12,20.3333)]
+]</screen></para>
+  </sect1>
+  <sect1 remap="h3">
+    <title>Aliases</title>
+    <para>AQL provides a way to refer to arrays and array attributes in a query via aliases. These are useful when using the same array repeatedly in an AQL statement, or when abbreviating a long array name. Aliases are created by adding an &quot;as&quot; to the array or attribute name, followed by the alias. Future references to the array can then use the alias. Once an alias has been assigned, all attributes and dimensions of the array can use the fully qualified name using the dotted naming convention.<programlisting>AQL% <command>SELECT</command> data.i*10 <command>FROM</command> A <command>AS</command> data <command>WHERE</command> A.i &lt; 5;</programlisting><screen>[(0),(10),(20),(30),(40),(),(),(),(),()]</screen></para>
+  </sect1>
+  <sect1 remap="h3">
+    <title>Nested Subqueries</title>
+    <para>You can nest AQL queries to refine query results. </para>
+    <para>For example, you  can nest <code>
+        <command>SELECT</command>
+      </code> statements before a <code>
+        <command>WHERE</command>
+      </code> clause to select a subset of the query output. For example, this query <orderedlist>
+        <listitem>
+          <para>Sums two attributes from two different arrays and stores the output in an alias,</para>
+        </listitem>
+        <listitem>
+          <para>Selects the cells with indices greater than 5, and</para>
+        </listitem>
+        <listitem>
+          <para>Squares the result.</para>
+        </listitem>
+      </orderedlist><programlisting>AQL% <command>SELECT</command> pow(c,2) <command>FROM</command> 
+   (<command>SELECT</command> A.val_a + B.val_b <command>AS</command> c <command>FROM</command> A,B) <command> WHERE</command> i &gt; 5;</programlisting><screen>[(),(),(),(),(),(),(12996),(13456),(13924),(14400)]</screen></para>
+  </sect1>
+  <sect1 remap="h3">
+    <title>Data Sampling</title>
+    <para>SciDB provides operations to sample array data. The <code>bernoulli</code> command allows you to select a subset of array cells based upon a given probability. For example, you can use the <code>bernoulli</code> operator to randomly sample data from an array one element at a time. The syntax of  <code>bernoulli</code> is:<programlisting>bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
+    <para>The <code>sample</code> command allows you to randomly sample data one array chunk at a time:<programlisting>sample(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting>The probability is a double between 0 and 1. The commands work by generating a random number for each cell or chunk in the array and scaling it to the probability. If the random number is within the probability, the cell/chunk is included. Both commands allow you to produce repeatable results by seeding the random number generator. All calls to the random number generator with the same seed produce the same random number. Seeds must be a 64-bit integer.</para>
+  </sect1>
+</chapter>

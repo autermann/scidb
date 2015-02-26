@@ -162,8 +162,7 @@ namespace scidb {
                                                         std::set<std::string>(),
                                                         &defaultNull,
                                                         "",
-                                                        "",
-                                                        aggregates[i]->getStateVarSize()));
+                                                        ""));
                 }
                 else
                 {
@@ -321,7 +320,9 @@ namespace scidb {
                             size_t j = attributesMapping[i];
                             if (j != SYNTHETIC)
                             {
-                                dstChunkIterators[i]->setPosition(dstPos);
+                                if (!dstChunkIterators[i]->setPosition(dstPos)) { 
+                                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                                }
                                 if (j & FLIP)
                                 {
                                     coord.setInt64(srcPos[j & ~FLIP]);

@@ -10,6 +10,9 @@
 
 #include "array/Metadata.h"
 
+#include "system/Config.h"
+#include "system/SciDBConfigOptions.h"
+
 #include "query/parser/AST.h"
 #include "query/parser/ParsingContext.h"
 %}
@@ -32,6 +35,7 @@
     int64_t int64Val;
     double realVal;    
     std::string* stringVal;
+    std::string* keyword;
     //std::string* keyword;
     class AstNode* node;
     bool boolean;
@@ -50,7 +54,7 @@
 %left UNARY_MINUS
 
 %type <node> start statement create_array_statement immutable_modifier array_attribute
-    typename array_attribute_list array_dimension array_dimension_list
+    distinct typename array_attribute_list array_dimension array_dimension_list
     dimension_boundary dimension_boundaries nullable_modifier empty_modifier
     default default_value compression reserve schema 
     select_statement select_list into_clause path_expression
@@ -61,14 +65,18 @@
     expr_list update_statement update_list
     update_list_item where_clause common_expr load_library_statement unload_library_statement constant_bool
     drop_array_statement function_argument int64_list sort_quirk select_list_item index_clause
+    load_save_instance_id save_statement save_format
 
 %type <boolean> negative_index
 
+%type <keyword> non_reserved_keywords
+
 %destructor { delete $$; $$ = NULL; } IDENTIFIER STRING_LITERAL <node>
 
-%token ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END AGG
+%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END
     SELECT WHERE GROUP BY JOIN ON REGRID LOAD INTO INDEX
-    VALUES UPDATE SET LIBRARY UNLOAD TRUE FALSE DROP IS RESERVE CROSS WINDOW ASC DESC REDIMENSION
+    VALUES UPDATE SET LIBRARY UNLOAD TRUE FALSE DROP IS RESERVE CROSS WINDOW ASC DESC REDIMENSION ALL DISTINCT
+    CURRENT INSTANCE INSTANCES SAVE BETWEEN
 
 %token EOQ         0              "end of query"
 %token EOL                        "end of line"
@@ -100,6 +108,7 @@ statement:
     create_array_statement
     | select_statement
     | load_statement
+    | save_statement
     | update_statement
     | drop_array_statement
     | load_library_statement
@@ -141,7 +150,7 @@ empty_modifier:
     }
     | dummy
     {
-        $$ = new AstNodeBool(emptyable, CONTEXT(@1), false);
+        $$ = new AstNodeBool(emptyable, CONTEXT(@1), Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT));
     }
     ;
 
@@ -158,11 +167,11 @@ array_attribute_list:
     ;
 
 array_attribute:
-    IDENTIFIER ':' typename nullable_modifier default compression reserve 
+    identifier_clause ':' typename nullable_modifier default compression reserve 
     {
         $$ = new AstNode(attribute, CONTEXT(@1),
             attributeArgCount, 
-            new AstNodeString(attributeName, CONTEXT(@1), *$1),
+            $1,
             $3,
             $4,
             $5,
@@ -170,7 +179,6 @@ array_attribute:
             $7);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
     ;
 
@@ -252,53 +260,76 @@ array_dimension_list:
     ;
     
 array_dimension:
-    IDENTIFIER '=' dimension_boundaries ',' INTEGER ',' INTEGER
+    identifier_clause '=' dimension_boundaries ',' INTEGER ',' INTEGER
     {
         if ($5 <= 0 || $5 > std::numeric_limits<uint32_t>::max())
         {
-            delete $1;
-            glue.error2(@2, boost::str(boost::format("Chunk length must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
         }
 
         if ($7 < 0 || $7 > std::numeric_limits<uint32_t>::max())
         {
-            delete $1;
             glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
         }
     
         $$ = new AstNode(dimension, CONTEXT(@1),
             dimensionArgCount, 
-            new AstNodeString(dimensionName, CONTEXT(@1), *$1),
+            $1,
             $3,
             new AstNodeInt64(dimensionChunkInterval, CONTEXT(@5), $5),
             new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@7), $7));
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
-    |
-    IDENTIFIER '(' typename ')' '=' dimension_boundary ',' INTEGER ',' INTEGER
+    | identifier_clause
     {
-        if ($8 <= 0 || $8 > std::numeric_limits<uint32_t>::max())
+        $$ = new AstNode(dimension, CONTEXT(@1),
+            dimensionArgCount, 
+            $1,
+            new AstNode(dimensionBoundaries, CONTEXT(@1),
+                dimensionBoundaryArgCount,
+                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), 0),
+                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE)),
+            NULL,
+            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
+    }
+    | identifier_clause '(' distinct typename ')' '=' dimension_boundary ',' INTEGER ',' INTEGER
+    {
+        if ($9 <= 0 || $9 > std::numeric_limits<uint32_t>::max())
         {
-            delete $1;
-            glue.error2(@2, boost::str(boost::format("Chunk length must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
         }
 
-        if ($10 < 0 || $10 > std::numeric_limits<uint32_t>::max())
+        if ($11 < 0 || $11 > std::numeric_limits<uint32_t>::max())
         {
-            delete $1;
             glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
         }
 
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
             nIdimensionArgCount,
-            new AstNodeString(dimensionName, CONTEXT(@1), *$1),
+            $1,
             $3,
-            $6,
-            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@8), $8),
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@10), $10));
-        delete $1;
+            $4,
+            $7,
+            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@8), $9),
+            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@10), $11));
+    }
+    | identifier_clause '(' distinct typename ')'
+    {
+        $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
+            nIdimensionArgCount,
+            $1,
+            $3,
+            $4,
+            new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE),
+            NULL,
+            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
     }
     ;
 
@@ -340,12 +371,27 @@ negative_index:
     }
     ;
 
+distinct:
+    ALL 
+    {
+        $$ = new AstNodeBool(distinct, CONTEXT(@1), false);
+    }
+    | 
+    DISTINCT 
+    {
+        $$ = new AstNodeBool(distinct, CONTEXT(@1), true);
+    }
+    | 
+    {
+        $$ = NULL;
+    }    
+    ;
+
 //FIXME: need more flexible way
 typename:
-    IDENTIFIER
+    identifier_clause
     {
-        $$ = new AstNodeString(attributeTypeName, CONTEXT(@1), *$1);
-        delete $1;
+        $$ = $1;
     }
     ;
 
@@ -570,6 +616,13 @@ path_expression_list:
     
 identifier_clause:
     IDENTIFIER
+    {
+        $$ = new AstNodeString(identifierClause, CONTEXT(@1), *$1);
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
+        delete $1;
+    }
+    | non_reserved_keywords
     {
         $$ = new AstNodeString(identifierClause, CONTEXT(@1), *$1);
         $$->setComment(glue._docComment);
@@ -853,36 +906,33 @@ constant_bool:
     ;
 
 function:
-    IDENTIFIER '(' ')'
+    identifier_clause '(' ')'
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), *$1),
+            $1,
             new AstNode(functionArguments, CONTEXT(@2), 0),
             NULL,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
     }
-    | IDENTIFIER '(' function_argument_list ')'
+    | identifier_clause '(' function_argument_list ')'
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), *$1),
+            $1,
             $3,
             NULL,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
     }
-    | IDENTIFIER '(' '*' ')'
+    | identifier_clause '(' '*' ')'
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), *$1),
+            $1,
             new AstNode(functionArguments, CONTEXT(@2), 1,
                 new AstNode(asterisk, CONTEXT(@1), 0)),
             NULL,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
     }
     ;
 
@@ -967,9 +1017,57 @@ beetween_expr:
     ;
 
 load_statement:
-    LOAD identifier_clause FROM constant_string
+    LOAD identifier_clause FROM load_save_instance_id constant_string
     {
-        $$ = new AstNode(loadStatement, CONTEXT(@1), loadStatementArgCount, $2, $4);        
+        $$ = new AstNode(loadStatement, CONTEXT(@1), loadStatementArgCount,
+            $2,
+            $4,
+            $5);
+    }
+    ;
+
+save_statement:
+    SAVE path_expression INTO load_save_instance_id constant_string save_format
+    {
+        $$ = new AstNode(saveStatement, CONTEXT(@1), saveStatementArgCount,
+            $2,
+            $4,
+            $5,
+            $6);
+    }
+    ;
+
+save_format:
+    AS constant_string
+    {
+        $$ = $2;
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
+load_save_instance_id:
+    constant_int64
+    {
+        $$ = $1;
+    }
+    | INSTANCE constant_int64
+    {
+        $$ = $2;
+    }
+    | CURRENT INSTANCE
+    {
+        $$ = new AstNodeInt64(int64Node, CONTEXT(@1), -2);
+    }
+    | ALL INSTANCES
+    {
+        $$ = new AstNodeInt64(int64Node, CONTEXT(@1), -1);
+    }
+    | dummy
+    {
+        $$ = new AstNodeInt64(int64Node, CONTEXT(@1), -2);   
     }
     ;
 
@@ -1056,6 +1154,32 @@ sort_quirk:
     {
         $$ = NULL;
     }
+    ;
+
+non_reserved_keywords:
+    ALL
+    | ARRAY
+    | AS
+    | ASC
+    | BETWEEN
+    | BY
+    | COMPRESSION
+    | CREATE
+    | CURRENT
+    | DESC
+    | DEFAULT
+    | DISTINCT
+    | DROP
+    | END
+    | IMMUTABLE
+    | INSTANCE
+    | INSTANCES
+    | IS
+    | LIBRARY
+    | LOAD
+    | RESERVE
+    | SAVE
+    | VALUES
     ;
 
 %%

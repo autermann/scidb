@@ -1,0 +1,10 @@
+Query was executed successfully
+
+[("str1"),("str2"),("str3"),("str4"),("str5"),("str6"),("str7"),("str8"),("str9"),("str10")]
+
+[("str1"),("str2"),("str3"),("str4"),("str5"),("str6"),("str7"),("str8"),("str9"),()]
+
+[An error expected at this place for the query "store(build(fs, 'string' + string(i)), fs)". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TRUNCATION. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TRUNCATION.]
+
+Query was executed successfully
+

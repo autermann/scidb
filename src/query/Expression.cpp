@@ -39,6 +39,9 @@
 #include "array/DBArray.h"
 #include "query/parser/ParsingContext.h"
 #include "network/NetworkManager.h"
+#include "query/parser/QueryParser.h"
+#include "query/parser/AST.h"
+#include "query/parser/ALTranslator.h"
 
 using namespace std;
 using namespace boost;
@@ -202,7 +205,7 @@ void Expression::compile(std::string functionName,
     _constant = true;
 
     // Searching function pointer for given function name and type of arguments
-     FunctionDescription functionDesc;
+    FunctionDescription functionDesc;
     vector<FunctionPointer> converters;
     if (FunctionLibrary::getInstance()->findFunction(f.functionName, funcArgTypes,
                                                      functionDesc, converters,
@@ -260,7 +263,22 @@ void Expression::compile(std::string functionName,
     _compiled = true;
 }
 
-void Expression::compile(bool tile, const TypeId& type, const  Value& value)
+void Expression::compile(const string& expression, vector<string> names, vector<TypeId> types, TypeId expectedType)
+{
+    assert(names.size() == types.size());
+    QueryParser p;
+    shared_ptr<AstNode> astTree = p.parse("EXPRESSION(" + expression + ")", false);
+    AstNode* ast = astTree->getChild(1);
+    shared_ptr<LogicalExpression> logicalExpression = AstToLogicalExpression( ast->getChild(0) );
+
+    for (size_t i = 0; i < names.size(); i++) {
+        addVariableInfo(names[i], types[i]);
+    }
+    shared_ptr<Query> emptyQuery;
+    compile(logicalExpression, emptyQuery, false, expectedType);
+}
+
+void Expression::compile(bool tile, const TypeId& type, const Value& value)
 {
     _tileMode = tile;
     _eargs[0] = value;

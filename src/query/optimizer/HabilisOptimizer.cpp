@@ -101,17 +101,17 @@ PhysPlanPtr HabilisOptimizer::optimize(const boost::shared_ptr<Query>& query,
 
     if (isFeatureEnabled(INSERT_REPART))
     {
-        tw_insertRepartNodes(_root);
+        tw_insertRepartInstances(_root);
     }
 
-    tw_insertSgNodes(_root);
+    tw_insertSgInstances(_root);
 
     if (isFeatureEnabled(CONDENSE_SG))
     {
-        tw_collapseSgNodes(_root);
+        tw_collapseSgInstances(_root);
         while (tw_pushupJoinSgs(_root))
         {
-            tw_collapseSgNodes(_root);
+            tw_collapseSgInstances(_root);
         }
     }
 
@@ -122,7 +122,7 @@ PhysPlanPtr HabilisOptimizer::optimize(const boost::shared_ptr<Query>& query,
         tw_insertChunkMaterializers(_root);
     }
 
-    if (isFeatureEnabled(REWRITE_STORING_SG) && query->getNodesCount()>1)
+    if (isFeatureEnabled(REWRITE_STORING_SG) && query->getInstancesCount()>1)
     {
         tw_rewriteStoringSG(_root);
     }
@@ -151,50 +151,50 @@ void HabilisOptimizer::dbg_logPlan()
     LOG4CXX_DEBUG(logger, out.str().c_str())
 }
 
-void HabilisOptimizer::n_addParentNode(PhysNodePtr target, PhysNodePtr nodeToInsert)
+void HabilisOptimizer::n_addParentInstance(PhysInstancePtr target, PhysInstancePtr instanceToInsert)
 {
     if (target->hasParent())
     {
-        PhysNodePtr parent = target->getParent();
-        nodeToInsert->setParent(parent);
-        parent->replaceChild(target, nodeToInsert);
+        PhysInstancePtr parent = target->getParent();
+        instanceToInsert->setParent(parent);
+        parent->replaceChild(target, instanceToInsert);
     }
     else
     {
         assert(_root == target);
-        _root = nodeToInsert;
+        _root = instanceToInsert;
     }
 
-    target->setParent(nodeToInsert);
-    nodeToInsert->addChild(target);
+    target->setParent(instanceToInsert);
+    instanceToInsert->addChild(target);
 }
 
-void HabilisOptimizer::n_cutOutNode(PhysNodePtr nodeToRemove)
+void HabilisOptimizer::n_cutOutInstance(PhysInstancePtr instanceToRemove)
 {
-    vector<PhysNodePtr> children = nodeToRemove->getChildren();
+    vector<PhysInstancePtr> children = instanceToRemove->getChildren();
     assert(children.size()<=1);
 
-    if (nodeToRemove->hasParent())
+    if (instanceToRemove->hasParent())
     {
-        PhysNodePtr parent = nodeToRemove->getParent();
+        PhysInstancePtr parent = instanceToRemove->getParent();
         if (children.size() == 1)
         {
-            PhysNodePtr child = children[0];
-            parent->replaceChild(nodeToRemove, child);
+            PhysInstancePtr child = children[0];
+            parent->replaceChild(instanceToRemove, child);
             child->setParent(parent);
         }
         else
         {
-            parent->removeChild(nodeToRemove);
+            parent->removeChild(instanceToRemove);
         }
     }
 
     else
     {
-        assert(_root == nodeToRemove);
+        assert(_root == instanceToRemove);
         if (children.size() == 1)
         {
-            PhysNodePtr child = children[0];
+            PhysInstancePtr child = children[0];
             _root = child;
             _root->resetParent();
         }
@@ -249,17 +249,17 @@ boost::shared_ptr<OperatorParam> HabilisOptimizer::n_createPhysicalParameter(con
     }
 }
 
-PhysNodePtr HabilisOptimizer::n_createPhysicalNode(boost::shared_ptr<LogicalQueryPlanNode> logicalNode,
+PhysInstancePtr HabilisOptimizer::n_createPhysicalInstance(boost::shared_ptr<LogicalQueryPlanNode> logicalInstance,
                                                    bool tileMode)
 {
-    const boost::shared_ptr<LogicalOperator>& logicalOp = logicalNode->getLogicalOperator();
+    const boost::shared_ptr<LogicalOperator>& logicalOp = logicalInstance->getLogicalOperator();
     const string& logicalName = logicalOp->getLogicalName();
 
     OperatorLibrary* opLibrary = OperatorLibrary::getInstance();
     vector<string> physicalOperatorsNames;
     opLibrary->getPhysicalNames(logicalName, physicalOperatorsNames);
     const string &physicalName = physicalOperatorsNames[0];
-    const vector<boost::shared_ptr<LogicalQueryPlanNode> >& children = logicalNode->getChildren();
+    const vector<boost::shared_ptr<LogicalQueryPlanNode> >& children = logicalInstance->getChildren();
 
     // Collection of input schemas of operator for resolving references
     vector<ArrayDesc> inputSchemas;
@@ -291,10 +291,10 @@ PhysNodePtr HabilisOptimizer::n_createPhysicalNode(boost::shared_ptr<LogicalQuer
     PhysOpPtr physicalOp = opLibrary->createPhysicalOperator(logicalName, physicalName, physicalParams, outputSchema);
     physicalOp->setQuery(_query);
     physicalOp->setTileMode(tileMode);
-    return PhysNodePtr(new PhysicalQueryPlanNode(physicalOp, false, logicalNode->isDdl(), tileMode));
+    return PhysInstancePtr(new PhysicalQueryPlanNode(physicalOp, false, logicalInstance->isDdl(), tileMode));
 }
 
-PhysNodePtr HabilisOptimizer::n_buildSgNode(const ArrayDesc & outputSchema,
+PhysInstancePtr HabilisOptimizer::n_buildSgInstance(const ArrayDesc & outputSchema,
                                             PartitioningSchema partSchema, bool storeArray)
 {
     PhysicalOperator::Parameters sgParams;
@@ -309,12 +309,12 @@ PhysNodePtr HabilisOptimizer::n_buildSgNode(const ArrayDesc & outputSchema,
 
     if (storeArray)
     {
-       boost::shared_ptr<Expression> nodeConst = boost::make_shared<Expression> ();
-        Value node(TypeLibrary::getType(TID_INT64));
-        node.setInt64(-1);
-        nodeConst->compile(false, TID_INT64, node);
+       boost::shared_ptr<Expression> instanceConst = boost::make_shared<Expression> ();
+        Value instance(TypeLibrary::getType(TID_INT64));
+        instance.setInt64(-1);
+        instanceConst->compile(false, TID_INT64, instance);
         sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""),
-                                                                                          nodeConst,
+                                                                                          instanceConst,
                                                                                           true)));
 
         sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamArrayReference(boost::make_shared<ParsingContext> (""),
@@ -326,27 +326,27 @@ PhysNodePtr HabilisOptimizer::n_buildSgNode(const ArrayDesc & outputSchema,
     PhysOpPtr sgOp = OperatorLibrary::getInstance()->createPhysicalOperator("sg", "impl_sg", sgParams, outputSchema);
     sgOp->setQuery(_query);
 
-    PhysNodePtr sgNode(new PhysicalQueryPlanNode(sgOp, false, false, false));
-    return sgNode;
+    PhysInstancePtr sgInstance(new PhysicalQueryPlanNode(sgOp, false, false, false));
+    return sgInstance;
 }
 
-PhysNodePtr HabilisOptimizer::tw_createPhysicalTree(boost::shared_ptr<LogicalQueryPlanNode> logicalRoot, bool tileMode)
+PhysInstancePtr HabilisOptimizer::tw_createPhysicalTree(boost::shared_ptr<LogicalQueryPlanNode> logicalRoot, bool tileMode)
 {
    logicalRoot = logicalRewriteIfNeeded(_query, logicalRoot);
 
     vector<boost::shared_ptr<LogicalQueryPlanNode> > logicalChildren = logicalRoot->getChildren();
-    vector<PhysNodePtr> physicalChildren(logicalChildren.size());
+    vector<PhysInstancePtr> physicalChildren(logicalChildren.size());
     bool rootTileMode = tileMode;
     for (size_t i = 0; i < logicalChildren.size(); i++)
     {
         boost::shared_ptr<LogicalQueryPlanNode> logicalChild = logicalChildren[i];
-        PhysNodePtr physicalChild = tw_createPhysicalTree(logicalChild, tileMode);
+        PhysInstancePtr physicalChild = tw_createPhysicalTree(logicalChild, tileMode);
         rootTileMode &= physicalChild->getPhysicalOperator()->getTileMode();
         physicalChildren[i] = physicalChild;
     }
-    PhysNodePtr physicalRoot = n_createPhysicalNode(logicalRoot, rootTileMode);
+    PhysInstancePtr physicalRoot = n_createPhysicalInstance(logicalRoot, rootTileMode);
 
-    if (physicalRoot->isSgNode())
+    if (physicalRoot->isSgInstance())
     {
         //this is a user-inserted explicit SG. So we don't mess with it.
         physicalRoot->setSgMovable(false);
@@ -354,7 +354,7 @@ PhysNodePtr HabilisOptimizer::tw_createPhysicalTree(boost::shared_ptr<LogicalQue
     }
     for (size_t i = 0; i < physicalChildren.size(); i++)
     {
-        PhysNodePtr physicalChild = physicalChildren[i];
+        PhysInstancePtr physicalChild = physicalChildren[i];
         physicalChild->setParent(physicalRoot);
         physicalRoot->addChild(physicalChild);
     }
@@ -367,24 +367,24 @@ PhysNodePtr HabilisOptimizer::tw_createPhysicalTree(boost::shared_ptr<LogicalQue
                                                                        PhysicalOperator::Parameters(),
                                                                        logicalOp->getSchema());
         globalOp->setQuery(_query);
-        PhysNodePtr globalNode(new PhysicalQueryPlanNode(globalOp, true, false, false));
+        PhysInstancePtr globalInstance(new PhysicalQueryPlanNode(globalOp, true, false, false));
         physicalRoot->inferBoundaries();
-        physicalRoot->setParent(globalNode);
-        globalNode->addChild(physicalRoot);
-        physicalRoot = globalNode;
+        physicalRoot->setParent(globalInstance);
+        globalInstance->addChild(physicalRoot);
+        physicalRoot = globalInstance;
     }
 
     physicalRoot->inferBoundaries();
     return physicalRoot;
 }
 
-static void s_setSgDistribution(PhysNodePtr sgNode,
+static void s_setSgDistribution(PhysInstancePtr sgInstance,
                                 ArrayDistribution const& dist)
 {
     if (dist.isUndefined())
         throw SYSTEM_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_CANT_CREATE_SG_WITH_UNDEFINED_DISTRIBUTION);
 
-    PhysicalOperator::Parameters _parameters = sgNode->getPhysicalOperator()->getParameters();
+    PhysicalOperator::Parameters _parameters = sgInstance->getPhysicalOperator()->getParameters();
     PhysicalOperator::Parameters newParameters;
 
     boost::shared_ptr<Expression> psConst = boost::make_shared<Expression> ();
@@ -398,15 +398,15 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
         newParameters.push_back(_parameters[i]);
     }
 
-    ArrayDesc sgSchema = sgNode->getPhysicalOperator()->getSchema();
+    ArrayDesc sgSchema = sgInstance->getPhysicalOperator()->getSchema();
 
     if (_parameters.size() < 2)
     {
-        boost::shared_ptr<Expression> nodeConst(new Expression());;
-        Value node(TypeLibrary::getType(TID_INT64));
-        node.setInt64(-1);
-        nodeConst->compile(false, TID_INT64, node);
-        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), nodeConst, true)));
+        boost::shared_ptr<Expression> instanceConst(new Expression());;
+        Value instance(TypeLibrary::getType(TID_INT64));
+        instance.setInt64(-1);
+        instanceConst->compile(false, TID_INT64, instance);
+        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), instanceConst, true)));
 
         newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamArrayReference(boost::make_shared<ParsingContext> (""),
                                                                                       "",
@@ -445,15 +445,15 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
         newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), vectorValueExpr, true)));
     }
 
-    sgNode->getPhysicalOperator()->setParameters(newParameters);
+    sgInstance->getPhysicalOperator()->setParameters(newParameters);
 }
 
-static PhysNodePtr s_findThinPoint(PhysNodePtr root)
+static PhysInstancePtr s_findThinPoint(PhysInstancePtr root)
 {
     double dataWidth = root->getDataWidth();
-    PhysNodePtr candidate = root;
+    PhysInstancePtr candidate = root;
 
-    while (root->isSgNode() == false &&
+    while (root->isSgInstance() == false &&
            root->needsSpecificDistribution() == false &&
            root->isDistributionPreserving() &&
            root->isChunkPreserving() &&
@@ -469,41 +469,41 @@ static PhysNodePtr s_findThinPoint(PhysNodePtr root)
     return candidate;
 }
 
-static ArrayDistribution s_propagateDistribution(PhysNodePtr node,
-                                                 PhysNodePtr end = PhysNodePtr())
+static ArrayDistribution s_propagateDistribution(PhysInstancePtr instance,
+                                                 PhysInstancePtr end = PhysInstancePtr())
 {
     ArrayDistribution dist;
     do
     {
-        dist = node->inferDistribution();
-        node = node->getParent();
-    } while (node != end && node->getChildren().size() <= 1);
+        dist = instance->inferDistribution();
+        instance = instance->getParent();
+    } while (instance != end && instance->getChildren().size() <= 1);
 
     return dist;
 }
 
-void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
+void HabilisOptimizer::tw_insertSgInstances(PhysInstancePtr root)
 {
     assert(_root.get() != NULL);
 
     for (size_t i = 0; i < root->getChildren().size(); i ++)
     {
-        tw_insertSgNodes(root->getChildren()[i]);
+        tw_insertSgInstances(root->getChildren()[i]);
     }
 
-    if (root->isSgNode() == false)
+    if (root->isSgInstance() == false)
     {
         if (root->getChildren().size() == 1)
         {
-            PhysNodePtr child = root->getChildren()[0];
+            PhysInstancePtr child = root->getChildren()[0];
             ArrayDistribution cDist = child->getDistribution();
-            PhysNodePtr sgCandidate = child;
+            PhysInstancePtr sgCandidate = child;
 
             bool sgNeeded = false;
             PartitioningSchema newDist;
             bool sgMovable = true, sgOffsetable = true;
 
-            if (child -> isChunkPreserving() == false || cDist == ArrayDistribution(psLocalNode))
+            if (child -> isChunkPreserving() == false || cDist == ArrayDistribution(psLocalInstance))
             {
                 sgNeeded = true;
                 newDist = psRoundRobin;
@@ -527,72 +527,72 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
 
             if (sgNeeded)
             {
-               PhysNodePtr sgNode = n_buildSgNode(sgCandidate->getPhysicalOperator()->getSchema(), newDist);
-                n_addParentNode(sgCandidate,sgNode);
-                sgNode->inferBoundaries();
-                sgNode->setSgMovable(sgMovable);
-                sgNode->setSgOffsetable(sgOffsetable);
-                s_propagateDistribution(sgNode, root);
+               PhysInstancePtr sgInstance = n_buildSgInstance(sgCandidate->getPhysicalOperator()->getSchema(), newDist);
+                n_addParentInstance(sgCandidate,sgInstance);
+                sgInstance->inferBoundaries();
+                sgInstance->setSgMovable(sgMovable);
+                sgInstance->setSgOffsetable(sgOffsetable);
+                s_propagateDistribution(sgInstance, root);
             }
         }
         else if (root->getChildren().size() == 2)
         {
             ArrayDistribution lhs = root->getChildren()[0]->getDistribution();
-            if (root->getChildren()[0]->isChunkPreserving() == false || lhs == ArrayDistribution(psLocalNode))
+            if (root->getChildren()[0]->isChunkPreserving() == false || lhs == ArrayDistribution(psLocalInstance))
             {
-                PhysNodePtr sgNode = n_buildSgNode(root->getChildren()[0]->getPhysicalOperator()->getSchema(), psRoundRobin);
-                n_addParentNode(root->getChildren()[0],sgNode);
-                sgNode->inferBoundaries();
-                sgNode->setSgMovable(false);
-                lhs = s_propagateDistribution(sgNode, root);
+                PhysInstancePtr sgInstance = n_buildSgInstance(root->getChildren()[0]->getPhysicalOperator()->getSchema(), psRoundRobin);
+                n_addParentInstance(root->getChildren()[0],sgInstance);
+                sgInstance->inferBoundaries();
+                sgInstance->setSgMovable(false);
+                lhs = s_propagateDistribution(sgInstance, root);
             }
 
             ArrayDistribution rhs = root->getChildren()[1]->getDistribution();
-            if (root->getChildren()[1]->isChunkPreserving() == false || rhs == ArrayDistribution(psLocalNode))
+            if (root->getChildren()[1]->isChunkPreserving() == false || rhs == ArrayDistribution(psLocalInstance))
             {
-               PhysNodePtr sgNode = n_buildSgNode(root->getChildren()[1]->getPhysicalOperator()->getSchema(), psRoundRobin);
-                n_addParentNode(root->getChildren()[1],sgNode);
-                sgNode->inferBoundaries();
-                sgNode->setSgMovable(false);
-                rhs = s_propagateDistribution(sgNode, root);
+               PhysInstancePtr sgInstance = n_buildSgInstance(root->getChildren()[1]->getPhysicalOperator()->getSchema(), psRoundRobin);
+                n_addParentInstance(root->getChildren()[1],sgInstance);
+                sgInstance->inferBoundaries();
+                sgInstance->setSgMovable(false);
+                rhs = s_propagateDistribution(sgInstance, root);
             }
 
             if(root->getDistributionRequirement().getReqType() == DistributionRequirement::Collocated)
             {
-                if (lhs != rhs)
+                if (lhs != rhs || lhs.getPartitioningSchema() != psRoundRobin)
                 {
-                    bool canMoveLeftToRight = (rhs.isViolated() == false);
-                    bool canMoveRightToLeft = (lhs.isViolated() == false);
+                    bool canMoveLeftToRight = (rhs.isViolated() == false && rhs.getPartitioningSchema() == psRoundRobin);
+                    bool canMoveRightToLeft = (lhs.isViolated() == false && lhs.getPartitioningSchema() == psRoundRobin);
 
-                    PhysNodePtr leftCandidate = s_findThinPoint(root->getChildren()[0]);
-                    PhysNodePtr rightCandidate = s_findThinPoint(root->getChildren()[1]);
+                    PhysInstancePtr leftCandidate = s_findThinPoint(root->getChildren()[0]);
+                    PhysInstancePtr rightCandidate = s_findThinPoint(root->getChildren()[1]);
 
                     double leftDataWidth = leftCandidate->getDataWidth();
                     double rightDataWidth = rightCandidate->getDataWidth();
 
                     if (leftDataWidth < rightDataWidth && canMoveLeftToRight)
                     {
-                       PhysNodePtr sgNode = n_buildSgNode(leftCandidate->getPhysicalOperator()->getSchema(), rhs.getPartitioningSchema());
-                        n_addParentNode(leftCandidate, sgNode);
-                        sgNode->inferBoundaries();
-                        s_propagateDistribution(sgNode, root);
+                       PhysInstancePtr sgInstance = n_buildSgInstance(leftCandidate->getPhysicalOperator()->getSchema(), rhs.getPartitioningSchema());
+                        n_addParentInstance(leftCandidate, sgInstance);
+                        sgInstance->inferBoundaries();
+                        s_propagateDistribution(sgInstance, root);
                     }
                     else if (canMoveRightToLeft)
                     {
-                       PhysNodePtr sgNode = n_buildSgNode(rightCandidate->getPhysicalOperator()->getSchema(), lhs.getPartitioningSchema());
-                        n_addParentNode(rightCandidate, sgNode);
-                        sgNode->inferBoundaries();
-                        s_propagateDistribution(sgNode, root);
+                       PhysInstancePtr sgInstance = n_buildSgInstance(rightCandidate->getPhysicalOperator()->getSchema(), lhs.getPartitioningSchema());
+                        n_addParentInstance(rightCandidate, sgInstance);
+                        sgInstance->inferBoundaries();
+                        s_propagateDistribution(sgInstance, root);
                     }
                     else
                     {
-                       PhysNodePtr leftSg = n_buildSgNode(leftCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
-                        n_addParentNode(leftCandidate, leftSg);
+                       PhysInstancePtr leftSg = n_buildSgInstance(leftCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
+                        n_addParentInstance(leftCandidate, leftSg);
                         leftSg->inferBoundaries();
                         s_propagateDistribution(leftSg, root);
 
-                        PhysNodePtr rightSg = n_buildSgNode(rightCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
-                        n_addParentNode(rightCandidate, rightSg);
+                        PhysInstancePtr rightSg = n_buildSgInstance(rightCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
+                        n_addParentInstance(rightCandidate, rightSg);
                         rightSg->inferBoundaries();
                         s_propagateDistribution(rightSg, root);
                     }
@@ -619,7 +619,7 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
             {
                 bool sgNeeded = false;
 
-                PhysNodePtr child = root->getChildren()[i];
+                PhysInstancePtr child = root->getChildren()[i];
                 ArrayDistribution distro = child->getDistribution();
 
                 if (child->isChunkPreserving()==false)
@@ -635,13 +635,13 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
 
                 if (sgNeeded)
                 {
-                    PhysNodePtr sgCandidate = s_findThinPoint(child);
-                    PhysNodePtr sgNode = n_buildSgNode(sgCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
-                    sgNode->setSgMovable(false);
-                    sgNode->setSgOffsetable(false);
-                    n_addParentNode(sgCandidate, sgNode);
-                    sgNode->inferBoundaries();
-                    s_propagateDistribution(sgNode, root);
+                    PhysInstancePtr sgCandidate = s_findThinPoint(child);
+                    PhysInstancePtr sgInstance = n_buildSgInstance(sgCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
+                    sgInstance->setSgMovable(false);
+                    sgInstance->setSgOffsetable(false);
+                    n_addParentInstance(sgCandidate, sgInstance);
+                    sgInstance->inferBoundaries();
+                    s_propagateDistribution(sgInstance, root);
                 }
             }
         }
@@ -650,20 +650,20 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
     root->inferDistribution();
 }
 
-static PhysNodePtr s_getChainBottom(PhysNodePtr chainRoot)
+static PhysInstancePtr s_getChainBottom(PhysInstancePtr chainRoot)
 {
-    PhysNodePtr chainTop = chainRoot;
+    PhysInstancePtr chainTop = chainRoot;
     while (chainTop->getChildren().size() == 1)
     {
         chainTop = chainTop->getChildren()[0];
     }
-    assert(chainTop->isSgNode() == false);
+    assert(chainTop->isSgInstance() == false);
     return chainTop;
 }
 
-static PhysNodePtr s_getFirstOffsetableSg(PhysNodePtr chainRoot)
+static PhysInstancePtr s_getFirstOffsetableSg(PhysInstancePtr chainRoot)
 {
-    if (chainRoot->isSgNode() && chainRoot->isSgOffsetable())
+    if (chainRoot->isSgInstance() && chainRoot->isSgOffsetable())
     {
         return chainRoot;
     }
@@ -673,7 +673,7 @@ static PhysNodePtr s_getFirstOffsetableSg(PhysNodePtr chainRoot)
         chainRoot->isChunkPreserving() == false ||
         chainRoot->needsSpecificDistribution())
     {
-        return PhysNodePtr();
+        return PhysInstancePtr();
     }
 
     return s_getFirstOffsetableSg(chainRoot->getChildren()[0]);
@@ -681,118 +681,118 @@ static PhysNodePtr s_getFirstOffsetableSg(PhysNodePtr chainRoot)
 
 
 
-void HabilisOptimizer::cw_rectifyChainDistro(PhysNodePtr root,
-                                             PhysNodePtr sgCandidate,
+void HabilisOptimizer::cw_rectifyChainDistro(PhysInstancePtr root,
+                                             PhysInstancePtr sgCandidate,
                                              const ArrayDistribution & requiredDistribution)
 {
     ArrayDistribution currentDistribution = root->getDistribution();
-    PhysNodePtr chainParent = root->getParent();
+    PhysInstancePtr chainParent = root->getParent();
 
     if (requiredDistribution != currentDistribution)
     {
-        PhysNodePtr sgNode = s_getFirstOffsetableSg(root);
-        if (sgNode.get() == NULL)
+        PhysInstancePtr sgInstance = s_getFirstOffsetableSg(root);
+        if (sgInstance.get() == NULL)
         {
-            sgNode = n_buildSgNode(sgCandidate->getPhysicalOperator()->getSchema(), requiredDistribution.getPartitioningSchema());
-            n_addParentNode(sgCandidate,sgNode);
-            sgNode->inferBoundaries();
+            sgInstance = n_buildSgInstance(sgCandidate->getPhysicalOperator()->getSchema(), requiredDistribution.getPartitioningSchema());
+            n_addParentInstance(sgCandidate,sgInstance);
+            sgInstance->inferBoundaries();
             if (sgCandidate == root)
             {
-                root = sgNode;
+                root = sgInstance;
             }
         }
         if (requiredDistribution.isViolated())
         {
             boost::shared_ptr<DistributionMapper> requiredMapper = requiredDistribution.getMapper();
             assert(requiredMapper.get()!=NULL);
-            s_setSgDistribution(sgNode, requiredDistribution);
+            s_setSgDistribution(sgInstance, requiredDistribution);
         }
 
-        ArrayDistribution newRdStats = s_propagateDistribution(sgNode, chainParent);
+        ArrayDistribution newRdStats = s_propagateDistribution(sgInstance, chainParent);
     }
 
     assert(root->getDistribution() == requiredDistribution);
 }
 
-void HabilisOptimizer::tw_collapseSgNodes(PhysNodePtr root)
+void HabilisOptimizer::tw_collapseSgInstances(PhysInstancePtr root)
 {
     bool topChain = (root == _root);
 
-    PhysNodePtr chainBottom = s_getChainBottom(root);
-    PhysNodePtr curNode = chainBottom;
-    PhysNodePtr sgCandidate = chainBottom;
+    PhysInstancePtr chainBottom = s_getChainBottom(root);
+    PhysInstancePtr curInstance = chainBottom;
+    PhysInstancePtr sgCandidate = chainBottom;
 
-    ArrayDistribution runningDistribution = curNode->getDistribution();
+    ArrayDistribution runningDistribution = curInstance->getDistribution();
     ArrayDistribution chainOutputDistribution = root->getDistribution();
 
     do
     {
-        runningDistribution = curNode->inferDistribution();
+        runningDistribution = curInstance->inferDistribution();
 
-        if (curNode->isSgNode() == false &&
-             (curNode->isDistributionPreserving() == false ||
-              curNode->isChunkPreserving() == false ||
-              curNode->getDataWidth() < sgCandidate->getDataWidth()))
+        if (curInstance->isSgInstance() == false &&
+             (curInstance->isDistributionPreserving() == false ||
+              curInstance->isChunkPreserving() == false ||
+              curInstance->getDataWidth() < sgCandidate->getDataWidth()))
         {
-            sgCandidate = curNode;
+            sgCandidate = curInstance;
         }
 
-        if (curNode->hasParent() &&
-            curNode->getParent()->getChildren().size() == 1 &&
-            curNode->getParent()->needsSpecificDistribution())
+        if (curInstance->hasParent() &&
+            curInstance->getParent()->getChildren().size() == 1 &&
+            curInstance->getParent()->needsSpecificDistribution())
         {
-            ArrayDesc curSchema =  curNode->getPhysicalOperator()->getSchema();
-            ArrayDistribution neededDistribution = curNode->getParent()->getDistributionRequirement().getSpecificRequirements()[0];
+            ArrayDesc curSchema =  curInstance->getPhysicalOperator()->getSchema();
+            ArrayDistribution neededDistribution = curInstance->getParent()->getDistributionRequirement().getSpecificRequirements()[0];
             if (runningDistribution != neededDistribution)
             {
-                if (curNode->isSgNode() && runningDistribution.getPartitioningSchema() == neededDistribution.getPartitioningSchema())
+                if (curInstance->isSgInstance() && runningDistribution.getPartitioningSchema() == neededDistribution.getPartitioningSchema())
                 {
-                    curNode->getPhysicalOperator()->setSchema(curSchema);
-                    s_setSgDistribution(curNode, neededDistribution);
-                    curNode->setSgMovable(false);
-                    curNode->setSgOffsetable(false);
-                    runningDistribution = curNode->inferDistribution();
+                    curInstance->getPhysicalOperator()->setSchema(curSchema);
+                    s_setSgDistribution(curInstance, neededDistribution);
+                    curInstance->setSgMovable(false);
+                    curInstance->setSgOffsetable(false);
+                    runningDistribution = curInstance->inferDistribution();
                 }
                 else
                 {
-                    PhysNodePtr newSg = n_buildSgNode(curSchema, neededDistribution.getPartitioningSchema());
-                    n_addParentNode(sgCandidate,newSg);
+                    PhysInstancePtr newSg = n_buildSgInstance(curSchema, neededDistribution.getPartitioningSchema());
+                    n_addParentInstance(sgCandidate,newSg);
                     newSg->inferBoundaries();
-                    runningDistribution = s_propagateDistribution(newSg, curNode->getParent());
+                    runningDistribution = s_propagateDistribution(newSg, curInstance->getParent());
                     newSg->setSgMovable(false);
                     newSg->setSgOffsetable(false);
 
-                    if (curNode == sgCandidate)
+                    if (curInstance == sgCandidate)
                     {
-                        curNode = newSg;
+                        curInstance = newSg;
                     }
                 }
             }
         }
-        else if (curNode->isSgNode() && curNode->isSgMovable())
+        else if (curInstance->isSgInstance() && curInstance->isSgMovable())
         {
-            PhysNodePtr newCur = curNode->getChildren()[0];
-            n_cutOutNode(curNode);
-            if (curNode == sgCandidate)
+            PhysInstancePtr newCur = curInstance->getChildren()[0];
+            n_cutOutInstance(curInstance);
+            if (curInstance == sgCandidate)
             {
                 sgCandidate = newCur;
             }
-            curNode = newCur;
-            runningDistribution = curNode->getDistribution();
+            curInstance = newCur;
+            runningDistribution = curInstance->getDistribution();
         }
 
-        root = curNode;
-        curNode = curNode->getParent();
-    } while (curNode.get() != NULL && curNode->getChildren().size()<=1);
+        root = curInstance;
+        curInstance = curInstance->getParent();
+    } while (curInstance.get() != NULL && curInstance->getChildren().size()<=1);
 
     assert(root);
 
     if (!topChain)
     {
-        PhysNodePtr parent = root->getParent();
+        PhysInstancePtr parent = root->getParent();
         if (parent->getDistributionRequirement().getReqType() != DistributionRequirement::Any)
         {
-            //we have a parent node that has multiple children and needs a specific distribution
+            //we have a parent instance that has multiple children and needs a specific distribution
             //so we must correct the distribution back to the way it was before we started messing with the chain
             cw_rectifyChainDistro(root, sgCandidate, chainOutputDistribution);
         }
@@ -800,17 +800,17 @@ void HabilisOptimizer::tw_collapseSgNodes(PhysNodePtr root)
 
     for (size_t i = 0; i< chainBottom->getChildren().size(); i++)
     {
-        tw_collapseSgNodes(chainBottom->getChildren()[i]);
+        tw_collapseSgInstances(chainBottom->getChildren()[i]);
     }
 }
 
-static PhysNodePtr s_getTopSgFromChain(PhysNodePtr chainRoot)
+static PhysInstancePtr s_getTopSgFromChain(PhysInstancePtr chainRoot)
 {
-    PhysNodePtr chainTop = chainRoot;
+    PhysInstancePtr chainTop = chainRoot;
 
     while (chainTop->getChildren().size() == 1)
     {
-        if(chainTop->isSgNode())
+        if(chainTop->isSgInstance())
         {
             return chainTop;
         }
@@ -818,22 +818,22 @@ static PhysNodePtr s_getTopSgFromChain(PhysNodePtr chainRoot)
                  chainTop->isChunkPreserving() == false)
         {
             //TODO: this case can be opened up.. but it requires subtraction of offset vectors
-            return PhysNodePtr();
+            return PhysInstancePtr();
         }
 
         chainTop = chainTop->getChildren()[0];
     }
-    return PhysNodePtr();
+    return PhysInstancePtr();
 }
 
-void HabilisOptimizer::cw_pushupSg (PhysNodePtr root, PhysNodePtr sgToRemove, PhysNodePtr sgToOffset)
+void HabilisOptimizer::cw_pushupSg (PhysInstancePtr root, PhysInstancePtr sgToRemove, PhysInstancePtr sgToOffset)
 {
-    PhysNodePtr sgrChild = sgToRemove->getChildren()[0];
-    n_cutOutNode(sgToRemove);
+    PhysInstancePtr sgrChild = sgToRemove->getChildren()[0];
+    n_cutOutInstance(sgToRemove);
 
     ArrayDistribution newSgrDistro = sgrChild->getDistribution();
 
-    for (PhysNodePtr n = sgrChild->getParent(); n != root; n = n->getParent())
+    for (PhysInstancePtr n = sgrChild->getParent(); n != root; n = n->getParent())
     {
         newSgrDistro = n->inferDistribution();
     }
@@ -844,7 +844,7 @@ void HabilisOptimizer::cw_pushupSg (PhysNodePtr root, PhysNodePtr sgToRemove, Ph
 
     s_setSgDistribution(sgToOffset, newDist);
     ArrayDistribution newSgoDistro = sgToOffset->inferDistribution();
-    for (PhysNodePtr n = sgToOffset->getParent(); n != root; n = n->getParent())
+    for (PhysInstancePtr n = sgToOffset->getParent(); n != root; n = n->getParent())
     {
         newSgoDistro = n->inferDistribution();
     }
@@ -852,22 +852,22 @@ void HabilisOptimizer::cw_pushupSg (PhysNodePtr root, PhysNodePtr sgToRemove, Ph
     assert(newSgrDistro == newSgoDistro);
     root->inferDistribution();
 
-    PhysNodePtr newSg = n_buildSgNode(root->getPhysicalOperator()->getSchema(), psRoundRobin);
+    PhysInstancePtr newSg = n_buildSgInstance(root->getPhysicalOperator()->getSchema(), psRoundRobin);
     newSg->setSgMovable(true);
     newSg->setSgOffsetable(true);
-    n_addParentNode(root,newSg);
+    n_addParentInstance(root,newSg);
     newSg->inferDistribution();
     newSg->inferBoundaries();
 }
 
-void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, PhysNodePtr oppositeThinPoint)
+void HabilisOptimizer::cw_swapSg (PhysInstancePtr root, PhysInstancePtr sgToRemove, PhysInstancePtr oppositeThinPoint)
 {
-    PhysNodePtr sgrChild = sgToRemove->getChildren()[0];
-    n_cutOutNode(sgToRemove);
+    PhysInstancePtr sgrChild = sgToRemove->getChildren()[0];
+    n_cutOutInstance(sgToRemove);
 
     ArrayDistribution newSgrDistro = sgrChild->getDistribution();
 
-    for (PhysNodePtr n = sgrChild->getParent(); n != root; n = n->getParent())
+    for (PhysInstancePtr n = sgrChild->getParent(); n != root; n = n->getParent())
     {
         newSgrDistro = n->inferDistribution();
     }
@@ -876,12 +876,12 @@ void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, Phys
 
     ArrayDistribution newDist (newSgrDistro.getPartitioningSchema(), newSgrDistro.getMapper());
 
-    PhysNodePtr newOppositeSg = n_buildSgNode(oppositeThinPoint->getPhysicalOperator()->getSchema(), psRoundRobin);
-    n_addParentNode(oppositeThinPoint, newOppositeSg);
+    PhysInstancePtr newOppositeSg = n_buildSgInstance(oppositeThinPoint->getPhysicalOperator()->getSchema(), psRoundRobin);
+    n_addParentInstance(oppositeThinPoint, newOppositeSg);
     s_setSgDistribution(newOppositeSg, newDist);
     newOppositeSg->inferBoundaries();
     ArrayDistribution newOppositeDistro = newOppositeSg->inferDistribution();
-    for (PhysNodePtr n = newOppositeSg->getParent(); n != root; n = n->getParent())
+    for (PhysInstancePtr n = newOppositeSg->getParent(); n != root; n = n->getParent())
     {
         newOppositeDistro = n->inferDistribution();
     }
@@ -889,10 +889,10 @@ void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, Phys
     assert(newSgrDistro == newOppositeDistro);
     root->inferDistribution();
 
-    PhysNodePtr newRootSg = n_buildSgNode(root->getPhysicalOperator()->getSchema(), psRoundRobin);
+    PhysInstancePtr newRootSg = n_buildSgInstance(root->getPhysicalOperator()->getSchema(), psRoundRobin);
     newRootSg->setSgMovable(true);
     newRootSg->setSgOffsetable(true);
-    n_addParentNode(root,newRootSg);
+    n_addParentInstance(root,newRootSg);
     newRootSg->inferDistribution();
 
     dbg_logPlan();
@@ -902,7 +902,7 @@ void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, Phys
     dbg_logPlan();
 }
 
-bool HabilisOptimizer::tw_pushupJoinSgs(PhysNodePtr root)
+bool HabilisOptimizer::tw_pushupJoinSgs(PhysInstancePtr root)
 {
     //"pushup" is a transformation from root(...join(sg(A),sg(B))) into root(...sg(join(sg(A),B)))
     //Note this is advantageous if placing sg on top results in less data movement
@@ -922,13 +922,13 @@ bool HabilisOptimizer::tw_pushupJoinSgs(PhysNodePtr root)
             parentChainThinPoint = currentThickness;
         }
 
-        //If the closest node above the join is an SG, then we can place another
+        //If the closest instance above the join is an SG, then we can place another
         //SG onto top chain and the two SGs will collapse.
 
-        //Otherwise, if the closest node above join needs correct distribution,
+        //Otherwise, if the closest instance above join needs correct distribution,
         //new SG will have to stay on top chain and get run
 
-        if (root->isSgNode())
+        if (root->isSgInstance())
         {
             parentChainWillCollapse = true;
         }
@@ -949,11 +949,11 @@ bool HabilisOptimizer::tw_pushupJoinSgs(PhysNodePtr root)
             root->getChildren()[0]->getPhysicalOperator()->getSchema().getDimensions().size() ==
             root->getChildren()[1]->getPhysicalOperator()->getSchema().getDimensions().size())
         {
-            PhysNodePtr leftChainRoot = root->getChildren()[0];
-            PhysNodePtr rightChainRoot = root->getChildren()[1];
+            PhysInstancePtr leftChainRoot = root->getChildren()[0];
+            PhysInstancePtr rightChainRoot = root->getChildren()[1];
 
-            PhysNodePtr leftSg = s_getTopSgFromChain(leftChainRoot);
-            PhysNodePtr rightSg = s_getTopSgFromChain(rightChainRoot);
+            PhysInstancePtr leftSg = s_getTopSgFromChain(leftChainRoot);
+            PhysInstancePtr rightSg = s_getTopSgFromChain(rightChainRoot);
 
             if (leftSg.get()!=NULL && rightSg.get()!=NULL)
             {
@@ -995,8 +995,8 @@ bool HabilisOptimizer::tw_pushupJoinSgs(PhysNodePtr root)
             }
             else if ( leftSg.get() != NULL || rightSg.get() != NULL )
             {
-                PhysNodePtr sg = leftSg.get() != NULL ? leftSg : rightSg;
-                PhysNodePtr oppositeChain = leftSg.get() != NULL ? rightChainRoot : leftChainRoot;
+                PhysInstancePtr sg = leftSg.get() != NULL ? leftSg : rightSg;
+                PhysInstancePtr oppositeChain = leftSg.get() != NULL ? rightChainRoot : leftChainRoot;
                 oppositeChain = s_findThinPoint(oppositeChain);
 
                 bool canMoveSg = sg->isSgMovable() &&
@@ -1029,7 +1029,7 @@ bool HabilisOptimizer::tw_pushupJoinSgs(PhysNodePtr root)
     return result;
 }
 
-void HabilisOptimizer::tw_insertAggReducers(PhysNodePtr root)
+void HabilisOptimizer::tw_insertAggReducers(PhysInstancePtr root)
 {
         //Assumptions we make here. All true as of writing:
         // 1. we assume that every "agg" operator is preceded by the first-phase operator.
@@ -1043,7 +1043,7 @@ void HabilisOptimizer::tw_insertAggReducers(PhysNodePtr root)
                 root->getChildren()[0]->getChildren().size() <= 0)
             throw SYSTEM_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_MALFORMED_AGGREGATE);
 
-        PhysNodePtr inputToAggregate = root->getChildren()[0]->getChildren()[0];
+        PhysInstancePtr inputToAggregate = root->getChildren()[0]->getChildren()[0];
 
         ArrayDistribution const& inputDistribution = inputToAggregate->getDistribution();
         ArrayDesc const& inputSchema = inputToAggregate->getPhysicalOperator()->getSchema();
@@ -1062,28 +1062,28 @@ void HabilisOptimizer::tw_insertAggReducers(PhysNodePtr root)
                                                                                          reducerParams,
                                                                                          inputSchema);
             reducerOp->setQuery(_query);
-            PhysNodePtr reducerNode(new PhysicalQueryPlanNode(reducerOp, false, false, false));
-            n_addParentNode(inputToAggregate, reducerNode);
-            reducerNode->inferBoundaries();
-            reducerNode->inferDistribution();
+            PhysInstancePtr reducerInstance(new PhysicalQueryPlanNode(reducerOp, false, false, false));
+            n_addParentInstance(inputToAggregate, reducerInstance);
+            reducerInstance->inferBoundaries();
+            reducerInstance->inferDistribution();
 
             //cosmetic
-            reducerNode->getParent()->inferDistribution();
+            reducerInstance->getParent()->inferDistribution();
         }
     }
 
-    BOOST_FOREACH(PhysNodePtr child, root->getChildren())
+    BOOST_FOREACH(PhysInstancePtr child, root->getChildren())
     {
         tw_insertAggReducers(child);
     }
 }
 
-void HabilisOptimizer::tw_rewriteStoringSG(PhysNodePtr root)
+void HabilisOptimizer::tw_rewriteStoringSG(PhysInstancePtr root)
 {
     if ( root->getPhysicalOperator()->getPhysicalName() == "physicalStore" )
     {
-        PhysNodePtr child = root->getChildren()[0];
-        if (child->isSgNode() && !child->isStoringSg() && child->getChildren()[0]->isChunkPreserving())
+        PhysInstancePtr child = root->getChildren()[0];
+        if (child->isSgInstance() && !child->isStoringSg() && child->getChildren()[0]->isChunkPreserving())
         {
             PhysOpPtr storeOp = root->getPhysicalOperator();
             ArrayDesc storeSchema = storeOp->getSchema();
@@ -1092,11 +1092,11 @@ void HabilisOptimizer::tw_rewriteStoringSG(PhysNodePtr root)
             if (distro != ArrayDistribution(psRoundRobin))
                 throw SYSTEM_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_NOT_IMPLEMENTED) << " storing arrays in non-roro distribution";
 
-            PhysNodePtr newSg = n_buildSgNode(storeSchema, psRoundRobin, true);
-            PhysNodePtr grandChild = child->getChildren()[0];
-            n_cutOutNode(root);
-            n_cutOutNode(child);
-            n_addParentNode(grandChild, newSg);
+            PhysInstancePtr newSg = n_buildSgInstance(storeSchema, psRoundRobin, true);
+            PhysInstancePtr grandChild = child->getChildren()[0];
+            n_cutOutInstance(root);
+            n_cutOutInstance(child);
+            n_addParentInstance(grandChild, newSg);
 
             newSg->inferBoundaries();
             newSg->inferDistribution();
@@ -1111,7 +1111,7 @@ void HabilisOptimizer::tw_rewriteStoringSG(PhysNodePtr root)
     }
 }
 
-void HabilisOptimizer::tw_insertRepartNodes(PhysNodePtr root)
+void HabilisOptimizer::tw_insertRepartInstances(PhysInstancePtr root)
 {
     if ( root->getChildren().size() == 1)
     {
@@ -1126,10 +1126,10 @@ void HabilisOptimizer::tw_insertRepartNodes(PhysNodePtr root)
             PhysOpPtr repartOp = OperatorLibrary::getInstance()->createPhysicalOperator("repart", "physicalRepart", repartParams, repartSchema);
             repartOp->setQuery(_query);
 
-            PhysNodePtr repartNode(new PhysicalQueryPlanNode(repartOp, false, false, false));
-            n_addParentNode(root->getChildren()[0], repartNode);
-            repartNode->inferBoundaries();
-            repartNode->inferDistribution();
+            PhysInstancePtr repartInstance(new PhysicalQueryPlanNode(repartOp, false, false, false));
+            n_addParentInstance(root->getChildren()[0], repartInstance);
+            repartInstance->inferBoundaries();
+            repartInstance->inferDistribution();
 
             root->inferBoundaries();
             root->inferDistribution();
@@ -1138,15 +1138,15 @@ void HabilisOptimizer::tw_insertRepartNodes(PhysNodePtr root)
 
     for (size_t i =0; i < root->getChildren().size(); i++)
     {
-        tw_insertRepartNodes(root->getChildren()[i]);
+        tw_insertRepartInstances(root->getChildren()[i]);
     }
 }
 
-void HabilisOptimizer::tw_insertChunkMaterializers(PhysNodePtr root)
+void HabilisOptimizer::tw_insertChunkMaterializers(PhysInstancePtr root)
 {
     if ( root->hasParent() && root->getChildren().size() != 0)
     {
-        PhysNodePtr parent = root->getParent();
+        PhysInstancePtr parent = root->getParent();
         if (root->getPhysicalOperator()->getTileMode() != parent->getPhysicalOperator()->getTileMode())
         {
             ArrayDesc const& schema = root->getPhysicalOperator()->getSchema();
@@ -1160,10 +1160,10 @@ void HabilisOptimizer::tw_insertChunkMaterializers(PhysNodePtr root)
             PhysOpPtr materializeOp = OperatorLibrary::getInstance()->createPhysicalOperator("materialize", "impl_materialize", params, schema);
             materializeOp->setQuery(_query);
 
-            PhysNodePtr materializeNode(new PhysicalQueryPlanNode(materializeOp, false, false, false));
-            n_addParentNode(root, materializeNode);
-            materializeNode->inferBoundaries();
-            materializeNode->inferDistribution();
+            PhysInstancePtr materializeInstance(new PhysicalQueryPlanNode(materializeOp, false, false, false));
+            n_addParentInstance(root, materializeInstance);
+            materializeInstance->inferBoundaries();
+            materializeInstance->inferDistribution();
         }
     }
 

@@ -58,13 +58,13 @@ protected:
 class FileExistsResourcesCollector: public BaseResourcesCollector
 {
 public:
-    void collect(NodeID nodeId, bool exists, bool release = true)
+    void collect(InstanceID instanceId, bool exists, bool release = true)
     {
-        LOG4CXX_TRACE(logger, "FileExistsResourcesCollector::collect." << " nodeId=" << nodeId
+        LOG4CXX_TRACE(logger, "FileExistsResourcesCollector::collect." << " instanceId=" << instanceId
             << " exists=" << exists);
         {
             ScopedMutexLock lock(_lock);
-            _nodesMap[nodeId] = exists;
+            _instancesMap[instanceId] = exists;
             if (release)
                 _collectorSem.release();
         }
@@ -74,14 +74,14 @@ public:
         ScopedMutexLock lock(_lock);
     }    
 
-    map<NodeID, bool> _nodesMap;
+    map<InstanceID, bool> _instancesMap;
 
 private:
     Mutex _lock;
     friend class Resources;
 };
 
-void Resources::fileExists(const string &path, map<NodeID, bool> &nodesMap, const shared_ptr<Query> &query)
+void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesMap, const shared_ptr<Query> &query)
 {
     LOG4CXX_TRACE(logger, "Resources::fileExists. Checking file '" << path << "'");
     NetworkManager* networkManager = NetworkManager::getInstance();
@@ -93,7 +93,7 @@ void Resources::fileExists(const string &path, map<NodeID, bool> &nodesMap, cons
         id = ++_lastResourceCollectorId;
         _resourcesCollectors[id] = collector;
 
-        collector->collect(query->getNodeID(), checkFileExists(path), false);
+        collector->collect(query->getInstanceID(), checkFileExists(path), false);
     }
 
     shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
@@ -104,12 +104,12 @@ void Resources::fileExists(const string &path, map<NodeID, bool> &nodesMap, cons
     request->set_file_path(path);
     networkManager->broadcast(msg);
 
-    LOG4CXX_TRACE(logger, "Resources::fileExists. Waiting while nodes return result for collector " << id);
+    LOG4CXX_TRACE(logger, "Resources::fileExists. Waiting while instances return result for collector " << id);
 
     try
     {
        Semaphore::ErrorChecker errorChecker = bind(&Query::validateQueryPtr, query);
-       collector->_collectorSem.enter(query->getNodesCount() - 1, errorChecker);
+       collector->_collectorSem.enter(query->getInstancesCount() - 1, errorChecker);
     }
     catch (...)
     {
@@ -127,25 +127,25 @@ void Resources::fileExists(const string &path, map<NodeID, bool> &nodesMap, cons
 
     {
         ScopedMutexLock lock(_lock);
-        nodesMap = ((FileExistsResourcesCollector*) _resourcesCollectors[id])->_nodesMap;
+        instancesMap = ((FileExistsResourcesCollector*) _resourcesCollectors[id])->_instancesMap;
         delete _resourcesCollectors[id];
         _resourcesCollectors.erase(id);
     }
 }
 
-bool Resources::fileExists(const string &path, NodeID nodeId, const shared_ptr<Query>& query)
+bool Resources::fileExists(const string &path, InstanceID instanceId, const shared_ptr<Query>& query)
 {
     LOG4CXX_TRACE(logger, "Resources::fileExists. Checking file '" << path << "'");
     NetworkManager* networkManager = NetworkManager::getInstance();
 
-    if (nodeId == query->getNodeID())
+    if (instanceId == query->getInstanceID())
     {
-        LOG4CXX_TRACE(logger, "Resources::fileExists. Node id " << nodeId << " is local node. Returning result.");
+        LOG4CXX_TRACE(logger, "Resources::fileExists. Instance id " << instanceId << " is local instance. Returning result.");
         return checkFileExists(path);
     }
     else
     {
-        LOG4CXX_TRACE(logger, "Resources::fileExists. Node id " << nodeId << " is remote node. Requesting result.");
+        LOG4CXX_TRACE(logger, "Resources::fileExists. Instance id " << instanceId << " is remote instance. Requesting result.");
         FileExistsResourcesCollector* collector = new FileExistsResourcesCollector();
         uint64_t id = 0;
         {
@@ -160,9 +160,9 @@ bool Resources::fileExists(const string &path, NodeID nodeId, const shared_ptr<Q
         msg->setQueryID(0);
         request->set_resource_request_id(id);
         request->set_file_path(path);
-        networkManager->sendMessage(nodeId, msg);
+        networkManager->sendMessage(instanceId, msg);
 
-        LOG4CXX_TRACE(logger, "Resources::fileExists. Waiting while node return result for collector " << id);
+        LOG4CXX_TRACE(logger, "Resources::fileExists. Waiting while instance return result for collector " << id);
 
         try
         {
@@ -186,7 +186,7 @@ bool Resources::fileExists(const string &path, NodeID nodeId, const shared_ptr<Q
         bool result;
         {
             ScopedMutexLock lock(_lock);
-            result = ((FileExistsResourcesCollector*) _resourcesCollectors[id])->_nodesMap[nodeId];
+            result = ((FileExistsResourcesCollector*) _resourcesCollectors[id])->_instancesMap[instanceId];
             delete _resourcesCollectors[id];
             _resourcesCollectors.erase(id);
         }
@@ -214,7 +214,7 @@ void Resources::handleFileExists(const shared_ptr<MessageDesc>& messageDesc)
         outMsgRecord->set_resource_request_id(inMsgRecord->resource_request_id());
         outMsgRecord->set_exits_flag(Resources::getInstance()->checkFileExists(file));
 
-        networkManager->sendMessage(messageDesc->getSourceNodeID(), msg);
+        networkManager->sendMessage(messageDesc->getSourceInstanceID(), msg);
     }
     // mtResourcesFileExistsResponse
     else
@@ -226,7 +226,7 @@ void Resources::handleFileExists(const shared_ptr<MessageDesc>& messageDesc)
         LOG4CXX_TRACE(logger, "Marking file");
         Resources::getInstance()->markFileExists(
             inMsgRecord->resource_request_id(),
-            messageDesc->getSourceNodeID(),
+            messageDesc->getSourceInstanceID(),
             inMsgRecord->exits_flag());
     }
 }
@@ -245,15 +245,15 @@ bool Resources::checkFileExists(const std::string &path) const
     }
 }
 
-void Resources::markFileExists(uint64_t resourceCollectorId, NodeID nodeId, bool exists)
+void Resources::markFileExists(uint64_t resourceCollectorId, InstanceID instanceId, bool exists)
 {
     LOG4CXX_TRACE(logger, "Resources::markFileExists. resourceCollectorId=" << resourceCollectorId
-        << " nodeId=" << nodeId << " exists=" << exists);
+        << " instanceId=" << instanceId << " exists=" << exists);
 
     if (_resourcesCollectors.find(resourceCollectorId) != _resourcesCollectors.end())
     {
         FileExistsResourcesCollector *rc = (FileExistsResourcesCollector*) _resourcesCollectors[resourceCollectorId];
-        rc->collect(nodeId, exists);
+        rc->collect(instanceId, exists);
     }
     else
     {

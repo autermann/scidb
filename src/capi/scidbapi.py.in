@@ -69,6 +69,12 @@ class Connection(object):
         db = swig.getSciDB()
         return db.cancelQuery(queryID, connection=self._handle)
 
+    def completeQuery(self, queryID):
+        if not self._handle:
+            raise ValueError("no open connection")
+        db = swig.getSciDB()
+        return db.completeQuery(queryID, connection=self._handle)
+
 
 def connect(hostname = None, port = 1239):
     db = swig.getSciDB()

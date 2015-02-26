@@ -97,6 +97,8 @@ set (scalar_proc_src
     FunctionDescription.cpp
     TypeSystem.cpp
     BuiltinAggregates.cpp
+    TileFunctions.cpp
+    Aggregate.cpp
 )
 
 add_library(scalar_proc_lib STATIC ${scalar_proc_src} ${qproc_include})

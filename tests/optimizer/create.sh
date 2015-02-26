@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MYDIR=`dirname $0`
-NUM_NODES=4 #including coordinator
+NUM_INSTANCES=4 #including coordinator
 DB_NAME="mydb"
 	
 check_exit_status()
@@ -16,7 +16,7 @@ launch_db()
 {
 	pushd ../basic > /dev/null
 	check_exit_status $?
-	./runN.py $NUM_NODES $DB_NAME init,start > /dev/null
+	./runN.py $NUM_INSTANCES $DB_NAME init,start > /dev/null
 	check_exit_status $?
 	popd > /dev/null
 }

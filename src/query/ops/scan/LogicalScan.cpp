@@ -59,6 +59,7 @@ public:
         SystemCatalog* systemCatalog = SystemCatalog::getInstance();
 
         systemCatalog->getArrayDesc(arrayRef->getObjectName(), arrayRef->getVersion(), schema);
+        
         if (arrayRef->getIndex() != "")
         {
             const string &dimName = arrayRef->getIndex();
@@ -71,7 +72,7 @@ public:
             if (dims[i].getType() == TID_INT64)
                 assert(0);
 
-            const string &mappingArray = schema.getCoordinateIndexArrayName(i);
+            const string &mappingArray = schema.getMappingArrayName(i);
             if (!SystemCatalog::getInstance()->containsArray(mappingArray))
                 assert(0);
 
@@ -79,6 +80,7 @@ public:
         }
 
         schema.addAlias(arrayRef->getObjectName());
+        schema.trim();
         return schema;
     }
 };

@@ -1,0 +1,382 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter remap="h1">
+    <title>Array Schemas: Change the Shape and Size of Your Arrays</title>
+    <para>In the case of some shape-changing operators that require a fully qualified array schema, SciDB supports two ways to specify an array schema.</para>
+    <itemizedlist><listitem>
+        <para> You can create a new array with the desired output schema and refer to it for the changed shape: </para>
+      </listitem>
+</itemizedlist>
+    <screen>show(src);
+[(&quot;a1&lt;a:double NOT NULL&gt; [i=1:3,3,0,j=1:3,3,0]&quot;)]
+reshape(src, foo)</screen>
+    <itemizedlist><listitem>
+        <para> You can specify a schema without a creating a named array. This is called an<emphasis> anonymous schema</emphasis>: </para>
+      </listitem>
+</itemizedlist>
+    <screen>reshape(src, &lt;a: double&gt;[k=1:9,9,0]);</screen>
+    <sect1 remap="h2">
+      <title>adddim and deldim</title>
+      <para><emphasis role="bold">Summary</emphasis>: Adding and deleting dimensions of an array</para>
+      <para>Change the structure of an array by adding or deleting a dimension.</para>
+      <para>The adddim operator prepends the existing dimensions for an array with a new dimension, whose name is supplied as the second argument to the operator.</para>
+      <para>The new dimension will have start = 0, length = 1, chunkSize = 1, overlap = 0.</para>
+      <para>The <literal condition="western">deldim</literal> operator deletes the left-most dimension from the array. Deleted dimension must have size = 1.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <screen>adddim( array, new_dimension : dimension_name )
+deldim( array )</screen>
+      <para><emphasis role="bold">Examples</emphasis>:</para>
+      <screen>adddim(matrix, timestamp);
+deldim(subarray(matrix, 1, 100, 1, 200));</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>redimension and redimension_store</title>
+      <para><emphasis role="bold">Summary</emphasis>: Transform attributes to dimensions</para>
+      <para>The <literal condition="western">redimension</literal> and <literal condition="western">redimension_store</literal> operators convert array attributes to dimensions. You can redimension the array and apply aggregates to duplicate cells.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>redimension(<emphasis> array</emphasis>,<emphasis> target : array_identfier</emphasis> ) </para>
+      <para> redimension_store(<emphasis> array</emphasis>,<emphasis> target : array_identfier</emphasis> ) </para>
+      <para> redimension_store ( source_array, target_array [, (aggregate_call_1 as alias_1 ) ,... (aggregate_call_N as alias_N ) ] )</para>
+      <para><literal condition="western">redimension</literal> does not create or update array storage or metadata, and returns the transformed array result. redimension also only works when transforming int64 attributes into dimensions.</para>
+      <para><literal condition="western">redimension_store</literal> updates the target_array storage and creates additional mapping arrays if necessary.</para>
+      <para>For both variants of redimension, the target array must have the EMPTY flag set.</para>
+      <para>The input and target arrays must have compatible schemas, and both commands determine the list of transformations (attribute to dimension) by matching names in the attribute and dimension lists of the two arrays. It is possible to omit certain attributes and dimensions from the target array.</para>
+      <para><emphasis role="bold">Note</emphasis>: redimension supports noninteger dimensions while redimension_store does not.</para>
+      <para><emphasis role="bold">Example 1</emphasis>: Count the even and odd values in an array.</para>
+      <orderedlist><listitem>
+          <para> Create an array that has a single attribute &quot;a&quot;. </para>
+        </listitem>
+</orderedlist>
+      <screen>create array A &lt;a:double&gt;[x=0:5,3,0,y=0:5,3,0];
+store(build(A, x*3+y), A);</screen>
+      <orderedlist><listitem>
+          <para> Apply a synthetic attribute &quot;even_or_odd&quot; that is 0 when a is even and 1 when a is odd. Turn the even_or_odd attribute into a dimension with the <literal condition="western">redimension</literal> command and perform a <literal condition="western">count</literal> aggregate: </para>
+        </listitem>
+</orderedlist>
+      <screen>redimension(apply(A, even_or_odd, iif(int64(a)%2=0,0,1)),
+  &lt;count:uint64 null,empty_tag:indicator&gt;[even_or_odd=0:1,2,0], count(a) as c\
+ount);</screen>
+      <para>SciDB returns:</para>
+      <screen>[{0}(18),{1}(18)]</screen>
+      <para>This tells you that there are 18 even and 18 odd values in the array.</para>
+      <para><emphasis>Note</emphasis>: the target array schema must contain the empty_tag attribute and the datatype of the new <literal condition="western">count</literal> attribute must match the output of the aggregate (uint64 and nullable).</para>
+      <para><emphasis role="bold">Example 2</emphasis>: Maintain one of the original dimensions and use the aggregates <literal condition="western">sum</literal> and <literal condition="western">avg</literal> to find the sum and average of the even and odd elements:</para>
+      <screen>redimension(apply(A, even_or_odd, iif(int64(a)%2=0,0,1)), 
+  &lt;sum:double null, avg:double null, empty_tag:indicator&gt;[x=0:5,3,0,even_or_o\
+dd=0:1,2,0], 
+  sum(a) as sum, avg(a) as avg);</screen>
+      <para>SciDB returns:</para>
+      <screen>[
+[{0,0}(6,2),{0,1}(9,3),{1,0}(18,6),{1,1}(15,5),{2,0}(24,8),{2,1}(27,9)]
+];
+[
+[{3,0}(36,12),{3,1}(33,11),{4,0}(42,14),{4,1}(45,15),{5,0}(54,18),{5,1}(51,\
+17)]
+]</screen>
+      <para>This means that for x=0, the sum of the even numbers is 6 and the average is 2; the sum of the odd numbers is 9 and average is 3.</para>
+      <para><emphasis role="bold">Example 3</emphasis>: Instead of creating a schema, the target schema can come from a pre-existing array:</para>
+      <screen>create empty array dense_redim &lt;a:double&gt;[x=0:5,3,0]
+redimension(dense,dense_redim)</screen>
+      <para>In this case, we don&apos;t use any aggregates and condense values. In the original array, there are 6 values for x=0, and the result of the query at x=0 will contain an unspecified value, chosen from one of the 6 possible candidates. This command does not change any data for the array dense_redim - just reads the schema from it.</para>
+      <para>The two statements</para>
+      <screen>create empty array dense_redim &lt;a:double&gt;[x=0:5,3,0];</screen>
+      <para>and</para>
+      <screen>create array dense_redim &lt;a:double, empty_tag:indicator&gt;[x=0:5,3,0];</screen>
+      <para>are equivalent.</para>
+    </sect1>
+    <sect1 remap="h2">
+      <title>repart</title>
+      <para><emphasis role="bold">Summary</emphasis>: Change array chunking</para>
+      <para>Change partitioning (chunking) of the array. Target array must have the same attributes and dimensions, but chunk size may be different. Repart returns an array whose attributes are taken from the input array, with the dimensions of the target.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>repart(<emphasis> array</emphasis>,<emphasis> target : array_identifier | anonymous_schema</emphasis> )</para>
+      <para>The input to <literal condition="western">repart</literal> can be:</para>
+      <orderedlist><listitem>
+          <para> An array </para>
+        </listitem>
+<listitem>
+          <para> A subquery that outputs a SciDB array </para>
+        </listitem>
+</orderedlist>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <orderedlist><listitem>
+          <para> Create a 4-by-4 array with chunk size of 1 called <literal condition="western">source</literal>: </para>
+        </listitem>
+</orderedlist>
+      <screen>create array source &lt;val:double&gt; [x=0:3,1,0,y=0:3,1,0];</screen>
+      <orderedlist><listitem>
+          <para> Add numerical values to source: </para>
+        </listitem>
+</orderedlist>
+      <screen>store(build(source,x*3+y),source);</screen>
+      <orderedlist><listitem>
+          <para> Repartition the array into 2-by-2 chunks and store the result in an array called <literal condition="western">target</literal>: </para>
+        </listitem>
+</orderedlist>
+      <screen>store(repart(source, &lt;values:double&gt; [x=0:3,2,0, y=0:3,2,0]),target);
+show(target);
+
+[(&quot;target&lt;val:double NOT NULL&gt; [x=0:3,2,0,y=0:3,2,0]&quot;)]</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>reshape</title>
+      <para><emphasis role="bold">Summary</emphasis>: Change array shape</para>
+      <para>Change the shape of an array to that of another array or array schema.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>reshape(<emphasis> array</emphasis>,<emphasis> target : array_identifier | anonymous_schema</emphasis> )</para>
+      <para>The first input to <literal condition="western">reshape</literal> can be:</para>
+      <itemizedlist><listitem>
+          <para> An array </para>
+        </listitem>
+<listitem>
+          <para> A subquery that outputs a SciDB array </para>
+        </listitem>
+</itemizedlist>
+      <para>The <literal condition="western">reshape</literal> operator&apos;s second argument is:</para>
+      <itemizedlist><listitem>
+          <para> the name of an array and its schema to be used as the template for the operator&apos;s result, or </para>
+        </listitem>
+<listitem>
+          <para> an array schema (&quot;anonymous_schema&quot;) to be used as the template for the operator result </para>
+        </listitem>
+</itemizedlist>
+      <para><emphasis role="bold">NOTES:</emphasis></para>
+      <orderedlist><listitem>
+          <para> The target array (or anonymous array schema) should have the same number of attributes as the input array. </para>
+        </listitem>
+<listitem>
+          <para> The arrays must have fixed size dimensions. That is, reshape for unbounded arrays is not supported. </para>
+        </listitem>
+<listitem>
+          <para> Size of the input and target array should be the same. That is, both arrays should have the same number of<emphasis> cells</emphasis>. For example, it is possible to reshape 2x2x2 array to 4x2, but not 3x3 to 2x2. </para>
+        </listitem>
+</orderedlist>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <orderedlist><listitem>
+          <para> Create a 3-by-4 array called <literal condition="western">source</literal>: </para>
+        </listitem>
+</orderedlist>
+      <screen>create array source &lt;val:double&gt; [x=0:2,1,0,y=0:3,1,0];</screen>
+      <orderedlist><listitem>
+          <para> Add numerical values to source: </para>
+        </listitem>
+</orderedlist>
+      <screen>store(build(source,x*3+y),source)</screen>
+      <orderedlist><listitem>
+          <para> Reshape the array to 4-by-3 and store the result in an array called <literal condition="western">target</literal>: </para>
+        </listitem>
+</orderedlist>
+      <screen>store(reshape(source, &lt;values:double&gt; [x=0:3,1,0, y=0:2,1,0]),target)
+show(target);
+
+[(&quot;target&lt;val:double NOT NULL&gt; [x=0:3,1,0,y=0:2,1,0]&quot;)]</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>reverse</title>
+      <para><emphasis role="bold">Summary</emphasis>: Invert the elements of an array by reversing the values of each dimension.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>reverse(<emphasis> array</emphasis> )</para>
+      <para>Assume that dense is a 2-dimensional array with the following definition and contents:</para>
+      <screen>CREATE ARRAY dense &lt;a: int32&gt;[x=0:5,3,0, y=0:5,3,0]
+
+scan(dense)
+[
+[(66),(65),(64)],
+[(56),(55),(54)],
+[(46),(45),(44)]
+];
+[
+[(63),(62),(61)],
+[(53),(52),(51)],
+[(43),(42),(41)]
+];
+[
+[(36),(35),(34)],
+[(26),(25),(24)],
+[(16),(15),(14)]
+];
+[
+[(33),(32),(31)],
+[(23),(22),(21)],
+[(13),(12),(11)]
+]</screen>
+      <para><emphasis>reverse</emphasis> returns an array in which each dimension is the reverse of the corresponding dimension of the source array.</para>
+      <screen>reverse(dense)
+[
+[(11),(12),(13)],
+[(21),(22),(23)],
+[(31),(32),(33)]
+];
+[
+[(14),(15),(16)],
+[(24),(25),(26)],
+[(34),(35),(36)]
+];
+[
+[(41),(42),(43)],
+[(51),(52),(53)],
+[(61),(62),(63)]
+];
+[
+[(44),(45),(46)],
+[(54),(55),(56)],
+[(64),(65),(66)]
+]</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>slice</title>
+      <para><emphasis role="bold">Summary</emphasis>: Subplane of an array</para>
+      <para>Get a slice of the array. The result is a slice of the input array corresponding to the given coordinate value(s). Number of dimensions of the result array is equal to the number of dimensions of input array minus number of specified dimension, and the coordinate value should be a valid dimension value of the input array.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>slice(<emphasis> array</emphasis>,<emphasis> dimension1 : dimension_identifier</emphasis>,<emphasis> coordinate1 : value</emphasis> [ ,<emphasis>dimensionN : dimension_identifier</emphasis>,<emphasis> coordinate-value-N : value</emphasis> ] )</para>
+      <para>The first input to <literal condition="western">slice</literal> can be:</para>
+      <itemizedlist><listitem>
+          <para> An array </para>
+        </listitem>
+<listitem>
+          <para> A subquery that outputs a SciDB array </para>
+        </listitem>
+</itemizedlist>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <screen>scan(m3x3);
+
+[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]
+
+slice(m3x3,x,1);
+
+[(3),(4),(5)]</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>subarray</title>
+      <para><emphasis role="bold">Summary</emphasis>:Select by dimension range</para>
+      <para>Subarray selects a block of cells from an input array. The result is an array whose shape is defined by the &apos;bounding box&apos; specified by the subarray.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>subarray (<emphasis> array</emphasis>,<emphasis> low-boundary-coordinate-1: value</emphasis> , ...,<emphasis> low-boundary-coordinate-N: value</emphasis>,<emphasis> high-boundary-coordinate-1: value</emphasis>, ...,<emphasis> high-boundary-coordinate-N: value</emphasis> )</para>
+      <para>The first argument to the subarray operator is the array from which the block is to be sampled. This argument can be:</para>
+      <itemizedlist><listitem>
+          <para> An array </para>
+        </listitem>
+<listitem>
+          <para> A subquery that outputs a SciDB array </para>
+        </listitem>
+</itemizedlist>
+      <para>The second parameter section specifies which block is to be extracted. There are as many pairs of array index values in the parameter block as the<emphasis> input : array</emphasis> has dimensions. For each dimension, the operator requires the minimum index value for each dimension first, followed by the maximum index value for each dimension. In other words, if the<emphasis> input : array</emphasis> has two dimensions, then the subarray operator requires four start and end values.</para>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <para>Suppose &apos;my_array&apos; is a 2-dimensional array with two integer attributes and dimensions x and y.</para>
+      <screen>create array my_array &lt;val1:int64, val2:int64&gt; [x=0:4,5,0,y=0:4,5,0];
+load(my_array, &apos;/tmp/my_array.txt&apos;);
+
+[
+[(1,3),(5,7),(9,11),(13,15),(17,19)],
+[(21,23),(25,27),(29,31),(33,35),(37,39)],
+[(41,43),(45,47),(49,51),(53,55),(57,59)],
+[(61,63),(65,67),(69,71),(73,75),(77,79)],
+[(81,83),(85,87),(89,91),(93,95),(97,99)]
+]</screen>
+      <para>The first input to the subarray operator is the source array. The rest of the inputs are the indexes of the subarray window. First, the lower bound indexes for all dimensions in the input array, are given, then the upper ones. The result of subarray is an array of smaller or equal size, whose dimensions always start at 0 and span only the length of the subarray region.</para>
+      <para>You can use the subarray operator as shown here:</para>
+      <screen>subarray( my_array, 1, 1, 2, 2)</screen>
+      <para>This query will return a block of the input array where the initial (top-left) cell is [ 1,1 ] and the final (bottom-right) cell is at [ 2, 2 ].</para>
+      <screen>(11,11.0)  (12,12.0)
+(21,21.0)  (22,22.0)</screen>
+      <para>This query will return a block of the input array where the initial (top-left) cell is [ 4,4 ] and the final (bottom-right) cell is at [ 6,6 ].</para>
+      <screen> subarray ( my_array, 4, 4, 6, 6);
+
+(44,44.0)  (45,45.0)  (46,46.0)
+(54,54.0)  (55,55.0)  (56,56.0)
+(64,64.0)  (65,65.0)  (66,66.0)
+ subarray ( my_array, 4, 3, 6, 7);
+
+(43,43.0)  (44,44.0)  (45,45.0)  (46,46.0)  (47,47.0)
+(53,53.0)  (54,54.0)  (55,55.0)  (56,56.0)  (57,57.0)
+(63,63.0)  (64,64.0)  (65,65.0)  (66,66.0)  (67,67.0)</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>thin</title>
+      <para><emphasis role="bold">Summary</emphasis>: Select elements from an array dimension</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <screen>thin( &apos;&apos;array&apos;&apos;, &apos;&apos;start-1&apos;&apos;, &apos;&apos;step-1&apos;&apos;, &apos;&apos;start-2&apos;&apos;, &apos;&apos;step-2&apos;&apos;, ... )</screen>
+      <para>Select regularly spaced elements of the array in each dimension. The selection criteria are specified by the starting dimension value<emphasis> start-i</emphasis> and the number of cells to skip using<emphasis> step-i</emphasis> for each dimension of the input array.</para>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <orderedlist><listitem>
+          <para> Create a 2-dimensional array: </para>
+        </listitem>
+</orderedlist>
+      <screen>create array A &lt;a:int32&gt; [x=0:8,6,0,y=0:8,8,1];</screen>
+      <orderedlist><listitem>
+          <para> Store numerical values in the array: </para>
+        </listitem>
+</orderedlist>
+      <screen>store(build(A,(x*8+y),A));</screen>
+      <orderedlist><listitem>
+          <para> Select every other element from the first dimension: </para>
+        </listitem>
+</orderedlist>
+      <screen>thin(A,1,3,0,2);</screen>
+      <para>Note: The position specified by<emphasis> start-1</emphasis> must be within the actual, rather than the relative position of the array indices. For example, if the range of dimension x were 10:18, the thin command would throw an out-of-range error.</para>
+    </sect1>
+    <sect1 remap="h2">
+      <title>unpack</title>
+      <para><emphasis role="bold">Summary</emphasis>: Change multidimensional array to single dimension</para>
+      <para>Unpack array into a single-dimensional array creating new attributes to represent source array dimension values. Result array has a single zero-based dimension and arguments combining attributes of the input array. The name for the new single dimension is passed to the operator as the second argument.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para><literal condition="western">unpack(</literal><emphasis> array</emphasis>,<emphasis> attribute_name</emphasis><literal condition="western">)</literal></para>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <screen>show(m3x3);
+
+[(&quot;m3x3&lt;val:double NOT NULL&gt; [x=0:2,3,0,y=0:2,3,0]&quot;)]
+
+scan(m3x3);
+
+[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]
+
+unpack(m3x3,i);
+
+[(0,0,0),(0,1,1),(0,2,2),(1,0,3),(1,1,4),
+(1,2,5),(2,0,6),(2,1,7),(2,2,8)]</screen>
+      <para>The format for the output of the unpack operator is to begin by enumerating the dimensions of the input, and then to append the attribute values. Chunk size -- ie., the number of elements per chunk is preserved from input to output. The resulting one-dimensional array has chunk dimension equal to the count of cells in each input chunk.</para>
+      <para><emphasis role="bold">NOTE</emphasis>: unpack only supports arrays whose size is evenly divisible by chunk size in every dimension. You cannot unpack an array A &lt;a:int32&gt; [x=0:100,30,0]; but you can unpack an array A &lt;a:int32&gt; [x=0:100,20,0].</para>
+    </sect1>
+    <sect1 remap="h2">
+      <title>xgrid</title>
+      <para><emphasis role="bold">Summary</emphasis>: Expand single element to grid</para>
+      <para>Use this operator to scale an input array by repeating cells of the original array specified number of times. This operator can be considered as the inverse of the regrid operator. While regrid splits an input array into hypercubes and calculates an aggregate function over them, xgrid produces a hypercube from the single element of the input array by repeating that element.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>xgrid(<emphasis> array</emphasis>,<emphasis> scale-1</emphasis>, ...,<emphasis> scale-N</emphasis> )</para>
+      <para>The first argument to xgrid can be</para>
+      <orderedlist><listitem>
+          <para> An array. </para>
+        </listitem>
+<listitem>
+          <para> An array operator, that is, an operator that outputs a SciDB array. </para>
+        </listitem>
+</orderedlist>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <screen>scan(m3x3);
+[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]
+
+xgrid(m3x3,2,2);
+
+[
+[(0),(0),(1),(1),(2),(2)],
+[(0),(0),(1),(1),(2),(2)],
+[(3),(3),(4),(4),(5),(5)],
+[(3),(3),(4),(4),(5),(5)],
+[(6),(6),(7),(7),(8),(8)],
+[(6),(6),(7),(7),(8),(8)]
+] </screen>
+    </sect1>
+  </chapter>

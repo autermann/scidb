@@ -64,23 +64,41 @@ public:
         Attributes const& leftAttributes = schemas[0].getAttributes();
         Dimensions const& leftDimensions = schemas[0].getDimensions();
         Attributes const* newAttributes = &leftAttributes;
+        Dimensions newDims = leftDimensions;
+        size_t nDims = newDims.size();
 
         for (size_t j = 1; j < schemas.size(); j++) {
             Attributes const& rightAttributes = schemas[j].getAttributes();
             Dimensions const& rightDimensions = schemas[j].getDimensions();
 
-            if (leftDimensions.size() != rightDimensions.size())
+            if (nDims != rightDimensions.size())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
 
-            for (size_t i = 0, n = leftDimensions.size(); i < n; i++) {
-                if (leftDimensions[i].getLength() != rightDimensions[i].getLength()
-                        || leftDimensions[i].getType() != rightDimensions[i].getType()
-                        || leftDimensions[i].getStart() != rightDimensions[i].getStart()
-                        || leftDimensions[i].getChunkInterval() != rightDimensions[i].getChunkInterval()
-                        || leftDimensions[i].getChunkOverlap() != rightDimensions[i].getChunkOverlap())
+            for (size_t i = 0; i < nDims; i++) {
+                if (//leftDimensions[i].getLength() != rightDimensions[i].getLength() ||
+                    leftDimensions[i].getType() != rightDimensions[i].getType()
+                    || leftDimensions[i].getStart() != rightDimensions[i].getStart()
+                    || leftDimensions[i].getChunkInterval() != rightDimensions[i].getChunkInterval()
+                    || leftDimensions[i].getChunkOverlap() != rightDimensions[i].getChunkOverlap())
+                {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+                }
+                DimensionDesc& dim = newDims[i];
+                dim = DimensionDesc(dim.getBaseName(),
+                                    dim.getNamesAndAliases(),
+                                    min(dim.getStartMin(), rightDimensions[i].getStartMin()),
+                                    min(dim.getCurrStart(), rightDimensions[i].getCurrStart()),
+                                    max(dim.getCurrEnd(), rightDimensions[i].getCurrEnd()),
+                                    max(dim.getEndMax(), rightDimensions[i].getEndMax()),
+                                    dim.getChunkInterval(), 
+                                    dim.getChunkOverlap(), 
+                                    dim.getType(), 
+                                    dim.getFlags(), 
+                                    dim.getMappingArrayName(), 
+                                    dim.getComment(),
+                                    dim.getFuncMapOffset(),
+                                    dim.getFuncMapScale());
             }
-
             if (leftAttributes.size() != rightAttributes.size()
                     && (leftAttributes.size() != rightAttributes.size()+1
                         || !leftAttributes[leftAttributes.size()-1].isEmptyIndicator())
@@ -98,7 +116,7 @@ public:
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
         }
-        return ArrayDesc(schemas[0].getName(), *newAttributes, leftDimensions);
+        return ArrayDesc(schemas[0].getName(), *newAttributes, newDims);
     }
 };
 

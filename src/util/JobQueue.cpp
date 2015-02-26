@@ -30,29 +30,42 @@
 
 #include "util/JobQueue.h"
 #include "util/Mutex.h"
-
+#include <log4cxx/logger.h>
 
 namespace scidb
 {
 
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.common.thread"));
 
 JobQueue::JobQueue()
 {
 
 }
 
-
 // Add new job to the end of queue
 void JobQueue::pushJob(boost::shared_ptr<Job> job)
 {
-	{ // scope
-		ScopedMutexLock scopedMutexLock(_queueMutex);
+    { // scope
+        ScopedMutexLock scopedMutexLock(_queueMutex);
         _queue.push_back(job);
-	}
+        LOG4CXX_TRACE(logger, "JobQueue::pushJob: Q ("<<this<<") size = "<<getSize());
+    }
+    // We are releasing semaphore after unlocking mutex to
+    // prevent unwanted _queueMutex sleeping in popJob.
+    _queueSemaphore.release();
+}
 
-	// We are releasing semaphore after unlocking mutex to
-	// prevent unwanted _queueMutex sleeping in popJob.
-	_queueSemaphore.release();
+// Add new job to the end of queue
+void JobQueue::pushHighPriorityJob(boost::shared_ptr<Job> job)
+{
+    { // scope
+        ScopedMutexLock scopedMutexLock(_queueMutex);
+        _queue.push_front(job);
+        LOG4CXX_TRACE(logger, "JobQueue::pushHighPriorityJob: Q ("<<this<<") size = "<<getSize());
+    }
+    // We are releasing semaphore after unlocking mutex to
+    // prevent unwanted _queueMutex sleeping in popJob.
+    _queueSemaphore.release();
 }
 
 
@@ -67,6 +80,7 @@ boost::shared_ptr<Job> JobQueue::popJob()
 
         boost::shared_ptr<Job> job = _queue.front();
         _queue.pop_front();
+        LOG4CXX_TRACE(logger, "JobQueue::popJob: Q ("<<this<<") size = "<<getSize());
         return job;
     }
 }

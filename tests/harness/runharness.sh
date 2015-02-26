@@ -60,6 +60,10 @@ scidb.py stopall $dbname  $cfgfile
 scidb.py initall $dbname  $cfgfile
 scidb.py startall $dbname  $cfgfile
 
+# Set dbname for unit tests
+sedexpr="s/mydb/$dbname/g"
+sed -i -e "$sedexpr" testcases/t/checkin/other/unit.test
+
 echo "Executing scidbtestharness..."
 scidbtestharness --port 8888 --debug 5 --root-dir=testcases --report-file=Report.xml $@
 

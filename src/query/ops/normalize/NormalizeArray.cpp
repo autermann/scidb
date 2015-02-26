@@ -42,13 +42,20 @@ NormalizeChunkIterator::NormalizeChunkIterator(DelegateChunk const* chunk, int i
  Value& NormalizeChunkIterator::getItem()
 {
     // TODO: insert converter here
-    _value.setDouble(DelegateChunkIterator::getItem().getDouble() / _len);
-    return _value;
+    Value& v = DelegateChunkIterator::getItem();
+    if (v.isNull()) { 
+        return v;
+    } else { 
+        _value.setDouble(v.getDouble() / _len);
+        return _value;
+    }
 }
 
 DelegateChunkIterator* NormalizeArray::createChunkIterator(DelegateChunk const* chunk, int iterationMode) const
 {
-    return new NormalizeChunkIterator(chunk, iterationMode, _len);
+    return chunk->getAttributeDesc().getId() == 0 
+        ? (DelegateChunkIterator*)new NormalizeChunkIterator(chunk, iterationMode, _len)
+        : DelegateArray::createChunkIterator(chunk, iterationMode);
 }
 
 NormalizeArray::NormalizeArray(ArrayDesc const& schema, boost::shared_ptr<Array> inputArray, double len)

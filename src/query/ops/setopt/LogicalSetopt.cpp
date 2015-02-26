@@ -66,8 +66,8 @@ public:
             attributes.push_back(AttributeDesc((AttributeID)1, "new",  TID_STRING, 0, 0));
         }
         vector<DimensionDesc> dimensions(1);
-        size_t nNodes = query->getNodesCount();
-        dimensions[0] = DimensionDesc("No", 0, 0, nNodes-1, nNodes-1, 1, 0);
+        size_t nInstances = query->getInstancesCount();
+        dimensions[0] = DimensionDesc("No", 0, 0, nInstances-1, nInstances-1, 1, 0);
         return ArrayDesc("Option", attributes, dimensions);
 	}
 };

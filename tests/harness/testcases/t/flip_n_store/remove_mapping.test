@@ -1,0 +1,20 @@
+--setup
+--start-query-logging
+create array Foo<x:double>[i=1:10,10,0]
+store(build(Foo, i + 10), Foo)
+create empty array Foo_Flipped<i:int64>[x(double)=*,10,0]
+
+--test
+redimension_store(Foo, Foo_Flipped)
+subarray(Foo_Flipped, 11, 12)
+store(Foo_Flipped, Foo_Copy)
+subarray(Foo_Copy, 11, 12)
+remove(Foo_Flipped)
+subarray(Foo_Copy, 11, 12)
+remove(Foo_Copy)
+list()
+
+--cleanup
+remove(Foo)
+
+--stop-query-logging

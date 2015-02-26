@@ -131,7 +131,7 @@ namespace scidb {
       inPos(arr.dims.size()),
       outPos(1),
       attrID(chunk.getAttributeDesc().getId()),
-      inputIterator(chunk.inputChunk->getConstIterator(iterationMode & ~IGNORE_DEFAULT_VALUES)),
+      inputIterator(chunk.inputChunk->getConstIterator(iterationMode & ~(INTENDED_TILE_MODE|IGNORE_DEFAULT_VALUES))),
       mode(iterationMode)
     {
         size_t nDims = inPos.size();

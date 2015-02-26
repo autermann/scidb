@@ -61,7 +61,7 @@ class PhysicalDiskInfo: public PhysicalOperator
         tuple[3].setUint64(info.nFreeClusters);
         tuple[4].setUint64(info.nSegments);
         tuples[0] = boost::shared_ptr<Tuple>(&tuple);
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples, Coordinate(query->getNodeID())));
+        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples, Coordinate(query->getInstanceID())));
     }
 };
 

@@ -31,6 +31,8 @@
 #include "SliceArray.h"
 #include "system/Exceptions.h"
 
+#include <stdio.h>
+
 namespace scidb
 {
     using namespace boost;
@@ -127,6 +129,7 @@ namespace scidb
     void SliceChunkIterator::moveNext()
     {
         uint64_t mask = array.mask;
+      TryPos:
         for (int i = inPos.size(); --i >= 0;) { 
             if (!((mask >> i) & 1)) { 
                 while (++inPos[i] <= lastPos[i]) { 
@@ -134,6 +137,7 @@ namespace scidb
                         hasCurrent = true;
                         return;
                     }
+                    goto TryPos;
                 }
                 inPos[i] = firstPos[i];
             }
@@ -190,7 +194,7 @@ namespace scidb
     SliceChunkIterator::SliceChunkIterator(SliceChunk const& aChunk, int iterationMode)
     : array(aChunk.array),
       chunk(aChunk),
-      inputIterator(aChunk.inputChunk->getConstIterator(iterationMode)),
+      inputIterator(aChunk.inputChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       inPos(array.inputDims.size()),
       outPos(array.desc.getDimensions().size())
     {
@@ -255,7 +259,7 @@ namespace scidb
     SimpleSliceChunkIterator::SimpleSliceChunkIterator(SliceChunk const& aChunk, int iterationMode)
     : array(aChunk.array),
       chunk(aChunk),
-      inputIterator(aChunk.inputChunk->getConstIterator(iterationMode)),
+      inputIterator(aChunk.inputChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       inPos(array.inputDims.size()),
       outPos(array.desc.getDimensions().size())
     {
@@ -308,6 +312,7 @@ namespace scidb
         Dimensions const& dims = array.inputDims;
         uint64_t mask = array.mask;
         chunkInitialized = false;
+      TryPos:
         for (int i = inPos.size(); --i >= 0;) { 
             if (!((mask >> i) & 1)) { 
                 while ((inPos[i] += dims[i].getChunkInterval()) <= dims[i].getEndMax()) { 
@@ -315,6 +320,7 @@ namespace scidb
                         hasCurrent = true;
                         return;
                     }
+                    goto TryPos;
                 }
                 inPos[i] = dims[i].getStart();
             }
@@ -345,16 +351,18 @@ namespace scidb
 	void SliceArrayIterator::reset()
 	{
         Dimensions const& dims = array.inputDims;
-        int shift = dims[0].getChunkInterval();
+        int j = -1;
         uint64_t mask = array.mask;
-        for (int i = inPos.size(); --i >= 0;) { 
-            if (!((mask >> i) & 1)) { 
-                inPos[i] = dims[i].getStart() - shift;
-                shift = 0;
+        for (int i = 0, n = inPos.size(); i < n ; mask >>= 1, i++) { 
+            if (!(mask & 1)) { 
+                inPos[i] = dims[i].getStart();
+                j = i;
             } else { 
                 inPos[i] = array.slice[i];
             }
         }
+        assert(j != -1);
+        inPos[j] -= dims[j].getChunkInterval();
         moveNext();
     }
     
@@ -458,7 +466,7 @@ namespace scidb
         simple = true;
         for (size_t i = 0, n = inputDims.size(); i < n; i++, aMask >>= 1) {
             if (!(aMask & 1)) { 
-                if (Coordinate(inputDims[i].getLength()) == MAX_COORDINATE) { 
+                if (inputDims[i].getLength() == INFINITE_LENGTH) { 
                     infinite = true;
                 }
             } else if (inputDims[i].getChunkInterval() != 1) { 

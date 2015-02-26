@@ -11,7 +11,7 @@ store(join(build_sparse(T,x,1),build_sparse(TS,string(x+10),1)),A)
 --test
 redimension_store(A,B)
 list()
---error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_STORE_ERROR1 --aql="update B set b = b + '_new' where x=1"
+--aql update B set b = b + '_new' where x=1
 list()
 redimension_store(B,A)
 scan(A)

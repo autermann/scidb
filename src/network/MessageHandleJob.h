@@ -37,13 +37,15 @@
 #include "util/Job.h"
 #include <util/JobQueue.h>
 #include <util/WorkQueue.h>
+#include <query/Query.h>
 #include "network/proto/scidb_msg.pb.h"
 #include "array/Metadata.h"
 #include "network/Connection.h"
+#include "network/NetworkManager.h"
 
 namespace scidb
 {
-class NodeLiveness;
+class InstanceLiveness;
  class MessageHandleJob: public Job, public boost::enable_shared_from_this<MessageHandleJob>
 {
 public:
@@ -61,6 +63,8 @@ private:
 
     typedef void(MessageHandleJob::*MsgHandler)();
     static MsgHandler _msgHandlers[scidb::mtSystemMax];
+    static boost::shared_ptr<WorkQueue> _replicationQueue;
+    static boost::shared_ptr<WorkQueue> getReplicationQueue();
 
     void sgSync();
     void handlePreparePhysicalPlan();
@@ -80,7 +84,7 @@ private:
     void handleReplicaSyncRequest();
     void handleReplicaSyncResponse();
     void handleChunkReplica();
-    void handleNodeStatus();
+    void handleInstanceStatus();
     void handleResourcesFileExists();
     void handleInvalidMessage();
     void handleAbortQuery();

@@ -76,7 +76,7 @@ namespace scidb
     };
 
     /**
-     * Interface of chunks scatter - determine which chunks belongs to this node.
+     * Interface of chunks scatter - determine which chunks belongs to this instance.
      * This interface is using in Storage.setScatter method and also can be used
      * by scatter/gather component
      */
@@ -85,7 +85,7 @@ namespace scidb
       public:
         virtual ~Scatter() {}
         /**
-         * Check if local node contains chunk with specified address of first element
+         * Check if local instance contains chunk with specified address of first element
          * @return true if chunk with specified address belongs to the current domain
          */
         virtual bool contains(const Address& addr) = 0;
@@ -105,17 +105,17 @@ namespace scidb
 
        /**
          * Construct scatter with specified domainId.
-         * @param nDomains total number of domains (should be equal to the number of nodes at which query is planed to be executed)
+         * @param nDomains total number of domains (should be equal to the number of instances at which query is planed to be executed)
          * @param domainId identifier of domain [1...nDomains]
          */
         HashScatter(size_t nDomains, size_t domainId);
 
         /**
-         * Construct scatter with current nodeId used as domainId.
-         * Use nodeId assigned to this node while node registration as domainId and
-         * number of registed nodes as number of domains.
-         * So this method is equivalent to HashScatter(SystemCatalog::getInstance()->getNumberOfNodes(),
-         *                                             (size_t))StorageManager::getInstance().getNodeId());
+         * Construct scatter with current instanceId used as domainId.
+         * Use instanceId assigned to this instance while instance registration as domainId and
+         * number of registed instances as number of domains.
+         * So this method is equivalent to HashScatter(SystemCatalog::getInstance()->getNumberOfInstances(),
+         *                                             (size_t))StorageManager::getInstance().getInstanceId());
          */
         HashScatter();
       private:
@@ -172,14 +172,14 @@ namespace scidb
         virtual void close() = 0;
 
         /**
-         * Set this node identifier
+         * Set this instance identifier
          */
-        virtual void setNodeId(NodeID id) = 0;
+        virtual void setInstanceId(InstanceID id) = 0;
 
         /**
-         * Get this node identifier
+         * Get this instance identifier
          */
-        virtual NodeID getNodeId() const = 0;
+        virtual InstanceID getInstanceId() const = 0;
 
         /**
          * Check if storage is local: provide access to the chunks located only in the local file system
@@ -190,7 +190,7 @@ namespace scidb
          * This method allows to virtually partition data in case of DFS-based storage manager.
          * By default DFS storage manager array iterator traverse all array chunks.
          * But this method allows to restrict storage to visit only some fraction of chunks.
-         * Scatter.contains() methos is used to determine which chunks belongs to this node.
+         * Scatter.contains() methos is used to determine which chunks belongs to this instance.
          * @param pointer to the scatter implementation, if NULL then virtual partitioning is disabled
          */
         virtual void setScatter(Scatter* scatter) = 0;
@@ -198,7 +198,12 @@ namespace scidb
         /**
          * Remove data of the particular array
          */
-        virtual void remove(ArrayID id, bool allVersions = false) = 0;
+        virtual void remove(ArrayID id, bool allVersions = false, uint64_t timestamp = 0) = 0;
+
+        /** 
+         * Create new clone of existed chunk
+         */
+        virtual void cloneChunk(Coordinates const& pos, AttributeID attrID, ArrayID originalArrayID, ArrayID cloneArrayID) = 0;
 
         /**
          * Map value of this coordinate to the integer value
@@ -223,9 +228,10 @@ namespace scidb
                                            const boost::shared_ptr<Query>& query) = 0;
 
         /**
-         * Cleanup coordinates mapping cache
+         * Remove coordinate mapping 
+         * @param indexName name of coordinate index        
          */
-        virtual void cleanupCache() = 0;
+        virtual void removeCoordinateMap(string const& indexName) = 0;
 
         /**
          * Rollback uncompleted updates
@@ -234,10 +240,10 @@ namespace scidb
         virtual void rollback(std::map<ArrayID,VersionID> const& undoUpdates) = 0;
 
         /**
-         * Recover node
-         * @param recoveredNode ID of recovered node
+         * Recover instance
+         * @param recoveredInstance ID of recovered instance
          */
-        virtual void recover(NodeID recoveredNode, boost::shared_ptr<Query>& query) = 0;
+        virtual void recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query) = 0;
 
         struct DiskInfo 
         {             
@@ -247,6 +253,8 @@ namespace scidb
             uint64_t nFreeClusters;
             uint64_t nSegments;
         };
+
+        virtual uint64_t getCurrentTimestamp() const = 0;
         
         virtual void getDiskInfo(DiskInfo& info) = 0;
     };

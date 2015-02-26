@@ -98,9 +98,10 @@ public:
     ConstChunk const* chunk;
     FunctionPointer _converter;
     Value _value;
+    Value _trueValue;
     Expression _expression;
     ExpressionContext _params;
-    bool _nullable;
+    bool _nullable;    
 };
 
 class BuildArrayIterator : public ConstArrayIterator
@@ -118,14 +119,14 @@ public:
     BuildArrayIterator(BuildArray& array, AttributeID id);
 
 private:
-    void setPosition();
+    void nextChunk();
 
     BuildArray& array;
-    Coordinates currPos;
     bool hasCurrent;
     bool chunkInitialized;
     BuildChunk chunk;
-    size_t currChunkNo;
+    Dimensions const& dims;
+    Coordinates currPos;
 };
 
 class BuildArray : public Array
@@ -145,8 +146,8 @@ private:
     boost::shared_ptr<Expression> _expression;
     vector<BindInfo> _bindings;
      FunctionPointer _converter;
-    size_t nNodes;
-    size_t nodeID;
+    size_t nInstances;
+    size_t instanceID;
     boost::weak_ptr<Query> _query;
 };
 

@@ -62,18 +62,18 @@ void initConfig(int argc, char* argv[])
         (CONFIG_LOG4CXX_PROPERTIES, 'l', "log-properties", "LOG_PROPERTIES", "",
             Config::STRING, "Log4cxx properties file.", string(""), false)
         (CONFIG_COORDINATOR, 'k', "coordinator", "COORDINATOR", "", Config::BOOLEAN,
-            "Option to start coordinator node. It will works on default port or on port specified by port option.",
+            "Option to start coordinator instance. It will works on default port or on port specified by port option.",
             false, false)
         (CONFIG_PORT, 'p', "port", "PORT", "", Config::INTEGER, "Set port for server. Default - any free port, but 1239 if coodinator.",
                 0, false)
         (CONFIG_ADDRESS, 'i', "interface", "INTERFACE", "", Config::STRING, "Interface for listening connections.",
                 string("0.0.0.0"), false)
         (CONFIG_REGISTER, 'r', "register", "", "", Config::BOOLEAN,
-            "Register node in system catalog.", false, false)
+            "Register instance in system catalog.", false, false)
         (CONFIG_ASYNC_REPLICATION, 0, "async-replication", "", "", Config::BOOLEAN,
             "Asynchronous replication.", true, false)
         (CONFIG_RECOVER, 0, "recover", "", "", Config::INTEGER,
-            "Recover node.", -1, false)
+            "Recover instance.", -1, false)
         (CONFIG_REDUNDANCY, 0, "redundancy", "", "", Config::INTEGER,
             "Level of redundancy.", 0, false)
         (CONFIG_INITIALIZE, 0, "initialize", "", "", Config::BOOLEAN,
@@ -89,7 +89,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_OPTIMIZER_TYPE, 'o', "optimizer", "OPTIMIZER", "", Config::INTEGER,
             "Optimizer type: 0 - L2P, 1 - Habilis (default)", 1, false)
         (CONFIG_CONFIGURATION_FILE, 'f', "config", "", "", Config::STRING,
-                "Node configuration file.", string(""), false)
+                "Instance configuration file.", string(""), false)
         (CONFIG_HELP, 'h', "help", "", "", Config::BOOLEAN, "Show this text.",
                 false, false)
         (CONFIG_SPARSE_CHUNK_INIT_SIZE, 0, "sparse-chunk-init-size", "SPARSE_CHUNK_INIT_SIZE", "", Config::REAL,
@@ -140,14 +140,14 @@ void initConfig(int argc, char* argv[])
          "Level for basic log4cxx logger. Ignored if log-properties option is used. Default level is ERROR", string("error"), false)
         (CONFIG_RECONNECT_TIMEOUT, 0, "reconnect-timeout", "RECONNECT_TIMEOUT", "", Config::INTEGER, "Time in seconds to wait before re-connecting to peer(s).",
        3, false)
-        (CONFIG_LIVENESS_TIMEOUT, 0, "liveness-timeout", "LIVENESS_TIMEOUT", "", Config::INTEGER, "Time in seconds to wait before declaring a network-silent node dead.",
+        (CONFIG_LIVENESS_TIMEOUT, 0, "liveness-timeout", "LIVENESS_TIMEOUT", "", Config::INTEGER, "Time in seconds to wait before declaring a network-silent instance dead.",
        120, false)
         (CONFIG_NO_WATCHDOG, 0, "no-watchdog", "NO_WATCHDOG", "", Config::BOOLEAN, "Do not start a watch-dog process.",
                 false, false)
         (CONFIG_PARALLEL_SORT, 0, "parallel-sort", "PARALLEL_SORT", "", Config::BOOLEAN, "Performs first phase of merge sort in parallel.",
                 true, false)
         (CONFIG_RLE_CHUNK_FORMAT, 0, "rle-chunk-format", "RLE_CHUNK_FORMAT", "", Config::BOOLEAN, "Use RLE chunk format.",
-                false, false)
+                true, false)
         (CONFIG_TILE_SIZE, 0, "tile-size", "TILE_SIZE", "", Config::INTEGER, "Size of tile", 10000, false)
         (CONFIG_TILES_PER_CHUNK, 0, "tiles-per-chunk", "TILES_PER_CHUNK", "", Config::INTEGER, "Number of tiles per chunk", 100, false)
         (CONFIG_SYNC_IO_INTERVAL, 0, "sync-io-interval", "SYNC_IO_INTERVAL", "", Config::INTEGER, "Interval of time for io synchronization (milliseconds)", -1, false)
@@ -155,6 +155,17 @@ void initConfig(int argc, char* argv[])
         (CONFIG_OUTPUT_PROC_STATS, 0, "output-proc-stats", "OUTPUT_PROC_STATS", "", Config::BOOLEAN, "Output SciDB process statistics such as virtual memory usage to stderr",
                 false, false)
         (CONFIG_MAX_MEMORY_LIMIT, 0, "max-memory-limit", "MAX_MEMORY_LIMIT", "", Config::INTEGER, "Maximum amount of memory the scidb process can take up (megabytes)", -1, false)
+
+        (CONFIG_SMALL_MEMALLOC_SIZE, 0, "small-memalloc-size", "SMALL-MEMALLOC-SIZE", "", Config::INTEGER, "Maximum size of a memory allocation request which is considered small (in bytes). Larger memory allocation requests may be allocated according to a different policy.", -1, false)
+
+        (CONFIG_LARGE_MEMALLOC_LIMIT, 0, "large-memalloc-limit", "LARGE-MEMALLOC-LIMIT", "", Config::INTEGER, "Maximum number of large  (vs. small) memory allocations. The policy for doing large memory allocations may be different from the (default) policy used for small memory allocations. This parameter limits the number of outstanding allocations performed using the (non-default) large-size allocation policy.", -1, false)
+    
+        (CONFIG_STRICT_CACHE_LIMIT, 0, "strict-cache-limit", "STRICT_CACHE_LIMIT", "", Config::BOOLEAN, "Block thread if cache is overflown", false, false)
+        (CONFIG_REPART_SEQ_SCAN_THRESHOLD, 0, "repart-seq-scan-threshold", "REPART_SEQ_SCAN_THRESHOLD", "", Config::INTEGER, "Number of chunks in array cause repart to use sequential scan through source array", 1000000, false)
+        (CONFIG_REPART_USE_SPARSE_ALGORITHM, 0, "repart-use-sparse-algorithm", "REPART_USE_SPARSE_ALGORITHM", "", Config::BOOLEAN, "Use algorithm optimized for sparse data in REPART", false, false)
+        (CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE, 0, "replication-receive-queue-size", "REPLICATION_RECEIVE_QUEUE_SIZE", "", Config::INTEGER, "The length of incoming replication queue (across all connections)", 1000, false)
+        (CONFIG_REPLICATION_SEND_QUEUE_SIZE, 0, "replication-send-queue-size", "REPLICATION_SEND_QUEUE_SIZE", "", Config::INTEGER, "The length of outgoing replication queue (across all connections)", 1000, false)
+        (CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT, 0, "array-emptyable-by-default", "ARRAY_EMPTYABLE_BY_DEFAULT", "", Config::BOOLEAN, "Be default arrays are emptyable", true, false)
         ;
 
     cfg->addHook(configHook);

@@ -10,13 +10,45 @@ Query was executed successfully
 SCIDB QUERY : <load(A,'../tests/harness/testcases/data/iquery_5.txt')>
 [[(10,"b_04","c_04")],[(11,"b_14","c_14")],[(12,"b_24","c_24")]];[[(10,"b_05","c_05")],[(11,"b_15","c_15")],[(12,"b_25","c_25")]]
 
-Non-integer dimension labels cannnot be retrieved for an update query
+SCIDB QUERY : < iquery   -o lcsv+ -aq 'redimension_store(A,A2)' 2>iquery_6.stderr>
+c,a,b,EmptyTag
+"c_04",10,"b_04",true
+"c_05",10,"b_05",true
+"c_14",11,"b_14",true
+"c_15",11,"b_15",true
+"c_24",12,"b_24",true
+"c_25",12,"b_25",true
 
-Non-integer dimension labels cannnot be retrieved for an update query
+SCIDB QUERY : <cat iquery_6.stderr>
 
-Non-integer dimension labels cannnot be retrieved for an update query
+SCIDB QUERY : <rm iquery_6.stderr>
 
-Non-integer dimension labels cannnot be retrieved for an update query
+SCIDB QUERY : < iquery   -o lsparse -aq 'redimension_store(A,A2)' 2>iquery_6.stderr>
+{"c_04"}[{"c_04"}(10,"b_04",true),{"c_05"}(10,"b_05",true),{"c_14"}{"c_14"}(11,"b_14",true),{"c_15"}(11,"b_15",true),{"c_24"}{"c_24"}(12,"b_24",true),{"c_25"}(12,"b_25",true)]
+
+SCIDB QUERY : <cat iquery_6.stderr>
+
+SCIDB QUERY : <rm iquery_6.stderr>
+
+SCIDB QUERY : < iquery   -o lcsv+ -aq 'redimension_store(A,A3)' 2>iquery_6.stderr>
+b,x,c,a,EmptyTag
+"b_04",0,"c_04",10,true
+"b_05",0,"c_05",10,true
+"b_14",1,"c_14",11,true
+"b_15",1,"c_15",11,true
+"b_24",2,"c_24",12,true
+"b_25",2,"c_25",12,true
+
+SCIDB QUERY : <cat iquery_6.stderr>
+
+SCIDB QUERY : <rm iquery_6.stderr>
+
+SCIDB QUERY : < iquery   -o lsparse -aq 'redimension_store(A,A3)' 2>iquery_6.stderr>
+{"b_04",0}[[{"b_04",0}("c_04",10,true)],[{"b_05",0}("c_05",10,true),{"b_14",1}{"b_14",1}("c_14",11,true)],[{"b_15",1}("c_15",11,true),{"b_24",2}{"b_24",2}("c_24",12,true)],[{"b_25",2}("c_25",12,true)]]
+
+SCIDB QUERY : <cat iquery_6.stderr>
+
+SCIDB QUERY : <rm iquery_6.stderr>
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

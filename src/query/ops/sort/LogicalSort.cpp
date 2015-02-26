@@ -61,7 +61,17 @@ public:
         assert(_parameters.size() > 0);
         if (dims.size() != 1)
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_SORT_ERROR1);
-        return ArrayDesc(schema.getName(), schema.getAttributes(), dims);
+        Dimensions newDims(1);
+        DimensionDesc const& oldDim = dims[0];
+        newDims[0] = DimensionDesc(oldDim.getBaseName(),
+                                   oldDim.getNamesAndAliases(),
+                                   oldDim.getStartMin(), 
+                                   oldDim.getCurrStart(), 
+                                   oldDim.getCurrEnd(), 
+                                   oldDim.getEndMax(), 
+                                   oldDim.getChunkInterval(), 
+                                   0);
+         return ArrayDesc(schema.getName(), schema.getAttributes(), newDims);
 	}
 };
 

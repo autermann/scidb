@@ -77,6 +77,7 @@ const char TID_DATETIME[] = "datetime";
 const char TID_DATETIMETZ[] = "datetimetz";
 const char TID_VOID[] = "void";
 const char TID_BINARY[] = "binary";
+const char TID_FIXED_STRING[] = "string_*";
 
 #define IS_VARLEN(type) (type==TID_STRING || type==TID_BINARY ? true : false)
 
@@ -513,7 +514,7 @@ public:
             }
         }
         _size = size;
-        _missingReason = -3;
+//        _missingReason = -3;
     }
 
 	/**
@@ -744,7 +745,7 @@ public:
  * @param value a value to be converted
  * @return string with value
  */
-std::string ValueToString(const TypeId type, const Value& value);
+std::string ValueToString(const TypeId type, const Value& value, bool verbose = false);
 
 
 /**

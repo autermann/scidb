@@ -61,7 +61,7 @@ public:
 
         const string& libraryName = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 
-        const bool isCoordinator = (query->getCoordinatorID() == COORDINATOR_NODE);
+        const bool isCoordinator = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
         PluginManager::getInstance()->loadLibrary(libraryName, isCoordinator);
 
         // It's DDL command and should not return a value

@@ -36,7 +36,7 @@ using namespace boost;
 namespace scidb
 {
     boost::shared_ptr< LogicalQueryPlanNode> Optimizer::logicalRewriteIfNeeded(const boost::shared_ptr<Query>& query,
-                                                                               boost::shared_ptr< LogicalQueryPlanNode> node)
+                                                                               boost::shared_ptr< LogicalQueryPlanNode> instance)
     {
         //rewrite load(array,'filename') into store(input(array,'filename'),array)
 
@@ -49,9 +49,9 @@ namespace scidb
         //  2. they are recursive. We don't want logical rewrites to be recursive.
 
         OperatorLibrary *olib =  OperatorLibrary::getInstance();
-        if (node->getLogicalOperator()->getLogicalName()=="load")
+        if (instance->getLogicalOperator()->getLogicalName()=="load")
         {
-            boost::shared_ptr< LogicalOperator> loadOperator = node->getLogicalOperator();
+            boost::shared_ptr< LogicalOperator> loadOperator = instance->getLogicalOperator();
 
             LogicalOperator::Parameters loadParameters = loadOperator->getParameters();
             ArrayDesc outputSchema = loadOperator->getSchema();
@@ -62,7 +62,7 @@ namespace scidb
 
             boost::shared_ptr< OperatorParam> paramArrayName = loadParameters[0];
 
-            if ( query->getNodesCount() == 1) {
+            if ( query->getInstancesCount() == 1) {
                 boost::shared_ptr< LogicalOperator> storeOperator = olib->createLogicalOperator("store");
                 storeOperator->addParameter(paramArrayName);
                 
@@ -71,31 +71,31 @@ namespace scidb
                 
                 storeOperator->setSchema(storeOperator->inferSchema(storeInputSchemas, query));
 
-                boost::shared_ptr< LogicalQueryPlanNode> inputNode(
-                    new  LogicalQueryPlanNode (node->getParsingContext(),
+                boost::shared_ptr< LogicalQueryPlanNode> inputInstance(
+                    new  LogicalQueryPlanNode (instance->getParsingContext(),
                                                      inputOperator));
                 
-                boost::shared_ptr< LogicalQueryPlanNode> storeNode(
-                    new  LogicalQueryPlanNode (node->getParsingContext(),
+                boost::shared_ptr< LogicalQueryPlanNode> storeInstance(
+                    new  LogicalQueryPlanNode (instance->getParsingContext(),
                                                      storeOperator));
 
-                //load node does not have any children. so the input node will also have none.
-                assert(node->getChildren().size()==0);
+                //load instance does not have any children. so the input instance will also have none.
+                assert(instance->getChildren().size()==0);
                 
-                storeNode->addChild(inputNode);
-                return storeNode;
+                storeInstance->addChild(inputInstance);
+                return storeInstance;
             } else { 
                 LogicalOperator::Parameters sgParams(3);    
                 Value ival(TypeLibrary::getType(TID_INT32));
                 ival.setInt32(psRoundRobin);
                 sgParams[0] = boost::shared_ptr<OperatorParam>(
-                    new OperatorParamLogicalExpression(node->getParsingContext(),
-                                                       boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)), 
+                    new OperatorParamLogicalExpression(instance->getParsingContext(),
+                                                       boost::shared_ptr<LogicalExpression>(new Constant(instance->getParsingContext(), ival, TID_INT32)), 
                                                        TypeLibrary::getType(TID_INT32), true));
                 ival.setInt32(-1);
                 sgParams[1] = boost::shared_ptr<OperatorParam>(
-                    new OperatorParamLogicalExpression(node->getParsingContext(), 
-                                                       boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)), 
+                    new OperatorParamLogicalExpression(instance->getParsingContext(), 
+                                                       boost::shared_ptr<LogicalExpression>(new Constant(instance->getParsingContext(), ival, TID_INT32)), 
                                                        TypeLibrary::getType(TID_INT32), true));
                 sgParams[2] = paramArrayName;
                 
@@ -107,41 +107,41 @@ namespace scidb
                 
                 sgOperator->setSchema(sgOperator->inferSchema(sgInputSchemas,query));
 
-                boost::shared_ptr< LogicalQueryPlanNode> inputNode(
-                    new  LogicalQueryPlanNode (node->getParsingContext(),
+                boost::shared_ptr< LogicalQueryPlanNode> inputInstance(
+                    new  LogicalQueryPlanNode (instance->getParsingContext(),
                                                      inputOperator));
                 
-                boost::shared_ptr< LogicalQueryPlanNode> sgNode(
-                    new  LogicalQueryPlanNode (node->getParsingContext(),
+                boost::shared_ptr< LogicalQueryPlanNode> sgInstance(
+                    new  LogicalQueryPlanNode (instance->getParsingContext(),
                                                      sgOperator));
 
-                //load node does not have any children. so the input node will also have none.
-                assert(node->getChildren().size()==0);
+                //load instance does not have any children. so the input instance will also have none.
+                assert(instance->getChildren().size()==0);
                 
-                sgNode->addChild(inputNode);
+                sgInstance->addChild(inputInstance);
 
-                return sgNode;
+                return sgInstance;
             }
         }
-        else if (node->getLogicalOperator()->getLogicalName()=="sum" ||
-                 node->getLogicalOperator()->getLogicalName()=="avg" ||
-                 node->getLogicalOperator()->getLogicalName()=="min" ||
-                 node->getLogicalOperator()->getLogicalName()=="max" ||
-                 node->getLogicalOperator()->getLogicalName()=="stdev" ||
-                 node->getLogicalOperator()->getLogicalName()=="var" ||
-                 node->getLogicalOperator()->getLogicalName()=="count")
+        else if (instance->getLogicalOperator()->getLogicalName()=="sum" ||
+                 instance->getLogicalOperator()->getLogicalName()=="avg" ||
+                 instance->getLogicalOperator()->getLogicalName()=="min" ||
+                 instance->getLogicalOperator()->getLogicalName()=="max" ||
+                 instance->getLogicalOperator()->getLogicalName()=="stdev" ||
+                 instance->getLogicalOperator()->getLogicalName()=="var" ||
+                 instance->getLogicalOperator()->getLogicalName()=="count")
         {
-           boost::shared_ptr< LogicalOperator> oldStyleOperator = node->getLogicalOperator();
+           boost::shared_ptr< LogicalOperator> oldStyleOperator = instance->getLogicalOperator();
            boost::shared_ptr< LogicalOperator> aggOperator = olib->createLogicalOperator("aggregate");
            aggOperator->setSchema(oldStyleOperator->getSchema());
            LogicalOperator::Parameters oldStyleParams = oldStyleOperator->getParameters();
 
-           if (node->getLogicalOperator()->getLogicalName()=="count")
+           if (instance->getLogicalOperator()->getLogicalName()=="count")
            {
-               shared_ptr<OperatorParam> asterisk (new OperatorParamAsterisk(node->getParsingContext()));
+               shared_ptr<OperatorParam> asterisk (new OperatorParamAsterisk(instance->getParsingContext()));
 
-               shared_ptr<OperatorParam> aggCall ( new OperatorParamAggregateCall (node->getParsingContext(),
-                                                                                   node->getLogicalOperator()->getLogicalName(),
+               shared_ptr<OperatorParam> aggCall ( new OperatorParamAggregateCall (instance->getParsingContext(),
+                                                                                   instance->getLogicalOperator()->getLogicalName(),
                                                                                    asterisk,
                                                                                    ""));
                aggOperator->addParameter(aggCall);
@@ -149,16 +149,16 @@ namespace scidb
            }
            else if (oldStyleParams.size() == 0)
            {
-               ArrayDesc const& inputSchema = node->getChildren()[0]->getLogicalOperator()->getSchema();
-               shared_ptr<OperatorParamReference> attRef ( new OperatorParamAttributeReference(node->getParsingContext(),
+               ArrayDesc const& inputSchema = instance->getChildren()[0]->getLogicalOperator()->getSchema();
+               shared_ptr<OperatorParamReference> attRef ( new OperatorParamAttributeReference(instance->getParsingContext(),
                                                                                                inputSchema.getName(),
                                                                                                inputSchema.getAttributes()[0].getName(),
                                                                                                true));
                attRef->setInputNo(0);
                attRef->setObjectNo(0);
 
-               shared_ptr<OperatorParam> aggCall ( new OperatorParamAggregateCall (node->getParsingContext(),
-                                                                                   node->getLogicalOperator()->getLogicalName(),
+               shared_ptr<OperatorParam> aggCall ( new OperatorParamAggregateCall (instance->getParsingContext(),
+                                                                                   instance->getLogicalOperator()->getLogicalName(),
                                                                                    attRef,
                                                                                    ""));
                aggOperator->addParameter(aggCall);
@@ -169,7 +169,7 @@ namespace scidb
                if (oldStyleParams[i]->getParamType() == PARAM_ATTRIBUTE_REF)
                {
                    shared_ptr<OperatorParam> aggCall ( new OperatorParamAggregateCall (oldStyleParams[i]->getParsingContext(),
-                                                                                       node->getLogicalOperator()->getLogicalName(),
+                                                                                       instance->getLogicalOperator()->getLogicalName(),
                                                                                        oldStyleParams[i],
                                                                                        ""));
                    aggOperator->addParameter(aggCall);
@@ -180,14 +180,14 @@ namespace scidb
                }
            }
 
-           boost::shared_ptr< LogicalQueryPlanNode> aggNode( new  LogicalQueryPlanNode (node->getParsingContext(), aggOperator));
-           assert(node->getChildren().size() == 1);
-           aggNode->addChild(node->getChildren()[0]);
-           return aggNode;
+           boost::shared_ptr< LogicalQueryPlanNode> aggInstance( new  LogicalQueryPlanNode (instance->getParsingContext(), aggOperator));
+           assert(instance->getChildren().size() == 1);
+           aggInstance->addChild(instance->getChildren()[0]);
+           return aggInstance;
         }
         else
         {
-           return node;
+           return instance;
         }
     }
 }

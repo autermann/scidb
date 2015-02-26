@@ -1,10 +1,14 @@
+SCIDB QUERY : <create immutable empty array imtest <a:int64>[x=0:100,10,0, y=0:100,10,0]>
 Query was executed successfully
 
+SCIDB QUERY : <count(imtest)>
 [(0)]
 
+SCIDB QUERY : <dimensions(imtest)>
 [("x",0,101,10,0,4611686018427387903,-4611686018427387903,"int64"),("y",0,101,10,0,4611686018427387903,-4611686018427387903,"int64")]
 
-[("a","int64",false),("empty_indicator","indicator",false)]
+SCIDB QUERY : <attributes(imtest)>
+[("a","int64",false)]
 
 Query was executed successfully
 

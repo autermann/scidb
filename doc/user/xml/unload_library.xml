@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>unload_library</refname>
+    <refpurpose>Unload a plugin</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis>unload_library(&apos;<replaceable>library_name</replaceable>&apos;)</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>Unload a plug-in from the current SciDB instance.
+</para>
+    <note>
+      <para>The unload_library operator provides the same functionality as the AQL UNLOAD LIBRARY &apos;<replaceable>library_name</replaceable>&apos; statement.</para>
+    </note>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example loads and unloads the example plug-in librational.so.<programlisting>load_library(&apos;librational&apos;)
+unload_library (&apos;librational&apos;)</programlisting>The file extension is not included in the library name.</para>
+    </informalexample>
+  </refsect1>
+</refentry>

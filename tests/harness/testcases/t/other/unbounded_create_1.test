@@ -1,0 +1,15 @@
+--setup
+
+--test
+
+create empty array imtest <a:int64>[x=0:*,10,0, y=0:*,10,0]
+
+count(imtest)
+
+dimensions(imtest)
+
+attributes(imtest)
+
+--cleanup
+
+remove(imtest)

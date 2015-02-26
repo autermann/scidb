@@ -65,9 +65,9 @@ class QueryProcessorImpl: public QueryProcessor
 {
 private:
     // Recursive method for executing physical plan
-    boost::shared_ptr<Array> execute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query, int depth);
-    void preSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query);
-    void postSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query);
+    boost::shared_ptr<Array> execute(boost::shared_ptr<PhysicalQueryPlanNode> instance, boost::shared_ptr<Query> query, int depth);
+    void preSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> instance, boost::shared_ptr<Query> query);
+    void postSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> instance, boost::shared_ptr<Query> query);
     // Synchronization methods
     /**
      * Worker notifies coordinator about finishing work.
@@ -119,7 +119,7 @@ void QueryProcessorImpl::parsePhysical(const std::string& plan, boost::shared_pt
 {
     assert(!plan.empty());
 
-    boost::shared_ptr<PhysicalQueryPlanNode> node;
+    boost::shared_ptr<PhysicalQueryPlanNode> instance;
 
     stringstream ss;
     ss << plan;
@@ -134,9 +134,9 @@ void QueryProcessorImpl::parsePhysical(const std::string& plan, boost::shared_pt
     ia.register_type(static_cast<OperatorParamSchema*>(NULL));
     ia.register_type(static_cast<OperatorParamAggregateCall*>(NULL));
     ia.register_type(static_cast<OperatorParamAsterisk*>(NULL));
-    ia & node;
+    ia & instance;
 
-    query->addPhysicalPlan(boost::make_shared<PhysicalPlan>(node));
+    query->addPhysicalPlan(boost::make_shared<PhysicalPlan>(instance));
 }
 
 
@@ -165,13 +165,13 @@ void QueryProcessorImpl::setParameters(boost::shared_ptr<Query> query, QueryPara
 
 
 // Recursive method for single executing physical plan
-void QueryProcessorImpl::preSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query)
+void QueryProcessorImpl::preSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> instance, boost::shared_ptr<Query> query)
 {
     Query::validateQueryPtr(query);
 
-    boost::shared_ptr<PhysicalOperator> physicalOperator = node->getPhysicalOperator();
+    boost::shared_ptr<PhysicalOperator> physicalOperator = instance->getPhysicalOperator();
 
-    vector<boost::shared_ptr<PhysicalQueryPlanNode> >& childs = node->getChildren();
+    vector<boost::shared_ptr<PhysicalQueryPlanNode> >& childs = instance->getChildren();
     for (size_t i = 0; i < childs.size(); i++) {
         preSingleExecute(childs[i], query);
     }
@@ -188,13 +188,13 @@ void QueryProcessorImpl::preSingleExecute(boost::shared_ptr<Query> query)
     preSingleExecute(query->getCurrentPhysicalPlan()->getRoot(), query);
 }
 
-void QueryProcessorImpl::postSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query)
+void QueryProcessorImpl::postSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> instance, boost::shared_ptr<Query> query)
 {
    Query::validateQueryPtr(query);
 
-    boost::shared_ptr<PhysicalOperator> physicalOperator = node->getPhysicalOperator();
+    boost::shared_ptr<PhysicalOperator> physicalOperator = instance->getPhysicalOperator();
 
-    vector<boost::shared_ptr<PhysicalQueryPlanNode> >& childs = node->getChildren();
+    vector<boost::shared_ptr<PhysicalQueryPlanNode> >& childs = instance->getChildren();
     for (size_t i = 0; i < childs.size(); i++) {
         postSingleExecute(childs[i], query);
     }
@@ -212,18 +212,18 @@ void QueryProcessorImpl::postSingleExecute(boost::shared_ptr<Query> query)
 }
 
 // Recursive method for executing physical plan
-boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query, int depth)
+boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQueryPlanNode> instance, boost::shared_ptr<Query> query, int depth)
 {
     Query::validateQueryPtr(query);
 
-    boost::shared_ptr<PhysicalOperator> physicalOperator = node->getPhysicalOperator();
+    boost::shared_ptr<PhysicalOperator> physicalOperator = instance->getPhysicalOperator();
     physicalOperator->setQuery(query);
 
     vector<boost::shared_ptr<Array> > operatorArguments;
-    vector<boost::shared_ptr<PhysicalQueryPlanNode> >& childs = node->getChildren();
+    vector<boost::shared_ptr<PhysicalQueryPlanNode> >& childs = instance->getChildren();
 
     StatisticsScope sScope(&physicalOperator->getStatistics());
-    if (node->isAgg())
+    if (instance->isAgg())
     {
         // This assert should be provided by optimizer
         assert(childs.size() == 1);
@@ -231,7 +231,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
         boost::shared_ptr<Array> currentResultArray = execute(childs[0], query, depth+1);
         assert(currentResultArray);
 
-        if (query->getCoordinatorID() != COORDINATOR_NODE)
+        if (query->getCoordinatorID() != COORDINATOR_INSTANCE)
         {
             if (Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS) > 1 && currentResultArray->supportsRandomAccess()) {
                 boost::shared_ptr<ParallelAccumulatorArray> paa = boost::make_shared<ParallelAccumulatorArray>(currentResultArray);
@@ -245,12 +245,12 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
 
         notify(query); 
 
-        if (query->getCoordinatorID() == COORDINATOR_NODE)
+        if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
         {
-            for (size_t i = 0; i < query->getNodesCount(); i++)
+            for (size_t i = 0; i < query->getInstancesCount(); i++)
             {
                 boost::shared_ptr<Array> arg;
-                if (i != query->getNodeID()) {
+                if (i != query->getInstanceID()) {
                     arg = RemoteArray::create(query->getCurrentResultArray()->getArrayDesc(), query->getQueryID(), i);
                 } else {
                     arg = query->getCurrentResultArray();
@@ -259,8 +259,8 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
             }
 
             /**
-             * TODO: we need to get whole result on this node before we call wait(query)
-             * because we hope on currentResultArray of remote nodes but it lives until we send wait notification
+             * TODO: we need to get whole result on this instance before we call wait(query)
+             * because we hope on currentResultArray of remote instances but it lives until we send wait notification
              */
             boost::shared_ptr<Array> res = physicalOperator->execute(operatorArguments, query);
             wait(query);
@@ -272,7 +272,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
             wait(query);
             /**
              * TODO: This is temporary. 2-nd phase is performed only on coordinator but
-             * other nodes can continue execution with empty array with the same schema.
+             * other instances can continue execution with empty array with the same schema.
              * All data should be on coordinator.
              * But we also can't do it if coordinator will request data as pipeline.
              * For example count2 uses MergeArray.
@@ -282,7 +282,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
                 : query->getCurrentResultArray();
         }
     }
-    else if (node->isDdl() && COORDINATOR_NODE != query->getCoordinatorID()) 
+    else if (instance->isDdl() && COORDINATOR_INSTANCE != query->getCoordinatorID()) 
     { 
         return boost::shared_ptr<Array>(new MemArray(physicalOperator->getSchema()));
     }        
@@ -301,8 +301,8 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
     LOG4CXX_INFO(logger, "Executing query(" << query->getQueryID() << "): " << query->queryString << "")
     Query::validateQueryPtr(query);
 
-    boost::shared_ptr<PhysicalQueryPlanNode> rootNode = query->getCurrentPhysicalPlan()->getRoot();
-    boost::shared_ptr<Array> currentResultArray = execute(rootNode, query, 0);
+    boost::shared_ptr<PhysicalQueryPlanNode> rootInstance = query->getCurrentPhysicalPlan()->getRoot();
+    boost::shared_ptr<Array> currentResultArray = execute(rootInstance, query, 0);
 
     Query::validateQueryPtr(query);
 
@@ -319,9 +319,9 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
                 currentResultArray = boost::make_shared<AccumulatorArray>(currentResultArray);
             }
         }
-        if (query->getNodesCount() > 1 &&
-            query->getCoordinatorID() == COORDINATOR_NODE &&
-            !rootNode->isAgg() && !rootNode->isDdl())
+        if (query->getInstancesCount() > 1 &&
+            query->getCoordinatorID() == COORDINATOR_INSTANCE &&
+            !rootInstance->isAgg() && !rootInstance->isDdl())
         {
             // RemoteMergedArray uses the Query::_currentResultArray
             // so make sure to set it in advance
@@ -336,30 +336,30 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
 
 void QueryProcessorImpl::notify(boost::shared_ptr<Query> query)
 {
-   if (query->getCoordinatorID() != COORDINATOR_NODE)
+   if (query->getCoordinatorID() != COORDINATOR_INSTANCE)
     {
         QueryID queryID = query->getQueryID();
-        LOG4CXX_DEBUG(logger, "Sending notification in queryID: " << queryID << " to node #" << query->getCoordinatorID())
+        LOG4CXX_DEBUG(logger, "Sending notification in queryID: " << queryID << " to instance #" << query->getCoordinatorID())
         boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtNotify);
         messageDesc->setQueryID(queryID);
         NetworkManager::getInstance()->send(query->getCoordinatorID(), messageDesc);
     }
     else
     {
-        const size_t nodesCount = query->getNodesCount() - 1;
-        LOG4CXX_DEBUG(logger, "Waiting notification in queryID from " << nodesCount << " nodes")
+        const size_t instancesCount = query->getInstancesCount() - 1;
+        LOG4CXX_DEBUG(logger, "Waiting notification in queryID from " << instancesCount << " instances")
         Semaphore::ErrorChecker errorChecker = bind(&Query::validate, query);
-        query->results.enter(nodesCount, errorChecker);
+        query->results.enter(instancesCount, errorChecker);
     }
 }
 
 
 void QueryProcessorImpl::wait(boost::shared_ptr<Query> query)
 {
-   if (query->getCoordinatorID() == COORDINATOR_NODE)
+   if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
     {
         QueryID queryID = query->getQueryID();
-        LOG4CXX_DEBUG(logger, "Send message from coordinator for waiting nodes in queryID: " << query->getQueryID())
+        LOG4CXX_DEBUG(logger, "Send message from coordinator for waiting instances in queryID: " << query->getQueryID())
         boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtWait);
         messageDesc->setQueryID(queryID);
         NetworkManager::getInstance()->sendOutMessage(messageDesc);

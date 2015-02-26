@@ -74,7 +74,7 @@ void
 MessageDesc::init(MessageType messageType)
 {
     _messageHeader.netProtocolVersion = NET_PROTOCOL_CURRENT_VER;
-    _messageHeader.sourceNodeID = CLIENT_NODE;
+    _messageHeader.sourceInstanceID = CLIENT_INSTANCE;
     _messageHeader.recordSize = 0;
     _messageHeader.binarySize = 0;
     _messageHeader.messageType = static_cast<uint16_t>(messageType);
@@ -170,6 +170,7 @@ MessagePtr MessageDesc::createRecordByType(MessageType messageType)
     case mtExecutePhysicalPlan:
     case mtAbort:
     case mtCommit:
+    case mtCompleteQuery:
         return MessagePtr(new scidb_msg::DummyQuery());
 
     //Resources chat messages
@@ -177,6 +178,8 @@ MessagePtr MessageDesc::createRecordByType(MessageType messageType)
         return MessagePtr(new scidb_msg::ResourcesFileExistsRequest());
     case mtResourcesFileExistsResponse:
         return MessagePtr(new scidb_msg::ResourcesFileExistsResponse());
+    case mtControl:
+        return MessagePtr(new scidb_msg::Control());
 
     default:
         LOG4CXX_ERROR(logger, "Unknown message type " << messageType);
@@ -218,6 +221,8 @@ bool MessageDesc::validate()
     case mtResourcesFileExistsResponse:
     case mtAbort:
     case mtCommit:
+    case mtCompleteQuery:
+    case mtControl:
         break;
     default:
         return false;
@@ -318,7 +323,7 @@ boost::shared_ptr<MessageDesc> BaseConnection::sendAndReadMessage(boost::shared_
    {
        { // scope for sending
           vector<asio::const_buffer> constBuffers;
-          messageDesc->_messageHeader.sourceNodeID = CLIENT_NODE;
+          messageDesc->_messageHeader.sourceInstanceID = CLIENT_INSTANCE;
           messageDesc->writeConstBuffers(constBuffers);
 
           asio::write(_socket, constBuffers);

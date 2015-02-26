@@ -35,6 +35,46 @@ namespace scidb
 {
     using namespace boost;
     
+
+    void subarrayMappingArray(string const& dimName, string const& mappingArrayName, string const& tmpMappingArrayName, 
+                              Coordinate from, Coordinate till, boost::shared_ptr<Query> const& query)
+    {
+        shared_ptr<Array> srcMappingArray = query->getArray(mappingArrayName);
+        ArrayDesc const& srcMappingArrayDesc = srcMappingArray->getArrayDesc();
+        shared_ptr<ConstArrayIterator> srcArrayIterator = srcMappingArray->getConstIterator(0);
+        Coordinates origin(1);
+        origin[0] = srcMappingArrayDesc.getDimensions()[0].getStart();
+        srcArrayIterator->setPosition(origin);
+        ConstChunk const& srcChunk = srcArrayIterator->getChunk();
+        shared_ptr<ConstChunkIterator> srcChunkIterator = srcChunk.getConstIterator();
+        
+        Dimensions indexMapDim(1);
+        indexMapDim[0] = DimensionDesc("no", 0, 0, till-from, till-from, till-from+1, 0);                
+        ArrayDesc dstMappingArrayDesc(tmpMappingArrayName,
+                                      srcMappingArrayDesc.getAttributes(), 
+                                      indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
+        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc));
+        if (till >= from) { 
+            shared_ptr<ArrayIterator> dstArrayIterator = dstMappingArray->getIterator(0);
+            Coordinates pos(1);
+            Chunk& dstChunk = dstArrayIterator->newChunk(pos, 0);
+            dstChunk.setRLE(false);
+            shared_ptr<ChunkIterator> dstChunkIterator = dstChunk.getIterator(query);
+            
+            pos[0] = from;
+            if (srcChunkIterator->setPosition(pos)) {
+                while (from <= till && !srcChunkIterator->end()) { 
+                    dstChunkIterator->writeItem(srcChunkIterator->getItem());
+                    ++(*dstChunkIterator);
+                    ++(*srcChunkIterator);
+                    from += 1;
+                }
+            }
+            dstChunkIterator->flush();
+        }
+        query->setTemporaryArray(dstMappingArray);
+    }
+
     //
     // SubArray chunk methods
     //
@@ -189,11 +229,11 @@ namespace scidb
     : array(aChunk.array),
       chunk(aChunk),
       inputChunk(&aChunk.getInputChunk()),
-      inputIterator(inputChunk->getConstIterator(iterationMode)),
+      inputIterator(inputChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       outPos(array.dims.size()),
       inPos(outPos.size()),
       hasCurrent(false),
-      mode(iterationMode)
+      mode(iterationMode & ~INTENDED_TILE_MODE)
     {
         reset();
     }
@@ -230,7 +270,8 @@ namespace scidb
       outPos(subarray.subarrayLowPos.size()),
       inPos(outPos.size()),
       hasCurrent(false),
-      positioned(false)
+      positioned(false),
+      outChunkPos(outPos.size())
     {
 	}
 
@@ -247,13 +288,64 @@ namespace scidb
         return !hasCurrent;
     }
 
+    void SubArrayIterator::fillSparseChunk(size_t i) 
+    {
+        Dimensions const& dims = array.dims;
+        chunkInitialized = false;
+        if (i == dims.size()) {
+            if (inputIterator->setPosition(inPos)) { 
+                ConstChunk const& inChunk = inputIterator->getChunk();
+                boost::shared_ptr<ConstChunkIterator> inIterator = inChunk.getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS);
+                
+                while (!inIterator->end()) {
+                    Coordinates const& inChunkPos = inIterator->getPosition();                    
+                    array.in2out(inChunkPos, outChunkPos);
+                    if (outIterator->setPosition(outChunkPos)) { 
+                        outIterator->writeItem(inIterator->getItem());
+                    }
+                    ++(*inIterator);
+                }
+            }
+        } else { 
+            fillSparseChunk(i+1);
+            
+            size_t interval = dims[i].getChunkInterval() - 1;
+            inPos[i] += interval;
+            fillSparseChunk(i+1);
+            inPos[i] -= interval;
+        }
+    }
+         
     ConstChunk const& SubArrayIterator::getChunk() 
     { 
         checkState();
         if (!chunkInitialized) { 
-            chunk->setInputChunk(inputIterator->getChunk());
-            ((SubArrayChunk&)*chunk).setPosition(outPos);
             chunkInitialized = true;
+            ConstChunk const& inChunk = inputIterator->getChunk();
+            if (inChunk.isSparse()) {
+                ArrayDesc const& desc = array.getArrayDesc();
+                Address addr(desc.getId(), attr, outPos);
+                sparseChunk.initialize(&array, &desc, addr, 0);
+                sparseChunk.setSparse(true);
+                if (sparseChunk.isRLE() && !emptyIterator) { 
+                    AttributeDesc const* emptyAttr = desc.getEmptyBitmapAttribute();
+                    if (emptyAttr != NULL && emptyAttr->getId() != attr) {
+                        emptyIterator = array.getConstIterator(emptyAttr->getId());
+                    }
+                }
+                if (emptyIterator) {
+                    if (!emptyIterator->setPosition(outPos))
+                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                    sparseChunk.setBitmapChunk((Chunk*)&emptyIterator->getChunk());
+                }
+                boost::shared_ptr<Query> dummyQuery;
+                outIterator = sparseChunk.getIterator(dummyQuery, ChunkIterator::NO_EMPTY_CHECK);
+                fillSparseChunk(0);
+                outIterator->flush();
+                return sparseChunk;
+            }
+            chunk->setInputChunk(inChunk);
+            ((SubArrayChunk&)*chunk).setPosition(outPos);
         }
         return *chunk;
     }

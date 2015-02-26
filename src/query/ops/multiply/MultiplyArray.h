@@ -97,37 +97,47 @@ class MultiplyArray : public Array
     };
 
   public:
-        virtual ArrayDesc const& getArrayDesc() const;
-        virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const;
-        MultiplyArray(ArrayDesc desc,
-                      boost::shared_ptr<Array> const& leftArray,
-                      boost::shared_ptr<Array> const& rightArray,
-                      const boost::shared_ptr<Query>& query);
+    enum Algorithm { 
+        Auto,
+        Sparse,                                 
+        Dense,                                 
+        Iterative
+    };
 
+    virtual ArrayDesc const& getArrayDesc() const;
+    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const;
+    MultiplyArray(ArrayDesc desc,
+                  boost::shared_ptr<Array> const& leftArray,
+                  boost::shared_ptr<Array> const& rightArray,
+                  const boost::shared_ptr<Query>& query,
+                  Algorithm algorithm
+        );
+    
   protected:
-        boost::shared_ptr<Array> doIterativeMultiply(AttributeID attr);
-        void multiplyChunks(boost::shared_ptr<ConstArrayIterator> const& rowArrayIter,
+    boost::shared_ptr<Array> doIterativeMultiply(AttributeID attr);
+    void multiplyChunks(boost::shared_ptr<ConstArrayIterator> const& rowArrayIter,
                         boost::shared_ptr<ConstArrayIterator> const& colArrayIter,
-                            boost::shared_ptr<ChunkIterator> const& outIter, Coordinate ci, Coordinate cj, Coordinate ck) const;
-
-        void multiplyChunks(void const* leftData,
-                            void const* rightData,
-                            void* resultData,
-                            Coordinate ci, Coordinate cj, Coordinate ck, Coordinate offset) const;
-
+                        boost::shared_ptr<ChunkIterator> const& outIter, Coordinate ci, Coordinate cj, Coordinate ck) const;
+    
+    void multiplyChunks(void const* leftData,
+                        void const* rightData,
+                        void* resultData,
+                        Coordinate ci, Coordinate cj, Coordinate ck, Coordinate offset) const;
+    
     bool isSelfChunk(Coordinates const& pos) const;
 
     bool supportsRandomAccess() const;
-        ArrayDesc desc;
+
+    ArrayDesc desc;
     Dimensions const& dims;
-        boost::shared_ptr<Array> leftArray;
-        boost::shared_ptr<Array> rightArray;
-        size_t iChunkLen, jChunkLen, kChunkLen;
-        uint64_t iLength, jLength, kLength;
+    boost::shared_ptr<Array> leftArray;
+    boost::shared_ptr<Array> rightArray;
+    size_t iChunkLen, jChunkLen, kChunkLen;
+    uint64_t iLength, jLength, kLength;
     Coordinate iStart, jStart, kStartLeft, kStartRight;
     bool isSparse;
-    NodeID nodeId;
-    size_t nNodes;
+    InstanceID instanceId;
+    size_t nInstances;
     boost::weak_ptr<Query> _query;
     boost::shared_ptr<Array> result;
     int rangePartitionBy;

@@ -34,6 +34,7 @@
 #include "system/Exceptions.h"
 #include "system/Config.h"
 #include "system/SciDBConfigOptions.h"
+#include <sys/time.h>
 
 using namespace std;
 
@@ -41,6 +42,10 @@ namespace scidb
 {
     // Logger for operator. static to prevent visibility of variable outside of file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc"));
+
+    #ifdef __APPLE__
+    #define fdatasync(x) fsync(x)
+    #endif
 
     const size_t MAX_READ_RETRIES = 3;
     const size_t MAX_WRITE_RETRIES = 10;
@@ -93,7 +98,7 @@ namespace scidb
 #ifdef NDEBUG
                 if (rc < 0 && errno == EAGAIN && ++nRetries < MAX_READ_RETRIES) 
 #else
-                if (rc == 0 || errno == EAGAIN)                      
+                if (rc < 0 && errno == EAGAIN)
 #endif
                 { 
                     LOG4CXX_DEBUG(logger, "pread returns nothing fd " << fd << " dst " << size_t(dst) <<" size "<<size<<" offs "<<offs<<" rc "<<rc<<" errno "<<errno<<" retries "<<nRetries);
@@ -137,13 +142,16 @@ namespace scidb
         return fd;
     }
 
+
 #ifndef SCIDB_CLIENT
+
     inline int64_t getTimeNanos()
     {
         struct timeval tv;
         gettimeofday(&tv,0);
         return ((int64_t) tv.tv_sec) * 1000000000 + ((int64_t) tv.tv_usec) * 1000;
     }
+
     void BackgroundFileFlusher::FsyncJob::run()
     {
         while (true)
@@ -157,8 +165,10 @@ namespace scidb
                     {
                         return;
                     }
+
                     fds = _flusher->_fileDescriptors;
                 }
+
                 set<int>::iterator it;
                 for (it= fds.begin(); it != fds.end(); it++)
                 {
@@ -168,6 +178,7 @@ namespace scidb
                         LOG4CXX_DEBUG(logger, "BFF: fdatasync fail on fd "<<(*it)<<" errno "<<errno);
                     }
                     int64_t t1 = getTimeNanos();
+
                     if(_logThresholdNanos >= 0 && (int64_t)(t1 - t0) > _logThresholdNanos )
                     {
                         double syncTime = ((double)(t1-t0)) / 1000000000.0;
@@ -176,6 +187,7 @@ namespace scidb
                     totalSyncTime = totalSyncTime + t1 - t0;
                 }
             }
+
             if ( totalSyncTime < _timeIntervalNanos )
             {
                 uint64_t sleepTime = _timeIntervalNanos - totalSyncTime;
@@ -192,6 +204,7 @@ namespace scidb
             }
         }
     }
+
     void BackgroundFileFlusher::start(int timeIntervalMSecs, int logThresholdMSecs, vector<int> const& fileDescriptors)
     {
         ScopedMutexLock cs(_lock);
@@ -199,11 +212,13 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED) << "BFF: error on start; already running";
         }
+
         _running = true;
         for(size_t i=0; i<fileDescriptors.size(); i++)
         {
             _fileDescriptors.insert(fileDescriptors[i]);
         }
+
         if (!_threadPool->isStarted())
         {
             _threadPool->start();
@@ -211,6 +226,7 @@ namespace scidb
         _myJob.reset(new FsyncJob(timeIntervalMSecs, logThresholdMSecs, this));
         _queue->pushJob(_myJob);
     }
+
     void BackgroundFileFlusher::stop()
     {
         {
@@ -224,11 +240,13 @@ namespace scidb
                 return;
             }
         }
+
         if(!_myJob->wait())
         {
             LOG4CXX_ERROR(logger, "BFF: error on stop.");
         }
     }
+
     void BackgroundFileFlusher::addDescriptors(vector<int> const& fileDescriptors)
     {
         ScopedMutexLock cs(_lock);
@@ -240,6 +258,7 @@ namespace scidb
             }
         }
     }
+
     void BackgroundFileFlusher::dropDescriptors(vector<int> const& fileDescriptors)
     {
         ScopedMutexLock cs(_lock);
@@ -251,6 +270,7 @@ namespace scidb
             }
         }
     }
+
     void BackgroundFileFlusher::addDescriptor (int const& fileDesc)
     {
         ScopedMutexLock cs(_lock);
@@ -259,6 +279,7 @@ namespace scidb
             _fileDescriptors.insert(fileDesc);
         }
     }
+
     void BackgroundFileFlusher::dropDescriptor (int const& fileDesc)
     {
         ScopedMutexLock cs(_lock);
@@ -267,5 +288,6 @@ namespace scidb
             _fileDescriptors.erase(fileDesc);
         }
     }
+
 #endif
 }

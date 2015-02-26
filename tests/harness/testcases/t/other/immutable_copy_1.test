@@ -8,6 +8,7 @@ create array mutable <a:int64>[x=0:30,5,0]
 store (bounded, mutable)
 
 --test
+--start-query-logging
 
 scan(bounded)  
 scan(mutable)
@@ -15,6 +16,7 @@ scan(mutable)
 # try to update mutable... just to be sure
 --aql update mutable set a=99
 
+--stop-query-logging
 --cleanup
 
 remove(bounded) 

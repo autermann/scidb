@@ -65,7 +65,7 @@ class EmbeddedChunk : public Chunk
     int getCompressionMethod() const;
     Coordinates const& getFirstPosition(bool withOverlap) const;
     Coordinates const& getLastPosition(bool withOverlap) const;
-    boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query>& query, int iterationMode);
+    boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query, int iterationMode);
     boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
     bool pin() const;
     void unPin() const;

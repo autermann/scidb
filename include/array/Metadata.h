@@ -51,10 +51,11 @@ namespace scidb
 
 class AttributeDesc;
 class DimensionDesc;
-class NodeDesc;
+class InstanceDesc;
 class LogicalOpDesc;
 class PhysicalOpDesc;
 class Query;
+class ObjectNames;
 
 /**
  * Vector of AttributeDesc type
@@ -67,18 +68,18 @@ typedef std::vector<AttributeDesc> Attributes;
 typedef std::vector<DimensionDesc> Dimensions;
 
 /**
- * Vector of NodeDesc type
+ * Vector of InstanceDesc type
  */
-typedef std::vector<NodeDesc> Nodes;
+typedef std::vector<InstanceDesc> Instances;
 
 typedef std::vector<LogicalOpDesc> LogicalOps;
 
 typedef std::vector<PhysicalOpDesc> PhysicalOps;
 
 /**
- * Node identifier
+ * Instance identifier
  */
-typedef uint64_t NodeID;
+typedef uint64_t InstanceID;
 
 /**
  * Array identifier
@@ -113,16 +114,17 @@ const uint64_t   INFINITE_LENGTH = MAX_COORDINATE;
 const VersionID  LAST_VERSION = (VersionID)-1;
 const VersionID  ALL_VERSIONS = (VersionID)-2;
 
-const NodeID CLIENT_NODE = ~0;  // Connection with this node id is client connection
-const NodeID INVALID_NODE = ~0;  // Invalid nodeID for checking that it's not registered
+const InstanceID CLIENT_INSTANCE = ~0;  // Connection with this instance id is client connection
+const InstanceID INVALID_INSTANCE = ~0;  // Invalid instanceID for checking that it's not registered
 const QueryID INVALID_QUERY_ID = ~0;
 const ArrayID INVALID_ARRAY_ID = ~0;
 const AttributeID INVALID_ATTRIBUTE_ID = ~0;
-const NodeID COORDINATOR_NODE = INVALID_NODE;
+const size_t INVALID_DIMENSION_ID = ~0;
+const InstanceID COORDINATOR_INSTANCE = INVALID_INSTANCE;
 const std::string DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME = "EmptyTag";
 
 /**
- * Partitioning schema show how an array is distributed through nodes.
+ * Partitioning schema show how an array is distributed through instances.
  * Every kind of partitioning has one or more parameters. These parameters
  * stored in vector of integers.
  */
@@ -130,7 +132,7 @@ enum PartitioningSchema
 {
     psReplication,
     psRoundRobin,
-    psLocalNode,
+    psLocalInstance,
     psByRow,
     psByCol,
     psUndefined
@@ -241,6 +243,7 @@ public:
     bool operator==(const ObjectNames &o) const;
 
     friend std::ostream& operator<<(std::ostream& stream, const ObjectNames &ob);
+    friend void printSchema (std::ostream& stream, const ObjectNames &ob);
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -256,7 +259,10 @@ protected:
 };
 
 std::ostream& operator<<(std::ostream& stream, const ObjectNames::NamesType &ob);
-
+/**
+ * Print only the names
+ */
+void printNames(std::ostream& stream, const ObjectNames::NamesType &ob);
 /**
  * Syntactic sugar to represent an n-dimensional vector.
  */
@@ -463,8 +469,11 @@ public:
      * Various array qualifiers
      */
     enum ArrayFlags {
-        IMMUTABLE = 1,
-        LOCAL = 2
+        IMMUTABLE    = 0x01,
+        LOCAL        = 0x02,
+        TEMPORARY    = 0x04,
+        DENSE        = 0x08,
+        DETERIORATED = 0x10
     };
 
 
@@ -480,7 +489,8 @@ public:
      * @param attributes vector of attributes
      * @param dimensions vector of dimensions
      */
-    ArrayDesc(const std::string &name, const Attributes& attributes, const Dimensions &dimensions, int32_t flags = 0);
+    ArrayDesc(const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
+              int32_t flags = 0);
 
     /**
      * Construct full descriptor (for returning metadata from catalog)
@@ -490,7 +500,8 @@ public:
      * @param attributes vector of attributes
      * @param dimensions vector of dimensions
      */
-    ArrayDesc(ArrayID id, const std::string &name, const Attributes& attributes, const Dimensions &dimensions, int32_t flags = 0, std::string const& comment = std::string());
+    ArrayDesc(ArrayID id, const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
+              int32_t flags = 0, std::string const& comment = std::string());
 
     /**
      * Copy constructor
@@ -517,6 +528,19 @@ public:
     }
 
     /**
+     * Mark array descriptor as deteriaorated (needed for maintain array descriptor's cache)
+     */
+    void invalidate() 
+    {
+        _flags |= DETERIORATED;
+    }
+
+    bool isInvalidated() const
+    {    
+        return _flags & DETERIORATED;
+    }
+
+    /**
      * Get name of array
      * @return array name
      */
@@ -529,10 +553,16 @@ public:
     void setName(const std::string& name);
 
     /**
-     * Get array size (number of elements)
+     * Get static array size (number of elements within static boundaries)
      * @return array size
      */
     uint64_t getSize() const;
+
+    /**
+     * Get actual array size (number of elements within actual boundaries)
+     * @return array size
+     */
+    uint64_t getCurrSize() const;
 
     /**
      * Get array size in bytes (works only for arrays with fixed size dimensions and fixed size types)
@@ -556,7 +586,7 @@ public:
      * Get vector of array attributes
      * @return array attributes
      */
-    const Attributes& getAttributes() const;
+    const Attributes& getAttributes(bool excludeEmptyBitmap = false) const;
 
     /**
      * Get vector of array dimensions
@@ -580,7 +610,7 @@ public:
      * @param pos in: element position
      * @param box in: bounding box for offset distributions
      */
-    uint64_t getChunkNumber(Coordinates const& pos, DimensionVector const& box = DimensionVector()) const;
+    uint64_t getChunkNumber(Coordinates const& pos) const;
 
     /**
      * Get flags associated with array
@@ -592,12 +622,21 @@ public:
     }
 
     /**
+     * Trim unbounded array to its actual boundaries
+     */
+    void trim();
+
+    /**
      * Get array comment
      * @return array comment
      */
-        const std::string& getComment() const;
+    const std::string& getComment() const;
 
-
+    /**
+     * Checks if arrya has non-zero overlap in any dimension
+     */
+    bool hasOverlap() const;
+    
     /**
      * Check if array is updatable
      */
@@ -618,6 +657,22 @@ public:
      * Check if array contains overlaps
      */
     bool containsOverlaps() const;
+
+    /**
+     * Get partitioning schema
+     */
+    PartitioningSchema getPartitioningSchema() const
+    {
+        return _ps;
+    }
+
+    /**
+     * Set partitioning schema
+     */
+    void setPartitioningSchema(PartitioningSchema ps)
+    {
+       _ps = ps;
+    }
 
     /**
      * Map value of this coordinate to the integer value
@@ -645,13 +700,22 @@ public:
      * @param dimensionNo dimension index
      * @param indexDesc [OUT] coordinate index array descriptor
      */
-    void getCoordinateIndexArrayDesc(size_t dimensionNo, ArrayDesc& indexDesc) const;
+    void getMappingArrayDesc(size_t dimensionNo, ArrayDesc& indexDesc) const;
 
     /**
      * Get name of array with coordinates index
      * @param dimensionNo dimension index
      */
-    std::string getCoordinateIndexArrayName(size_t dimensionNo) const;
+    std::string const& getMappingArrayName(size_t dimensionNo) const;
+
+    /**
+     * Create name of array with coordinates index
+     * @param dimensionNo dimension index
+     */
+    std::string createMappingArrayName(size_t dimensionNo, VersionID version) const;
+
+
+    
 
     /**
      * Add alias to all objects of schema
@@ -682,7 +746,8 @@ public:
         return !(*this == other);
     }
 
-    Dimensions grabDimensions(std::string const& newOwner) const;
+    void cutOverlap();
+    Dimensions grabDimensions(VersionID version) const;
 
     bool coordsAreAtChunkStart(Coordinates const& coords) const;
     bool coordsAreAtChunkEnd(Coordinates const& coords) const;
@@ -699,16 +764,23 @@ private:
     ArrayID _id;
     std::string _name;
     Attributes _attributes;
+    Attributes _attributesWithoutBitmap;
     Dimensions _dimensions;
     AttributeDesc* _bitmapAttr;
     int32_t _flags;
     std::string _comment;
+    PartitioningSchema _ps;
 };
 
 std::ostream& operator<<(std::ostream& stream,const Attributes& ob);
 std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob);
 
-/***
+/**
+ * Print only the persistent part of the array descriptor
+ */
+void printSchema(std::ostream& stream,const ArrayDesc& ob);
+
+/**
  * Attribute descriptor
  */
 class AttributeDesc
@@ -955,6 +1027,13 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& ob);
 class DimensionDesc: public ObjectNames
 {
 public:
+    enum DimensionFlags 
+    {
+        DISTINCT = 0,
+        ALL = 1,
+        COMPLEX_TRANSFORMATION = 2
+    };
+
     /**
      * Construct empty dimension descriptor (for receiving metadata)
      */
@@ -971,16 +1050,17 @@ public:
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
      * @param type dimension type
-     * @param sourceArrayName name of the persistent array from which this dimension was taken
+     * @param mappingArrayName name of the persistent array from which this dimension was taken
      * @param comment documentation comment
      */
     DimensionDesc(const std::string &name,
-              int64_t start, int64_t end,
-              uint32_t chunkInterval, uint32_t chunkOverlap,
-              TypeId type = TID_INT64,
-              std::string const& sourceArrayName = std::string(),
-              std::string const& comment = std::string()
-    );
+                  Coordinate start, Coordinate end,
+                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  TypeId type = TID_INT64,
+                  int flags = 0,
+                  std::string const& mappingArrayName = std::string(),
+                  std::string const& comment = std::string()
+        );
 
     /**
      *
@@ -991,14 +1071,15 @@ public:
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
      * @param type dimension type
-     * @param sourceArrayName name of the persistent array from which this dimension was taken
+     * @param mappingArrayName name of the persistent array from which this dimension was taken
      * @param comment documentation comment
      */
     DimensionDesc(const std::string &baseName, const NamesType &names,
-                  int64_t start, int64_t end,
+                  Coordinate start, Coordinate end,
                   uint32_t chunkInterval, uint32_t chunkOverlap,
                   TypeId type = TID_INT64,
-                  std::string const& sourceArrayName = std::string(),
+                  int flags = 0,
+                  std::string const& mappingArrayName = std::string(),
                   std::string const& comment = std::string()
         );
 
@@ -1013,16 +1094,21 @@ public:
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
      * @param type dimension type
-     * @param sourceArrayName name of the persistent array from which this dimension was taken
+     * @param mappingArrayName name of the persistent array from which this dimension was taken
      * @param comment documentation comment
+     * @param funcMapOffset offset for coordinate map function (used for SUBARRAY, THIN)
+     * @param funcMapScale scale for coordinate map function (used for THIN)
      */
     DimensionDesc(const std::string &name,
-                              int64_t startMin, int64_t currStart,
-                              int64_t currEnd, int64_t endMax,
-                          uint32_t chunkInterval, uint32_t chunkOverlap,
-              TypeId type = TID_INT64,
-              std::string const& sourceArrayName =std::string(),
-              std::string const& comment = std::string()
+                  Coordinate startMin, Coordinate currStart,
+                  Coordinate currEnd, Coordinate endMax,
+                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  TypeId type = TID_INT64,
+                  int flags = 0,
+                  std::string const& mappingArrayName =std::string(),
+                  std::string const& comment = std::string(),
+                  Coordinate funcMapOffset = 0,
+                  Coordinate funcMapScale = 1
     );
 
     /**
@@ -1036,16 +1122,21 @@ public:
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
      * @param type dimension type
-     * @param sourceArrayName name of the persistent array from which this dimension was taken
+     * @param mappingArrayName name of the persistent array from which this dimension was taken
      * @param comment documentation comment
+     * @param funcMapOffset offset for coordinate map function (used for SUBARRAY, THIN)
+     * @param funcMapScale scale for coordinate map function (used for THIN)
      */
     DimensionDesc(const std::string &baseName, const NamesType &names,
-              int64_t startMin, int64_t currStart,
-              int64_t currEnd, int64_t endMax,
-              uint32_t chunkInterval, uint32_t chunkOverlap,
-              TypeId type = TID_INT64,
-              std::string const& sourceArrayName = std::string(),
-              std::string const& comment = std::string()
+                  Coordinate startMin, Coordinate currStart,
+                  Coordinate currEnd, Coordinate endMax,
+                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  TypeId type = TID_INT64,
+                  int flags = 0,
+                  std::string const& mappingArrayName = std::string(),
+                  std::string const& comment = std::string(),
+                  Coordinate funcMapOffset = 0,
+                  Coordinate funcMapScale = 1
     );
 
     bool operator == (DimensionDesc const& other) const;
@@ -1058,43 +1149,43 @@ public:
      * Get minimum value for array index - _startMin
      * @return minimum dimension start
      */
-    int64_t getStartMin() const;
+    Coordinate getStartMin() const;
 
     /**
      * Get current start for array index - _currStart
      * @return current dimension start
      */
-    int64_t getCurrStart() const;
+    Coordinate getCurrStart() const;
 
     /**
      * Get from catalog low boundary for the specified dimension
      * @return low boundary for the dimension
      */
-    int64_t getLowBoundary() const;
+    Coordinate getLowBoundary() const;
 
     /**
      * Get from catalog high boundary for the specified dimension
      * @return high boundary for the dimension
      */
-    int64_t getHighBoundary() const;
+    Coordinate getHighBoundary() const;
 
     /**
      * Get dimension start ( _startMin  )
      * @return dimension start
      */
-    int64_t getStart() const;
+    Coordinate getStart() const;
 
     /**
      * Get current end for array index - _currEnd
      * @return current dimension end
      */
-    int64_t getCurrEnd() const;
+    Coordinate getCurrEnd() const;
 
     /**
      * Get maximum end for array index - _endMax
      * @return maximum dimension end
      */
-    int64_t getEndMax() const;
+    Coordinate getEndMax() const;
 
     /**
      * Get dimension length
@@ -1123,7 +1214,7 @@ public:
     /**
      * Get name of the persistent array from which this dimension was taken
      */
-    std::string getSourceArrayName() const;
+    std::string const& getMappingArrayName() const;
 
     /**
      * Get current origin of array along this dimension (not including overlap).
@@ -1180,8 +1271,11 @@ public:
            <<" chnkInterval "<<_chunkInterval
            <<" chnkOverlap "<<_chunkOverlap
            <<" type "<<_type
-           <<" sourceArrayName "<<_sourceArrayName
-           <<" comment " << _comment << "\n";
+           <<" flags "<<_flags
+           <<" mappingArrayName "<<_mappingArrayName
+           <<" comment " << _comment
+           <<" funcMapOffset " << _funcMapOffset
+           <<" funcMapScale " << _funcMapScale << "\n";
     }
 
     template<class Archive>
@@ -1195,94 +1289,161 @@ public:
         ar & _chunkInterval;
         ar & _chunkOverlap;
         ar & _type;
-        ar & _sourceArrayName;
+        ar & _flags;
+        ar & _mappingArrayName;
         ar & _comment;
         ar & _isInteger;
+        ar & _funcMapOffset;
+        ar & _funcMapScale;        
+    }
+
+    int getFlags() const
+    {
+        return _flags;
+    }
+
+    bool isDistinct() const
+    {
+        return (_flags & ALL) == 0;
+    }
+
+    void setMappingArrayName(const std::string &mappingArrayName)
+    {
+        _mappingArrayName = mappingArrayName;
+    }
+
+    Coordinate getFuncMapOffset() const
+    {
+        return _funcMapOffset;
+    }
+
+    Coordinate getFuncMapScale() const
+    {
+        return _funcMapScale;
+    }
+
+    void setFuncMapOffset(Coordinate offs)
+    { 
+        _funcMapOffset = offs;
+    }
+    
+    void setFuncMapScale(Coordinate scale)
+    { 
+        _funcMapScale = scale;
+    }
+    
+    void setCurrStart(Coordinate currStart)
+    {
+        _currStart = currStart;
+    }
+
+    void setCurrEnd(Coordinate currEnd)
+    {
+        _currEnd = currEnd;
+    }
+
+    void setEndMax(Coordinate endMax)
+    {
+        _endMax = endMax;
     }
 
 private:
     friend class ArrayDesc;
 
-    int64_t  _startMin;
-    int64_t  _currStart;
+    Coordinate _startMin;
+    Coordinate _currStart;
 
-    int64_t  _currEnd;
-    int64_t  _endMax;
+    Coordinate _currEnd;
+    Coordinate _endMax;
 
     uint32_t _chunkInterval;
     uint32_t _chunkOverlap;
 
     ArrayDesc* _array;
 
+    Coordinate _funcMapOffset;
+    Coordinate _funcMapScale;
+    
     TypeId _type;
-    std::string _sourceArrayName;
+    int  _flags;
+    std::string _mappingArrayName;
     std::string _comment;
     bool _isInteger;
 };
 
 std::ostream& operator<<(std::ostream& stream,const Dimensions& ob);
+
+/**
+ * Print only the persistent part of the dimensions
+ */
+void printSchema(std::ostream& stream,const Dimensions& ob);
 std::ostream& operator<<(std::ostream& stream,const DimensionDesc& ob);
 
 /**
- * Descriptor of node
+ * Print only the persistent part of the dimension descriptor
  */
-class NodeDesc
+void printSchema (std::ostream& stream,const DimensionDesc& ob);
+
+/**
+ * Descriptor of instance
+ */
+class InstanceDesc
 {
 public:
     /**
-     * Construct empty node descriptor (for receiving metadata)
+     * Construct empty instance descriptor (for receiving metadata)
      */
-    NodeDesc();
+    InstanceDesc();
 
     /**
-     * Construct partial node descriptor (without id, for adding to catalog)
+     * Construct partial instance descriptor (without id, for adding to catalog)
      *
-     * @param host ip or hostname where node running
+     * @param host ip or hostname where instance running
      * @param port listening port
-     * @param online node status (online or offline)
+     * @param online instance status (online or offline)
      */
-    NodeDesc(const std::string &host, uint16_t port);
+    InstanceDesc(const std::string &host, uint16_t port);
 
     /**
-     * Construct full node descriptor
+     * Construct full instance descriptor
      *
-     * @param node_id node identifier
-     * @param host ip or hostname where node running
+     * @param instance_id instance identifier
+     * @param host ip or hostname where instance running
      * @param port listening port
-     * @param online node status (online or offline)
+     * @param online instance status (online or offline)
      */
-    NodeDesc(uint64_t node_id, const std::string &host, uint16_t port, uint64_t onlineTs);
+    InstanceDesc(uint64_t instance_id, const std::string &host, uint16_t port, uint64_t onlineTs);
 
     /**
-     * Get node identifier
-     * @return node identifier
+     * Get instance identifier
+     * @return instance identifier
      */
-    uint64_t getNodeId() const;
+    uint64_t getInstanceId() const;
 
     /**
-     * Get node hostname or ip
-     * @return node host
+     * Get instance hostname or ip
+     * @return instance host
      */
     const std::string& getHost() const;
 
     /**
-     * Get node listening port number
+     * Get instance listening port number
      * @return port number
      */
     uint16_t getPort() const;
 
     /**
-     * @return time when the node marked itself online
+     * @return time when the instance marked itself online
      */
     uint64_t getOnlineSince() const;
 
 private:
-    uint64_t _node_id;
+    uint64_t _instance_id;
     std::string _host;
     uint16_t _port;
     uint64_t _online;
 };
-std::ostream& operator<<(std::ostream& stream,const NodeDesc& ob);
+std::ostream& operator<<(std::ostream& stream,const InstanceDesc& ob);
 
 /**
  * Descriptor of pluggable logical operator
@@ -1458,7 +1619,7 @@ public:
         return _entry;
     }
 
-private:
+  private:
     OpID _physicalOpId;
     std::string _logicalOpName;
     std::string _name;

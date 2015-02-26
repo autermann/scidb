@@ -68,7 +68,7 @@ public:
         ArrayDesc desc;
         SystemCatalog::getInstance()->getArrayDesc(oldArrayName, desc);
 
-        return ArrayDesc(desc.getId(), newArrayName, desc.getAttributes(), desc.grabDimensions(newArrayName), desc.getFlags());
+        return ArrayDesc(desc.getId(), newArrayName, desc.getAttributes(), desc.getDimensions(), desc.getFlags());
 	}
 
     void inferArrayAccess(boost::shared_ptr<Query>& query)
@@ -78,10 +78,9 @@ public:
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
         const string& oldArrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         assert(oldArrayName.find('@') == std::string::npos);
-        string baseName = oldArrayName.substr(0, oldArrayName.find('@'));
-        boost::shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(baseName,
+        boost::shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(oldArrayName,
                                                                                     query->getQueryID(),
-                                                                                    Cluster::getInstance()->getLocalNodeId(),
+                                                                                    Cluster::getInstance()->getLocalInstanceId(),
                                                                                     SystemCatalog::LockDesc::COORD,
                                                                                     SystemCatalog::LockDesc::RNF));
         boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);

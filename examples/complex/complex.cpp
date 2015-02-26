@@ -46,28 +46,52 @@ enum
     COMPLEX_ERROR1 = SCIDB_USER_ERROR_CODE_START
 };
 
-static class ComplexLibrary
-{
-public:
-    ComplexLibrary()
-    {
-        _errors[COMPLEX_ERROR1] = "Failed to parse complex number";
-        scidb::ErrorsLibrary::getInstance()->registerErrors("complex", &_errors);
-    }
-
-    ~ComplexLibrary()
-    {
-        scidb::ErrorsLibrary::getInstance()->unregisterErrors("complex");
-    }
-
-private:
-    scidb::ErrorsLibrary::ErrorsMessages _errors;
-} _instance;
-
 struct Complex
 {
     double re;
     double im;
+
+    Complex(int n = 0): re(n), im(0) {}
+
+    /** C++ operators implementation for aggregating */
+    Complex operator*(const Complex& b) const
+    {
+        Complex c;
+        c.re = (re * b.re - im * b.im);
+        c.im = (im * b.re + re * b.im);
+        return c;
+    }
+
+    Complex operator*(uint64_t v) const
+    {
+        Complex r;
+        r.re = re * v;
+        r.im = im * v;
+        return r;
+    }
+
+    Complex operator/(uint64_t v) const
+    {
+        Complex c;
+        c.re = (re * v) / (v * v);
+        c.im = (im * v) / (v * v);
+        return c;
+    }
+
+    Complex operator-(const Complex& b) const
+    {
+        Complex c;
+        c.re = re - b.re;
+        c.im = im - b.im;
+        return c;
+    }
+
+    Complex& operator+=(const Complex& b)
+    {
+        re += b.re;
+        im += b.im;
+        return *this;
+    }
 };
 
 static void addComplex(const Value** args, Value* res, void*)
@@ -189,3 +213,36 @@ REGISTER_CONVERTER(double, complex, IMPLICIT_CONVERSION_COST, double2complex);
 REGISTER_CONVERTER(int64, complex, IMPLICIT_CONVERSION_COST, integer2complex);
 REGISTER_CONVERTER(string, complex, EXPLICIT_CONVERSION_COST, string2complex);
 REGISTER_CONVERTER(complex, string, EXPLICIT_CONVERSION_COST, complex2string);
+
+vector<AggregatePtr> _aggregates;
+EXPORTED_FUNCTION const vector<AggregatePtr>& GetAggregates()
+{
+    return _aggregates;
+}
+
+/**
+ * Class for registering/unregistering user defined objects
+ */
+static class ComplexLibrary
+{
+public:
+    ComplexLibrary()
+    {
+        Type complexType("complex", sizeof(Complex) * 8);
+
+        // Aggregates
+        _aggregates.push_back(AggregatePtr(new BaseAggregate<AggSum, Complex, Complex>("sum", complexType, complexType)));
+        _aggregates.push_back(AggregatePtr(new BaseAggregate<AggAvg, Complex, Complex>("avg", complexType, complexType)));
+        _aggregates.push_back(AggregatePtr(new BaseAggregate<AggVar, Complex, Complex>("var", complexType, complexType)));
+
+        _errors[COMPLEX_ERROR1] = "Failed to parse complex number";
+        scidb::ErrorsLibrary::getInstance()->registerErrors("complex", &_errors);
+    }
+    ~ComplexLibrary()
+    {
+        scidb::ErrorsLibrary::getInstance()->unregisterErrors("complex");
+    }
+
+private:
+    scidb::ErrorsLibrary::ErrorsMessages _errors;
+} _instance;

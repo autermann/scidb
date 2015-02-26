@@ -44,6 +44,7 @@ set(scidbclient_src
     ../system/ErrorsLibrary.cpp
     ../network/MessageUtils.cpp
     ../system/Warnings.cpp
+    ../query/TileFunctions.cpp
 )
 
 file(GLOB scidbclient_include "include/*.h")

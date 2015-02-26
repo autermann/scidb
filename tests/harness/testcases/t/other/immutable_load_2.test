@@ -1,6 +1,7 @@
 --setup
 
 --test
+--start-query-logging
 
 create immutable empty array unbounded <a:int64>[x=0:*,5,0]
 load(unbounded,'../tests/harness/testcases/data/unbounded_empty.txt')
@@ -10,6 +11,7 @@ load(unbounded,'../tests/harness/testcases/data/unbounded_empty.txt')
 scan(unbounded)  
 
 
+--stop-query-logging
 --cleanup
 
 remove(unbounded) 

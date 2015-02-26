@@ -83,7 +83,7 @@ namespace scidb
 
 		bool validDelta;
 
-		const static Value ValueDifference(const Value v1, const Value v2);
+		const static Value ValueDifference(const Value& v1, const Value& v2);
 
 		void writeDeltaData(const uint8_t bitDepth, const MemChunk& sparseData, const MemChunk& denseData);
 		static MemChunk& subtractChunks(MemChunk& deltaChunk, const ConstChunk& srcChunk, const ConstChunk& targetChunk);

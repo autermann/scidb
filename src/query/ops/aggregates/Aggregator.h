@@ -278,8 +278,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
                                               _schema.getAttributes()[i].getName(),
                                               _aggs[i]->getStateType().typeId(),
                                               AttributeDesc::IS_NULLABLE,
-                                              0, std::set<std::string>(), &defaultNull, "", "",
-                                              _aggs[i]->getStateVarSize() ));
+                                              0, std::set<std::string>(), &defaultNull, "", ""));
         }
 
         return ArrayDesc(_schema.getName(), outAttrs, _schema.getDimensions(), _schema.getFlags());
@@ -354,11 +353,12 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         {
             setOutputPosition(stateArrayIterator, stateChunkIterator, bucket.first, i);
             Value& state = stateChunkIterator->getItem();
+            const RLEPayload* payload = bucket.second.getPayload();
             if (state.getMissingReason()==0)
             {
                 _aggs[i]->initializeState(state);
             }
-            _aggs[i]->accumulatePayload(state, bucket.second.getPayload());
+            _aggs[i]->accumulatePayload(state, payload);
             stateChunkIterator->writeItem(state);
         }
     }
@@ -580,10 +580,6 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         shared_ptr<ConstArrayIterator> inArrayIterator = inputArray->getConstIterator(mapping.inputAttributeId);
         size_t nAggs = mapping.aggregates.size();
         vector<Value> states(nAggs);
-        for (size_t i=0; i<mapping.aggregates.size(); i++)
-        {
-            mapping.aggregates[i]->initializeState(states[i]);
-        }
 
         while (!inArrayIterator->end())
         {
@@ -594,10 +590,15 @@ class AggregatePartitioningOperator: public  PhysicalOperator
                 {
                     Value &v = inChunkIterator->getItem();
                     RLEPayload *tile = v.getTile();
-                    
-                    for (size_t i=0; i<mapping.aggregates.size(); i++)
+                    if (tile->count())
                     {
-                        mapping.aggregates[i]->accumulatePayload(states[i],tile);
+                        for (size_t i=0; i<mapping.aggregates.size(); i++)
+                        {
+                            if (states[i].getMissingReason() == 0) {
+                                mapping.aggregates[i]->initializeState(states[i]);
+                            }
+                            mapping.aggregates[i]->accumulatePayload(states[i], tile);
+                        }
                     }
                     
                     ++(*inChunkIterator);
@@ -713,7 +714,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
                             {
                                 mapping.aggregates[i]->initializeState(states[i]);
                             }
-                            mapping.aggregates[i]->accumulate(states[i],v);
+                            mapping.aggregates[i]->accumulate(states[i], v);
                         }
                     }
                     ++(*inChunkIterator);
@@ -740,7 +741,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
                 {
                     mapping.aggregates[i]->initializeState(states[i]);
                 }
-                ((CountingAggregate*)mapping.aggregates[i].get())->overrideCount(states[i],chunkCount);
+                ((CountingAggregate*)mapping.aggregates[i].get())->overrideCount(states[i], chunkCount);
             }
             stateChunkIterator->writeItem(states[i]);
             stateChunkIterator->flush();

@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>input</refname>
+    <refpurpose>Read a system file</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>INTO</command> <replaceable>target_array</replaceable> 
+   <command>FROM</command> input(<replaceable>named_array</replaceable>|<replaceable>anonymous_schema</replaceable>,<replaceable>filename</replaceable><optional>,<replaceable>instance</replaceable></optional>);</synopsis>
+<synopsis>store(input(<replaceable>target_array</replaceable>|<replaceable>anonymous_schema</replaceable>,<replaceable>filename</replaceable><optional>,<replaceable>instance</replaceable></optional>),
+   <replaceable>target_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>Input works exactly the same way as load, except it does NOT store the data unless the INTO clause or the AFL store operator is present.
+The instance_id argument allows you to select which SciDB instance you want to input into. To see a list of SciDB instances running on your system, type <code>scidb.py status hostname</code> at the Unix command-line.</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example reads a csv file from the examples directory.<programlisting>input(m4x4,&apos;path/trunk/doc/user/examples/m4x4_missing.txt);</programlisting></para>
+    </informalexample>
+  </refsect1>
+</refentry>

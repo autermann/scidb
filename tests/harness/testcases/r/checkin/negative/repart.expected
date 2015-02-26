@@ -35,10 +35,10 @@ SCIDB QUERY : <store(repart(A,<b:int32> [x=1:3,3,0]),B4)>
 [An error expected at this place for the query "store(repart(A,<b:int32> [x=1:3,3,0]),B4)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR3.]
 
 SCIDB QUERY : <store(repart(A,<b:int32> [x=0:3,3,0]),B5)>
-[An error expected at this place for the query "store(repart(A,<b:int32> [x=0:3,3,0]),B5)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR4. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR4.]
+[(10),(11),(12)]
 
 SCIDB QUERY : <store(repart(D,<z:int32>[y(string)=4,2,0]),B6)>
-[An error expected at this place for the query "store(repart(D,<z:int32>[y(string)=4,2,0]),B6)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR4. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR4.]
+[("10"),("11"),("12"),()]
 
 SCIDB QUERY : <store(repart(D,<z:int32>[y(string)=3,2,1,a(string)=3,2,1]),B7)>
 [An error expected at this place for the query "store(repart(D,<z:int32>[y(string)=3,2,1,a(string)=3,2,1]),B7)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR1. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR1.]
@@ -65,5 +65,11 @@ SCIDB QUERY : <remove(D)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(E)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(B5)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(B6)>
 Query was executed successfully
 

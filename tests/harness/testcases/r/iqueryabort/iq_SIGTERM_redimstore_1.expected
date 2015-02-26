@@ -1,7 +1,10 @@
+SCIDB QUERY : <CREATE IMMUTABLE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:2999,100,0, y=0:2999,100,0]>
 Query was executed successfully
 
+SCIDB QUERY : <CREATE EMPTY ARRAY ABRREDIM <x:int64>[a=0:2999,20,0]>
 Query was executed successfully
 
+SCIDB QUERY : <load(ABRLOAD,'../tests/harness/testcases/data/xyz_small.txt')>
 [[{5,16}(0.497321)]];
 [[{2,132}(0.944702)]];
 [[{0,244}(0.657221),{53,255}(0.609632),{68,226}(0.448509)]];
@@ -340,6 +343,7 @@ Query was executed successfully
 [[{1911,1843}(0.524654),{1957,1833}(0.111498),{1998,1811}(0.48727)]];
 [[{1906,1926}(0.196587),{1915,1954}(0.603749),{1942,1954}(0.302553)]]
 
+SCIDB QUERY : <scan(ABRLOAD)>
 [[{5,16}(0.497321)]];
 [[{2,132}(0.944702)]];
 [[{0,244}(0.657221),{53,255}(0.609632),{68,226}(0.448509)]];
@@ -678,8 +682,10 @@ Query was executed successfully
 [[{1911,1843}(0.524654),{1957,1833}(0.111498),{1998,1811}(0.48727)]];
 [[{1906,1926}(0.196587),{1915,1954}(0.603749),{1942,1954}(0.302553)]]
 
+SCIDB QUERY : <scan(ABRREDIM)>
 []
 
+SCIDB QUERY : <scan(ABRLOAD)>
 [[{5,16}(0.497321)]];
 [[{2,132}(0.944702)]];
 [[{0,244}(0.657221),{53,255}(0.609632),{68,226}(0.448509)]];
@@ -1019,9 +1025,11 @@ Query was executed successfully
 [[{1906,1926}(0.196587),{1915,1954}(0.603749),{1942,1954}(0.302553)]]
 
 "should be empty..."
+SCIDB QUERY : <scan(ABRREDIM)>
 []
 
 "should be no mapping arrays..."
+SCIDB QUERY : <list('arrays')>
 [("ABRLOAD"),("ABRREDIM")]
 
 Query was executed successfully

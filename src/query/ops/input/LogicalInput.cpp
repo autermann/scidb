@@ -44,7 +44,7 @@ namespace scidb
 {
 
 /**
- * Must be called as INPUT('existing_array_name', '/path/to/file/on/node')
+ * Must be called as INPUT('existing_array_name', '/path/to/file/on/instance')
  */
 class LogicalInput: public LogicalOperator
 {
@@ -77,28 +77,28 @@ public:
     {
         assert(inputSchemas.size() == 0);
 
-        int64_t nodeID = -2;
+        int64_t instanceID = -2;
         if (_parameters.size() == 3)
         {
-            nodeID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
+            instanceID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
                                       query, TID_INT64).getInt64();
-            if (nodeID < -2 ||   nodeID >= (int64_t) query->getNodesCount())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_NODE_ID,
-                                           _parameters[2]->getParsingContext()) << nodeID;
+            if (instanceID < -2 ||   instanceID >= (int64_t) query->getInstancesCount())
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
+                                           _parameters[2]->getParsingContext()) << instanceID;
         }
 
         const string &path = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                                       query, TID_STRING).getString();
 
-        if (nodeID == -1)
+        if (instanceID == -1)
         {
-            //Distributed loading let's check file existence on all nodes
-            map<NodeID, bool> nodesMap;
-            Resources::getInstance()->fileExists(path, nodesMap, query);
+            //Distributed loading let's check file existence on all instances
+            map<InstanceID, bool> instancesMap;
+            Resources::getInstance()->fileExists(path, instancesMap, query);
 
             bool fileDetected = false;
-            vector<NodeID> nodesWithoutFile;
-            for (map<NodeID, bool>::const_iterator it = nodesMap.begin(); it != nodesMap.end(); ++it)
+            vector<InstanceID> instancesWithoutFile;
+            for (map<InstanceID, bool>::const_iterator it = instancesMap.begin(); it != instancesMap.end(); ++it)
             {
                 if (it->second)
                 {
@@ -108,12 +108,12 @@ public:
                 else
                 {
                     //Remembering file name on each missing file
-                    LOG4CXX_WARN(oplogger, "File '" << path << "' not found on node #" << it->first);
-                    nodesWithoutFile.push_back(it->first);
+                    LOG4CXX_WARN(oplogger, "File '" << path << "' not found on instance #" << it->first);
+                    instancesWithoutFile.push_back(it->first);
                 }
             }
 
-            //Such file not found on any node. Failing with exception
+            //Such file not found on any instance. Failing with exception
             if (!fileDetected)
             {
                 throw USER_QUERY_EXCEPTION(
@@ -121,22 +121,22 @@ public:
                     _parameters[1]->getParsingContext()) << path;
             }
 
-            //If some nodes missing this file posting appropriate warning
-            if (nodesWithoutFile.size())
+            //If some instances missing this file posting appropriate warning
+            if (instancesWithoutFile.size())
             {
-                stringstream nodesList;
-                for (size_t i = 0, count = nodesWithoutFile.size();  i < count; ++i)
+                stringstream instancesList;
+                for (size_t i = 0, count = instancesWithoutFile.size();  i < count; ++i)
                 {
-                    nodesList << nodesWithoutFile[i] << (i == count - 1 ? "" : ", ");
+                    instancesList << instancesWithoutFile[i] << (i == count - 1 ? "" : ", ");
                 }
-                LOG4CXX_WARN(oplogger, "File " << path << " not found on nodes " << nodesList.str());
-                query->postWarning(SCIDB_WARNING(SCIDB_W_FILE_NOT_FOUND_ON_NODES) << path << nodesList.str());
+                LOG4CXX_WARN(oplogger, "File " << path << " not found on instances " << instancesList.str());
+                query->postWarning(SCIDB_WARNING(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES) << path << instancesList.str());
             }
         }
-        else if (nodeID == -2)
+        else if (instanceID == -2)
         {
-            //This is loading from local node. Throw error if file not found.
-            if (!Resources::getInstance()->fileExists(path, query->getNodeID(), query))
+            //This is loading from local instance. Throw error if file not found.
+            if (!Resources::getInstance()->fileExists(path, query->getInstanceID(), query))
             {
                 throw USER_QUERY_EXCEPTION(
                     SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
@@ -145,8 +145,8 @@ public:
         }
         else
         {
-            //This is loading from single node. Throw error if file not found.
-            if (!Resources::getInstance()->fileExists(path, nodeID, query))
+            //This is loading from single instance. Throw error if file not found.
+            if (!Resources::getInstance()->fileExists(path, instanceID, query))
             {
                 throw USER_QUERY_EXCEPTION(
                     SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,

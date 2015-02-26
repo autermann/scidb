@@ -51,16 +51,16 @@ public:
         assert(schemas.size() == 1);
         assert(_parameters.size() == 1);
 
-        ArrayDesc dstArrayDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc schemaParam = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         ArrayDesc const& srcArrayDesc = schemas[0];
         Attributes const& srcAttributes = srcArrayDesc.getAttributes();
         Dimensions const& srcDimensions = srcArrayDesc.getDimensions();
-        Dimensions const& dstDimensions = dstArrayDesc.getDimensions();
+        Dimensions dstDimensions = schemaParam.getDimensions();
 
-        if (dstArrayDesc.getName().size() == 0)
+        if (schemaParam.getName().size() == 0)
         {
-            dstArrayDesc.setName(srcArrayDesc.getName()+"_repart");
+            schemaParam.setName(srcArrayDesc.getName()+"_repart");
         }
 
         if (srcDimensions.size() != dstDimensions.size())
@@ -71,12 +71,16 @@ public:
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR2);
             if (srcDimensions[i].getStart() != dstDimensions[i].getStart())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR3);
-            if (srcDimensions[i].getLength() != dstDimensions[i].getLength())
+            if (!(srcDimensions[i].getEndMax() == dstDimensions[i].getEndMax() 
+                               || (srcDimensions[i].getEndMax() < dstDimensions[i].getEndMax() 
+                                   && ((srcDimensions[i].getLength() % srcDimensions[i].getChunkInterval()) == 0
+                                       || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR4);
             if (srcDimensions[i].getStart() == MIN_COORDINATE)
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR5);
+            dstDimensions[i].setMappingArrayName(srcDimensions[i].getMappingArrayName());
         }
-        return ArrayDesc(dstArrayDesc.getName(), srcAttributes, dstDimensions);
+        return ArrayDesc(schemaParam.getName(), srcAttributes, dstDimensions, schemaParam.getFlags());
     }
 };
 

@@ -147,7 +147,7 @@ namespace scidb {
     {
         currIterator = -1;
         for (size_t i = 0, n = inputChunks.size(); i < n; i++) {
-            iterators[i] = inputChunks[i]->getConstIterator(iterationMode);
+            iterators[i] = inputChunks[i]->getConstIterator(iterationMode & ~INTENDED_TILE_MODE);
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
                 currIterator = i;

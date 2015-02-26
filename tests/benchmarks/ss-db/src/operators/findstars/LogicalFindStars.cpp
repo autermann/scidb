@@ -66,7 +66,7 @@ public:
     Dimensions const& dims = desc.getDimensions();
 
     Attributes aggAttrs(6); // pixel and Object Id (star id)
-    Dimensions aggDims(3); // 2 dimension array
+    Dimensions aggDims(3); // 3 dimension array
     
     // add the dimensions
     aggDims[0] = DimensionDesc(dims[0].getBaseName(), dims[0].getStart() , dims[0].getEndMax() , dims[0].getChunkInterval() , dims[0].getChunkOverlap());

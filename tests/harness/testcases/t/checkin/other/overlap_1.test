@@ -8,7 +8,6 @@ create array B <a:int32 null> [x=0:3,2,1]
 
 --test
 --aql load A from '../tests/harness/testcases/data/null_8.txt'
---aql load B from '../tests/harness/testcases/data/null_8.txt'
 --aql select * into B from repart(A,B)
 
 --cleanup

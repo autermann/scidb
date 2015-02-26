@@ -4,7 +4,7 @@ import subprocess
 import shlex
 import time
 import re
-# Tested on 2-node cluster
+# Tested on 2-instance cluster
 
 basepath = os.path.realpath(os.path.dirname(sys.argv[0])) 
 dgpath = basepath + "/../data_gen/gen_matrix"

@@ -34,7 +34,7 @@
  * and communicate with coordinator of cluster by message exchanging.
  *
  * Embedded version is linked with scidb implementation and can be loaded into client process.
- * In this case client process becomes a node of scidb cluster.
+ * In this case client process becomes a instance of scidb cluster.
  */
 
 #ifndef SCIDBAPI_H_
@@ -78,6 +78,7 @@ public:
     std::string explainPhysical; // Every executed physical plan separated by ';'
 
     std::vector<std::string> plugins; /**< a list of plugins containing UDT in result array */
+    std::vector< boost::shared_ptr<Array> > mappingArrays;
 
 #ifdef SCIDB_CLIENT
     bool hasWarnings();
@@ -111,8 +112,8 @@ public:
     virtual ~SciDB() {}
     /**
      * Connect client to a coordinator of scidb cluster.
-     * @param connectionString an address of scidb coordinator node.
-     * @param port a TCP/IP port of a coordinator node.
+     * @param connectionString an address of scidb coordinator instance.
+     * @param port a TCP/IP port of a coordinator instance.
      * @return a handle for connection
      */
     virtual void* connect( const std::string& connectionString = "localhost",
@@ -143,9 +144,15 @@ public:
 
     /**
      * @param connection is handle to connection returned by connect method
-     * Cancel current query execution or just free resources if query already finished.
-     */
+     * Cancel current query execution, rollback any changes on disk, free the query reqources 
+     */   
     virtual void cancelQuery(QueryID queryID, void* connection = NULL) const = 0;
+
+    /**
+     * @param connection is handle to connection returned by connect method
+     * Commit and free resources if query already finished.
+     */
+    virtual void completeQuery(QueryID queryID, void* connection = NULL) const = 0;
 };
 
 

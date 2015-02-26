@@ -64,7 +64,7 @@ class LogicalSubstitute: public LogicalOperator
 
         Dimensions const& substDims = substDesc.getDimensions();
         Attributes const& inputAttrs = inputDesc.getAttributes();
-        Attributes const& substAttrs = substDesc.getAttributes();
+        Attributes const& substAttrs = substDesc.getAttributes(true);
 
         if (substDims.size() != 1)
         {

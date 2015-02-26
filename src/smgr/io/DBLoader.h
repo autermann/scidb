@@ -68,13 +68,11 @@ namespace scidb
          * Save data in text format in specified file, replacing ordinal coordinates
          * with non-integer dimension values.
          * @param array array to be saved
-         * @param mappingArrays non-integer dimension arrays, in the order of dimensions
          * @param file path to the exported data file
          * @param format output format: must be "lcsv+" or "lsparse"
          * @return number of saved tuples
          */
-        static uint64_t saveWithLabels(Array const& array, std::vector<boost::shared_ptr<Array> > mappingArrays,
-                                       std::string const& file, std::string const& format = "lcsv+", bool append = false);
+        static uint64_t saveWithLabels(Array const& array, std::string const& file, std::string const& format = "lcsv+", bool append = false);
     };
 }
 

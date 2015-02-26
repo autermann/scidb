@@ -1,6 +1,6 @@
 /*
 **
-* BEGIN_COPYRIGHT
+BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
 * Copyright (C) 2008-2012 SciDB, Inc.
@@ -45,7 +45,6 @@ AQLKW("else", token::ELSE)
 AQLKW("case", token::CASE)
 AQLKW("when", token::WHEN)
 AQLKW("end", token::END)
-AQLKW("agg", token::AGG)
 AQLKW("select", token::SELECT)
 AQLKW("from", token::FROM)
 AQLKW("where", token::WHERE)
@@ -72,3 +71,9 @@ AQLKW("window", token::WINDOW)
 AQLKW("asc", token::ASC)
 AQLKW("desc", token::DESC)
 AQLKW("redimension", token::REDIMENSION)
+AQLKW("all", token::ALL)
+AQLKW("distinct", token::DISTINCT)
+AQLKW("current", token::CURRENT)
+AQLKW("instance", token::INSTANCE)
+AQLKW("instances", token::INSTANCES)
+AQLKW("save", token::SAVE)

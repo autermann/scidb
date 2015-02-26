@@ -543,7 +543,7 @@ typedef bool Bool;
 // iif implementation
 void iif(const Value** args, Value* res, void*)
 {
-    if (args[0]->getBool())
+    if (!args[0]->isNull() && args[0]->getBool())
         *res = *args[1];
     else
         *res = *args[2];
@@ -569,6 +569,16 @@ void missingReason(const Value** args, Value* res, void*)
 void identicalConversion(const Value** args, Value* res, void*)
 {
     *res = *args[0];
+}
+
+void boolMax(const Value** args, Value* res, void*)
+{
+    res->setBool(args[0]->getBool() || args[1]->getBool());
+}
+
+void boolMin(const Value** args, Value* res, void*)
+{
+    res->setBool(args[0]->getBool() && args[1]->getBool());
 }
 
 // NULL converter
@@ -675,6 +685,15 @@ void strLess(const Value** args, Value* res, void*)
     res->setBool(strcmp(args[0]->getString(), args[1]->getString()) < 0);
 }
 
+void strMin(const Value** args, Value* res, void*)
+{
+    if (args[0]->isNull() || args[1]->isNull()) {
+        res->setNull();
+        return;
+    }
+    res->setString(strcmp(args[0]->getString(), args[1]->getString()) > 0 ? args[1]->getString() : args[0]->getString());
+}
+
 void strGreater(const Value** args, Value* res, void*)
 {
     if (args[0]->isNull() || args[1]->isNull()) {
@@ -682,6 +701,15 @@ void strGreater(const Value** args, Value* res, void*)
         return;
     }
     res->setBool(strcmp(args[0]->getString(), args[1]->getString()) > 0);
+}
+
+void strMax(const Value** args, Value* res, void*)
+{
+    if (args[0]->isNull() || args[1]->isNull()) {
+        res->setNull();
+        return;
+    }
+    res->setString(strcmp(args[0]->getString(), args[1]->getString()) > 0 ? args[0]->getString() : args[1]->getString());
 }
 
 void strLessOrEq(const Value** args, Value* res, void*)
@@ -1173,10 +1201,10 @@ void high1(const Value** args, Value* res, void*)
     res->setInt64(highBoundary[0]);
 }
 
-void nodeId(const Value** args, Value* res, void*)
+void instanceId(const Value** args, Value* res, void*)
 {
-   // there is no per-query ID mapping applied, this is the physical node ID
-    res->setInt64( Cluster::getInstance()->getLocalNodeId());
+   // there is no per-query ID mapping applied, this is the physical instance ID
+    res->setInt64( Cluster::getInstance()->getLocalInstanceId());
 }
 
 #endif

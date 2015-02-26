@@ -1,0 +1,175 @@
+{
+"Ubuntu":
+{
+    "packaging_tool":"dpkg",
+    "scidb":
+    {
+        "#": { "libscidbclient": "(>=${scidbver})" },
+        "libpqxx-3.0": "(>=${targetver})",        
+        "python-paramiko": "(>=${targetver})",
+        "python-crypto": "(>=${targetver})"        
+    },
+
+    "scidb-dbg": { "#": { "scidb": "(>=${scidbver})" } },
+
+    "libscidbclient":
+    {
+        "libbz2-1.0": "(>=${targetver})",
+        "zlib1g": "(>=${targetver})",
+        "liblog4cxx10": "(>=${targetver})",
+        
+        "?":
+        {
+            "11.10":
+            {
+                "libboost-program-options1.46.1": "(>=${targetver})",
+                "libboost-serialization1.46.1": "(>=${targetver})",
+                "libboost-system1.46.1": "(>=${targetver})",
+                "libboost-regex1.46.1": "(>=${targetver})",
+                "libboost-filesystem1.46.1": "(>=${targetver})",
+                "libboost-thread1.46.1": "(>=${targetver})",
+                "libprotobuf7": "(>=${targetver})"
+            },
+            "11.04":
+            {
+                "libboost-program-options1.42.0": "(>=${targetver})",
+                "libboost-serialization1.42.0": "(>=${targetver})",
+                "libboost-system1.42.0": "(>=${targetver})",
+                "libboost-regex1.42.0": "(>=${targetver})",
+                "libboost-filesystem1.42.0": "(>=${targetver})",
+                "libboost-thread1.42.0": "(>=${targetver})",
+                "libprotobuf6": "(>=${targetver})"
+            },
+            "10.04":
+            {
+                "libboost-program-options1.40.0": "(>=${targetver})",
+                "libboost-serialization1.40.0": "(>=${targetver})",
+                "libboost-system1.40.0": "(>=${targetver})",
+                "libboost-regex1.40.0": "(>=${targetver})",
+                "libboost-filesystem1.40.0": "(>=${targetver})",
+                "libboost-thread1.40.0": "(>=${targetver})",
+                "libprotobuf5": "(>=${targetver})"
+            },            
+            "9.10":
+            {
+                "libboost-program-options1.38.0": "(>=${targetver})",
+                "libboost-serialization1.38.0": "(>=${targetver})",
+                "libboost-system1.38.0": "(>=${targetver})",
+                "libboost-regex1.38.0": "(>=${targetver})",
+                "libboost-filesystem1.38.0": "(>=${targetver})",
+                "libboost-thread1.38.0": "(>=${targetver})",
+                "libprotobuf3": "(>=${targetver})"
+            },            
+            "*":
+            {
+                "libboost-program-options1.40.0": "(>=${targetver})",
+                "libboost-serialization1.40.0": "(>=${targetver})",
+                "libboost-system1.40.0": "(>=${targetver})",
+                "libboost-regex1.40.0": "(>=${targetver})",
+                "libboost-filesystem1.40.0": "(>=${targetver})",
+                "libboost-thread1.40.0": "(>=${targetver})",
+                "libprotobuf5": "(>=${targetver})"
+            }
+        }
+    },
+
+    "libscidbclient-dbg": { "#": { "libscidbclient": "(>=${scidbver})" } },
+
+    "libscidbclient_python":
+    {
+        "#": { "libscidbclient": "(>=${scidbver})" },
+        "python": "(>=${targetver})"
+    },
+
+    "libscidbclient_python-dbg": { "#": { "libscidbclient_python": "(>=${scidbver})" } }
+},
+
+"RedHat":
+{
+    "packaging_tool":"rpm",
+    "scidb":
+    {
+        "#": { "libscidbclient": ">= ${scidbver}" },
+        "postgresql-libs": ">= ${targetver}",        
+        "python-paramiko": ">= ${targetver}",
+        "python-crypto": ">= ${targetver}"        
+    },
+
+    "libscidbclient":
+    {
+        "bzip2-libs": ">= ${targetver}",
+        "zlib": ">= ${targetver}"
+    },
+
+    "libscidbclient_python":
+    {
+        "#": { "libscidbclient": ">= ${scidbver}" },
+        "python": ">= ${targetver}"
+    },
+
+    "scidb-dbg": { "#": { "scidb": ">= ${scidbver}" } },
+    "libscidbclient-dbg": { "#": { "libscidbclient": ">= ${scidbver}" } },
+    "libscidbclient_python-dbg": { "#": { "libscidbclient_python": ">= ${scidbver}" } }
+},
+
+"CentOS":
+{
+    "packaging_tool":"rpm",
+    "scidb":
+    {
+        "#": { "libscidbclient": ">= ${scidbver}" },
+        "postgresql-libs": ">= ${targetver}",        
+        "python-paramiko": ">= ${targetver}",
+        "python-crypto": ">= ${targetver}"
+    },
+
+    "libscidbclient":
+    {
+        "bzip2-libs": ">= ${targetver}",
+        "zlib": ">= ${targetver}",
+        "log4cxx": ">= ${targetver}",
+        "protobuf": ">= ${targetver}"
+    },
+
+    "libscidbclient_python":
+    {
+        "#": { "libscidbclient": ">= ${scidbver}" },
+        "python": ">= ${targetver}"
+    },
+
+    "scidb-dbg": { "#": { "scidb": ">= ${scidbver}" } },
+    "libscidbclient-dbg": { "#": { "libscidbclient": ">= ${scidbver}" } },
+    "libscidbclient_python-dbg": { "#": { "libscidbclient_python": ">= ${scidbver}" } }
+},
+
+"Fedora":
+{
+    "packaging_tool":"rpm",
+    "scidb":
+    {
+        "#": { "libscidbclient": ">= ${scidbver}" },
+        "postgresql-libs": ">= ${targetver}",        
+        "python-paramiko": ">= ${targetver}",
+        "python-crypto": ">= ${targetver}"
+    },
+
+    "libscidbclient":
+    {
+        "bzip2-libs": ">= ${targetver}",
+        "zlib": ">= ${targetver}",
+        "log4cxx": ">= ${targetver}",
+        "protobuf": ">= ${targetver}"
+    },
+
+    "libscidbclient_python":
+    {
+        "#": { "libscidbclient": ">= ${scidbver}" },
+        "python": ">= ${targetver}"
+    },
+
+    "scidb-dbg": { "#": { "scidb": ">= ${scidbver}" } },
+    "libscidbclient-dbg": { "#": { "libscidbclient": ">= ${scidbver}" } },
+    "libscidbclient_python-dbg": { "#": { "libscidbclient_python": ">= ${scidbver}" } }
+}
+
+}

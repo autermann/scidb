@@ -49,17 +49,19 @@ putdelim ( char type, FILE * out )
 
 int main(int argc, char* argv[]) 
 { 
-    int i, j, ch, delim = ',';
+    int i, j, ch;
+	char delim = ',';
     long count = 0;
     FILE* in = stdin;
     FILE* out = stdout;
     long skip = 0;
-    long nChunkLen = 0, outCnt = 0;
+    long nChunkLen = 500000, outCnt = 0;
     int valSize = 0;
     char chTypeString[128];
     int numAttrs = 0, attrCnt = 0;
     long startChunk = 0;
     long chunknum = 0;
+	bool quoteLine = false;
 
     memset(chTypeString, 'N', sizeof(chTypeString));
     numAttrs = sizeof(chTypeString);
@@ -93,7 +95,7 @@ int main(int argc, char* argv[])
         } else if (strcmp(argv[i], "-c") == 0) { 
             nChunkLen = atol(argv[++i]);
             if ( 0 >= nChunkLen ) { 
-                perror("chunk length > 0");
+                perror("chunk size > 0");
                 return 1;
             }
         } else if (strcmp(argv[i], "-f") == 0) { 
@@ -103,7 +105,11 @@ int main(int argc, char* argv[])
                 return 1;
             }
         } else if (strcmp(argv[i], "-d") == 0) { 
-            if ( 0 == ( delim = atoi(argv[++i]))) { 
+			i++;
+			if ((('"' == argv[i][0]) || ('\'' == argv[i][0])) && (3 == strlen(argv[i]))) { 
+				delim=argv[i][1];
+			} 
+            else if ( 0 == ( delim = argv[i][0])) { 
                 perror("delim required");
                 return 1;
             }
@@ -126,6 +132,8 @@ int main(int argc, char* argv[])
         } else if (strcmp(argv[i], "-v") == 0) {
             printf("csv to scidb tool version %s, build type is %s\n", scidb::SCIDB_VERSION(), scidb::SCIDB_BUILD_TYPE());
             return 0;
+        } else if (strcmp(argv[i], "-q") == 0) {
+			quoteLine = true;
         } else {
             fprintf(stderr, "Utility for conversion of CSV file to SciDB input text format\n"
                     "\tUsage: csv2scidb [options] [ < input-file ] [ > output-file ]\n"
@@ -138,6 +146,7 @@ int main(int argc, char* argv[])
                     "\t\t-f INT\tstarting chunk number\n"
                     "\t\t-d char\tdelimieter - default ,\n"
                     "\t\t-p STR\ttype pattern - N number, S string, s nullable-string, C char\n"
+					"\t\t-q Quote the input line exactly, simply wrap it in ()\n"
                     "\t\t-s N\tskip N lines at the beginning of the file\n");
             return 2;
         }
@@ -171,18 +180,21 @@ int main(int argc, char* argv[])
                 }
 
                 putc('(', out);
-                putdelim(chTypeString[attrCnt],out);
+				if (!quoteLine) 
+                	putdelim(chTypeString[attrCnt],out);
                 firstCh = false;
             }
 
-            if ( delim == ch ) {
+			if ( quoteLine ) { 
+                putc(ch, out);
+			} else if ( delim == ch ) {
                 if (valSize == 0 && (chTypeString[attrCnt] == 'N' || chTypeString[attrCnt] =='s'))
                 {
                     fputs("null", out);
                 }
                 else if (valSize > 0 && chTypeString[attrCnt] =='s')
                 {
-                    putc('"',out);
+                   	putc('"',out);
                 }
 
                 valSize = 0;
@@ -204,7 +216,7 @@ int main(int argc, char* argv[])
 
         } while ((ch = getc(in)) != EOF && ch != '\n');
 
-        if (attrCnt>0 || (numAttrs == 1 && !firstCh))
+        if (attrCnt>0 || (numAttrs == 1 && !firstCh) || (quoteLine))
         {
             if (attrCnt < numAttrs)
             {
@@ -214,10 +226,12 @@ int main(int argc, char* argv[])
                 }
                 else if (valSize > 0 && chTypeString[attrCnt] =='s')
                 {
-                    putc('"',out);
+					if (!quoteLine) 
+                    	putc('"',out);
                 }
-
-                putdelim(chTypeString[attrCnt],out);
+ 
+				if (!quoteLine) 
+                	putdelim(chTypeString[attrCnt],out);
             }
             putc(')', out);
             count++;
@@ -234,7 +248,9 @@ int main(int argc, char* argv[])
         putc(']', out);
         putc('\n', out);
     }
+/*
     fprintf(stderr, "Processed %ld records\n", count);
     fprintf(stderr, "Next chunk prefix %ld\n", chunknum);
+*/
     return 0;
 }

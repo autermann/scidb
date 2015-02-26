@@ -26,7 +26,7 @@ def usage():
   print ""
   print "fulldatadirpath:"
   print "   FULL PATH for directory containing file simplearray.data."
-  print "   The data file MUST be on the same node as the server!"
+  print "   The data file MUST be on the same instance as the server!"
   print "" 
   print "fullpythonlibdir:"
   print "   FULL PATH for directory libscidbpython.py"
@@ -36,7 +36,7 @@ def usage():
   print "" 
   print "This program uses an ODBC/JDBC like interface to connect to the SciDB server"
   print "and execute statements. The functions are: connect, disconnect, executeQuery,"
-  print "and cancelQuery." 
+  print "completeQuery and cancelQuery." 
   print ""
   print "Data retrieval is performed through a set of methods attached to objects describing"
   print "the result set. The root object for data retrieval is the Array object. From this"
@@ -67,13 +67,13 @@ if __name__ == "__main__":
         createarraystring = "CREATE ARRAY simplearray < COL000N: int32,COL001C: char,COL002S: string > [a=0:99,10,0,b=0:9,10,0]"
         loaddatafile = "'" + fulldatadirpath + "/simplearray.data" + "'"
         loadcommandstring = "load simplearray from " + loaddatafile  
-        #Get an object to access the connect, disconnect, executeQuery, and cancelQuery methods of 
-        #the python API. 
+        #Get an object to access the connect, disconnect, executeQuery, completeQuery and cancelQuery methods of 
+        #the python API.
 	zz = libscidbpython.getSciDB()
 
         #Connect to a SciDB server.  This examples requires the client to be on the same machine as the 
         #server.  This is necessary because the server loads data from the accessable file system on 
-        #the node that it executes. A full path is neccessary to find the file. 
+        #the instance that it executes. A full path is neccessary to find the file. 
         try: 
 		myhandle = zz.connect("localhost",1239)
         except Exception,  inst: 
@@ -92,6 +92,7 @@ if __name__ == "__main__":
         qr4=libscidbpython.QueryResult()
         try:
             zz.executeQuery(droparraystring, libscidbpython.AQL, qr4, myhandle)
+            zz.completeQuery(qr4.queryID, myhandle)
         except Exception, inst:
             print "     Exception Type: %s" % type(inst)     # the exception instance
             print "     %s" % inst
@@ -106,7 +107,8 @@ if __name__ == "__main__":
         print "_____________________________________________________________________________________"
         print "Creat array statement: %s" % createarraystring 
         try:
-         	zz.executeQuery(createarraystring, libscidbpython.AQL, qr3, myhandle) 
+         	zz.executeQuery(createarraystring, libscidbpython.AQL, qr3, myhandle)
+                zz.completeQuery(qr3.queryID, myhandle)
         except Exception,  inst:
                 print "Exception occured during array creation:"
                 print "     Exception Type: %s" % type(inst)     # the exception instance
@@ -118,6 +120,7 @@ if __name__ == "__main__":
         qr2 = libscidbpython.QueryResult()
         try: 
         	zz.executeQuery(loadcommandstring, libscidbpython.AQL, qr2, myhandle)
+                zz.completeQuery(qr2.queryID, myhandle)
         except Exception,  inst:
                 print "Exception occured during data load attempt:"
                 print "     Exception Type: %s" % type(inst)     # the exception instance
@@ -236,11 +239,16 @@ if __name__ == "__main__":
         print "          End of data"
 
         print "_____________________________________________________________________________________"
+
+
+        zz.completeQuery(qr.queryID, myhandle)
+        
         print "Dropping simplearray"
         #Drop the table
         qr4 = libscidbpython.QueryResult()
         try:
         	zz.executeQuery("drop array simplearray", libscidbpython.AQL ,qr4,myhandle)
+                zz.completeQuery(qr4.queryID, myhandle)
         except Exception,  inst:
                 print "Exception occured during drop array attempt:"
                 print "     Exception Type: %s" % type(inst)     # the exception instance

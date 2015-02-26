@@ -213,7 +213,7 @@ void Tiles::genData(std::string const& fileBase, int n, int i, bool roundRobin,
                     int total, int size, int range, Mode outputMode) {
     std::ofstream md((fileBase + ".pos").c_str());
     if (roundRobin) {
-        (outputMode == AFL)? md << "[[\n" : md  ;
+        (outputMode == AFL)? md << "[\n" : md  ;
         int next=1;
         for (int t = 0; t < total; ++t) {
             if (t % n != i) continue;
@@ -226,12 +226,12 @@ void Tiles::genData(std::string const& fileBase, int n, int i, bool roundRobin,
             }
 	    next++;
         }
-        (outputMode == AFL)? md << "]]\n": md;
+        (outputMode == AFL)? md << "]\n": md;
     }
     else {
         int const low = total * i / n;
         int const high = total * (i + 1) / n;
-        (outputMode == AFL)? md << "[[\n" : md  ;
+        (outputMode == AFL)? md << "[\n" : md  ;
         int next= low;
         for (int t = low; t < high; ++t) {
             std::stringstream fname;
@@ -243,7 +243,7 @@ void Tiles::genData(std::string const& fileBase, int n, int i, bool roundRobin,
             }
           next++;
         }
-        (outputMode == AFL)? md << "]]\n": md;
+        (outputMode == AFL)? md << "]\n": md;
     }
     md.close();
 }
@@ -606,7 +606,7 @@ int main(int argc, char** argv) {
     //digits are for total, size, range, it produce size*size image/array
     // generate 10 array of 1000*1000 size
     if (config == "tiny") {
-        tiles.genData(fbase, chunks, index, roundRobin, 4, 2, 120, outputMode); // 10x10 100 lines
+        tiles.genData(fbase, chunks, index, roundRobin, 20, 10, 120, outputMode); // 10x10 100 lines
     }
     else if (config == "very_small") {
         tiles.genData(fbase, chunks, index, roundRobin, 40, 1600, 3162, outputMode);

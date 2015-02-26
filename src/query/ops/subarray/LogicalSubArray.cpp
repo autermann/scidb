@@ -29,7 +29,7 @@
 
 #include "query/Operator.h"
 #include "system/Exceptions.h"
-
+#include "SubArray.h"
 
 namespace scidb {
 
@@ -37,16 +37,34 @@ namespace scidb {
  * Helper function to set the dimension start and length properties in the array descriptor.
  * Constructs a new array descriptor with the appropriate dimensions.
  ***/
-    ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos, Coordinates& highPos, bool sameOrigin)
+    ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos, Coordinates& highPos, boost::shared_ptr<Query> const& query)
     {
         Dimensions dims = desc.getDimensions();
         Dimensions newDims(dims.size());
         
-        for (size_t i = 0, n = dims.size(); i < n; i++) {
-            newDims[i] = DimensionDesc(dims[i].getBaseName(), dims[i].getNamesAndAliases(), 0, 0, highPos[i] - lowPos[i],
-                                       highPos[i] - lowPos[i], dims[i].getChunkInterval(), dims[i].getChunkOverlap(),
-                                       sameOrigin ? dims[i].getType() : TID_INT64,
-                                       sameOrigin ? dims[i].getSourceArrayName() : string(), dims[i].getComment());
+        for (size_t i = 0, n = dims.size(); i < n; i++) { 
+            DimensionDesc const& srcDim = dims[i];
+            string mappingArrayName = srcDim.getMappingArrayName();
+            if (highPos[i] >= lowPos[i] && !mappingArrayName.empty() && srcDim.getType() != TID_INT64) { 
+                string tmpMappingArrayName;
+                size_t tmpArrayNo = 0;
+                do { 
+                    std::stringstream ss;
+                    ss << mappingArrayName << '$' << ++tmpArrayNo;
+                    tmpMappingArrayName = ss.str();
+                } while (query->getTemporaryArray(tmpMappingArrayName));
+                
+                subarrayMappingArray(srcDim.getBaseName(), mappingArrayName, tmpMappingArrayName, lowPos[i], highPos[i], query);
+                mappingArrayName = tmpMappingArrayName;
+            }
+            newDims[i] = DimensionDesc(srcDim.getBaseName(), srcDim.getNamesAndAliases(), 0, 0, highPos[i] - lowPos[i],
+                                       highPos[i] - lowPos[i], srcDim.getChunkInterval(), srcDim.getChunkOverlap(),
+                                       srcDim.getType(),
+                                       srcDim.getFlags() | (srcDim.getFuncMapScale() != 1 ? DimensionDesc::COMPLEX_TRANSFORMATION : 0),
+                                       mappingArrayName,
+                                       srcDim.getComment(),
+                                       srcDim.getFuncMapOffset() + lowPos[i] - srcDim.getStart(),
+                                       srcDim.getFuncMapScale());
         }
         
         /***
@@ -99,10 +117,8 @@ namespace scidb {
             // Fetch the low and high coordinates of the subarray window from the operator parameters
             Coordinates lowPos(nDims);
             Coordinates highPos(nDims);
-            bool sameOrigin = false;
 
             if (_parameters.size() == 0) { 
-                sameOrigin = true;
                 for (size_t i = 0; i < nDims; i++)
                 {
                     lowPos[i] = dims[i].getLowBoundary();
@@ -119,8 +135,6 @@ namespace scidb {
                         lowPos[i] = desc.getOrdinalCoordinate(i, low, cmLowerBound, query);
                         if (dims[i].getStart() != MIN_COORDINATE && lowPos[i] < dims[i].getStart()) {
                             lowPos[i] = dims[i].getStart();
-                        } else if (lowPos[i] != dims[i].getStart()) {
-                            sameOrigin = false;
                         }
                     }
                     Value const& high = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i+nDims])->getExpression(),
@@ -150,7 +164,7 @@ namespace scidb {
              * We first create a physical schema for the array and modify the dimension start and length
              * parameters.
              */
-            return setDimensions(desc, lowPos, highPos, sameOrigin);
+            return setDimensions(desc, lowPos, highPos, query);
         }
     };
 

@@ -29,15 +29,19 @@
 
 #include <boost/foreach.hpp>
 #include <map>
+#include <math.h>
 
 #include "query/Operator.h"
 #include "system/SystemCatalog.h"
 #include "system/Exceptions.h"
+#include <smgr/io/Storage.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb {
+
+const size_t DEFAULT_CHUNK_ELEMS = 1024*1024;
 
 class LogicalFlipStore: public  LogicalOperator
 {
@@ -56,15 +60,7 @@ public:
 		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
 
 		res.push_back(END_OF_VARIES_PARAMS());
-
-		if (_parameters.size() == 1)
-		{
-		    res.push_back(PARAM_CONSTANT("bool"));
-		}
-		else
-		{
-		    res.push_back(PARAM_AGGREGATE_CALL());
-		}
+        res.push_back(PARAM_AGGREGATE_CALL());
 
 		return res;
 	}
@@ -75,10 +71,9 @@ public:
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
         const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         assert(arrayName.find('@') == std::string::npos);
-        string baseName = arrayName.substr(0, arrayName.find('@'));
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(baseName,
+        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
                                                                                      query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalNodeId(),
+                                                                                     Cluster::getInstance()->getLocalInstanceId(),
                                                                                      SystemCatalog::LockDesc::COORD,
                                                                                      SystemCatalog::LockDesc::WR));
         boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
@@ -87,11 +82,13 @@ public:
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
-	{
-		assert(schemas.size() == 1);
+    {
+        assert(schemas.size() == 1);
 
         string arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         ArrayDesc const& srcDesc = schemas[0];
+
+        //query->exclusiveLock(arrayName);
 
         //Compile a desc of all possible attributes (aggregate calls first) and source dimensions
         ArrayDesc aggregationDesc (srcDesc.getName(), Attributes(), srcDesc.getDimensions());
@@ -100,11 +97,9 @@ public:
         //add aggregate calls first
         for (size_t i = 1; i < _parameters.size(); i++)
         {
-            if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
-            {
-                addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc);
-                aggregatedNames.push_back(aggregationDesc.getAttributes()[aggregationDesc.getAttributes().size()-1].getName());
-            }
+            assert(_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL);
+            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc);
+            aggregatedNames.push_back(aggregationDesc.getAttributes()[aggregationDesc.getAttributes().size()-1].getName());
         }
 
         //add other attributes
@@ -138,9 +133,35 @@ public:
         ArrayDesc dstDesc;
         if (!SystemCatalog::getInstance()->getArrayDesc(arrayName, dstDesc, false))
         {
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
+
             Dimensions outDims;
             Attributes outAttrs;
             AttributeID outAttrId = 0;
+            size_t nDims = 0;
+
+            BOOST_FOREACH(const AttributeDesc& inAttr, aggregationDesc.getAttributes())
+            {
+                if (inAttr.getType() == TID_INDICATOR)
+                    continue;
+
+                bool isAggAttr = false;
+                for (size_t i = 0; i< aggregatedNames.size(); i++)
+                {
+                    if(inAttr.getName() == aggregatedNames[i])
+                    {
+                        isAggAttr = true;
+                        break;
+                    }
+                }
+
+                if (!isAggAttr)
+                {
+                    nDims += 1;
+                }
+            }
+            
+            size_t defaultChunkSize = nDims != 0 ? (size_t)pow(DEFAULT_CHUNK_ELEMS, 1.0/nDims) : 0;
 
             BOOST_FOREACH(const AttributeDesc& inAttr, aggregationDesc.getAttributes())
             {
@@ -182,8 +203,8 @@ public:
                                 MAX_COORDINATE,
                                 MIN_COORDINATE,
                                 MAX_COORDINATE,
-                                10, //FIXME: Which interval?
-                                0,  //FIXME: Which overlap?
+                                defaultChunkSize,
+                                0,  
                                 inAttr.getType()
                                 );
                     }
@@ -195,8 +216,8 @@ public:
                                 0,
                                 MIN_COORDINATE,
                                 MAX_COORDINATE,
-                                10, //FIXME: Which interval?
-                                0,  //FIXME: Which overlap?
+                                defaultChunkSize,
+                                0,
                                 inAttr.getType()
                                 );
                     }
@@ -229,8 +250,9 @@ public:
             dstDesc = ArrayDesc(arrayName, outAttrs, outDims, 0);
         }
 
-        if (!dstDesc.getEmptyBitmapAttribute())
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR2);
+        // Let's allow to flip to non-emptyable arrays
+        //if (!dstDesc.getEmptyBitmapAttribute())
+        //    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR2);
  
         Attributes const& dstAttrs = dstDesc.getAttributes();
         Attributes const& srcAttrs = aggregationDesc.getAttributes();
@@ -252,7 +274,7 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_TYPE)
                             << srcAttrs[j].getName() << srcAttrs[j].getType() << dstAttrs[i].getType();
                     }
-                    if (srcAttrs[j].getFlags() != dstAttrs[i].getFlags())
+                    if (!dstAttrs[i].isNullable() && srcAttrs[j].isNullable())
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_FLAGS)
                             << srcAttrs[j].getName();
@@ -289,20 +311,22 @@ public:
             NextAttr:;
         }
             
+        size_t nNewDims = 0;
+
         for (size_t i = 0; i < nDims; i++)
         {
-            if (dstDims[i].getChunkOverlap() != 0)
+            if (dstDims[i].getChunkOverlap() > dstDims[i].getChunkInterval()/2)
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR3);
 
             for (size_t j = 0; j < nSrcDims; j++)
             {
                 if (srcDims[j].hasNameOrAlias(dstDims[i].getBaseName()))
                 {
-                    if (dstDims[i].getType() != srcDims[j].getType()
-                            || dstDims[i].getStart() != srcDims[j].getStart()
-                            || dstDims[i].getLength() != srcDims[j].getLength()
-                        || dstDims[i].getChunkInterval() != srcDims[j].getChunkInterval())
+                    if (dstDims[i].getStart() != srcDims[j].getStart())
                     {
+                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6);
+                    }
+                    if (dstDims[i].getType() != srcDims[j].getType()) {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR4) << srcDims[j].getBaseName();
                     }
                     goto NextDim;
@@ -333,13 +357,15 @@ public:
                                                dstDims[i].getChunkInterval(),
                                                dstDims[i].getChunkOverlap(), 
                                                srcAttrs[j].getType(),
-                                               arrayName);
+                                               dstDims[i].getFlags(),
+                                               dstDesc.createMappingArrayName(i, 0));
                     goto NextDim;
                 }
             }
-
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION)
-                << dstDims[i].getBaseName();
+            if (nNewDims++ != 0 || !aggregatedNames.empty() || dstDims[i].getType() != TID_INT64) { 
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION)
+                    << dstDims[i].getBaseName();
+            }
             NextDim:;
         }
         return ArrayDesc(dstDesc.getId(), arrayName, dstAttrs, dstDims, dstDesc.getFlags());

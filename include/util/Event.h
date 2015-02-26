@@ -70,20 +70,44 @@ public:
         }
     }
 
+    /**
+     * Wait for the Event to become signalled (based on the POSIX (timed) conditional variable+mutex).
+     * If the event is signalled before the call to wait,
+     * the wait will never return. The signal will cause the wait()'s of *all* threads to return.
+     * @param cs associated with this event, the same mutex has to be used the corresponding wait/signal
+     * @param errorChecker if set, it will be invoked periaodically and
+     *                     the false return code will force this wait() to return regardless of whether the signal is received.
+     * @note The errorChecker must also check for the condition predicate for which this Event is used because of the unavoidable
+     *       race condition between the timer expiring (in pthread_cond_timedwait) and another thread signalling.
+     */
+
     bool wait(Mutex& cs, ErrorChecker& errorChecker)
     {
-       if (errorChecker) {
+        cs.checkForDeadlock();
+        if (errorChecker) {
             if (!errorChecker()) {
                return false;
             }
            
             signaled = false;
             do {
+#ifdef __APPLE__
                 struct timeval tv;
                 struct timespec ts;
-                gettimeofday(&tv, NULL);
+                if (gettimeofday(&tv, NULL) == -1) { 
+                    assert(false);
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+                }
                 ts.tv_sec = tv.tv_sec + 10;
                 ts.tv_nsec = tv.tv_usec*1000;
+#else
+                struct timespec ts;
+                if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+                    assert(false);
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+                }
+                ts.tv_sec = ts.tv_sec + 10;
+#endif
                 const int e = pthread_cond_timedwait(&_cond, &cs._mutex, &ts);
                 if (e == 0) {
                     return true;
@@ -99,8 +123,9 @@ public:
         }
         else
         {
-            if (pthread_cond_wait(&_cond, &cs._mutex))
+            if (pthread_cond_wait(&_cond, &cs._mutex)) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_cond_wait";
+            }
         }
         return true;
     }

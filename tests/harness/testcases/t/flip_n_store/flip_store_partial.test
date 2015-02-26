@@ -1,0 +1,18 @@
+# ticket no. 666
+
+--setup
+create immutable array A <a:int64,b:int64>[x=0:2,3,0]
+create immutable array T <a:int64>[x=0:2,3,0]
+create immutable empty array B <b:int64>[a=0:2,3,0]
+store(join(build(T,x+1),build(T,x+1)),A)
+
+--test
+scan(B)
+--error --code=scidb::SCIDB_SE_STORAGE::SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES  "redimension_store(A,B)"
+scan(B)
+
+--cleanup
+remove(A)
+remove(T)
+remove(B)
+

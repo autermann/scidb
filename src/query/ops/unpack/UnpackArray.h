@@ -54,7 +54,7 @@ private:
     AttributeID attrID;
     boost::shared_ptr<ConstChunkIterator> inputIterator;
     int mode;
-     Value _value;
+    Value _value;
     bool hasCurrent;
     Coordinate  first;
     Coordinate  last;

@@ -81,17 +81,16 @@ class AttributeComparator
     FunctionPointer less;
 };
 
-
-template < template < class Key, class Compare = less<Key>, class Allocator = allocator<Key> > class SetClass,
-           class IteratorClass,
-           bool sizing = true>
+template<typename DoubleSet, typename ValueSet>
 class __Attribute_XSet : AttributeComparator
 {
+    typedef typename DoubleSet::const_iterator DoubleIterator;
+    typedef typename ValueSet::const_iterator ValueIterator;
+
   public:
     __Attribute_XSet(TypeId tid) : AttributeComparator(tid), totalSize(0), valueSet(*this)
     {
     }
-
     size_t size() const 
     { 
         return (typeID == TID_DOUBLE) ? doubleSet.size() : valueSet.size();
@@ -173,7 +172,7 @@ class __Attribute_XSet : AttributeComparator
         }
     }
 
-    void add(shared_ptr<SharedBuffer> buf) 
+    void add(shared_ptr<SharedBuffer> buf, InstanceID instance = 0) 
     {
         if (buf) { 
             add(buf->getData(), buf->getSize());
@@ -188,26 +187,18 @@ class __Attribute_XSet : AttributeComparator
             {
                 totalSize += valueSet.size()*sizeof(int);
             }
-
-            totalSize += sizeof(size_t);
+            totalSize += sizeof(size_t); // number of coordinates 
         }
 
         MemoryBuffer* buf = new MemoryBuffer(NULL, totalSize);
+        char* dst = (char*)buf->getData();
         if (typeID == TID_DOUBLE) {
-            double* dst = (double*)buf->getData();
-            for (set<double>::iterator i = doubleSet.begin(); i != doubleSet.end(); ++i) { 
-                *dst++ = *i;
+            double* dp = (double*)dst;
+            for (DoubleIterator i = doubleSet.begin(); i != doubleSet.end(); ++i) { 
+                *dp++ = *i;
             }
-
-            if (!partial)
-            {
-                *((size_t *) dst) = size();
-                dst = (double*)(((size_t*) dst)+1);
-            }
-
-            assert((char*)dst == (char*)buf->getData() + buf->getSize());
+            dst = (char*)dp;
         } else {
-            char* dst = (char*)buf->getData();
             size_t attrSize = type.byteSize();
             if (attrSize == 0) { 
                 int* offsPtr = (int*)dst;
@@ -216,7 +207,7 @@ class __Attribute_XSet : AttributeComparator
                     base = (char*)(offsPtr + valueSet.size());
                     dst = base;
                 }
-                for (IteratorClass i = valueSet.begin(); i != valueSet.end(); ++i) {
+                for (ValueIterator i = valueSet.begin(); i != valueSet.end(); ++i) {
                     attrSize = i->size();
                     if (!partial) { 
                         *offsPtr++ = (int)(dst - base);
@@ -232,20 +223,18 @@ class __Attribute_XSet : AttributeComparator
                     dst += attrSize;
                 }
             } else { 
-                for (IteratorClass i = valueSet.begin(); i != valueSet.end(); ++i) {
+                for (ValueIterator i = valueSet.begin(); i != valueSet.end(); ++i) {
                     memcpy(dst, i->data(), attrSize);
                     dst += attrSize;
                 }
             }
-
-            if (!partial)
-            {
-                *((size_t *) dst) = size();
-                dst = (char*)(((size_t*) dst)+1);
-            }
-
-            assert(dst == (char*)buf->getData() + buf->getSize());
         }
+        if (!partial)
+        {
+            *(size_t*)dst = size();
+            dst += sizeof(size_t);
+        }
+        assert(dst == (char*)buf->getData() + buf->getSize());
         return shared_ptr<SharedBuffer>(buf);
     }
             
@@ -255,19 +244,215 @@ class __Attribute_XSet : AttributeComparator
     }
 
   private:
-    SetClass <double> doubleSet;
+    DoubleSet doubleSet;
     size_t totalSize;
-    SetClass <Value, AttributeComparator> valueSet;
+    ValueSet valueSet;
 };
 
-typedef __Attribute_XSet<set, set <Value, AttributeComparator>::iterator > AttributeSet;
-typedef __Attribute_XSet<multiset, multiset <Value, AttributeComparator>::iterator, false> AttributeMultiSet;
+struct DoubleKey 
+{
+    double key;
+    InstanceID instance;
+    
+    bool operator <(DoubleKey const& other) const
+    {
+        return key < other.key;
+    }
 
-template < template < class Key, class T, class Compare = less<Key>, class Allocator = allocator<pair<const Key,T> > > class MapClass,
-           class ValueIteratorClass,
-           class DoubleIteratorClass >
+    DoubleKey(double k, InstanceID n) : key(k), instance(n) {}
+    DoubleKey() {}
+};
+
+struct ValueKey 
+{
+    Value  key;
+    InstanceID instance;
+
+    ValueKey(Value const& k, InstanceID n) : key(k), instance(n) {}
+    ValueKey() {}
+};
+
+class ValueKeyComparator : public AttributeComparator
+{
+  public:
+    bool operator()(const ValueKey& v1, const ValueKey& v2) const
+    {
+        return AttributeComparator::operator()(v1.key, v2.key);
+    }
+
+    ValueKeyComparator() 
+    {
+    }
+
+    ValueKeyComparator(TypeId tid) : AttributeComparator(tid) {}
+};
+
+class AttributeBag : ValueKeyComparator
+{
+  public:
+    AttributeBag(TypeId tid) : ValueKeyComparator(tid), totalSize(0), valueSet(*this)
+    {
+    }
+
+    size_t size() const 
+    { 
+        return (typeID == TID_DOUBLE) ? doubleSet.size() : valueSet.size();
+    }
+
+    void add(Value const& item, InstanceID instance = 0) 
+    {
+        if (typeID == TID_DOUBLE) {
+            doubleSet.insert(DoubleKey(item.getDouble(), instance));
+            totalSize += sizeof(ValueKey);
+        } else {
+            valueSet.insert(ValueKey(item, instance));
+            totalSize += item.size();
+            if (type.variableSize()) { 
+                totalSize += item.size()-1 >= 0xFF ? 5 : 1;
+            }
+        }
+    }
+
+    void add(void const* data, size_t size, InstanceID instance) 
+    {
+        totalSize += size;
+        if (typeID == TID_DOUBLE) {
+            DoubleKey dk;
+            dk.instance = instance;
+            double* src = (double*)data;
+            double* end = src + size/sizeof(double);
+            while (src < end)
+            {
+                dk.key = *src++;
+                doubleSet.insert(dk);
+            }
+        } else {
+            ValueKey vk;
+            uint8_t* src = (uint8_t*)data;
+            uint8_t* end = src + size;
+            size_t attrSize = type.byteSize();
+            vk.instance = instance;
+                    
+            if (attrSize == 0) { 
+                while (src < end) {
+                    if (*src == 0) { 
+                        attrSize = (src[1] << 24) | (src[2] << 16) | (src[3] << 8) | src[4];
+                        src += 5;
+                    } else { 
+                        attrSize = *src++;
+                    }
+                    vk.key.setData(src, attrSize);
+                    valueSet.insert(vk);
+                    src += attrSize;
+                }
+            } else { 
+                while (src < end) {
+                    vk.key.setData(src, attrSize);
+                    valueSet.insert(vk);
+                    src += attrSize;
+                }
+            }
+        }
+    }
+
+    void add(shared_ptr<SharedBuffer> buf, InstanceID instance) 
+    {
+        if (buf) { 
+            add(buf->getData(), buf->getSize(), instance);
+        }
+    }
+
+    shared_ptr<SharedBuffer> sort(bool partial)
+    {
+        if (!partial)
+        {
+            if (type.variableSize())
+            {
+                totalSize += valueSet.size()*sizeof(int); // string offsets
+            }
+            totalSize += size()*sizeof(uint16_t); // instance IDs
+            totalSize += sizeof(size_t); // number of coordinates 
+        }
+
+        MemoryBuffer* buf = new MemoryBuffer(NULL, totalSize);
+        char* dst = (char*)buf->getData();
+        uint16_t* np = (uint16_t*)(dst + totalSize - sizeof(size_t) - size()*sizeof(uint16_t));
+        if (typeID == TID_DOUBLE) {
+            double* dp = (double*)dst;
+            for (multiset<DoubleKey>::iterator i = doubleSet.begin(); i != doubleSet.end(); ++i) { 
+                *dp++ = i->key;
+                if (!partial) {
+                    *np++ = i->instance;
+                }
+            }
+            dst = (char*)dp;
+        } else {
+            size_t attrSize = type.byteSize();
+            if (attrSize == 0) { 
+                int* offsPtr = (int*)dst;
+                char* base = NULL;
+                if (!partial) { 
+                    base = (char*)(offsPtr + valueSet.size());
+                    dst = base;
+                }
+                for (multiset<ValueKey, ValueKeyComparator>::const_iterator i = valueSet.begin(); i != valueSet.end(); ++i) {
+                    attrSize = i->key.size();
+                    if (!partial) { 
+                        *offsPtr++ = (int)(dst - base);
+                    }
+                    if (attrSize-1 >= 0xFF) {
+                        *dst++ = '\0';
+                        *dst++ = char(attrSize >> 24);
+                        *dst++ = char(attrSize >> 16);
+                        *dst++ = char(attrSize >> 8);
+                    }
+                    *dst++ = char(attrSize);
+                    memcpy(dst, i->key.data(), attrSize);
+                    dst += attrSize;
+                    if (!partial) {
+                        *np++ = i->instance;
+                    }
+                }
+            } else { 
+                for (multiset<ValueKey, ValueKeyComparator>::const_iterator i = valueSet.begin(); i != valueSet.end(); ++i) {
+                    memcpy(dst, i->key.data(), attrSize);
+                    dst += attrSize;
+                    if (!partial) {
+                        *np++ = i->instance;
+                    }
+                }
+            }
+        }
+        if (!partial)
+        {
+            dst = (char*)np;
+            *(size_t *)dst = size();
+            dst += sizeof(size_t);
+        }
+        assert(dst == (char*)buf->getData() + buf->getSize());
+        return shared_ptr<SharedBuffer>(buf);
+    }
+            
+    TypeId getType()
+    {
+        return typeID;
+    }
+
+  private:
+    multiset<DoubleKey> doubleSet;
+    size_t totalSize;
+    multiset<ValueKey, ValueKeyComparator> valueSet; 
+};
+
+typedef __Attribute_XSet< set<double>, set<Value, AttributeComparator> > AttributeSet;
+typedef __Attribute_XSet< multiset<double>, multiset<Value, AttributeComparator> > AttributeMultiSet;
+
+template<typename DoubleMap, typename ValueMap>
 class __Attribute_XMap : AttributeComparator
 {
+    typedef typename DoubleMap::const_iterator DoubleIterator;
+    typedef typename ValueMap::const_iterator ValueIterator;
+
   public:
     __Attribute_XMap(DimensionDesc const& dim, FunctionPointer to, FunctionPointer from) 
     {
@@ -315,6 +500,69 @@ class __Attribute_XMap : AttributeComparator
         }
     }
 
+    __Attribute_XMap(TypeId tid, Coordinate start, size_t nCoords, void const* data, size_t size, InstanceID myInstance)
+    : AttributeComparator(tid), valueMap(*this), _start(start), _toOrdinal(NULL), _fromOrdinal(NULL)
+    {        
+        Coordinate coord = start;
+        duplicates.resize(nCoords);
+        if (typeID == TID_DOUBLE) {
+            double* dp = (double*)data;
+            uint16_t* np = (uint16_t*)(dp + nCoords);
+            for (size_t i = 0, j = 0; i < nCoords; i++) { 
+                doubleMap.insert(make_pair(dp[i], start + i));
+                if (dp[i] != dp[j]) {
+                    j = i;
+                }
+                if (InstanceID(np[i]) < myInstance) { 
+                    duplicates[j] += 1;
+                }
+            }
+        } else {
+            Value prev;
+            Value value;
+            uint8_t* src = (uint8_t*)data;
+            uint16_t* np = (uint16_t*)(src + size) - nCoords;
+            size_t attrSize = type.byteSize();
+            if (attrSize == 0) { 
+                int* offsPtr = (int*)src;
+                uint8_t* base = src + nCoords*sizeof(int);
+                for (size_t i = 0, j = 0; i < nCoords; i++) {
+                    src = base + offsPtr[i];
+                    if (*src == 0) { 
+                        attrSize = (src[1] << 24) | (src[2] << 16) | (src[3] << 8) | src[4];
+                        src += 5;
+                    } else { 
+                        attrSize = *src++;
+                    }
+                    value.setData(src, attrSize);
+                    valueMap.insert(make_pair(value, coord + i));
+                    src += attrSize;
+                    if (value != prev) { 
+                        prev = value;
+                        j = i;
+                    }
+                    if (InstanceID(np[i]) < myInstance) { 
+                        duplicates[j] += 1;
+                    }
+                }
+            } else {
+                for (size_t i = 0, j = 0; i < nCoords; i++) {
+                    value.setData(src, attrSize);
+                    src += attrSize;
+                    valueMap.insert(make_pair(value, coord + i));
+                    if (value != prev) { 
+                        prev = value;
+                        j = i;
+                    }
+                    if (InstanceID(np[i]) < myInstance) { 
+                        duplicates[j] += 1;
+                    }
+                }
+                assert(src == (uint8_t*)np);
+            }
+        }
+    }
+
     void getOriginalCoordinate(Value& value, Coordinate pos, bool throwException = true) const
     {
         assert(_fromOrdinal != NULL);
@@ -330,7 +578,7 @@ class __Attribute_XMap : AttributeComparator
         }
     }
 
-    Coordinate get(Value const& value, CoordinateMappingMode mode = cmExact) const
+    Coordinate get(Value const& value, CoordinateMappingMode mode = cmExact)
     {
         if (value.isNull()) {
             if (mode != cmTest)
@@ -352,9 +600,9 @@ class __Attribute_XMap : AttributeComparator
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_FOR_COORDINATE);
             return result.getInt64();
         }
+        Coordinate coord;
         if (typeID == TID_DOUBLE) { 
-//            map<double, Coordinate>::const_iterator i;
-            DoubleIteratorClass i;
+            DoubleIterator i;
             double d = value.getDouble();
             switch (mode) { 
               case cmTest:
@@ -384,10 +632,9 @@ class __Attribute_XMap : AttributeComparator
             }
             if (i == doubleMap.end())
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_FOR_COORDINATE);
-            return i->second;
+            coord = i->second;
         } else { 
-//            map<Value, Coordinate, AttributeComparator>::const_iterator i;
-            ValueIteratorClass i;
+            ValueIterator i;
             switch (mode) { 
               case cmTest:
                 i = valueMap.find(value);
@@ -416,26 +663,36 @@ class __Attribute_XMap : AttributeComparator
             }
             if (i == valueMap.end())
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_FOR_COORDINATE);
-            return i->second;
+            coord = i->second;
         }
+        if (!duplicates.empty()) { 
+            coord += duplicates[coord - _start]++;
+        }
+        return coord;
     }
 
     bool hasFunctionMapping() const { 
         return _toOrdinal != NULL;
     }
+    
+    size_t size() const
+    {
+        return (typeID == TID_DOUBLE) ? doubleMap.size() : valueMap.size();
+    }
+
 
   private:
-    MapClass <double, Coordinate> doubleMap;
-    MapClass <Value, Coordinate, AttributeComparator> valueMap;
+    DoubleMap doubleMap;
+    ValueMap  valueMap;
     Coordinate _start;
     Coordinate _length;
-
+    vector<size_t> duplicates;
     FunctionPointer _toOrdinal;
     FunctionPointer _fromOrdinal;
 };
 
-typedef __Attribute_XMap <map, map<Value,Coordinate,AttributeComparator>::const_iterator, map<double,Coordinate>::const_iterator> AttributeMap;
-typedef __Attribute_XMap <multimap, multimap<Value,Coordinate,AttributeComparator>::const_iterator, multimap<double,Coordinate>::const_iterator> AttributeMultiMap;
+typedef __Attribute_XMap< map<double,Coordinate>, map<Value,Coordinate,AttributeComparator> > AttributeMap;
+typedef __Attribute_XMap< multimap<double,Coordinate>, multimap<Value,Coordinate,AttributeComparator> > AttributeMultiMap;
 
 
 

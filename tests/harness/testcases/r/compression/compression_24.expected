@@ -83,46 +83,46 @@ SCIDB QUERY : <create empty array edTs_nf <a:string null default 'default' compr
 Query was executed successfully
 
 SCIDB QUERY : <load Ts_rle from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_d from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_ns from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_be from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_z from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_bz from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_nf from '../tests/harness/testcases/data/null_19.txt'>
-[[(null),(null),(null)],[(null),(null),(?2)],[(?1),(null),(null)],[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(null)]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_rle from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_d from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_ns from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_be from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_z from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_bz from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load dTs_nf from '../tests/harness/testcases/data/null_19.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),(?2)],[(?1),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),("default")]]
+[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load eTs_rle from '../tests/harness/testcases/data/null_19.txt'>
 [[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
@@ -167,46 +167,46 @@ SCIDB QUERY : <load edTs_nf from '../tests/harness/testcases/data/null_19.txt'>
 [[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <load Ts_rle from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load Ts_d from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load Ts_ns from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load Ts_be from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load Ts_z from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load Ts_bz from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load Ts_nf from '../tests/harness/testcases/data/null_20.txt'>
-[[(null),(null),(null)],[(null),(null),(null)],[(null),(null),(?3)],[(null),(null),(null)],[(?1),(null),(null)],[(null),(null),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_rle from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_d from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_ns from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_be from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_z from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_bz from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load dTs_nf from '../tests/harness/testcases/data/null_20.txt'>
-[[("default"),("default"),("default")],[("default"),("default"),("default")],[("default"),("default"),(?3)],[("default"),("default"),("default")],[(?1),("default"),("default")],[("default"),("default"),(?2)]]
+[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
 
 SCIDB QUERY : <load eTs_rle from '../tests/harness/testcases/data/null_20.txt'>
 [[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]

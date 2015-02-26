@@ -42,7 +42,8 @@ public:
     LogicalCast(const string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-    	ADD_PARAM_INPUT()
+        _properties.tile = true;
+        ADD_PARAM_INPUT()
     	ADD_PARAM_SCHEMA()
     }
 
@@ -51,21 +52,21 @@ public:
         assert(schemas.size() == 1);
         assert(_parameters.size() == 1);
 
-        ArrayDesc dstArrayDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc schemaParam = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         ArrayDesc const& srcArrayDesc = schemas[0];
         Attributes const& srcAttributes = srcArrayDesc.getAttributes();
         Dimensions const& srcDimensions = srcArrayDesc.getDimensions();
-        Attributes const& dstAttributes = dstArrayDesc.getAttributes();
-        Dimensions const& dstDimensions = dstArrayDesc.getDimensions();
+        Attributes const& dstAttributes = schemaParam.getAttributes();
+        Dimensions dstDimensions = schemaParam.getDimensions();
 
-        if (dstArrayDesc.getName().size() == 0)
+        if (schemaParam.getName().size() == 0)
         {
-            dstArrayDesc.setName(srcArrayDesc.getName());
+            schemaParam.setName(srcArrayDesc.getName());
         }
 
         const boost::shared_ptr<ParsingContext> &pc = _parameters[0]->getParsingContext();
-        if (srcAttributes.size() != dstAttributes.size())
+        if (srcAttributes.size() != dstAttributes.size() && srcAttributes.size() != schemaParam.getAttributes(true).size())
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR1, pc);
         for (size_t i = 0, n = srcAttributes.size(); i < n; i++) {
             if (srcAttributes[i].getType() != dstAttributes[i].getType())
@@ -79,16 +80,41 @@ public:
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR4, pc);
 
         for (size_t i = 0, n = srcDimensions.size(); i < n; i++) {
-            if (srcDimensions[i].getLength() != dstDimensions[i].getLength())
+            DimensionDesc const& srcDim = srcDimensions[i];
+            DimensionDesc const& dstDim = dstDimensions[i];
+            if (srcDim.getType() != dstDim.getType() && dstDim.getType() != TID_INT64)
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR9, pc);
+            if (!(srcDim.getEndMax() == dstDim.getEndMax() 
+                  || (srcDim.getEndMax() < dstDim.getEndMax() 
+                      && ((srcDim.getLength() % srcDim.getChunkInterval()) == 0
+                          || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR5, pc);
-            if (srcDimensions[i].getStart() != dstDimensions[i].getStart())
+            if (srcDim.getStart() != dstDim.getStart())
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6, pc);
-            if (srcDimensions[i].getChunkInterval() != dstDimensions[i].getChunkInterval())
+            if (srcDim.getChunkInterval() != dstDim.getChunkInterval())
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR7, pc);
-            if (srcDimensions[i].getChunkOverlap() != dstDimensions[i].getChunkOverlap())
+            if (srcDim.getChunkOverlap() != dstDim.getChunkOverlap())
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR8, pc);
+            
+            if (!srcDim.getEndMax() != dstDim.getEndMax()) {
+                _properties.tile = false;
+            }
+            dstDimensions[i] = DimensionDesc(dstDim.getBaseName(),
+                                             dstDim.getNamesAndAliases(),
+                                             dstDim.getStartMin() == MIN_COORDINATE && srcDim.getCurrStart() != MAX_COORDINATE ? srcDim.getCurrStart() : dstDim.getStartMin(), 
+                                             srcDim.getCurrStart(), 
+                                             srcDim.getCurrEnd(), 
+                                             dstDim.getEndMax() == MAX_COORDINATE && srcDim.getCurrEnd() != MIN_COORDINATE ? srcDim.getCurrEnd() : dstDim.getEndMax(), 
+                                             dstDim.getChunkInterval(), 
+                                             dstDim.getChunkOverlap(), 
+                                             dstDim.getType(), 
+                                             dstDim.getFlags(), 
+                                             srcDim.getMappingArrayName(), 
+                                             dstDim.getComment(),
+                                             srcDim.getFuncMapOffset(),
+                                             srcDim.getFuncMapScale());
         }
-        return dstArrayDesc;
+        return ArrayDesc(schemaParam.getName(), dstAttributes, dstDimensions, schemaParam.getFlags());
     }
 };
 

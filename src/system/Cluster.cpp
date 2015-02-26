@@ -38,31 +38,31 @@ namespace scidb
 /**
  * @todo XXX Use NetworkManager until we explicitely start managing the membership
  */
-boost::shared_ptr<const NodeMembership> Cluster::getNodeMembership()
+boost::shared_ptr<const InstanceMembership> Cluster::getInstanceMembership()
 {
    ScopedMutexLock lock(_mutex);
 
    if (_lastMembership) {
       return _lastMembership;
    }
-   std::vector<NodeID> nodes;
-   NetworkManager::getInstance()->getPhysicalNodes(nodes);
-   _lastMembership = boost::shared_ptr<const NodeMembership>(new NodeMembership(0, nodes));
+   std::vector<InstanceID> instances;
+   NetworkManager::getInstance()->getPhysicalInstances(instances);
+   _lastMembership = boost::shared_ptr<const InstanceMembership>(new InstanceMembership(0, instances));
    return _lastMembership;
 }
 
-boost::shared_ptr<const NodeLiveness> Cluster::getNodeLiveness()
+boost::shared_ptr<const InstanceLiveness> Cluster::getInstanceLiveness()
 {
-   boost::shared_ptr<const NodeLiveness> liveness(NetworkManager::getInstance()->getNodeLiveness());
+   boost::shared_ptr<const InstanceLiveness> liveness(NetworkManager::getInstance()->getInstanceLiveness());
    if (liveness) {
       return liveness;
    }
-   boost::shared_ptr<const NodeMembership> membership(getNodeMembership());
-   boost::shared_ptr<NodeLiveness> newLiveness(new NodeLiveness(membership->getViewId(), 0));
-   for (std::set<NodeID>::const_iterator i = membership->getNodes().begin();
-        i != membership->getNodes().end(); ++i) {
-      NodeID nodeId(*i);
-      NodeLiveness::NodePtr entry(new NodeLivenessEntry(nodeId, 0, false));
+   boost::shared_ptr<const InstanceMembership> membership(getInstanceMembership());
+   boost::shared_ptr<InstanceLiveness> newLiveness(new InstanceLiveness(membership->getViewId(), 0));
+   for (std::set<InstanceID>::const_iterator i = membership->getInstances().begin();
+        i != membership->getInstances().end(); ++i) {
+      InstanceID instanceId(*i);
+      InstanceLiveness::InstancePtr entry(new InstanceLivenessEntry(instanceId, 0, false));
       newLiveness->insert(entry);
    }
    liveness = newLiveness;
@@ -70,9 +70,9 @@ boost::shared_ptr<const NodeLiveness> Cluster::getNodeLiveness()
    return liveness;
 }
 
-NodeID Cluster::getLocalNodeId()
+InstanceID Cluster::getLocalInstanceId()
 {
-   return NetworkManager::getInstance()->getPhysicalNodeID();
+   return NetworkManager::getInstance()->getPhysicalInstanceID();
 }
 
 } // namespace scidb
@@ -80,8 +80,8 @@ NodeID Cluster::getLocalNodeId()
 namespace boost
 {
    template<>
-   bool operator< (boost::shared_ptr<const scidb::NodeLivenessEntry> const& l,
-                   boost::shared_ptr<const scidb::NodeLivenessEntry> const& r) {
+   bool operator< (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                   boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
       if (!l || !r) {
          assert(false);
          return false;
@@ -90,8 +90,8 @@ namespace boost
    }
 
    template<>
-   bool operator== (boost::shared_ptr<const scidb::NodeLivenessEntry> const& l,
-                    boost::shared_ptr<const scidb::NodeLivenessEntry> const& r) {
+   bool operator== (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
 
       if (!l || !r) {
          assert(false);
@@ -101,17 +101,17 @@ namespace boost
    }
 
    template<>
-   bool operator!= (boost::shared_ptr<const scidb::NodeLivenessEntry> const& l,
-                    boost::shared_ptr<const scidb::NodeLivenessEntry> const& r) {
+   bool operator!= (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
        return (!operator==(l,r));
    }
 } // namespace boost
 
 namespace std
 {
-   bool less<boost::shared_ptr<const scidb::NodeLivenessEntry> >::operator() (
-                               const boost::shared_ptr<const scidb::NodeLivenessEntry>& l,
-                               const boost::shared_ptr<const scidb::NodeLivenessEntry>& r) const
+   bool less<boost::shared_ptr<const scidb::InstanceLivenessEntry> >::operator() (
+                               const boost::shared_ptr<const scidb::InstanceLivenessEntry>& l,
+                               const boost::shared_ptr<const scidb::InstanceLivenessEntry>& r) const
    {
       return l < r;
    }

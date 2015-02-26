@@ -1,2 +1,32 @@
-OK (53 tests)
+................................Start Testing TypeLibrary and Type Class handling
+List of Types
+	binary
+	bool
+	char
+	datetime
+	datetimetz
+	double
+	float
+	indicator
+	int16
+	int32
+	int64
+	int8
+	string
+	string_*
+	uint16
+	uint32
+	uint64
+	uint8
+	void
+End Testing TypeLibrary and Type Class handling
+.Start Testing TypeLibrary and Type Class handling
+End Testing TypeLibrary and Type Class handling
+...................
+
+
+
+OK (52 tests)
+
+
 

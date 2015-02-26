@@ -27,6 +27,8 @@
 
 # include <string>
 # include <sstream>
+# include <iostream>
+# include <fstream>
 # include <fcntl.h>
 # include <log4cxx/patternlayout.h>
 # include <log4cxx/consoleappender.h>
@@ -524,7 +526,7 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 {
 	po::options_description desc(
 			"Usage: scidbtestharness [--connect <value>] [--port <value>] [--root-dir <value>] "
-			"[--test-id <value>] [--test-name <value>] [--suite-id <value>] [--skip-tests <yes/no/value>] "
+			"[--test-id <value>] [--test-list <value>] [--test-name <value>] [--suite-id <value>] [--skip-tests <yes/no/value>] "
 			"[--include-regex-id <regex_expression>] [--exclude-regex-id <regex_expression>] "
 			"[--include-regex-name <regex_expression>] [--exclude-regex-name <regex_expression>] "
 			"[--sleep <value>] [--log-queries] [--log-dir <value>] [--log-destination <value>] [--report-file <value>] [--parallel <value>] "
@@ -532,11 +534,12 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			);
 
 	desc.add_options()
-		("connect",              po::value<string>(), "Host of one of the cluster nodes. Default is 'localhost'.")
+		("connect",              po::value<string>(), "Host of one of the cluster instances. Default is 'localhost'.")
 		("port",                 po::value<int>(),    "Port for connection. Default is 1239.")
 		("root-dir",             po::value<string>(), "Root directory in which test cases are kept. Default is Current directory.")
 		("test-id",              po::value<string>(), "Test Id.")
 		("test-name",            po::value<string>(), "Test Case name mentioned with .test extension.")
+		("test-list",            po::value<string>(), "File with list of test ids.")
 		("suite-id",             po::value<string>(), "Suite Id. If neither of test-id, test-name, suite-id is mentioned then Default suite-id is \"t\" under the root-dir. Suite-id could be either the directory path specified in the dot form or path of the .suite file specified in the dot form without .suite extension.")
 		("skip-tests",           po::value<string>(), "yes/no/file-name. yes: skip tests specified in all the disable.tests files, no: do not skip any test, file-name: skip tests/suites mentioned in this file. Default is \"yes\".")
 		("include-regex-id",     po::value<string>(), "regex expression specifying test ids to be included that match the given expression.")
@@ -617,6 +620,21 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 		{
 			_c.suiteId.clear ();
 			tokenize (vm["test-id"].as<string>(), _c.testId, DELIMITERS);
+		}
+
+		if (vm.count ("test-list"))
+		{
+			_c.suiteId.clear ();
+            vector<string> lists;
+			tokenize (vm["test-list"].as<string>(), lists, DELIMITERS);
+            for (size_t i = 0; i < lists.size(); i++) { 
+            	ifstream list(lists[i].c_str());
+                string testId;
+                while (!list.eof()) { 
+                    getline(list, testId);
+                    _c.testId.push_back(testId);
+                }
+            }
 		}
 
 		if (vm.count ("test-name"))

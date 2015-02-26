@@ -138,7 +138,7 @@ void ConstRLEChunk::getCoordinatePayloads(vector<char*> &coordPayloads,
             }
             else
             {
-               Value v = StorageManager::getInstance().reverseMapCoordinate(_arrayDesc->getCoordinateIndexArrayName(i),
+               Value v = StorageManager::getInstance().reverseMapCoordinate(_arrayDesc->getMappingArrayName(i),
                                                                             dims[i], coord, query);
                 memcpy(coordWriters[i], v.data(), coordSizes[i]);
             }

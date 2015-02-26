@@ -107,6 +107,8 @@ class CrossChunkIterator : public ConstChunkIterator
     boost::shared_ptr<ConstChunkIterator> inputIterator;
     Coordinates currentPos; 
     bool hasCurrent;
+    AttributeID attrID;
+    Value trueValue;
 };
 
 /***
@@ -194,6 +196,7 @@ class CrossArray : public Array
 	boost::shared_ptr<Array> rightArray;
     size_t nLeftDims;
     size_t nLeftAttrs;
+    size_t nRightAttrs;
 };
 
 

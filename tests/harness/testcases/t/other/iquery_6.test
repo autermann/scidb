@@ -8,19 +8,23 @@ load(A,'../tests/harness/testcases/data/iquery_5.txt')
 
 --test
 
---shell --command " iquery   -o lcsv+ -aq 'filter(redimension_store(A,A2), a>0)' 2>iquery_6.stderr" --store
+#--shell --command " iquery   -o lcsv+ -aq 'filter(redimension_store(A,A2), a>0)' 2>iquery_6.stderr" --store
+--shell --command " iquery   -o lcsv+ -aq 'redimension_store(A,A2)' 2>iquery_6.stderr" --store
 --shell --command "cat iquery_6.stderr" --store
 --shell --command "rm iquery_6.stderr" --store
 
---shell --command " iquery   -o lsparse -aq 'filter(redimension_store(A,A2), a>0)' 2>iquery_6.stderr" --store
+#--shell --command " iquery   -o lsparse -aq 'filter(redimension_store(A,A2), a>0)' 2>iquery_6.stderr" --store
+--shell --command " iquery   -o lsparse -aq 'redimension_store(A,A2)' 2>iquery_6.stderr" --store
 --shell --command "cat iquery_6.stderr" --store
 --shell --command "rm iquery_6.stderr" --store
 
---shell --command " iquery   -o lcsv+ -aq 'store(redimension_store(A,A3), A3)' 2>iquery_6.stderr" --store
+#--shell --command " iquery   -o lcsv+ -aq 'store(redimension_store(A,A3), A3)' 2>iquery_6.stderr" --store
+--shell --command " iquery   -o lcsv+ -aq 'redimension_store(A,A3)' 2>iquery_6.stderr" --store
 --shell --command "cat iquery_6.stderr" --store
 --shell --command "rm iquery_6.stderr" --store
 
---shell --command " iquery   -o lsparse -aq 'store(redimension_store(A,A3), A3)' 2>iquery_6.stderr" --store
+#--shell --command " iquery   -o lsparse -aq 'store(redimension_store(A,A3), A3)' 2>iquery_6.stderr" --store
+--shell --command " iquery   -o lsparse -aq 'redimension_store(A,A3)' 2>iquery_6.stderr" --store
 --shell --command "cat iquery_6.stderr" --store
 --shell --command "rm iquery_6.stderr" --store
 

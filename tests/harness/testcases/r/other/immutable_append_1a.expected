@@ -2,12 +2,16 @@ Query was executed successfully
 
 [(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29),(30)]
 
+SCIDB QUERY : <store(input(unbounded,  '../tests/harness/testcases/data/append.txt'), unbounded)>
 [(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29),(30),(31),(32),(33),(34),(35),(36),(37),(38),(39),(40),(41),(42),(43),(44),(45),(46),(47),(48),(49),(50)]
 
+SCIDB QUERY : <store(input(unbounded,  '../tests/harness/testcases/data/append2.txt'), unbounded)>
 [(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29),(30),(31),(32),(33),(34),(35),(36),(37),(38),(39),(40),(41),(42),(43),(44),(45),(46),(47),(48),(49),(50),(51),(52),(53),(54),(55),(56),(57),(58),(59),(60),(61),(62),(63),(64),(65),(66),(67),(68),(69),(70)]
 
-[An error expected at this place for the query "store(input(unbounded,  '../tests/harness/testcases/data/append2.txt'), unbounded)". And it failed with long code = 165. Expected long code = 165.]
+SCIDB QUERY : <store(input(unbounded,  '../tests/harness/testcases/data/append2.txt'), unbounded)>
+[An error expected at this place for the query "store(input(unbounded,  '../tests/harness/testcases/data/append2.txt'), unbounded)". And it failed with error code = scidb::SCIDB_SE_MERGE::SCIDB_LE_CHUNK_ALREADY_EXISTS..]
 
+SCIDB QUERY : <scan(unbounded)>
 [(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29),(30),(31),(32),(33),(34),(35),(36),(37),(38),(39),(40),(41),(42),(43),(44),(45),(46),(47),(48),(49),(50),(51),(52),(53),(54),(55),(56),(57),(58),(59),(60),(61),(62),(63),(64),(65),(66),(67),(68),(69),(70)]
 
 Query was executed successfully

@@ -1,5 +1,4 @@
 --setup
---start-query-logging
 create immutable array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
 --igdata "store(build(A,iif(x+y=0,1,x+y)),A)"
 
@@ -26,8 +25,8 @@ filter(r,count=count_2 and count=count_3)
 
 
 --echo range should be 1000 +/- 999  (1-1999)
-filter(r,count<1 or count>2999)
-filter(r,count_2<1 or count_2>2999)
+filter(r,count<1 or count>1999)
+filter(r,count_2<1 or count_2>1999)
 
 --echo size of join should be much smaller
 filter(r,count_3>=count or count_3>=count_2)
@@ -42,4 +41,3 @@ remove(t1)
 remove(t2)
 remove(t3)
 remove(r)
---stop-query-logging

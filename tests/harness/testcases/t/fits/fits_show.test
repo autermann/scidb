@@ -1,0 +1,4 @@
+--setup
+load_library('fits')
+--test
+fits_show('../tests/harness/testcases/data/rosat_pspc_rdf2_3_bk1.fits')

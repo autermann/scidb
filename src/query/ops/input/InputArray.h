@@ -274,7 +274,7 @@ namespace scidb
         size_t currChunkIndex;
     };
 
-    const size_t LOOK_AHEAD = 1;
+    const size_t LOOK_AHEAD = 2;
 
     class InputArray : public Array
     {

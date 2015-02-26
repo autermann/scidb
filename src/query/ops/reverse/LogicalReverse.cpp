@@ -49,8 +49,9 @@ public:
         Dimensions const& dims = schema.getDimensions();
         for (size_t i = 0; i < dims.size(); i++)
         {
-            if (dims[i].getLength() == Coordinate(MAX_COORDINATE))
+            if (dims[i].getLength() == INFINITE_LENGTH) {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REVERSE_ERROR1);
+            }
         }
         // TODO: Why do we point name of array? It can be wrong if such already used in query. No?
         return ArrayDesc("reverse", schema.getAttributes(), dims);

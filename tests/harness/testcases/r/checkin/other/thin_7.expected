@@ -9,7 +9,7 @@ SCIDB QUERY : <create empty array B <x:int64 compression 'dictionary'> [a(string
 Query was executed successfully
 
 SCIDB QUERY : <redimension_store(A,B)>
-[(0),(1),(2),(3),(4),(6),(7),(8),(5)]
+[(0),(1),(2),(3),(4),(6),(7),(8),()]
 
 SCIDB QUERY : <thin(A,0,1)>
 [{0}("10"),{1}("11"),{2}("12"),{3}("13"),{4}("14")];
@@ -36,10 +36,10 @@ SCIDB QUERY : <thin(A,2,3)>
 [{2}("18")]
 
 SCIDB QUERY : <store(thin(B,0,2),C)>
-[(0),(2),(4),(7),(5)]
+[(0),(2),(4),(7),()]
 
 SCIDB QUERY : <show(C)>
-[("C<x:int64 NOT NULL COMPRESSION 'dictionary',empty_indicator:indicator NOT NULL> [a=0:4,3,0]")]
+[("C<x:int64 COMPRESSION 'dictionary'> [a(string)=5,3,0]")]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

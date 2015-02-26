@@ -66,7 +66,6 @@ using namespace pqxx::prepare;
 
 namespace scidb
 {
-
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.catalog"));
 
     static const int WAIT_LOCK_TIMEOUT = 5; // 5 seconds
@@ -87,7 +86,67 @@ namespace scidb
         return exepath;
     }
 
+    SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
+                                      QueryID  queryId,
+                                      InstanceID   instanceId,
+                                      InstanceRole instanceRole,
+                                      LockMode lockMode,
+                                      uint64_t timestamp
+        )
+    : _arrayName(arrayName),
+      _arrayId(0),
+      _queryId(queryId),
+      _instanceId(instanceId),
+      _arrayVersionId(0),
+      _arrayVersion(0),
+      _instanceRole(instanceRole),
+      _lockMode(lockMode),
+      _timestamp(timestamp),
+      _immutableArrayId(0)
+     {}
+    
+     SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
+                                      QueryID  queryId,
+                                      InstanceID   instanceId,
+                                      InstanceRole instanceRole,
+                                      LockMode lockMode)
+    : _arrayName(arrayName),
+      _arrayId(0),
+      _queryId(queryId),
+      _instanceId(instanceId),
+      _arrayVersionId(0),
+      _arrayVersion(0),
+      _instanceRole(instanceRole),
+      _lockMode(lockMode),
+      _timestamp(StorageManager::getInstance().getCurrentTimestamp()),
+      _immutableArrayId(SystemCatalog::getInstance()->findArrayByName(arrayName))
+     {}
 
+     std::string SystemCatalog::LockDesc::toString()
+     {
+        std::ostringstream out;
+        out << "Lock: arrayName="
+            << _arrayName
+            << ", arrayId="
+            << _arrayId
+            << ", queryId="
+            << _queryId
+            << ", instanceId="
+            << _instanceId
+            << ", instanceRole="
+            << (_instanceRole==COORD ? "COORD" : "WORKER")
+            << ", lockMode="
+            << _lockMode
+            << ", arrayVersion="
+            << _arrayVersion
+            << ", arrayVersionId="
+            << _arrayVersionId
+            << ", timestamp="
+            << _timestamp;
+        return out.str();
+    }
+            
+ 
     const std::string& SystemCatalog::initializeCluster()
     {
         ScopedMutexLock mutexLock(_pgLock);
@@ -145,6 +204,9 @@ namespace scidb
         return _uuid;
     }
 
+    int totalNewArrays;
+    int maxTotalNewArrays;
+
     ArrayID SystemCatalog::addArray(const ArrayDesc &array_desc, PartitioningSchema ps)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::addArray ( array_name = " << array_desc.getName() << ")");
@@ -152,17 +214,21 @@ namespace scidb
         LOG4CXX_TRACE(logger, "Partitioning = " << ps );
 
         ScopedMutexLock mutexLock(_pgLock);
+        if (++totalNewArrays > maxTotalNewArrays) { 
+            maxTotalNewArrays = totalNewArrays;
+        }
 
         assert(_connection);
-        ArrayID array_id;
+        ArrayID array_id = array_desc.getId();
 
         try
         {
             work tr(*_connection);
 
-            result query_res = tr.exec("select nextval from nextval('array_id_seq')");
-            array_id = query_res[0].at("nextval").as(int64_t());
-
+            if (array_id == 0) { 
+                result query_res = tr.exec("select nextval from nextval('array_id_seq')");
+                array_id = query_res[0].at("nextval").as(int64_t());
+            } 
             string sql1 = "insert into \"array\"(id, name, partitioning_schema, flags, comment) values ($1, $2, $3, $4, $5)";
             _connection->prepare(sql1, sql1)
                 ("bigint", treat_direct)
@@ -221,7 +287,7 @@ namespace scidb
             //      " start, length, chunk_interval, chunk_overlap) values ($1, $2, $3, $4, $5, $6, $7)";
             //
             string sql3 = "insert into \"array_dimension\"(array_id, id, name,"
-                " startMin, currStart, currEnd, endMax, chunk_interval, chunk_overlap, type, source_array_name, comment) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
+                " startMin, currStart, currEnd, endMax, chunk_interval, chunk_overlap, funcMapOffset, funcMapScale, type, flags, mapping_array_name, comment) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)";
             _connection->prepare(sql3, sql3)
                 ("bigint", treat_direct)
                 ("int", treat_direct)
@@ -232,7 +298,10 @@ namespace scidb
                 ("bigint", treat_direct)
                 ("int", treat_direct)
                 ("int", treat_direct)
+                ("bigint", treat_direct)
+                ("bigint", treat_direct)
                 ("varchar", treat_string)
+                ("int", treat_direct)
                 ("varchar", treat_string)
                 ("varchar", treat_string)
                 ;
@@ -251,8 +320,11 @@ namespace scidb
                     (dim.getEndMax())
                     (dim.getChunkInterval())
                     (dim.getChunkOverlap())
+                    (dim.getFuncMapOffset())
+                    (dim.getFuncMapScale())
                     (dim.getType())
-                    (dim.getSourceArrayName())
+                    (dim.getFlags())
+                    (dim.getMappingArrayName())
                     (dim.getComment()).exec();
                 //TODO: If DimensionDesc will store IDs in future, here must be building vector of
                 //dimensions for caching as for attributes.
@@ -260,15 +332,7 @@ namespace scidb
 
             tr.commit();
 
-            //Caching descriptor builded manually because passed in arguments has no right IDs
-            boost::shared_ptr<ArrayDesc> cachedArrayDesc(new ArrayDesc(array_id,
-                                                                             array_desc.getName(),
-                                                                             cachedAttributes,
-                                                                             array_desc.getDimensions(),
-                                                                             array_desc.getFlags(),
-                                                                             array_desc.getComment()));
-
-            arrayDescByID[array_id] = cachedArrayDesc;
+            LOG4CXX_DEBUG(logger, "Create array " << array_desc.getName() << "(" << array_id << ") in query " << Query::getCurrentQueryID());
         }
         catch (const sql_error &e)
         {
@@ -290,13 +354,49 @@ namespace scidb
         return array_id;
     }
 
+    size_t SystemCatalog::countReferences(std::string const& arrayName)
+    {
+        LOG4CXX_TRACE(logger, "SystemCatalog::countReferences(arrayName=" << arrayName << ")");
+
+        ScopedMutexLock mutexLock(_pgLock);
+        assert(_connection);
+        size_t count = 0;
+        try
+        {
+            work tr(*_connection);
+            _connection->prepare("countReferences", "select count(distinct array_id) as cnt from array_dimension where mapping_array_name=$1")
+                ("varchar", treat_string);
+             result query_res = tr.prepared("countReferences")(arrayName).exec();
+             count = query_res[0].at("cnt").as(uint32_t());
+             tr.commit();
+        }
+        catch (const sql_error &e)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
+        }
+        catch (const Exception &e)
+        {
+            throw;
+        }
+        catch (const std::exception &e)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
+        }
+        catch (...)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
+                "Unknown exception when get number of instances";
+        }
+        return count;
+    }
+
     void SystemCatalog::updateArray(const ArrayDesc &array_desc)
     {
 
         LOG4CXX_TRACE(logger, "SystemCatalog::updateArray ( old_array_ID = " << array_desc.getId() << ", new array_name = " << array_desc.getName() << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
-        const boost::shared_ptr<ArrayDesc>& oldArrayDesc = getArrayDesc(array_desc.getId());
+        boost::shared_ptr<ArrayDesc> oldArrayDesc = getArrayDesc(array_desc.getId());
 
         LOG4CXX_TRACE(logger, "Previously = " << *oldArrayDesc);
         LOG4CXX_TRACE(logger, "New        = " << array_desc);
@@ -372,7 +472,7 @@ namespace scidb
                     (attr.getComment()).exec();
             }
 
-            string sql3 = "update \"array_dimension\" set name=$3, startMin=$4, endMax=$5, chunk_interval=$6, chunk_overlap=$7, type=$8, source_array_name=$9, comment=$10 where array_id=$1 and id=$2";
+            string sql3 = "update \"array_dimension\" set name=$3, startMin=$4, endMax=$5, chunk_interval=$6, chunk_overlap=$7, funcMapOffset=$12, funcMapScale=$13, type=$8, flags=$9, mapping_array_name=$10, comment=$11 where array_id=$1 and id=$2";
 
             _connection->prepare(sql3, sql3)
                 ("bigint", treat_direct)
@@ -383,8 +483,12 @@ namespace scidb
                 ("int", treat_direct)
                 ("int", treat_direct)
                 ("varchar", treat_string)
+                ("int", treat_direct)
                 ("varchar", treat_string)
-                ("varchar", treat_string);
+                ("varchar", treat_string)
+                ("bigint", treat_direct)
+                ("bigint", treat_direct)
+                ;
 
             Dimensions const& dims = array_desc.getDimensions();
             for (int i = 0, n = dims.size(); i < n; i++)
@@ -399,19 +503,15 @@ namespace scidb
                     (dim.getChunkInterval())
                     (dim.getChunkOverlap())
                     (dim.getType())
-                    (dim.getSourceArrayName())
-                    (dim.getComment()).exec();
+                    (dim.getFlags())
+                    (dim.getMappingArrayName())
+                    (dim.getComment())
+                    (dim.getFuncMapOffset())
+                    (dim.getFuncMapScale()).exec();
             }
 
             tr.commit();
-
-            boost::shared_ptr<ArrayDesc>& elem = arrayDescByID[array_desc.getId()];
-            if (!elem) {
-                const boost::shared_ptr<ArrayDesc> ad(new ArrayDesc(array_desc));
-                elem = ad;
-            } else {
-                *elem = array_desc;
-            }
+            *oldArrayDesc = array_desc;
         }
         catch (const sql_error &e)
         {
@@ -481,10 +581,9 @@ namespace scidb
 
         ScopedMutexLock mutexLock(_pgLock);
 
-        if (arrayDescByID.find(array_id) != arrayDescByID.end()) {
+        if (_arrDescCache.find(array_id) != _arrDescCache.end()) {
             return true;
         }
-
         LOG4CXX_TRACE(logger, "Failed to find array_id = " << array_id << " locally.");
         assert(_connection);
 
@@ -586,7 +685,23 @@ namespace scidb
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( name = " << array_name << ")");
 
+        boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
+        if (query) {
+            boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(array_name);
+            if (tmpArray) { 
+                array_desc = tmpArray->getArrayDesc();
+                return true;
+            }
+        }
+
         ScopedMutexLock mutexLock(_pgLock);
+        boost::shared_ptr<const ArrayDesc> dummy;
+        boost::shared_ptr<const ArrayDesc>& ad(query ? query->arrayDescByNameCache[array_name] : dummy);
+        if (ad) {
+            assert(ad->getName() == array_name);
+            array_desc = *ad;
+            return true;
+        }
 
         LOG4CXX_TRACE(logger, "Failed to find array_name = " << array_name << " locally.");
         assert(_connection);
@@ -594,7 +709,7 @@ namespace scidb
         try
         {
             work tr(*_connection);
-            string sql1 = "select id, name, flags, comment from \"array\" where name = $1";
+            string sql1 = "select id, name, partitioning_schema, flags, comment from \"array\" where name = $1";
             _connection->prepare("find-by-name", sql1)("varchar", treat_string);
             result query_res1 = tr.prepared("find-by-name")(array_name).exec();
 
@@ -664,7 +779,7 @@ namespace scidb
 
             // string sql3 = "select name, start, length, chunk_interval, chunk_overlap "
             //          " from \"array_dimension\" where array_id = $1 order by id";
-            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap, type, source_array_name, comment "
+            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap, funcMapOffset, funcMapScale, type, flags, mapping_array_name, comment "
                 " from \"array_dimension\" where array_id = $1 order by id";
 
             _connection->prepare(sql3, sql3)("integer", treat_direct);
@@ -686,28 +801,25 @@ namespace scidb
                             i.at("chunk_interval").as(size_t()),
                             i.at("chunk_overlap").as(size_t()),
                             i.at("type").as(string()),
-                            i.at("source_array_name").as(string()),
-                            i.at("comment").as(string())
+                            i.at("flags").as(int()),
+                            i.at("mapping_array_name").as(string()),
+                            i.at("comment").as(string()),
+                            i.at("funcMapOffset").as(int64_t()),
+                            i.at("funcMapScale").as(int64_t())
                             ));
                 }
             }
 
-            boost::shared_ptr<ArrayDesc> ad(new ArrayDesc(array_id,
-                                                                query_res1[0].at("name").as(string()),
-                                                                attributes,
-                                                                dimensions,
-                                                                query_res1[0].at("flags").as(int()),
-                                                                query_res1[0].at("comment").as(string())));
-
-            array_desc = *ad;
+            boost::shared_ptr<ArrayDesc> newDesc(new ArrayDesc(array_id,
+                                                               query_res1[0].at("name").as(string()),
+                                                               attributes,
+                                                               dimensions,
+                                                               query_res1[0].at("flags").as(int()),
+                                                               query_res1[0].at("comment").as(string())));
+            newDesc->setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
-
-            boost::shared_ptr<ArrayDesc>& elem = arrayDescByID[array_id];
-            if (!elem) {
-                elem = ad;
-            } else {
-                *elem = *ad;
-            }
+            ad = newDesc;
+            array_desc = *ad;
         }
         catch (const sql_error &e)
         {
@@ -731,8 +843,8 @@ namespace scidb
     void SystemCatalog::getArrayDesc(const ArrayID array_id, ArrayDesc &array_desc)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( id = " << array_id << ", array_desc )");
-        boost::shared_ptr<ArrayDesc> ad = getArrayDesc(array_id);
-        array_desc = *ad.get();
+        boost::shared_ptr<ArrayDesc> desc = getArrayDesc(array_id);
+        array_desc = *desc;
     }
 
     boost::shared_ptr<ArrayDesc> SystemCatalog::getArrayDesc(const ArrayID array_id)
@@ -740,33 +852,24 @@ namespace scidb
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( id = " << array_id << ")");
         ScopedMutexLock mutexLock(_pgLock);
 
-        std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = arrayDescByID.find(array_id);
-        if (i != arrayDescByID.end())
-        {
-            return i->second;
-        }
-        return reloadArrayDesc(array_id, true);
-    }
-
-    boost::shared_ptr<ArrayDesc> SystemCatalog::reloadArrayDesc(const ArrayID array_id, bool throwException)
-    {
+        std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator adIter = _arrDescCache.find(array_id);
+        if (adIter != _arrDescCache.end() && !((adIter->second)->isInvalidated())) {
+            assert(adIter->second->getId() == array_id);
+            return adIter->second;
+        } 
         LOG4CXX_TRACE(logger, "Failed to find array_id = " << array_id << " locally.");
         assert(_connection);
-        boost::shared_ptr<ArrayDesc> array_desc;
+        boost::shared_ptr<ArrayDesc> newDesc;
         try
         {
             work tr(*_connection);
-            string sql1 = "select id, name, flags, comment from \"array\" where id = $1";
+            string sql1 = "select id, name, partitioning_schema, flags, comment from \"array\" where id = $1";
             _connection->prepare("find-by-id", sql1)("bigint", treat_direct);
             result query_res1 = tr.prepared("find-by-id")(array_id).exec();
 
             if (query_res1.size() <= 0)
             {
-                if (throwException) {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAYID_DOESNT_EXIST) << array_id;
-                } else {
-                    return array_desc;
-                }
+                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAYID_DOESNT_EXIST) << array_id;
             }
             ArrayID array_id = query_res1[0].at("id").as(int64_t());
 
@@ -829,7 +932,7 @@ namespace scidb
             // string sql3 = "select name, start, length, chunk_interval, chunk_overlap "
             //      " from \"array_dimension\" where array_id = $1 order by id";
 
-            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap, type, source_array_name, comment "
+            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap, funcMapOffset, funcMapScale, type, flags, mapping_array_name, comment "
                 " from \"array_dimension\" where array_id = $1 order by id";
             _connection->prepare(sql3, sql3)("integer", treat_direct);
             result query_res3 = tr.prepared(sql3)(array_id).exec();
@@ -850,27 +953,28 @@ namespace scidb
                             i.at("chunk_interval").as(size_t()),
                             i.at("chunk_overlap").as(size_t()),
                             i.at("type").as(string()),
-                            i.at("source_array_name").as(string()),
-                            i.at("comment").as(string())
+                            i.at("flags").as(int()),
+                            i.at("mapping_array_name").as(string()),
+                            i.at("comment").as(string()),
+                            i.at("funcMapOffset").as(int64_t()),
+                            i.at("funcMapScale").as(int64_t())
                             ));
                 }
             }
-            array_desc = boost::shared_ptr<ArrayDesc>(new ArrayDesc(array_id,
-                                                                    query_res1[0].at("name").as(string()),
-                                                                    attributes,
-                                                                    dimensions,
-                                                                    query_res1[0].at("flags").as(int()),
-                                                                    query_res1[0].at("comment").as(string())
-                                                                    ));
-            boost::shared_ptr<ArrayDesc>& elem = arrayDescByID[array_id];
-            if (!elem) {
-                elem = array_desc;
-            } else {
-                *elem = *array_desc;
-            }
-            array_desc = elem;
-
+            newDesc = boost::shared_ptr<ArrayDesc>(new ArrayDesc(array_id,
+                                                                 query_res1[0].at("name").as(string()),
+                                                                 attributes,
+                                                                 dimensions,
+                                                                 query_res1[0].at("flags").as(int()),
+                                                                 query_res1[0].at("comment").as(string())));
+            newDesc->setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
+            if (adIter != _arrDescCache.end()) { 
+                *(adIter->second) = *newDesc;
+                newDesc = adIter->second;
+            } else {
+                _arrDescCache[array_id] = newDesc;
+            }
         }
         catch (const sql_error &e)
         {
@@ -888,7 +992,7 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting array";
         }
-        return array_desc;
+        return newDesc;
     }
 
     PartitioningSchema SystemCatalog::getPartitioningSchema(const ArrayID array_id)
@@ -931,6 +1035,10 @@ namespace scidb
         }
     }
 
+    const std::string SystemCatalog::cleanupMappingArraysSql("delete from \"array\" as AR where not exists"
+                                                             " (select AD.array_id from array_dimension as AD where AR.name=AD.mapping_array_name)"
+                                                             " and AR.name like '%:%'");
+
     bool SystemCatalog::deleteArray(const string &array_name)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::deleteArray( name = " << array_name << ")");
@@ -942,12 +1050,30 @@ namespace scidb
         try
         {
             work tr(*_connection);
-            string sql1 = "delete from \"array\" where name = $1 or name like $1||'@%' or name like $1||':%'";
-            _connection->prepare("delete-array-name", sql1)("varchar", treat_string);
-            result query_res = tr.prepared("delete-array-name")(array_name).exec();
 
+            const string deleteArraySql = "delete from \"array\" where name = $1 or (name like $1||'@%' and name not like '%:%')";
+            _connection->prepare("delete-array-name", deleteArraySql)("varchar", treat_string);
+            result query_res = tr.prepared("delete-array-name")(array_name).exec();
+            totalNewArrays -= query_res.affected_rows();
             rc = (query_res.affected_rows() > 0);
+            
+            _connection->prepare("cleanup-mapping-arrays", cleanupMappingArraysSql); 
+            totalNewArrays -= tr.prepared("cleanup-mapping-arrays").exec().affected_rows();; 
+
             tr.commit();
+
+            std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.begin();
+            size_t prefixLen = array_name.size();
+
+            while (i != _arrDescCache.end()) { 
+                boost::shared_ptr<ArrayDesc>& desc = i->second;
+                std::string const& name = desc->getName();
+                if (name == array_name || (name.compare(0, prefixLen, array_name) && name[prefixLen] == '@')) { 
+                    _arrDescCache.erase(i++);
+                } else { 
+                    ++i;
+                }
+            }
         }
         catch (const sql_error &e)
         {
@@ -975,25 +1101,16 @@ namespace scidb
         ScopedMutexLock mutexLock(_pgLock);
 
         assert(_connection);
-
         try
         {
             work tr(*_connection);
-            string sql1 = "delete from \"array\" where id = $1";
-            _connection->prepare("delete-array-id", sql1)("integer", treat_direct);
-            tr.prepared("delete-array-id")(array_id).exec();
 
-            string sql2 = "delete from \"array_version\" where array_id=$1";
-            _connection->prepare("delete-array-version", sql2)("bigint", treat_direct);
-            tr.prepared("delete-array-version")(array_id).exec();
+            const string sql1 = "delete from \"array\" where id = $1";
+            _connection->prepare("delete-array-id", sql1)("integer", treat_direct);
+            totalNewArrays -= tr.prepared("delete-array-id")(array_id).exec().affected_rows();
 
             tr.commit();
-
-            if (arrayDescByID.find(array_id) != arrayDescByID.end())
-            {
-                LOG4CXX_TRACE(logger, "Deleting array name = " << arrayDescByID[array_id]->getName());
-                arrayDescByID.erase(array_id);
-            }
+            _arrDescCache.erase(array_id);
         }
         catch (const sql_error &e)
         {
@@ -1013,64 +1130,43 @@ namespace scidb
         }
     }
 
+    void SystemCatalog::invalidateArrayCache(const ArrayID array_id)
+    {
+        LOG4CXX_TRACE(logger, "SystemCatalog::invlaidateArrayCache( array_id = " << array_id << ")");
+        ScopedMutexLock mutexLock(_pgLock);
+
+        std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.find(array_id);
+        if (i != _arrDescCache.end()) { 
+            i->second->invalidate();
+        }
+    }
+
     void SystemCatalog::deleteArrayCache(const ArrayID array_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayCache( array_id = " << array_id << ")");
-
         ScopedMutexLock mutexLock(_pgLock);
 
-        arrayDescByID.erase(array_id);
+        _arrDescCache.erase(array_id);
     }
 
-    void SystemCatalog::deleteArrayCache(const string& array_name)
+    void SystemCatalog::invalidateArrayCache(std::string const& array_name)
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayCache( array_name = " << array_name << ")");
-    }
-
-    void SystemCatalog::cleanupCache()
-    {
+        LOG4CXX_TRACE(logger, "SystemCatalog::invlaidateArrayCache( array_name = " << array_name << ")");
         ScopedMutexLock mutexLock(_pgLock);
-
-        std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator it = arrayDescByID.begin();
-        while (it != arrayDescByID.end())
-        {
-            if (!reloadArrayDesc(it->first, false))
-            {
-                arrayDescByID.erase(it++);
+        
+        size_t prefixLen = array_name.size();
+        
+        for (std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.begin();
+             i != _arrDescCache.end(); 
+             ++i) 
+        { 
+            boost::shared_ptr<ArrayDesc>& desc = i->second;
+            std::string const& name = desc->getName();
+            if (name == array_name || (name.compare(0, prefixLen, array_name) && name[prefixLen] == '@')) { 
+                desc->invalidate();
             }
-            else
-            {
-                ++it;
-            }
         }
-    }
-
-void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArrayName)
-{
-    LOG4CXX_TRACE(logger, "SystemCatalog::deleteAllArrayVersionsFromCacheByName( baseArrayName = "
-                  << baseArrayName << ")");
-
-    ScopedMutexLock mutexLock(_pgLock);
-
-    std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator it = arrayDescByID.begin();
-    while (it != arrayDescByID.end())
-    {
-        VersionID ver(0);
-        const string& arrayName = it->second->getName();
-        const std::string& versionName = splitArrayNameVersion(arrayName, ver);
-
-        if (versionName == baseArrayName)
-        {
-            LOG4CXX_TRACE(logger, "SystemCatalog::deleteAllArrayVersionsFromCacheByName: array descriptor for '"
-                           << arrayName << "' being removed");
-            arrayDescByID.erase(it++);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-}
+    } 
 
     VersionID SystemCatalog::createNewVersion(const ArrayID array_id, const ArrayID version_array_id)
     {
@@ -1124,7 +1220,6 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
                     "Unknown exception when creating a new version of an updateable array";
             }
         }
-        // updateArrayBoundaries(array_id, getLowBoundary(version_array_id), getHighBoundary(version_array_id));
         return version_id;
     }
 
@@ -1172,7 +1267,7 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
 **       piggy-backed on a "heartbeat" message, which contains the latest
 **       lamport clock value. Meta-data additions to the persistent store
 **       will increment the lamport clock value, which will be propogated
-**       throughout the nodes. When the local node's clock value < the
+**       throughout the instances. When the local instance's clock value < the
 **       'global', and the local is obliged to check it's local catalogs,
 **       then it can reload meta-data from the persistent store.
 */
@@ -1395,7 +1490,6 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         ScopedMutexLock mutexLock(_pgLock);
         try
         {
-
             work tr(*_connection);
 
             string sql1 = "update \"array_dimension\" set currStart=$1 where array_id=$2 and id=$3 and currStart>$1";
@@ -1413,6 +1507,7 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
                 tr.prepared("update-high-boundary")(high[i])(array_id)(i).exec();
             }
             tr.commit();
+            invalidateArrayCache(array_id);
         }
         catch (const sql_error &e)
         {
@@ -1433,20 +1528,20 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         }
     }
 
-    uint32_t SystemCatalog::getNumberOfNodes() const
+    uint32_t SystemCatalog::getNumberOfInstances() const
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::getNumberOfNodes()");
+        LOG4CXX_TRACE(logger, "SystemCatalog::getNumberOfInstances()");
 
         ScopedMutexLock mutexLock(_pgLock);
 
         assert(_connection);
-        uint32_t n_nodes;
+        uint32_t n_instances;
         try
         {
             work tr(*_connection);
 
-            result query_res = tr.exec("select count(*) as cnt from \"node\"");
-            n_nodes = query_res[0].at("cnt").as(uint32_t());
+            result query_res = tr.exec("select count(*) as cnt from \"instance\"");
+            n_instances = query_res[0].at("cnt").as(uint32_t());
             tr.commit();
         }
         catch (const sql_error &e)
@@ -1464,33 +1559,33 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         catch (...)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
-                "Unknown exception when get number of nodes";
+                "Unknown exception when get number of instances";
         }
-        return n_nodes;
+        return n_instances;
     }
 
-    NodeID SystemCatalog::addNode(const NodeDesc &node) const
+    InstanceID SystemCatalog::addInstance(const InstanceDesc &instance) const
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::addNode( " << node << ")");
+        LOG4CXX_TRACE(logger, "SystemCatalog::addInstance( " << instance << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
 
         assert(_connection);
 
-        int64_t node_id = 0;
+        int64_t instance_id = 0;
         try
         {
             work tr(*_connection);
 
-            result query_res = tr.exec("select nextval from nextval('node_id_seq')");
-            node_id = query_res[0].at("nextval").as(int64_t());
+            result query_res = tr.exec("select nextval from nextval('instance_id_seq')");
+            instance_id = query_res[0].at("nextval").as(int64_t());
 
-            string sql1 = "insert into \"node\"(node_id, host, port, online_since) values ($1, $2, $3, 'infinity')";
+            string sql1 = "insert into \"instance\"(instance_id, host, port, online_since) values ($1, $2, $3, 'infinity')";
             _connection->prepare(sql1, sql1)
                 ("bigint", treat_direct)
                 ("varchar", treat_string)
                 ("varchar", treat_string);
-            tr.prepared(sql1)(node_id)(node.getHost())(node.getPort()).exec();
+            tr.prepared(sql1)(instance_id)(instance.getHost())(instance.getPort()).exec();
 
             tr.commit();
         }
@@ -1508,14 +1603,14 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         }
         catch (...)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when adding node";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when adding instance";
         }
-        return node_id;
+        return instance_id;
     }
 
-    void SystemCatalog::getNodes(Nodes &nodes) const
+    void SystemCatalog::getInstances(Instances &instances) const
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::getNodes()");
+        LOG4CXX_TRACE(logger, "SystemCatalog::getInstances()");
 
         ScopedMutexLock mutexLock(_pgLock);
 
@@ -1525,17 +1620,17 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         {
             work tr(*_connection);
 
-            string sql = "select node_id, host, port, date_part('epoch', online_since)::bigint as ts from \"node\" order by node_id";
+            string sql = "select instance_id, host, port, date_part('epoch', online_since)::bigint as ts from \"instance\" order by instance_id";
             result query_res = tr.exec(sql);
 
             if (query_res.size() > 0)
             {
-                nodes.reserve(query_res.size());
+                instances.reserve(query_res.size());
                 for (result::const_iterator i = query_res.begin(); i != query_res.end(); ++i)
                 {
-                    nodes.push_back(
-                        NodeDesc(
-                            i.at("node_id").as(uint64_t()),
+                    instances.push_back(
+                        InstanceDesc(
+                            i.at("instance_id").as(uint64_t()),
                             i.at("host").as(string()),
                             i.at("port").as(uint16_t()),
                             i.at("ts").as(uint64_t()) ));
@@ -1559,15 +1654,15 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         }
         catch (...)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting nodes list";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting instances list";
         }
 
-        LOG4CXX_TRACE(logger, "Retrieved " << nodes.size() << " nodes from catalogs");
+        LOG4CXX_TRACE(logger, "Retrieved " << instances.size() << " instances from catalogs");
     }
 
-    void SystemCatalog::getNode(const NodeID node_id, NodeDesc &node) const
+    void SystemCatalog::getClusterInstance(const InstanceID instance_id, InstanceDesc &instance) const
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::getNode( node_id = " << node_id << " NodeDesc& )");
+        LOG4CXX_TRACE(logger, "SystemCatalog::getInstance( instance_id = " << instance_id << " InstanceDesc& )");
 
         ScopedMutexLock mutexLock(_pgLock);
 
@@ -1577,15 +1672,15 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         {
             work tr(*_connection);
 
-            string sql = "select node_id, host, port, date_part('epoch', online_since)::bigint as ts from \"node\" where node_id = $1";
+            string sql = "select instance_id, host, port, date_part('epoch', online_since)::bigint as ts from \"instance\" where instance_id = $1";
             _connection->prepare(sql, sql)("bigint", treat_direct);
-            result query_res = tr.prepared(sql)(node_id).exec();
+            result query_res = tr.prepared(sql)(instance_id).exec();
 
             if (query_res.size() <= 0)
-                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_NODE_DOESNT_EXIST) << node_id;
+                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_INSTANCE_DOESNT_EXIST) << instance_id;
 
-            node = NodeDesc(
-                query_res[0].at("node_id").as(uint64_t()),
+            instance = InstanceDesc(
+                query_res[0].at("instance_id").as(uint64_t()),
                 query_res[0].at("host").as(string()),
                 query_res[0].at("port").as(uint16_t()),
                 query_res[0].at("ts").as(uint64_t()) );
@@ -1606,14 +1701,14 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         }
         catch (...)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting node";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting instance";
         }
-        LOG4CXX_TRACE(logger, "node_id = " << node_id << " is node " << node);
+        LOG4CXX_TRACE(logger, "instance_id = " << instance_id << " is instance " << instance);
     }
 
-    void SystemCatalog::markNodeOnline(const NodeID node_id, const std::string host, const uint16_t port) const
+    void SystemCatalog::markInstanceOnline(const InstanceID instance_id, const std::string host, const uint16_t port) const
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::markNodeOnline( node_id = " << node_id << ", host = " << host << ", port = " << port << ")");
+        LOG4CXX_TRACE(logger, "SystemCatalog::markInstanceOnline( instance_id = " << instance_id << ", host = " << host << ", port = " << port << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
 
@@ -1623,13 +1718,13 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         {
             work tr(*_connection);
 
-            string sql = "update \"node\" set host = $1, port = $2, online_since = 'now' where node_id = $3";
+            string sql = "update \"instance\" set host = $1, port = $2, online_since = 'now' where instance_id = $3";
             _connection->prepare(sql, sql)
                 ("varchar", treat_string)
                 ("varchar", treat_string)
                 ("bigint", treat_direct);
 
-            tr.prepared(sql)(host)(port)(node_id).exec();
+            tr.prepared(sql)(host)(port)(instance_id).exec();
 
             tr.commit();
         }
@@ -1647,13 +1742,13 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         }
         catch (...)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when marking node online";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when marking instance online";
         }
     }
 
-    void SystemCatalog::markNodeOffline(const NodeID node_id) const
+    void SystemCatalog::markInstanceOffline(const InstanceID instance_id) const
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::markNodeOffline( node_id = " << node_id << ")");
+        LOG4CXX_TRACE(logger, "SystemCatalog::markInstanceOffline( instance_id = " << instance_id << ")");
         ScopedMutexLock mutexLock(_pgLock);
 
         assert(_connection);
@@ -1662,11 +1757,11 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         {
             work tr(*_connection);
 
-            string sql = "update \"node\" set online_since = 'infinity' where node_id = $1";
+            string sql = "update \"instance\" set online_since = 'infinity' where instance_id = $1";
             _connection->prepare(sql, sql)
                 ("bigint", treat_direct);
 
-            tr.prepared(sql)(node_id).exec();
+            tr.prepared(sql)(instance_id).exec();
 
             tr.commit();
         }
@@ -1684,7 +1779,7 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
         }
         catch (...)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when marking node offline";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when marking instance offline";
         }
     }
 
@@ -1692,10 +1787,11 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
                                                     const AttributeID attr_id, const int16_t compressionMethod)
     {
 
-        LOG4CXX_TRACE(logger, "SystemCatalog::setDefaultCompressionMethod( array_id = " << array_id << ", attr_id = " << attr_id << ", compressionMethod = " << compressionMethod << ")");
+        LOG4CXX_TRACE(logger, "SystemCatalog::setDefaultCompressionMethod( array_id = " << array_id
+                      << ", attr_id = " << attr_id << ", compressionMethod = " << compressionMethod << ")");
         ScopedMutexLock mutexLock(_pgLock);
 
-        const boost::shared_ptr<ArrayDesc>& arrayDesc = getArrayDesc(array_id);
+        boost::shared_ptr<ArrayDesc> arrayDesc = getArrayDesc(array_id);
         assert(arrayDesc);
 
         assert(_connection);
@@ -1722,31 +1818,7 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
             tr.prepared(sql)(compressionMethod)(array_id)(attr_id).exec();
 
             tr.commit();
-
-            if (arrayDescByID.find(array_id) != arrayDescByID.end())
-            {
-                Attributes const& attributes = arrayDesc->getAttributes();
-                Attributes cachedAttributes;
-                cachedAttributes.reserve(attributes.size());
-                for (size_t i = 0, n = attributes.size(); i < n; i++)
-                {
-                    AttributeDesc const& attr = attributes[i];
-                    cachedAttributes[i] = ((AttributeID)i == attr_id)
-                        ? AttributeDesc(i, attr.getName(), attr.getType(), attr.getFlags(),
-                                        compressionMethod, std::set<std::string>(), attr.getReserve(), &attr.getDefaultValue(),
-                                        attr.getDefaultValueExpr(), attr.getComment())
-                        : attr;
-                }
-                const boost::shared_ptr<ArrayDesc> cachedArrayDesc(new ArrayDesc(array_id, arrayDesc->getName(), cachedAttributes,
-                                                                                       arrayDesc->getDimensions(), arrayDesc->getFlags(),
-                                                                                       arrayDesc->getComment()));
-                boost::shared_ptr<ArrayDesc>& elem = arrayDescByID[array_id];
-                if (!elem) {
-                    elem = cachedArrayDesc;
-                } else {
-                    *elem = *cachedArrayDesc;
-                }
-            }
+            arrayDesc->invalidate();
         }
         catch (const sql_error &e)
         {
@@ -1979,17 +2051,17 @@ void SystemCatalog::deleteAllArrayVersionsFromCacheByName(const string& baseArra
 std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& lockDesc)
 {
    assert(lockDesc);
-   assert(lockDesc->getNodeRole() == LockDesc::COORD ||
-          lockDesc->getNodeRole() == LockDesc::WORKER);
+   assert(lockDesc->getInstanceRole() == LockDesc::COORD ||
+          lockDesc->getInstanceRole() == LockDesc::WORKER);
    string lockInsertSql;
 
 
    if (lockDesc->getLockMode() == LockDesc::RD) {
-      if (lockDesc->getNodeRole() == LockDesc::COORD) {
+      if (lockDesc->getInstanceRole() == LockDesc::COORD) {
          lockInsertSql = "insert into array_version_lock"
-         " (array_name, array_id, query_id, node_id, array_version_id, array_version, node_role, lock_mode)"
+         " (array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
-         "  (select AVL.array_name from array_version_lock as AVL where AVL.array_name=$1::VARCHAR and AVL.lock_mode>$9 and AVL.node_role=$10))";
+         "  (select AVL.array_name from array_version_lock as AVL where AVL.array_name=$1::VARCHAR and AVL.lock_mode>$9 and AVL.instance_role=$10))";
 
       } else {
           assert(false);
@@ -1997,29 +2069,29 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
       }
    } else if (lockDesc->getLockMode() == LockDesc::WR ||
               lockDesc->getLockMode() == LockDesc::CRT) {
-      if (lockDesc->getNodeRole() == LockDesc::COORD) {
+      if (lockDesc->getInstanceRole() == LockDesc::COORD) {
          lockInsertSql = "insert into array_version_lock"
-         " (array_name, array_id, query_id, node_id, array_version_id, array_version, node_role, lock_mode)"
+         " (array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
          "  (select AVL.array_name from array_version_lock as AVL where AVL.array_name=$1::VARCHAR and AVL.lock_mode>$9))";
 
-      } else if (lockDesc->getNodeRole() == LockDesc::WORKER) {
+      } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
           if (lockDesc->getLockMode() == LockDesc::CRT) {
               assert(false);
               throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "lock mode";
           }          
          lockInsertSql = "insert into array_version_lock"
-         " ( array_name, array_id, query_id, node_id, array_version_id, array_version, node_role, lock_mode)"
+         " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "  (select AVL.array_name, AVL.array_id, AVL.query_id, $3, AVL.array_version_id, AVL.array_version, $4, AVL.lock_mode"
          " from array_version_lock as AVL where AVL.array_name=$1::VARCHAR"
-         " and AVL.query_id=$2 and AVL.node_role=1 and (AVL.lock_mode=$5 or AVL.lock_mode=$6))";
+         " and AVL.query_id=$2 and AVL.instance_role=1 and (AVL.lock_mode=$5 or AVL.lock_mode=$6))";
 
       }
    }  else if (lockDesc->getLockMode() == LockDesc::RM) {
 
-      if (lockDesc->getNodeRole() == LockDesc::COORD) {
+      if (lockDesc->getInstanceRole() == LockDesc::COORD) {
          lockInsertSql = "insert into array_version_lock"
-         " ( array_name, array_id, query_id, node_id, array_version_id, array_version, node_role, lock_mode)"
+         " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
          "  (select array_name from array_version_lock where array_name=$1::VARCHAR))";
       } else {
@@ -2027,17 +2099,17 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
          throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "lock mode";
       }
    }  else if (lockDesc->getLockMode() == LockDesc::RNF) {
-        if (lockDesc->getNodeRole() == LockDesc::COORD) {
+        if (lockDesc->getInstanceRole() == LockDesc::COORD) {
             lockInsertSql = "insert into array_version_lock"
-            " ( array_name, array_id, query_id, node_id, array_version_id, array_version, node_role, lock_mode)"
+            " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
             "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
             "  (select array_name from array_version_lock where array_name=$1::VARCHAR))";
-      } else if (lockDesc->getNodeRole() == LockDesc::WORKER) {
+      } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
          lockInsertSql = "insert into array_version_lock"
-         " ( array_name, array_id, query_id, node_id, array_version_id, array_version, node_role, lock_mode)"
+         " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "  (select AVL.array_name, AVL.array_id, AVL.query_id, $3, AVL.array_version_id, AVL.array_version, $4, AVL.lock_mode"
          " from array_version_lock as AVL where AVL.array_name=$1::VARCHAR"
-         " and AVL.query_id=$2 and AVL.node_role=$5 and AVL.lock_mode=$6)";
+         " and AVL.query_id=$2 and AVL.instance_role=$5 and AVL.lock_mode=$6)";
       }
    } else {
       assert(false);
@@ -2049,7 +2121,7 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
 bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, ErrorChecker& errorChecker)
 {
    assert(lockDesc);
-   LOG4CXX_TRACE(logger, "SystemCatalog::lockArray: "<<lockDesc->toString());
+   LOG4CXX_DEBUG(logger, "SystemCatalog::lockArray: "<<lockDesc->toString());
    try
    {
       assert(_connection);
@@ -2068,7 +2140,7 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
 
             if (lockDesc->getLockMode() == LockDesc::RD) {
 
-                if (lockDesc->getNodeRole() == LockDesc::COORD) {
+                if (lockDesc->getInstanceRole() == LockDesc::COORD) {
                     string uniquePrefix("COORD-RD-");
                     _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
                     ("varchar", treat_string)
@@ -2086,10 +2158,10 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                     (lockDesc->getArrayName())
                     (lockDesc->getArrayId())
                     (lockDesc->getQueryId())
-                    (lockDesc->getNodeId())
+                    (lockDesc->getInstanceId())
                     (lockDesc->getArrayVersionId())
                     (lockDesc->getArrayVersion())
-                    ((int)lockDesc->getNodeRole())
+                    ((int)lockDesc->getInstanceRole())
                     ((int)lockDesc->getLockMode())
                     ((int)LockDesc::RD)
                     ((int)LockDesc::COORD).exec();
@@ -2097,7 +2169,7 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
             } else if (lockDesc->getLockMode() == LockDesc::WR
                        || lockDesc->getLockMode() == LockDesc::CRT) {
 
-                if (lockDesc->getNodeRole() == LockDesc::COORD) {
+                if (lockDesc->getInstanceRole() == LockDesc::COORD) {
                     string uniquePrefix("COORD-WR-");
                     _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
                     ("varchar", treat_string)
@@ -2114,14 +2186,14 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                     (lockDesc->getArrayName())
                     (lockDesc->getArrayId())
                     (lockDesc->getQueryId())
-                    (lockDesc->getNodeId())
+                    (lockDesc->getInstanceId())
                     (lockDesc->getArrayVersionId())
                     (lockDesc->getArrayVersion())
-                    ((int)lockDesc->getNodeRole())
+                    ((int)lockDesc->getInstanceRole())
                     ((int)lockDesc->getLockMode())
                     ((int)LockDesc::INVALID_MODE).exec();
 
-                } else if (lockDesc->getNodeRole() == LockDesc::WORKER) {
+                } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
                     assert(lockDesc->getLockMode() != LockDesc::CRT);
                     string uniquePrefix("WORKER-WR-");
                     _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
@@ -2135,14 +2207,14 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                     query_res = tr.prepared(uniquePrefix+lockInsertSql)
                     (lockDesc->getArrayName())
                     (lockDesc->getQueryId())
-                    (lockDesc->getNodeId())
+                    (lockDesc->getInstanceId())
                     ((int)LockDesc::WORKER)
                     ((int)LockDesc::WR)
                     ((int)LockDesc::CRT).exec();
 
                     if (query_res.affected_rows() == 1) {
                         string lockReadSql = "select array_id, array_version_id, array_version"
-                        " from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and node_id=$3";
+                        " from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and instance_id=$3";
 
                         _connection->prepare(lockReadSql, lockReadSql)
                         ("varchar", treat_string)
@@ -2152,7 +2224,7 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                         result query_res_read = tr.prepared(lockReadSql)
                         (lockDesc->getArrayName())
                         (lockDesc->getQueryId())
-                        (lockDesc->getNodeId()).exec();
+                        (lockDesc->getInstanceId()).exec();
 
                         assert(query_res_read.size() == 1);
 
@@ -2163,7 +2235,7 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                } else { assert(false); }
             }  else if (lockDesc->getLockMode() == LockDesc::RM) {
 
-               assert(lockDesc->getNodeRole() == LockDesc::COORD);
+               assert(lockDesc->getInstanceRole() == LockDesc::COORD);
 
                string uniquePrefix("RM-");
                _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
@@ -2180,13 +2252,13 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                (lockDesc->getArrayName())
                (lockDesc->getArrayId())
                (lockDesc->getQueryId())
-               (lockDesc->getNodeId())
+               (lockDesc->getInstanceId())
                (lockDesc->getArrayVersionId())
                (lockDesc->getArrayVersion())
-               ((int)lockDesc->getNodeRole())
+               ((int)lockDesc->getInstanceRole())
                ((int)lockDesc->getLockMode()).exec();
             }  else if (lockDesc->getLockMode() == LockDesc::RNF) {
-                if (lockDesc->getNodeRole() == LockDesc::COORD) {
+                if (lockDesc->getInstanceRole() == LockDesc::COORD) {
 
                     string uniquePrefix("COORD-RNF-");
                     _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
@@ -2203,13 +2275,13 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                     (lockDesc->getArrayName())
                     (lockDesc->getArrayId())
                     (lockDesc->getQueryId())
-                    (lockDesc->getNodeId())
+                    (lockDesc->getInstanceId())
                     (lockDesc->getArrayVersionId())
                     (lockDesc->getArrayVersion())
-                    ((int)lockDesc->getNodeRole())
+                    ((int)lockDesc->getInstanceRole())
                     ((int)lockDesc->getLockMode()).exec();
 
-                } else if (lockDesc->getNodeRole() == LockDesc::WORKER) {
+                } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
 
                     string uniquePrefix("WORKER-RNF-");
                     _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
@@ -2223,7 +2295,7 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                     query_res = tr.prepared(uniquePrefix+lockInsertSql)
                     (lockDesc->getArrayName())
                     (lockDesc->getQueryId())
-                    (lockDesc->getNodeId())
+                    (lockDesc->getInstanceId())
                     ((int)LockDesc::WORKER)
                     ((int)LockDesc::COORD)
                     ((int)LockDesc::RNF).exec();
@@ -2235,7 +2307,7 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
                tr.commit();
                return true;
             }
-            if (lockDesc->getNodeRole() == LockDesc::WORKER &&
+            if (lockDesc->getInstanceRole() == LockDesc::WORKER &&
                 query_res.affected_rows() != 1) {
                // workers must error out immediately
                assert(query_res.affected_rows()==0);
@@ -2280,12 +2352,12 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
 bool SystemCatalog::unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
 {
    assert(lockDesc);
-   LOG4CXX_TRACE(logger, "SystemCatalog::unlockArray: "<<lockDesc->toString());
+   LOG4CXX_DEBUG(logger, "SystemCatalog::unlockArray: "<<lockDesc->toString());
    bool rc = false;
    try
    {
       assert(_connection);
-      string lockDeleteSql("delete from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and node_id=$3");
+      string lockDeleteSql("delete from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and instance_id=$3");
 
       {
          ScopedMutexLock mutexLock(_pgLock);
@@ -2300,7 +2372,7 @@ bool SystemCatalog::unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
          result query_res = tr.prepared(lockDeleteSql)
          (lockDesc->getArrayName())
          (lockDesc->getQueryId())
-         (lockDesc->getNodeId()).exec();
+         (lockDesc->getInstanceId()).exec();
 
          rc = (query_res.affected_rows() == 1);
          tr.commit();
@@ -2340,7 +2412,7 @@ bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
    {
       assert(_connection);
       string lockUpdateSql = "update array_version_lock set array_id=$4, array_version_id=$5, array_version=$6, lock_mode=$7"
-                             " where array_name=$1::VARCHAR and query_id=$2 and node_id=$3";
+                             " where array_name=$1::VARCHAR and query_id=$2 and instance_id=$3";
       {
          ScopedMutexLock mutexLock(_pgLock);
 
@@ -2358,7 +2430,7 @@ bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
          result query_res = tr.prepared(lockUpdateSql)
          (lockDesc->getArrayName())
          (lockDesc->getQueryId())
-         (lockDesc->getNodeId())
+         (lockDesc->getInstanceId())
          (lockDesc->getArrayId())
          (lockDesc->getArrayVersionId())
          (lockDesc->getArrayVersion())
@@ -2393,11 +2465,11 @@ bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
    return rc;
 }
 
-void SystemCatalog::readArrayLocks(const NodeID nodeId,
+void SystemCatalog::readArrayLocks(const InstanceID instanceId,
                                    std::list<boost::shared_ptr<LockDesc> >& coordLocks,
                                    std::list<boost::shared_ptr<LockDesc> >& workerLocks)
 {
-   LOG4CXX_TRACE(logger, "SystemCatalog::getArrayLocks(nodeId = " << nodeId);
+   LOG4CXX_TRACE(logger, "SystemCatalog::getArrayLocks(instanceId = " << instanceId);
 
    ScopedMutexLock mutexLock(_pgLock);
    assert(_connection);
@@ -2405,26 +2477,27 @@ void SystemCatalog::readArrayLocks(const NodeID nodeId,
    {
       work tr(*_connection);
 
-      string sql = "select array_name, array_id, query_id, array_version_id, array_version, node_role, lock_mode"
-      " from array_version_lock where node_id=$1";
+      string sql = "select array_name, array_id, query_id, array_version_id, array_version, instance_role, lock_mode"
+      " from array_version_lock where instance_id=$1";
       _connection->prepare(sql, sql)("bigint", treat_direct);
 
-      result query_res = tr.prepared(sql)(nodeId).exec();
+      result query_res = tr.prepared(sql)(instanceId).exec();
       size_t size = query_res.size();
       LOG4CXX_TRACE(logger, "SystemCatalog::getArrayLocks: found "<< size <<" locks");
 
       for (size_t i=0; i < size; ++i) {
          boost::shared_ptr<LockDesc> lock( new LockDesc(query_res[i].at("array_name").as(string()),
                                                         query_res[i].at("query_id").as(QueryID()),
-                                                        nodeId,
-                                                        static_cast<LockDesc::NodeRole>(query_res[i].at("node_role").as(int())),
-                                                        static_cast<LockDesc::LockMode>(query_res[i].at("lock_mode").as(int()))
+                                                        instanceId,
+                                                        static_cast<LockDesc::InstanceRole>(query_res[i].at("instance_role").as(int())),
+                                                        static_cast<LockDesc::LockMode>(query_res[i].at("lock_mode").as(int())),
+                                                        0
                                                         ));
          lock->setArrayVersion(query_res[i].at("array_version").as(VersionID()));
          lock->setArrayId(query_res[i].at("array_id").as(ArrayID()));
          lock->setArrayVersionId(query_res[i].at("array_version_id").as(ArrayID()));
 
-         if (lock->getNodeRole() == LockDesc::COORD) {
+         if (lock->getInstanceRole() == LockDesc::COORD) {
             coordLocks.push_back(lock);
          } else {
             workerLocks.push_back(lock);
@@ -2437,7 +2510,7 @@ void SystemCatalog::readArrayLocks(const NodeID nodeId,
    {
       LOG4CXX_ERROR(logger, "SystemCatalog::readArrayLocks: postgress exception:"<< e.what());
       LOG4CXX_ERROR(logger, "SystemCatalog::readArrayLocks: query:"<< e.query());
-      LOG4CXX_ERROR(logger, "SystemCatalog::readArrayLocks: node ID = " << nodeId);
+      LOG4CXX_ERROR(logger, "SystemCatalog::readArrayLocks: instance ID = " << instanceId);
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
    }
    catch (const Exception &e)
@@ -2451,19 +2524,19 @@ void SystemCatalog::readArrayLocks(const NodeID nodeId,
    catch (...)
    {
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR)
-      << "Unknown exception when reading all node locks";
+      << "Unknown exception when reading all instance locks";
    }
 }
 
-uint32_t SystemCatalog::deleteArrayLocks(const NodeID& nodeId)
+uint32_t SystemCatalog::deleteArrayLocks(const InstanceID& instanceId)
 {
-    return deleteArrayLocks(nodeId, INVALID_QUERY_ID);
+    return deleteArrayLocks(instanceId, INVALID_QUERY_ID);
 }
 
-uint32_t SystemCatalog::deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId)
+uint32_t SystemCatalog::deleteArrayLocks(const InstanceID& instanceId, const QueryID& queryId)
 {
-    LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayLocks nodeId = "
-                  << nodeId
+    LOG4CXX_DEBUG(logger, "SystemCatalog::deleteArrayLocks instanceId = "
+                  << instanceId
                   << " queryId = "<<queryId);
    size_t numLocksDeleted = 0;
    ScopedMutexLock mutexLock(_pgLock);
@@ -2471,7 +2544,7 @@ uint32_t SystemCatalog::deleteArrayLocks(const NodeID& nodeId, const QueryID& qu
    {
       assert(_connection);
 
-      string lockDeleteSql("delete from array_version_lock where node_id=$1");
+      string lockDeleteSql("delete from array_version_lock where instance_id=$1");
       bool isQuerySpecified = (queryId != INVALID_QUERY_ID && queryId != 0);
 
       work tr(*_connection);
@@ -2483,17 +2556,17 @@ uint32_t SystemCatalog::deleteArrayLocks(const NodeID& nodeId, const QueryID& qu
           _connection->prepare(lockDeleteSql, lockDeleteSql)
           ("bigint", treat_direct)
           ("bigint", treat_direct);
-          query_res = tr.prepared(lockDeleteSql)(nodeId)(queryId).exec();
+          query_res = tr.prepared(lockDeleteSql)(instanceId)(queryId).exec();
       } else {
           _connection->prepare(lockDeleteSql, lockDeleteSql)
           ("bigint", treat_direct);
-          query_res = tr.prepared(lockDeleteSql)(nodeId).exec();
+          query_res = tr.prepared(lockDeleteSql)(instanceId).exec();
       }
       numLocksDeleted = query_res.affected_rows();
 
       LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayLocks: deleted "
                     << numLocksDeleted
-                    <<"locks for node " << nodeId);
+                    <<"locks for instance " << instanceId);
       tr.commit();
    }
    catch (const sql_error &e)
@@ -2511,7 +2584,7 @@ uint32_t SystemCatalog::deleteArrayLocks(const NodeID& nodeId, const QueryID& qu
    catch (...)
    {
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR)
-      << "Unknown exception when deleting all node locks";
+      << "Unknown exception when deleting all instance locks";
    }
    return numLocksDeleted;
 }
@@ -2531,8 +2604,8 @@ SystemCatalog::checkForCoordinatorLock(const string& arrayName, const QueryID& q
    {
       work tr(*_connection);
 
-      string sql = "select array_id, node_id, array_version_id, array_version, lock_mode"
-      " from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and node_role=$3";
+      string sql = "select array_id, instance_id, array_version_id, array_version, lock_mode"
+      " from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and instance_role=$3";
       _connection->prepare(sql, sql)
       ("varchar", treat_string)
       ("bigint", treat_direct)
@@ -2546,10 +2619,11 @@ SystemCatalog::checkForCoordinatorLock(const string& arrayName, const QueryID& q
       if (size > 0) {
          coordLock = boost::shared_ptr<LockDesc>(new LockDesc(arrayName,
                                                               queryId,
-                                                              query_res[0].at("node_id").as(NodeID()),
+                                                              query_res[0].at("instance_id").as(InstanceID()),
                                                               LockDesc::COORD,
-                                                              static_cast<LockDesc::LockMode>(query_res[0].at("lock_mode").as(int()))
-                                                              ));
+                                                              static_cast<LockDesc::LockMode>(query_res[0].at("lock_mode").as(int())),
+                                                              0
+                                                     ));
          coordLock->setArrayVersion(query_res[0].at("array_version").as(VersionID()));
          coordLock->setArrayId(query_res[0].at("array_id").as(ArrayID()));
          coordLock->setArrayVersionId(query_res[0].at("array_version_id").as(ArrayID()));
@@ -2584,17 +2658,13 @@ void SystemCatalog::renameArray(const string &old_array_name, const string &new_
                  << old_array_name << ")"
                  << "new name = " << new_array_name << ")");
 
-   // replace all AAA, AAA:x, AAA@y with BBB, BBB:x, BBB@y correspondingly
-   string renameDimSql = "update \"array_dimension\" set source_array_name=regexp_replace(source_array_name, '^'||$1::VARCHAR||'([:@].+)?$', $2::VARCHAR||E'\\\\1')";
-   string renameSql = "update \"array\" set name=regexp_replace(name, '^'||$1::VARCHAR||'([:@].+)?$', $2::VARCHAR||E'\\\\1')";
+   // replace all AAA, AAA@y with BBB, BBB@y correspondingly
+   string renameSql = "update \"array\" set name=regexp_replace(name, '^'||$1::VARCHAR||'(@.+)?$', $2::VARCHAR||E'\\\\1')";
    ScopedMutexLock mutexLock(_pgLock);
    assert(_connection);
    try
    {
       work tr(*_connection);
-
-      _connection->prepare(renameDimSql, renameDimSql)("varchar", treat_string)("varchar", treat_string);
-      tr.prepared(renameDimSql)(old_array_name)(new_array_name).exec();
 
       _connection->prepare(renameSql, renameSql)("varchar", treat_string)("varchar", treat_string);
       result query_res = tr.prepared(renameSql)(old_array_name)(new_array_name).exec();
@@ -2604,6 +2674,7 @@ void SystemCatalog::renameArray(const string &old_array_name, const string &new_
           throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << old_array_name;
       }
       tr.commit();
+      invalidateArrayCache(old_array_name);
    }
    catch (const unique_violation& e)
    {
@@ -2629,6 +2700,4 @@ void SystemCatalog::renameArray(const string &old_array_name, const string &new_
    }
 }
 
-
 } // namespace catalog
-

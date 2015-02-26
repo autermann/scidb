@@ -77,7 +77,7 @@ class LogicalJoin: public LogicalOperator
         size_t j = 0;
         for (size_t i = 0, n = leftAttributes.size(); i < n; i++) {
             AttributeDesc const& attr = leftAttributes[i];
-            if (nBitmaps != 2 || !attr.isEmptyIndicator()) {
+            if (!attr.isEmptyIndicator()) {
                 joinAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
                     attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
                     attr.getDefaultValueExpr());
@@ -104,21 +104,27 @@ class LogicalJoin: public LogicalOperator
         for (size_t i = 0, n = leftDimensions.size(); i < n; i++) {
             if(!(leftDimensions[i].getType() ==  rightDimensions[i].getType()
                        && (leftDimensions[i].getType() != TID_INT64 
-                           || (leftDimensions[i].getLength() == rightDimensions[i].getLength()
-                               && leftDimensions[i].getStart() == rightDimensions[i].getStart()
-                               && leftDimensions[i].getChunkInterval() == rightDimensions[i].getChunkInterval()
-                               && leftDimensions[i].getChunkOverlap() == rightDimensions[i].getChunkOverlap()))))
+                           || (leftDimensions[i].getStart() == rightDimensions[i].getStart()
+                              && leftDimensions[i].getChunkInterval() == rightDimensions[i].getChunkInterval()
+                              && leftDimensions[i].getChunkOverlap() == rightDimensions[i].getChunkOverlap()))))
            {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LOGICAL_JOIN_ERROR2);
            }
-            leftDimensions[i].addAlias(leftArrayDesc.getName());
-            BOOST_FOREACH(const ObjectNames::NamesPairType &rDimName, rightDimensions[i].getNamesAndAliases())
-            {
-                BOOST_FOREACH(const string &alias, rDimName.second)
-                {
-                    leftDimensions[i].addAlias(alias, rDimName.first);
-                }
-            }
+           leftDimensions[i].addAlias(leftArrayDesc.getName());
+           Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
+           Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
+           Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
+           leftDimensions[i].setCurrStart(newCurrStart);
+           leftDimensions[i].setCurrEnd(newCurrEnd);
+           leftDimensions[i].setEndMax(newEndMax);
+
+           BOOST_FOREACH(const ObjectNames::NamesPairType &rDimName, rightDimensions[i].getNamesAndAliases())
+           {
+               BOOST_FOREACH(const string &alias, rDimName.second)
+               {
+                   leftDimensions[i].addAlias(alias, rDimName.first);
+               }
+           }
         }
         return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(), joinAttributes, leftDimensions);
     }

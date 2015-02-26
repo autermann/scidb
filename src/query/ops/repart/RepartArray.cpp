@@ -30,6 +30,8 @@
 
 #include "system/Exceptions.h"
 #include "RepartArray.h"
+#include "system/Config.h"
+#include "system/SciDBConfigOptions.h"
 
 namespace scidb {
 
@@ -287,29 +289,46 @@ namespace scidb {
         currChunk = NULL;
         pos = newPos;
         array.getArrayDesc().getChunkPositionFor(pos);
-        inputIterator->setPosition(pos);
-        return hasCurrent = true;
+        if (hasChunkSet) {
+            chunkSetIterator = chunkSet.find(pos);
+            hasCurrent = chunkSetIterator != chunkSet.end();
+        }
+        else
+        {
+            //if containsChunk returns true, then inputIterator is set to the right position
+            hasCurrent = containsChunk(pos);
+        }
+        return hasCurrent;
     }
 
     void RepartArrayIterator::operator ++()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        Dimensions const& dims = array.getArrayDesc().getDimensions();
-        do {
-            size_t i = dims.size()-1;
-            while ((pos[i] += dims[i].getChunkInterval()) > upperBound[i]) {
-                if (i == 0) {
-                    hasCurrent = false;
-                    return;
-                }
-                pos[i] = dims[i].getStart();
-                i -= 1;
+        if (hasChunkSet) {
+            ++chunkSetIterator;
+            hasCurrent = chunkSetIterator != chunkSet.end(); 
+            if (hasCurrent) { 
+                pos = *chunkSetIterator;
             }
-        } while (!containsChunk(pos));
-
-        currChunk = NULL;
-        inputIterator->setPosition(pos);
+            currChunk = NULL;
+        } else {
+            Dimensions const& dims = array.getArrayDesc().getDimensions();
+            do {
+                size_t i = dims.size()-1;
+                while ((pos[i] += dims[i].getChunkInterval()) > upperBound[i]) {
+                    if (i == 0) {
+                        hasCurrent = false;
+                        return;
+                    }
+                    pos[i] = dims[i].getStart();
+                    i -= 1;
+                }
+            } while (!containsChunk(pos));
+            
+            currChunk = NULL;
+            inputIterator->setPosition(pos);
+        }
     }
 
     bool RepartArrayIterator::end()
@@ -319,17 +338,76 @@ namespace scidb {
 
     void RepartArrayIterator::reset()
     {
-        Dimensions const& dims = array.getArrayDesc().getDimensions();
-        size_t nDims = dims.size();
-        for (size_t i = 0; i < nDims; i++) {
-            pos[i] = dims[i].getStart();
-        }
-        pos[nDims-1] -= dims[nDims-1].getChunkInterval();
         inputIterator->reset();
-        isSparseArray = !inputIterator->end() && inputIterator->getChunk().isSparse();
-        hasCurrent = true;
-        currChunk = NULL;
-        ++(*this);
+        if (hasChunkSet) { 
+            chunkSetIterator = chunkSet.begin();
+            hasCurrent = chunkSetIterator != chunkSet.end();
+            currChunk = NULL;
+            if (hasCurrent) { 
+                pos = *chunkSetIterator;
+            }
+        } else { 
+            Dimensions const& dims = array.getArrayDesc().getDimensions();
+            size_t nDims = dims.size();
+            for (size_t i = 0; i < nDims; i++) {
+                pos[i] = dims[i].getStart();
+            }
+            pos[nDims-1] -= dims[nDims-1].getChunkInterval();
+            isSparseArray = Config::getInstance()->getOption<bool>(CONFIG_REPART_USE_SPARSE_ALGORITHM)
+                || (!inputIterator->end() && inputIterator->getChunk().isSparse());
+            hasCurrent = true;
+            currChunk = NULL;
+            ++(*this);
+        }
+    }
+    
+    void RepartArrayIterator::findAllOverlappedChunks(Coordinates const& pos)
+    {
+        ArrayDesc const& inDesc = array.getInputArray()->getArrayDesc();
+        Dimensions const& inDims = inDesc.getDimensions();
+        ArrayDesc const& outDesc = array.getArrayDesc();
+        Dimensions const& outDims = outDesc.getDimensions();
+        size_t nDims = inDims.size();
+        Coordinates from(nDims);
+        Coordinates till(nDims);                
+        for (size_t i = 0; i < nDims; i++) {
+            from[i] = max(Coordinate(pos[i] - inDims[i].getChunkOverlap() - outDims[i].getChunkOverlap()), inDims[i].getStart());
+            till[i] = min(Coordinate(pos[i] + inDims[i].getChunkInterval() + inDims[i].getChunkOverlap() + outDims[i].getChunkOverlap() - 1), upperBound[i]);
+        }
+        outDesc.getChunkPositionFor(from);
+        outDesc.getChunkPositionFor(till);
+        if (((RepartArray&)array).overlapMode & ConstChunkIterator::IGNORE_OVERLAPS) { 
+            for (size_t i = 0; i < nDims; i++) {
+                while (from[i] + outDims[i].getChunkInterval() + outDims[i].getChunkOverlap() <= pos[i]) { 
+                    from[i] += outDims[i].getChunkInterval();
+                }
+                while (pos[i] + inDims[i].getChunkInterval() <= till[i] - outDims[i].getChunkOverlap()) { 
+                    till[i] -= outDims[i].getChunkInterval();
+                }
+            }
+        } else { 
+            for (size_t i = 0; i < nDims; i++) {
+                while (from[i] + outDims[i].getChunkInterval() + outDims[i].getChunkOverlap() <= pos[i] - inDims[i].getChunkOverlap()) { 
+                    from[i] += outDims[i].getChunkInterval();
+                }
+                while (pos[i] + inDims[i].getChunkInterval() + inDims[i].getChunkOverlap() <= till[i] - outDims[i].getChunkOverlap()) { 
+                    till[i] -= outDims[i].getChunkInterval();
+                }
+            }
+       }
+        Coordinates curr = from;
+        curr[nDims-1] -= outDims[nDims-1].getChunkInterval();
+        while (true) { 
+            size_t i = nDims - 1;
+            while ((curr[i] += outDims[i].getChunkInterval()) > till[i]) { 
+                if (i == 0) {
+                    return;
+                }
+                curr[i] = from[i];
+                i -= 1;
+            }
+            chunkSet.insert(curr);
+        }
     }
 
     RepartArrayIterator::RepartArrayIterator(RepartArray const& arr, AttributeID attrID,
@@ -345,11 +423,25 @@ namespace scidb {
         chunkInterval.resize(nDims);
         chunkOverlap.resize(nDims);
         upperBound.resize(nDims);
+        uint64_t totalChunks = 1;
         for (size_t i = 0; i < nDims; i++) {
             upperBound[i] = dims[i].getStart() + dims[i].getCurrLength() - 1;
             chunkInterval[i] = dims[i].getChunkInterval();
             chunkOverlap[i] = outDims[i].getChunkOverlap();
+            totalChunks *= (upperBound[i] - dims[i].getStart() +  dims[i].getChunkInterval()) / dims[i].getChunkInterval();
         }
+        if (totalChunks > uint64_t(Config::getInstance()->getOption<int>(CONFIG_REPART_SEQ_SCAN_THRESHOLD))) {
+            hasChunkSet = true;
+            isSparseArray = Config::getInstance()->getOption<bool>(CONFIG_REPART_USE_SPARSE_ALGORITHM)
+                || (!inputIterator->end() && inputIterator->getChunk().isSparse());
+            while (!inputIterator->end()) { 
+                findAllOverlappedChunks(inputIterator->getPosition());
+                ++(*inputIterator);
+            }
+        } else { 
+            hasChunkSet = false;
+        }
+
         reset();
         if (isSparseArray) {
             AttributeDesc const* emptyAttr = arr.getArrayDesc().getEmptyBitmapAttribute();
@@ -379,7 +471,7 @@ namespace scidb {
                              const boost::shared_ptr<Query>& query)
     : DelegateArray(desc, array), _query(query)
     {
-        overlapMode = query->getNodesCount() > 1 ? ConstChunkIterator::IGNORE_OVERLAPS : 0;
+        overlapMode = query->getInstancesCount() > 1 ? ConstChunkIterator::IGNORE_OVERLAPS : 0;
     }
 }
 

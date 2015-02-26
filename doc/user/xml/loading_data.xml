@@ -1,0 +1,282 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter>
+  <title>Loading Data</title>
+  <para>The key part of setting up your SciDB array is loading your data. This chapter begins by explaining the simplest way to prepare and load a data file. Later, this chapter explains more complicated load scenarios such as sparse loading and parallel loading. Finally, this chapter shows you how to round-trip your data by saving it from a SciDB array back out into a csv file.</para>
+  <para>The array data model is core to SciDB. When you define a schema for an array you specify which aspects of your data you want to be dimensions and which aspects you want to be attributes based on how you want to conceptualize, access and operate on the data. Before loading data, you have to create an array to load your data into. Refer to the chapter &quot;Creating and Removing SciDB Arrays&quot; for how to create a SciDB array.</para>
+  <sect1>
+    <title>Simple Data Loading</title>
+    <para>This section describes how to do a simple data load procedure. The steps in simple data loading are:<orderedlist>
+        <listitem>
+          <para>Save your data in comma-separated value (csv) format.</para>
+        </listitem>
+        <listitem>
+          <para>Use the csv2scidb command to create a SciDB-formatted load file.</para>
+        </listitem>
+        <listitem>
+          <para>Create a 1-dimensional SciDB array to load the data into.</para>
+        </listitem>
+        <listitem>
+          <para>Use the LOAD statement to load the data from the SciDB-formatted file into the array.</para>
+        </listitem>
+      </orderedlist></para>
+    <para>Consider the 20-line, csv-formatted file <code>num_data.csv</code>, the first few lines of which are shown here:<programlisting>val,err
+1.48306e+09,1
+5.80814e+08,1
+1.51079e+09,1
+1.16154e+09,1
+1.42655e+09,1
+1.06341e+09,1</programlisting>This file has two entries per row, where the entries are labelled <code>val</code> and <code>err</code>. To prepare this file for loading into a SciDB array, use the command <code>csv2scidb</code>. The <code>csv2scidb</code> command takes multicolumn csv data and transforms it into 1-dimensional arrays with one attribute for every comma-delimited column. The syntax of <code>csv2scidb</code> is:<programlisting>csv2scidb [options]  &lt; input-file  &gt; output-file </programlisting><note>
+        <para><code>csv2scidb</code> is accessed directly at the command-line and not through the <code>iquery</code> client. To see the options for <code>csv2scidb</code>, type <code>csv2scidb --help</code> at the command line. The options for csv2scidb are: <screen>-v version of tool
+-i PATH input file
+-o PATH output file
+-a PATH appended output file
+-c INT length of chunk
+-f INT starting chunk number
+-d char delimiter,default is , (comma)
+-p STR type pattern, N number, S string, s nullable 
+   string, C char
+-q Quote the input line exactly, simply wrap it in ()
+-s INT skip N lines at the beginning of the file</screen></para>
+      </note>This code will transform <code>num_data.csv</code> to SciDB load file format:<programlisting>csv2scidb -s 1 -p N &lt; num_data.csv &gt; num_data.scidb</programlisting>The -s flag specifies the number of lines to skip at the beginning of the file. Since the file has a header, you can strip that line, and provide that information as attribute names. The -p flag specifies the type of data you are loading. Possible values are N (number), S (string), s (nullable string), and C (char).</para>
+    <para>The file <code>num_data.scidb</code> looks like this:<screen>[
+(1.48306e+09,1),
+(5.80814e+08,1),
+(1.51079e+09,1),
+(1.16154e+09,1),
+(1.42655e+09,1),
+(1.06341e+09,1),
+(4.9253e+08,1),
+(5.6065e+08,1),
+(1.60886e+08,2),
+(1.37844e+09,1),
+(4.08495e+08,1),
+(5.65393e+07,1),
+(1.47646e+09,1),
+(9.52609e+08,1),
+(1.8548e+09,1),
+(1.42396e+09,1),
+(1.75107e+09,1),
+(1.52007e+09,1),
+(5.4882e+08,1),
+(7.28928e+08,1)
+]</screen>The square braces show the beginning and end of the array dimension. The parentheses show the cells of the array. There are commas between attributes in cells and cells in the dimension.</para>
+    <para>To create an array for this data, create an array with 1-dimension. The original data set had two column headers of val and err, so you can name the attributes <code>val</code> and <code>err</code>:<programlisting>AQL% <command>CREATE ARRAY</command> num_data &lt;val:double,err:double&gt;[i];</programlisting>To load the data into the array <code>num_data</code>, use a <code>LOAD</code> statement:<programlisting>AQL% <command>LOAD</command> num_data 
+     <command>FROM</command> &apos;<replaceable>base-path</replaceable>/doc/user/examples/num_data.scidb&apos;;</programlisting>The <replaceable>base-path</replaceable> is the directory where your SciDB source files are stored.</para>
+  </sect1>
+<!--<sect1>
+  <title>Data Files in Two or More Dimensions</title>
+  <para>SciDB data load files must be organized for dimensions according to the schema of the target array. The following examples show how to load data into a 2-dimensional SciDB array.</para>
+  <para>Given an array defined as follows: <programlisting>CREATE ARRAY Two_Dim&lt;a: int32, c: char&gt;[I=0:7,4,0, J=0:7,4,0];</programlisting>The external load file must contain chunks corresponding to array chunks. So, for the example 2-dimensional array with the following chunk layout:  <programlisting>C11 C12 
+C21 C22</programlisting></para>
+  <para>SciDB supports two formats in load files corresponding to dense and sparse data sets. The sparse format is more efficient when a majority of the cells in the array  do not contain any data. </para>
+  <sect2>
+    <title>Dense Load Format</title>
+    <para>The dense load format    <itemizedlist>
+        <listitem>
+          <para>Data to be loaded is divided up into chunks, with each chunk enclosed within a &apos;[ ]&apos; and separated by a semi-colon. </para>
+        </listitem>
+        <listitem>
+          <para>Each cell contains a comma-separated list of attribute values placed within (). This &apos;dense&apos; representation can denote empty cells using &apos;()&apos;. </para>
+        </listitem>
+        <listitem>
+          <para>Cells within each chunk must appear in left-to-right dimension order (e.g., row-major order for a 2-dimensional array, or generalized appropriately to higher dimensions). </para>
+        </listitem>
+        <listitem>
+          <para>The location of each cell within the chunk is implicit in the order of the load data.</para>
+        </listitem>
+      </itemizedlist></para>
+    <para>A load file for a 2-dimensional dense array looks like this:<programlisting>[
+[ (0, &apos;A&apos;), (1, &apos;B&apos;), (2, &apos;C&apos;), (3, &apos;D&apos;)],
+[ (8, &apos;I&apos;), (9, &apos;J&apos;), (10, &apos;K&apos;), (11, &apos;L&apos;)],
+
+[ (16, &apos;Q&apos;), (17, &apos;R&apos;), (18, &apos;S&apos;), (19, &apos;T&apos;)],
+[ (24, &apos;Y&apos;), (25, &apos;Z&apos;), (26, &apos;A&apos;), (27, &apos;B&apos;)]
+];
+[
+[ (4, &apos;E&apos;), (5, &apos;F&apos;), (6, &apos;G&apos;), (7, &apos;H&apos;)],
+
+[ (12, &apos;M&apos;), (13, &apos;N&apos;), (14, &apos;O&apos;), (15, &apos;P&apos;)],
+[ (20, &apos;U&apos;), (21, &apos;V&apos;), (22, &apos;W&apos;), (23, &apos;X&apos;)],
+[ (28, &apos;C&apos;), (29, &apos;D&apos;), (30, &apos;E&apos;), (31, &apos;F&apos;)]
+
+];
+[
+[ (32, &apos;G&apos;), (33, &apos;H&apos;), (34, &apos;I&apos;), (35, &apos;J&apos;)],
+[ (40, &apos;O&apos;), (41, &apos;P&apos;), (42, &apos;Q&apos;), (43, &apos;R&apos;)],
+[ (48, &apos;W&apos;), (49, &apos;X&apos;), (50, &apos;Y&apos;), (51, &apos;Z&apos;)],
+
+[ (56, &apos;E&apos;), (57, &apos;F&apos;), (58, &apos;G&apos;), (59, &apos;H&apos;)]
+];
+[
+[ (36, &apos;K&apos;), (37, &apos;L&apos;), (38, &apos;M&apos;), (39, &apos;N&apos;)],
+[ (44, &apos;S&apos;), (45, &apos;T&apos;), (46, &apos;U&apos;), (47, &apos;V&apos;)],
+
+[ (52, &apos;A&apos;), (53, &apos;B&apos;), (54, &apos;C&apos;), (55, &apos;D&apos;)],
+[ (60, &apos;I&apos;), (61, &apos;J&apos;), (62, &apos;K&apos;), (63, &apos;L&apos;)]
+] </programlisting></para>
+  </sect2>
+ 
+</sect1>-->  <sect1>
+    <title>Data with Special Values</title>
+    <para>Suppose you have a load file that is missing some values, like this file, <code>v4.scidb</code>:</para>
+    <screen>[
+ (0,100),(1,99),(2,),(3,97)
+]</screen>
+    <para>The load file <code>v4.scidb</code> has a missing value in the third cell. If you create an array and load this data set, SciDB will substitute 0 for the missing value:<programlisting>AQL% <command>CREATE ARRAY</command> v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0];
+AQL% <command>LOAD</command> v4 <command>FROM</command> &apos;/examples/v4.scidb&apos;;</programlisting><screen>[
+(0,100),(1,99),(2,0),(3,97)
+]</screen></para>
+    <para>To change the default value, that is, the value the SciDB substitutes for the missing data, set the DEFAULT attribute option. This code creates an array <code>v4_dflt</code> with default attribute value set to 111:</para>
+    <programlisting>AQL% <command>CREATE ARRAY</command> v4_dflt 
+     &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0];
+AQL% <command>LOAD</command> v4_dflt 
+     <command>FROM</command> &apos;/examples/v4.scidb&apos;;</programlisting>
+    <screen>[
+(0,100),(1,99),(2,111),(3,97)
+]</screen>
+    <para>Load files may also contain null values, such as in this file, <code>v4_null.scidb</code>:<programlisting>[
+ (0,100),(1,99),(2,null),(3,97)
+]</programlisting>To preserve null values at load time, add the NULL option to the attribute type:<programlisting>AQL% <command>CREATE ARRAY</command> v4_null
+&lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0];
+AQL% <command>LOAD</command> v4_null 
+     <command>FROM</command> &apos;/example/v4_null.scidb&apos;;</programlisting><screen>[
+(0,100),(1,99),(2,null),(3,97)
+]</screen></para>
+  </sect1>
+  <sect1>
+    <title>Sparse Load Format</title>
+    <para>The sparse load format allows a large number of cells to be unspecified. In the sparse load format, data is listed by chunks. Chunks are delimited by two square brackets. There are semicolons between chunks. <programlisting>[[<replaceable>chunk1</replaceable>]];
+[[<replaceable>chunk2</replaceable>]];</programlisting>Within each chunk, the data is organized as a list of cells. Each cell includes the coordinate indices of the cell in curly braces and the attributes of the cell (separated by commas) in parentheses.<programlisting>[[{<replaceable>index1</replaceable>,<replaceable>index2</replaceable>,...} (<replaceable>attribute1</replaceable>,<replaceable>attribute2</replaceable>,...), ... 
+  {<replaceable>indexm</replaceable>,<replaceable>indexn</replaceable>} (<replaceable>attribute1m</replaceable>,<replaceable>attribute2n</replaceable>)]];</programlisting></para>
+    <para>For example, a load file for a diagonal 2-D array with two chunks looks like this:<programlisting>[[
+{0,0}(0,&apos;A&apos;),{1,1}(1,&apos;B&apos;),{2,2}(2,&apos;C&apos;),{3,3}(3,&apos;D&apos;)
+]];
+[[
+{4,4}(6,&apos;G&apos;),{5,5}(7,&apos;P&apos;),{6,6}(9,&apos;H&apos;)
+]]</programlisting>This data is stored like this:<informalfigure>
+        <mediaobject>
+          <imageobject>
+            <imagedata scale="30" fileref="../graphics/sparse_load.png"/>
+          </imageobject>
+        </mediaobject>
+      </informalfigure></para>
+    <tip>
+      <para>In addition to storing the data, <command>
+          <code>LOAD</code>
+        </command>  operator returns the data back to the client (or next operator in the query). When the data set is very large, you may want to suppress the query output. The <code>iquery</code> executable that accompanies SciDB includes the <code>-n</code> option for this purpose. See &quot;Getting Started with SciDB Development&quot; for how to use <code>iquery</code>.</para>
+    </tip>
+    <sect2>
+      <title>Sparse Load Chunks</title>
+      <para>Consider a load file like this:<programlisting>[[
+{0,0} (11),
+{1,0} (21),
+{0,1} (12)
+]];
+[[
+{0,2} (13)
+]];
+[[
+{2,0} (31),
+{3,0} (41),
+{2,1} (32),
+{3,1} (42)
+]];
+[[
+{2,2} (33),
+{3,3} (44)
+]];
+[[
+{7,0} (81),
+{6,1} (72),
+{7,1} (82)
+]];
+[[
+{6,2} (73),
+{7,2} (83),
+{7,3} (84)
+]];
+[[
+{8,0} (91)
+]];
+[[
+{8,2} (93),
+{8,3} (94)
+]]</programlisting>The chunk distribution in the load file requires that the array have chunks of size 2 in the first dimension and chunks of size 2 in the second dimension. The array schema for this load file is:<programlisting>&lt;attribute:int16&gt;[x=0:8,2,0,y=0:3,2,0];</programlisting></para>
+    </sect2>
+  </sect1>
+  <sect1>
+    <title>Parallel Load</title>
+    <para>The simple data loading procedure  serially loads all the data from a single load file.   You can set up parallel loading for much faster loading. Parallel loading is more complex because it requires the creation of multiple load files which are chunk-size specific.   That is, they are custom constructed around a known chunk size and have to be written with embedded chunk identifiers.</para>
+    <para>The optional<emphasis> id</emphasis> parameter instructs the <code>LOAD</code> command to open and load data from a particular instance of SciDB. Possible<emphasis> id</emphasis> values are:</para>
+    <informaltable frame="none">
+      <tgroup cols="2">
+        <colspec colname="c1" colwidth="20*"/>
+        <colspec colname="c2" colwidth="50*"/>
+        <tbody>
+          <row>
+            <entry>
+              <para><emphasis role="bold">id Value</emphasis> </para>
+            </entry>
+            <entry>
+              <para><emphasis role="bold">Description</emphasis></para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> 0</para>
+            </entry>
+            <entry>
+              <para>Coordinator</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> 1,2, ..., N</para>
+            </entry>
+            <entry>
+              <para><emphasis>id</emphasis> of the instance that should perform the load where N is the number of instances in the cluster.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> –1</para>
+            </entry>
+            <entry>
+              <para>All instances in the cluster. The file path is assumed to be the same at all instances. If an instance cannot open the data file, the load will continue after logging a warning. </para>
+            </entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </informaltable>
+    <para>For parallel load, each instance must be given distinct chunks. To do this, chunks in the load file must be prefixed with a distinct chunk header that lists the starting dimension values of the chunk.  </para>
+    <para>If your SciDB cluster has 4 instances (with identifiers 1, 2, 3, and 4) and there are 20 chunks, you can place chunks 1&ndash;5 on instance 1, chunks 6–10 on instance 2, and so on. The following load command will simultaneously load all 20 chunks into the array and complete 4 times faster. </para>
+    <screen>AFL% load (Array, &apos;/tmp/load.data&apos;, -1);</screen>
+  </sect1>
+  <sect1>
+    <title>Saving Data from a SciDB Array to a File</title>
+    <para>You can save all or part of the data that is contained in a SciDB array to a file. You can use a <code>
+        <command>SELECT</command>
+      </code> statement with the <code>
+        <command>SAVE</command>
+      </code> clause to save an entire array. For example, consider the following array <code>random_numbers</code>:<programlisting>AQL% <command>CREATE ARRAY</command> random_numbers &lt;val:double&gt;[i=0:99,100,0];
+AQL% <command>SELECT</command> * <command>INTO</command> random_numbers 
+     <command>FROM</command> build(random_numbers,random());</programlisting>You can save the values stored in the array <code>random_numbers</code> to a  file with the following query:<programlisting>AQL% <command>SAVE</command> random_numbers 
+     <command>INTO</command> &apos;/tmp/random_data.txt&apos;;</programlisting>This statement saves a SciDB-formatted file called <code>random_data.txt</code>. </para>
+    <para>To save the data to <code>csv</code> format, set the <code>iquery</code> output option to <code>csv</code>:<programlisting>% iquery -o csv -q &quot;<command>SAVE</command> random_numbers 
+     <command>INTO</command> &apos;/tmp/random_data.csv&apos;;&quot;</programlisting><screen>val,val_rand
+1,939618095
+2,1011655774
+3,3620619210
+4,2317057332
+5,6137260845
+6,10771327980
+7,4496569336
+8,10364290328
+9,2309513805
+10,1398261690</screen></para>
+    <note>
+      <para>You will need to enter your iquery statement directly at the command line to change the output option to csv. Type <code>exit;</code> at the <code>AQL%</code> prompt to stop the current <code>iquery</code> session.</para>
+    </note>
+  </sect1>
+</chapter>

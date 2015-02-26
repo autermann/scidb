@@ -1,0 +1,341 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter remap="h1">
+  <title>AQL: Array Query Language Reference</title>
+  <para>The AQL language includes two classes of queries:</para>
+  <itemizedlist>
+    <listitem>
+      <para> <emphasis role="bold">Data Definition Language</emphasis> (DDL) : queries to define arrays and load data. </para>
+    </listitem>
+    <listitem>
+      <para> <emphasis role="bold">Data Manipulation Language</emphasis> (DML) : queries to access and operate on array data. </para>
+    </listitem>
+  </itemizedlist>
+  <para>This document provides reference material for AQL.</para>
+  <sect1 remap="h2">
+    <title>DDL</title>
+    <sect2 remap="h3">
+      <title>CREATE ARRAY</title>
+      <para>The CREATE ARRAY command creates an array with specified name and schema.</para>
+      <para>The rest of this document will refer to the following CREATE ARRAY example:</para>
+      <screen>CREATE ARRAY A &lt;x: double NOT NULL, err: double&gt; [i=0:99,10,0, j=0:99,10,0];</screen>
+      <para>This creates a 100-by-100 array with a chunk size of 10 in each dimension and no chunk overlap.</para>
+    </sect2>
+    <sect2 remap="h3">
+      <title>LOAD</title>
+      <para>Loading data into arrays is done using the load command.</para>
+      <para>The syntax for LOAD is:</para>
+      <para>LOAD<emphasis> array_name : string</emphasis> FROM<emphasis> file_path : string</emphasis>;</para>
+      <para>Example:</para>
+      <screen>LOAD A FROM &apos;/tmp/A.txt&apos;;</screen>
+      <para>The data file formats supported by SciDB are documented in the AFL document. The file path &apos;A.txt&apos; is assumed to be a path name relative to the coordinator&apos;s working directory. For this document, the file A.txt is a 100-by-100 file with two numerical values per cell.</para>
+      <para><emphasis role="bold">Note</emphasis>: AQL only supports coordinator load (corresponding to nodeid=0 in the AFL<emphasis> load()</emphasis> command). See the section on<emphasis> load()</emphasis> in the AFL documentation.</para>
+    </sect2>
+    <sect2 remap="h3">
+      <title>DROP</title>
+      <para>Deleting arrays is done with the <literal condition="western">drop</literal> command.</para>
+      <para>DROP ARRAY array_name;</para>
+      <para>For example to drop array A, run the following command:</para>
+      <screen>DROP ARRAY A;</screen>
+      <para>The array and all its versions are dropped. Any associated mapping arrays created for noninteger dimensions are also dropped.</para>
+      <para><emphasis role="bold">Note</emphasis>: Many AQL commands do not create or accept arrays with noninteger dimensions.</para>
+    </sect2>
+  </sect1>
+  <sect1 remap="h2">
+    <title>DML Query Syntax</title>
+    <sect2 remap="h3">
+      <title>SELECT attributes FROM </title>
+      <para>As in SQL, AQL SELECT is used to select one or more attributes from an array.</para>
+      <para>Syntax: SELECT &quot;expr_list | *&quot; [INTO name] FROM &quot;array_name | array_result&quot;</para>
+      <para>For example:</para>
+      <screen>SELECT * FROM A;</screen>
+      <para>This is a basic query the selects all attributes from the whole array A. SELECT lists can also reference individual attributes and dimensions, as well as constants and expressions. Expressions are discussed later in this document.</para>
+      <screen>SELECT err FROM A;</screen>
+      <para>This is a SELECT query that selects the attribute <literal condition="western">err</literal> from A. To store the value of the attribute <literal condition="western">err</literal> in and array called C:</para>
+      <screen>SELECT err INTO C FROM A;</screen>
+      <para>This query selects the attribute <literal condition="western">err</literal> from the array A and stores the result in array C. If the array C does not exist, an array with the appropriate schema is created for it. If C exists, its attribute values are updated.</para>
+      <para>If an array exists in SciDB, but its schema has different chunking and overlap specifications, or some dimensions in the schema are declared as noninteger dimensions, then the repart() or redimension() is applied to the result before storing it into the destination array.</para>
+      <para>In place of a table<emphasis> A</emphasis> or a join result, SELECT can also be used to select data from an AFL operator result. For a full list of AFL operators, please refer to the &quot;SciDB Array Functional Language Reference&quot; document. Shown below is such an example with the &quot;show&quot; operator which return an array containing the schema of<emphasis> A</emphasis>.</para>
+      <para>Example:</para>
+      <screen>SELECT * FROM show(A);</screen>
+    </sect2>
+    <sect2 remap="h3">
+      <title>WHERE Clause</title>
+      <para>A WHERE clause is used to filter cells from the input array.</para>
+      <para>Syntax: SELECT &quot;expr_list | *&quot; [INTO name] FROM &quot;array_name | array_result&quot; [ WHERE expr ]</para>
+      <para>For example:</para>
+      <screen>SELECT * FROM A WHERE err &lt; 2;</screen>
+      <para>The above query selects all cells in the array whose error is less than 2. The shape of the array is preserved by the WHERE clause. The user will see a result with the same shape as A, except the cells that don&apos;t match the condition of the WHERE clause will be empty.</para>
+      <para>Note that the where clause can be used to check if a particular attribute is NULL. This is done with the &apos;IS NULL&apos; and &apos;IS NOT NULL&apos; construct.</para>
+      <screen>SELECT x FROM A WHERE x IS NOT null;</screen>
+      <para>SciDB supports SQL semantics for null values. Hence, any comparison or use of null values in expressions will evaluate to NULL, except for the ?is null? or &apos;is not null&apos; predicates. For a description of NULL values in SciDB please refer to the section on &quot;CREATE ARRAY&quot; in the AFL document.</para>
+      <para>In contrast, EMPTY elements of an array are not evaluated by the WHERE clause.</para>
+    </sect2>
+    <sect2 remap="h3">
+      <title>AQL Expressions</title>
+      <para>AQL expressions in the SELECT list or the WHERE clause are standard expressions over the attributes and dimensions of the array. They can also refer to special built-in functions supported by SciDB. The full list of built-in functions is available in the Alphabetical List of Functions appendix to this document.</para>
+      <screen>SELECT x FROM A WHERE sin(x)&lt;0;</screen>
+      <para>returns all values of the attribute x (in radians) where sin(x) is negative.</para>
+      <screen>SELECT sqrt(x) FROM A WHERE sin(x)&lt;0;</screen>
+      <para>returns the square root of all values of the attribute x for which sin(x) is negative.</para>
+    </sect2>
+    <sect2 remap="h3">
+      <title>Natural JOIN</title>
+      <para>A join combines two or more arrays typically as a preprocessing step for subsequent operations. The following example illustrates SciDB JOIN.</para>
+      <para>Syntax:</para>
+      <para>SELECT &quot;expr_list | *&quot; [INTO name] FROM joinexpr [ WHERE expr ]</para>
+      <para>joinexpr := expr ( (&quot;,&quot; expr) )*</para>
+      <para>Consider an array B, that has the same shape as array A declared earlier:</para>
+      <screen>CREATE ARRAY B &lt;y: double, err2: double&gt; [i=0:99,10,0, j=0:99,10,0];</screen>
+      <para>The following query returns an array by joining arrays A and B.</para>
+      <screen>SELECT * FROM A, B;</screen>
+      <para>This join is a natural join of array A with B. This is only possible with two arrays with matching shape. The arrays must have the same number of dimensions, matching dimension start and endpoints, and same chunk size. But dimension names need not match. The dimensions of the resulting array are the same dimensions as the inputs but with the dimension names from the first array.</para>
+      <para>The resulting array also has combined attributes of all inputs. Each cell in the resulting array in this example has 4 attributes, x, err from A and y, err2 from B. Natural join is useful when you need to merge two arrays with the same shape in order to perform further processing on their attributes.</para>
+      <para>The following example joins two arrays in order to compute the sum of two attributes for each element.</para>
+      <screen>SELECT A.x + B.y FROM A,B;</screen>
+    </sect2>
+    <sect2 remap="h3">
+      <title>JOIN ON</title>
+      <para>AQL JOIN ON is used to join two compatible arrays.</para>
+      <para>The JOIN ON returns an array that is the cross product join of its inputs. Only JOIN ON equality predicates are supported. Predicates must use compatible dimensions from the input arrays -- size, types and chunking.</para>
+      <para>Each cell in the output array contains all elements from the join inputs from corresponding dimension values.</para>
+      <para>AQL currently supports dimension-dimension, attribute-attribute and attribute-dimension JOINs.</para>
+      <sect3 remap="h4">
+        <title>Dimension-dimension join</title>
+        <para>In a dimension-dimension join, two or more arrays can be joined on dimensions. This is translated by AQL into AFL cross-joins. JOIN ON dimension predicates are compiled into the dimension pairs list for cross-join. Any aliasing required is performed by the AQL-to-AFL compiler.</para>
+        <para>Example: Consider the following example 3-by-3 arrays <literal condition="western">v1</literal> and <literal condition="western">k</literal>.</para>
+        <screen>CREATE array v1 &lt;a:double, b:int64&gt; [x=1:3,3,0, y=1:3,3,0];
+CREATE ARRAY k &lt;c: string, d:double&gt; [x=1:3,3,0, y=1:3,3,0];
+
+scan(v1)
+[
+[(1,1),(1,2),(1,3)],
+[(2,1),(2,2),(2,3)],
+[(3,1),(3,2),(3,3)]
+]
+
+scan(k)
+[
+[(&quot;addr_11&quot;,11),(&quot;addr_12&quot;,12),(&quot;addr_13&quot;,13)],
+[(&quot;addr_21&quot;,21),(&quot;addr_22&quot;,22),(&quot;addr_23&quot;,23)],
+[(&quot;addr_31&quot;,31),(&quot;addr_32&quot;,32),(&quot;addr_33&quot;,33)]
+]</screen>
+        <para>Performing a join on the first dimension creates a 3-by-3-by-3 array:</para>
+        <screen>set lang AQL;
+DROP array res_dim;
+SELECT * INTO res_dim FROM v1 JOIN k ON v1.x = k.x;
+
+[
+[
+[(1,1,&quot;addr_11&quot;,11),(1,1,&quot;addr_12&quot;,12),(1,1,&quot;addr_13&quot;,13)],
+[(1,2,&quot;addr_11&quot;,11),(1,2,&quot;addr_12&quot;,12),(1,2,&quot;addr_13&quot;,13)],
+[(1,3,&quot;addr_11&quot;,11),(1,3,&quot;addr_12&quot;,12),(1,3,&quot;addr_13&quot;,13)]
+],
+[
+[(2,1,&quot;addr_21&quot;,21),(2,1,&quot;addr_22&quot;,22),(2,1,&quot;addr_23&quot;,23)],
+[(2,2,&quot;addr_21&quot;,21),(2,2,&quot;addr_22&quot;,22),(2,2,&quot;addr_23&quot;,23)],
+[(2,3,&quot;addr_21&quot;,21),(2,3,&quot;addr_22&quot;,22),(2,3,&quot;addr_23&quot;,23)]
+],
+[
+[(3,1,&quot;addr_31&quot;,31),(3,1,&quot;addr_32&quot;,32),(3,1,&quot;addr_33&quot;,33)],
+[(3,2,&quot;addr_31&quot;,31),(3,2,&quot;addr_32&quot;,32),(3,2,&quot;addr_33&quot;,33)],
+[(3,3,&quot;addr_31&quot;,31),(3,3,&quot;addr_32&quot;,32),(3,3,&quot;addr_33&quot;,33)]
+]
+]</screen>
+        <para>The output of the join on statement above is an array with the following schema:</para>
+        <screen>&lt;a:double NOT NULL,b:int64 NOT NULL,c:string NOT NULL,d:double NOT NULL&gt; 
+     [x=1:3,3,0,y=1:3,3,0,y_2=1:3,3,0]
+</screen>
+        <para>The new generated dimension name is y_2.</para>
+      </sect3>
+      <sect3 remap="h4">
+        <title>Attribute-attribute JOIN</title>
+        <para>The JOIN ON predicate may have a list of equality predicates based on array attributes. If this is done, the inputs are first transformed into temporary stored arrays using the redimension_store() operator and then joined using AFL cross_join(). Any additional arrays created to execute the JOIN are removed at the end of query execution.</para>
+        <para>The following shows an example of attribute-attribute join:</para>
+        <screen>SELECT * INTO res_attr FROM v1 JOIN k ON v1.a = k.d;</screen>
+        <para>The above query produces a result with the following schema:</para>
+        <screen>&lt;a:double NOT NULL,b:int64 NOT NULL,c:string NOT NULL,
+     empty_indicator:indicator NOT NULL&gt; [x=1:3,3,0,y=1:3,3,0]
+SELECT * FROM vector3 A JOIN vector3 B ON A.a = B.b and A.b = B.a;</screen>
+        <para>produces a result with the following schema:</para>
+        <screen>&lt;a:int64 NOT NULL, b:int64 NOT NULL, empty_indicator:indicator NOT NULL&gt;
+[i=*:*,10,0, i_2=*:*,10,0]</screen>
+      </sect3>
+      <sect3 remap="h4">
+        <title>Dimension-Attribute Join</title>
+        <para>A dimension-attribute join can be performed between attributes and dimensions that have the same data type.</para>
+        <screen>SELECT * INTO result FROM v1 JOIN k ON v1.b = k.x;
+[
+[
+[(2,1,&quot;addr_11&quot;),(),()],
+[(),(3,2,&quot;addr_22&quot;),()],
+[(),(),(4,3,&quot;addr_33&quot;)]
+],
+[
+[(),(3,2,&quot;addr_22&quot;),()],
+[(),(),()],[(),(),()]],
+[
+[(),(),(4,3,&quot;addr_33&quot;)],
+[(),(),()],[(),(),()]
+]
+]</screen>
+      </sect3>
+    </sect2>
+    <sect2 remap="h3">
+      <title>Aggregates</title>
+      <para>AQL supports the following built-in aggregate functions:</para>
+      <informaltable frame="none">
+        <tgroup cols="2">
+          <colspec colname="c1" colwidth="50*"/>
+          <colspec colname="c2" colwidth="50*"/>
+          <tbody>
+            <row>
+              <entry>
+                <para><emphasis role="bold">Name</emphasis></para>
+              </entry>
+              <entry>
+                <para><emphasis role="bold">Operation Performed</emphasis></para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">avg</literal></para>
+              </entry>
+              <entry>
+                <para> Average value</para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">count</literal></para>
+              </entry>
+              <entry>
+                <para> Number of nonempty elements</para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">max</literal></para>
+              </entry>
+              <entry>
+                <para> Largest value</para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">min</literal></para>
+              </entry>
+              <entry>
+                <para> Smallest value</para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">sum</literal></para>
+              </entry>
+              <entry>
+                <para> Sum of all the elements</para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">stdev</literal></para>
+              </entry>
+              <entry>
+                <para> Standard deviation</para>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <para> <literal condition="western">var</literal></para>
+              </entry>
+              <entry>
+                <para> Variance</para>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+      <para>The scalar aggregate functions in AQL take an input array and produce a scalar result. The value for the result is the aggregate function applied to the entire array.</para>
+      <para>For example:</para>
+      <screen>AQL% SELECT max (SELECT a1 FROM a);</screen>
+      <para>Each array aggregate function accepts one attribute of appropriate type. For example, to compute the maximum value of an attribute, that attribute type must support inequality and equality functions. So, for the max aggregate, the data types that can be used are</para>
+      <blockquote>
+        <para>integers (int8, int16, int32, int64, uint8, uint16, uint32, uint64) and floating point (double,float) types.</para>
+      </blockquote>
+      <para>The aggregate function count that  an array as input and returns a scalar value in its output.</para>
+      <para>Below is a query that counts all the measurements of array A:</para>
+      <screen>SELECT count(A);</screen>
+    </sect2>
+    <sect2 remap="h3">
+      <title>GROUP BY Aggregates</title>
+      <para>AQL aggregates can also be used with the GROUP BY clause. The syntax for a group by aggregate is as follows.</para>
+      <para>SELECT &quot;namedExprList | *&quot; [ INFO name] FROM joinexpr [ WHERE expr ] [ groupBy ];</para>
+      <para>groupBy := &quot;group by&quot; dimensionList &quot;as&quot; pathExpr</para>
+      <para>dimensionList := dim (&quot;,&quot; dim)*</para>
+      <para>AQL GROUP BY takes a list of dimensions as a &quot;group by&quot; list, groups the array by the specified dimensions and computes the aggregate function for each group. The result of aggregate is an array with same dimensions as the source array without the group by dimensions. The result array has a single attribute which is the aggregate result per group.</para>
+      <para>The result of a &quot;GROUP BY x, y&quot; is an array with only x, y dimensions and a new attribute which is the corresponding partition. This partition can be accessed by sub-queries or expressions in the SELECT aggregate clause. The following examples explain the GROUP BY aggregate.</para>
+      <sect3 remap="h4">
+        <title>Example 1. count group by</title>
+        <para>Suppose we want to first group measurements by the first dimension, then calculate the count over each of the groups, the AQL query will look like this:</para>
+        <screen>SELECT count(part)
+FROM A
+GROUP BY i AS part;</screen>
+        <para>The group by clause here creates a nested array for each group and names the nested array<emphasis> part.</emphasis> Part is a one-dimensional array corresponding to a given value of dimension<emphasis> i</emphasis> and attributes of the input array<emphasis> A.</emphasis></para>
+      </sect3>
+      <sect3 remap="h4">
+        <title>Example 2. group by avg over an attribute</title>
+        <para>Now suppose we need to compute the average measurement from A, grouped by i we issue the following AQL query which selects the attribute to be used as input to the average. AQL also supports standard SQL-like syntax for computing the aggregate over array groupings. In the current release of SciDB, the AQL GROUP BY must provide a name for the partition attribute created in the GROUP BY aggregate. See example below.</para>
+        <screen>SELECT avg(x)
+FROM A
+GROUP BY i AS T;</screen>
+      </sect3>
+    </sect2>
+    <sect2 remap="h3">
+      <title>Nested sub-queries</title>
+      <para>In this release nested queries can either be simple aggregate queries in the SELECT clause, or nested queries in the FROM clause. Other kinds of nested queries will be supported in forthcoming releases</para>
+      <para>In the example below, we select partitions whose average value is greater than 10:</para>
+      <screen>SELECT * FROM
+( 
+SELECT avg (SELECT x FROM part)
+FROM A
+GROUP BY i AS part
+)
+WHERE avg &gt; 10;</screen>
+    </sect2>
+    <sect2 remap="h3">
+      <title>Updates and Versions</title>
+      <para>AQL arrays that are updatable can be updated using the following command:</para>
+      <para>UPDATE array SET &quot;attr = expr&quot;, ... [ WHERE condition ];</para>
+      <para>For example, to add 1.0 to each measurement in array A and add 0.05 to each error, we can write the following query:</para>
+      <screen>UPDATE A SET x = x+1, err = err + 0.05;</screen>
+      <para>Update can be used with a WHERE clause. To increase the measurement only if the error is smaller than 0.05:</para>
+      <screen>UPDATE A SET x = x+1 WHERE err &lt; 0.05;</screen>
+      <para>Note that the UPDATE clause can be used to update non-null elements using the following example:</para>
+      <screen>SELECT * FROM A;
+[(), (2), (3)]
+UPDATE A SET a = a + 1 WHERE a IS NOT NULL; 
+[(), (3), (4)] 
+UPDATE A SET a = 22222 WHERE a IS NULL;
+[(22222),(3),(4)] </screen>
+      <para>For a definition of NULLs in the SciDB array data model please refer to the AFL documentation for this release.</para>
+      <para>SciDB saves all versions of the data, so the user has an option to query data as it was in the database at a specific time. This is done by appending a @ datetime prefix after the name of the array. For example, the following query returns data as of November 11 2010:</para>
+      <screen>SELECT * FROM A @ datetime(&apos;2011-12-15 22:33:12&apos;);</screen>
+      <para>If multiple versions have the same datetime, the most recent version, i.e., the one with the highest version number is returned. The timestamp of a version is the time on the SciDB server, which is by default reported in UTC timezone.</para>
+      <para>To set the time zone, use the datetimetz argument.</para>
+      <para>For convenience, SciDB includes a now() function, so one can write a query to retrieve all data that was in the array 1000 miliseconds prior to current date and time:</para>
+      <screen>SELECT * FROM A @ now() - 1000;</screen>
+      <para>Any expression yielding a datetime value is supported after the @ operator.</para>
+    </sect2>
+    <sect2 remap="h3">
+      <title>Aliases</title>
+      <para>AQL provides a way to refer to arrays in the query via aliases. These are useful when using the same array repeatedly in an AQL statement, or when abbreviating a long array name. Aliases are created by adding an &quot;as&quot; to the array name, followed by the alias. Future references to the array can then use the alias.</para>
+      <para>Example:</para>
+      <screen>SELECT * FROM vector3 AS A;</screen>
+      <para>Once an alias has been assigned, all attributes and dimensions of the array can use the fully qualified name using the dotted naming convention.</para>
+      <screen>SELECT A.x + 10 from vector3 AS A;</screen>
+      <para>For example:</para>
+      <screen>SELECT pow(sin(a1), 2) as p1, pow(cos(a1), 2) as p2 FROM A; </screen>
+    </sect2>
+  </sect1>
+</chapter>

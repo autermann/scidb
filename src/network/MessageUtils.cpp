@@ -58,15 +58,15 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     errorRecord->set_stringified_long_error_code(e.getStringifiedLongErrorCode());
     errorRecord->set_what_str(e.getWhatStr());
 
-    if (typeid(SystemException) == typeid(e))
+    if (dynamic_cast<const SystemException*>(&e) != NULL)
     {
         errorRecord->set_type(1);
     }
-    else if (typeid(UserException) == typeid(e))
+    else if (dynamic_cast<const UserException*>(&e) != NULL)
     {
         errorRecord->set_type(2);
     }
-    else if (typeid(UserQueryException) == typeid(e))
+    else if (dynamic_cast<const UserQueryException*>(&e) != NULL)
     {
         errorRecord->set_type(3);
         const shared_ptr<ParsingContext> &ctxt = ((const UserQueryException&) e).getParsingContext();
@@ -80,6 +80,7 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     else
     {
         assert(0);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR);
     }
 
     return errorMessage;
@@ -97,19 +98,19 @@ boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID)
     return okMessage;
 }
 
-static bool parseNodeList(shared_ptr<NodeLiveness>& queryLiveness,
-                          const scidb_msg::PhysicalPlan_NodeList& nodeList,
+static bool parseInstanceList(shared_ptr<InstanceLiveness>& queryLiveness,
+                          const scidb_msg::PhysicalPlan_InstanceList& instanceList,
                           const bool isDeadList)
             
 {
    assert(queryLiveness);
 
-   const google::protobuf::RepeatedPtrField<scidb_msg::PhysicalPlan_NodeListEntry>&  nodes = nodeList.node_entry();
-   for(  google::protobuf::RepeatedPtrField<scidb_msg::PhysicalPlan_NodeListEntry>::const_iterator nodeIter = nodes.begin();
-         nodeIter != nodes.end(); ++nodeIter) {
+   const google::protobuf::RepeatedPtrField<scidb_msg::PhysicalPlan_InstanceListEntry>&  instances = instanceList.instance_entry();
+   for(  google::protobuf::RepeatedPtrField<scidb_msg::PhysicalPlan_InstanceListEntry>::const_iterator instanceIter = instances.begin();
+         instanceIter != instances.end(); ++instanceIter) {
 
-      const scidb_msg::PhysicalPlan_NodeListEntry& entry = (*nodeIter);
-      if(!entry.has_node_id()) {
+      const scidb_msg::PhysicalPlan_InstanceListEntry& entry = (*instanceIter);
+      if(!entry.has_instance_id()) {
          assert(false);
          return false;
       }
@@ -117,8 +118,8 @@ static bool parseNodeList(shared_ptr<NodeLiveness>& queryLiveness,
          assert(false);
          return false;
       }
-      NodeLiveness::NodePtr nodeEntry(new NodeLivenessEntry(entry.node_id(), entry.gen_id(), isDeadList));
-      bool rc = queryLiveness->insert(nodeEntry);
+      InstanceLiveness::InstancePtr instanceEntry(new InstanceLivenessEntry(entry.instance_id(), entry.gen_id(), isDeadList));
+      bool rc = queryLiveness->insert(instanceEntry);
       if (!rc) {
          assert(false);
          return false;
@@ -145,7 +146,7 @@ boost::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID)
    return msg;
 }
 
-bool parseQueryLiveness(shared_ptr<NodeLiveness>& queryLiveness,
+bool parseQueryLiveness(shared_ptr<InstanceLiveness>& queryLiveness,
                         shared_ptr<scidb_msg::PhysicalPlan>& ppMsg)
 {
    assert(ppMsg);
@@ -157,25 +158,25 @@ bool parseQueryLiveness(shared_ptr<NodeLiveness>& queryLiveness,
    }
 
    queryLiveness =
-   shared_ptr<scidb::NodeLiveness>(new scidb::NodeLiveness(ppMsg->view_id(), 0));
+   shared_ptr<scidb::InstanceLiveness>(new scidb::InstanceLiveness(ppMsg->view_id(), 0));
 
    if (!ppMsg->has_dead_list()) {
       assert(false);
       return false;
    }
-   const scidb_msg::PhysicalPlan_NodeList& deadList = ppMsg->dead_list();
+   const scidb_msg::PhysicalPlan_InstanceList& deadList = ppMsg->dead_list();
 
    if (!ppMsg->has_live_list()) {
       assert(false);
       return false;
    }
-   const scidb_msg::PhysicalPlan_NodeList& liveList = ppMsg->live_list();
+   const scidb_msg::PhysicalPlan_InstanceList& liveList = ppMsg->live_list();
 
-   if (!parseNodeList(queryLiveness, deadList, true)) {
+   if (!parseInstanceList(queryLiveness, deadList, true)) {
       assert(false);
       return false;
    }
-   if (!parseNodeList(queryLiveness, liveList, false)) {
+   if (!parseInstanceList(queryLiveness, liveList, false)) {
       assert(false);
       return false;
    }
@@ -186,7 +187,7 @@ bool parseQueryLiveness(shared_ptr<NodeLiveness>& queryLiveness,
    return true;
 }
 
-bool serializeQueryLiveness(shared_ptr<const NodeLiveness>& queryLiveness,
+bool serializeQueryLiveness(shared_ptr<const InstanceLiveness>& queryLiveness,
                             shared_ptr<scidb_msg::PhysicalPlan>& ppMsg)
 {
    assert(ppMsg);
@@ -194,33 +195,33 @@ bool serializeQueryLiveness(shared_ptr<const NodeLiveness>& queryLiveness,
 
    ppMsg->set_view_id(queryLiveness->getViewId());
 
-   const NodeLiveness::DeadNodes& deadNodes = queryLiveness->getDeadNodes();
-   scidb_msg::PhysicalPlan_NodeList* deadList = ppMsg->mutable_dead_list();
+   const InstanceLiveness::DeadInstances& deadInstances = queryLiveness->getDeadInstances();
+   scidb_msg::PhysicalPlan_InstanceList* deadList = ppMsg->mutable_dead_list();
    assert(deadList);
 
-   for ( NodeLiveness::DeadNodes::const_iterator iter = deadNodes.begin();
-        iter != deadNodes.end(); ++iter) {
-      google::protobuf::uint64 id = (*iter)->getNodeId();
+   for ( InstanceLiveness::DeadInstances::const_iterator iter = deadInstances.begin();
+        iter != deadInstances.end(); ++iter) {
+      google::protobuf::uint64 id = (*iter)->getInstanceId();
       google::protobuf::uint64 genId = (*iter)->getGenerationId();
-      scidb_msg::PhysicalPlan_NodeListEntry* nodeEntry = deadList->add_node_entry();
-      assert(nodeEntry);
-      nodeEntry->set_node_id(id);
-      nodeEntry->set_gen_id(genId);
+      scidb_msg::PhysicalPlan_InstanceListEntry* instanceEntry = deadList->add_instance_entry();
+      assert(instanceEntry);
+      instanceEntry->set_instance_id(id);
+      instanceEntry->set_gen_id(genId);
    }
 
-   const NodeLiveness::LiveNodes& liveNodes = queryLiveness->getLiveNodes();
-   assert(liveNodes.size() > 0);
-   scidb_msg::PhysicalPlan_NodeList* liveList = ppMsg->mutable_live_list();
+   const InstanceLiveness::LiveInstances& liveInstances = queryLiveness->getLiveInstances();
+   assert(liveInstances.size() > 0);
+   scidb_msg::PhysicalPlan_InstanceList* liveList = ppMsg->mutable_live_list();
    assert(liveList);
 
-   for ( NodeLiveness::LiveNodes::const_iterator iter = liveNodes.begin();
-        iter != liveNodes.end(); ++iter) {
-      google::protobuf::uint64 id = (*iter)->getNodeId();
+   for ( InstanceLiveness::LiveInstances::const_iterator iter = liveInstances.begin();
+        iter != liveInstances.end(); ++iter) {
+      google::protobuf::uint64 id = (*iter)->getInstanceId();
       google::protobuf::uint64 genId = (*iter)->getGenerationId();
-      scidb_msg::PhysicalPlan_NodeListEntry* nodeEntry = liveList->add_node_entry();
-      assert(nodeEntry);
-      nodeEntry->set_node_id(id);
-      nodeEntry->set_gen_id(genId);
+      scidb_msg::PhysicalPlan_InstanceListEntry* instanceEntry = liveList->add_instance_entry();
+      assert(instanceEntry);
+      instanceEntry->set_instance_id(id);
+      instanceEntry->set_gen_id(genId);
    }
    return true;
 }
@@ -260,8 +261,14 @@ shared_ptr<Exception> makeExceptionFromErrorMessage(const boost::shared_ptr<Mess
                 ),
                 msg->getQueryID()));
         default:
+        {
             assert(0);
+            const MessageType messageType = static_cast<MessageType>(msg->getMessageType());
+            LOG4CXX_ERROR(logger, "Unknown/unexpected message format for type " << messageType);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_MESSAGE_FORMAT)  << messageType;
+        }
     }
+    return boost::shared_ptr<Exception>();
 }
 
 void makeExceptionFromErrorMessageAndThrow(const boost::shared_ptr<MessageDesc> &msg)

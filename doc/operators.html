@@ -357,7 +357,7 @@ is specified using definition of the destination array.
 <dd>Exchange specified dimensions and attributes of the source array and store result to the disk. 
   Mapping between attributes and dimensions is specified using definition of the destination array.
 <dt><b>Syntax</b></dt>
-<dd><u>redimension</u> ( <i>source-array</i>, <i>destination-array</i> )
+<dd><u>redimension</u> ( <i>source-array</i>, <i>destination-array</i> { ',' <i>aggregation-expression</i> } )
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "redimension_store(B, A)"</code></dd>
 </dl>

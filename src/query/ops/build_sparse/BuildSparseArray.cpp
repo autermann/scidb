@@ -272,8 +272,7 @@ namespace scidb {
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        currChunkNo += array.nNodes;
-        setPosition(true);
+        nextChunk();
     }
 
     bool BuildSparseArrayIterator::end()
@@ -283,76 +282,78 @@ namespace scidb {
 
     Coordinates const& BuildSparseArrayIterator::getPosition()
     {
+        if (!hasCurrent)
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         return currPos;
     }
 
-    void BuildSparseArrayIterator::setPosition(bool nextAvailable)
+    void BuildSparseArrayIterator::nextChunk()
     {
-        while (true) {
-            Dimensions const& dims = array._desc.getDimensions();
-            size_t chunkNo = currChunkNo;
-            for (int i = dims.size(); --i >= 0;) {
-                size_t chunkInterval = dims[i].getChunkInterval();
-                size_t nChunks = (dims[i].getLength() + chunkInterval - 1) / chunkInterval;
-                currPos[i] = dims[i].getStart() + (chunkNo % nChunks)*chunkInterval;
-                chunkNo /= nChunks;
-            }
-            if (chunkNo == 0) {
-                chunk.setPosition(currPos);
-                if (!chunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS)->end()) {
-                    hasCurrent = true;
+        hasCurrent = true;
+        while (true) { 
+            int i = dims.size() - 1;
+            while ((currPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) { 
+                if (i == 0) { 
+                    hasCurrent = false;
                     return;
-                } else if (nextAvailable) {
-                    currChunkNo += array.nNodes;
-                    continue;
                 }
+                currPos[i] = dims[i].getStart();
+                i -= 1;
             }
-            hasCurrent = false;
-            return;
+            chunkInitialized = false;
+            if (array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID
+                && !getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS)->end())
+            {
+                return;
+            }
         }
     }
 
-
     bool BuildSparseArrayIterator::setPosition(Coordinates const& pos)
     {
-        Dimensions const& dims = array._desc.getDimensions();
-        size_t chunkNo = 0;
         for (size_t i = 0, n = currPos.size(); i < n; i++) {
             if (pos[i] < dims[i].getStart() || pos[i] > dims[i].getEndMax()) {
                 return hasCurrent = false;
             }
-            chunkNo *= (dims[i].getLength() + dims[i].getChunkInterval() - 1) / dims[i].getChunkInterval();
-            chunkNo += (pos[i] - dims[i].getStart()) / dims[i].getChunkInterval();
-
         }
-        if (chunkNo % array.nNodes == array.nodeID) {
-            currChunkNo = chunkNo;
-            setPosition(false);
-        } else {
+        currPos = pos;
+        array._desc.getChunkPositionFor(currPos);
+        chunkInitialized = false;
+        hasCurrent = array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID;
+        if (hasCurrent && getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS)->end()) {
             hasCurrent = false;
         }
         return hasCurrent;
+                                                                                                                                    
     }
 
     void BuildSparseArrayIterator::reset()
     {
-        currChunkNo = array.nodeID;
-        setPosition(true);
+        size_t nDims = currPos.size(); 
+        for (size_t i = 0; i < nDims; i++) {
+            currPos[i] = dims[i].getStart();
+        }
+        currPos[nDims-1] -= dims[nDims-1].getChunkInterval();
+        nextChunk();
     }
 
     ConstChunk const& BuildSparseArrayIterator::getChunk()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        if (!chunkInitialized) { 
+            chunk.setPosition(currPos);
+            chunkInitialized = true;
+        }
         return chunk;
     }
 
 
     BuildSparseArrayIterator::BuildSparseArrayIterator(BuildSparseArray& arr, AttributeID attrID)
     : array(arr),
-      currPos(arr._desc.getDimensions().size()),
-      chunk(arr, attrID)
-
+      chunk(arr, attrID),
+      dims(arr._desc.getDimensions()),
+      currPos(dims.size())
     {
         reset();
     }
@@ -380,16 +381,16 @@ BuildSparseArray::BuildSparseArray(boost::shared_ptr<Query>& query,
       _predicate(predicate),
       _predicateBindings(predicate->getBindings()),
       _converter(NULL),
-      nNodes( 0),
-      nodeID(INVALID_NODE),
+      nInstances( 0),
+      instanceID(INVALID_INSTANCE),
       emptyable(desc.getEmptyBitmapAttribute() != NULL),
       _query(query)
     {
        assert(query);
-       nNodes = query->getNodesCount();
-       nodeID = query->getNodeID();
-       assert(nNodes>0);
-       assert(nodeID < nNodes);
+       nInstances = query->getInstancesCount();
+       instanceID = query->getInstanceID();
+       assert(nInstances>0);
+       assert(instanceID < nInstances);
          TypeId attrType = _desc.getAttributes()[0].getType();
          TypeId exprType = expression->getType();
         if (attrType != exprType) {

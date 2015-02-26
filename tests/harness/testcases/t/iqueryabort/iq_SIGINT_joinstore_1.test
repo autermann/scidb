@@ -1,4 +1,5 @@
 --setup
+--start-query-logging
 
 store (build (<v : int64> [I=0:2000,1,0], I), ARRAY1)
 store (build (<v : int64> [I=0:2000,1,0], I), ARRAY2)
@@ -14,6 +15,7 @@ store (build (<v : int64> [I=0:2000,1,0], I), ARRAY2)
 #project(list('queries'), name)
 
 --cleanup
+--stop-query-logging
 
 remove(ARRAY1)
 remove(ARRAY2)

@@ -57,7 +57,7 @@ public:
 
 private:
     boost::shared_ptr<PhysicalQueryPlanNode> traverse(const boost::shared_ptr<Query>& query,
-                                                      boost::shared_ptr<LogicalQueryPlanNode> node);
+                                                      boost::shared_ptr<LogicalQueryPlanNode> instance);
 };
 
 boost::shared_ptr<PhysicalPlan> L2POptimizer::optimize(const boost::shared_ptr<Query>& query,
@@ -77,10 +77,10 @@ boost::shared_ptr<PhysicalPlan> L2POptimizer::optimize(const boost::shared_ptr<Q
 }
 
 boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::shared_ptr<Query>& query,
-                                                                boost::shared_ptr<LogicalQueryPlanNode> node)
+                                                                boost::shared_ptr<LogicalQueryPlanNode> instance)
 {
-   node = logicalRewriteIfNeeded(query, node);
-    boost::shared_ptr<LogicalOperator> logicalOp = node->getLogicalOperator();
+   instance = logicalRewriteIfNeeded(query, instance);
+    boost::shared_ptr<LogicalOperator> logicalOp = instance->getLogicalOperator();
 
     vector<string> physicalOperatorsNames;
     OperatorLibrary::getInstance()->getPhysicalNames(logicalOp->getLogicalName(), physicalOperatorsNames);
@@ -90,7 +90,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
     vector< ArrayDesc> inputSchemas;
 
     // Adding children schemas
-    const vector<boost::shared_ptr<LogicalQueryPlanNode> >& childs = node->getChildren();
+    const vector<boost::shared_ptr<LogicalQueryPlanNode> >& childs = instance->getChildren();
     for (size_t ch = 0; ch < childs.size(); ch++)
     {
         inputSchemas.push_back(childs[ch]->getLogicalOperator()->getSchema());
@@ -143,11 +143,11 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
             createPhysicalOperator(logicalOp->getLogicalName(), physicalName, phParams, logicalOp->getSchema());
     physicalOp->setQuery(query);
 
-    boost::shared_ptr<PhysicalQueryPlanNode> result(new PhysicalQueryPlanNode(physicalOp, false, node->isDdl(), node->supportsTileMode()));
+    boost::shared_ptr<PhysicalQueryPlanNode> result(new PhysicalQueryPlanNode(physicalOp, false, instance->isDdl(), instance->supportsTileMode()));
 
-    BOOST_FOREACH(boost::shared_ptr<LogicalQueryPlanNode> node_child, node->getChildren())
+    BOOST_FOREACH(boost::shared_ptr<LogicalQueryPlanNode> instance_child, instance->getChildren())
     {
-       boost::shared_ptr <PhysicalQueryPlanNode> pChild = traverse(query, node_child);
+       boost::shared_ptr <PhysicalQueryPlanNode> pChild = traverse(query, instance_child);
         pChild->setParent(result);
         result->addChild(pChild);
     }
@@ -162,9 +162,9 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
                 logicalOp->getGlobalOperatorName().second, PhysicalOperator::Parameters(), logicalOp->getSchema());
         globalOp->setQuery(query);
 
-        boost::shared_ptr<PhysicalQueryPlanNode> globalNode(new PhysicalQueryPlanNode(globalOp, true, false, false));
+        boost::shared_ptr<PhysicalQueryPlanNode> globalInstance(new PhysicalQueryPlanNode(globalOp, true, false, false));
 
-        if ( query->getNodesCount() > 1) {
+        if ( query->getInstancesCount() > 1) {
             // Insert SG to scatter aggregated result
             ArrayDesc sgSchema =  logicalOp->getSchema();
             sgSchema.setId(0);
@@ -186,20 +186,20 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
                 OperatorLibrary::getInstance()->createPhysicalOperator("sg", "impl_sg", sgParams, sgSchema);
             sgOp->setQuery(query);
 
-            boost::shared_ptr<PhysicalQueryPlanNode> sgNode(new PhysicalQueryPlanNode(sgOp, false, false, false));
+            boost::shared_ptr<PhysicalQueryPlanNode> sgInstance(new PhysicalQueryPlanNode(sgOp, false, false, false));
 
-            globalNode->setParent(sgNode);
-            sgNode->addChild(globalNode);
+            globalInstance->setParent(sgInstance);
+            sgInstance->addChild(globalInstance);
 
-            result->setParent(globalNode);
-            globalNode->addChild(result);
+            result->setParent(globalInstance);
+            globalInstance->addChild(result);
 
-            result = sgNode;
+            result = sgInstance;
         } else {
-            result->setParent(globalNode);
-            globalNode->addChild(result);
+            result->setParent(globalInstance);
+            globalInstance->addChild(result);
 
-            result = globalNode;
+            result = globalInstance;
         }
     }
     else if ( !result->isDistributionPreserving() || !result->isChunkPreserving() )
@@ -224,13 +224,13 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
                                                                                                                 sgSchema);
         sgOperator->setQuery(query);
 
-        boost::shared_ptr<PhysicalQueryPlanNode> sgNode(new PhysicalQueryPlanNode(sgOperator,
+        boost::shared_ptr<PhysicalQueryPlanNode> sgInstance(new PhysicalQueryPlanNode(sgOperator,
                                                                                   false,
                                                                                   false,
                                                                                   false));
-        sgNode->addChild(result);
-        result->setParent(sgNode);
-        result = sgNode;
+        sgInstance->addChild(result);
+        result->setParent(sgInstance);
+        result = sgInstance;
     }
 
     return result;

@@ -11,7 +11,7 @@ SCIDB QUERY : <select * into B from build(A,x+1) where x<>1>
 [(1),(),(3)]
 
 SCIDB QUERY : <select * from attributes(B)>
-[("a","int64",false),("EmptyTag","indicator",false)]
+[("a","int64",false)]
 
 SCIDB QUERY : <select * into C from build(A,x+1)>
 [(1),(2),(3)]

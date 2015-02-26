@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>transpose</refname>
+    <refpurpose>Matrix transpose</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> transpose(<replaceable>array</replaceable>)</synopsis>
+    <synopsis>transpose(<replaceable>array</replaceable>)</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>
+The transpose operator accepts an array which may contain any number of attributes and dimensions.
+Attributes may be of any type. If the array contains dimensions d1, d2, d3, ..., dn the result contains the
+dimensions in reverse order dn, ..., d3, d2, d1.
+</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example transposes a 3<symbol>&times;</symbol>3 matrix.</para>
+      <procedure>
+        <step>
+          <para>Create a 1-attribute, 2-dimensional array called m3x3:<programlisting>CREATE ARRAY m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Store values of 0&ndash;8 in m3x3:<programlisting>store(build(m3x3,i*3+j),m3x3);</programlisting><screen>[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]</screen></para>
+        </step>
+        <step>
+          <para>Transpose m3x3:<programlisting>transpose(m3x3);</programlisting>This query outputs:<screen>[
+[(0),(3),(6)],
+[(1),(4),(7)],
+[(2),(5),(8)]]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

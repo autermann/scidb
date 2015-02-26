@@ -47,6 +47,7 @@
 #include <log4cxx/logger.h>
 #include "system/ErrorsLibrary.h"
 #include "system/Warnings.h"
+#include <util/InjectedError.h>
 
 enum
 {
@@ -110,11 +111,11 @@ void netPauseOnNotEqual(const Value** args, Value* res, void*)
 
 void injectRemoteError(const Value** args, Value* res, void*)
 {
-   NodeID nodeID  = static_cast<NodeID>(args[0]->getInt64());
+   InstanceID instanceID  = static_cast<InstanceID>(args[0]->getInt64());
    long int errCode = args[1]->getInt64();
    res->setInt64(-1);
 
-   if (Cluster::getInstance()->getLocalNodeId() != nodeID) {
+   if (Cluster::getInstance()->getLocalInstanceId() != instanceID) {
       return;
    }
 
@@ -137,17 +138,17 @@ void injectRemoteError(const Value** args, Value* res, void*)
       errorRecord->set_what_str("Injected error");
       NetworkManager::getInstance()->broadcast(errorMessage);
    }
-   res->setInt64(nodeID);
+   res->setInt64(instanceID);
 }
 
-void killNode(const Value** args, Value* res, void*)
+void killInstance(const Value** args, Value* res, void*)
 {
-   NodeID nodeID = static_cast<NodeID>(args[0]->getInt64());
+   InstanceID instanceID = static_cast<InstanceID>(args[0]->getInt64());
    int   sigNum  = args[1]->getInt32();
    bool  killParent = args[2]->getBool();
-   res->setInt64(nodeID);
+   res->setInt64(instanceID);
 
-   if (Cluster::getInstance()->getLocalNodeId() != nodeID) {
+   if (Cluster::getInstance()->getLocalInstanceId() != instanceID) {
       return;
    }
    if (killParent) {
@@ -158,14 +159,33 @@ void killNode(const Value** args, Value* res, void*)
 
 void postWarning(const Value** args, Value* res, void*)
 {
-    NodeID nodeID = static_cast<NodeID>(args[0]->getInt64());
-    res->setInt64(nodeID);
+    InstanceID instanceID = static_cast<InstanceID>(args[0]->getInt64());
+    res->setInt64(instanceID);
 
-    if (Cluster::getInstance()->getLocalNodeId() == nodeID)
+    if (Cluster::getInstance()->getLocalInstanceId() == instanceID)
     {
         scidb::Query::getQueryByID(scidb::Query::getCurrentQueryID())->postWarning(
-                    SCIDB_PLUGIN_WARNING("misc_functions", MISC_FUNCTIONS_WARNING) << nodeID);
+                    SCIDB_PLUGIN_WARNING("misc_functions", MISC_FUNCTIONS_WARNING) << instanceID);
     }
+}
+
+void injectError(const Value** args, Value* res, void*)
+{
+   InstanceID instanceID  = static_cast<InstanceID>(args[0]->getInt64());
+   long int errID = args[1]->getInt64();
+   res->setInt64(-1);
+
+   if (Cluster::getInstance()->getLocalInstanceId() != instanceID) {
+      return;
+   }
+
+   boost::shared_ptr<const InjectedError> err = InjectedErrorLibrary::getLibrary()->getError(errID);
+
+   if (!err) {
+       return;
+   }
+   res->setInt64(errID);
+   err->inject();
 }
 
 #endif // MISC_FUNCTIONS_H

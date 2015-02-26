@@ -33,65 +33,57 @@
 #ifndef __AGGREGATE_H__
 #define __AGGREGATE_H__
 
+#include <map>
+
 #include "query/TypeSystem.h"
 #include "array/Metadata.h"
 #include "array/RLE.h"
-#include <map>
+#include "query/TileFunctions.h"
 
 namespace scidb
 {
+
+typedef boost::shared_ptr<class Aggregate> AggregatePtr;
 
 class Aggregate
 {
 protected:
     std::string _aggregateName;
     Type _inputType;
-    Type _stateType;
     Type _resultType;
-    size_t _stateVarSize;
 
     Aggregate( std::string const& aggregateName,
                Type const& inputType,
-               Type const& stateType,
-               Type const& resultType,
-               size_t stateVarSize = 0):
+               Type const& resultType):
         _aggregateName(aggregateName),
         _inputType(inputType),
-        _stateType(stateType),
-        _resultType(resultType),
-        _stateVarSize(stateVarSize)
+        _resultType(resultType)
     {}
 
 public:
-    virtual ~Aggregate()
-    {}
+    virtual ~Aggregate() {}
 
-    virtual boost::shared_ptr<Aggregate> clone() const        = 0;
+    virtual AggregatePtr clone() const        = 0;
+    virtual AggregatePtr clone(Type const& aggregateType) const        = 0;
 
-    inline std::string getName() const
+    const std::string& getName() const
     {
         return _aggregateName;
     }
 
-    inline Type getInputType() const
+    const Type& getAggregateType() const
     {
         return _inputType;
     }
 
-    inline Type getStateType() const
-    {
-        return _stateType;
-    }
+    virtual Type getStateType() const = 0;
 
-    inline Type getResultType() const
+    const Type& getResultType() const
     {
         return _resultType;
     }
 
-    inline size_t getStateVarSize() const
-    {
-        return _stateVarSize;
-    }
+    virtual bool supportAsterisk() const { return false; }
 
     virtual bool ignoreZeroes() const
     {
@@ -108,8 +100,8 @@ public:
         return false;
     }
 
-    virtual void initializeState(Value& state)                  = 0;
-    virtual void accumulate(Value& state, Value const& input)   = 0;
+    virtual void initializeState(Value& state) = 0;
+    virtual void accumulate(Value& state, Value const& input) = 0;
 
     virtual void accumulate(Value& state, std::vector<Value> const& input)
     {
@@ -119,7 +111,7 @@ public:
         }
     }
 
-    virtual void accumulatePayload(Value& state, RLEPayload const* tile)
+    virtual void accumulatePayload(Value& state, ConstRLEPayload const* tile)
     {
         ConstRLEPayload::iterator iter = tile->getIterator();
         bool noNulls = ignoreNulls();
@@ -144,21 +136,189 @@ public:
     virtual void finalResult(Value& result, Value const& state) = 0;
 };
 
+template<template <typename TS, typename TSR> class A, typename T, typename TR, bool asterisk = false>
+class BaseAggregate: public Aggregate
+{
+public:
+    BaseAggregate(const std::string& name, Type const& aggregateType, Type const& resultType): Aggregate(name, aggregateType, resultType)
+    {}
+
+    AggregatePtr clone() const
+    {
+        return AggregatePtr(new BaseAggregate(getName(), getAggregateType(), getResultType()));
+    }
+
+    AggregatePtr clone(Type const& aggregateType) const
+    {
+        return AggregatePtr(new BaseAggregate(getName(), aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType));
+    }
+
+    bool ignoreNulls() const
+    {
+        return true;
+    }
+
+    Type getStateType() const
+    {
+        Type stateType(TID_BINARY, sizeof(typename A<T, TR>::State));
+        return stateType;
+    }
+
+    bool supportAsterisk() const
+    {
+        return asterisk;
+    }
+
+    void initializeState(Value& state)
+    {
+        state.setVector(sizeof(typename A<T, TR>::State));
+        A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()));
+        state.setNull(-1);
+    }
+
+    void accumulate(Value& state, Value const& input)
+    {
+        A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), *reinterpret_cast<T*>(input.data()));
+    }
+
+    virtual void accumulatePayload(Value& state, ConstRLEPayload const* tile)
+    {
+        typename A<T, TR>::State& s = *static_cast< typename A<T, TR>::State* >(state.data());
+        for (size_t i = 0; i < tile->nSegments(); i++)
+        {
+            const RLEPayload::Segment& v = tile->getSegment(i);
+            if (v.null)
+                continue;
+            if (v.same) {
+                A<T, TR>::multAggregate(s, getPayloadValue<T>(tile, v.valueIndex), v.length());
+            } else {
+                const size_t end = v.valueIndex + v.length();
+                for (size_t j = v.valueIndex; j < end; j++) {
+                    A<T, TR>::aggregate(s, getPayloadValue<T>(tile, j));
+                }
+            }
+        }
+    }
+
+    void merge(Value& dstState, Value const& srcState)
+    {
+        A<T, TR>::merge(*static_cast< typename A<T, TR>::State* >(dstState.data()), *static_cast< typename A<T, TR>::State* >(srcState.data()));
+    }
+
+    void finalResult(Value& result, Value const& state)
+    {
+        result.setVector(sizeof(TR));
+        if (!A<T, TR>::final(*static_cast< typename A<T, TR>::State* >(state.data()), state.isNull(), *static_cast< TR* >(result.data()))) {
+            result.setNull();
+        } else {
+            result.setNull(-1);
+        }
+    }
+};
+
+template<template <typename TS, typename TSR> class A, typename T, typename TR, bool asterisk = false>
+class BaseAggregateInitByFirst: public Aggregate
+{
+public:
+    BaseAggregateInitByFirst(const std::string& name, Type const& aggregateType, Type const& resultType): Aggregate(name, aggregateType, resultType)
+    {}
+
+    AggregatePtr clone() const
+    {
+        return AggregatePtr(new BaseAggregateInitByFirst(getName(), getAggregateType(), getResultType()));
+    }
+
+    AggregatePtr clone(Type const& aggregateType) const
+    {
+        return AggregatePtr(new BaseAggregateInitByFirst(getName(), aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType));
+    }
+
+    bool ignoreNulls() const
+    {
+        return true;
+    }
+
+    Type getStateType() const
+    {
+        Type stateType(TID_BINARY, sizeof(typename A<T, TR>::State));
+        return stateType;
+    }
+
+    bool supportAsterisk() const
+    {
+        return asterisk;
+    }
+
+    void initializeState(Value& state)
+    {
+        state.setVector(sizeof(typename A<T, TR>::State));
+        state.setNull();
+    }
+
+    void accumulate(Value& state, Value const& input)
+    {
+        if (state.isNull())
+        {
+            A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()),
+                           *reinterpret_cast<T*>(input.data()));
+            state.setNull(-1);
+        }
+        A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), *reinterpret_cast<T*>(input.data()));
+    }
+
+    virtual void accumulatePayload(Value& state, ConstRLEPayload const* tile)
+    {
+        if (!tile->payloadSize()) {
+            return;
+        }
+        typename A<T, TR>::State& s = *static_cast< typename A<T, TR>::State* >(state.data());
+        if (state.isNull())
+        {
+            A<T, TR>::init(s, getPayloadValue<T>(tile, 0));
+            state.setNull(-1);
+        }
+        for (size_t i = 0; i < tile->nSegments(); i++)
+        {
+            const RLEPayload::Segment& v = tile->getSegment(i);
+            if (v.null)
+                continue;
+            if (v.same) {
+                A<T, TR>::multAggregate(s, getPayloadValue<T>(tile, v.valueIndex), v.length());
+            } else {
+                const size_t end = v.valueIndex + v.length();
+                for (size_t j = v.valueIndex; j < end; j++) {
+                    A<T, TR>::aggregate(s, getPayloadValue<T>(tile, j));
+                }
+            }
+        }
+    }
+
+    void merge(Value& dstState, Value const& srcState)
+    {
+        A<T, TR>::merge(*static_cast< typename A<T, TR>::State* >(dstState.data()), *static_cast< typename A<T, TR>::State* >(srcState.data()));
+    }
+
+    void finalResult(Value& result, Value const& state)
+    {
+        result.setVector(sizeof(TR));
+        if (!A<T, TR>::final(*static_cast< typename A<T, TR>::State* >(state.data()), state.isNull(), *static_cast< TR* >(result.data()))) {
+            result.setNull();
+        } else {
+            result.setNull(-1);
+        }
+    }
+};
+
 class CountingAggregate : public Aggregate
 {
 protected:
-    CountingAggregate( std::string const& aggregateName,
+    CountingAggregate(std::string const& aggregateName,
                Type const& inputType,
-               Type const& stateType,
-               Type const& resultType,
-               size_t stateVarSize = 0):
-        Aggregate(aggregateName, inputType, stateType, resultType, stateVarSize)
+               Type const& resultType):
+        Aggregate(aggregateName, inputType, resultType)
     {}
 
 public:
-    virtual ~CountingAggregate()
-    {}
-
     virtual bool isCounting() const
     {
         return true;
@@ -172,38 +332,13 @@ public:
     virtual void overrideCount(Value& state, uint64_t newCount)   = 0;
 };
 
-
-
-typedef boost::shared_ptr<Aggregate> AggregatePtr;
-
-class AggregateFactory
-{
-private:
-    std::string _aggregateName;
-
-public:
-    AggregateFactory (std::string const& aggName):
-        _aggregateName(aggName)
-    {}
-
-    virtual ~AggregateFactory()
-    {}
-
-    inline std::string getName() const
-    {
-        return _aggregateName;
-    }
-
-    virtual bool supportsInputType (Type const& input)  const      = 0;
-    virtual AggregatePtr createAggregate (Type const& input) const = 0;
-};
-
-typedef boost::shared_ptr<AggregateFactory> AggregateFactoryPtr;
-
 class AggregateLibrary: public Singleton<AggregateLibrary>
 {
 private:
-    std::map <std::string, AggregateFactoryPtr> _registeredFactories;
+    // Map of aggregate factories.
+    // '*' for aggregate type means universal aggregate operator which operates by expressions (slow universal implementation).
+    typedef std::map < std::string, std::map<TypeId, AggregatePtr> > FactoriesMap;
+    FactoriesMap _registeredFactories;
 
 public:
     AggregateLibrary();
@@ -211,66 +346,21 @@ public:
     virtual ~AggregateLibrary()
     {}
 
-    void addAggregateFactory( AggregateFactoryPtr const& aggregateFactory)
-    {
-        if (aggregateFactory.get() == 0)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_ADD_NULL_FACTORY);
+    void addAggregate(AggregatePtr const& aggregate);
 
-        if (_registeredFactories.count(aggregateFactory->getName()) != 0)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_DUPLICATE_AGGREGATE_FACTORY);
+    void getAggregateNames(std::vector<std::string>& names) const;
 
-        _registeredFactories[aggregateFactory->getName()] = aggregateFactory;
-    }
-
-    std::vector<std::string> getAggregateNames() const
-    {
-        std::vector<std::string> result;
-        std::map <std::string, AggregateFactoryPtr>::const_iterator iter;
-        for (iter = _registeredFactories.begin(); iter != _registeredFactories.end(); iter++)
-        {
-            result.push_back((*iter).first);
-        }
-        return result;
-    }
-
-    inline size_t getNumAggregates() const
+    size_t getNumAggregates() const
     {
         return _registeredFactories.size();
     }
 
-    inline bool hasAggregate(std::string const& aggregateName) const
+    bool hasAggregate(std::string const& aggregateName) const
     {
-        return (_registeredFactories.count(aggregateName) > 0);
+        return _registeredFactories.find(aggregateName) != _registeredFactories.end();
     }
 
-    AggregatePtr createAggregate ( std::string const& aggregateName, Type const& inputType) const
-    {
-        AggregatePtr null_ptr;
-        if ( _registeredFactories.count(aggregateName) == 0 )
-        {
-            throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_AGGREGATE_NOT_FOUND) << aggregateName;
-        }
-
-        AggregateFactoryPtr const& factory = _registeredFactories.find(aggregateName)->second;
-        if ( !factory->supportsInputType(inputType))
-        {
-            std::string errorstr;
-            if (TID_VOID == inputType.typeId())
-            {
-                throw USER_EXCEPTION(SCIDB_SE_TYPE, SCIDB_LE_AGGREGATE_DOESNT_SUPPORT_ASTERISK)
-                        << aggregateName;
-            }
-            else
-            {
-                throw USER_EXCEPTION(SCIDB_SE_TYPE, SCIDB_LE_AGGREGATE_DOESNT_SUPPORT_TYPE)
-                        << aggregateName << inputType.typeId();
-            }
-        }
-        else
-        {
-            return factory->createAggregate(inputType);
-        }
-    }
+    AggregatePtr createAggregate(std::string const& aggregateName, Type const& aggregateType) const;
 };
 
 } //namespace scidb

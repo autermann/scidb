@@ -49,6 +49,7 @@
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/export.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "array/Array.h"
 #include "array/MemArray.h"
@@ -59,6 +60,7 @@
 #include "system/Config.h"
 #include "../src/system/SciDBConfigOptions.h"
 #include "../src/smgr/io/DimensionIndex.h"
+#include <util/InjectedError.h>
 
 namespace scidb
 {
@@ -1221,13 +1223,13 @@ class ArrayDistribution
 private:
     PartitioningSchema _partitioningSchema;
     boost::shared_ptr <DistributionMapper> _distMapper;
-    int64_t _nodeId;
+    int64_t _instanceId;
 
 public:
     ArrayDistribution(PartitioningSchema ps = psRoundRobin,
                       boost::shared_ptr <DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper>(),
-                      int64_t nodeId = 0):
-        _partitioningSchema(ps), _distMapper(distMapper), _nodeId(nodeId)
+                      int64_t instanceId = 0):
+        _partitioningSchema(ps), _distMapper(distMapper), _instanceId(instanceId)
     {
         if(_distMapper.get() != NULL && _partitioningSchema == psUndefined)
             throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER);
@@ -1236,7 +1238,7 @@ public:
     ArrayDistribution(const ArrayDistribution& other):
         _partitioningSchema(other._partitioningSchema),
         _distMapper(other._distMapper),
-        _nodeId(other._nodeId)
+        _instanceId(other._instanceId)
     {
         if (_distMapper.get() != NULL && _partitioningSchema == psUndefined)
             throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER);
@@ -1251,7 +1253,7 @@ public:
         {
             _partitioningSchema = rhs._partitioningSchema;
             _distMapper = rhs._distMapper;
-            _nodeId = rhs._nodeId;
+            _instanceId = rhs._instanceId;
         }
         return *this;
     }
@@ -1281,9 +1283,9 @@ public:
         return _distMapper;
     }
 
-    int64_t getNodeId() const
+    int64_t getInstanceId() const
     {
-        return _nodeId;
+        return _instanceId;
     }
 
     friend bool operator== (ArrayDistribution const& lhs, ArrayDistribution const& rhs);
@@ -1426,7 +1428,7 @@ public:
             {
                 DimensionDesc dO = originalDimensions[j];
                 if (dO.getBaseName() == d.getBaseName() &&
-                    dO.getLength() == d.getLength())
+                    (dO.getLength() == INFINITE_LENGTH || dO.getLength() == d.getLength()))
                 {
                     _dimensionMask.push_back(j);
                 }
@@ -1465,6 +1467,393 @@ public:
 
 private:
     vector<size_t> _dimensionMask;
+};
+
+typedef boost::shared_ptr < std::pair<Coordinates, InstanceID> > ChunkLocation;
+
+/**
+ * A map that describes which chunks exist on which instances for the purpose of searching along an axis.
+ * The map is constructed with a set of dimensions and an axis of interest. After that, given the coordinates of a chunk,
+ * the map can be used to locate the next or previous chunk along the specified axis.
+ *
+ * The map can be serialized for transfer between instances.
+ */
+class ChunkInstanceMap
+{
+private:
+    size_t _numCoords;
+    size_t _axis;
+
+    size_t _numChunks;
+
+    boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > > _chunkLocations;
+    boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::iterator _outerIter;
+    std::map<Coordinate, InstanceID>::iterator _innerIter;
+
+    template <int SEARCH_MODE>
+    ChunkLocation search(Coordinates const& coords) const
+    {
+        assert(coords.size() == _numCoords);
+        Coordinates copy = coords;
+        Coordinate inner = copy[_axis];
+        copy[_axis]=0;
+
+        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter = _chunkLocations.find(copy);
+        if (outerIter == _chunkLocations.end())
+        {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+
+        std::map<Coordinate, InstanceID>::const_iterator iter = outerIter->second->find(inner);
+        if (iter == outerIter->second->end())
+        {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+
+        if (SEARCH_MODE == 1)
+        {
+            iter++;
+            if (iter == outerIter->second->end())
+            {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+        }
+        else if (SEARCH_MODE == 2)
+        {
+            if (iter == outerIter->second->begin())
+            {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+            iter--;
+        }
+
+        copy[_axis]=iter->first;
+        return boost::shared_ptr <std::pair<Coordinates,InstanceID> > ( new std::pair<Coordinates,InstanceID> (copy,iter->second) );
+    }
+
+public:
+    /**
+     * Create empty map.
+     * @param numCoords number of dimensions; must not be zero
+     * @param axis the dimension of interest; must be between zero and numCoords
+     */
+    ChunkInstanceMap(size_t numCoords, size_t axis):
+        _numCoords(numCoords), _axis(axis), _numChunks(0)
+    {
+        if (numCoords==0 || axis >= numCoords)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Invalid parameters passed to ChunkInstanceMap ctor";
+        }
+    }
+
+    virtual ~ChunkInstanceMap()
+    {}
+
+    /**
+     * Add information about a chunk to the map.
+     * @param coords coordinates of the chunk. Must match numCoords. Adding duplicate chunks is not allowed.
+     * @param instanceId the id of the instance that contains the chunk
+     */
+    void addChunkInfo(Coordinates const& coords, InstanceID instanceId)
+    {
+        if (coords.size() != _numCoords)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Invalid coords passed to ChunkInstanceMap::addChunkInfo";
+        }
+
+        Coordinates copy = coords;
+        Coordinate inner = copy[_axis];
+        copy[_axis]=0;
+
+        _outerIter=_chunkLocations.find(copy);
+        if(_outerIter==_chunkLocations.end())
+        {
+            _outerIter=_chunkLocations.insert( std::pair<Coordinates, boost::shared_ptr<std::map<Coordinate, InstanceID> > >(copy, boost::shared_ptr<map<Coordinate,uint64_t> >(new map <Coordinate, uint64_t> ()))).first;
+        }
+
+        if (_outerIter->second->find(inner) != _outerIter->second->end())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Duplicate chunk information passed to ChunkInstanceMap::addChunkInfo";
+        }
+
+        _outerIter->second->insert(std::pair<Coordinate, InstanceID>(inner, instanceId));
+        _numChunks++;
+    }
+
+    inline vector<Coordinates> getAxesList() const
+    {
+        vector<Coordinates> result;
+        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter = _chunkLocations.begin();
+        while (outerIter != _chunkLocations.end())
+        {
+            result.push_back(outerIter->first);
+            outerIter++;
+        }
+        return result;
+    }
+
+    /**
+     * Print human-readable form.
+     */
+    friend std::ostream& operator<<(std::ostream& stream, const ChunkInstanceMap& cm)
+    {
+        if(cm._chunkLocations.size()==0)
+        {
+            stream<<"[empty]";
+            return stream;
+        }
+
+        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter;
+        std::map<Coordinate, InstanceID>::const_iterator innerIter;
+
+        outerIter=cm._chunkLocations.begin();
+        while(outerIter!=cm._chunkLocations.end())
+        {
+            Coordinates coords = outerIter->first;
+            innerIter = outerIter->second->begin();
+            while (innerIter!=outerIter->second->end())
+            {
+                Coordinate coord = innerIter->first;
+                coords[cm._axis]=coord;
+                stream << "[";
+                for (size_t i=0; i<coords.size(); i++)
+                {
+                    if(i>0)
+                    { stream <<","; }
+                    stream<<coords[i];
+                }
+                stream<<"]:"<<innerIter->second<<" ";
+                ++innerIter;
+            }
+            stream<<"| ";
+            ++outerIter;
+        }
+        return stream;
+    }
+
+    class axial_iterator
+    {
+    private:
+        ChunkInstanceMap const& _cm;
+        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator _outer;
+        std::map<Coordinate, InstanceID>::const_iterator _inner;
+
+    public:
+        axial_iterator(ChunkInstanceMap const& cm):
+             _cm(cm)
+        {
+            reset();
+        }
+
+        ChunkLocation getNextChunk(bool& moreChunksInAxis)
+        {
+            ChunkLocation result;
+            if (_inner==_outer->second->end())
+            {
+                assert(!end());
+                ++_outer;
+                _inner=_outer->second->begin();
+            }
+
+            Coordinates coords = _outer->first;
+            coords[_cm._axis]=_inner->first;
+            result = boost::shared_ptr <std::pair<Coordinates,InstanceID> > ( new std::pair<Coordinates,InstanceID> (coords,_inner->second) );
+            ++_inner;
+            moreChunksInAxis = true;
+            if(_inner==_outer->second->end())
+            {
+                moreChunksInAxis = false;
+            }
+            return result;
+        }
+
+        inline ChunkLocation getNextChunk()
+        {
+            bool placeholder;
+            return getNextChunk(placeholder);
+        }
+
+        inline bool end() const
+        {
+            if(_outer == _cm._chunkLocations.end())
+            {
+                return true;
+            }
+            else if(_inner==_outer->second->end())
+            {
+                boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator i = _outer;
+                i++;
+                if(i==_cm._chunkLocations.end())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        inline void setAxis(Coordinates const& axisPos)
+        {
+            _outer=_cm._chunkLocations.find(axisPos);
+            if(_outer == _cm._chunkLocations.end())
+            {
+                return;
+            }
+            _inner=_outer->second->begin();
+        }
+
+        inline bool endOfAxis() const
+        {
+            if (_outer == _cm._chunkLocations.end())
+            {
+                return true;
+            }
+            return _inner==_outer->second->end();
+        }
+
+        inline void reset()
+        {
+            _outer = _cm._chunkLocations.begin();
+            if (_outer != _cm._chunkLocations.end())
+            {
+                _inner=_outer->second->begin();
+            }
+        }
+    };
+
+    axial_iterator getAxialIterator() const
+    {
+        return axial_iterator(*this);
+    }
+
+    /**
+     * Given a chunk, find the next chunk along the axis.
+     * @param coords coordinates of a chunk.
+     * @return a pair of coords and instance id of next chunk. Null if no such chunk in map.
+     */
+    ChunkLocation getNextChunkFor(Coordinates const& coords) const
+    {
+        return search <1> (coords);
+    }
+
+    /**
+     * Given a chunk, find the previous chunk along the axis.
+     * @param coords coordinates of a chunk.
+     * @return a pair of coords and instance id of next chunk. Null if no such chunk in map.
+     */
+    ChunkLocation getPrevChunkFor(Coordinates const& coords) const
+    {
+        return search <2> (coords);
+    }
+
+    /**
+     * Get the information about a chunk by coordinates.
+     * @param coords coordinates of a chunk.
+     * @return a pair of coords and instance id that contains the chunk. Null if no such chunk in map.
+     */
+    ChunkLocation getChunkFor(Coordinates const& coords) const
+    {
+        return search <3> (coords);
+    }
+
+    /**
+     * Get the size of the map in buffered form.
+     * @return size in bytes.
+     */
+    inline size_t getBufferedSize() const
+    {
+        return (_numCoords * sizeof(Coordinate) + sizeof(InstanceID)) * _numChunks + 3 * sizeof(size_t);
+    }
+
+    /**
+     * Marshall map into a buffer.
+     * @return buffer of getBufferedSize() that completely describes the map.
+     */
+    boost::shared_ptr<SharedBuffer> serialize() const
+    {
+        if(_chunkLocations.size()==0)
+        {
+            return boost::shared_ptr<SharedBuffer>();
+        }
+
+        size_t totalSize = getBufferedSize();
+        boost::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, totalSize));
+        MemoryBuffer* b = (MemoryBuffer*) buf.get();
+        size_t* sizePtr = (size_t*)b->getData();
+
+        *sizePtr = _numCoords;
+        sizePtr++;
+
+        *sizePtr = _axis;
+        sizePtr++;
+
+        *sizePtr = _numChunks;
+        sizePtr++;
+
+        Coordinate* coordPtr = (Coordinate*) sizePtr;
+
+        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter;
+        std::map<Coordinate, InstanceID>::const_iterator innerIter;
+
+        outerIter=_chunkLocations.begin();
+        while(outerIter!=_chunkLocations.end())
+        {
+            Coordinates coords = outerIter->first;
+            innerIter = outerIter->second->begin();
+            while (innerIter!=outerIter->second->end())
+            {
+                Coordinate coord = innerIter->first;
+                coords[_axis]=coord;
+
+                for (size_t i=0; i<_numCoords; i++)
+                {
+                    *coordPtr = coords[i];
+                    coordPtr++;
+                }
+
+                InstanceID* instancePtr = (InstanceID*) coordPtr;
+                *instancePtr = innerIter->second;
+                instancePtr++;
+                coordPtr = (Coordinate*) instancePtr;
+                ++innerIter;
+            }
+            ++outerIter;
+        }
+        return buf;
+    }
+
+    /**
+     * Merge information from another map into this.
+     * @param serializedMap a buffer received as the result of calling serialize() on another ChunkInstanceMap.
+     */
+    void merge( boost::shared_ptr<SharedBuffer> const& serializedMap)
+    {
+        if(serializedMap.get() == 0)
+        {   return; }
+
+        size_t* sizePtr = (size_t*) serializedMap->getData();
+
+        size_t nCoords = *sizePtr;
+        assert(nCoords == _numCoords);
+        sizePtr ++;
+
+        assert(*sizePtr == _axis);
+        sizePtr ++;
+
+        size_t numChunks = *sizePtr;
+        sizePtr++;
+
+        assert(serializedMap->getSize() == (nCoords * sizeof(Coordinate) + sizeof(InstanceID)) * numChunks + 3 * sizeof(size_t));
+
+        Coordinate* coordPtr = (Coordinate*) sizePtr;
+
+        Coordinates coords(nCoords);
+        for(size_t i=0; i<numChunks; i++)
+        {
+            for(size_t j = 0; j<nCoords; j++)
+            {
+                coords[j] = *coordPtr;
+                coordPtr++;
+            }
+
+            InstanceID* instancePtr = (InstanceID*) coordPtr;
+            InstanceID nid = *instancePtr;
+            addChunkInfo(coords, nid);
+            instancePtr ++;
+            coordPtr = (Coordinate*) instancePtr;
+        }
+    }
 };
 
 /**
@@ -1524,7 +1913,7 @@ public:
     }
 
     /**
-     * This method is executed on coordinator node before sending out plan on remote nodes and
+     * This method is executed on coordinator instance before sending out plan on remote instances and
      * before local call of execute method.
      */
     virtual void preSingleExecute(boost::shared_ptr<Query>)
@@ -1532,7 +1921,7 @@ public:
     }
 
     /**
-     * This method is executed on coordinator node before sending out plan on remote nodes and
+     * This method is executed on coordinator instance before sending out plan on remote instances and
      * after call of execute method in overall cluster.
      */
     virtual void postSingleExecute(boost::shared_ptr<Query>)
@@ -1631,7 +2020,7 @@ public:
     }
 
     /**
-     *  [Optimizer API] Determine if the operator requires a repart node.
+     *  [Optimizer API] Determine if the operator requires a repart instance.
      *  @param inputSchema shape of array that will given as input (op must be unary)
      *  @return true if repart is needed. If so, getRepartSchema() will provide the schema of needed repart.
      */
@@ -1668,9 +2057,17 @@ protected:
 
     boost::weak_ptr<Query> _query;
 
+    static InjectedErrorListener<OperatorInjectedError>&
+    getInjectedErrorListener()
+    {
+        _injectedErrorListener.start();
+        return _injectedErrorListener;
+    }
+
 private:
     std::string _logicalName;
     std::string _physicalName;
+    static InjectedErrorListener<OperatorInjectedError> _injectedErrorListener;
 };
 
 
@@ -1804,12 +2201,13 @@ class UserDefinedPhysicalOperatorFactory: public PhysicalOperatorFactory<T>
 #define REGISTER_PHYSICAL_OPERATOR_FACTORY(name, ulname, upname) static UserDefinedPhysicalOperatorFactory<name> _physicalFactory##name(ulname, upname)
 
 
-NodeID getNodeForChunk(boost::shared_ptr<Query> query,
+InstanceID getInstanceForChunk(boost::shared_ptr<Query> query,
                        Coordinates chunkPosition,
                        ArrayDesc const& desc,
                        PartitioningSchema ps,
                        boost::shared_ptr<DistributionMapper> distMapper,
-                       NodeID defaultNodeId);
+                       size_t shift,
+                       InstanceID defaultInstanceIDId);
 
 
 /**
@@ -1823,10 +2221,11 @@ NodeID getNodeForChunk(boost::shared_ptr<Query> query,
  * @return pointer to new local array with part of array after repart.
  */
 boost::shared_ptr< Array> redistribute(boost::shared_ptr< Array> inputArray, boost::shared_ptr< Query> query,
-                                              PartitioningSchema ps,
-                                              const std::string& resultArrayName = "",
-                                              NodeID nodeID = NodeID(~0),
-                                              boost::shared_ptr<DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper> ());
+                                       PartitioningSchema ps,
+                                       const std::string& resultArrayName = "",
+                                       InstanceID instanceID = InstanceID(~0),
+                                       boost::shared_ptr<DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper> (),
+                                       size_t shift = 0);
 
 AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
                               Attributes const& inputAttributes,
@@ -1859,9 +2258,9 @@ PhysicalBoundaries findArrayBoundaries(shared_ptr<Array> srcArray,
 /**
  * Build functional attribute mapping
  * @param dim dimension for which mapping should be build
- * @return AttributeMap providing required mapping
+ * @return AttributeMultiMap providing required mapping
  */
-boost::shared_ptr<AttributeMap> buildFunctionalMapping(DimensionDesc const& dim);
+boost::shared_ptr<AttributeMultiMap> buildFunctionalMapping(DimensionDesc const& dim);
 
 /**
  * Build a sorted index from the given attribute set.
@@ -1895,6 +2294,39 @@ boost::shared_ptr<AttributeMap> buildSortedIndex( shared_ptr<Array> srcArray,
                                                   string const& indexArrayName = "",
                                                   Coordinate indexStart = 0,
                                                   uint64_t maxElements = 0);
+
+/**
+ * Build a sorted index from the given attribute set.
+ * In order to save memory footprint, the given attrSet is sorted in-place; therefore it is mutated.
+ * @param attrSet the attributes to index
+ * @param query for reference
+ * @param indexArrayName the name under which the index will be stored. Index is not stored if empty.
+ * @param indexStart the desired minimum coordinate of index array and index position of first element in index
+ * @param maxElements maximum index size. If set, throw exception if index size exceeds this value.
+ * @return AttributeMap containing the entire index.
+ */
+boost::shared_ptr<AttributeMultiMap> buildSortedMultiIndex( AttributeSet& attrSet,
+                                                            boost::shared_ptr<Query> query,
+                                                            string const& indexArrayName = "",
+                                                            Coordinate indexStart = 0,
+                                                            uint64_t maxElements = 0);
+
+/**
+ * Build a sorted index based on an attribute of the given array, persist if necessary.
+ * @param srcArray a pointer to local part of array
+ * @param attrID the attribute to index
+ * @param query a query context
+ * @param indexArrayName the name under which the index will be stored. Index is not stored if empty.
+ * @param indexStart the desired minimum coordinate of index array and index position of first element in index
+ * @param maxElements maximum index size. If set, throw exception if index size exceeds this value.
+ * @return AttributeMap containing the entire index.
+ */
+boost::shared_ptr<AttributeMultiMap> buildSortedMultiIndex( shared_ptr<Array> srcArray,
+                                                            AttributeID attrID,
+                                                            boost::shared_ptr<Query> query,
+                                                            string const& indexArrayName = "",
+                                                            Coordinate indexStart = 0,
+                                                            uint64_t maxElements = 0);
 
 } // namespace
 

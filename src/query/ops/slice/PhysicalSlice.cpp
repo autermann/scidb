@@ -45,7 +45,12 @@ public:
         {
         }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
+        virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+        {
+            return false;
+        }
+
+     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                    const std::vector< ArrayDesc> & inputSchemas) const
     {
         if (inputBoundaries[0].isEmpty())

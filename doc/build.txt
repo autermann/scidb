@@ -11,7 +11,7 @@ sudo make install
 sudo apt-get install build-essential cmake libboost1.40-all-dev postgresql-8.4 libpqxx3-dev libprotobuf-dev doxygen flex bison liblog4cxx10-dev libcppunit-dev libbz2-dev postgresql-contrib libreadline6-dev python-paramiko python-crypto
 
 === Ubuntu ===
-sudo apt-get install build-essential cmake libboost1.42-all-dev postgresql-8.4 libpqxx3-dev libprotobuf-dev doxygen flex bison liblog4cxx10-dev libcppunit-dev libbz2-dev postgresql-contrib libreadline6-dev python-paramiko python-crypto
+sudo apt-get install build-essential cmake libboost1.42-all-dev postgresql-8.4 libpqxx3-dev libprotobuf-dev doxygen flex bison liblog4cxx10-dev libcppunit-dev libbz2-dev postgresql-contrib libreadline6-dev python-paramiko python-crypto fop xsltproc docbook
 
 === Fedora-16 ===
 sudo yum install gcc subversion cmake boost-devel gcc-c++ protobuf protobuf-c-devel protobuf-devel log4cxx-devel doxygen libpqxx-devel flex-devel flex-static bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko

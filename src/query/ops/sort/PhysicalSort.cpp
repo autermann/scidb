@@ -119,14 +119,14 @@ class PhysicalSort: public PhysicalOperator
             if ((size_t)keys[i].columnNo >= attrs.size())
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_SORT_ERROR2);
         }
-        if ( query->getNodesCount() > 1) { 
+        if ( query->getInstancesCount() > 1) { 
             // Prepare context for second phase
             SortContext* ctx = new SortContext();
             ctx->keys = keys;
             query->userDefinedContext = ctx;
         }
 
-        uint64_t tupleArraySize = _schema.getSize();
+        uint64_t tupleArraySize = _schema.getCurrSize();
         if (tupleArraySize != INFINITE_LENGTH) { 
             size_t nAttrs = attrs.size();
             tupleArraySize = tupleArraySize*(sizeof(Tuple) + sizeof(Value)*nAttrs) + _schema.getUsedSpace(); 

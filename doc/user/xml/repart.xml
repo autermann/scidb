@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>repart</refname>
+    <refpurpose>Change array chunk sizes</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> repart(<replaceable>array</replaceable>,<replaceable>target_array</replaceable>|<replaceable>anonymous_schema</replaceable>)</synopsis>
+    <synopsis>repart(<replaceable>array</replaceable>,<replaceable>target_array</replaceable>|<replaceable>anonymous_schema</replaceable>)</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>
+The repart operator changes the partitioning (chunking) of the array. The target array must have the same attributes and dimensions, but
+chunk size may be different. Repart returns an array whose attributes are taken from the input array, with the
+dimensions of the target.
+</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example repartitions a 4<symbol role="symbolfont">&times;</symbol>4 array with chunk size 1 into an array with chunk size 2.</para>
+      <procedure>
+        <step>
+          <para>Create an array with chunk size of 1 called source:
+<programlisting>CREATE ARRAY source &lt;val:double&gt; [x=0:3,1,0,y=0:3,1,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Add values of 0&ndash;15 to source:<programlisting>store(build(source,x*3+y),source);</programlisting></para>
+        </step>
+        <step>
+          <para>Repartition the array into 2-by-2 chunks and store the result in an array called target:
+<programlisting>store(repart(source, &lt;values:double&gt; [x=0:3,2,0, y=0:3,2,0]),target);</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

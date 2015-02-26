@@ -1,0 +1,300 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter>
+  <title>Creating and Removing SciDB Arrays</title>
+  <para> SciDB stores data as a collection of chunked multi-dimensional nested arrays. Just as a relational table is the basic data structure of relational algebra and SQL, SciDB uses multi-dimensional arrays as the basis for linear algebra and complex analytics.</para>
+  <para> A SciDB database is organized into arrays that have:</para>
+  <itemizedlist>
+    <listitem>
+      <para> A<emphasis> name</emphasis>. Each array in a SciDB database has an identifier that distinguishes it from all other arrays in the same database.</para>
+    </listitem>
+  </itemizedlist>
+  <itemizedlist>
+    <listitem>
+      <para> A<emphasis> schema</emphasis>, which is the array structure. The schema contains array dimensions and attributes.</para>
+    </listitem>
+  </itemizedlist>
+  <itemizedlist>
+    <listitem>
+      <para> We use the term<emphasis> shape</emphasis> in reference to an array&apos;s collection of dimensions. To have the same or compatible shapes, two arrays must have the same number and order of dimensions and the corresponding dimensions in the two arrays must have the same type and size.</para>
+    </listitem>
+  </itemizedlist>
+  <itemizedlist>
+    <listitem>
+      <para> Each<emphasis> dimension</emphasis> consists of a list of index values. At the most basic level the dimension of an array is represented using 64-bit unsigned integers. The number of index values in a dimension is referred to as the dimension&apos;s size (or occasionally its extent). SciDB support arrays with noninteger dimensions by mapping noninteger values into the basic unsigned 64-bit integer dimension type.</para>
+    </listitem>
+  </itemizedlist>
+  <itemizedlist>
+    <listitem>
+      <para><emphasis>Cell</emphasis>  or<emphasis> element</emphasis>. Each combination of dimension values identifies a single element or cell in the array. Each cell may be empty or is occupied by one or more attributes.</para>
+    </listitem>
+  </itemizedlist>
+  <itemizedlist>
+    <listitem>
+      <para><emphasis>Attribute</emphasis> . Each cell contains a list of named, typed attributes.</para>
+    </listitem>
+  </itemizedlist>
+  <sect1 remap="h2" xml:id="Creatingandremovingarrays">
+    <title>Creating and removing arrays</title>
+    <para> Arrays are created and removed using the<emphasis> create array</emphasis> and<emphasis> remove</emphasis> commands described below.</para>
+  </sect1>
+  <sect1 remap="h2" xml:id="createarray">
+    <title>create array</title>
+    <para><emphasis role="bold"> Summary</emphasis>: Create a SciDB array</para>
+    <para> The CREATE ARRAY statement is used to a create new array. The statement specifies the array name and the array schema. The array schema is a description of the array properties which includes the array<emphasis> shape</emphasis> (the number of dimensions and their sizes), and the array<emphasis> attributes</emphasis> (the data items that appear in each cell).<programlisting>CREATE [array_type] ARRAY 
+
+    array_name 
+
+    &lt; attribute_name : type_name [ NULL | NOT NULL ] [, ...] &gt; 
+
+    [ dimension_name = start: end|*, chunk_size, chunk_overlap [, ...] ]</programlisting></para>
+    <para><emphasis role="bold"> Signature</emphasis>:</para>
+    <para> SciDB arrays have the following elements.</para>
+    <informaltable frame="all">
+      <tgroup cols="3">
+        <colspec colname="c1" colwidth="33*"/>
+        <colspec colname="c2" colwidth="33*"/>
+        <colspec colname="c3" colwidth="33*"/>
+        <tbody>
+          <row>
+            <entry>
+              <para><emphasis role="bold"> Array Feature</emphasis></para>
+            </entry>
+            <entry>
+              <para><emphasis role="bold"> Optional</emphasis></para>
+            </entry>
+            <entry>
+              <para><emphasis role="bold"> Description</emphasis></para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> array_name</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para>The string name of the array. The array name uniquely identifies the array in the SciDB instance. You cannot use the same array name twice in one SciDB instance. Array names should not contain the characters <literal>@</literal> or <literal>:</literal> as these characters are reserved for mapping arrays.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> EMPTY flag</para>
+            </entry>
+            <entry>
+              <para> Yes</para>
+            </entry>
+            <entry>
+              <para> By default, all arrays have all cells present. Users can optionally specify &apos;EMPTY&apos;, in which case some cells may be omitted.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> attribute_name</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para> Name of an attribute. No two attributes in the same array can share a name.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> type_name</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para> Type identifier. One of the data types supported by SciDB. Use the <literal>list(&apos;types&apos;)</literal> command to see the list of available data types.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>NULL flag</para>
+            </entry>
+            <entry>
+              <para> Yes</para>
+            </entry>
+            <entry>
+              <para> By default, all attributes are &apos;NOT NULL&apos;, i.e. they will have a value. Optionally, users can specify &apos;NULL&apos; to indicate attributes that are allowed to contain null values.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> dimension_name</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para> Each dimension has a name. Just like attributes, each dimension must be named, and dimension names cannot be repeated in the same array</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> start (integer)</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para> The starting coordinate of a dimension</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> end (integer)</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para> The ending coordinate of a dimension, or * if unknown</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> chunk_size</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para>The length of the data chunk along a dimension.</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para> chunk_overlap</para>
+            </entry>
+            <entry>
+              <para> No</para>
+            </entry>
+            <entry>
+              <para> The length of overlap along a dimension. Overlap specifies the extended chunk, including additional cells from adjoining chunks in the array that are colocated with a given chunk. Like chunk sizes, overlap is an internal storage management concept, and does not change the result of an operator. In this release, some operators rely on overlap, as described later in this document.</para>
+            </entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </informaltable>
+  </sect1>
+  <sect1 remap="h2" xml:id="Basicexamples">
+    <title>Basic examples</title>
+    <para> This sections contains several examples of creating arrays using the CREATE ARRAY statement.</para>
+    <para><emphasis> Example One:</emphasis></para>
+    <para> Create a 2-dimensional array that has:</para>
+    <orderedlist>
+      <listitem>
+        <para> Dimension names &apos;x&apos; and &apos;y&apos;,</para>
+      </listitem>
+      <listitem>
+        <para> Equal length dimensions ranging between 0 and 49 (having length 50)</para>
+      </listitem>
+      <listitem>
+        <para> Chunks each of size 10 in each dimension</para>
+      </listitem>
+      <listitem>
+        <para> No chunk overlap</para>
+      </listitem>
+      <listitem>
+        <para> One integer attribute named &apos;Val&apos;</para>
+      </listitem>
+    </orderedlist>
+    <programlisting>CREATE ARRAY Example_One &lt; Val: int32 &gt; [ X=0:49,10,0, Y=0:49,10,0]</programlisting>
+    <para><emphasis> Example Two:</emphasis></para>
+    <para> Create a 3-dimensional array with dimension indices</para>
+    <orderedlist>
+      <listitem>
+        <para> having names X, Y and Z,</para>
+      </listitem>
+      <listitem>
+        <para> with values for the X and Y dimensions ranging between 0 and 9 (length 10) and the Z dimension ranging over 0:99 (length = 100)</para>
+      </listitem>
+      <listitem>
+        <para> stored entirely within a single chunk of size 10x10x100.</para>
+      </listitem>
+      <listitem>
+        <para> with no overlap.</para>
+      </listitem>
+    </orderedlist>
+    <para> and two attributes A and B being a string and a double-precision value:<programlisting>CREATE ARRAY Example_Three &lt; A: string, B: double &gt; [ X=0:9,10,0, Y=0:9,10,0\
+, Z=0:99,100,0 ];</programlisting></para>
+    <para><emphasis> Example Three:</emphasis></para>
+    <para> The following is a 2-dimensional array with dimensions</para>
+    <orderedlist>
+      <listitem>
+        <para> having names I and J, with I ranging over 0 to 99 and J over 0 to 199, and</para>
+      </listitem>
+      <listitem>
+        <para> broken into<emphasis> chunks</emphasis> of size 10x20</para>
+      </listitem>
+    </orderedlist>
+    <para> The array&apos;s cells contain a pair of attribute values, A and B, having types int32 and float.<programlisting>CREATE ARRAY Example_Four &lt;A:int32, B:float&gt; [I=0:99,10,0, J=0:199,20,0];</programlisting></para>
+    <para><emphasis> Example Four:</emphasis></para>
+    <para> The following is a 2-dimensional array with dimensions</para>
+    <orderedlist>
+      <listitem>
+        <para> having names I and J, with I ranging over 0 to 9 and J over 0 to 9, and</para>
+      </listitem>
+      <listitem>
+        <para> fitting into a single<emphasis> chunk</emphasis> of size 10x10</para>
+      </listitem>
+    </orderedlist>
+    <para> Our example has two attributes, A and B, having types int32 and double.<programlisting>CREATE ARRAY Example_Five &lt; A: int32, B: double &gt; [ I=0:9,10,0, J=0:9,10,0 ]</programlisting></para>
+  </sect1>
+  <sect1 remap="h2" xml:id="show">
+    <title>show</title>
+    <para><emphasis role="bold"> Summary:</emphasis> The show operator can be used to review the schema of an array that is stored within SciDB.</para>
+    <para><emphasis role="bold"> Signature</emphasis>:<programlisting>show( array )
+</programlisting></para>
+    <para><emphasis role="bold"> Example</emphasis>:<programlisting>create empty array A &lt;a:int32&gt; [x=0:2,3,0];
+show(A);
+
+[(&quot;A&lt;a:int32 NOT NULL,empty_indicator:indicator NOT NULL&gt; [x=0:2,3,0]&quot;)]</programlisting></para>
+  </sect1>
+  <sect1 remap="h2" xml:id="Emptyarrays">
+    <title>Empty arrays</title>
+    <para> The EMPTY keyword in the CREATE statement indicates that some cells may be absent.<programlisting>CREATE EMPTY ARRAY A_10 &lt;x:double null, y:double null&gt;[i=1:10,5,0]</programlisting></para>
+    <para>Note that EMPTY is fundamentally different than NULL. EMPTY is a property of an entire cell and indicates that the entire cell has been omitted, i.e. is not present. In contrast, NULL is a property of a cell value. A cell that contains one or more null values is not considered empty.</para>
+    <para>If the array is not designated EMPTY at creation time, then unspecified cells within existing chunks assume the default value (which in the current version is 0 for numerical attributes and empty string for string and character attributes). However, chunks that are missing entirely are always treated as regions of empty cells.</para>
+  </sect1>
+  <sect1 remap="h2" xml:id="Dimensions">
+    <title>Dimensions</title>
+    <sect2 remap="h3" xml:id="Unboundeddimensions">
+      <title>Unbounded Dimensions</title>
+      <para> An array dimension can be created as an unbounded dimension by declaring the high boundary as open using &apos;*&apos;. Examples of unbounded dimensions include<emphasis> I=0:*,10,0</emphasis> or<emphasis> J=-7:*,100,0.</emphasis> In the first example,<emphasis> I</emphasis> has a low boundary of 0 and an open high boundary and<emphasis> J</emphasis> has a low boundary of -7 and an open high boundary.</para>
+      <para> A regular array does not allow chunks to be loaded into chunk addresses that fall outside the region defined by the create array definition. However, with an array having unbounded dimensions, chunks can be incrementally loaded into the array into new chunks of the array and there is no limit on the array dimensions, other than storage resources available in the system. The array boundaries are dynamically updated as new data is added to it.<programlisting>CREATE ARRAY open_array &lt;a:int64&gt;[x=0:*,5,0];</programlisting></para>
+      <para> An example of incremental loading into an unbounded array is described in the<emphasis> load</emphasis> section. Loading data into an unbounded array causes new array versions to be created.</para>
+    </sect2>
+    <sect2 remap="h3" xml:id="Non-integerdimensionsandMappingarrays">
+      <title> noninteger dimensions and Mapping arrays</title>
+      <para> Regular arrays in SciDB use the int64 data type for dimensions. SciDB also supports arrays with noninteger dimensions. These arrays map dimension<emphasis> values</emphasis> of a declared type to an internal int64 array<emphasis> position</emphasis>. Mapping is done through special mapping arrays internal to SciDB.</para>
+      <para> Below is an example of an array with a noninteger dimension:<programlisting>CREATE ARRAY non_int_array &lt;a:int64&gt;[ID(string)=10,5,0];</programlisting></para>
+      <para> This command will create an array with a noninteger dimension, named ID, that has 10 unique string dimension values mapped internally to positions 0,.., 9, and uses chunks of 5 elements each, with no overlap.</para>
+      <para> The most common way to store data into such an array is to use redimension_store. This AFL command is described in detail in a later chapter.</para>
+      <para> However, any output array that has a schema compatible with this array can be stored into it.<programlisting>CREATE ARRAY another_non_int_array &lt;a:int64&gt;[ID(string)=10,5,0];
+
+store(another_non_int_array,non_int_array);</programlisting></para>
+      <para>SciDB stores the mapping from value to position for these special arrays (with noninteger dimensions) using a mapping array. The name of the mapping array is &quot;array@version:dimname&quot;. This mapping array is used by SciDB array operators to translate from dimension value to an integer dimension position in the array. The mapping array is fully replicated at every instance in a cluster SciDB configuration.</para>
+      <para> For example, when data is stored into the above array, we see the following new mapping array created for it. This array maps each string<emphasis> identifier</emphasis> to a corresponding integer array<emphasis> position.</emphasis><programlisting>show(&quot;non_int_array@1:ID&quot;);
+
+[(&quot;non_int_array@1:ID&lt;value:string NOT NULL&gt; [no=0:9,10,0]&quot;)]</programlisting></para>
+      <para>If the base array is created as a standard versioned array, the corresponding mapping arrays are also versioned. Hence, the mapping array shown above corresponds to array version 1, and array version 2 of<emphasis> non_int_array</emphasis> has mapping array<emphasis> non_int_array@2:ID</emphasis> .</para>
+    </sect2>
+  </sect1>
+  <sect1 remap="h2" xml:id="remove">
+    <sect1info>
+      <subtitle id="afl_remove">
+        <function>remove</function>
+      </subtitle>
+    </sect1info>
+    <title>remove</title>
+    <para><emphasis role="bold"> Summary</emphasis>: Remove an array from a SciDB instance</para>
+    <para><emphasis role="bold"> Syntax</emphasis>: </para>
+    <para><literal>remove(</literal><emphasis>array_name</emphasis>);</para>
+    <para> The remove command removes a SciDB array and all of its versions from the SciDB namespace. The remove operation is preserved even if there is an instance failure. This means that if a remove operation throws an error, the array will still be removed.</para>
+  </sect1>
+</chapter>

@@ -74,7 +74,7 @@ void DeltaVersionControl::getVersion(Chunk& dst, ConstChunk const& src, VersionI
     
 	if (block.isMaterialized(version)) {
 		uint64_t size = block.chunkSize(version);
-		dst.reallocate(size);
+		dst.allocate(size);
 		memcpy(dst.getData(), block.chunkData(version), size);
 	}
 	else
@@ -97,7 +97,7 @@ void DeltaVersionControl::getVersion(Chunk& dst, ConstChunk const& src, VersionI
 			deltas[0]->pushDelta(*deltas[i]);
 		}
 
-		dst.reallocate( block.chunkSize(block.versionAtIndex(0)) );
+		dst.allocate( block.chunkSize(block.versionAtIndex(0)) );
 		deltas[0]->applyDelta(src, dst);
 	}
 }
@@ -118,10 +118,10 @@ bool DeltaVersionControl::newVersion(Chunk& dst, ConstChunk const& src, VersionI
     dstChunk.allocate(dst.getSize());
     memcpy(dstChunk.getData(), dst.getData(), dst.getSize());
     dstChunk.initialize(dst);
+    currLatestVersion.initialize(dst);
 
 #ifdef SCIDB_FORWARD_DELTAS
     DeltaVersionControl::getVersion(currLatestVersion, dstChunk, block.versionAtIndex(targetVer - 1));
-    currLatestVersion.initialize(dst);
         
     ChunkDelta delta(currLatestVersion, src);
     if (!delta.isValidDelta() || delta.getSize() > src.getSize()) {
@@ -133,7 +133,6 @@ bool DeltaVersionControl::newVersion(Chunk& dst, ConstChunk const& src, VersionI
     return true;
 #else // #ifdef SCIDB_FORWARD_DELTAS
     DeltaVersionControl::getVersion(currLatestVersion, dstChunk, block.versionAtIndex(0));
-    currLatestVersion.initialize(dst);
     
     ChunkDelta delta(src, currLatestVersion);
     if (!delta.isValidDelta() || delta.getSize() > src.getSize()) {
@@ -170,7 +169,7 @@ bool DeltaVersionControl::newVersion(Chunk& dst, ConstChunk const& src, VersionI
     // Note that it's illegal to reallocate dst while it's used by block, so
     // we can't use block after this point.
     // Should probably enforce this with scoping...
-    dst.reallocate(newDst.getSize());
+    dst.allocate(newDst.getSize());
     memcpy(dst.getData(), newDst.getData(), newDst.getSize());
     
     return true;

@@ -54,8 +54,6 @@ public:
 
         for (size_t i = 0, n = dims.size(); i < n; i++)
         {
-            if (dims[i].getLength() == INFINITE_LENGTH)
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_TRANSPOSE_ERROR1);
             transDims[n-i-1] = dims[i];
         }
 

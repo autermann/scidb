@@ -7,14 +7,14 @@ SCIDB QUERY : <store(build(A,x+10),A)>
 SCIDB QUERY : <create empty array B <x:int64> [a=0:15,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create empty array C <x:int64> [a=0:15,2,2]>
+SCIDB QUERY : <create empty array C <x:int64> [a=0:15,2,1]>
 Query was executed successfully
 
 SCIDB QUERY : <redimension_store(A,B)>
-[An error expected at this place for the query "redimension_store(A,B)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR3.]
+{8}[(),(),(0),(1),(2),()]
 
 SCIDB QUERY : <redimension_store(A,C)>
-[An error expected at this place for the query "redimension_store(A,C)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR3.]
+{8}[(),(),(0),(1),(2),()]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

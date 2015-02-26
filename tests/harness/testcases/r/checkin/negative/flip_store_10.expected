@@ -20,16 +20,16 @@ SCIDB QUERY : <list()>
 [("A"),("B"),("T"),("TS")]
 
 SCIDB QUERY : <update B set b = b + '_new' where x=1>
-[An error expected at this place for the query "update B set b = b + '_new' where x=1". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_STORE_ERROR1. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_STORE_ERROR1.]
+[("10",0),("11_new",1),("12",2)]
 
 SCIDB QUERY : <list()>
 [("A"),("B"),("T"),("TS")]
 
 SCIDB QUERY : <redimension_store(B,A)>
-[(0,"10"),(1,"11"),(2,"12")]
+[(0,"10"),(1,"11_new"),(2,"12")]
 
 SCIDB QUERY : <scan(A)>
-[(0,"10"),(1,"11"),(2,"12")]
+[(0,"10"),(1,"11_new"),(2,"12")]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

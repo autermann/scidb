@@ -170,7 +170,7 @@ int SciDBTCExecutor :: parseCommandLine (unsigned int argc, char** argv)
 				);
 
 		desc.add_options()
-			("connect",              po::value<string>(), "Host of one of the cluster nodes. Default is 'localhost'.")
+			("connect",              po::value<string>(), "Host of one of the cluster instances. Default is 'localhost'.")
 			("port",                 po::value<int>(),    "Port for connection. Default is 1239.")
 			("test-file",            po::value<string>(), "Test Case file path.")
 			("sleep",                po::value<int>(),    "Execution is paused after each statement in the test case.")

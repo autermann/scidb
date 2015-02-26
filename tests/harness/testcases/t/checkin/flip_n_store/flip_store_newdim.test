@@ -1,0 +1,29 @@
+--setup
+--start-query-logging
+create immutable array TS <timestamp:datetime, userID:int64, resourceID:int64>[i=1:*,5,0]
+create immutable empty array TS_1 <userID:int64, resourceID:int64>[timestamp(datetime)=*,5,0, eventID=1:1000,1000,0]
+create immutable empty array TS_2 <userID:int64 null, resourceID:int64 null>[timestamp(datetime)=*,5,0]
+create immutable empty array TS_3 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0, eventID=1:1000,1000,0]
+create immutable empty array TS_4 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0]
+load(TS,'../tests/harness/testcases/data/redimension_ts.txt')
+
+--igdata "redimension_store(TS, TS_1)"
+--igdata "redimension_store(TS, TS_2, max(userID) as userID, max(resourceID) as resourceID)"
+--igdata "redimension_store(TS, TS_3)"
+--igdata "redimension_store(TS, TS_4)"
+
+--test
+count(TS)
+count(TS_1)
+count(TS_2)
+count(TS_3)
+count(TS_4)
+
+
+--cleanup
+remove(TS)
+remove(TS_1)
+remove(TS_2)
+remove(TS_3)
+remove(TS_4)
+--stop-query-logging

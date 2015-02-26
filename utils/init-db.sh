@@ -1,15 +1,13 @@
 #!/bin/bash
 #
-#
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2011 SciDB, Inc.
+# Copyright (C) 2008-2012 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# the Free Software Foundation version 3 of the License.
 #
 # SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 # INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
@@ -18,9 +16,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
-#
 # END_COPYRIGHT
 #
+
 #
 # Script for preparing SciDB catalog database 
 #
@@ -104,9 +102,9 @@ function db_init()
     echo "update pg_language set lanpltrusted = true where lanname = 'c'" | psql "$database" || die
     echo "grant usage on language c to $owner;" | psql "$database" || die
     
-    export PGPASSWORD=$password
-    echo metadata $metadata
-    psql -h localhost -f "$metadata" -U "$owner" "$database" || die
+#    export PGPASSWORD=$password
+#    echo metadata $metadata
+#    psql -h localhost -f "$metadata" -U "$owner" "$database" || die
 }
 
 [ "`whoami`" = "postgres" ] || die "You must run this script as owner of PostgreSQL!"

@@ -47,8 +47,6 @@ inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName)
     uint64_t arrayLength = 1;
     for (size_t j = 0; j < dims.size(); j++, i++)
     {
-        if (dims[j].getLength() % dims[j].getChunkInterval() != 0)
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_UNPACK_ERROR1);
         arrayLength *= dims[j].getLength();
         newAttributes[i] = AttributeDesc(i, dims[j].getBaseName(), dims[j].getType(), 0, 0);
     }

@@ -1,0 +1,36 @@
+SCIDB QUERY : <create array Foo<x:double>[i=1:10,10,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(Foo, i + 10), Foo)>
+[(11),(12),(13),(14),(15),(16),(17),(18),(19),(20)]
+
+SCIDB QUERY : <create empty array Foo_Flipped<i:int64>[x(double)=*,10,0]>
+Query was executed successfully
+
+SCIDB QUERY : <redimension_store(Foo, Foo_Flipped)>
+[(1),(2),(3),(4),(5),(6),(7),(8),(9),(10)]
+
+SCIDB QUERY : <subarray(Foo_Flipped, 11, 12)>
+[(1),(2)]
+
+SCIDB QUERY : <store(Foo_Flipped, Foo_Copy)>
+[(1),(2),(3),(4),(5),(6),(7),(8),(9),(10)]
+
+SCIDB QUERY : <subarray(Foo_Copy, 11, 12)>
+[(1),(2)]
+
+SCIDB QUERY : <remove(Foo_Flipped)>
+Query was executed successfully
+
+SCIDB QUERY : <subarray(Foo_Copy, 11, 12)>
+[(1),(2)]
+
+SCIDB QUERY : <remove(Foo_Copy)>
+Query was executed successfully
+
+SCIDB QUERY : <list()>
+[("Foo")]
+
+SCIDB QUERY : <remove(Foo)>
+Query was executed successfully
+

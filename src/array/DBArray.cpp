@@ -39,6 +39,12 @@ namespace scidb
     //
     // DBArray
     //
+    string DBArray::getRealName() const
+    {
+        return SystemCatalog::getInstance()->getArrayDesc(_desc.getId())->getName();
+    }
+            
+
     DBArray::DBArray(const DBArray& other)
     : _desc(other._desc),
       _query(other._query)
@@ -46,36 +52,53 @@ namespace scidb
     }
 
     DBArray::DBArray(ArrayID id, const boost::shared_ptr<Query>& query) 
-    : _desc(SystemCatalog::getInstance()->getArrayDesc(id)),
-      _query(query)
-    {        
+    : _query(query)
+    {
+        SystemCatalog::getInstance()->getArrayDesc(id, _desc);
+        if (query) { 
+            query->sharedLock(getRealName());
+        }
+    }
+
+    DBArray::DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query) 
+    : 
+    _desc(desc),
+    _query(query)
+    {
+        _desc.setPartitioningSchema(SystemCatalog::getInstance()->getPartitioningSchema(desc.getId()));
+        if (query) { 
+            query->sharedLock(getRealName());
+        }
     }
 
     DBArray::DBArray(std::string const& name, const boost::shared_ptr<Query>& query)
-    : _desc(SystemCatalog::getInstance()->getArrayDesc(SystemCatalog::getInstance()->findArrayByName(name))),
-      _query(query)
-    {        
+    : _query(query)
+    {
+        SystemCatalog::getInstance()->getArrayDesc(name, _desc);
+        if (query) { 
+            query->sharedLock(name);
+        }
     }
     
     std::string const& DBArray::getName() const
     {
-        return _desc->getName();
+        return _desc.getName();
     }
 
     ArrayID DBArray::getHandle() const
     {
-        return _desc->getId();
+        return _desc.getId();
     }
 
     ArrayDesc const& DBArray::getArrayDesc() const
     {
-        return *_desc;
+        return _desc;
     }
 
     boost::shared_ptr<ArrayIterator> DBArray::getIterator(AttributeID attId)
     {
        boost::shared_ptr<Query> query(_query.lock());
-       return StorageManager::getInstance().getArrayIterator(*_desc, attId, query);
+       return StorageManager::getInstance().getArrayIterator(_desc, attId, query);
     }
 
     boost::shared_ptr<ConstArrayIterator> DBArray::getConstIterator(AttributeID attId) const

@@ -1,0 +1,40 @@
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+[[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)]]
+
+[[(1),(2),(3)],[(2),(3),(4)]]
+
+[("0z",1),("1z",2),("2z",3),("3z",4),("4z",5)]
+
+[[("00",1),("01",2),("02",3)],[("10",2),("11",3),("12",4)],[("20",3),("21",4),("22",5)]]
+
+[[("00",1)],[("10",2)],[("20",3)]];[[("01",2)],[("11",3)],[("21",4)]];[[("02",3)],[("12",4)],[("22",5)]]
+
+[[(0),(1),(2)],[(0),(1),(2)],[(0),(1),(2)]]
+
+[[(1),(2)],[(2),(3)],[(3),(4)]]
+
+[("0z",1),("1z",2),("2z",3),("3z",4),("4z",5)]
+
+[[("00",1),("10",2),("20",3)],[("01",2),("11",3),("21",4)],[("02",3),("12",4),("22",5)]]
+
+[[("00",1),("10",2),("20",3)],[("01",2),("11",3),("21",4)],[("02",3),("12",4),("22",5)]]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

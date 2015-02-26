@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MYDIR=`dirname $0`
-NUM_NODES=4 #including coordinator
+NUM_INSTANCES=4 #including coordinator
 DB_NAME="mydb"
 	
 check_exit_status()
@@ -16,7 +16,7 @@ launch_db()
 {
 	pushd ../basic > /dev/null
 	check_exit_status $?
-	./runN.py $NUM_NODES $DB_NAME init,start > /dev/null
+	./runN.py $NUM_INSTANCES $DB_NAME init,start > /dev/null
 	check_exit_status $?
 	popd > /dev/null
 }
@@ -33,34 +33,34 @@ fi
 
 rm -f distrotest.out
 
-iquery -a -q "apply(tbt,nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(tbt,instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
-iquery -a -q "apply(sg(tbt,1,-1,foo,0,1,0,2,2),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(tbt,1,-1,foo,0,1,0,2,2),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
-iquery -a -q "apply(sg(tbt,1,-1,foo,0,0,1,2,2),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(tbt,1,-1,foo,0,0,1,2,2),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
-iquery -a -q "apply(sg(tbt,1,-1,foo,0,1,1,2,2),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(tbt,1,-1,foo,0,1,1,2,2),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
-iquery -a -q "apply(sg(fbf,1,-1,foo,0,0,0,4,4),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(fbf,1,-1,foo,0,0,0,4,4),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 #does nothing (vector smaller than chunk size)
-iquery -a -q "apply(sg(fbf,1,-1,foo,0,1,1,4,4),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(fbf,1,-1,foo,0,1,1,4,4),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
 #same as vector (2,0)
-iquery -a -q "apply(sg(fbf,1,-1,foo,0,2,1,4,4),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(fbf,1,-1,foo,0,2,1,4,4),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
-iquery -a -q "apply(sg(fbf,1,-1,foo,0,2,0,4,4),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(fbf,1,-1,foo,0,2,0,4,4),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
 #equiv
-iquery -a -q "apply(sg(fbf,1,-1,foo,0,-2,-2,4,4),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(fbf,1,-1,foo,0,-2,-2,4,4),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
-iquery -a -q "apply(sg(fbf,1,-1,foo,0,2, 2,4,4),nodeid,nodeid())" >> distrotest.out
+iquery -a -q "apply(sg(fbf,1,-1,foo,0,2, 2,4,4),instanceid,instanceid())" >> distrotest.out
 check_exit_status $?
 
 #proof that join only requires colocation, but not correct distribution

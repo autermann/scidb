@@ -111,6 +111,7 @@ namespace scidb
       end(start + offset + schema.getDimensions()[0].getLength() - 1), 
       tuples(data), chunkSize(schema.getDimensions()[0].getChunkInterval())
     {
+        desc.cutOverlap();
         if (Coordinate(start + tuples.size()) <= end) { 
             end = start + tuples.size() - 1;
         }

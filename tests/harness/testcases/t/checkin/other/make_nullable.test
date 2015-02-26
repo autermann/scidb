@@ -5,13 +5,13 @@ store(build_sparse(foo, x, x%2<>0),foo)
 store(build_sparse(bar, iif(x%3=0,null,x), x%2<>1),bar)
 
 --test
-cast(foo, <val:int64 null, empty_tag:indicator> [x=1:12,3,0])
-cast(foo, <a:int64, empty_tag:indicator> [x=1:12,3,0])
-cast(bar, <a:int64 null, empty_tag:indicator> [x=1:12,3,0])
+cast(foo, empty <val:int64 null> [x=1:12,3,0])
+cast(foo, empty <a:int64> [x=1:12,3,0])
+cast(bar, empty <a:int64 null> [x=1:12,3,0])
 
-sum(cast(foo, <a:int64 null, empty_tag:indicator> [x=1:12,3,0]))
+sum(cast(foo, empty <a:int64 null> [x=1:12,3,0]))
 
-merge(cast(foo, <val:int64 null, empty_tag:indicator> [x=1:12,3,0]),bar)
+merge(cast(foo, empty <val:int64 null> [x=1:12,3,0]),bar)
 
 --cleanup
 remove (foo)

@@ -54,7 +54,7 @@ public:
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psLocalNode);
+        return ArrayDistribution(psLocalInstance);
     }
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
@@ -75,7 +75,7 @@ public:
                 boost::shared_ptr<Query> innerQuery = Query::createDetached();
                 innerQuery->init(INVALID_QUERY_ID-1,
                                  query->mapLogicalToPhysical(query->getCoordinatorID()),
-                                 query->mapLogicalToPhysical(query->getNodeID()),
+                                 query->mapLogicalToPhysical(query->getInstanceID()),
                                  query->getCoordinatorLiveness());
                 innerQuery->queryString = queryString;
 

@@ -54,7 +54,7 @@ std::string SCIDB_BUILD_INFO_STRING(const char* separator)
 {
     return std::string("SciDB version: @CONFIGURE_SCIDB_VERSION@") + separator +
            "Build type: @CONFIGURE_SCIDB_BUILD_TYPE@" + separator +
-           "Copyright (C) 2008-2011 SciDB, Inc.";
+           "Copyright (C) 2008-2012 SciDB, Inc.";
 }
 
 extern const size_t MB = 1024*1024;

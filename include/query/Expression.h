@@ -155,6 +155,17 @@ public:
 
     /**
      * @brief this method is useful for internal using in operators
+     * to perform evaluations of functions.
+     *
+     * @param expression a string with expression that should be compiled
+     * @param names strings with names of variables which are used in expression
+     * @param types a vector of variable types
+     * @param expectedType an expected type of result
+     */
+    void compile(const std::string& expression, std::vector<std::string> names, std::vector<TypeId> types, TypeId expectedType = TID_VOID);
+
+    /**
+     * @brief this method is useful for internal using in operators
      * to prepare constant expression for example for
      * physical operator parameters.
      *
@@ -336,7 +347,7 @@ private:
 public:
 
     /**
-     * Serialize expression into boost::Archive for transfer to remote nodes with
+     * Serialize expression into boost::Archive for transfer to remote instances with
      * physical plan.
      */
     template<class Archive>

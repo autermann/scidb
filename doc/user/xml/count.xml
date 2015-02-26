@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>count</refname>
+    <refpurpose>Count nonempty cells</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> count(<replaceable>array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The count operator counts nonempty cells of the input array. When dimensions are provided they are used to do a group-by and
+a count per resulting group is returned.
+</para>
+    <note>
+      <para>The count operator provides the same functionality as the count aggregate. See the count aggregate  page.</para>
+    </note>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example finds the element count value along the second dimension of a 4<symbol role="symbolfont">&times;</symbol>4 array where some cells are empty.</para>
+      <procedure>
+        <step>
+          <para>Create an array named source_array:<programlisting>CREATE ARRAY source_array&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Store values of 0&ndash;15 in source_array:<programlisting>store(build(source_array,i*4+j),source_array);</programlisting><screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen></para>
+        </step>
+        <step>
+          <para>Use between to create some empty cells in source_array and store the result in count_array:<programlisting>store(between(source_array,1,1,1,2),count_array);</programlisting><screen>[
+[(),(),(),()],
+[(),(5),(6),()],
+[(),(),(),()],
+[(),(),(),()]
+]</screen></para>
+        </step>
+        <step>
+          <para>Find the count of nonempty elements in count_array:<programlisting>count(count_array);</programlisting>This query outputs:<screen>[(2)]</screen></para>
+        </step>
+        <step>
+          <para>Count the nonempty elements along the dimensions of count_array:<programlisting>count(count_array,i);</programlisting><screen>[(0),(2),(0),(0)]</screen><programlisting>count(count_array,j);</programlisting><screen>[(0),(1),(1),(0)]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

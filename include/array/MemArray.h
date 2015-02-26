@@ -270,6 +270,7 @@ namespace scidb
         bool isRLE() const;
         void setSparse(bool sparse);
         void setRLE(bool rle);
+        void fillRLEBitmap();
 
         void initialize(Array const* array, ArrayDesc const* desc, const Address& firstElem, int compressionMethod);
         void initialize(ConstChunk const& srcChunk);
@@ -294,7 +295,7 @@ namespace scidb
         void free();
         Coordinates const& getFirstPosition(bool withOverlap) const;
         Coordinates const& getLastPosition(bool withOverlap) const;
-        boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query>& query, int iterationMode);
+        boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query, int iterationMode);
         boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
         bool pin() const;
         void unPin() const;
@@ -405,6 +406,9 @@ namespace scidb
         Address addr;
         Chunk* currChunk;
         boost::shared_ptr<Array> parent;
+        bool positioned;
+
+        void position();
 
       public:
         void setParentArray(boost::shared_ptr<Array> arr) {
@@ -455,7 +459,7 @@ namespace scidb
          * @param iterationMode bit mask of iteration mode flags
          */
         MemChunkIterator(ArrayDesc const& desc, AttributeID attId, Chunk* dataChunk, Chunk* bitmapChunk,
-                         bool newChunk, int iterationMode, boost::shared_ptr<Query>& query);
+                         bool newChunk, int iterationMode, boost::shared_ptr<Query> const& query);
         virtual ~MemChunkIterator();
 
       protected:
@@ -548,7 +552,7 @@ namespace scidb
          * @param iterationMode bit mask of iteration mode flags
          */
         SparseChunkIterator(ArrayDesc const& desc, AttributeID attId, Chunk* dataChunk, Chunk* bitmapChunk,
-                            bool newChunk, int iterationMode, boost::shared_ptr<Query>& query);
+                            bool newChunk, int iterationMode, boost::shared_ptr<Query> const& query);
         ~SparseChunkIterator();
 
         struct SparseChunkHeader {
@@ -652,6 +656,7 @@ namespace scidb
         Value const& defaultValue;
         position_t tilePos;
         position_t tileSize;
+        bool isEmptyIndicator;
 
         BaseChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, int iterationMode);
         ~BaseChunkIterator();
@@ -712,7 +717,7 @@ namespace scidb
         bool setPosition(Coordinates const& pos);
         boost::shared_ptr<Query> getQuery();
         
-        RLEChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode, boost::shared_ptr<Query>& q);
+        RLEChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode, boost::shared_ptr<Query> const& q);
 
       private:
         position_t getPos() { 
@@ -721,12 +726,15 @@ namespace scidb
 
         ValueMap values;
         Value    trueValue;
+        Value    falseValue;
         Value    tmpValue;
         Value    tileValue;
         shared_ptr<ChunkIterator> emptyChunkIterator; 
         boost::weak_ptr<Query> query;
         RLEPayload payload;
         Chunk* bitmapChunk;
+        RLEPayload::append_iterator appender;
+        position_t prevPos;
     };
 
 }

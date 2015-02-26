@@ -35,7 +35,6 @@ namespace scidb
     const uint64_t RLE_EMPTY_BITMAP_MAGIC = 0xEEEEAAAA00EEBAACLL;
     const uint64_t RLE_PAYLOAD_MAGIC = 0xDDDDAAAA000EAAACLL;
         
-
     bool checkChunkMagic(ConstChunk const& chunk)
     {
         if (chunk.isRLE()) {
@@ -774,9 +773,17 @@ namespace scidb
     bool ConstRLEPayload::iterator::isDefaultValue(Value const& defaultValue)
     {
         assert(!end());
-        return defaultValue.isNull() 
-            ? (_cs->null && defaultValue.getMissingReason() == _cs->valueIndex)
-            : (!_cs->null && _cs->valueIndex == 0);
+        if (defaultValue.isNull()) {
+            return _cs->null && defaultValue.getMissingReason() == _cs->valueIndex;
+        } else if (_cs->null || !_cs->same) { 
+            return false;
+        }
+        size_t index = _cs->valueIndex;
+        size_t valSize;
+        char* data = _payload->getRawVarValue(index, valSize);
+        return _payload->isBoolean
+            ? defaultValue.getBool() == ((*data & (1 << (index&7))) != 0)
+            : defaultValue.size() == valSize && memcmp(data, defaultValue.data(), valSize) == 0;
     }
 
     void ConstRLEPayload::iterator::getItem(Value& item)
@@ -830,6 +837,16 @@ namespace scidb
     // Payload
     //
 
+    void RLEPayload::setVarPart(char const* varData, size_t varSize)
+    {
+        varOffs = data.size();
+        data.resize(varOffs + varSize);
+        memcpy(&data[varOffs], varData, varSize);
+        dataSize = data.size();
+        payload = &data[0];
+        elemSize = 0;
+    }
+
     void RLEPayload::setVarPart(vector<char>& varPart)
     {
         varOffs = data.size();
@@ -877,15 +894,17 @@ namespace scidb
             }
             else
             {
-                assert(val.size() == fixedSize);
-                memcpy(&data[dataSize], val.data(), fixedSize);
+                if (val.size() > elemSize) {
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << val.size() << fixedSize;
+                }
+                memcpy(&data[dataSize], val.data(), val.size());
             }
             dataSize += fixedSize;
         }
         payload = &data[0];
     }
 
-    RLEPayload::RLEPayload(): ConstRLEPayload()
+    RLEPayload::RLEPayload(): ConstRLEPayload(), _valuesCount(0)
     {
     }
 
@@ -1007,6 +1026,7 @@ namespace scidb
         payload = &data[0];
         varOffs = dataSize;
         dataSize += varPart.size();
+        _valuesCount = valueIndex;
     }
 
     RLEPayload::RLEPayload(char* rawData, size_t rawSize, size_t varOffs, size_t elemSize, size_t nElems, bool isBoolean)
@@ -1035,6 +1055,7 @@ namespace scidb
         data.resize(rawSize);
         memcpy(&data[0], rawData, rawSize);
         payload = &data[0];
+        _valuesCount = nElems;
     }
 
     RLEPayload::RLEPayload(const class Type& type): ConstRLEPayload(),
@@ -1099,6 +1120,7 @@ namespace scidb
             } else {
                 data.insert(data.end(), payload.data.begin(), payload.data.end());
                 headItems = dataSize*8;
+                _valuesCount += payload._valuesCount;
             }
             Segment* s = &container[headSegments];
             Segment* end = &container[container.size()];
@@ -1152,6 +1174,7 @@ namespace scidb
         nSegs = container.size();
         rs.pPosition = vEnd - vStart;
         container.push_back(rs);
+        _valuesCount = 2;
         seg = &container[0];
         payload = &data[0];
     }
@@ -1357,6 +1380,7 @@ namespace scidb
             data.insert(data.end(), varPart.begin(), varPart.end());
         }
         dataSize = data.size();
+        _valuesCount = dstValueIndex;
         this->payload = &data[0];
     }
         
@@ -1391,16 +1415,19 @@ namespace scidb
             }
             else
             {
+                if (v.size() > _payload.elemSize) {
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << v.size() << _payload.elemSize;
+                }
                 _payload.container[_nextSeg].valueIndex = _nextValIndex;
                 _payload.data.resize((_nextValIndex + 1) * _payload.elemSize);
-                memcpy( &_payload.data[(_nextValIndex) * _payload.elemSize], v.data(), _payload.elemSize);
+                memcpy(&_payload.data[(_nextValIndex) * _payload.elemSize], v.data(), v.size());
                 _nextValIndex++;
             }
             _nextSeg++;
         }
         else if (!v.isNull())
         {
-            bool valuesEqual = memcmp(&_payload.data[(_nextValIndex-1) * _payload.elemSize], v.data(), _payload.elemSize) == 0;
+            bool valuesEqual = v.size() == _payload.elemSize && memcmp(&_payload.data[(_nextValIndex-1) * _payload.elemSize], v.data(), _payload.elemSize) == 0;
             if (valuesEqual && !_payload.container[_nextSeg-1].same)
             {
                 _payload.container.resize(_nextSeg+1);
@@ -1412,8 +1439,11 @@ namespace scidb
             }
             else if (!valuesEqual)
             {
+                if (v.size() > _payload.elemSize) {
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << v.size() << _payload.elemSize;
+                }
                 _payload.data.resize((_nextValIndex + 1) * _payload.elemSize);
-                memcpy( &_payload.data[(_nextValIndex) * _payload.elemSize], v.data(), _payload.elemSize);
+                memcpy(&_payload.data[(_nextValIndex) * _payload.elemSize], v.data(), _payload.elemSize);
                 _nextValIndex++;
                 if (_payload.container[_nextSeg-1].pPosition == _nextPPos-1)
                 {
@@ -1462,6 +1492,7 @@ namespace scidb
         if (segLength != 0) { 
             result->addSegment(segm);
         }
+        result->_valuesCount = valueIndex;
         result->setVarPart(varPart);
         result->flush(segm.pPosition + segLength);
     }

@@ -42,32 +42,32 @@ namespace scidb
  * @brief Class that examine different cluster's physical resources in runtime
  *
  * Class divided into two parts: 1. public interface, which can be accessed from any part of engine,
- * primarily from operators for calling/obtaining result on caller node. 2. private interface which
- * accessible only from MessageHandleJob object for requesting/collecting result from remote nodes.
+ * primarily from operators for calling/obtaining result on caller instance. 2. private interface which
+ * accessible only from MessageHandleJob object for requesting/collecting result from remote instances.
  *
  */
 class Resources: public Singleton<Resources>
 {
 public:
     /**
-     * @brief Check file existing on all nodes
+     * @brief Check file existing on all instances
      *
      * @param[in] path Path to file
-     * @param[out] nodesMap Map with nodes ids and flags of file existence
+     * @param[out] instancesMap Map with instances ids and flags of file existence
      * @param[in] query Current query context
      */
-    void fileExists(const std::string &path, std::map<NodeID, bool> &nodesMap,
+    void fileExists(const std::string &path, std::map<InstanceID, bool> &instancesMap,
         const boost::shared_ptr<class Query>& query);
 
     /**
-     * @brief Check file existing on single node
+     * @brief Check file existing on single instance
      *
      * @param[in] path Path to file
-     * @param[in] nodeId Node ID
+     * @param[in] instanceId Instance ID
      * @param[in] query Current query context
      * @return true if exists
      */
-    bool fileExists(const std::string &path, NodeID nodeId, const boost::shared_ptr<class Query>& query);
+    bool fileExists(const std::string &path, InstanceID instanceId, const boost::shared_ptr<class Query>& query);
 
 private:
     Resources():
@@ -77,7 +77,7 @@ private:
 
     void handleFileExists(const boost::shared_ptr<class MessageDesc> &messageDesc);
     bool checkFileExists(const std::string &path) const;
-    void markFileExists(uint64_t resourceCollectorId, NodeID nodeId, bool exists);
+    void markFileExists(uint64_t resourceCollectorId, InstanceID instanceId, bool exists);
 
     std::map<uint64_t, class BaseResourcesCollector*> _resourcesCollectors;
 

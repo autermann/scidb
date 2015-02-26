@@ -30,6 +30,7 @@
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "array/DelegateArray.h"
+#include "system/SciDBConfigOptions.h"
 #include "NumericOps.h"
 
 using namespace std;
@@ -95,7 +96,9 @@ class BernoulliArrayIterator : public DelegateArrayIterator
       probability(prob), seed(rndGenSeed), threshold((int)(RAND_MAX*probability)),
       nops(rndGenSeed),
       inputDesc(array.getInputArray()->getArrayDesc()),
-      isPlainArray(inputDesc.getEmptyBitmapAttribute() == NULL && !array.getArrayDesc().getAttributes()[attrID].isNullable())
+      isPlainArray(inputDesc.getEmptyBitmapAttribute() == NULL 
+                   && (Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT) // NULLs are never ignored WITH NEW CHUNK FORMAT
+                       || !array.getArrayDesc().getAttributes()[attrID].isNullable()))
     {
         isNewEmptyIndicator = attrID >= array.getInputArray()->getArrayDesc().getAttributes().size();
         reset();
@@ -146,14 +149,13 @@ class BernoulliArrayIterator : public DelegateArrayIterator
         }
 
         BernoulliChunkIterator(DelegateChunk const* chunk, int iterationMode) 
-        : DelegateChunkIterator(chunk, ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS|ConstChunkIterator::IGNORE_NULL_VALUES),
+        : DelegateChunkIterator(chunk, ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS),
           arrayIterator((BernoulliArrayIterator&)chunk->getArrayIterator()),                
           nops(arrayIterator.nops),
           nextElem(arrayIterator.nextElem),
           lastElem(0)
         {
             setSamplePosition();        
-            hasCurrent = true;
             trueValue.setBool(true);
         }
 
@@ -162,10 +164,11 @@ class BernoulliArrayIterator : public DelegateArrayIterator
             size_t offset = nextElem;
             if (!arrayIterator.isPlainArray) { 
                 offset -= lastElem;
-                while (offset-- != 0) { 
+                while (offset-- != 0 && !inputIterator->end()) { 
                     ++(*inputIterator);
                 }            
                 lastElem = nextElem;
+                hasCurrent = !inputIterator->end();
             } else {
                 Coordinates pos = chunk->getFirstPosition(false);
                 Coordinates const& last = chunk->getLastPosition(false);
@@ -176,10 +179,7 @@ class BernoulliArrayIterator : public DelegateArrayIterator
                     offset /= length;
                 }
                 assert(offset == 0);
-                inputIterator->setPosition(pos);
-            }
-            if (inputIterator->end()) {
-                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+                hasCurrent = inputIterator->setPosition(pos);
             }
         }
         

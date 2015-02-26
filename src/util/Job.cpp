@@ -46,10 +46,10 @@ namespace scidb
 
        if (!_removed) {
             try  {
-                    run();
+                run();
             } catch (Exception const& x) { 
                 _error = x.copy();
-                LOG4CXX_ERROR(logger, "Unhandled exception in job: " << x.what());
+                LOG4CXX_ERROR(logger, "Job::execute: unhandled exception in job: " << x.what());
             } catch (...) {
                 _query.reset();
                 throw;

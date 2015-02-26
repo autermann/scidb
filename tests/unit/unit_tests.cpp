@@ -60,6 +60,7 @@
 #include "query/optimizer/OptUnitTests.h"
 #include "query/AggregateUnitTests.h"
 #include "array/BitmaskUnitTests.h"
+#include "query/AuxUnitTests.h"
 //#include "system/ExceptionUnitTests.h"
 
 using namespace std;
@@ -99,6 +100,7 @@ int main(int argc, char **argv)
         TypeLibrary::registerBuiltInTypes();
         FunctionLibrary::getInstance()->registerBuiltInFunctions();
         initConfig(argc, argv);
+        cfg->setOption(CONFIG_PORT,0);
 
         SystemCatalog* catalog = SystemCatalog::getInstance();
         catalog->connect(cfg->getOption<string>(CONFIG_CATALOG_CONNECTION_STRING));
@@ -107,7 +109,7 @@ int main(int argc, char **argv)
         CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
         runner.addTest(registry.makeTest());
         const bool wasSuccessful = runner.run("", false);
-        return !wasSuccessful;
+        return wasSuccessful ? 0 : 3;
     }
     catch(const std::exception& e)
     {

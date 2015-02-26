@@ -85,6 +85,7 @@ class WindowChunk : public ConstChunk
     std::map<uint64_t, bool> _stateMap;
     std::map<uint64_t, Value> _inputMap;
     bool _iterativeFill;
+    bool _materialized;
 };
 
 class WindowChunkIterator : public ConstChunkIterator

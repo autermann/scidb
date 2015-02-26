@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-# Initialize, start and stop scidb.
-# Supports single instance and cluster configurations.
+# Initialize, start and stop scidb in a cluster.
+#
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
@@ -43,12 +43,12 @@ def usage():
   print "\t Usage: scidb.py <command> <db> [<conffile>]"
   print ""
   print " Use this script to control the initialization, startup and "
-  print " stop of a SciDB compute node. "
+  print " stop of SciDB. "
   print "$ scidb.py <command> <db> <conffile>"
   print ""
   print "Commands:"
   print "   version "
-  print "   initall | startall | stopall | status | dbginfo | dbginfo-lt | version"
+  print "   initall | startall | stopall | status | dbginfo | dbginfo-lt | purge | version"
   sys.exit(2)
 
 # Very basic check.
@@ -73,7 +73,7 @@ if (len(sys.argv) >= 4):
 
 #print configfile, db, cmd
 
-nodeList = []
+srvList = []
 baseDataPath = None
 basePort = 1239
 sshPort = 22
@@ -90,34 +90,35 @@ def parse_global_options(filename):
       #print "Parsing %s section." % (section_name)
       for (key, value) in config.items(section_name):
         d[key] = value
-        # make a node & instance list
-        # node 0 is master
-        # format: node-N=ip, number of worker instances
-        #         (master has an extra instance)
-        if key[0:5] == 'node-' :
-            node = [ int(key[5:]) ]
-            node.extend(value.split(','))
-            #print node
-            node[2] = int(node[2])
-            nodeList.append(node)
+        # make a srv & instance list
+        # srv 0 hosts the coordinator
+        # format: server-N=ip, number of local workers
+        #         (server0 always has a coordinator)
+        if key[0:7] == 'server-' :
+            srv = [ int(key[7:]) ]
+            srv.extend(value.split(','))
+            #print srv
+            srv[2] = int(srv[2])
+            srvList.append(srv)
 
     except:
       print "Unexpected error:", sys.exc_info()[0]
       sys.exit(1)
-    nodeList.sort()
+    srvList.sort()
     d['db_name'] = db
 #    print d
 
-def remove_inst_dir(node, instance, dt): 
+# liid is the local instance id -- coordinator always has liid=0, workers have liid=1, ...,
+def remove_inst_dir(srv, liid, dt): 
 
-  ldir = getInstanceDataPath(node, instance)
+  ldir = getInstanceDataPath(srv, liid)
   bdir = "%s-%s" % (ldir, dt)
   
   try: 
-    print "Move/unlink directory (node %d (%s) instance %d %s -> %s)"%(node[0],node[1],instance,ldir,bdir)
+    print "Move/unlink directory (server %d (%s) local instance %d %s -> %s)"%(srv[0],srv[1],liid,ldir,bdir)
 #    cmdList = ['[ -d', ldir, ' ]', '&&', 'mv', ldir, bdir]
     cmdList = ['mv', ldir, bdir]
-    executeIt(cmdList, node, instance, nocwd=True, useConnstr=False)
+    executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
 
   except Exception, detail: 
     if detail.errno != errno.ENOENT:    
@@ -128,7 +129,7 @@ def remove_inst_dir(node, instance, dt):
   try:
 #    cmdList = ['[ -L', ldir, ' ]', '&&', 'rm', '-f', ldir]
     cmdList = ['rm', '-f', ldir]
-    executeIt(cmdList, node, instance, nocwd=True, useConnstr=False)
+    executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
 
   except Exception, detail: 
     if detail.errno != errno.ENOENT:    
@@ -138,26 +139,26 @@ def remove_inst_dir(node, instance, dt):
 
   return
 
-# get the path for a node (parent) directory
-def getNodeDataPath(node, instance):
+# get the path for a srv (parent) directory
+def getSrvDataPath(srv, liid):
   global baseDataPath
-  return "%s/%03d"%(baseDataPath, node[0])
+  return "%s/%03d"%(baseDataPath, srv[0])
 
 # get the path for a specific instance
-def getInstanceFS(node, instance):
+def getInstanceFS(srv, liid):
   global datadirPrefix
   if (datadirPrefix == None): 
     return ""
-  if (node[0] == 0 and instance == 0): 
+  if (srv[0] == 0 and liid == 0): 
     suffix=""
   else:
-    suffix="%s"%(instance)
+    suffix="%s"%(liid)
   return "%s%s"%(datadirPrefix, suffix)
   
 # get the path for a specific instance
-def getInstanceDataPath(node, instance):
+def getInstanceDataPath(srv, liid):
     global baseDataPath
-    return "%s/%03d/%d"%(baseDataPath, node[0], instance)
+    return "%s/%03d/%d"%(baseDataPath, srv[0], liid)
 
 # Get IP address of an interface
 def get_ip_address(ifname):
@@ -166,7 +167,7 @@ def get_ip_address(ifname):
 
 # Connection string
 def createConnstr(remote=False):
-  connstr="host=" + masterNode[1] + " port=5432 dbname=" + d.get('db_name') + \
+  connstr="host=" + masterSrv[1] + " port=5432 dbname=" + d.get('db_name') + \
       " user=" + d.get('db_user') + " password=" + d.get('db_passwd')
   if remote:
      connstr = "'"+connstr+"'"
@@ -257,12 +258,12 @@ def remote_exec(client, lcmd, auto_close=False, wait=True, tmo=600, read_max=10*
 
 
 
-def sshconnect(node, instance):
+def sshconnect(srv, liid):
   sshc = paramiko.SSHClient()
   sshc.set_missing_host_key_policy(paramiko.AutoAddPolicy())
   try:
-    sshc.connect(node[1],port=sshPort,key_filename=keyFilenameList,timeout=120)
-#  print "Connecting to %s %d" %(node[1], sshPort)
+    sshc.connect(srv[1],port=sshPort,key_filename=keyFilenameList,timeout=120)
+#  print "Connecting to %s %d" %(srv[1], sshPort)
   except paramiko.SSHException, s:
     print "ssh failure: ", s
     raise s
@@ -282,18 +283,18 @@ def print_output():
     return(exit_status) 
 
 # Local/Remote Execution Module
-# by the identity of the node, it decides whether to run locally or remotely
+# by the identity of the srv, it decides whether to run locally or remotely
 # also if supplied with an existing connection, it uses it
-def executeIt(cmdList, node, instance, waitFlag=True, nocwd=False, useConnstr=True, executable=None,
+def executeIt(cmdList, srv, liid, waitFlag=True, nocwd=False, useConnstr=True, executable=None,
               sshc=None, stdoutFile=None, stderrFile=None, useSSH4Local=False, useShell=False):
-#    print " ".join(cmdList), " on ", node," (",instance,")"
-    dataDir = getInstanceDataPath(node,instance)
+    # print " ".join(cmdList), " on ", srv," (",liid,")"
+    dataDir = getInstanceDataPath(srv,liid)
     if nocwd:
        currentDir = None
     else:
        currentDir = dataDir
-
-    if node[0] == 0 and not useSSH4Local :
+    # print currentDir
+    if srv[0] == 0 and not useSSH4Local :
        sout = None
        if stdoutFile != None:
           # print "local - about to open stdoutFile log file:", stdoutFile
@@ -311,7 +312,13 @@ def executeIt(cmdList, node, instance, waitFlag=True, nocwd=False, useConnstr=Tr
        if d.get('malloc_check_'):
          my_env["MALLOC_CHECK_"] = d.get('malloc_check_')
 
+       if (d.get('tcmalloc') in  ['true', 'True', 'on', 'On']): 
+         my_env["LD_LIBRARY_PATH"] = "@CMAKE_INSTALL_PREFIX@/lib:" + my_env["LD_LIBRARY_PATH"]
+         my_env["LD_PRELOAD"] = "libtcmalloc.so"                                              
+         my_env["HEAPPROFILE"] = "/data/heap/heapprof"                                              
+
        try: 
+         # print currentDir, cmdList, sout, executable, useShell
          p = subprocess.Popen(cmdList, env=my_env, cwd=currentDir, stderr=serr, stdout=sout, executable=executable, shell=useShell)
          time.sleep(2)
          if waitFlag:
@@ -324,7 +331,7 @@ def executeIt(cmdList, node, instance, waitFlag=True, nocwd=False, useConnstr=Tr
        # remote execution
        needsClose = False
        if sshc == None:
-         sshc = sshconnect(node, instance)
+         sshc = sshconnect(srv, liid)
          needsClose = True
        if useConnstr:
           cmdList.append('-c')
@@ -341,7 +348,7 @@ def executeIt(cmdList, node, instance, waitFlag=True, nocwd=False, useConnstr=Tr
            cmdString = "cd "+currentDir+";"+(" ".join(cmdList))
        else:
            cmdString = " ".join(cmdList)
-#       print "cmdString: ",cmdString
+       # print "cmdString: ",cmdString
        try:
          remote_exec(sshc, cmdString, wait=waitFlag)
          if needsClose:
@@ -352,24 +359,24 @@ def executeIt(cmdList, node, instance, waitFlag=True, nocwd=False, useConnstr=Tr
 
 
 # Cleanup logs/storage files and initialize storage file.
-def cleanup(node, instance, dt):
+def cleanup(srv, liid, dt):
   print "Cleaning up old logs and storage files."
   logFiles = ['scidb.log', 'init-stdout.log', 'init-stderr.log', 'scidb-stderr.log', 'scidb-stdout.log']
   storageFiles = ['storage.header', 'storage.cfg', 'storage.data1', 'storage.log_1', 'storage.log_2']
   logFiles.extend(storageFiles)
-  logFiles.append(binFile(node,instance))
+  logFiles.append(binFile(srv,liid))
   #print "logFiles",logFiles
-  if node[0] != 0:
-       # remote nodes need ssh connection
-       #print 'opening ssh connection to ', node[1]
+  if srv[0] != 0:
+       # remote srvs need ssh connection
+       #print 'opening ssh connection to ', srv[1]
        sshc = paramiko.SSHClient()
        sshc.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-       sshc.connect(node[1],port=sshPort,key_filename=keyFilenameList, timeout=120)
+       sshc.connect(srv[1],port=sshPort,key_filename=keyFilenameList, timeout=120)
   for f in logFiles:
-       file2del=("%s/%s"%(getInstanceDataPath(node,instance), f))
+       file2del=("%s/%s"%(getInstanceDataPath(srv,liid), f))
        #print "Removing %s"%file2del
-       if node[0] == 0:
-          # master node
+       if srv[0] == 0:
+          # master srv
           try:
               os.remove(file2del)
           except OSError, detail:
@@ -379,102 +386,111 @@ def cleanup(node, instance, dt):
        else :
           # worker nodes
           sshc.exec_command("rm -f %s"%file2del)
-  if node[0] != 0:
+  if srv[0] != 0:
      #print "Closing connection"
      sshc.close()
   try: 
-    remove_inst_dir(node, instance, dt)
+    remove_inst_dir(srv, liid, dt)
   except OSError, detail:
     if detail.errno != errno.ENOENT:
       print "OSError:", detail
       sys.exit(detail.errno)
 
 # named binary
-def binFile(node, instance):
-  return "SciDB-%03d-%d-%04d"%(node[0],instance,basePort+instance)
+def binFile(srv, liid):
+  return "SciDB-%03d-%d-%04d"%(srv[0],liid,basePort+liid)
 
 # create directories and link bin
-def createDirsAndLinks(node, instance):
-  ndir = getNodeDataPath(node,instance)
+def createDirsAndLinks(srv, liid):
+  ndir = getSrvDataPath(srv,liid)
 
   # create the directories for this instance
   cmdList = ['mkdir', '-p', ndir]
-  executeIt(cmdList, node, instance, nocwd=True, useConnstr=False)
+  executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
 
-  ddir = getInstanceFS(node, instance)
-  ldir = getInstanceDataPath(node, instance)
+  ddir = getInstanceFS(srv, liid)
+  ldir = getInstanceDataPath(srv, liid)
 
   # create/link directories and add symlink for executable
   if (ddir != ""): 
 #    cmdList = ['[ ', '-d', ddir, ' ]', '&&', 'ln', '-fs', ddir, ldir]
     cmdList = ['ln', '-fs', ddir, ldir]
-    executeIt(cmdList, node, instance, nocwd=True, useConnstr=False)
+    executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
   
 #    cmdList = ['[ ', '-L', ldir, ' ]', '||', 'mkdir', '-p', ldir]
-#    executeIt(cmdList, node, instance, nocwd=True, useConnstr=False)
+#    executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
   else: 
     cmdList = ['mkdir', '-p', ldir]
-    executeIt(cmdList, node, instance, nocwd=True, useConnstr=False)
+    executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
     
-  relink_binary(node, instance)
+  relink_binary(srv, liid)
 
-def relink_binary(node, instance):
-  cmdList = ['rm', '-f', binFile(node, instance)]
-  executeIt(cmdList, node, instance, useConnstr=False)
-  cmdList = ['ln', '-fs', binpath + "/scidb", binFile(node, instance)]
-  executeIt(cmdList, node, instance, useConnstr=False)
+def relink_binary(srv, liid):
+  cmdList = ['rm', '-f', binFile(srv, liid)]
+  executeIt(cmdList, srv, liid, useConnstr=False)
+  cmdList = ['ln', '-fs', binpath + "/scidb", binFile(srv, liid)]
+  executeIt(cmdList, srv, liid, useConnstr=False)
 
   
 # init the whole database
-# loop through the whole node & instance list and do them all
+# loop through the whole srv & liid list and do them all
 def initAll():
   # Timestamp for backup directory
   now = datetime.datetime.now()
   dt = now.strftime("%Y%m%d-%H%M%S")
   
   
-  for n in nodeList:
+  for n in srvList:
     if n[0]==0:
       #print 'Init master on ', n
       cleanup(n,0,dt)
       init(n,0)
     for i in range(1, n[2]+1):
-    #print 'Register worker node ',n,' instance ',i
+    #print 'Register worker srv ',n,' liid ',i
       cleanup(n,i,dt)
       init(n,i);
 
+def purgeBackupAll():
+  for n in srvList:
+    if n[0] == 0:
+      purgeBackup(n, 0)
+    for i in range(1, n[2]+1):
+      purgeBackup(n, i)
+  
 # Re-init this instance (single/master)
-def init(node, instance):
-  print "init(node %d (%s) instance %d)"%(node[0],node[1],instance)
+def init(srv, liid):
+  print "init(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
   print "Reinitializing and registering local scidb instance/storage.\n"
 
   metadata = d.get('metadata')
 
-  createDirsAndLinks(node, instance)
-  os.chdir(getInstanceDataPath(masterNode,0))
+  createDirsAndLinks(srv, liid)
+  os.chdir(getInstanceDataPath(masterSrv,0))
 
-  if node[0]==0 and instance==0:
+  if srv[0]==0 and liid==0:
      print "sudo privileges are required to configure the postgres database."
      user   = d.get('db_user')
      db     = d.get('db_name')
      passwd = d.get('db_passwd')
      cmdList = ["sudo", "-u", "postgres", binpath + "/init-db.sh",
                 user, db, passwd, metadata]
-     executeIt(cmdList, node, instance, useConnstr=False,
+     executeIt(cmdList, srv, liid, useConnstr=False,
                stdoutFile="init-stdout.log", stderrFile="init-stderr.log")
 
   cmdList = [binpath + "/scidb", "--register"]
 
-  if node[0]==0 and instance==0:
+  if srv[0]==0 and liid==0:
     initFlag = "--initialize"
-    cmdList.extend(["-p", str(basePort+instance), initFlag, "--metadata", metadata])
+    cmdList.extend(["-p", str(basePort+liid), initFlag, "--metadata", metadata])
+  else:
+    cmdList.extend(["-p", str(basePort+liid)])
 
   logconf = d.get('logconf')
-  cmdList.extend(["-i", node[1], #get_ip_address(d.get('interface')),
-                  "-s", getInstanceDataPath(node,instance) + '/storage.cfg',
+  cmdList.extend(["-i", srv[1], #get_ip_address(d.get('interface')),
+                  "-s", getInstanceDataPath(srv,liid) + '/storage.cfg',
                   "-l", logconf])
 
-  if d.get('rle-chunk-format') in ['true', 'True', 'on', 'On']:
+  if d.get('rle-chunk-format') in ['false', 'False', 'off', 'Off']:
      rlechunkClause = "--rle-chunk-format"
      cmdList.extend([rlechunkClause])
 
@@ -486,22 +502,23 @@ def init(node, instance):
      reserveClause = "--chunk-reserve=%s" % d.get('chunk-reserve')
      cmdList.extend([reserveClause])
 
-  executeIt(cmdList, node, instance)
+  executeIt(cmdList, srv, liid,
+            stdoutFile="init-stdout.log", stderrFile="init-stderr.log")
 
 # start the whole database
-# loop through all nodes and instances
+# loop through all srvs and instances
 def startAll():
-    for n in sorted(nodeList):
+    for n in sorted(srvList):
         if n[0]==0:
             #print 'Starting master on ', n
             start(n,0)
         for i in range(1, n[2]+1):
-            #print 'Starting worker node ',n,' instance ',i
+            #print 'Starting worker srv ',n,' liid ',i
             start(n,i)
 
-# Start this instance (single/cluster).
-def start(node, instance):
-  print "start(node %d (%s) instance %d)"%(node[0],node[1],instance)
+# Start this liid (single/cluster).
+def start(srv, liid):
+  print "start(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
   db = d.get('db_name')
   pluginsdir = d.get('pluginsdir')
   logconf = d.get('logconf')
@@ -562,8 +579,8 @@ def start(node, instance):
      threadsClause = threadsClause + " -j %s" % d.get('execution-threads')
 
 # Per instantiation of an operator (only for multi-threaded ops)
-#  if d.get('operator-threads'):
-#     threadsClause = threadsClause + " -x %s" % d.get('operator-threads')
+  if d.get('operator-threads'):
+     threadsClause = threadsClause + " -x %s" % d.get('operator-threads')
 
 # Shared pool
   if d.get('result-prefetch-threads'):
@@ -602,28 +619,49 @@ def start(node, instance):
      memLimit = "--max-memory-limit=%s" % d.get('max-memory-limit')
   else:
      memLimit = ''
-     
-  relink_binary(node, instance)
+
+  if d.get('replication-send-queue-size'):
+     repSendQSize = "--replication-send-queue-size=%s" % d.get('replication-send-queue-size')
+  else:
+     repSendQSize = ''
+
+  if d.get('replication-receive-queue-size'):
+     repRecvQSize = "--replication-receive-queue-size=%s" % d.get('replication-receive-queue-size')
+  else:
+     repRecvQSize = ''
+
+  if d.get('small-memalloc-size'):
+     repSendQSize = "--small-memalloc-size=%s" % d.get('small-memalloc-size')
+  else:
+     repSendQSize = ''
+
+  if d.get('large-memalloc-limit'):
+     repRecvQSize = "--large-memalloc-limit=%s" % d.get('large-memalloc-limit')
+  else:
+     repRecvQSize = ''
+
+  relink_binary(srv, liid)
   print "Starting SciDB server."
-  cmdList = [getInstanceDataPath(node,instance)+'/'+binFile(node, instance),
-             "-i", node[1],
-             "-p", str(basePort+instance),
+  cmdList = [getInstanceDataPath(srv,liid)+'/'+binFile(srv, liid),
+             "-i", srv[1],
+             "-p", str(basePort+liid),
              saveRamClause,  "--merge-sort-buffer", mergeSortClause,
                          "--cache", smgrCacheSize, noWatchDogClause,
              "-k", "-l", logconf, sitClause, wrtClause,
              "--plugins", pluginsdir, repl, tmpPathClause, 
              memArrayClause] + threadsClause.split() + [netbuffClause, plsortClause,
              rlechunkClause, clusterClause, reserveClause, liveness, memLimit,
-             "-s", getInstanceDataPath(node,instance) + '/storage.cfg']
+             repSendQSize, repRecvQSize,
+             "-s", getInstanceDataPath(srv,liid) + '/storage.cfg']
 
-  executeIt(cmdList, node, instance, waitFlag=False,
+  executeIt(cmdList, srv, liid, waitFlag=False,
             stdoutFile="scidb-stdout.log", stderrFile="scidb-stderr.log")
 
 # stop the whole system
-# loop through all nodes and instances, master last
+# loop through all srvs and liids, master last
 def stopAll(force=False):
-    for n in sorted(nodeList, reverse=True):
-        #print 'Stopping worker node ', n, ' Instance', i
+    for n in sorted(srvList, reverse=True):
+        #print 'Stopping worker srv ', n, ' Instance', i
         for i in range(n[2],0,-1):
             stop(n,i,force)
         if n[0] == 0:
@@ -631,30 +669,30 @@ def stopAll(force=False):
             stop(n,0,force)
 
 # Collect debug
-# loop through all nodes and instances, master last
+# loop through all srvs and instances, master last
 def collectDbgAll(mode='full'):
   now = datetime.datetime.now()
   dt = now.strftime("%Y%m%d-%H%M%S")
-  for n in sorted(nodeList, reverse=True):
+  for n in sorted(srvList, reverse=True):
     for i in range(n[2],0,-1):
       collectDbg(n, i, dt, mode)
     if n[0] == 0:
       collectDbg(n, 0, dt, mode)
 
 
-def collectDbg(node, instance, dt, mode='full'): 
+def collectDbg(srv, liid, dt, mode='full'): 
 
   if (mode == 'stacksonly'): 
     filelist='`ls *.log* stack* 2> /dev/null`'
   else: 
     filelist='`ls *.log* core* stack* 2> /dev/null`'
 
-  conn = sshconnect(node, instance)
+  conn = sshconnect(srv, liid)
 
-  # this is called after all other instances.
-  print "collect logs, cores, install files (node %d (%s) instance %d)"%(node[0],node[1],instance)
+  # this is called after all other liids.
+  print "collect logs, cores, install files (srv %d (%s) local instance %d)"%(srv[0],srv[1],liid)
   
-  if (node[0] == 0 and instance == 0): 
+  if (srv[0] == 0 and liid == 0): 
     tgzname = "coord-" + dt + ".tgz"
     instgzname = "install-" + dt + ".tgz"
     allname =  'all-'+dt+'.tar'
@@ -666,10 +704,10 @@ def collectDbg(node, instance, dt, mode='full'):
     cmdList4 = ['tar', 'cvf', allname, dmpfiles]
 
     try:
-      executeIt(cmdList1, node, instance, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null')
-      executeIt(cmdList2, node, instance, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
-      executeIt(cmdList3, node, instance, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
-      executeIt(cmdList4, node, instance, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
+      executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null')
+      executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
+      executeIt(cmdList3, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
+      executeIt(cmdList4, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
 
     except IOError, detail: 
       if detail.errno != errno.ENOENT:
@@ -677,18 +715,18 @@ def collectDbg(node, instance, dt, mode='full'):
         raise
 
   else: 
-    tgzname = "node-" + "%03d" % node[0] + "-" + "%d" % instance + "-" + dt + ".tgz"
+    tgzname = "srv-" + "%03d" % srv[0] + "-" + "%d" % liid + "-" + dt + ".tgz"
     cmdList1 = [binpath + "/" + "scidb_cores"]
     cmdList2 = ["tar", "cvfz", tgzname, filelist]
-    prefix = getInstanceDataPath(node, instance)
+    prefix = getInstanceDataPath(srv, liid)
 
     try:
-      executeIt(cmdList1, node, instance, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
-      executeIt(cmdList2, node, instance, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
+      executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
+      executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null")
       sftp = paramiko.SFTPClient.from_transport(conn.get_transport())
 
       remotep = prefix + "/" + tgzname
-      localp = getInstanceDataPath(masterNode, 0) + "/" + tgzname
+      localp = getInstanceDataPath(masterSrv, 0) + "/" + tgzname
 
       print "Running sftp remote: %s -> local: %s" % (remotep, localp)
       sftp.get(remotep, localp)
@@ -698,25 +736,54 @@ def collectDbg(node, instance, dt, mode='full'):
         raise
   conn.close()
   
-# stop a particular instance
+# stop a particular liid
 # since we use a unique name for each process, use ps to find it and kill it
-# command: kill `ps -eo comm,pid | awk '/baseFile(node,instance)/{print \$2}'`
-def stop(node, instance, force=False):
-  print "stop(node %d (%s) instance %d)"%(node[0],node[1],instance)
+# command: kill `ps -eo comm,pid | awk '/baseFile(srv,liid)/{print \$2}'`
+def stop(srv, liid, force=False):
   if (not force): 
-    cmdList = ['kill','`ps','--no-headers','-o','pid','-C',"%s`"%binFile(node,instance)]
+    print "stop(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
+    cmdList = ['kill','`ps','--no-headers','-o','pid','-C',"%s`"%binFile(srv,liid)]
   else: 
-    cmdList = ['kill','-9','`ps','--no-headers','-o','pid','-C',"%s`"%binFile(node,instance)] 
-  executeIt(cmdList, node, instance, useConnstr=False, useSSH4Local=True, nocwd=True)
+    cmdList = ['kill','-9','`ps','--no-headers','-o','pid','-C',"%s`"%binFile(srv,liid)] 
+  executeIt(cmdList, srv, liid, useConnstr=False, useSSH4Local=True, nocwd=True)
   return
 
-# check the system status. at the moment a trivial view into the postgres Node table.
+# check the system status. at the moment a trivial view into the postgres Srv table.
 def checkSystemStatus():
-  cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select node_id,host,port,online_since from node order by node_id"' % (
+  cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select instance_id,host,port,online_since from instance order by instance_id"' % (
                       d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
-  executeIt(cmdList, masterNode, 0, useConnstr=False, nocwd=True, useShell=True)
+  executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
 
-# check the system status. at the moment a trivial view into the postgres Node table.
+
+def checkLocks():
+  cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select array_name,query_id,instance_id,instance_role,lock_mode from array_version_lock"' % (
+      d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
+  executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
+
+def dumpSyscat():
+#  cmdList = 'select AR.name from \"array\" as AR where not exists (select AD.array_id from array_dimension as AD where AR.name=AD.mapping_array_name) and AR.name like '%:%'" '
+  cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select array_name,query_id,instance_id,instance_role,lock_mode from array_version_lock"' % (
+      d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
+  executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
+
+# s.Popen(cmdList, stdout=open('purge.txt'))
+# Add ts to purge.txt.
+def purgeBackup(srv, inst):
+  if (getSrvDataPath(srv, inst) != ""): 
+    print "purge backups (server %d (%s) local instance %d)" % (srv[0], srv[1], inst)
+    instPrefix = "'%s-*'" % (inst)
+    # Purge all backups more than 2 days old.
+    cmdList = ["find", getSrvDataPath(srv, inst)+"/", "-maxdepth", "1", "-type", "d", "-mtime", "+7", "-name", instPrefix, "-exec", "/bin/rm -rf {} \;", "-print"]
+    print " ".join(cmdList), " on ", srv," (",inst,")"
+    executeIt(cmdList, srv, inst, useConnstr=False, stdoutFile='purge-out.log', nocwd=False, useShell=True, stderrFile='purge-err.log', useSSH4Local=True)
+  
+#def checkArray():
+#  cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select * from array"' % (
+#      d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
+#  executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
+
+
+# check the system status. at the moment a trivial view into the postgres Srv table.
 def checkVersion():
   cmdList = ["scidbconf", '-A' ]
   p = subprocess.Popen(cmdList)
@@ -733,7 +800,7 @@ if __name__ == "__main__":
   datadirPrefix = d.get('data-dir-prefix')
   basePort = int(d.get('base-port'))
 
-  masterNode = nodeList[0]
+  masterSrv = srvList[0]
 
   if d.get('ssh-port'):
      sshPort = int(d.get('ssh-port'))
@@ -746,21 +813,26 @@ if __name__ == "__main__":
   if cmd == "initall":
     initAll()
   elif cmd == "startall":
-    os.chdir(getInstanceDataPath(masterNode,0))
+    os.chdir(getInstanceDataPath(masterSrv,0))
     startAll()
   elif cmd == "stopall":
-    os.chdir(getInstanceDataPath(masterNode,0))
+    os.chdir(getInstanceDataPath(masterSrv,0))
     stopAll()
     time.sleep(5)
     stopAll(force=True)
   elif cmd == "dbginfo":
-    os.chdir(getInstanceDataPath(masterNode,0))
+    os.chdir(getInstanceDataPath(masterSrv,0))
     collectDbgAll()
   elif cmd == "dbginfo-lt":
-    os.chdir(getInstanceDataPath(masterNode,0))
+    os.chdir(getInstanceDataPath(masterSrv,0))
     collectDbgAll(mode='stacksonly')
   elif cmd == "status":
     checkSystemStatus()
+  elif cmd == "purge":
+    purgeBackupAll()
+  elif cmd == "metadata":
+#    checkArray()
+    checkLocks()
   else:
     usage()
 

@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>reshape</refname>
+    <refpurpose>Change dimension sizes and array shape</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> reshape(<replaceable>array</replaceable>,<replaceable>array</replaceable>|<replaceable>anonymous_schema</replaceable>);</synopsis>
+    <synopsis>reshape(<replaceable>array</replaceable>,<replaceable>array</replaceable>|<replaceable>anonymous_schema</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The reshape operator
+changes the shape of an array to the rank and dimensions of a given array or a given array schema. The the reshape command inputs must have the same number of total cells and cell attributes.</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example reshapes a 4<symbol role="symbolfont">&times;</symbol>4 array into a 2<symbol role="symbolfont">&times;</symbol>8 array.</para>
+      <procedure>
+        <step>
+          <para>Create an array called m4x4:<programlisting>CREATE ARRAY m4X4 &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Store values of 0&ndash;15 in m4x4:<programlisting>store(build(m4x4,i*4+j),m4x4);</programlisting>This query outputs:<screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen></para>
+        </step>
+        <step>
+          <para>Reshape m4x4 as 2-by-8:<programlisting>reshape(m4x4,&lt;val:double&gt;[i=0:7,8,0,j=0:1,2,0]);</programlisting>This query returns:<screen>[
+[(0),(1)],
+[(2),(3)],
+[(4),(5)],
+[(6),(7)],
+[(8),(9)],
+[(10),(11)],
+[(12),(13)],
+[(14),(15)]
+]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

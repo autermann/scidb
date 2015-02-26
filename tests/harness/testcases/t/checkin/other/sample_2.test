@@ -1,11 +1,8 @@
 --setup
---start-query-logging
-
 create immutable array A <a:double> [x=0:9,2,0]
 store(build(A,x+1),A)
 
 --test
-
 --error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_SAMPLE_ERROR1 "count(filter(sample(A,0.1,-9),a<>0))"
 --error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_SAMPLE_ERROR2 "count(filter(sample(A,-0.1,9),a<>0))"
 --error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_SAMPLE_ERROR2 "count(filter(sample(A,-0.1),a<>0))"
@@ -14,4 +11,3 @@ store(build(A,x+1),A)
 
 --cleanup
 remove(A)
---stop-query-logging

@@ -1,7 +1,8 @@
 --setup
+--start-query-logging
 
-create empty array ABR1 <a:float,b:float>[x=0:3000,30,0]
-create empty array ABR2 <a:float>[x=0:3000,30,0]
+create empty array ABR1 <a:float,b:float>[x=0:4000,30,0]
+create empty array ABR2 <a:float>[x=0:4000,30,0]
 create empty array ABR3 <x:int64>[a=0:*,30,0, b=0:*,30,0]
 store(join(build_sparse(ABR2, x+2 ,1),build_sparse(ABR2, x+1, 1)),ABR1)
 
@@ -18,6 +19,7 @@ scan(ABR3)
 list('arrays')
 
 --cleanup
+--stop-query-logging
 remove(ABR1)
 remove(ABR2)
 remove(ABR3)

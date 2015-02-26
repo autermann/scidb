@@ -38,6 +38,8 @@ using namespace boost;
 // Logger for operator. static to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.window"));
 
+const size_t MATERIALIZED_WINDOW_THRESHOLD = 1000;
+
 namespace scidb
 {
 
@@ -455,7 +457,8 @@ namespace scidb
       arrSize(_nDims),
       firstPos(_nDims),
       lastPos(_nDims),
-      attrID(attr)
+      attrID(attr),
+      _materialized(false)
     {
         if (arr._desc.getEmptyBitmapAttribute() == 0 || attr!=arr._desc.getEmptyBitmapAttribute()->getId())
         {
@@ -490,13 +493,12 @@ namespace scidb
 
     boost::shared_ptr<ConstChunkIterator> WindowChunk::getConstIterator(int iterationMode) const
     {
+        ConstChunk const& inputChunk = arrayIterator->iterator->getChunk();
         if (array.getArrayDesc().getEmptyBitmapAttribute() && attrID == array.getArrayDesc().getEmptyBitmapAttribute()->getId())
         {
-            return arrayIterator->iterator->getChunk().getConstIterator(iterationMode | ChunkIterator::IGNORE_OVERLAPS);
+            return inputChunk.getConstIterator((iterationMode & ~ChunkIterator::INTENDED_TILE_MODE) | ChunkIterator::IGNORE_OVERLAPS);
         }
-
-        if (array.getArrayDesc().getEmptyBitmapAttribute())
-        {
+        if (_materialized) { 
             return boost::shared_ptr<ConstChunkIterator>(new MaterializedWindowChunkIterator(arrayIterator, this, iterationMode));
         }
 
@@ -535,6 +537,7 @@ namespace scidb
 
     void WindowChunk::materialize()
     {
+        _materialized = true;
         _stateMap.clear();
        _inputMap.clear();
 
@@ -656,15 +659,18 @@ namespace scidb
                 lastPos[i] = dims[i].getEndMax();
             }
         }
-
+        _materialized = false;
         if (_aggregate.get() == 0)
         {
             return;
         }
-
-        if (array._desc.getEmptyBitmapAttribute())
-        {
-            materialize();
+ 
+        if (array._desc.getEmptyBitmapAttribute()) {
+            ConstChunk const& inputChunk = arrayIterator->iterator->getChunk();
+            if (/*!inputChunk.isCountKnown() || */inputChunk.count()*MATERIALIZED_WINDOW_THRESHOLD < inputChunk.getNumberOfElements(false))  
+            {
+                materialize();
+            }
         }
     }
     

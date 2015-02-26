@@ -48,7 +48,7 @@ public:
                              AttributeID attrID,
                              shared_ptr<ConstArrayIterator> inputIterator,
                              PartitioningSchema ps):
-   DelegateArrayIterator(delegate, attrID, inputIterator), _ps(ps), _myNode(query->getNodeID()), _nextChunk(0), _query(query)
+   DelegateArrayIterator(delegate, attrID, inputIterator), _ps(ps), _myInstance(query->getInstanceID()), _nextChunk(0), _query(query)
     {
         findNext();
     }
@@ -62,7 +62,7 @@ public:
         while (!inputIterator->end())
         {
             Coordinates const& pos = inputIterator->getPosition();
-            if (getNodeForChunk(_query, pos, array.getArrayDesc(), _ps, shared_ptr<DistributionMapper>(), 0) == _myNode)
+            if (getInstanceForChunk(_query, pos, array.getArrayDesc(), _ps, shared_ptr<DistributionMapper>(), 0, 0) == _myInstance)
             {
                 _nextChunk = &inputIterator->getChunk();
                 _hasNext = true;
@@ -96,7 +96,7 @@ public:
     bool setPosition(Coordinates const& pos)
     {
         chunkInitialized = false;
-        if (getNodeForChunk(_query, pos, array.getArrayDesc(), _ps, shared_ptr<DistributionMapper>(), 0) == _myNode &&
+        if (getInstanceForChunk(_query, pos, array.getArrayDesc(), _ps, shared_ptr<DistributionMapper>(), 0, 0) == _myInstance &&
             inputIterator->setPosition(pos))
         {
             _nextChunk = &inputIterator->getChunk();
@@ -119,7 +119,7 @@ public:
 private:
     bool _hasNext;
     PartitioningSchema _ps;
-    NodeID _myNode;
+    InstanceID _myInstance;
     ConstChunk const* _nextChunk;
     boost::shared_ptr<Query> _query;
 };

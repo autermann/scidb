@@ -1,4 +1,3 @@
-
 --
 --  BEGIN_COPYRIGHT
 --
@@ -26,7 +25,7 @@ drop table if exists "array" cascade;
 drop table if exists "array_version" cascade;
 drop table if exists "array_version_lock" cascade;
 drop table if exists "array_partition" cascade;
-drop table if exists "node" cascade;
+drop table if exists "instance" cascade;
 drop table if exists "array_attribute" cascade;
 drop table if exists "array_dimension" cascade;
 drop table if exists "cluster" cascade;
@@ -34,7 +33,7 @@ drop table if exists "libraries" cascade;
 
 drop sequence if exists "array_id_seq" cascade;
 drop sequence if exists "partition_id_seq" cascade;
-drop sequence if exists "node_id_seq" cascade;
+drop sequence if exists "instance_id_seq" cascade;
 drop sequence if exists "libraries_id_seq" cascade;
 
 drop function if exists uuid_generate_v1();
@@ -45,14 +44,59 @@ drop function if exists get_cluster_uuid();
 --
 create sequence "array_id_seq";
 create sequence "partition_id_seq";
-create sequence "node_id_seq" minvalue 0 start with 0;
+create sequence "instance_id_seq" minvalue 0 start with 0;
 create sequence "libraries_id_seq";
 
 create table "cluster"
 (
   cluster_uuid uuid
 );
-
+--
+--  Table: "array"  (public.array) List of arrays in the SciDB installation.
+--
+--          Information about all persistent arrays in the SciDB installation 
+--          are recorded in public.array. 
+--
+--   SciDB arrays recorded in public.array come in several forms. 
+--
+--   1. Basic (or persistent) Arrays: Arrays named in CREATE ARRAY statements. 
+--
+--   2. Array Versions: SciDB supports data modification by creating new 
+--      version of basic arrays. Each new version of a Basic array gets its 
+--      own entry in public.array.
+--
+--   3. NID arrays. NID rrays are used to hold the values of non-integer 
+--      dimensions. 
+--
+--   SciDB creates rows in the public.array catalog to record the existance 
+--  of many things; arrays created by users, each version of these arrays, 
+--  and arrays created to hold non-integer dimension values and their 
+--  mappings to array dimension offsets. 
+-- 
+--   public.array.id - unique int64 identifier for the array. This synthetic 
+--            key is used to maintain references within the catalogs, and to 
+--            identify the array within the SciDB engine's own metadata: 
+--            ArrayDesc._id. 
+--
+-- public.array.name - the array's name. If the array is a Basic or persistent 
+--            array the public.array.name reflects the name as it appears in 
+--            the CREATE ARRAY statement. If the entry corresponds to a 
+--            version of an array, then the contents of this field consist of 
+--            the array name plus the version number. If the entry in this 
+--            catalog correspond to an NID then the name consists of the base 
+--            array name, the version number, and the name of the array's 
+--            dimension. 
+--
+--public.array.partitiong_scheme - SciDB supports several partitioning schemes. 
+--
+--                     0. Replication of the array's contents on all instances. 
+--                     1. Round Robin allocation of chunks to instances. 
+--
+-- public.array.flags - records details about the array's status. 
+--
+-- public.array.comment - comment on the array. 
+-- 
+-- 
 create table "array"
 (
   id bigint primary key default nextval('array_id_seq'),
@@ -61,7 +105,27 @@ create table "array"
   flags integer,
   comment varchar
 );
-
+--
+--   Table: public.array_version
+--
+--      Information about array versions, their relationship to the Basic 
+--   arrays and the entries in the public.array table, and their creation 
+--   timestamps. 
+--
+--  public.array_version.array_id - reference back to the entry in the 
+--                                  public.array.id column that corresponds 
+--                                  to the Basic array. 
+--
+--  public.array_version.version_id - the (sequential) number of the version. 
+--
+--  public.array_version.version_array_id - reference back to the entry in the 
+--                  public.array.id column that identifies the Versioned Array. 
+--
+--  public.array_version.time_stamp - timestamp (in seconds since epoch) at 
+--                  which the version was created. 
+--
+--  PGB: I worry that time-to-the-second might not be sufficient precision. 
+--  
 create table "array_version"
 (
    array_id bigint references "array" (id) on delete cascade,
@@ -71,36 +135,98 @@ create table "array_version"
    primary key(array_id, time_stamp, version_id),
    unique(array_id, version_id)
 );
-
+--
+--  Table: public.array_version_lock 
+--
+--    Information about the locks held by currently running queries. 
+--  
 create table "array_version_lock"
 (
    array_name varchar,
    array_id bigint,
    query_id bigint,
-   node_id bigint,
+   instance_id bigint,
    array_version_id bigint,
    array_version bigint,
-   node_role integer, -- 0-invalid, 1-coordinator, 2-worker
+   instance_role integer, -- 0-invalid, 1-coordinator, 2-worker
    lock_mode integer, -- {0=invalid, read, write, remove, renameto, renamefrom}
-   unique(array_name, query_id, node_id)
+   unique(array_name, query_id, instance_id)
 );
-
-create table "node"
+--
+--  Table: public.instance 
+--
+--    Information about the SciDB instances that are part of this installation.
+--
+create table "instance"
 (
-  node_id bigint primary key default nextval('node_id_seq'),
+  instance_id bigint primary key default nextval('instance_id_seq'),
   host varchar,
   port integer,
   online_since timestamp
 );
-
+--
+--  Table: public.array_partition 
+--
+--    Information about the way arrays are mapped to instances. 
+--
+--    NOTE: Currently unused. 
+--
 create table "array_partition"
 (
   partition_id bigint primary key default nextval('partition_id_seq'),
   array_id bigint references "array" (id) on delete cascade,
   partition_function varchar,
-  node_id integer references "node" (node_id) on delete cascade
+  instance_id integer references "instance" (instance_id) on delete cascade
 );
-
+--
+--  Table: public.array_attribute
+--
+--     Information about each array's attributes. 
+--
+--  public.array_attribute.array_id - reference to the entry in the 
+--          public.array catalog containing details about the array to which 
+--          this attribute belongs. 
+--
+--          Each new array version creates an entirely new set of entries in 
+--          the public.array_attribute and the public.array_dimension catalogs. 
+--
+--  public.array_attribute.id - defines the order of the attribute within the 
+--                              array. 
+--
+--  public.array_attribute.name - name of the attribute as it appears in the 
+--           CREATE ARRAY ... statement. 
+--
+--  public.array_attribute.type - data type of the attribute. Note that the 
+--           types are not recorded in the catalogs, but instead are named 
+--           when the types are loaded into each instance. The idea is that 
+--           using integer identifiers would make it hard to disentangle 
+--           changes in type implementation.
+--
+--  public.array_attribute.flags - information about the attribute. 
+--
+--  public.array_attribute.default_compression_method - compression method 
+--            used on the attribute's chunks. 
+--
+--  public.array_attribute.reserve - SciDB organizes attribute data into 
+--            chunks, which are the physical unit of storage and 
+--            inter-instance communication. To support modifications to the 
+--            array each chunk reserves a block of memory to hold backwards 
+--            deltas that can be applied to the chunk's contents to recover 
+--            previous versions. The value in this column reflects the 
+--            percentage of the chunk which is set aside (reserved) to hold 
+--            deltas. 
+--
+-- public.array_attribute.default_missing_reason - if the attribute has a 
+--            DEFAULT with a missing code, the missing code is recorded here. 
+--            If the attribute has no default missing code (and by default, 
+--            SciDB array attributes are prevented from having missing codes). 
+--
+-- public.array_attribute.default_value - if the attribute has a DEFAULT value,
+--            the default value is recorded here. When a DEFAULT value is 
+--            calculated from an expression, the expression is placed here. 
+--
+-- public.array_attribute.comment - comment on the attribute. 
+--
 create table "array_attribute"
 (
   array_id bigint references "array" (id) on delete cascade,
@@ -116,7 +242,98 @@ create table "array_attribute"
   primary key(array_id, id),
   unique ( array_id, name )
 );
-
+--
+-- Table: public.array_dimension 
+--
+--    Information about array dimensions.
+--
+--  Array dimensions come in three forms. 
+--
+--  1. There are integer (whole number) dimensions that correspond to the 
+--     simplest and most basic arrays. 
+--
+--  2. There are non-integer dimensions where the values that make up the 
+--     collection of labels on the dimension are organized into an array. 
+--
+--  3. There are non-integer dimensions where a pair of functions are used 
+--     to map from the dimension's type to int64 values, and vice-versa. 
+--
+--  public.array_dimension.array_id - reference to the entry in the
+--                          public.array catalog containing details about
+--                          the array to which this dimension belongs.
+--
+--                           Each new array version creates an entirely new
+--                          set of entries in the public.array_attribute and
+--                          the public.array_dimension catalogs.
+--
+--  public.array_dimension.id - order of the dimension within the array's 
+--                              shape. The combination of the array id and
+--                              this id make up the key of this catalog. 
+--
+--  public.array_dimension.name - the name of the array dimension.
+--
+--  public.array_dimension.startMin
+--                        .currStart
+--                        .currEnd
+--                        .endMax
+--
+--     Regardless of the data types used in the dimension, all array
+--   dimensions have an extent defined in terms of the integer offsets into 
+--   the dimension space. Generally, array dimensions have an initial offset 
+--   of zero (0), but then some maximum length (say 100). Now, it is also true 
+--   that when they are declared, array dimensions can be given proscribed 
+--   limits. For example, we can declare that an array can only be 200 long 
+--   on some dimension. Also, arrays can be unbounded in their declaration, 
+--   but in practice can currently have only a current length. 
+--
+--    These four columns of the public.array_dimension catalog record the 
+--   minimum legal start value, the current start value, the current end value 
+--   and the maximum end value for the dimension. The dimension's length is 
+--   currEnd - currStart. 
+--
+--  public.array_dimension.funcMapOffset - when we use operators to change the 
+--               shape of an array, we want to avoid copying the data in the 
+--               NID array, and we want t understand how to scale arrays 
+--               that use a functional mapping. When we use an operator like 
+--               subarray ( A, start, end ), we store the value of 'start' 
+--               (or rather, the value of the integer offset in the dimension
+--               corresponding to the 'start' value) in this column. 
+--   
+--  public.array_dimension.funcMapScale - when we use operators to change 
+--               the shape of the array, we want to avoid copying data in the 
+--               NID arrays. Operators like thin() pick values from their 
+--               source array at intervals to construct their output 
+--               array. This funcMapScale-the step length in thin()-is 
+--               stored here. 
+--
+--  public.array_dimension.chunk_interval - length of the chunks in this 
+--               dimension. 
+-- 
+--  public.array_dimension.chunk_overlap  - overlap of the chunks in this 
+--               dimension. 
+--
+--  public.array_dimension.type - name of the data type for the dimension, if 
+--               the dimension is declared as a non-integer type. 
+--
+--   NID belong to one of two types. Either the values of the dimension's type 
+--  are converted to an integer with a function, or else the values of the type
+--  in the NID are mapped to the underlying integer offset using a mapping 
+--  array. 
+-- 
+--  public.array_dimension.flags - flag describing the properties of the 
+--                                 dimension. 
+--
+--  public.array_dimension.mapping_array_name - If this dimension has an NID 
+--               array, the mapping_array_name field of the catalog contains 
+--               the name of the array containing the NID data. These NID 
+--               arrays have a single dimension named "no".
+--
+--  public.array_dimension.comment - comment on the dimension.
+--
+-- PGB: There's a small problem here. If a user starts with an NID that uses a 
+--      mapping array, and then adds functions to convert between instances of
+--      that type and the int64, there's a potential for problems. 
+--
 create table "array_dimension"
 (
   array_id bigint references "array" (id) on delete cascade,
@@ -126,21 +343,20 @@ create table "array_dimension"
   currStart bigint,
   currEnd bigint,
   endMax bigint,
+  funcMapOffset bigint,
+  funcMapScale bigint,
 --
--- PGB: Changed from.
--- start bigint,  - this is currMin
--- length bigint, - this is currMax - currMin
-
   chunk_interval int,
   chunk_overlap int,
   type varchar,
-  source_array_name varchar,
+  flags int,
+  mapping_array_name varchar,
   comment varchar,
   primary key(array_id, id),
   unique ( array_id, name )
 );
 --
--- Triggers to ensure that, for a given array, the list of the names of the
+--  Triggers to ensure that, for a given array, the list of the names of the
 -- array's attributes and dimensions is unique. That is, that attribute
 -- names are not repeated, that dimension names are not repeated, and
 -- that no array has an attrinute name that is also a dimension name.

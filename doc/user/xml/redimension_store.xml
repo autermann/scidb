@@ -1,0 +1,80 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>redimension_store</refname>
+    <refpurpose>Transform attributes to dimensions</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis>AFL% redimension_store(<replaceable>source_array</replaceable>,<replaceable>named_target_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>redimension_store  converts array attributes to dimensions. The redimension_store operator updates the target_array  and creates additional mapping arrays if necessary. The argument <replaceable>named_target_array</replaceable> must be an array that was previously created and stored in the SciDB namespace.</para>
+    <para>You can
+redimension the array and apply aggregates to duplicate cells.
+
+</para>
+    <para>The input and target arrays must have compatible schemas, and both commands determine the list of
+transformations (attribute to dimension) by matching names in the attribute and dimension lists of the two
+arrays.</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example redimensions a 2-attribute, 1-dimensional array into a 2-dimensional, 1-attribute array. This example uses the data set device_trial.txt, shown here:<programlisting>s,p,val
+&quot;device-0&quot;,&quot;trial-0&quot;,0.01
+&quot;device-1&quot;,&quot;trial-0&quot;,2.04
+&quot;device-2&quot;,&quot;trial-0&quot;,6.09
+&quot;device-3&quot;,&quot;trial-0&quot;,12.16
+&quot;device-4&quot;,&quot;trial-0&quot;,20.25
+&quot;device-0&quot;,&quot;trial-1&quot;,30.36
+&quot;device-1&quot;,&quot;trial-1&quot;,42.49
+&quot;device-2&quot;,&quot;trial-1&quot;,56.64
+&quot;device-3&quot;,&quot;trial-1&quot;,72.81
+&quot;device-4&quot;,&quot;trial-1&quot;,91
+&quot;device-0&quot;,&quot;trial-2&quot;,111.21
+&quot;device-1&quot;,&quot;trial-2&quot;,133.44
+&quot;device-2&quot;,&quot;trial-2&quot;,157.69
+&quot;device-3&quot;,&quot;trial-2&quot;,183.96
+&quot;device-4&quot;,&quot;trial-2&quot;,212.25
+&quot;device-0&quot;,&quot;trial-3&quot;,242.56
+&quot;device-1&quot;,&quot;trial-3&quot;,274.89
+&quot;device-2&quot;,&quot;trial-3&quot;,309.24
+&quot;device-3&quot;,&quot;trial-3&quot;,345.61
+&quot;device-4&quot;,&quot;trial-3&quot;,384
+&quot;device-0&quot;,&quot;trial-4&quot;,424.41
+&quot;device-1&quot;,&quot;trial-4&quot;,466.84
+&quot;device-2&quot;,&quot;trial-4&quot;,511.29
+&quot;device-3&quot;,&quot;trial-4&quot;,557.76
+&quot;device-4&quot;,&quot;trial-4&quot;,606.25</programlisting></para>
+      <procedure>
+        <step>
+          <para>Create an array named device_trial, with one cell for every row in device_trial.txt<programlisting>CREATE ARRAY device_trial
+&lt;s:string,p:string,val:double&gt; 
+[i=1:25,5,0]</programlisting></para>
+        </step>
+        <step>
+          <para>Convert the file device_trial.txt to SciDB format. You will need to exit your iquery session or do this in a new terminal window because the csv2scidb tool is run at the command line.<programlisting>csv2scidb -p SSN -s N &lt; device_trial.txt &gt; device_trial.scidb</programlisting></para>
+        </step>
+        <step>
+          <para>Load the data device_trial.scidb into device_trial:<programlisting>LOAD device_trial FROM &apos;/doc/examples/device_trial.scidb&apos;;</programlisting></para>
+        </step>
+        <step>
+          <para>Create an array with a noninteger dimension to be the redimension target:<programlisting>CREATE ARRAY Dsp
+&lt;val:double&gt;
+[s(string)=5,5,0, p(string)=5,5,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Redimension device_trial and store the result in  Dsp:<programlisting>redimension_store(device_trial, Dsp);</programlisting>This query returns:<screen>[
+[(0.01),(30.36),(111.21),(242.56),(424.41)],
+[(2.04),(42.49),(133.44),(274.89),(466.84)],
+[(6.09),(56.64),(157.69),(309.24),(511.29)],
+[(12.16),(72.81),(183.96),(345.61),(557.76)],
+[(20.25),(91),(212.25),(384),(606.25)]
+]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

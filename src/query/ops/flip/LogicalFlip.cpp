@@ -121,7 +121,7 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_TYPE)
                             << srcAttr.getName() << srcAttr.getType() << dstAttr.getType();
                     }
-                    if (srcAttr.getFlags() != dstAttr.getFlags())
+                    if (!dstAttr.isNullable() && srcAttr.isNullable())
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_FLAGS)
                             << srcAttr.getName();

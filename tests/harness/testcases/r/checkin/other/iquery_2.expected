@@ -13,7 +13,8 @@ SCIDB QUERY : <redimension_store ( RawDataForDorfs, Dorfs )>
 SCIDB QUERY : <echo ('iquery  -o lcsv+ -aq \'scan ( Dorfs )\'')>
 [("iquery  -o lcsv+ -aq 'scan ( Dorfs )'")]
 
-name,item,detail,qty,empty_indicator
+SCIDB QUERY : < iquery  -o lcsv+ -aq 'scan ( Dorfs )' >
+name,item,detail,qty,EmptyTag
 "Bashful","Beard","long",7,true
 "Bashful","Body","normal",5,true
 "Bashful","Hat","green",7,true
@@ -46,6 +47,7 @@ name,item,detail,qty,empty_indicator
 SCIDB QUERY : <echo ('iquery  -o lsparse -aq \'scan ( Dorfs )\'')>
 [("iquery  -o lsparse -aq 'scan ( Dorfs )'")]
 
+SCIDB QUERY : < iquery  -o lsparse -aq 'scan ( Dorfs )' >
 {"Bashful","Beard"}[[{"Bashful","Beard"}("long",7,true),{"Bashful","Body"}("normal",5,true),{"Bashful","Hat"}("green",7,true),{"Bashful","Shirt"}("brown",5,true)],[{"Doc","Beard"}("short",2,true),{"Doc","Body"}("large",7,true),{"Doc","Hat"}("brown",5,true),{"Doc","Shirt"}("red",8,true)],[{"Dopey","Beard"}("none",0,true),{"Dopey","Body"}("small",3,true),{"Dopey","Hat"}("purple",6,true),{"Dopey","Shirt"}("red",8,true)],[{"Grumpy","Beard"}("long",7,true),{"Grumpy","Body"}("small",3,true),{"Grumpy","Hat"}("brown",5,true),{"Grumpy","Shirt"}("red",8,true)],[{"Happy","Beard"}("short",3,true),{"Happy","Body"}("large",7,true),{"Happy","Hat"}("orange",6,true),{"Happy","Shirt"}("brown",5,true)],[{"Sleepy","Beard"}("long",7,true),{"Sleepy","Body"}("small",2,true),{"Sleepy","Hat"}("blue",6,true),{"Sleepy","Shirt"}("green",3,true)],[{"Sneezy","Beard"}("short",2,true),{"Sneezy","Body"}("normal",5,true),{"Sneezy","Hat"}("orange",6,true),{"Sneezy","Shirt"}("brown",5,true)]]
 
 SCIDB QUERY : <remove(RawDataForDorfs)>

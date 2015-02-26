@@ -55,7 +55,7 @@ public:
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psLocalNode);
+        return ArrayDistribution(psLocalInstance);
     }
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
@@ -78,7 +78,7 @@ public:
         }
 
         if (what == "aggregates") {
-            list = AggregateLibrary::getInstance()->getAggregateNames();
+            AggregateLibrary::getInstance()->getAggregateNames(list);
         } else if (what == "arrays") {
             SystemCatalog::getInstance()->getArrays(list);
             if (!showSystem)
@@ -192,8 +192,8 @@ public:
                 tuple[5].setBool(query.idle());
             }
             return shared_ptr<Array>(new TupleArray(_schema, tuples));
-         } else if (what == "nodes") {
-           return listNodes(query);
+         } else if (what == "instances") {
+           return listInstances(query);
         } else {
            assert(0);
         }
@@ -206,33 +206,33 @@ public:
         return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
     }
 
-   boost::shared_ptr<Array> listNodes(const boost::shared_ptr<Query>& query)
+   boost::shared_ptr<Array> listInstances(const boost::shared_ptr<Query>& query)
    {
-      boost::shared_ptr<const NodeLiveness> queryLiveness(query->getCoordinatorLiveness());
-      Nodes nodes;
-      SystemCatalog::getInstance()->getNodes(nodes);
+      boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
+      Instances instances;
+      SystemCatalog::getInstance()->getInstances(instances);
 
-      assert(queryLiveness->getNumNodes() == nodes.size());
+      assert(queryLiveness->getNumInstances() == instances.size());
 
       vector<boost::shared_ptr<Tuple> > tuples;
-      tuples.reserve(nodes.size());
-      for (Nodes::const_iterator iter = nodes.begin();
-           iter != nodes.end(); ++iter) {
+      tuples.reserve(instances.size());
+      for (Instances::const_iterator iter = instances.begin();
+           iter != instances.end(); ++iter) {
 
          shared_ptr<Tuple> tuplePtr(new Tuple(4));
          Tuple& tuple = *tuplePtr.get();
          tuples.push_back(tuplePtr);
 
-         const NodeDesc& nodeDesc = *iter;
-         NodeID nodeId = nodeDesc.getNodeId();
-         time_t t = static_cast<time_t>(nodeDesc.getOnlineSince());
-         tuple[0].setString(nodeDesc.getHost().c_str());
-         tuple[1].setUint16(nodeDesc.getPort());
-         tuple[2].setUint64(nodeId);
-         if ((t == (time_t)0) || queryLiveness->isDead(nodeId)){
+         const InstanceDesc& instanceDesc = *iter;
+         InstanceID instanceId = instanceDesc.getInstanceId();
+         time_t t = static_cast<time_t>(instanceDesc.getOnlineSince());
+         tuple[0].setString(instanceDesc.getHost().c_str());
+         tuple[1].setUint16(instanceDesc.getPort());
+         tuple[2].setUint64(instanceId);
+         if ((t == (time_t)0) || queryLiveness->isDead(instanceId)){
             tuple[3].setString("offline");
          } else {
-            assert(queryLiveness->find(nodeId));
+            assert(queryLiveness->find(instanceId));
             struct tm date;
 
             if (!(&date == gmtime_r(&t, &date)))

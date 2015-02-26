@@ -58,9 +58,12 @@ const char* InvalidDeltaException::what() const throw()
 }
 
 
-const Value ChunkDelta::ValueDifference(const Value v1, const Value v2)
+const Value ChunkDelta::ValueDifference(const Value& v1, const Value& v2)
 {
-        assert(v1.size() <= 8 && v2.size() <= 8);
+        if (v1.size() > 8 || v2.size() > 8) {
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << max(v1.size(), v2.size()) << 8;
+        }
+     
         int64_t v1_val = 0, v2_val = 0;
         memcpy(&v1_val, v1.data(), v1.size());
         memcpy(&v2_val, v2.data(), v2.size());
@@ -577,7 +580,7 @@ void ChunkDelta::applyDeltas_BSDiff(const ConstChunk& srcChunk, SharedBuffer& ou
         // Copy the new data into the output buffer.
         // It would be nice to avoid this copy, but doing so would
         // involve changing the SharedBuffer interface.
-        out.reallocate(currDataSize);
+        out.allocate(currDataSize);
         memcpy(out.getData(), currData, currDataSize);
         free(currData);
 }

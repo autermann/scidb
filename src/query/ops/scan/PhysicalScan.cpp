@@ -66,7 +66,8 @@ class PhysicalScan: public  PhysicalOperator
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
                                       boost::shared_ptr<Query> query)
     {
-        return boost::shared_ptr< Array>(new DBArray(_schema.getId(), query));
+        boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(_schema.getName());
+        return tmpArray ? tmpArray : boost::shared_ptr<Array>(new DBArray(_schema, query));
     }
 
 

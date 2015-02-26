@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>cast</refname>
+    <refpurpose>Change attribute and dimension names</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>INTO</command> <replaceable>target_array</replaceable> <command>FROM</command> cast(<replaceable>array</replaceable>, <replaceable>schema</replaceable>);
+
+store(cast(<replaceable>array</replaceable>,<replaceable>schema</replaceable>),<replaceable>target_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The cast operator allows renaming an array or any of its attributes and dimensions. A single cast invocation can be used to rename multiple items at once (one or more attribute names and/or one or more dimension names). The input array and template arrays should have the same numbers and types of attributes and the same numbers and types of dimension.</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example changes the name of an array attribute and an array dimension. The arrays must be compatible; that is, they must have the same number of dimensions and attributes, and the attributes and dimensions must be of the same type.</para>
+      <procedure>
+        <step>
+          <para>Create an array called source with an attribute called val and a dimension called i: <programlisting>CREATE ARRAY source &lt;val:double&gt;[i=0:9,10,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Use an anonymous schema to change the attribute name to num_val and the dimension name to x. Store the result in an array called target:<programlisting>store(cast(source, &lt;num_val:double&gt;[x=0:9,10,0]),target);</programlisting>This is useful when you are joining arrays and want to avoid naming conflicts. For example, doing a cross_join on source and target will create an array with two attributes, val and num_val, and two dimensions, i and x:<programlisting>store(cross_join(source,target),new_array);
+show(new_array);</programlisting><screen>[(&quot;new_array&lt;val:double,num_val:double&gt; [i=0:9,10,0,x=0:9,10,0]&quot;)]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

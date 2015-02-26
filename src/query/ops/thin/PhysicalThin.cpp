@@ -67,7 +67,7 @@ class PhysicalThin: public  PhysicalOperator
         {
             Coordinate from = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i*2])->getExpression()->evaluate().getInt64();
             Coordinate step = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i*2+1])->getExpression()->evaluate().getInt64();
-            Coordinate last = (inDims[i].getLength() - from + inDims[i].getStart() + step - 1) / step - 1;
+            Coordinate last = (inDims[i].getCurrLength() - from + inDims[i].getStart() + step - 1) / step - 1;
             outStart.push_back(0);
             outEnd.push_back(last);
         }
@@ -83,15 +83,26 @@ class PhysicalThin: public  PhysicalOperator
 	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
-        size_t nDims = _schema.getDimensions().size();        
+        boost::shared_ptr<Array> input = inputArrays[0];
+        ArrayDesc const& inputDesc = input->getArrayDesc();
+        Dimensions const& srcDims = inputDesc.getDimensions();
+        Dimensions const& dstDims = _schema.getDimensions();
+        size_t nDims = dstDims.size();        
 		assert(_parameters.size() == nDims*2);
         Coordinates from(nDims);        
         Coordinates step(nDims);
         for (size_t i = 0; i < nDims; i++) { 
             from[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i*2])->getExpression()->evaluate().getInt64();
             step[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i*2+1])->getExpression()->evaluate().getInt64();
+            if (query->getCoordinatorID() != COORDINATOR_INSTANCE) { 
+                string const& oldMapping = srcDims[i].getMappingArrayName();
+                string const& newMapping = dstDims[i].getMappingArrayName();
+                if (!newMapping.empty() && oldMapping != newMapping) { 
+                    thinMappingArray(srcDims[i].getBaseName(), oldMapping, newMapping, from[i], step[i], dstDims[i].getEndMax(), query);
+                }
+            }
         }
-		return boost::shared_ptr<Array>(new ThinArray(_schema, inputArrays[0], from, step));
+		return boost::shared_ptr<Array>(new ThinArray(_schema, input, from, step));
 	 }
 };
     

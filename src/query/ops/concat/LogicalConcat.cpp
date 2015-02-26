@@ -81,8 +81,7 @@ namespace scidb
             size_t nDims = leftDimensions.size();
             Dimensions newDimensions(nDims);
 
-            if (Coordinate(leftDimensions[0].getLength()) == MAX_COORDINATE
-                    || Coordinate(rightDimensions[0].getLength()) == MAX_COORDINATE)
+            if (leftDimensions[0].getLength() == INFINITE_LENGTH || rightDimensions[0].getLength() == INFINITE_LENGTH)
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CONCAT_ERROR1);
             newDimensions[0] = DimensionDesc(leftDimensions[0].getBaseName(),
                                              leftDimensions[0].getNamesAndAliases(),
@@ -90,14 +89,16 @@ namespace scidb
                                              leftDimensions[0].getCurrStart(), 
                                              leftDimensions[0].getCurrEnd() + rightDimensions[0].getLength(), 
                                              leftDimensions[0].getEndMax() + rightDimensions[0].getLength(), 
-                                             leftDimensions[0].getChunkInterval(), 0);
-            if (leftDimensions[0].getChunkInterval() != rightDimensions[0].getChunkInterval())
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+                                             leftDimensions[0].getChunkInterval(), leftDimensions[0].getChunkOverlap());
+            if (leftDimensions[0].getChunkInterval() != rightDimensions[0].getChunkInterval()
+                || leftDimensions[0].getChunkOverlap() != rightDimensions[0].getChunkOverlap())
+               throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
 
             for (i = 1; i < nDims; i++) {
                 if (leftDimensions[i].getLength() != rightDimensions[i].getLength()
                         || leftDimensions[i].getStart() != rightDimensions[i].getStart()
-                        || leftDimensions[i].getChunkInterval() != rightDimensions[i].getChunkInterval())
+                        || leftDimensions[i].getChunkInterval() != rightDimensions[i].getChunkInterval()
+                        || leftDimensions[i].getChunkOverlap() != rightDimensions[i].getChunkOverlap())
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
                 newDimensions[i] = leftDimensions[i];
             }

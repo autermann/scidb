@@ -12,10 +12,10 @@ CREATE EMPTY ARRAY Dorfishness < dorfishness : int64 > [ name(string)=10,11,0, c
 
 --test
 
-echo ('iquery  -o lcsv+ -aq \'scan ( Dorfishness )\'')
---shell --command " iquery  -o lcsv+ -aq 'scan ( Dorfishness )' " --store
+echo ('iquery -o lcsv+ -aq \'scan ( Dorfishness )\'')
+--shell --command " iquery -o lcsv+ -aq 'scan ( Dorfishness )' " --store
 
-echo ('iquery  -o lsparse -aq \'scan ( Dorfishness )\'')
+echo ('iquery -o lsparse -aq \'scan ( Dorfishness )\'')
 --shell --command " iquery  -o lsparse -aq 'scan ( Dorfishness )' " --store
 
 

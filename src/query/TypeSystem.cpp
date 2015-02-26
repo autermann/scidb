@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <float.h>
 #include <vector>
 
 #include "log4cxx/logger.h"
@@ -117,6 +118,9 @@ void TypeLibrary::registerBuiltInTypes()
         _instance._registerType(type);
         _instance._builtinTypesById[BuiltInNames[i]] = type;
     }
+    Type fixedStringType(TID_FIXED_STRING, 0, TID_STRING);
+    _instance._registerType(fixedStringType);
+    _instance._builtinTypesById[TID_FIXED_STRING] = fixedStringType;    
 }
 
 bool TypeLibrary::_hasType(TypeId typeId)
@@ -138,6 +142,16 @@ const Type& TypeLibrary::_getType(TypeId typeId)
         ScopedMutexLock cs(mutex);
         i = _typesById.find(typeId);
         if (i == _typesById.end()) {
+            size_t pos = typeId.find_first_of('_');
+            if (pos != string::npos) { 
+                string genericTypeId = typeId.substr(0, pos+1) + '*';
+                i = _typesById.find(genericTypeId);
+                if (i != _typesById.end()) {
+                    Type limitedType(typeId, atoi(typeId.substr(pos+1).c_str())*8, i->second.baseType());
+                    _typeLibraries.addObject(typeId); 
+                    return _typesById[typeId] = limitedType;
+                }
+            }
             LOG4CXX_DEBUG(logger, "_getType('" << typeId << "') not found");
             throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_TYPE_NOT_REGISTERED) << typeId;
         }
@@ -192,7 +206,7 @@ std::vector<TypeId> TypeLibrary::_typeIds()
  * NOTE: This will only work efficiently for the built in types. If you try 
  *       use this for a UDT it needs to do a lookup to try and find a UDF.
  */
-string ValueToString(const TypeId type, const Value& value)
+string ValueToString(const TypeId type, const Value& value, bool verbose)
 {
     std::stringstream ss;
 
@@ -213,6 +227,9 @@ string ValueToString(const TypeId type, const Value& value)
         } else {
             if (isnan(val) || isinf(val) || val==0)
                 val = abs(val);
+            if (verbose) { 
+                ss.precision(DBL_DIG);
+            }
             ss << val;
         }
 	} else if ( TID_INT64 == type ) {

@@ -10,10 +10,11 @@ Query was executed successfully
 SCIDB QUERY : <redimension_store ( Raw_Dorf, Dorfishness )>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <echo ('iquery  -o lcsv+ -aq \'scan ( Dorfishness )\'')>
-[("iquery  -o lcsv+ -aq 'scan ( Dorfishness )'")]
+SCIDB QUERY : <echo ('iquery -o lcsv+ -aq \'scan ( Dorfishness )\'')>
+[("iquery -o lcsv+ -aq 'scan ( Dorfishness )'")]
 
-name,chin,top,head,face,dorfishness,empty_indicator
+SCIDB QUERY : < iquery -o lcsv+ -aq 'scan ( Dorfishness )' >
+name,chin,top,head,face,dorfishness,EmptyTag
 "Bashful","Long beard","Brown top","green hat","long eyelashes",1,true
 "Doc","Short beard","Red tunic","brown hat","glasses",1,true
 "Dopey","Beardless","Green tunic","purple hat","big ears",1,true
@@ -24,9 +25,10 @@ name,chin,top,head,face,dorfishness,empty_indicator
 "Snow White","No Beard","blue jacket","diadem","perky",0,true
 "Witch","No Beard","black blouse","no hat","warty",0,true
 
-SCIDB QUERY : <echo ('iquery  -o lsparse -aq \'scan ( Dorfishness )\'')>
-[("iquery  -o lsparse -aq 'scan ( Dorfishness )'")]
+SCIDB QUERY : <echo ('iquery -o lsparse -aq \'scan ( Dorfishness )\'')>
+[("iquery -o lsparse -aq 'scan ( Dorfishness )'")]
 
+SCIDB QUERY : < iquery  -o lsparse -aq 'scan ( Dorfishness )' >
 [[[[[{"Bashful","Long beard","Brown top","green hat","long eyelashes"}(1,true),{"Doc","Short beard","Red tunic","brown hat","glasses"}(1,true),{"Dopey","Beardless","Green tunic","purple hat","big ears"}(1,true),{"Grumpy","Long beard","Red tunic","brown hat","scowl"}(1,true),{"Happy","Short beard","Brown top","orange headpiece","smile"}(1,true),{"Sleepy","Long beard","Green top","blue hat","heavy eyelids"}(1,true),{"Sneezy","Short beard","brown jacket","orange headpiece","red nose"}(1,true),{"Snow White","No Beard","blue jacket","diadem","perky"}(0,true),{"Witch","No Beard","black blouse","no hat","warty"}(0,true)]]]]]
 
 SCIDB QUERY : <remove ( Raw_Dorf )>

@@ -51,6 +51,13 @@ namespace scidb
         return array.getArrayDesc();
     }
 
+    void DelegateChunk::overrideTileMode(bool enabled) {
+        if (chunk != NULL) { 
+            ((Chunk*)chunk)->overrideTileMode(enabled);
+        }
+        tileMode = enabled;
+    }
+
     Array const& DelegateChunk::getArray() const 
     {
         return array;
@@ -227,7 +234,7 @@ namespace scidb
     }
 
     DelegateChunkIterator::DelegateChunkIterator(DelegateChunk const* aChunk, int iterationMode)
-    : chunk(aChunk), inputIterator(aChunk->getInputChunk().getConstIterator(iterationMode))
+    : chunk(aChunk), inputIterator(aChunk->getInputChunk().getConstIterator(iterationMode & ~INTENDED_TILE_MODE))
     {
     }        
 
@@ -353,10 +360,14 @@ namespace scidb
         newAttrs[emptyTagID] = AttributeDesc(emptyTagID, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
                                             TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
         desc = ArrayDesc(desc.getName(), newAttrs, desc.getDimensions());
+        rle = Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT);
     }
 
     DelegateArrayIterator* NonEmptyableArray::createArrayIterator(AttributeID id) const
     {  
+        if (rle && id == emptyTagID) { 
+            return new DummyBitmapArrayIterator(*this, id, inputArray->getConstIterator(0));
+        }
         return new DelegateArrayIterator(*this, id, inputArray->getConstIterator(id == emptyTagID ? 0 : id));
     }
 
@@ -388,6 +399,27 @@ namespace scidb
       _true(TypeLibrary::getType(TID_BOOL))
     {        
         _true.setBool(true);
+    }
+
+    ConstChunk const& NonEmptyableArray::DummyBitmapArrayIterator::getChunk()
+    {
+        ConstChunk const& inputChunk = inputIterator->getChunk();
+        if (!inputChunk.isRLE()) {             
+            return DelegateArrayIterator::getChunk();
+        }
+        if (!shapeChunk.isInitialized() || shapeChunk.getFirstPosition(false) != inputChunk.getFirstPosition(false)) {
+            ArrayDesc const& arrayDesc = array.getArrayDesc();
+            Address addr(arrayDesc.getId(), attr, inputChunk.getFirstPosition(false));
+            shapeChunk.initialize(&array, &arrayDesc, addr, inputChunk.getCompressionMethod());
+            shapeChunk.setSparse(inputChunk.isSparse());
+            shapeChunk.fillRLEBitmap();
+        }
+        return shapeChunk;
+    }
+    
+    NonEmptyableArray::DummyBitmapArrayIterator::DummyBitmapArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator)
+    : DelegateArrayIterator(delegate, attrID, inputIterator)
+    {
     }
 
     //
@@ -633,11 +665,12 @@ size_t nMaterializedChunks = 0;
             materializedChunk.setRLE(false);
         }
         boost::shared_ptr<ConstChunkIterator> src 
-            = chunk.getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE);
+            = chunk.getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|
+                                     (chunk.isSolid() ? ChunkIterator::INTENDED_TILE_MODE : 0));
         shared_ptr<Query> emptyQuery;
         boost::shared_ptr<ChunkIterator> dst 
             = materializedChunk.getIterator(emptyQuery, 
-                                            (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK);
+                                            (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
         bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
         src->setVectorMode(vectorMode);
         dst->setVectorMode(vectorMode);
@@ -649,7 +682,7 @@ size_t nMaterializedChunks = 0;
             count += 1;
             ++(*src);
         }
-        if (!vectorMode && !chunk.getArrayDesc().containsOverlaps()) {
+        if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().containsOverlaps()) {
             materializedChunk.setCount(count);
         }
         dst->flush();

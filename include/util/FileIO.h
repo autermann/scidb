@@ -54,10 +54,11 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <set>
 
 #include "query/Statistics.h"
+
 #ifndef SCIDB_CLIENT
-#include <set>
 #include "util/Singleton.h"
 #include "util/JobQueue.h"
 #include "util/ThreadPool.h"
@@ -65,7 +66,6 @@
 
 namespace scidb
 {
-
     class File
     {
       public:
@@ -73,6 +73,7 @@ namespace scidb
         static void readAll(int fd, void* data, size_t size, uint64_t offs);
         static int createTemporary(std::string const& arrName, char const* filePath = NULL);
     };
+
 
 #ifndef SCIDB_CLIENT
     class BackgroundFileFlusher: public Singleton<BackgroundFileFlusher>
@@ -83,12 +84,14 @@ namespace scidb
         bool _running;
         std::set <int> _fileDescriptors;
         Mutex _lock;
+
         class FsyncJob : public Job
         {
         private:
             int64_t _timeIntervalNanos;
             int64_t _logThresholdNanos;
             BackgroundFileFlusher *_flusher;
+
         public:
             FsyncJob(int timeIntervalMSecs,
                      int logThresholdMSecs,
@@ -98,9 +101,12 @@ namespace scidb
                  _logThresholdNanos( (int64_t) logThresholdMSecs * 1000000 ),
                  _flusher(flusher)
             {}
+
             virtual void run();
         };
+
         boost::shared_ptr<FsyncJob> _myJob;
+
     public:
         BackgroundFileFlusher():
             _queue(boost::shared_ptr<JobQueue>(new JobQueue())),
@@ -110,19 +116,23 @@ namespace scidb
             _lock(),
             _myJob()
         {}
+
         void start(int timeIntervalMSecs, int logThresholdMSecs, std::vector<int> const& fileDescriptors);
         void addDescriptors(std::vector<int> const& fileDescriptors);
         void dropDescriptors(std::vector<int> const& fileDescriptors);
         void addDescriptor (int const& fileDesc);
         void dropDescriptor (int const& fileDesc);
         void stop();
+
     private:
         ~BackgroundFileFlusher()
         {
             stop();
         }
+
         friend class Singleton<BackgroundFileFlusher>;
     };
+
 #endif
 }
 

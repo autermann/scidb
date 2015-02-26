@@ -1,0 +1,112 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<chapter remap="h1">
+    <title>Data Sampling Operators</title>
+    <sect1 remap="h2">
+      <title>bernoulli</title>
+      <para><emphasis role="bold">Summary:</emphasis> Select cells at random</para>
+      <para>The bernoulli operator evaluates each cell by generating a random number and seeing if it lies in the range (0, probability). If it does, the cell is included.</para>
+      <para><emphasis role="bold">Signature</emphasis></para>
+      <blockquote>
+        <para><literal condition="western">bernoulli</literal>(<emphasis>array</emphasis> |<emphasis> array_operator</emphasis>,<emphasis> probability:double</emphasis> [,<emphasis> seed:int64</emphasis> ] )</para>
+      </blockquote>
+      <para>The first parameter can be an array name or an array operator (operator which outputs an array as result).</para>
+      <para>The sampling probability is the probability of inclusion. To repeat results, use a seed value for the underlying random number generator.</para>
+    </sect1>
+    <sect1 remap="h2">
+      <title>between</title>
+      <para><emphasis role="bold">Summary</emphasis>: Select a subset of data within a specified region</para>
+      <para>The between operator accepts an input array and a set of coordinates specifying a region within the array. The output is an array of the same shape as input, where all cells outside of the given region are marked empty.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <blockquote>
+        <para><literal condition="western">between</literal>(<emphasis> array</emphasis>,<emphasis> low-boundary-coordinate-1: value</emphasis>, ...,<emphasis> low-boundary-coordinate-N: value</emphasis>,<emphasis> high-boundary-coordinate-1: value</emphasis>, ...,<emphasis> high-boundary-coordinate-N: value</emphasis> )</para>
+      </blockquote>
+      <para>Note that between is very similar to subarray, except that between does not change the shape of the array, and does not change the starting coordinates.</para>
+      <para>For example, consider the following array of integers:</para>
+      <screen>less /tmp/fbf.txt
+[
+[(0),(1),(4),(5)],
+[(2),(3),(6),(7)],
+[(8),(9),(12),(13)],
+[(10),(11),(14),(15)]
+]
+create array fbf &lt;val1:int64&gt;[x=0:3,4,0, y=0:3,4,0];
+load(fbf, &apos;/tmp/fbf.txt&apos;);
+
+[
+[(0),(1),(4),(5)],
+[(2),(3),(6),(7)],
+[(8),(9),(12),(13)],
+[(10),(11),(14),(15)]
+]</screen>
+      <para>Between can be used to set all cells outside of the (1,1)-&gt;(2,2) region to empty:</para>
+      <screen>between(fbf,1,1,2,2);
+
+[
+[(),(),(),()],
+[(),(3),(6),()],
+[(),(9),(12),()],
+[(),(),(),()]
+]</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>filter</title>
+      <para><emphasis role="bold">Summary</emphasis>: Select subset of data by boolean expression</para>
+      <para>The filter operator &apos;filters&apos; out data in the array based on an expression over the attribute and dimension values. Suppose we want to filter out all the data from my_array, where the value of attribute A doesn&apos;t equal 75. We would use the following query:</para>
+      <screen>filter( my_array, A &lt;&gt; 75);</screen>
+      <para>The filter operator marks all cells in the input which do not satisfy the predicate expression to &apos;empty&apos;.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>filter (<emphasis> array</emphasis>,<emphasis> condition : expression</emphasis> )</para>
+      <para>where &apos;condition&apos; is a boolean expression.</para>
+      <para>The following examples illustrate both the functionality of the filter operator, and also how operators in AFL can be combined into query expressions.</para>
+      <screen>filter ( subarray ( my_array, 4, 4, 6, 6), A &gt; 46 );
+
+(0,0.0,false)   (0,0.0,false)  (0,0.0,false)
+(54,54.0,true)  (55,55.0,true)  (56,56.0,true)
+(64,64.0,true)  (65,65.0,true)  (66,66.0,true)
+filter ( subarray ( my_array, 4, 4, 6, 6), A &gt; 46 and A &lt; 56);
+
+(0,0.0,false)   (0,0.0,false)   (0,0.0,false)
+(54,54.0,true)  (55,55.0,true)  (56,56.0,true)
+(0,0.0,false)   (0,0.0,false)  (0,0.0,false)</screen>
+      <para>The output of the filter is an array with the EMPTY attribute.</para>
+    </sect1>
+    <sect1 remap="h2">
+      <title>lookup</title>
+      <para><emphasis role="bold">Summary</emphasis>: Pattern selection</para>
+      <para>Lookup maps elements from the second array using the attributes of the first array as coordinates into the second array. The result array has the same shape as first array and the same attributes as second array.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>lookup (<emphasis> pattern : array</emphasis>,<emphasis> source: array</emphasis> )</para>
+      <para><emphasis role="bold">Example</emphasis>: suppose the array foo has coordinates 0 to 7 and the values 1 to 8:</para>
+      <screen>scan(foo);
+
+[(1),(2),(3),(4),(5),(6),(7),(8)]</screen>
+      <para>Suppose the array bar ranges from -10 to 10 and has values from 40 to 60:</para>
+      <screen>scan(bar);
+
+[(40),(41),(42),(43),(44),(45),(46),(47),(48),(49),
+ (50),(51),(52),(53),(54),(55),(56),(57),(58),(59),(60)]</screen>
+      <para>Then lookup(foo,bar) returns 8 values, corresponding to bar positions from 1 to 8 :</para>
+      <screen>lookup(foo,bar);
+
+[(51),(52),(53),(54),(55),(56),(57),(58)]</screen>
+    </sect1>
+    <sect1 remap="h2">
+      <title>sample</title>
+      <para><emphasis role="bold">Summary:</emphasis> Select random chunk</para>
+      <para>In sample, the selection is chunk-based. We evaluate each chunk for inclusion based on the probability.</para>
+      <para>Users often want samples with repeatable results. To achieve this, SciDB uses a<emphasis> seed</emphasis> value for the underlying random number generator.</para>
+      <para><emphasis role="bold">Signature</emphasis>:</para>
+      <para>sample(<emphasis> array</emphasis>,<emphasis> probability : double</emphasis> [,<emphasis> seed : int64</emphasis> ] )</para>
+      <para><emphasis role="bold">Example</emphasis>:</para>
+      <screen>bernoulli(m4x4,0.3);
+
+[
+[(0),(1),(0),(3)],
+[(0),(0),(0),(0)],
+[(8),(0),(0),(0)],
+[(12),(13),(0),(0)]
+]</screen>
+    </sect1>
+  </chapter>

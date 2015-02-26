@@ -107,7 +107,7 @@ public:
         }
 
         size_t size = 1;
-                dimensions[0] = DimensionDesc("No", 0, 0, size-1, size-1, size, 0);
+        dimensions[0] = DimensionDesc("No", 0, 0, size-1, size-1, size, 0);
 
         return ArrayDesc("physical_plan", attributes, dimensions);
     }

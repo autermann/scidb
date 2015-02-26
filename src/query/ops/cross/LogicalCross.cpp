@@ -55,11 +55,11 @@ namespace scidb
 
             ArrayDesc const& leftArrayDesc = schemas[0];
             ArrayDesc const& rightArrayDesc = schemas[1];
-            Attributes const& leftAttributes = leftArrayDesc.getAttributes();
+            Attributes const& leftAttributes = leftArrayDesc.getAttributes(true);
             Dimensions const& leftDimensions = leftArrayDesc.getDimensions();
-            Attributes const& rightAttributes = rightArrayDesc.getAttributes();
+            Attributes const& rightAttributes = rightArrayDesc.getAttributes(true);
             Dimensions const& rightDimensions = rightArrayDesc.getDimensions();
-            Attributes crossAttributes(leftAttributes.size() + rightAttributes.size());
+            Attributes crossAttributes(leftAttributes.size() + rightAttributes.size() + ((leftArrayDesc.getEmptyBitmapAttribute() != NULL || rightArrayDesc.getEmptyBitmapAttribute() != NULL) ? 1 : 0));
             Dimensions crossDimensions(leftDimensions.size() + rightDimensions.size());
 
             size_t j = 0;
@@ -75,7 +75,9 @@ namespace scidb
                                                    attr.getAliases(), &attr.getDefaultValue(), attr.getDefaultValueExpr());
                 crossAttributes[j].addAlias(rightArrayDesc.getName());
             }
-            
+            if (j < crossAttributes.size()) { 
+                crossAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+            }
             j = 0;
             for (size_t i = 0, n = leftDimensions.size(); i < n; i++, j++) { 
                 crossDimensions[j] = leftDimensions[i];

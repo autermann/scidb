@@ -52,7 +52,7 @@ public:
         assert(_parameters.size() == 2);
 
         ArrayDesc desc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
-        if (desc.getAttributes().size() != 1)
+        if (desc.getAttributes(true).size() != 1)
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_BUILD_ERROR2,
                                        _parameters[0]->getParsingContext());
 

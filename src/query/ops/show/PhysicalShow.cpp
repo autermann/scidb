@@ -56,20 +56,20 @@ public:
         stringstream ss;
 
         ArrayDesc desc;
+        // we want to "show" only the persistent contents (i.e. the catalog contents)
+        printSchema(ss, ((const shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema());
 
-        ss << ((const shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
-
-                boost::shared_ptr<MemArray> arr = boost::shared_ptr<MemArray>(new MemArray(_schema));
-                boost::shared_ptr<ArrayIterator> arrIt = arr->getIterator(0);
-                Coordinates coords;
-                coords.push_back(0);
-                Chunk& chunk = arrIt->newChunk(coords);
-                boost::shared_ptr<ChunkIterator> chunkIt = chunk.getIterator(query);
-                Value v(TypeLibrary::getType(TID_STRING));
-                v.setString(ss.str().c_str());
-                chunkIt->writeItem(v);
-                chunkIt->flush();
-                return arr;
+        boost::shared_ptr<MemArray> arr = boost::shared_ptr<MemArray>(new MemArray(_schema));
+        boost::shared_ptr<ArrayIterator> arrIt = arr->getIterator(0);
+        Coordinates coords;
+        coords.push_back(0);
+        Chunk& chunk = arrIt->newChunk(coords);
+        boost::shared_ptr<ChunkIterator> chunkIt = chunk.getIterator(query);
+        Value v(TypeLibrary::getType(TID_STRING));
+        v.setString(ss.str().c_str());
+        chunkIt->writeItem(v);
+        chunkIt->flush();
+        return arr;
     }
 };
 

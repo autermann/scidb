@@ -127,6 +127,9 @@ namespace scidb
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        if (attrID > array.nLeftAttrs + array.nRightAttrs) { 
+            return trueValue;
+        }
         return inputIterator->getItem();
     }
 
@@ -181,11 +184,13 @@ namespace scidb
 
     CrossChunkIterator::CrossChunkIterator(CrossChunk const& aChunk, int iterationMode)
     : array(aChunk.array),
-      chunk(aChunk),
-      leftIterator(aChunk.leftChunk->getConstIterator(iterationMode)),
-      rightIterator(aChunk.rightChunk->getConstIterator(iterationMode)),
-      inputIterator(aChunk.attr < array.nLeftAttrs ? leftIterator : rightIterator)
+        chunk(aChunk),
+        leftIterator(aChunk.leftChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
+        rightIterator(aChunk.rightChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
+        inputIterator(aChunk.attr < array.nLeftAttrs ? leftIterator : rightIterator),
+        attrID(aChunk.getAttributeDesc().getId())
     {
+        trueValue.setBool(true);
         reset();
     }
 
@@ -196,7 +201,7 @@ namespace scidb
     : array(cross), 
       attr(attrID), 
       leftIterator(cross.leftArray->getConstIterator(attrID < cross.nLeftAttrs ? attrID : 0)),
-      rightIterator(cross.rightArray->getConstIterator(attrID < cross.nLeftAttrs ? 0 : attrID - cross.nLeftAttrs)),
+      rightIterator(cross.rightArray->getConstIterator(attrID < cross.nLeftAttrs || attrID - cross.nLeftAttrs > cross.nRightAttrs ? 0 : attrID - cross.nLeftAttrs)),
       chunk(cross, attrID),
       chunkInitialized(false)
     {
@@ -264,7 +269,8 @@ namespace scidb
       leftArray(left),
       rightArray(right),
       nLeftDims(left->getArrayDesc().getDimensions().size()),
-      nLeftAttrs(left->getArrayDesc().getAttributes().size())
+      nLeftAttrs(left->getArrayDesc().getAttributes(true).size()),
+      nRightAttrs(right->getArrayDesc().getAttributes().size())
     {
     }
     

@@ -133,8 +133,9 @@ void Thread::_threadFunction()
         catch (const std::exception& e)
         {
             try {  // This try catch block must prevent crash if there is no space on disk where log file is located.
-                LOG4CXX_ERROR(logger, "Unhandled exception: " << e.what())
+                LOG4CXX_ERROR(logger, "Thread::threadFunction: unhandled exception: " << e.what())
             } catch (...) {}
+            throw;
         }
     }
     _threadPool._terminatedThreads.release();

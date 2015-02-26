@@ -1,10 +1,10 @@
 [planet]
 base-port=1239
 base-path=/data/planet
-node-0=master,0
-node-2=node2,1
-node-3=node3,1
-node-4=node4,1
+instance-0=master,0
+instance-2=instance2,1
+instance-3=instance3,1
+instance-4=instance4,1
 db_user=planet
 db_passwd=planet
 install_root=@CMAKE_INSTALL_PREFIX@

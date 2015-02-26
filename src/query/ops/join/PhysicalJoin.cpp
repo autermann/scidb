@@ -118,10 +118,9 @@ public:
 class PhysicalJoin: public PhysicalOperator
 {
 public:
-        PhysicalJoin(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-            PhysicalOperator(logicalName, physicalName, parameters, schema)
-        {
-        }
+    PhysicalJoin(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    {}
 
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
@@ -138,13 +137,13 @@ public:
         return inputBoundaries[0].intersectWith(inputBoundaries[1]);
     }
 
-        /***
-         * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-         * that overrides the chunkiterator method.
-         */
-        boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    /***
+     * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+     * that overrides the chunkiterator method.
+     */
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-                assert(inputArrays.size() == 2);
+        assert(inputArrays.size() == 2);
         Dimensions const& rightDimensions = inputArrays[1]->getArrayDesc().getDimensions();
         size_t nRightDims = rightDimensions.size();
         for (size_t i = 0; i < nRightDims; i++) {

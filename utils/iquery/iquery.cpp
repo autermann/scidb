@@ -93,8 +93,6 @@ struct _iqueryState
 	void* connection;
     uint64_t currentQueryID;
 
-    bool terminating; //CTRL-C was hitted
-    
     bool firstSaving; //For clearing result file for the first time and appending next times
 
     bool nofetch;
@@ -122,41 +120,6 @@ void loadHistory()
     {
         read_history(path.c_str());
     }
-}
-
-vector < shared_ptr <scidb::Array> > getDimMappingArrays(scidb::ArrayDesc const& resultSchema)
-{
-    scidb::Dimensions const& dims = resultSchema.getDimensions();
-
-    vector <shared_ptr<scidb::Array> > result(dims.size());
-    for (size_t i =0; i< dims.size(); i++)
-    {
-        if (dims[i].isInteger() == false)
-        {
-            string ciArrayName = resultSchema.getCoordinateIndexArrayName(i);
-            //cout<<"Looked up array name "<<ciArrayName<<" for dimension "<<dims[i].getBaseName()<<"\n";
-
-            scidb::QueryResult queryResult;
-            const scidb::SciDB& sciDB = scidb::getSciDB();
-            string query = "scan(" + ciArrayName + ")";
-            sciDB.prepareQuery(query, true, queryResult, iqueryState.connection);
-            
-            if (queryResult.hasWarnings())
-            {
-                cerr << "Warnings during preparing:" << endl;
-                while (queryResult.hasWarnings())
-                {
-                    cerr << queryResult.nextWarning().msg() << endl;
-                }
-            }
-
-            sciDB.executeQuery(query, true, queryResult, iqueryState.connection);
-
-            result[i]=shared_ptr<scidb::Array>(new scidb::MemArray(queryResult.array));
-            sciDB.cancelQuery(queryResult.queryID, iqueryState.connection);
-        }
-    }
-    return result;
 }
 
 void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& queryResult, string const& format)
@@ -247,9 +210,7 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
 
             if (format == "lcsv+" || format == "lsparse")
             {
-                vector < shared_ptr <scidb::Array> > mappingArrays = getDimMappingArrays(queryResult.array->getArrayDesc());
                 dbSaver.saveWithLabels(*queryResult.array,
-                                       mappingArrays,
                                        cfg->getOption<string>(CONFIG_RESULT_FILE),
                                        format,
                                        !iqueryState.firstSaving);
@@ -289,32 +250,6 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
     }
 }
 
-class IqueryException: public scidb::Exception
-{
-public:
-    typedef boost::shared_ptr<IqueryException> Pointer;
-
-    IqueryException(const char* what_str)
-    {
-        if (what_str!=NULL)
-        {
-            _what_str = what_str;
-        }
-    }
-    virtual ~IqueryException() throw () {}
-
-    scidb::Exception::Pointer copy() const
-    {
-        return shared_ptr<IqueryException>(new IqueryException(_what_str.c_str()));
-    }
-    void raise() const
-    {
-        throw *this;
-    }
-private:
-    void format() {}
-};
-
 void executeSciDBQuery(const string &queryString)
 {
     scidb::QueryResult queryResult;
@@ -324,10 +259,7 @@ void executeSciDBQuery(const string &queryString)
 
     sciDB.prepareQuery(queryString, !iqueryState.aql, queryResult, iqueryState.connection);
 
-    if ((format == "lcsv+" || format == "lsparse") && queryResult.requiresExclusiveArrayAccess)
-    {
-        throw IqueryException("Non-integer dimension labels cannnot be retrieved for an update query");
-    }
+    iqueryState.currentQueryID = queryResult.queryID;
 
     if (queryResult.hasWarnings())
     {
@@ -338,15 +270,13 @@ void executeSciDBQuery(const string &queryString)
         }
     }
 
-    iqueryState.currentQueryID = queryResult.queryID;
-
     executePreparedSciDBQuery(queryString, queryResult, format);
 
     iqueryState.currentQueryID = 0;
 
     if (queryResult.queryID && iqueryState.connection)
     {
-        sciDB.cancelQuery(queryResult.queryID, iqueryState.connection);
+        sciDB.completeQuery(queryResult.queryID, iqueryState.connection);
     }
 }
 
@@ -437,9 +367,6 @@ void executeCommandOrQuery(const string &query)
 	}
 	catch (const scidb::Exception& e)
 	{
-	    //If query was cancelled by CTRL-C ignore all errors
-	    if (!iqueryState.terminating)
-	    {
             //Eat scidb exceptions, cleanup query, print error message and continue, if in interactive mode
             const scidb::SciDB& sciDB = scidb::getSciDB();
 
@@ -453,51 +380,46 @@ void executeCommandOrQuery(const string &query)
                 }
                 catch (const scidb::Exception& e)
                 {
-                   if (e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND
-                           && e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND2) {
-                      cerr << "Error during query canceling: " << endl << e.what() << endl << endl;
-                   }
+                    if (e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND
+                        && e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND2) {
+                        cerr << "Error during query canceling: " << endl << e.what() << endl << endl;
+                    }
                 }
             }
 
             iqueryState.currentQueryID = 0;
-
+            
             if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
             {
-                cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) << "' near line " << iqueryState.queryStart << endl;
+                cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE)
+                     << "' near line " << iqueryState.queryStart << endl;
             }
             cerr << e.what() << endl;
-	    }
 
-        if ((!iqueryState.interactive && !iqueryState.ignoreErrors)
-            || e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK)
-        {
-            exit(1);
-        }
-	    iqueryState.terminating = false;
+            if ((!iqueryState.interactive && !iqueryState.ignoreErrors)
+                || e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK)
+            {
+                exit(1);
+            }
 	}
 	catch (const std::exception& e)
 	{
-        // Eat all other exceptions exception in interactive mode, 
-		// but exit with error in non-interactive
-		cerr << szExecName << ": Exception caught " << e.what() << endl;
-		if (!iqueryState.interactive)
-			exit(1);
+            // Eat all other exceptions exception in interactive mode, 
+            // but exit with error in non-interactive
+            cerr << szExecName << ": Exception caught " << e.what() << endl;
+            if (!iqueryState.interactive) {
+                exit(1);
+            }
 	}
 }
 
 void termination_handler(int signum)
 {
-    if (iqueryState.currentQueryID && iqueryState.connection)
-    {
-        const scidb::SciDB& sciDB = scidb::getSciDB();
-        sciDB.cancelQuery(iqueryState.currentQueryID, iqueryState.connection);
-        iqueryState.currentQueryID = 0;
-        iqueryState.terminating = true;
-    }
-
-    if (iqueryState.interactive)
-        saveHistory();
+    // To avoid hangs and unexpected errors caused by mixing
+    // the query traffic with the cancelQuery traffic on the same connection
+    // we will just hard stop here.
+    // Note that _exit() is async-signal-safe.
+    _exit(1);
 }
 
 int main(int argc, char* argv[])
@@ -525,7 +447,6 @@ int main(int argc, char* argv[])
 	iqueryState.interactive = false;
     iqueryState.currentQueryID = 0;
 
-    iqueryState.terminating = false;
     iqueryState.firstSaving = true;
 
     try
@@ -543,7 +464,7 @@ int main(int argc, char* argv[])
 
         cfg->addOption
             (CONFIG_HOST, 'c', "host", "host", "IQUERY_HOST", scidb::Config::STRING,
-                "Host of one of the cluster nodes. Default is 'localhost'", string("localhost"), false)
+                "Host of one of the cluster instances. Default is 'localhost'", string("localhost"), false)
             (CONFIG_PORT, 'p', "port", "port", "IQUERY_PORT", scidb::Config::INTEGER,
                 "Port for connection. Default is 1239", 1239, false)
             (CONFIG_QUERY_STRING, 'q', "query", "", "", scidb::Config::STRING,

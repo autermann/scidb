@@ -106,7 +106,7 @@ public:
         {
             switch (inputDistributions[0].getPartitioningSchema())
             {
-                case psLocalNode:
+                case psLocalInstance:
                 case psReplication:
                 case psByRow:
                     return inputDistributions[0];
@@ -118,8 +118,8 @@ public:
                     {
                         numChunks = numChunks/inputSchemas[0].getAttributes().size();
                         boost::shared_ptr<Query> query(_query);
-                        size_t numNodes = query->getNodesCount();
-                        if (numChunks % numNodes == 0)
+                        size_t numInstances = query->getInstancesCount();
+                        if (numChunks % numInstances == 0)
                         {
                             return inputDistributions[0];
                         }

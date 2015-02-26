@@ -29,6 +29,7 @@
 
 #include "query/Operator.h"
 #include "system/Exceptions.h"
+#include "ThinArray.h"
 
 namespace scidb {
 
@@ -37,22 +38,50 @@ using namespace std;
 /***
  * Helper function to generate descriptor of thin array
  ***/
-    inline ArrayDesc createThinDesc(ArrayDesc const& desc, Coordinates const& from, Coordinates const& step)
+inline ArrayDesc createThinDesc(ArrayDesc const& desc, Coordinates const& from, Coordinates const& step, boost::shared_ptr<Query> const& query)
 {
     Dimensions const& dims = desc.getDimensions();
     Dimensions newDims(dims.size());
     for (size_t i = 0, n = dims.size(); i < n; i++) {
         DimensionDesc const& srcDim = dims[i];
-        Coordinate last = (srcDim.getLength() - from[i] + srcDim.getStart() + step[i] - 1) / step[i] - 1;
-        newDims[i] = DimensionDesc(srcDim.getBaseName(),
-                                   srcDim.getNamesAndAliases(),
-                                   0,
-                                   0,
-                                   last,
-                                   last,
-                                   srcDim.getChunkInterval()/step[i], 0);
+        Coordinate last = (srcDim.getCurrLength() - from[i] + srcDim.getStart() + step[i] - 1) / step[i] - 1;
+        string const& 
+mappingArrayName = srcDim.getMappingArrayName();
+        if (mappingArrayName.empty() || srcDim.getType() == TID_INT64) { 
+            newDims[i] = DimensionDesc(srcDim.getBaseName(),
+                                       srcDim.getNamesAndAliases(),
+                                       0,
+                                       0,
+                                       last,
+                                       last,
+                                       srcDim.getChunkInterval()/step[i], 0);
+        } else { 
+            string tmpMappingArrayName;
+            size_t tmpArrayNo = 0;
+            do { 
+                std::stringstream ss;
+                ss << mappingArrayName << '$' << ++tmpArrayNo;
+                tmpMappingArrayName = ss.str();
+            } while (query->getTemporaryArray(tmpMappingArrayName));
+            
+            thinMappingArray(srcDim.getBaseName(), mappingArrayName, tmpMappingArrayName, from[i], step[i], last, query);
+            
+            newDims[i] = DimensionDesc(srcDim.getBaseName(),
+                                       srcDim.getNamesAndAliases(),
+                                       0,
+                                       0,
+                                       last,
+                                       last,
+                                       srcDim.getChunkInterval()/step[i], 0,
+                                       srcDim.getType(), 
+                                       srcDim.getFlags() | (srcDim.getFuncMapScale() != 1 ? DimensionDesc::COMPLEX_TRANSFORMATION : 0),
+                                       tmpMappingArrayName,
+                                       srcDim.getComment(),
+                                       srcDim.getFuncMapOffset() + from[i] - srcDim.getStart(),
+                                       step[i]);
+        }
     }
-        return ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
+    return ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
 }
 
 
@@ -109,7 +138,7 @@ class LogicalThin: public  LogicalOperator
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_THIN_ERROR4,
                                           _parameters[i*2+1]->getParsingContext());
         }
-        return createThinDesc(desc, from, step);
+        return createThinDesc(desc, from, step, query);
     }
 };
 

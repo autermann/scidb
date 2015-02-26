@@ -33,11 +33,18 @@
 #include "query/Operator.h"
 #include "system/SystemCatalog.h"
 #include "system/Exceptions.h"
+#include <smgr/io/Storage.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb {
+
+inline string stripVersion(string const& s)
+{
+    size_t v = s.find('@');
+    return (v != string::npos) ? (s.substr(0, v) + s.substr(s.find(':'))) : s;
+}
 
 class LogicalStore: public  LogicalOperator
 {
@@ -58,10 +65,9 @@ public:
         const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         assert(arrayName.find('@') == std::string::npos);
-        string baseName = arrayName.substr(0, arrayName.find('@'));
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(baseName,
+        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
                                                                                      query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalNodeId(),
+                                                                                     Cluster::getInstance()->getLocalInstanceId(),
                                                                                      SystemCatalog::LockDesc::COORD,
                                                                                      SystemCatalog::LockDesc::WR));
         boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
@@ -70,12 +76,14 @@ public:
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
-	{
-		assert(schemas.size() == 1);
+    {
+        assert(schemas.size() == 1);
         assert(_parameters.size() == 1);
 
         string arrayName = ((shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         ArrayDesc const& srcDesc = schemas[0];
+
+        //query->exclusiveLock(arrayName);
 
         //Ensure attributes names uniqueness.
         ArrayDesc dstDesc;
@@ -117,7 +125,19 @@ public:
                 if (!dimsMap.count(dim.getBaseName()))
                 {
                     dimsMap[dim.getBaseName()] = 1;
-                    newDim = dim;
+                    newDim = DimensionDesc(dim.getBaseName(), 
+                                           dim.getStartMin(), 
+                                           dim.getCurrStart(), 
+                                           dim.getCurrEnd(), 
+                                           dim.getEndMax(), 
+                                           dim.getChunkInterval(), 
+                                           dim.getChunkOverlap(), 
+                                           dim.getType(), 
+                                           dim.getFlags(), 
+                                           dim.getMappingArrayName(), 
+                                           dim.getComment(),
+                                           dim.getFuncMapOffset(),
+                                           dim.getFuncMapScale());
                 }
                 else
                 {
@@ -125,7 +145,19 @@ public:
                         stringstream ss;
                         ss << dim.getBaseName() << "_" << ++dimsMap[dim.getBaseName()];
                         if (dimsMap.count(ss.str()) == 0) {
-                            newDim = DimensionDesc(ss.str(), dim.getStartMin(), dim.getCurrStart(), dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(), dim.getChunkOverlap(), dim.getType(), dim.getSourceArrayName(), dim.getComment());
+                            newDim = DimensionDesc(ss.str(), 
+                                                   dim.getStartMin(), 
+                                                   dim.getCurrStart(), 
+                                                   dim.getCurrEnd(), 
+                                                   dim.getEndMax(), 
+                                                   dim.getChunkInterval(), 
+                                                   dim.getChunkOverlap(), 
+                                                   dim.getType(), 
+                                                   dim.getFlags(), 
+                                                   dim.getMappingArrayName(), 
+                                                   dim.getComment(),
+                                                   dim.getFuncMapOffset(),
+                                                   dim.getFuncMapScale());
                             dimsMap[ss.str()] = 1;
                             break;
                         }
@@ -148,18 +180,23 @@ public:
             {
                 if (!(srcDims[i].getStartMin() == dstDims[i].getStartMin()
                            && (srcDims[i].getEndMax() == dstDims[i].getEndMax() 
-                               || (i == 0
-                                   && srcDims[i].getEndMax() <= dstDims[i].getEndMax() 
+                               || (srcDims[i].getEndMax() < dstDims[i].getEndMax() 
                                    && ((srcDims[i].getLength() % srcDims[i].getChunkInterval()) == 0
                                        || srcDesc.getEmptyBitmapAttribute() != NULL)))
                            && srcDims[i].getChunkInterval() == dstDims[i].getChunkInterval()
                            && srcDims[i].getChunkOverlap() == dstDims[i].getChunkOverlap()
                            && srcDims[i].getType() == dstDims[i].getType()))
+                {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+                }
+                if (srcDims[i].getType() != TID_INT64 && stripVersion(srcDims[i].getMappingArrayName()) != stripVersion(dstDims[i].getMappingArrayName()))
+                {
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_STORE_ERROR1);
+                }
             }
-            
-            Attributes const& srcAttrs = srcDesc.getAttributes();
-            Attributes const& dstAttrs = dstDesc.getAttributes();
+
+            Attributes const& srcAttrs = srcDesc.getAttributes(true);
+            Attributes const& dstAttrs = dstDesc.getAttributes(true);
 
             if (srcAttrs.size() != dstAttrs.size())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
@@ -168,7 +205,20 @@ public:
                 if(srcAttrs[i].getType() != dstAttrs[i].getType() || (!dstAttrs[i].isNullable() && srcAttrs[i].isNullable()))
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
-            return ArrayDesc(dstDesc.getId(), arrayName, dstDesc.getAttributes(), dstDesc.getDimensions(), dstDesc.getFlags());
+            Dimensions newDims(dstDims.size());
+            for (size_t i = 0; i < dstDims.size(); i++) { 
+                DimensionDesc const& dim = dstDims[i];
+                newDims[i] = DimensionDesc(dim.getBaseName(),
+                                           dim.getNamesAndAliases(),
+                                           dim.getStartMin(), dim.getCurrStart(),
+                                           dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(),
+                                           dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
+                                           srcDims[i].getMappingArrayName(),
+                                           dim.getComment(),
+                                           dim.getFuncMapOffset(),
+                                           dim.getFuncMapScale());
+            }
+            return ArrayDesc(dstDesc.getId(), arrayName, dstDesc.getAttributes(), newDims, dstDesc.getFlags());
         }
 	}
 };

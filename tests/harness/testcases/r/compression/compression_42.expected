@@ -161,13 +161,11 @@ SCIDB QUERY : <select * into Ts_nf from build_sparse(Ts,string(x),true),build_sp
 
 SCIDB QUERY : <select * into Ts_rle from build_sparse(Ts,string(x),x<>0),build_sparse(Ti,x,x<>0)>
 [{-2}("-2",-2),{-1}("-1",-1)];
-[{0}("",0),{1}("1",1)];
+[{0}(),{1}("1",1)];
 [{2}("2",2),{3}("3",3)]
 
 SCIDB QUERY : <select * into Ts_d from build_sparse(Ts,string(x),x<>x),build_sparse(Ti,x,x<>x)>
-[{-2}("",0),{-1}("",0)];
-[{0}("",0),{1}("",0)];
-[{2}("",0),{3}("",0)]
+[]
 
 SCIDB QUERY : <select * into Ts_ns from build_sparse(Ts,string(x),x<>1 or x<>-1),build_sparse(Ti,x,x<>1 or x<>-1)>
 [{-2}("-2",-2),{-1}("-1",-1)];
@@ -175,19 +173,14 @@ SCIDB QUERY : <select * into Ts_ns from build_sparse(Ts,string(x),x<>1 or x<>-1)
 [{2}("2",2),{3}("3",3)]
 
 SCIDB QUERY : <select * into Ts_be from build_sparse(Ts,string(x),x=0 or x=3),build_sparse(Ti,x,x=0 or x=3)>
-[{-2}("",0),{-1}("",0)];
-[{0}("0",0),{1}("",0)];
-[{2}("",0),{3}("3",3)]
+[{0}("0",0),{1}()];
+[{2}(),{3}("3",3)]
 
 SCIDB QUERY : <select * into Ts_z from build_sparse(Ts,string(x),x=-1),build_sparse(Ti,x,x=-1)>
-[{-2}("",0),{-1}("-1",-1)];
-[{0}("",0),{1}("",0)];
-[{2}("",0),{3}("",0)]
+[{-2}(),{-1}("-1",-1)]
 
 SCIDB QUERY : <select * into Ts_bz from build_sparse(Ts,string(x),x=9),build_sparse(Ti,x,x=9)>
-[{-2}("",0),{-1}("",0)];
-[{0}("",0),{1}("",0)];
-[{2}("",0),{3}("",0)]
+[]
 
 SCIDB QUERY : <select * into Ts_nf from build_sparse(Ts,string(x),x=x),build_sparse(Ti,x,x=x)>
 [{-2}("-2",-2),{-1}("-1",-1)];
@@ -200,9 +193,7 @@ SCIDB QUERY : <select * into Ts_rle from Ts_nf>
 [{2}("2",2),{3}("3",3)]
 
 SCIDB QUERY : <select * into Ts_d from Ts_bz>
-[{-2}("",0),{-1}("",0)];
-[{0}("",0),{1}("",0)];
-[{2}("",0),{3}("",0)]
+[]
 
 SCIDB QUERY : <select * into Ts_ns from Ts_rle>
 [{-2}("-2",-2),{-1}("-1",-1)];
@@ -215,9 +206,7 @@ SCIDB QUERY : <select * into Ts_be from Ts_ns>
 [{2}("2",2),{3}("3",3)]
 
 SCIDB QUERY : <select * into Ts_bz from Ts_z>
-[{-2}("",0),{-1}("-1",-1)];
-[{0}("",0),{1}("",0)];
-[{2}("",0),{3}("",0)]
+[{-2}(),{-1}("-1",-1)]
 
 SCIDB QUERY : <select * into Ts_nf from Ts_be>
 [{-2}("-2",-2),{-1}("-1",-1)];
@@ -368,13 +357,11 @@ SCIDB QUERY : <select * into dTs_nf from build_sparse(dTs,string(x),true),build_
 
 SCIDB QUERY : <select * into dTs_rle from build_sparse(dTs,string(x),x<>0),build_sparse(dTi,x,x<>0)>
 [{-2}("-2",-2),{-1}("-1",-1)];
-[{0}("default",2),{1}("1",1)];
+[{0}(),{1}("1",1)];
 [{2}("2",2),{3}("3",3)]
 
 SCIDB QUERY : <select * into dTs_d from build_sparse(dTs,string(x),x<>x),build_sparse(dTi,x,x<>x)>
-[{-2}("default",2),{-1}("default",2)];
-[{0}("default",2),{1}("default",2)];
-[{2}("default",2),{3}("default",2)]
+[]
 
 SCIDB QUERY : <select * into dTs_ns from build_sparse(dTs,string(x),x<>1 or x<>-1),build_sparse(dTi,x,x<>1 or x<>-1)>
 [{-2}("-2",-2),{-1}("-1",-1)];
@@ -382,19 +369,14 @@ SCIDB QUERY : <select * into dTs_ns from build_sparse(dTs,string(x),x<>1 or x<>-
 [{2}("2",2),{3}("3",3)]
 
 SCIDB QUERY : <select * into dTs_be from build_sparse(dTs,string(x),x=0 or x=3),build_sparse(dTi,x,x=0 or x=3)>
-[{-2}("default",2),{-1}("default",2)];
-[{0}("0",0),{1}("default",2)];
-[{2}("default",2),{3}("3",3)]
+[{0}("0",0),{1}()];
+[{2}(),{3}("3",3)]
 
 SCIDB QUERY : <select * into dTs_z from build_sparse(dTs,string(x),x=-1),build_sparse(dTi,x,x=-1)>
-[{-2}("default",2),{-1}("-1",-1)];
-[{0}("default",2),{1}("default",2)];
-[{2}("default",2),{3}("default",2)]
+[{-2}(),{-1}("-1",-1)]
 
 SCIDB QUERY : <select * into dTs_bz from build_sparse(dTs,string(x),x=9),build_sparse(dTi,x,x=9)>
-[{-2}("default",2),{-1}("default",2)];
-[{0}("default",2),{1}("default",2)];
-[{2}("default",2),{3}("default",2)]
+[]
 
 SCIDB QUERY : <select * into dTs_nf from build_sparse(dTs,string(x),x=x),build_sparse(dTi,x,x=x)>
 [{-2}("-2",-2),{-1}("-1",-1)];

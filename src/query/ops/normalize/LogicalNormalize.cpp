@@ -45,10 +45,12 @@ class LogicalNormalize : public  LogicalOperator
     {
         assert(schemas.size());
 
-        if (schemas[0].getAttributes().size() != 1)
+        if (schemas[0].getAttributes().size() != 1 && (schemas[0].getAttributes().size() != 2 || !schemas[0].getAttributes()[1].isEmptyIndicator()))
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_NORMALIZE_ERROR1);
         if (schemas[0].getDimensions().size() != 1)
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_NORMALIZE_ERROR2);
+        if (schemas[0].getAttributes()[0].getType() != TID_DOUBLE)
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_NORMALIZE_ERROR3);
         return schemas[0];
 	}
 };

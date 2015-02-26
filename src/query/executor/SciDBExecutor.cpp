@@ -28,7 +28,7 @@
  * @brief SciDB API internal implementation to coordinate query execution.
  *
  * This implementation is used by server side of remote protocol and
- * can be loaded directly to user process and transform it into scidb node.
+ * can be loaded directly to user process and transform it into scidb instance.
  * Maybe useful for debugging and embedding scidb into users applications.
  */
 
@@ -104,33 +104,43 @@ class SciDBExecutor: public scidb::SciDB
         assert(queryResult.queryID == query->getQueryID());
         CurrentQueryScope queryScope(query->getQueryID());
         StatisticsScope sScope(&query->statistics);
-        LOG4CXX_TRACE(logger, "Parsing query(" << query->getQueryID() << "): " << queryString << "");
+        LOG4CXX_DEBUG(logger, "Parsing query(" << query->getQueryID() << "): " << queryString << "");
 
-        Query::Finalizer f = bind(&Query::releaseLocks, _1);
-        query->pushFinalizer(f);
+        try { 
+            query->start();
 
-        // first pass to collect the array names in the query
-        queryProcessor->parseLogical(query, afl);
+            Query::Finalizer f = bind(&Query::releaseLocks, _1);
+            query->pushFinalizer(f);
 
-        queryProcessor->inferArrayAccess(query);
+            // first pass to collect the array names in the query
+            queryProcessor->parseLogical(query, afl);
+            
+            queryProcessor->inferArrayAccess(query);
+            
+            query->acquireLocks();
+            query->arrayDescByNameCache.clear();
 
-        query->acquireLocks();
+            // second pass under the array locks
+            queryProcessor->parseLogical(query, afl);
+            LOG4CXX_TRACE(logger, "Query is parsed");
 
-        // second pass under the array locks
-        queryProcessor->parseLogical(query, afl);
-        LOG4CXX_TRACE(logger, "Query is parsed");
-        const ArrayDesc& desc = queryProcessor->inferTypes(query);
-        fillUsedPlugins(desc, queryResult.plugins);
-        LOG4CXX_TRACE(logger, "Types of query are inferred");
+            const ArrayDesc& desc = queryProcessor->inferTypes(query);
+            fillUsedPlugins(desc, queryResult.plugins);
+            LOG4CXX_TRACE(logger, "Types of query are inferred");
+            
+            std::ostringstream planString;
+            query->logicalPlan->toString(planString);
+            queryResult.explainLogical = planString.str();
 
-        std::ostringstream planString;
-        query->logicalPlan->toString(planString);
-        queryResult.explainLogical = planString.str();
+            queryResult.selective = !query->logicalPlan->getRoot()->isDdl();
+            queryResult.requiresExclusiveArrayAccess = query->doesExclusiveArrayAccess();
 
-        queryResult.selective = !query->logicalPlan->getRoot()->isDdl();
-        queryResult.requiresExclusiveArrayAccess = query->doesExclusiveArrayAccess();
-
-        LOG4CXX_DEBUG(logger, "The query is prepared")
+            query->stop();
+            LOG4CXX_DEBUG(logger, "The query is prepared");
+        } catch (const Exception& e) {
+            query->done(e.copy());
+            e.raise();
+        }
     }
 
     void executeQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
@@ -145,7 +155,7 @@ class SciDBExecutor: public scidb::SciDB
         assert(query->getQueryID() == queryResult.queryID);
         CurrentQueryScope queryScope(query->getQueryID());
         StatisticsScope sScope(&query->statistics);
-        LOG4CXX_TRACE(logger, "Executing query(" << query->getQueryID() << "): " << queryString << "")
+        LOG4CXX_DEBUG(logger, "Executing query(" << query->getQueryID() << "): " << queryString << "")
 
         if (!query->logicalPlan->getRoot()) {
             throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_WAS_EXECUTED);
@@ -155,16 +165,15 @@ class SciDBExecutor: public scidb::SciDB
         queryResult.explainLogical = planString.str();
         // Note: Optimization will be performed while execution
         boost::shared_ptr<Optimizer> optimizer =  Optimizer::create();
-
+        bool isDdl = true;
         try {
-           query->start();
-           query->validate();
-
-           while (queryProcessor->optimize(optimizer, query))
+            query->start();
+            
+            while (queryProcessor->optimize(optimizer, query))
             {
                 LOG4CXX_DEBUG(logger, "Query is optimized");
 
-                const bool isDdl = query->getCurrentPhysicalPlan()->isDdl();
+                isDdl = query->getCurrentPhysicalPlan()->isDdl();
                 query->isDDL = isDdl;
                 LOG4CXX_DEBUG(logger, "The physical plan is detected as " << (isDdl ? "DDL" : "DML") );
                 if (logger->isDebugEnabled())
@@ -177,7 +186,7 @@ class SciDBExecutor: public scidb::SciDB
                 // Execution of single part of physical plan
                 queryProcessor->preSingleExecute(query);
                 NetworkManager* networkManager = NetworkManager::getInstance();
-                size_t nodesCount = query->getNodesCount();
+                size_t instancesCount = query->getInstancesCount();
                 if (!isDdl)
                 {
                     std::ostringstream planString;
@@ -192,23 +201,23 @@ class SciDBExecutor: public scidb::SciDB
                         preparePhysicalPlanMsg->getRecord<scidb_msg::PhysicalPlan>();
                     preparePhysicalPlanMsg->setQueryID(query->getQueryID());
                     preparePhysicalPlanRecord->set_physical_plan(physicalPlan);
-                    boost::shared_ptr<const NodeLiveness> queryLiveness(query->getCoordinatorLiveness());
+                    boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
                     serializeQueryLiveness(queryLiveness, preparePhysicalPlanRecord);
 
                     uint32_t redundancy = Config::getInstance()->getOption<int>(CONFIG_REDUNDANCY);
-                    shared_ptr<const NodeMembership> membership(Cluster::getInstance()->getNodeMembership());
+                    shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
                     assert(membership);
                     if ((membership->getViewId() != queryLiveness->getViewId()) ||
-                        ((nodesCount + redundancy) < membership->getNodes().size())) {
+                        ((instancesCount + redundancy) < membership->getInstances().size())) {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
                     }
                     networkManager->sendOutMessage(preparePhysicalPlanMsg);
                     LOG4CXX_DEBUG(logger, "Prepare physical plan was sent out");
                     LOG4CXX_DEBUG(logger, "Waiting confirmation about preparing physical plan in queryID from "
-                                  << nodesCount - 1 << " nodes")
+                                  << instancesCount - 1 << " instances")
 
                     Semaphore::ErrorChecker ec = bind(&Query::validate, query);
-                    query->results.enter(nodesCount-1, ec);
+                    query->results.enter(instancesCount-1, ec);
                     boost::shared_ptr<MessageDesc> executePhysicalPlanMsg = boost::make_shared<MessageDesc>(mtExecutePhysicalPlan);
                     executePhysicalPlanMsg->setQueryID(query->getQueryID());
                     networkManager->sendOutMessage(executePhysicalPlanMsg);
@@ -226,9 +235,9 @@ class SciDBExecutor: public scidb::SciDB
 
                 if (!isDdl)
                 {
-                    // Wait for results from every node except itself
+                    // Wait for results from every instance except itself
                     Semaphore::ErrorChecker ec = bind(&Query::validate, query);
-                    query->results.enter(nodesCount-1, ec);
+                    query->results.enter(instancesCount-1, ec);
                     LOG4CXX_DEBUG(logger, "The responses are received");
                     /**
                      * Check error state
@@ -238,29 +247,28 @@ class SciDBExecutor: public scidb::SciDB
 
                 queryProcessor->postSingleExecute(query);
             }
-            query-> done();
+            query->done();
         } catch (const Exception& e) {
-
-            if (e.getShortErrorCode() != SCIDB_SE_THREAD)
+            if (!isDdl && e.getShortErrorCode() != SCIDB_SE_THREAD)
             {
-                shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, query->getQueryID());
-                NetworkManager::getInstance()->broadcast(errorMessage); //query may not have the node map, so broadcast to all
+                LOG4CXX_DEBUG(logger, "Broadcast ABORT message to all instances for query " << query->getQueryID());
+                shared_ptr<MessageDesc> abortMessage = makeAbortMessage(query->getQueryID());
+                NetworkManager::getInstance()->broadcast(abortMessage); //query may not have the instance map, so broadcast to all
             }
             query->done(e.copy());
             e.raise();
         }
+
         const clock_t stopClock = clock();
         query->statistics.executionTime = (stopClock - startClock) * 1000 / CLOCKS_PER_SEC;
 
         queryResult.queryID = query->getQueryID();
         queryResult.executionTime = query->statistics.executionTime;
         queryResult.explainPhysical = query->statistics.explainPhysical;
-
         queryResult.selective = query->getCurrentResultArray();
         if (queryResult.selective) {
             queryResult.array = query->getCurrentResultArray();
         }
-
         LOG4CXX_DEBUG(logger, "The result of query is returned")
     }
 
@@ -272,6 +280,16 @@ class SciDBExecutor: public scidb::SciDB
         StatisticsScope sScope(&query->statistics);
 
         query->handleCancel();
+    }
+
+    void completeQuery(QueryID queryID, void* connection) const
+    {
+        LOG4CXX_TRACE(logger, "Completing query " << queryID)
+        boost::shared_ptr<Query> query = Query::getQueryByID(queryID);
+
+        StatisticsScope sScope(&query->statistics);
+
+        query->handleComplete();
     }
 
 } _sciDBExecutor;

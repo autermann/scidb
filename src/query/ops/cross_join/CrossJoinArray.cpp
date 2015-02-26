@@ -237,13 +237,13 @@ namespace scidb
     CrossJoinChunkIterator::CrossJoinChunkIterator(CrossJoinChunk const& aChunk, int iterationMode)
     : array(aChunk.array),
       chunk(aChunk),
-      leftIterator(aChunk.leftChunk->getConstIterator(iterationMode)),
+      leftIterator(aChunk.leftChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       currentPos(aChunk.array.desc.getDimensions().size()),
       currentBucket(0),
       currentIndex(-1)
     {
         rightHash.clear();
-        shared_ptr<ConstChunkIterator> iter = aChunk.rightChunk->getConstIterator(iterationMode);
+        shared_ptr<ConstChunkIterator> iter = aChunk.rightChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE);
         Coordinates joinKey(array.nJoinDims);
         Coordinates rightLeftover(array.nRightDims - array.nJoinDims);
         while(!iter->end())

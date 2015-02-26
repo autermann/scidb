@@ -24,10 +24,10 @@ cmake_minimum_required(VERSION 2.6)
 
 project(SciDB)
 
-set(SCIDB_VERSION_MAJOR "11")
-set(SCIDB_VERSION_MINOR "12")
+set(SCIDB_VERSION_MAJOR "12")
+set(SCIDB_VERSION_MINOR "3")
 set(SCIDB_VERSION_PATCH "0")
-set(SCIDB_VERSION_CODENAME "final")
+set(SCIDB_VERSION_CODENAME "Snowdrop-final")
 
 set(SCIDB_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}.${SCIDB_VERSION_PATCH}")
 set(SCIDB_SHORT_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}")
@@ -56,7 +56,8 @@ elseif(GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     execute_process(COMMAND ${GIT_EXECUTABLE} svn info
         OUTPUT_VARIABLE GIT_SVN_INFO
         RESULT_VARIABLE GIT_EXEC_RES
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
     string(COMPARE NOTEQUAL ${GIT_EXEC_RES} 0 GIT_EXEC_RES)       
     if(${GIT_EXEC_RES})
@@ -193,6 +194,15 @@ find_package(ZLIB REQUIRED)
 find_package(BZip2 REQUIRED)
 find_package(LibReadline REQUIRED)
 find_package(Threads REQUIRED)
+find_package(XsltProc)
+find_package(Fop)
+find_package(DocBook)
+find_package(PythonInterp REQUIRED)
+if(XSLTPROC_EXECUTABLE AND FOP_EXECUTABLE AND DOCBOOK_XSL_FILE)
+    set(BUILD_USER_DOC 1)
+else()
+    set(BUILD_USER_DOC 0)
+endif()
 
 # System specific constants. Result will be written into src/system/System.h
 include(CheckFunctionExists)
@@ -226,17 +236,21 @@ set(DEBUG_SYMBOLS_EXTENSION "${DEBUG_SYMBOLS_DIRECTORY}")
 
 macro(extractDebugInfo input_dir input_file targ)
     if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
-        set(DEBUG_SYMBOLS_OUTPUT_DIRECTORY "${input_dir}/${DEBUG_SYMBOLS_DIRECTORY}")
+		if (NOT APPLE)
+	        set(DEBUG_SYMBOLS_OUTPUT_DIRECTORY "${input_dir}/${DEBUG_SYMBOLS_DIRECTORY}")
 
-        file(MAKE_DIRECTORY "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}")
-        add_custom_command(TARGET ${targ}
-            POST_BUILD
-            COMMAND objcopy --only-keep-debug "${input_dir}/${input_file}" "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION}"
-            COMMAND strip --strip-debug --strip-unneeded "${input_dir}/${input_file}"
-            COMMAND objcopy --add-gnu-debuglink=${DEBUG_SYMBOLS_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION} ${input_dir}/${input_file}
-            COMMAND chmod -x "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION}"
-            WORKING_DIRECTORY "${input_dir}"
-        )
+	        file(MAKE_DIRECTORY "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}")
+	        add_custom_command(TARGET ${targ}
+	            POST_BUILD
+	            COMMAND objcopy --only-keep-debug "${input_dir}/${input_file}" "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION}"
+	            COMMAND strip --strip-debug --strip-unneeded "${input_dir}/${input_file}"
+	            COMMAND objcopy --add-gnu-debuglink=${DEBUG_SYMBOLS_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION} ${input_dir}/${input_file}
+	            COMMAND chmod -x "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION}"
+	            WORKING_DIRECTORY "${input_dir}"
+	        )
+		else()
+			message(WARNING "Can not generate debug info for ${input_file}")
+		endif()
     endif()
 endmacro(extractDebugInfo)
 

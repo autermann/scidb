@@ -1,3 +1,4 @@
+
 /*
 **
 * BEGIN_COPYRIGHT
@@ -60,8 +61,8 @@ namespace scidb
  *
  * On first access catalog object will be created and as result private constructor of SystemCatalog
  * will be called where connection to PostgreSQL will be created. After this
- * cluster can be initialized. Node must add itself to SC or mark itself as online,
- * and it ready to work (though we must wait other nodes online, this can be
+ * cluster can be initialized. Instance must add itself to SC or mark itself as online,
+ * and it ready to work (though we must wait other instances online, this can be
  * implemented as PostgreSQL event which will be transparently transported to
  * NetworkManager through callback for example).
  */
@@ -72,57 +73,40 @@ namespace scidb
         class LockDesc
         {
           public:
-            typedef enum {INVALID_ROLE=0, COORD, WORKER} NodeRole;
+            typedef enum {INVALID_ROLE=0, COORD, WORKER} InstanceRole;
             typedef enum {INVALID_MODE=0, RD, WR, CRT, RM, RNT, RNF} LockMode;
 
             LockDesc(const std::string& arrayName,
-                     const QueryID&  queryId,
-                     const NodeID&   nodeId,
-                     const NodeRole& nodeRole,
-                     const LockMode& lockMode) :
-            _arrayName(arrayName),
-            _arrayId(0),
-            _queryId(queryId),
-            _nodeId(nodeId),
-            _arrayVersionId(0),
-            _arrayVersion(0),
-            _nodeRole(nodeRole),
-            _lockMode(lockMode) {}
+                     QueryID  queryId,
+                     InstanceID   instanceId,
+                     InstanceRole instanceRole,
+                     LockMode lockMode);
+
+            LockDesc(const std::string& arrayName,
+                     QueryID  queryId,
+                     InstanceID   instanceId,
+                     InstanceRole instanceRole,
+                     LockMode lockMode,
+                     uint64_t timestmap
+                );
 
             virtual ~LockDesc() {}
             const std::string& getArrayName() const { return _arrayName; }
-            const ArrayID& getArrayId() const { return _arrayId; }
-            const QueryID& getQueryId() const { return _queryId; }
-            const NodeID&  getNodeId() const { return _nodeId; }
-            const VersionID& getArrayVersion() const { return _arrayVersion; }
-            const ArrayID& getArrayVersionId() const { return _arrayVersionId; }
-            const NodeRole& getNodeRole() const { return _nodeRole; }
-            const LockMode& getLockMode() const { return _lockMode; }
-            void setArrayId(const ArrayID& arrayId) { _arrayId = arrayId; }
-            void setArrayVersionId(const ArrayID& versionId) { _arrayVersionId = versionId; }
-            void setArrayVersion(const VersionID& version) { _arrayVersion = version; }
-            void setLockMode(const LockMode& mode) { _lockMode = mode; }
-            std::string toString()
-            {
-                std::ostringstream out;
-                out << "Lock: arrayName="
-                    << _arrayName
-                    << ", arrayId="
-                    << _arrayId
-                    << ", queryId="
-                    << _queryId
-                    << ", nodeId="
-                    << _nodeId
-                    << ", nodeRole="
-                    << (_nodeRole==COORD ? "COORD" : "WORKER")
-                    << ", lockMode="
-                    << _lockMode
-                    << ", arrayVersion="
-                    << _arrayVersion
-                    << ", arrayVersionId="
-                    << _arrayVersionId;
-                return out.str();
-            }
+            ArrayID   getArrayId() const { return _arrayId; }
+            ArrayID   getImmutableArrayId() const { return _immutableArrayId; }
+            QueryID   getQueryId() const { return _queryId; }
+            InstanceID    getInstanceId() const { return _instanceId; }
+            VersionID getArrayVersion() const { return _arrayVersion; }
+            ArrayID   getArrayVersionId() const { return _arrayVersionId; }
+            InstanceRole  getInstanceRole() const { return _instanceRole; }
+            LockMode  getLockMode() const { return _lockMode; }
+            uint64_t  getTimestamp() const { return _timestamp; }
+            void setArrayId(ArrayID arrayId) { _arrayId = arrayId; }
+            void setArrayVersionId(ArrayID versionId) { _arrayVersionId = versionId; }
+            void setArrayVersion(VersionID version) { _arrayVersion = version; }
+            void setLockMode(LockMode mode) { _lockMode = mode; }
+            std::string toString();
+
           private:
             LockDesc(const LockDesc&);
             LockDesc& operator=(const LockDesc&);
@@ -132,11 +116,13 @@ namespace scidb
             std::string _arrayName;
             ArrayID  _arrayId;
             QueryID  _queryId;
-            NodeID   _nodeId;
+            InstanceID   _instanceId;
             ArrayID  _arrayVersionId;
             VersionID _arrayVersion;
-            NodeRole _nodeRole; // 1-coordinator, 2-worker
+            InstanceRole _instanceRole; // 1-coordinator, 2-worker
             LockMode  _lockMode; // {1=read, write, remove, renameto, renamefrom}
+            uint64_t  _timestamp;
+            ArrayID  _immutableArrayId;
         };
         
 /**
@@ -155,7 +141,7 @@ typedef boost::function<bool()> ErrorChecker;
  
 /**
  * Acquire a lock in the catalog. On a coordinator the method will block until the lock can be acquired.
- * On a worker node, the lock will not be acquired unless a corresponding coordinator lock exists.
+ * On a worker instance, the lock will not be acquired unless a corresponding coordinator lock exists.
  * @param[in] lockDesc the lock descriptor
  * @param[in] errorChecker that is allowed to interrupt the lock acquisition
  * @return true if the lock was acquired, false otherwise
@@ -170,7 +156,7 @@ typedef boost::function<bool()> ErrorChecker;
  bool unlockArray(const boost::shared_ptr<LockDesc>& lockDesc);
 
  /**
- * Update the lock with new fields. Array name, query ID, node ID, node role
+ * Update the lock with new fields. Array name, query ID, instance ID, instance role
  * cannot be updated after the lock acquisition.
  * @param[in] lockDesc the lock descriptor
  * @return true if the lock was released, false if it did not exist
@@ -178,29 +164,31 @@ typedef boost::function<bool()> ErrorChecker;
  bool updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc);
 
  /**
- * Get all arrays locks from the catalog for a given node.
- * @param[in] nodeId
+ * Get all arrays locks from the catalog for a given instance.
+ * @param[in] instanceId
  * @param[in] coordLocks locks acquired as in the coordinator role
  * @param[in] workerLocks locks acquired as in the worker role
  */
- void readArrayLocks(const NodeID nodeId,
+ void readArrayLocks(const InstanceID instanceId,
                      std::list< boost::shared_ptr<LockDesc> >& coordLocks,
                      std::list< boost::shared_ptr<LockDesc> >& workerLocks);
 
  /**
-  * Delete all arrays locks from the catalog on a given node.
-  * @param[in] nodeId
+  * Delete all arrays locks from the catalog on a given instance.
+  * @param[in] instanceId
   * @return number of locks deleted
   */
- uint32_t deleteArrayLocks(const NodeID& nodeId);
+ uint32_t deleteArrayLocks(const InstanceID& instanceId);
 
  /**
-  * Delete all arrays locks from the catalog for a given query on a given node.
-  * @param[in] nodeId
+  * Delete all arrays locks from the catalog for a given query on a given instance.
+  * @param[in] instanceId
   * @param[in] queryId
   * @return number of locks deleted
   */
-uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
+uint32_t deleteArrayLocks(const InstanceID& instanceId, const QueryID& queryId);
+
+
 
  /**
   * Check if a coordinator lock for given array name and query ID exists in the catalog
@@ -211,6 +199,14 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
  boost::shared_ptr<LockDesc> checkForCoordinatorLock(const std::string& arrayName,
                                                      const QueryID& queryId);
 
+
+        /**
+         * Get number of array using specified coordinate mapping array 
+         * @param arrayName array definining coordinatres mapping
+         *
+         * @return number of references to coordinates mapping array
+         */
+        size_t countReferences(std::string const& arrayName);
 
         /**
          * Populate PostgreSQL database with metadata, generate cluster UUID and return
@@ -234,7 +230,7 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
         /**
          * Add new array to catalog by descriptor
          * @param[in] array_desc Descriptor populated with array metadata
-         * @param[in] ps Partitioning scheme for mapping array data to nodes
+         * @param[in] ps Partitioning scheme for mapping array data to instances
          * @return global ID assigned to the created array
          */
         ArrayID addArray(const ArrayDesc &array_desc, PartitioningSchema ps);
@@ -311,7 +307,7 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
          * Returns array metadata by its ID
          * @param[in] id array identifier
          * @return Array descriptor
-         */        
+         */
         boost::shared_ptr<ArrayDesc> getArrayDesc(const ArrayID id);
 
         /**
@@ -322,7 +318,7 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
         PartitioningSchema getPartitioningSchema(const ArrayID arrayId);
 
         /**
-         * Delete array from catalog by its name.
+         * Delete array from catalog by its name and all of its versions if this is the base array.
          * @param[in] array_name Array name
          * @return true if array was deleted, false if it did not exist
          */
@@ -335,29 +331,22 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
         void deleteArray(const ArrayID id);
 
         /**
-         * Remove array metadata from cache
-         * @param[in] array_name Array name
-         */
-        void deleteArrayCache(const std::string &array_name);
-
-        /**
-         * Remove array metadata from cache
+         * Delete cached array metadata
          * @param id array identifier
          */
         void deleteArrayCache(const ArrayID id);
-
-        /**
-         * Cleanup local system catalog cache
+        
+         /**
+         * Invalidate cached array metadata
+         * @param id array identifier
          */
-        void cleanupCache();
-
+        void invalidateArrayCache(const ArrayID id);
+        
         /**
-         * Delete all array descriptors for a given base name from the cache.
-         * This includes the version and index array descriptors
-         * i.e. baseArrayName@* & baseArrayName:*
-         * @param baseArrayName
+         * Invalidate cached array metadata
+         * @param id array identifier
          */
-        void deleteAllArrayVersionsFromCacheByName(const std::string& baseArrayName);
+        void invalidateArrayCache(std::string const& array_name);
         
         /**
          * Create new version of the array
@@ -419,44 +408,44 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
         void updateArrayBoundaries(ArrayID id, Coordinates const& low, Coordinates const& high);
 
         /**
-         * Get number of registered nodes
-         * return total number of nodes registered in catalog
+         * Get number of registered instances
+         * return total number of instances registered in catalog
          */
-        uint32_t getNumberOfNodes() const;
+        uint32_t getNumberOfInstances() const;
 
         /**
-         * Add new node to catalog
-         * @param[in] node Node descriptor
-         * @return Identifier of node (ordinal number actually)
+         * Add new instance to catalog
+         * @param[in] instance Instance descriptor
+         * @return Identifier of instance (ordinal number actually)
          */
-        uint64_t addNode(const NodeDesc &node) const;
+        uint64_t addInstance(const InstanceDesc &instance) const;
 
         /**
-         * Return all nodes registered in catalog.
-         * @param[out] nodes Nodes vector
+         * Return all instances registered in catalog.
+         * @param[out] instances Instances vector
          */
-        void getNodes(Nodes &nodes) const;
+        void getInstances(Instances &instances) const;
 
         /**
-         * Get node metadata by its identifier
-         * @param[in] node_id Node identifier
-         * @param[out] node Node metadata
+         * Get instance metadata by its identifier
+         * @param[in] instance_id Instance identifier
+         * @param[out] instance Instance metadata
          */
-        void getNode(NodeID node_id, NodeDesc &node) const;
+        void getClusterInstance(InstanceID instance_id, InstanceDesc &instance) const;
 
         /**
-         * Switch node to online and update its host and port
-         * @param[in] node_id Node identifier
-         * @param[in] host Node host
-         * @param[in] port Node port
+         * Switch instance to online and update its host and port
+         * @param[in] instance_id Instance identifier
+         * @param[in] host Instance host
+         * @param[in] port Instance port
          */
-        void markNodeOnline(const NodeID node_id, const std::string host, const uint16_t port) const;
+        void markInstanceOnline(const InstanceID instance_id, const std::string host, const uint16_t port) const;
 
         /**
-         * Switch node to offline
-         * @param[in] node_id Node identifier
+         * Switch instance to offline
+         * @param[in] instance_id Instance identifier
          */
-        void markNodeOffline(const NodeID node_id) const;
+        void markInstanceOffline(const InstanceID instance_id) const;
 
         /**
          * Set default compression method for the specified array attribute:
@@ -505,33 +494,34 @@ uint32_t deleteArrayLocks(const NodeID& nodeId, const QueryID& queryId);
          */
         void removeLibrary(const std::string& libraryName) const;
 
-      private:
+    private:
 
     /**
      * Helper method to get an appropriate SQL string for a given lock
      */
     static std::string getLockInsertSql(const boost::shared_ptr<LockDesc>& lockDesc);
 
-        /**
-         * Default constructor for SystemCatalog()
-         */
-        SystemCatalog();
-        ~SystemCatalog();
+    /// SQL to garbage-collect unused mapping arrays
+    static const std::string cleanupMappingArraysSql;
 
-        boost::shared_ptr<ArrayDesc> reloadArrayDesc(const ArrayID array_id, bool throwException);
+    /**
+     * Default constructor for SystemCatalog()
+     */
+    SystemCatalog();
+    virtual ~SystemCatalog();
 
-        bool _initialized;
-        pqxx::connection *_connection;
-        std::string _uuid;
+    bool _initialized;
+    pqxx::connection *_connection;
+    std::string _uuid;
 
-        std::map<ArrayID, boost::shared_ptr<ArrayDesc> > arrayDescByID;
+    //FIXME: libpq don't have ability of simultaneous access to one connection from
+    // multiple threads even on read-only operatinos, so every operation must
+    // be locked with this mutex while system catalog using PostgreSQL as storage.
+    static Mutex _pgLock;
 
-        //FIXME: libpq don't have ability of simultaneous access to one connection from
-        // multiple threads even on read-only operatinos, so every operation must
-        // be locked with this mutex while system catalog using PostgreSQL as storage.
-        static Mutex _pgLock;
+    friend class Singleton<SystemCatalog>;
 
-        friend class Singleton<SystemCatalog>;
+    std::map<ArrayID, boost::shared_ptr<ArrayDesc> > _arrDescCache;
     };
 
 } // namespace catalog

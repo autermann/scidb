@@ -48,7 +48,7 @@ namespace scidb
         {
             throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_FILE_IMPORT_FAILED)
                 << array.scanner.getFilePath()
-                << Query::getQueryByID(Query::getCurrentQueryID())->getNodeID()
+                << Query::getQueryByID(Query::getCurrentQueryID())->getInstanceID()
                 << array.getName()
                 << array.scanner.getLine()
                 << array.scanner.getColumn()
@@ -246,7 +246,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& filePath, boost::sh
                 bool inParen = false;
                 if (tkn == TKN_TUPLE_BEGIN) {
                     inParen = true;
-                    tkn =  scanner.get();
+                    tkn = scanner.get();
                 }
                 if (tkn == TKN_LITERAL || (inParen && tkn == TKN_COMMA)) {
                     for (size_t i = 0; i < nAttrs; i++) {
@@ -286,14 +286,14 @@ InputArray::InputArray(ArrayDesc const& array, string const& filePath, boost::sh
                             if (chunkIterators[i]->getPosition() != pos)
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR7);
                         }
-                        if (inParen && (tkn == TKN_COMMA || tkn == TKN_TUPLE_END)) {
+                        if ((inParen && (tkn == TKN_COMMA || tkn == TKN_TUPLE_END)) || (!inParen && i != 0)) {
                             if (i == emptyTagAttrID) {
                                 attrVal[i].setBool(true);
                                 chunkIterators[i]->writeItem(attrVal[i]);
                             } else if (chunkIterators[i]->getChunk().isRLE()/* && emptyTagAttrID != INVALID_ATTRIBUTE_ID*/) {
                                 chunkIterators[i]->writeItem(attrs[i].getDefaultValue());
                             }
-                            if (tkn == TKN_COMMA) {
+                            if (inParen && tkn == TKN_COMMA) {
                                 tkn = scanner.get();
                             }
                         } else {
@@ -316,7 +316,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& filePath, boost::sh
                             }                                    
                             chunkIterators[i]->writeItem(attrVal[i]);
                             tkn = scanner.get();
-                            if (i+1 < nAttrs && tkn == TKN_COMMA) {
+                            if (inParen && i+1 < nAttrs && tkn == TKN_COMMA) {
                                 tkn = scanner.get();
                             }
                         }

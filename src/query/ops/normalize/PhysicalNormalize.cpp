@@ -51,7 +51,7 @@ class PhysicalNormalize: public  PhysicalOperator
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psLocalNode);
+        return ArrayDistribution(psLocalInstance);
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
@@ -65,10 +65,10 @@ class PhysicalNormalize: public  PhysicalOperator
                                       boost::shared_ptr<Query> query)
 	{
         boost::shared_ptr<Array> inputArray = inputArrays[0];
-        if (query->getNodesCount() > 1) { 
-            uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getNodeID() : query->getCoordinatorID();
-            inputArray = redistribute(inputArray, query, psLocalNode, "", coordinatorID);
-            if (query->getNodeID() != coordinatorID) { 
+        if (query->getInstancesCount() > 1) { 
+            uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getInstanceID() : query->getCoordinatorID();
+            inputArray = redistribute(inputArray, query, psLocalInstance, "", coordinatorID);
+            if (query->getInstanceID() != coordinatorID) { 
                 return boost::shared_ptr<Array>(new MemArray(_schema));
             }
         }
@@ -82,8 +82,11 @@ class PhysicalNormalize: public  PhysicalOperator
                  ++(*chunkIterator))
             { 
                 // TODO: insert converter here
-                const double v = chunkIterator->getItem().getDouble();
-                len += v*v;
+                Value const& v = chunkIterator->getItem();
+                if (!v.isNull()) { 
+                    const double d = v.getDouble();
+                    len += d*d;
+                }
             }
         }
         return boost::shared_ptr<Array>(new NormalizeArray(_schema, inputArray, sqrt(len)));

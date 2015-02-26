@@ -48,6 +48,9 @@ public:
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {
         assert(schemas.size() == 2);
+        if (schemas[0].getAttributes(true).size() != schemas[1].getDimensions().size()) { 
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_LOOKUP_BAD_PARAM);
+        }
         return ArrayDesc("lookup",  schemas[1].getAttributes(), schemas[0].getDimensions());
 	}
 };

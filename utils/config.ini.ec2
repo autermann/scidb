@@ -1,6 +1,6 @@
 [ec2]
-node-0=10.96.223.160,0
-node-1=10.96.222.17,1
+server-0=10.96.223.160,0
+server-1=10.96.222.17,1
 db_user=ec2
 db_passwd=ec2
 install_root=@CMAKE_INSTALL_PREFIX@

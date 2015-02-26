@@ -197,6 +197,40 @@ namespace scidb
         return 0;
     }
     
+    Coordinates ConstChunk::getHighBoundary(bool withOverlap) const
+    {
+        boost::shared_ptr<ConstChunkIterator> i = getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS | (withOverlap ? 0 : ConstChunkIterator::IGNORE_OVERLAPS));
+        Coordinates high = getFirstPosition(withOverlap);
+        size_t nDims = high.size();
+        while (!i->end()) { 
+            Coordinates const& pos = i->getPosition();
+            for (size_t j = 0; j < nDims; j++) {
+                if (pos[j] > high[j]) { 
+                    high[j] = pos[j];
+                }
+            }
+            ++(*i);
+        }
+        return high;
+    }
+
+    Coordinates ConstChunk::getLowBoundary(bool withOverlap) const
+    {
+        boost::shared_ptr<ConstChunkIterator> i = getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS | (withOverlap ? 0 : ConstChunkIterator::IGNORE_OVERLAPS));
+        Coordinates low = getLastPosition(withOverlap);
+        size_t nDims = low.size();
+        while (!i->end()) { 
+            Coordinates const& pos = i->getPosition();
+            for (size_t j = 0; j < nDims; j++) {
+                if (pos[j] < low[j]) { 
+                    low[j] = pos[j];
+                }
+            }
+            ++(*i);
+        }
+        return low;
+    }
+
     ConstChunk const* ConstChunk::getBitmapChunk() const
     {
         return this;
@@ -219,11 +253,12 @@ namespace scidb
             materializedChunk->initialize(*this);
             materializedChunk->setBitmapChunk((Chunk*)getBitmapChunk());
             boost::shared_ptr<ConstChunkIterator> src 
-                = getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE);
+                = getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE
+                                   |(materializedChunk->getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
             shared_ptr<Query> emptyQuery;
             boost::shared_ptr<ChunkIterator> dst 
                 = materializedChunk->getIterator(emptyQuery, 
-                                                 (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK);
+                                                 (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
             bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
             src->setVectorMode(vectorMode);
             dst->setVectorMode(vectorMode);
@@ -517,7 +552,23 @@ namespace scidb
             && (getAttributeDesc().isEmptyIndicator() || getArrayDesc().getEmptyBitmapAttribute() == NULL);
     }
 
-        bool ConstChunk::isReadOnly() const
+    bool ConstChunk::isSolid() const
+    {
+        Dimensions const& dims = getArrayDesc().getDimensions();
+        Coordinates const& first = getFirstPosition(false);
+        Coordinates const& last = getLastPosition(false);
+        for (size_t i = 0, n = dims.size(); i < n; i++) {
+            if (dims[i].getChunkOverlap() != 0 || size_t(last[i] - first[i] + 1) != dims[i].getChunkInterval()) {
+                return false;
+            }
+        }
+        return !isSparse()
+            && !getAttributeDesc().isNullable()
+            && !TypeLibrary::getType(getAttributeDesc().getType()).variableSize()
+            && getArrayDesc().getEmptyBitmapAttribute() == NULL;
+    }
+
+    bool ConstChunk::isReadOnly() const
     {
         return true;
     }
@@ -576,6 +627,16 @@ namespace scidb
     ConstChunk::~ConstChunk()
     {
         delete materializedChunk; 
+    }
+
+    void Array::getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query) const
+    {
+        size_t nDims = intCoords.size();
+        origCoords.resize(nDims);
+        ArrayDesc const& desc = getArrayDesc();
+        for (size_t i = 0; i < nDims; i++) { 
+            origCoords[i] = desc.getOriginalCoordinate(i, intCoords[i], query);
+        }
     }
 
     std::string const& Array::getName() const
@@ -754,9 +815,10 @@ namespace scidb
         Chunk& outChunk = newChunk(pos, chunk.getCompressionMethod());
         try {
             boost::shared_ptr<Query> query(getQuery());
-            outChunk.setRLE(chunk.isRLE());
-            if (chunk.isMaterialized() && chunk.getAttributeDesc().isNullable() == outChunk.getAttributeDesc().isNullable()) {
+            outChunk.setSparse(chunk.isSparse());
+            if (chunk.isMaterialized() && chunk.getArrayDesc().hasOverlap() == outChunk.getArrayDesc().hasOverlap() && chunk.getAttributeDesc().isNullable() == outChunk.getAttributeDesc().isNullable() && (chunk.isRLE() == outChunk.isRLE() || chunk.isSolid())) {
                 PinBuffer scope(chunk);
+                outChunk.setRLE(chunk.isRLE());
                 if (emptyBitmap && chunk.getBitmapSize() == 0) { 
                     size_t size = chunk.getSize() + emptyBitmap->packedSize();
                     outChunk.allocate(size);
@@ -767,7 +829,6 @@ namespace scidb
                     outChunk.allocate(size);
                     memcpy(outChunk.getData(), chunk.getData(), size);
                 }
-                outChunk.setSparse(chunk.isSparse());
                 outChunk.setCount(chunk.isCountKnown() ? chunk.count() : 0);
                 outChunk.write(query);
             } else {
@@ -775,9 +836,9 @@ namespace scidb
                     chunk.makeClosure(outChunk, emptyBitmap);
                     outChunk.write(query);
                 } else { 
-                    boost::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE);
+                    boost::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(outChunk.getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
                     boost::shared_ptr<ChunkIterator> dst = outChunk.getIterator(query,
-                                                                                (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(chunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0));
+                                                                                (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(chunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
                     bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
                     src->setVectorMode(vectorMode);
                     dst->setVectorMode(vectorMode);
@@ -788,7 +849,7 @@ namespace scidb
                         dst->writeItem(src->getItem());
                         ++(*src);
                     }
-                    if (!vectorMode && !chunk.getArrayDesc().containsOverlaps()) {
+                    if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().containsOverlaps()) {
                         outChunk.setCount(count);
                     }
                     dst->flush();

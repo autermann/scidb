@@ -121,7 +121,7 @@ namespace scidb {
       inPos(outPos.size()),
       first(chunk.getFirstPosition(!(iterationMode & IGNORE_OVERLAPS))),
       last(chunk.getLastPosition(!(iterationMode & IGNORE_OVERLAPS))),
-      inputIterator(chunk.getArrayIterator().getInputIterator()->getChunk().getConstIterator(iterationMode)),
+      inputIterator(chunk.getArrayIterator().getInputIterator()->getChunk().getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       mode(iterationMode)
     {
         reset();

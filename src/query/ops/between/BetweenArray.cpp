@@ -46,6 +46,7 @@ namespace scidb
         } else { 
             iterationMode &= ~ChunkIterator::TILE_MODE;
         }        
+        iterationMode &= ~ChunkIterator::INTENDED_TILE_MODE;
         return boost::shared_ptr<ConstChunkIterator>(
             attr.isEmptyIndicator()
             ? (attrID >= array.getInputArray()->getArrayDesc().getAttributes().size())
@@ -380,7 +381,7 @@ namespace scidb
     : CoordinatesMapper(aChunk),
       array(aChunk.array),
       chunk(aChunk),
-      inputIterator(aChunk.getInputChunk().getConstIterator(iterationMode)),
+      inputIterator(aChunk.getInputChunk().getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       currPos(array.dims.size()),
       isSparse(inputIterator->getChunk().isSparse()),
       mode(iterationMode),

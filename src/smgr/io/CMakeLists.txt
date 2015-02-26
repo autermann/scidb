@@ -23,6 +23,7 @@
 set (io_src
     DBLoader.cpp
     Storage.cpp
+    ReplicationManager.cpp
 )
 
 file(GLOB io_include "*.h")

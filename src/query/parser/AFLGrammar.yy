@@ -10,6 +10,9 @@
 
 #include "array/Metadata.h"
 
+#include "system/Config.h"
+#include "system/SciDBConfigOptions.h"
+
 #include "query/parser/AST.h"
 #include "query/parser/ParsingContext.h"
 #include "util/na.h"
@@ -50,7 +53,7 @@
 %left UNARY
 
 %type <node>    start statement create_array_statement immutable_modifier identifier_clause array_attribute
-    typename array_attribute_list array_dimension array_dimension_list
+    distinct typename array_attribute_list array_dimension array_dimension_list
     dimension_boundary dimension_boundaries
     function function_argument_list function_argument nullable_modifier empty_modifier
     default default_value compression reserve null_value expression atom constant
@@ -62,7 +65,7 @@
 %destructor { delete $$; $$ = NULL; } IDENTIFIER STRING_LITERAL <node>
 
 %token ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END AGG
-    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC
+    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC ALL DISTINCT
 
 %token    EOQ         0 "end of query"
 %token    EOL            "end of line"
@@ -130,7 +133,7 @@ empty_modifier:
     }
     | dummy
     {
-        $$ = new AstNodeBool(emptyable, CONTEXT(@1), false);
+        $$ = new AstNodeBool(emptyable, CONTEXT(@1), Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT));
     }
     ;
 
@@ -270,12 +273,12 @@ array_dimension_list:
     ;
 
 array_dimension:
-    IDENTIFIER '=' dimension_boundaries ',' INTEGER ',' INTEGER
+    identifier_clause '=' dimension_boundaries ',' INTEGER ',' INTEGER
     {
         if ($5 <= 0 || $5 > std::numeric_limits<uint32_t>::max())
         {
             delete $1;
-            glue.error2(@2, boost::str(boost::format("Chunk length must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
         }
 
         if ($7 < 0 || $7 > std::numeric_limits<uint32_t>::max())
@@ -286,24 +289,37 @@ array_dimension:
     
         $$ = new AstNode(dimension, CONTEXT(@1),
             dimensionArgCount, 
-            new AstNodeString(dimensionName, CONTEXT(@1), *$1),
+            $1,
             $3,
             new AstNodeInt64(dimensionChunkInterval, CONTEXT(@5), $5),
             new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@7), $7));
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
-    |
-    IDENTIFIER '(' typename ')' '=' dimension_boundary ',' INTEGER ',' INTEGER
+    | identifier_clause
     {
-        if ($8 <= 0 || $8 > std::numeric_limits<uint32_t>::max())
+        $$ = new AstNode(dimension, CONTEXT(@1),
+            dimensionArgCount, 
+            $1,
+            new AstNode(dimensionBoundaries, CONTEXT(@1),
+                dimensionBoundaryArgCount,
+                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), 0),
+                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE)),
+            NULL,
+            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
+    }    
+    | identifier_clause '(' distinct typename ')' '=' dimension_boundary ',' INTEGER ',' INTEGER
+    {
+        if ($9 <= 0 || $9 > std::numeric_limits<uint32_t>::max())
         {
             delete $1;
-            glue.error2(@2, boost::str(boost::format("Chunk length must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
         }
 
-        if ($10 < 0 || $10 > std::numeric_limits<uint32_t>::max())
+        if ($11 < 0 || $11 > std::numeric_limits<uint32_t>::max())
         {
             delete $1;
             glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
@@ -311,12 +327,26 @@ array_dimension:
 
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
             nIdimensionArgCount,
-            new AstNodeString(dimensionName, CONTEXT(@1), *$1),
+            $1,
             $3,
-            $6,
-            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@8), $8),
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@10), $10));
-        delete $1;
+            $4,
+            $7,
+            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@8), $9),
+            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@10), $11));
+    }
+    | identifier_clause '(' distinct typename ')'
+    {
+        $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
+            nIdimensionArgCount,
+            $1,
+            $3,
+            $4,
+            new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE),
+            NULL,
+            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
     }
     ;
 
@@ -356,6 +386,22 @@ negative_index:
     {
         $$ = false;
     }
+    ;
+
+distinct:
+    ALL 
+    {
+        $$ = new AstNodeBool(distinct, CONTEXT(@1), false);
+    }
+    | 
+    DISTINCT 
+    {
+        $$ = new AstNodeBool(distinct, CONTEXT(@1), true);
+    }
+    | 
+    {
+        $$ = NULL;
+    }    
     ;
 
 //FIXME: need more flexible way
@@ -423,6 +469,17 @@ function:
             $5,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
         delete $1;
+    }
+    | reference AS identifier_clause
+    {
+        $$ = new AstNode(function, CONTEXT(@1),
+            functionArgCount,
+            new AstNodeString(functionName, CONTEXT(@1), "scan"),
+            new AstNode(functionArguments, CONTEXT(@1), 1,
+                $1
+            ),
+            $3,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
     }
     ;
     

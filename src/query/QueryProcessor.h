@@ -114,13 +114,13 @@ public:
     virtual void setParameters(boost::shared_ptr<Query> query, QueryParamMap queryParams) = 0;
 
     /**
-     * Execute the physical plan in query only for coordinator node.
+     * Execute the physical plan in query only for coordinator instance.
      * It's useful for some preparations before execution.
      */
     virtual void preSingleExecute(boost::shared_ptr<Query> query) = 0;
 
     /**
-     * Execute the physical plan in query only for coordinator node after execute part on all nodes.
+     * Execute the physical plan in query only for coordinator instance after execute part on all instances.
      */
     virtual void postSingleExecute(boost::shared_ptr<Query> query) = 0;
 

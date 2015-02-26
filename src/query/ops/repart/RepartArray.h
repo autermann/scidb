@@ -33,6 +33,7 @@
 
 #include "array/MemArray.h"
 #include "array/DelegateArray.h"
+#include <set>
 
 namespace scidb {
 
@@ -95,12 +96,19 @@ class RepartArrayIterator : public DelegateArrayIterator
     MemChunk repartChunk; // materialized result chunk (used for sparse arrays)
     vector<size_t> chunkInterval;
     vector<size_t> chunkOverlap;
+    bool hasChunkSet;
+    set<Coordinates, CoordinatesLess> chunkSet;
+    set<Coordinates, CoordinatesLess>::const_iterator chunkSetIterator;
+    
     boost::shared_ptr<ConstArrayIterator> emptyIterator;
     void fillSparseChunk(Coordinates const& chunkPos);
     bool containsChunk(Coordinates const& chunkPos);
     boost::weak_ptr<Query> _query;
     int overlapMode;
     ConstChunk const* currChunk;
+
+    void findAllOverlappedChunks(Coordinates const& pos);
+
   public:
     virtual ConstChunk const& getChunk();
     virtual Coordinates const& getPosition();

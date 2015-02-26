@@ -155,7 +155,7 @@ typedef const vector<BaseLogicalOperatorFactory*>& (*GetLogicalOperatorFactories
 typedef const vector<BasePhysicalOperatorFactory*>& (*GetPhysicalOperatorFactories)();
 typedef const vector<Type>& (*GetTypes)();
 typedef const vector<FunctionDescription>& (*GetFunctions)();
-typedef const vector<AggregateFactoryPtr>& (*GetAggregates)();
+typedef const vector<AggregatePtr>& (*GetAggregates)();
 
 
 template<typename T>
@@ -213,9 +213,9 @@ void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalo
     GetAggregates getAggregates = reinterpret_cast<GetAggregates>(reinterpret_cast<size_t>(openSymbol(library, "GetAggregates")));
     if (getAggregates)
     {
-        const vector< AggregateFactoryPtr>& aggregates = getAggregates();
+        const vector< AggregatePtr>& aggregates = getAggregates();
         for (size_t i = 0; i < aggregates.size(); i++) {
-            AggregateLibrary::getInstance() -> addAggregateFactory(aggregates[i]);
+            AggregateLibrary::getInstance() -> addAggregate(aggregates[i]);
         }
     }
 

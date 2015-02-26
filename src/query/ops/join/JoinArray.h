@@ -83,13 +83,14 @@ class JoinEmptyableArrayIterator : public DelegateArrayIterator
     virtual void operator ++();
     virtual bool end();
 	virtual ConstChunk const& getChunk();
-    JoinEmptyableArrayIterator(JoinEmptyableArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator, boost::shared_ptr<ConstArrayIterator> joinIterator);
+    JoinEmptyableArrayIterator(JoinEmptyableArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator, boost::shared_ptr<ConstArrayIterator> joinIterator, bool chunkLevelJoin);
 
   private:
     void alignIterators();
     
-    boost::shared_ptr<ConstArrayIterator> joinIterator;
-    bool hasCurrent;
+    boost::shared_ptr<ConstArrayIterator> _joinIterator;
+    bool _hasCurrent;
+    bool _chunkLevelJoin;
 };
 
 class JoinEmptyableArray : public DelegateArray

@@ -29,34 +29,34 @@ SCIDB QUERY : <create immutable empty array T2 <a:string, b:int32 compression 'n
 Query was executed successfully
 
 SCIDB QUERY : <show(Ts)>
-[("Ts<a:string NOT NULL,empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts<a:string> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Tsn)>
-[("Tsn<a:string NOT NULL DEFAULT \"test\",empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Tsn<a:string DEFAULT \"test\"> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_rle)>
-[("Ts_rle<a:string NOT NULL COMPRESSION 'rle',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_rle<a:string COMPRESSION 'rle'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_d)>
-[("Ts_d<a:int32 NOT NULL COMPRESSION 'dictionary',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_d<a:int32 COMPRESSION 'dictionary'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_ns)>
-[("Ts_ns<a:int64 NOT NULL COMPRESSION 'null suppression',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_ns<a:int64 COMPRESSION 'null suppression'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_be)>
-[("Ts_be<a:bool NOT NULL COMPRESSION 'bitmap encoding',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_be<a:bool COMPRESSION 'bitmap encoding'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_z)>
-[("Ts_z<a:float NOT NULL COMPRESSION 'zlib',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_z<a:float COMPRESSION 'zlib'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_bz)>
-[("Ts_bz<a:double NOT NULL COMPRESSION 'bzlib',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_bz<a:double COMPRESSION 'bzlib'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(Ts_nf)>
-[("Ts_nf<a:string NOT NULL COMPRESSION 'null filter',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("Ts_nf<a:string COMPRESSION 'null filter'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <show(T2)>
-[("T2<a:string NOT NULL,b:int32 NOT NULL COMPRESSION 'null suppression',empty_indicator:indicator NOT NULL> [x=-2:3,2,1]")]
+[("T2<a:string,b:int32 COMPRESSION 'null suppression'> [x=-2:3,2,1]")]
 
 SCIDB QUERY : <remove(Ts)>
 Query was executed successfully

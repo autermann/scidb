@@ -58,7 +58,9 @@ class LogicalCrossJoin: public LogicalOperator
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {
-        assert((_parameters.size() & 1) == 0);
+        if ((_parameters.size() & 1) != 0) {
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_CROSSJOIN_ERROR2);
+        }
         assert(schemas.size() == 2);
 
         ArrayDesc const& leftArrayDesc = schemas[0];
@@ -140,7 +142,6 @@ class LogicalCrossJoin: public LogicalOperator
             rightCrossJoinOnMask |=  (uint64_t)1 << r;
             
             if (leftDimensions[l].getType() != TID_INT64 || rightDimensions[r].getType() != TID_INT64
-                    || leftDimensions[l].getLength() != rightDimensions[r].getLength()
                     || leftDimensions[l].getStart() != rightDimensions[r].getStart()
                     || leftDimensions[l].getChunkInterval() != rightDimensions[r].getChunkInterval()
                     || leftDimensions[l].getChunkOverlap() != rightDimensions[r].getChunkOverlap())
@@ -157,10 +158,22 @@ class LogicalCrossJoin: public LogicalOperator
             ++j;
         }
         for (size_t i = 0; i < nRightDims; i++) { 
-            if (CrossJoinOnDimensions[i] < 0) {
+            if (CrossJoinOnDimensions[i] < 0)
+            {
                 CrossJoinDimensions[j] = rightDimensions[i];
                 CrossJoinDimensions[j].addAlias(rightArrayDesc.getName());
                 ++j;
+            }
+            else
+            {
+                DimensionDesc& d = CrossJoinDimensions[CrossJoinOnDimensions[i]];
+                DimensionDesc const& right = rightDimensions[i];
+                Coordinate newCurrStart = max(d.getCurrStart(), right.getCurrStart());
+                Coordinate newCurrEnd = min(d.getCurrEnd(), right.getCurrEnd());
+                Coordinate newEndMax = min(d.getEndMax(), right.getEndMax());
+                d.setCurrStart(newCurrStart);
+                d.setCurrEnd(newCurrEnd);
+                d.setEndMax(newEndMax);
             }
         }
         return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(), CrossJoinAttributes, CrossJoinDimensions);

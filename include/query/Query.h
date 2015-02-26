@@ -156,49 +156,49 @@ class Query : public boost::enable_shared_from_this<Query>
     static bool insert(QueryID queryID, boost::shared_ptr<Query>& query);
 
     boost::shared_ptr<SGContext> _sgContext;
-    Event eventSG; /** < Signals when result array has been created */
-    Mutex mutexSG; /** < Serialize access to resultSG */
 
+    std::map< std::string, boost::shared_ptr<Array> > _temporaryArrays;
+    
     /**
      * The physical plan of query. Optimizer generates it for current step of incremental execution
-     * from current logical plan. This plan is generated on coordinator and sent out to every node for execution.
+     * from current logical plan. This plan is generated on coordinator and sent out to every instance for execution.
      */
     std::vector< boost::shared_ptr<PhysicalPlan> > _physicalPlans;
 
     /**
      * Snapshot of the liveness information on the coordiantor
-     * The worker nodes must fail the query if their liveness view
+     * The worker instances must fail the query if their liveness view
      * is/becomes different any time during the query execution.
      */
-    boost::shared_ptr<const NodeLiveness> _coordinatorLiveness;
+    boost::shared_ptr<const InstanceLiveness> _coordinatorLiveness;
 
     /// Registration ID for liveness notifications
-    NodeLivenessNotification::ListenerID _livenessListenerID;
+    InstanceLivenessNotification::ListenerID _livenessListenerID;
 
     /**
-     * The list of nodes considered alive for the purposes
+     * The list of instances considered alive for the purposes
      * of this query. It is initialized to the liveness of
-     * the coordinator when it starts the query. If any node
+     * the coordinator when it starts the query. If any instance
      * detects a discrepancy in its current liveness and
      * this query liveness, it causes the query to abort.
      */
-    std::vector<NodeID> _liveNodes;
+    std::vector<InstanceID> _liveInstances;
 
     /**
-     * A "logical" node ID of the local node
+     * A "logical" instance ID of the local instance
      * for the purposes of this query.
-     * It is obtained from the "physical" node ID using
+     * It is obtained from the "physical" instance ID using
      * the coordinator liveness as the map.
-     * Currently, it is the index of the local node into
-     * the sorted list of live node IDs.
+     * Currently, it is the index of the local instance into
+     * the sorted list of live instance IDs.
      */
-    NodeID _nodeID;
+    InstanceID _instanceID;
 
     /**
-     * The "logical" node ID of the node responsible for coordination of query.
-     * COORDINATOR_NODE if node execute this query itself.
+     * The "logical" instance ID of the instance responsible for coordination of query.
+     * COORDINATOR_INSTANCE if instance execute this query itself.
      */
-    NodeID _coordinatorID;
+    InstanceID _coordinatorID;
 
     std::vector<Warning> _warnings;
 
@@ -256,14 +256,9 @@ class Query : public boost::enable_shared_from_this<Query>
     boost::shared_ptr<scidb::WorkQueue> _errorQueue;
 
     /**
-     * Handle query cancellation on a coordinator
-     * @param msg set to message that needs to be broadcast if any
-     * @param finalizers that need to be run
-     * @param abortError generated as a result of cancellation
+     * FIFO queue for SG messages
      */
-    void handleCancelOnCoordinator(boost::shared_ptr<MessageDesc>& msg,
-                                   std::deque<Finalizer>& finalizers,
-                                   boost::shared_ptr<scidb::Exception>& abortError);
+    boost::shared_ptr<scidb::WorkQueue> _sgQueue;
 
     /**
      *  Helper to invoke the finalizers with exception handling
@@ -310,6 +305,17 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     int _useCounter;
 
+    std::map< std::string, boost::shared_ptr<RWLock> > locks;
+    Mutex lockMutex;
+
+    void checkNoError() const
+    {
+        if (SCIDB_E_NO_ERROR != _error->getLongErrorCode())
+        {
+            _error->raise();
+        }
+    }
+
     /**
      * true if the query acquires exclusive locks
      */
@@ -318,6 +324,9 @@ class Query : public boost::enable_shared_from_this<Query>
  public:
     Query();
     ~Query();
+
+    void sharedLock(std::string const& arrayName);
+    void exclusiveLock(std::string const& arrayName);
 
     /**
      * The mutex to serialize access to _queries map.
@@ -337,24 +346,14 @@ class Query : public boost::enable_shared_from_this<Query>
      * and the query needs to be aborted/rolled back
      * @param eh - the error handler
      */
-    void pushErrorHandler(const boost::shared_ptr<ErrorHandler>& eh)
-    {
-       assert(eh);
-       ScopedMutexLock cs(errorMutex);
-       _errorHandlers.push_back(eh);
-    }
+    void pushErrorHandler(const boost::shared_ptr<ErrorHandler>& eh);
 
     /**
      * Add a finalizer to run after a query's "main" routine has completed (with any status)
      * and the query is about to be removed from the system
      * @param f - the finalizer
      */
-    void pushFinalizer(const Finalizer& f)
-    {
-       assert(f);
-       ScopedMutexLock cs(errorMutex);
-       _finalizers.push_back(f);
-    }
+    void pushFinalizer(const Finalizer& f);
 
     Mutex resultCS; /** < Critical section for SG result */
 
@@ -362,64 +361,66 @@ class Query : public boost::enable_shared_from_this<Query>
 
     RWLock queryLock;
 
+    std::map<std::string, boost::shared_ptr<const ArrayDesc> > arrayDescByNameCache;
+
     /**
      * Initialize a query
      * @param queryID
-     * @param coordID the "physical" coordinator ID (or COORDINATOR_NODE if on coordinator)
-     * @param localNodeID  "physical" local node ID
+     * @param coordID the "physical" coordinator ID (or COORDINATOR_INSTANCE if on coordinator)
+     * @param localInstanceID  "physical" local instance ID
      * @param coordinatorLiveness coordinator liveness at the time of query creation
      */
-    void init(QueryID queryID, NodeID coordID, NodeID localNodeID,
-              boost::shared_ptr<const NodeLiveness> coordinatorLiveness);
+    void init(QueryID queryID, InstanceID coordID, InstanceID localInstanceID,
+              boost::shared_ptr<const InstanceLiveness> coordinatorLiveness);
     /**
-     * Handle a change in the local node liveness. If the new livenes is different
+     * Handle a change in the local instance liveness. If the new livenes is different
      * from this query's coordinator liveness, the query is marked to be aborted.
      */
-    void handleLivenessNotification(boost::shared_ptr<const NodeLiveness>& newLiveness);
+    void handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>& newLiveness);
     /**
-     * Map a "logical" node ID to a "physical" one using the coordinator liveness
+     * Map a "logical" instance ID to a "physical" one using the coordinator liveness
      */
-    NodeID mapLogicalToPhysical(NodeID node);
+    InstanceID mapLogicalToPhysical(InstanceID instance);
     /**
-     * Map a "physical" node ID to a "logical" one using the coordinator liveness
+     * Map a "physical" instance ID to a "logical" one using the coordinator liveness
      */
-    NodeID mapPhysicalToLogical(NodeID node);
+    InstanceID mapPhysicalToLogical(InstanceID instance);
 
     /**
-     * @return true if a given node is considered dead
-     * @param node physical ID of a node
+     * @return true if a given instance is considered dead
+     * @param instance physical ID of a instance
      * @throw scidb::SystemException if this.errorCode is not 0
      */
-    bool isPhysicalNodeDead(NodeID node);
+    bool isPhysicalInstanceDead(InstanceID instance);
 
     /**
-     * Get the "physical" node ID of the coordinator
-     * @return COORDINATOR_NODE if this node is the coordinator, else the coordinato node ID
+     * Get the "physical" instance ID of the coordinator
+     * @return COORDINATOR_INSTANCE if this instance is the coordinator, else the coordinato instance ID
      */
-    NodeID getPhysicalCoordinatorID();
+    InstanceID getPhysicalCoordinatorID();
 
     /**
-     * Get logical node count
+     * Get logical instance count
      */
-    size_t getNodesCount()
+    size_t getInstancesCount()
     {
-        return _liveNodes.size();
+        return _liveInstances.size();
     }
     /**
-     * Get logical node ID
+     * Get logical instance ID
      */
-    NodeID getNodeID()
+    InstanceID getInstanceID()
     {
-        return _nodeID;
+        return _instanceID;
     }
     /**
-     * Get coordinator's logical node ID
+     * Get coordinator's logical instance ID
      */
-    NodeID getCoordinatorID()
+    InstanceID getCoordinatorID()
     {
         return _coordinatorID;
     }
-    boost::shared_ptr<const NodeLiveness> getCoordinatorLiveness()
+    boost::shared_ptr<const InstanceLiveness> getCoordinatorLiveness()
     {
        return _coordinatorLiveness;
     }
@@ -458,22 +459,22 @@ class Query : public boost::enable_shared_from_this<Query>
     }
 
 
-    boost::shared_ptr<RemoteArray> getRemoteArray(const NodeID& nodeID)
+    boost::shared_ptr<RemoteArray> getRemoteArray(const InstanceID& instanceID)
     {
         ScopedMutexLock cs(errorMutex);
         validate();
         assert(!_remoteArrays.empty());
-        assert(nodeID < _remoteArrays.size());
-        return _remoteArrays[nodeID];
+        assert(instanceID < _remoteArrays.size());
+        return _remoteArrays[instanceID];
     }
 
-    void setRemoteArray(const NodeID& nodeID, const boost::shared_ptr<RemoteArray>& array)
+    void setRemoteArray(const InstanceID& instanceID, const boost::shared_ptr<RemoteArray>& array)
     {
         ScopedMutexLock cs(errorMutex);
         validate();
         assert(!_remoteArrays.empty());
-        assert(nodeID < _remoteArrays.size());
-        _remoteArrays[nodeID] = array;
+        assert(instanceID < _remoteArrays.size());
+        _remoteArrays[instanceID] = array;
     }
 
     std::vector<boost::shared_ptr<Array> > tempArrays;
@@ -481,7 +482,7 @@ class Query : public boost::enable_shared_from_this<Query>
     Statistics statistics;
 
     /**
-     * The logical plan of query. QueryProcessor generates it by parser only at coordinator node.
+     * The logical plan of query. QueryProcessor generates it by parser only at coordinator instance.
      * Since we use incremental optimization this is the rest of logical plan to be executed.
      */
     boost::shared_ptr<LogicalPlan> logicalPlan;
@@ -522,13 +523,19 @@ class Query : public boost::enable_shared_from_this<Query>
         return _errorQueue;
     }
 
+    boost::shared_ptr<scidb::WorkQueue> getSGQueue()
+    {
+        ScopedMutexLock cs(errorMutex);
+        return _sgQueue;
+    }
+
     /**
      *  Context variables to control thread
      */
     Semaphore results;
 
     /**
-     * Semaphores for synchronization SG operations on remote nodes
+     * Semaphores for synchronization SG operations on remote instances
      */
     Semaphore semSG[MAX_BARRIERS];
     Semaphore syncSG;
@@ -584,9 +591,40 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Release all the locks previously acquired by acquireLocks()
      * @param query whose locks to release
-     * @throws exceptions while releasing the lock 
+     * @throws exceptions while releasing the lock
      */
     static void releaseLocks(const boost::shared_ptr<Query>& query);
+
+    /**
+     * Get temporary array
+     * @param arrayName temporary array name
+     * @return reference to the temporayr array or null referenec is not exists
+     */
+    boost::shared_ptr<Array> getTemporaryArray(std::string const& arrayName);
+
+    /**
+     * Get temporary or persistent array
+     * @param arrayName array name
+     * @return reference to the array 
+     * @exception SCIDB_LE_ARRAY_DOESNT_EXIST
+     */
+    boost::shared_ptr<Array> getArray(std::string const& arrayName);
+
+    /**
+     * Associate temporay array with this query
+     * @param tmpArray temporary array
+     */
+    void setTemporaryArray(boost::shared_ptr<Array> const& tmpArray);
+
+    /**
+     * Repeatedly execute given work until it either succeeds
+     * or throws an unrecoverable exception. Any scidb::Exeption
+     * is considered recoverable.
+     * @param work to execute
+     * @return result of running work
+     */
+    template<typename T>
+    static T runRestartableWork(boost::function<T()>& work);
 
     /**
      * Acquire all locks requested via requestLock(),
@@ -595,7 +633,7 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     void acquireLocks();
 
-    /**                                                                                                                                  
+    /**
      * @return  true if the query acquires exclusive locks
      */
     bool doesExclusiveArrayAccess();
@@ -607,11 +645,16 @@ class Query : public boost::enable_shared_from_this<Query>
     void handleError(boost::shared_ptr<Exception> unwindException);
 
     /**
+     * Handle a client complete request
+     */
+    void handleComplete();
+
+    /**
      * Handle a client cancellation request
      */
     void handleCancel();
 
-      /**
+    /**
      * Handle a coordinator commit request
      */
     void handleCommit();
@@ -645,6 +688,11 @@ class Query : public boost::enable_shared_from_this<Query>
     void setSGContext(boost::shared_ptr<SGContext> const& sgContext);
 
     /**
+     * Remove result SG context.
+     */
+    void unsetSGContext();
+
+    /**
      * Synchronize states of replics
      */
     void replicationBarrier();
@@ -659,6 +707,11 @@ class Query : public boost::enable_shared_from_this<Query>
      * Mark query as started
      */
     void start();
+
+    /**
+     * Suspend query processsing: state will be INIT
+     */
+    void stop();
 
     /**
      * Mark query as completed
@@ -676,18 +729,15 @@ class Query : public boost::enable_shared_from_this<Query>
     Mutex _receiveMutex; //< Mutex for serialization access to _receiveXXX fields.
 
     /**
-     * This vector holds send/receive messages for current query at this node.
-     * index in vector is source node number.
+     * This vector holds send/receive messages for current query at this instance.
+     * index in vector is source instance number.
      */
     std::vector< std::list<boost::shared_ptr< MessageDesc> > > _receiveMessages;
 
     /**
-     * This vector holds semaphores for working with messages queue. One semaphore for every source node.
+     * This vector holds semaphores for working with messages queue. One semaphore for every source instance.
      */
     std::vector< Semaphore> _receiveSemaphores;
-
-    Coordinates lowBoundary;
-    Coordinates highBoundary;
 
     void* userDefinedContext;
 
@@ -709,11 +759,11 @@ class Query : public boost::enable_shared_from_this<Query>
     };
 
     /**
-     * This handlers will be called on each node during query closing.
+     * This handlers will be called on each instance during query closing.
      */
-    std::queue<boost::shared_ptr<QueryOddJob> > _multinodePostOddJob;
+    std::queue<boost::shared_ptr<QueryOddJob> > _multiinstancePostOddJob;
 
-    void runMultinodePostOddJob();
+    void runMultiinstancePostOddJob();
 
     /**
      * Validates the query for errors
@@ -786,7 +836,7 @@ private:
 class UpdateErrorHandler : public Query::ErrorHandler
 {
  public:
-   typedef boost::function< void(const VersionID&,const ArrayID&,const ArrayID&) > RollbackWork;
+    typedef boost::function< void(VersionID,ArrayID,ArrayID,uint64_t) > RollbackWork;
 
     UpdateErrorHandler(const boost::shared_ptr<SystemCatalog::LockDesc> & lock)
     : _lock(lock) { assert(_lock); }
@@ -802,9 +852,11 @@ class UpdateErrorHandler : public Query::ErrorHandler
                                     bool forceCoordLockCheck,
                                     RollbackWork& rw);
  private:
-    static void doRollback(const VersionID& lastVersion,
-                           const ArrayID& baseArrayId,
-                           const ArrayID& newArrayId);
+    static void doRollback(VersionID lastVersion,
+                           ArrayID   baseArrayId,
+                           ArrayID   newArrayId,
+                           uint64_t  timestamp);
+    void _handleError(const boost::shared_ptr<Query>& query);
 
     UpdateErrorHandler(const UpdateErrorHandler&);
     UpdateErrorHandler& operator=(const UpdateErrorHandler&);

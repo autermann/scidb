@@ -53,6 +53,10 @@ class SubArray;
 class SubArrayIterator;
 class SubArrayChunkIterator;
 
+void subarrayMappingArray(string const& dimName, string const& mappingArrayName, string const& tmpMappingArrayName, 
+                          Coordinate from, Coordinate till, boost::shared_ptr<Query> const& query);
+
+
 class SubArrayChunk : public DelegateChunk
 {
     friend class SubArrayChunkIterator;
@@ -162,7 +166,7 @@ class SubArrayIterator : public DelegateArrayIterator
 
   private:
     bool setInputPosition(size_t i);
-
+    void fillSparseChunk(size_t i);
     void checkState();
 
     SubArray const& array;	
@@ -170,6 +174,11 @@ class SubArrayIterator : public DelegateArrayIterator
 	Coordinates inPos; 
     bool hasCurrent;
     bool positioned;
+
+    Coordinates outChunkPos;
+    boost::shared_ptr<ChunkIterator> outIterator;
+    MemChunk sparseChunk;
+    boost::shared_ptr<ConstArrayIterator> emptyIterator;
 };
 
 class SubArray : public DelegateArray

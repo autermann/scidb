@@ -61,7 +61,9 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.red
 
 struct TupleHeader
 {
-    uint64_t   size;
+    uint32_t   size;
+    uint16_t   overlapMask;
+    uint16_t   overlapDir;
     Coordinate coords[1];
 };
 
@@ -99,6 +101,33 @@ class ChunkCoordComparator
     }
 };
 
+class ChunkWithOverlapCoordComparator
+{
+    Dimensions const& dims;
+
+  public:
+    ChunkWithOverlapCoordComparator(Dimensions const& dimensions) : dims(dimensions) {}
+
+    int operator()(TupleHeader* t1, TupleHeader* t2) const {
+        for (size_t i = 0, n = dims.size(); i < n; i++) {
+            Coordinate c1 = (t1->coords[i] - dims[i].getStart()) / dims[i].getChunkInterval();
+            Coordinate c2 = (t2->coords[i] - dims[i].getStart()) / dims[i].getChunkInterval();
+            if (t1->overlapMask & (1 << i)) { 
+                // may be more efficient form of c1 += (t1->overlapDir & (1 << i)) ? 1 : -1
+                c1 += int(((t1->overlapDir >> i) & 1) << 1) - 1;
+            } 
+            if (t2->overlapMask & (1 << i)) { 
+                // may be more efficient form of c2 += (t2->overlapDir & (1 << i)) ? 1 : -1
+                c2 += int(((t2->overlapDir >> i) & 1) << 1) - 1;
+            }
+            if (c1 != c2) {
+                return c1 < c2 ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+};
+
 class TupleCoordComparator
 {
     size_t nDims;
@@ -122,9 +151,8 @@ static const size_t sortBufSize = 256*1024*1024;
 static const size_t writeBufSize = 1024*1024;
 static const size_t tupleHeaderSize = sizeof(uint64_t);
 
-void writeSegment(string const& baseName, char* buf, size_t segmentNo, TupleHeader** tuples, size_t nTuples, Dimensions const& dims, char* writeBuf, vector<int>& segments)
+void writeSegment(string const& baseName, char* buf, size_t segmentNo, TupleHeader** tuples, size_t nTuples, Dimensions const& dims, char* writeBuf, vector<int>& segments, bool hasOverlap)
 {
-    ChunkCoordComparator comparator(dims);
     std::stringstream ss;
     ss << baseName << segmentNo << ".XXXXXX";
     string path = ss.str();
@@ -136,32 +164,38 @@ void writeSegment(string const& baseName, char* buf, size_t segmentNo, TupleHead
         throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_OPEN_FILE) << fileName << error;
     }
     ::unlink(fileName);
-    
+
     BackgroundFileFlusher::getInstance()->addDescriptor(fd);
     try
     {
-      iqsort(tuples, nTuples, comparator);
-      size_t writeBufUsed = 0;
-      int64_t segPos = 0;
-      for (size_t i = 0; i < nTuples; i++) {
-          TupleHeader* hdr = tuples[i];
-          size_t tupleSize = hdr->size;
-          size_t available = writeBufSize - writeBufUsed >= tupleSize ? tupleSize : writeBufSize - writeBufUsed;
-          memcpy(writeBuf + writeBufUsed, hdr, available);
-          writeBufUsed += available;
-          if (available < tupleSize) {
-              File::writeAll(fd, writeBuf, writeBufSize, segPos);
-              segPos += writeBufSize;
-              memcpy(writeBuf, (char*)hdr + available, tupleSize - available);
-              writeBufUsed = tupleSize - available;
-          }
-      }
-      File::writeAll(fd, writeBuf, writeBufSize, segPos);
+        if (hasOverlap) { 
+            ChunkWithOverlapCoordComparator comparator(dims);
+            iqsort(tuples, nTuples, comparator);
+        } else {
+            ChunkCoordComparator comparator(dims);
+            iqsort(tuples, nTuples, comparator);
+        }
+        size_t writeBufUsed = 0;
+        int64_t segPos = 0;
+        for (size_t i = 0; i < nTuples; i++) {
+            TupleHeader* hdr = tuples[i];
+            size_t tupleSize = hdr->size;
+            size_t available = writeBufSize - writeBufUsed >= tupleSize ? tupleSize : writeBufSize - writeBufUsed;
+            memcpy(writeBuf + writeBufUsed, hdr, available);
+            writeBufUsed += available;
+            if (available < tupleSize) {
+                assert(writeBufUsed == writeBufSize);
+                File::writeAll(fd, writeBuf, writeBufSize, segPos);
+                segPos += writeBufSize;
+                memcpy(writeBuf, (char*)hdr + available, tupleSize - available);
+                writeBufUsed = tupleSize - available;
+            }
+        }
+        File::writeAll(fd, writeBuf, writeBufUsed, segPos);
     }
     catch (...)
     {
         BackgroundFileFlusher::getInstance()->dropDescriptor(fd);
-        throw;
     }
     segments.push_back(fd);
 }
@@ -204,11 +238,14 @@ void checkChunkElements(ArrayDesc const& dstArrayDesc, Coordinates const& chunkP
     assert(src == end);
 }
 
+
+
 struct SegmentContainer
 {
     vector<int> segments;
     SegmentContainer(): segments(0)
     {}
+
     ~SegmentContainer()
     {
         BackgroundFileFlusher::getInstance()->dropDescriptors(segments);
@@ -218,6 +255,7 @@ struct SegmentContainer
         }
     }
 };
+
 void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                     ArrayDesc const& srcArrayDesc, shared_ptr<Array> srcArray,
                     vector<size_t> const& attrMap, vector<size_t> const& dimMap,
@@ -273,25 +311,41 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
         }
     }
     size_t denseChunkSize = tupleFixedSize;
+    bool hasOverlap = false;
     for (size_t i = 0; i < nDims; i++) {
         denseChunkSize *= dstDims[i].getChunkInterval();
+        hasOverlap |= dstDims[i].getChunkOverlap() != 0;
     }
 
     NetworkManager* networkManager = NetworkManager::getInstance();
-    const size_t nNodes = (size_t)query->getNodesCount();
-    const size_t myNodeId = (size_t)query->getNodeID();
+    const size_t nInstances = (size_t)query->getInstancesCount();
+    const size_t myInstanceId = (size_t)query->getInstanceID();
+    size_t newDim = INVALID_DIMENSION_ID;
+    Coordinate newDimStart = MIN_COORDINATE;
+    Coordinate newDimEnd = MAX_COORDINATE;
 
+    vector< shared_ptr<AttributeMultiMap> > coordinateMultiIndices(nDims);
     vector< shared_ptr<AttributeMap> > coordinateIndices(nDims);
     for (size_t i = 0; i < nDims; i++)
     {
         size_t j = dimMap[i];
-        if ((j & FLIP) && (dstDims[i].getType() != TID_INT64))
+        if (j == SYNTHETIC) 
+        {
+            newDim = i;
+            newDimStart = dstDims[i].getStart();
+            newDimEnd = newDimStart + dstDims[i].getChunkInterval() - 1;
+        }
+        else if ((j & FLIP) && (dstDims[i].getType() != TID_INT64))
         {
             AttributeID attID = (j & ~FLIP);
-            string indexMapName = dstArrayDesc.getCoordinateIndexArrayName(i);
-            coordinateIndices[i] = buildFunctionalMapping(dstDims[i]);
-            if (!coordinateIndices[i]) {
-                coordinateIndices[i] = buildSortedIndex(srcArray, attID, query, indexMapName, dstDims[i].getStart(), dstDims[i].getLength());
+            string indexMapName = dstArrayDesc.getMappingArrayName(i);
+            if (!dstDims[i].isDistinct()) { 
+                coordinateMultiIndices[i] = buildSortedMultiIndex(srcArray, attID, query, indexMapName, dstDims[i].getStart(), dstDims[i].getLength());
+            } else { 
+                coordinateMultiIndices[i] = buildFunctionalMapping(dstDims[i]);
+                if (!coordinateMultiIndices[i]) {
+                    coordinateIndices[i] = buildSortedIndex(srcArray, attID, query, indexMapName, dstDims[i].getStart(), dstDims[i].getLength());
+                }
             }
         }
     }
@@ -311,7 +365,7 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
     }
     ss << dstArrayDesc.getName();
     ss << '-';
-    ss << myNodeId;
+    ss << myInstanceId;
     ss << ':';
     string baseName = ss.str();
 
@@ -356,12 +410,13 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
     shared_ptr<ConstChunkIterator> srcChunkIterator;
     map<Coordinates, vector<PartialChunk>, CoordinatesLess> myChunks;
     Coordinates chunkPos(nDims);
+    Coordinates overlapChunkPos(nDims);
     SegmentContainer c;
 
     //
     // Loop through input array: merge, partially sort data and store them in segments (files)
     //
-    int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS/*|(nSrcAttrs == 1 ? ConstChunkIterator::IGNORE_DEFAULT_VALUES : 0)*/; /* K&K: can be ever ignore default vlaues if attribute is flipped? */
+    int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS;
     while (!srcArrayIterator->end())
     {
         //
@@ -392,34 +447,76 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                        : chunkIterators[j]->getItem().size();
                 }
             }
-            if (tupleSize + segmentSize > bufSize) {
-                writeSegment(baseName, &buf[0], ++nSegments, &tuples[0], nTuples, dstDims, &writeBuf[0], c.segments);
-                nTuples = 0;
-                segmentSize = 0;
-            }
             for (size_t i = 0; i < nDims; i++) {
                 size_t j = dimMap[i];
                 if (j & FLIP) {
                     Value const& value = chunkIterators[j & ~FLIP]->getItem();
                     if (value.isNull())
                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_REDIMENSION_NULL);
-                    dstPos[i] = (dstDims[i].getType() == TID_INT64) ? value.getInt64() : coordinateIndices[i]->get(value);
+                    if (dstDims[i].getType() == TID_INT64) { 
+                        dstPos[i] = value.getInt64();
+                    } else { 
+                        if (coordinateIndices[i]) { 
+                            dstPos[i] = coordinateIndices[i]->get(value);
+                        } else {
+                            dstPos[i] = coordinateMultiIndices[i]->get(value);
+                        }
+                    }
+                } else if (j == SYNTHETIC) {
+                    dstPos[i] = newDimStart;
                 } else {
                     dstPos[i] = srcPos[j];
+                }
+            }
+            for (size_t i = 0; i < nDims; i++) {
+                chunkPos[i] = dstPos[i];
+            }
+            dstArrayDesc.getChunkPositionFor(chunkPos);
+
+            size_t nOverlappedChunks = 1; 
+            uint16_t overlapMask = 0;
+            uint16_t overlapDir = 0;
+            if (hasOverlap) { 
+                size_t nOverlaps = 0;
+                for (size_t i = 0; i < nDims; i++) {
+                    assert(chunkPos[i] <= dstPos[i]);
+                    if (dstPos[i] - chunkPos[i] + dstDims[i].getChunkOverlap() >= dstDims[i].getChunkInterval()
+                        && chunkPos[i] + dstDims[i].getChunkInterval() <= dstDims[i].getEndMax()) 
+                    {
+                        nOverlaps += 1;
+                        overlapMask |= 1 << i;                        
+                        overlapDir |= 1 << i;                        
+                    } else if (dstPos[i] - chunkPos[i] < dstDims[i].getChunkOverlap()
+                        && chunkPos[i] > dstDims[i].getStart()) 
+                    {
+                        nOverlaps += 1;
+                        overlapMask |= 1 << i;                        
+                    }
+                }
+                nOverlappedChunks = 1 << nOverlaps;
+            }
+            if (tupleSize*nOverlappedChunks + segmentSize > bufSize) {
+                writeSegment(baseName, &buf[0], ++nSegments, &tuples[0], nTuples, dstDims, &writeBuf[0], c.segments, hasOverlap);
+                nTuples = 0;
+                segmentSize = 0;
+                if (buf.size() < tupleSize*nOverlappedChunks) { 
+                    buf.resize(buf.size()*2 < tupleSize*nOverlappedChunks ? tupleSize*nOverlappedChunks : buf.size()*2);
                 }
             }
             char* dst = &buf[segmentSize];
             TupleHeader* hdr = (TupleHeader*)dst;
             hdr->size = tupleSize;
+            hdr->overlapMask = 0;
+            hdr->overlapDir = overlapDir;
 
-            if (tuples.size() <= nTuples) { 
-                tuples.resize(tuples.size() * 2);
+            if (tuples.size() < nTuples + nOverlappedChunks) { 
+                tuples.resize(tuples.size()*2 < nTuples + nOverlappedChunks ? nTuples + nOverlappedChunks : tuples.size()*2);
             }
             tuples[nTuples++] = hdr;
             segmentSize += tupleSize;
 
             for (size_t i = 0; i < nDims; i++) {
-                chunkPos[i] = hdr->coords[i] = dstPos[i];
+                hdr->coords[i] = dstPos[i];
             }
             dst += tupleHeaderSize + nDims*sizeof(Coordinate);
 
@@ -445,16 +542,22 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                             }
                             *(uint32_t*)dst = value.size();
                             dst += sizeof(uint32_t);
-                        } else if (isNull) {
-                            if (attrTypes[i].byteSize() >= sizeof(int)) {
-                                *(int*)dst = value.getMissingReason();
+                        } else { 
+                            if (isNull) {
+                                if (attrTypes[i].byteSize() >= sizeof(int)) {
+                                    *(int*)dst = value.getMissingReason();
+                                } else {
+                                    *dst = (char)value.getMissingReason();
+                                }
                             } else {
-                                *dst = (char)value.getMissingReason();
+                                if (value.size() > attrTypes[i].byteSize()) {
+                                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << value.size() << attrTypes[i].byteSize();
+                                }
                             }
                         }
                         if (!isNull) {
                             memcpy(dst, value.data(), value.size());
-                            dst += value.size();
+                            dst += attrTypes[i].variableSize() ? value.size() : attrTypes[i].byteSize();
                         } else {
                             dst += attrTypes[i].byteSize();
                         }
@@ -463,13 +566,39 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
             }
             assert(tupleSize == size_t(dst - (char*)hdr));
 
-            dstArrayDesc.getChunkPositionFor(chunkPos);
             vector<PartialChunk>& parts = myChunks[chunkPos];
             if (parts.size() == 0 || parts.back().segmentNo != nSegments) {
                 parts.push_back(PartialChunk(nSegments, tupleSize));
             } else {
                 parts.back().size += tupleSize;
             }
+
+            uint32_t mask = 0;
+            while (--nOverlappedChunks != 0) { 
+                uint32_t bit = 1 << nDims;
+                do { 
+                    bit >>= 1;                    
+                } while (!((overlapMask&~mask) & bit));
+                assert(bit != 0);
+                mask &= bit - 1;
+                mask |= bit;
+                TupleHeader* overlapHdr = (TupleHeader*)&buf[segmentSize];
+                memcpy(overlapHdr, hdr, tupleSize);
+                tuples[nTuples++] = overlapHdr;
+                overlapHdr->overlapMask = mask;
+                segmentSize += tupleSize;
+
+                for (size_t i = 0; i < nDims; i++) { 
+                    overlapChunkPos[i] = chunkPos[i] + ((mask & (1 << i)) ? (overlapDir & (1 << i)) ? int(dstDims[i].getChunkInterval()) : -int(dstDims[i].getChunkInterval()) : 0);
+                }
+                vector<PartialChunk>& parts = myChunks[overlapChunkPos];
+                if (parts.size() == 0 || parts.back().segmentNo != nSegments) {
+                    parts.push_back(PartialChunk(nSegments, tupleSize));
+                } else {
+                    parts.back().size += tupleSize;
+                }
+            }
+            assert(mask == overlapMask);
 
             //
             // Advance chunk iterators
@@ -501,7 +630,7 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
         }
     }
     if (nTuples != 0) {
-        writeSegment(baseName, &buf[0], ++nSegments, &tuples[0], nTuples, dstDims, &writeBuf[0], c.segments);
+        writeSegment(baseName, &buf[0], ++nSegments, &tuples[0], nTuples, dstDims, &writeBuf[0], c.segments, hasOverlap);
     }
     LOG4CXX_DEBUG(logger, "Partial sort time: " << (time(NULL) - start) << " seconds");
     start = time(NULL);
@@ -518,17 +647,17 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
     }
     assert(nc == myChunkCoordinates.size());
 
-    for (size_t i = 0; i < nNodes; i++) {
-        if (i != myNodeId) {
+    for (size_t i = 0; i < nInstances; i++) {
+        if (i != myInstanceId) {
             networkManager->send(i, shared_ptr<SharedBuffer>(new MemoryBuffer(&myChunkCoordinates[0], nc*sizeof(Coordinate))), query);
         }
     }
-    map<Coordinates, vector<NodeID>, CoordinatesLess> chunkNodeMap;
-    for (size_t i = 0; i < nNodes; i++) {
+    map<Coordinates, vector<InstanceID>, CoordinatesLess> chunkInstanceMap;
+    for (size_t i = 0; i < nInstances; i++) {
         Coordinate* coords;
         size_t nChunks;
         shared_ptr<SharedBuffer> buf;
-        if (i != myNodeId) {
+        if (i != myInstanceId) {
              buf = networkManager->receive(i, query);
              if (!buf) {
                  continue;
@@ -540,7 +669,7 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
              coords = &myChunkCoordinates[0];
          }
          while (nChunks-- != 0) {
-             chunkNodeMap[Coordinates(coords, coords+nDims)].push_back(i);
+             chunkInstanceMap[Coordinates(coords, coords+nDims)].push_back(i);
              coords += nDims;
          }
     }
@@ -550,16 +679,17 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
     Coordinates lowBoundary(nDims, MAX_COORDINATE);
     Coordinates highBoundary(nDims, MIN_COORDINATE);
     TupleCoordComparator comparator(nDims);
-
-    for (map<Coordinates, vector<NodeID>, CoordinatesLess>::iterator iter = chunkNodeMap.begin();
-         iter != chunkNodeMap.end();
+    Coordinate newDimMax = newDimStart;
+            
+    for (map<Coordinates, vector<InstanceID>, CoordinatesLess>::iterator iter = chunkInstanceMap.begin();
+         iter != chunkInstanceMap.end();
          ++iter)
     {
-        size_t targetNodeId = dstArrayDesc.getChunkNumber(iter->first) % nNodes;
-        if (targetNodeId == myNodeId) { // will be my chunk
+        size_t targetInstanceId = dstArrayDesc.getChunkNumber(iter->first) % nInstances;
+        if (targetInstanceId == myInstanceId) { // will be my chunk
             size_t chunkSize = 0;
             for (size_t i = 0; i < iter->second.size(); i++) {
-                if (iter->second[i] == myNodeId) { // local data
+                if (iter->second[i] == myInstanceId) { // local data
                     vector<PartialChunk>& parts = myChunks[iter->first];
                     for (size_t j = 0; j < parts.size(); j++) {
                         if (chunkSize + parts[j].size > buf.size()) { 
@@ -584,6 +714,7 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                 }
             }
             for (size_t i = 0; i < nDims; i++) {
+                dstPos[i] = iter->first[i];
                 if (iter->first[i] > highBoundary[i]) {
                     highBoundary[i] = iter->first[i];
                 }
@@ -594,6 +725,11 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
             double density = (double)chunkSize/denseChunkSize;
             bool isSparse = density < cfg->getOption<double>(CONFIG_SPARSE_CHUNK_THRESHOLD);
             int mode = isSparse ? ChunkIterator::SPARSE_CHUNK : 0;
+            if (newDim != INVALID_DIMENSION_ID) { 
+                mode |= ChunkIterator::SEQUENTIAL_WRITE;
+            }
+            Coordinate newDimPos = newDimStart;
+
             for (size_t i = 0; i < nAttrs; i++)
             {
                 aggregateStates[i].setNull(0);
@@ -623,15 +759,24 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
             for (size_t t = 0; t < nTuples; t++)
             {
                 TupleHeader* hdr = tuples[t];
-                bool newPosition = false;
+                bool newPosition = count == 0;
                 for (size_t i = 0; i < nDims; i++)
                 {
-                    Coordinate c = hdr->coords[i];
-                    if (c!=dstPos[i])
-                    {
-                        newPosition = true;
+                    if (i != newDim) { 
+                        Coordinate c = hdr->coords[i];
+                        if (c != dstPos[i])
+                        {
+                            newPosition = true;
+                            if (c > highBoundary[i]) { 
+                                highBoundary[i] = c;
+                            }
+                            if (newDimPos-1 > newDimMax) { 
+                                newDimMax = newDimPos-1;
+                            }
+                            newDimPos = newDimStart;
+                        }
+                        dstPos[i] = c;
                     }
-                    dstPos[i] = c;
                 }
 
                 if (count != 0 && newPosition)
@@ -650,6 +795,13 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
 
                 char* src = (char*)hdr + tupleHeaderSize + nDims*sizeof(Coordinate);
                 count += 1;
+                if (newDim != INVALID_DIMENSION_ID) { 
+                    if (newDimPos > newDimEnd) { 
+                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_REDIMENSION_STORE_ERROR7);                        
+                    }
+                    dstPos[newDim] = newDimPos++;
+                    newPosition = true;
+                }
                 for (size_t i = 0; i < nAttrs; i++)
                 {
                     if (!tupleAttrs[i].isEmptyIndicator())
@@ -672,6 +824,7 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                         } else {
                             if (isNull) {
                                 attrValues[i].setNull(attrSize >= sizeof(int) ? *(int*)src : *src);
+                                assert(attrValues[i].getMissingReason() >= 0);
                             } else {
                                 attrValues[i].setData(src, attrSize);
                             }
@@ -696,7 +849,9 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                         }
                         else
                         {
-                            dstChunkIterators[i]->writeItem(attrValues[i]);
+                            if (newPosition) {
+                                dstChunkIterators[i]->writeItem(attrValues[i]);
+                            }
                         }
                     }
                 }
@@ -718,9 +873,9 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                     dstChunkIterators[i].reset();
                 }
             }
-        } else { // chunk will belong to other node
+        } else { // chunk will belong to other instance
             for (size_t i = 0; i < iter->second.size(); i++) {
-                if (iter->second[i] == myNodeId) { // local data
+                if (iter->second[i] == myInstanceId) { // local data
                     vector<PartialChunk>& parts = myChunks[iter->first];
                     size_t chunkSize = 0;
                     for (size_t j = 0; j < parts.size(); j++) {
@@ -733,9 +888,9 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
                         //checkChunkElements(dstArrayDesc, iter->first, &buf[chunkSize], parts[j].size);
                         chunkSize += rc;
                     }
-                    networkManager->send(targetNodeId, shared_ptr<SharedBuffer>(new MemoryBuffer(&buf[0], chunkSize)), query);
+                    networkManager->send(targetInstanceId, shared_ptr<SharedBuffer>(new MemoryBuffer(&buf[0], chunkSize)), query);
 #ifdef SEND_ACK
-                    networkManager->receive(targetNodeId, query); // receive confirmation
+                    networkManager->receive(targetInstanceId, query); // receive confirmation
 #endif
                     break;
                 }
@@ -743,14 +898,23 @@ void transformArray(ArrayDesc const& dstArrayDesc, shared_ptr<Array> dstArray,
         }
     }
     for (size_t i = 0; i < nDims; i++) {
-        highBoundary[i] += dstDims[i].getChunkInterval()-1;
-        if (highBoundary[i] > dstDims[i].getEndMax()) {
-            highBoundary[i] = dstDims[i].getEndMax();
+        assert(highBoundary[i] <= dstDims[i].getEndMax());
+        if (coordinateIndices[i]) { 
+            assert(highBoundary[i] < Coordinate(dstDims[i].getStart() + coordinateIndices[i]->size()));
+            highBoundary[i] = dstDims[i].getStart() + coordinateIndices[i]->size() - 1;
+        } else if (coordinateMultiIndices[i]) { 
+            assert(highBoundary[i] < Coordinate(dstDims[i].getStart() + coordinateMultiIndices[i]->size()));
+            highBoundary[i] = dstDims[i].getStart() + coordinateMultiIndices[i]->size() - 1;
+        } else if (i == newDim && highBoundary[i] > newDimMax) { 
+            highBoundary[i] = newDimMax;
         }
     }
+
     SystemCatalog::getInstance()->updateArrayBoundaries(dstArrayDesc.getId(), lowBoundary, highBoundary);
     LOG4CXX_DEBUG(logger, "Time for merging data: " << (time(NULL) - start) << " seconds");
 }
+
+
 
 
 class PhysicalFlipStore: public PhysicalOperator
@@ -761,90 +925,32 @@ class PhysicalFlipStore: public PhysicalOperator
     Dimensions _updateableDims;
     shared_ptr<SystemCatalog::LockDesc> _lock;
 
-    class CleanupTemporaryArray : public Query::QueryOddJob
-    {
-      public:
-        CleanupTemporaryArray(ArrayID arrayID, bool coordinator) :
-            _arrayID(arrayID),
-            _coordinator(coordinator)
-        {}
-        virtual ~CleanupTemporaryArray() {}
-        virtual void run(Query& query)
-        {
-            //TODO: This is dirty quick solution to hide garbage after JOIN-ON attr-attr which
-            //produced by FLIP_STORE. We need good way to handle temporary arrays instead storing it
-            //in append only storage! Also good node syncronization needed as air.
-            if (_coordinator)
-            {
-                ArrayDesc arrayDesc;
-                SystemCatalog::getInstance()->getArrayDesc(_arrayID, arrayDesc);
-
-                if (!arrayDesc.isImmutable())
-                {
-                    BOOST_FOREACH(const VersionDesc &ver, SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId()))
-                    {
-                        std::stringstream versionName;
-                        versionName << arrayDesc.getName() << "@" << ver.getVersionID();
-
-                        ArrayDesc versionArrayDesc;
-                        if (SystemCatalog::getInstance()->getArrayDesc(versionName.str(), versionArrayDesc, false))
-                        {
-                            SystemCatalog::getInstance()->deleteArray(versionArrayDesc.getId());
-
-                            const Dimensions &dims = versionArrayDesc.getDimensions();
-                            for (size_t i = 0, n = dims.size(); i < n; i++)
-                            {
-                                if (dims[i].getType() != TID_INT64)
-                                {
-                                    const string indexName = versionArrayDesc.getName() + ":" + dims[i].getBaseName();
-                                    ArrayDesc indexDesc;
-                                    if (SystemCatalog::getInstance()->getArrayDesc(indexName, indexDesc, false))
-                                    {
-                                        SystemCatalog::getInstance()->deleteArray(indexDesc.getId());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                SystemCatalog::getInstance()->deleteArray(_arrayID);
-            }
-            else
-            {
-                SystemCatalog::getInstance()->cleanupCache();
-            }
-        }
-
-      private:
-        ArrayID _arrayID;
-        bool _coordinator;
-    };
-
   public:
-        PhysicalFlipStore(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalFlipStore(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
     PhysicalOperator(logicalName, physicalName, parameters, schema), _arrayID((ArrayID)~0), _updateableArrayID((ArrayID)~0)
-        {
-        }
+    {
+    }
+
 
     void preSingleExecute(shared_ptr<Query> query)
     {
         ArrayDesc desc;
-        shared_ptr<const NodeMembership> membership(Cluster::getInstance()->getNodeMembership());
+        shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
         assert(membership);
 
         if (((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-             (membership->getNodes().size() != query->getNodesCount()))) {
+             (membership->getInstances().size() != query->getInstancesCount()))) {
            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
         }
 
         _lock = shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(_schema.getName(),
                                                                                        query->getQueryID(),
-                                                                                       Cluster::getInstance()->getLocalNodeId(),
+                                                                                       Cluster::getInstance()->getLocalInstanceId(),
                                                                                        SystemCatalog::LockDesc::COORD,
                                                                                        SystemCatalog::LockDesc::WR));
         shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
         query->pushErrorHandler(ptr);
+
         bool rc = false;
         if (!SystemCatalog::getInstance()->getArrayDesc(_schema.getName(), desc, false)) {
 
@@ -856,22 +962,18 @@ class PhysicalFlipStore: public PhysicalOperator
             assert(rc);
 
             ArrayID newArrayID = SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
-
-            if (_parameters.size() >= 2 && _parameters[1]->getParamType() == PARAM_PHYSICAL_EXPRESSION
-               && ((shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getBool())
-           {
-               query->_multinodePostOddJob.push( make_shared<CleanupTemporaryArray>(newArrayID, query->getCoordinatorID() == COORDINATOR_NODE) );
-           }
-           desc = _schema;
-           desc.setId(newArrayID);
+            desc = _schema;
+            desc.setId(newArrayID);
         } else if (_schema.getId() != desc.getId()) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << _schema.getName();
         }
 
         if (desc.isImmutable()) {
-           return;
+            _lock->setArrayId(desc.getId());
+            rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
+            assert(rc);            
+            return;
         }
-        std::stringstream ss;
         _updateableArrayID = desc.getId();
         VersionID lastVersion = SystemCatalog::getInstance()->getLastVersion(_updateableArrayID);
 
@@ -881,10 +983,10 @@ class PhysicalFlipStore: public PhysicalOperator
         assert(rc);
 
         string const& arrayName = desc.getName();
-        ss << arrayName << "@" << (lastVersion+1);
-        string versionName = ss.str();
         _updateableDims = _schema.getDimensions();
-        _schema = ArrayDesc(ss.str(), _schema.getAttributes(), _schema.grabDimensions(versionName));
+        std::stringstream ss;
+        ss << arrayName << "@" << (lastVersion+1);
+        _schema = ArrayDesc(ss.str(), _schema.getAttributes(), _schema.grabDimensions(lastVersion+1));
 
         _arrayID = SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
         _lock->setArrayVersionId(_arrayID);
@@ -922,7 +1024,7 @@ class PhysicalFlipStore: public PhysicalOperator
     {
         for(size_t i =1; i<_parameters.size(); i++)
         {
-            if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
+            assert(_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL);
             {
                 AttributeID inputAttId;
                 string aggOutputName;
@@ -947,7 +1049,9 @@ class PhysicalFlipStore: public PhysicalOperator
                         break;
                     }
                 }
-                assert(found);
+                if (!found) { 
+                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR6) << aggOutputName;
+                }
             }
         }
     }
@@ -956,13 +1060,15 @@ class PhysicalFlipStore: public PhysicalOperator
     {
         assert(inputArrays.size() == 1);
 
-        if (!_lock) {
            VersionID version(0);
            string baseArrayName = splitArrayNameVersion(_schema.getName(), version);
 
+        query->exclusiveLock(baseArrayName);
+
+        if (!_lock) {
            _lock = shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(baseArrayName,
                                                             query->getQueryID(),
-                                                            Cluster::getInstance()->getLocalNodeId(),
+                                                            Cluster::getInstance()->getLocalInstanceId(),
                                                             SystemCatalog::LockDesc::WORKER,
                                                             SystemCatalog::LockDesc::WR));
            _lock->setArrayVersion(version);
@@ -981,7 +1087,7 @@ class PhysicalFlipStore: public PhysicalOperator
         }
 
         shared_ptr<Array> srcArray = inputArrays[0];
-        shared_ptr<Array> dstArray = shared_ptr<Array>(new DBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote nodes
+        shared_ptr<Array> dstArray = shared_ptr<Array>(new DBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
 
         ArrayDesc  const& srcArrayDesc = srcArray->getArrayDesc();
         ArrayDesc  const& dstArrayDesc = _schema;
@@ -1035,7 +1141,7 @@ class PhysicalFlipStore: public PhysicalOperator
                     goto NextDim;
                 }
             }
-            assert(false);
+            dimensionsMapping[i] = SYNTHETIC; 
           NextDim:;
         }
         if (_updateableArrayID != (ArrayID)~0) {
@@ -1048,8 +1154,9 @@ class PhysicalFlipStore: public PhysicalOperator
         transformArray(dstArrayDesc, dstArray, srcArrayDesc, srcArray, attributesMapping, dimensionsMapping, aggregates, query);
         StorageManager::getInstance().flush();
         query->replicationBarrier();
+        getInjectedErrorListener().check();
         return dstArray;
-         }
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalFlipStore, "redimension_store", "PhysicalFlipStore")

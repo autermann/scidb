@@ -67,6 +67,27 @@ public:
         virtual ~Thread();
 };
 
+class Destructor
+{
+ public:
+    Destructor(boost::function<void()>& w) : _work(w)
+    {
+    }
+    ~Destructor()
+    {
+        if (_work) {
+            _work();
+        }
+    }
+    void disarm()
+    {
+        boost::function<void()> tmp;
+        _work.swap(tmp);
+   }
+ private:
+
+    boost::function<void()> _work;
+};
 
 } //namespace
 

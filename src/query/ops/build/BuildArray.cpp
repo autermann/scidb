@@ -47,11 +47,14 @@ namespace scidb {
         return iterationMode;
     }
 
-     Value& BuildChunkIterator::getItem()
+    Value& BuildChunkIterator::getItem()
     {
-         if (!hasCurrent)
-             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-
+        if (!hasCurrent)
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        
+        if (attrID != 0) { 
+            return _trueValue;
+        }
         const size_t nBindings =  array._bindings.size();
 
         for (size_t i = 0; i < nBindings; i++) {
@@ -148,6 +151,7 @@ namespace scidb {
         _params(_expression),
         _nullable(aChunk->getAttributeDesc().isNullable())
     {
+        _trueValue.setBool(true);
         reset();
     }
 
@@ -228,8 +232,7 @@ namespace scidb {
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        currChunkNo += array.nNodes;
-        setPosition();
+        nextChunk();
     }
 
     bool BuildArrayIterator::end()
@@ -239,53 +242,52 @@ namespace scidb {
 
     Coordinates const& BuildArrayIterator::getPosition()
     {
+        if (!hasCurrent)
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         return currPos;
     }
 
-    void BuildArrayIterator::setPosition()
+    void BuildArrayIterator::nextChunk()
     {
-        Dimensions const& dims = array._desc.getDimensions();
-        size_t chunkNo = currChunkNo;
         chunkInitialized = false;
-        for (int i = dims.size(); --i >= 0;) {
-            size_t chunkInterval = dims[i].getChunkInterval();
-            if (chunkInterval == 0) {
-                hasCurrent = false;
+        while (true) { 
+            int i = dims.size() - 1;
+            while ((currPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) { 
+                if (i == 0) { 
+                    hasCurrent = false;
+                    return;
+                }
+                currPos[i] = dims[i].getStart();
+                i -= 1;
+            }
+            if (array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID) { 
+                hasCurrent = true;
                 return;
             }
-            size_t nChunks = (dims[i].getLength() + chunkInterval - 1) / chunkInterval;
-            currPos[i] = dims[i].getStart() + (chunkNo % nChunks)*chunkInterval;
-            chunkNo /= nChunks;
         }
-        hasCurrent = (chunkNo == 0);
     }
-
 
     bool BuildArrayIterator::setPosition(Coordinates const& pos)
     {
-        Dimensions const& dims = array._desc.getDimensions();
-        size_t chunkNo = 0;
         for (size_t i = 0, n = currPos.size(); i < n; i++) {
             if (pos[i] < dims[i].getStart() || pos[i] > dims[i].getEndMax()) {
                 return hasCurrent = false;
             }
-            chunkNo *= (dims[i].getLength() + dims[i].getChunkInterval() - 1) / dims[i].getChunkInterval();
-            chunkNo += (pos[i] - dims[i].getStart()) / dims[i].getChunkInterval();
-
         }
-        if (chunkNo % array.nNodes == array.nodeID) {
-            currChunkNo = chunkNo;
-            setPosition();
-        } else {
-            hasCurrent = false;
-        }
-        return hasCurrent;
+        currPos = pos;
+        array._desc.getChunkPositionFor(currPos);
+        chunkInitialized = false;
+        return hasCurrent = array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID;
     }
 
     void BuildArrayIterator::reset()
     {
-        currChunkNo = array.nodeID;
-        setPosition();
+        size_t nDims = currPos.size(); 
+        for (size_t i = 0; i < nDims; i++) {
+            currPos[i] = dims[i].getStart();
+        }
+        currPos[nDims-1] -= dims[nDims-1].getChunkInterval();
+        nextChunk();
     }
 
     ConstChunk const& BuildArrayIterator::getChunk()
@@ -302,8 +304,9 @@ namespace scidb {
 
     BuildArrayIterator::BuildArrayIterator(BuildArray& arr, AttributeID attrID)
     : array(arr),
-      currPos(arr._desc.getDimensions().size()),
-      chunk(arr, attrID)
+      chunk(arr, attrID), 
+      dims(arr._desc.getDimensions()),
+      currPos(dims.size())
     {
         reset();
     }
@@ -325,13 +328,13 @@ namespace scidb {
 
     BuildArray::BuildArray(boost::shared_ptr<Query>& query, ArrayDesc const& desc, boost::shared_ptr< Expression> expression)
     : _desc(desc), _expression(expression), _bindings(_expression->getBindings()), _converter(NULL),
-      nNodes(0),
-      nodeID(INVALID_NODE),
+      nInstances(0),
+      instanceID(INVALID_INSTANCE),
       _query(query)
     {
        assert(query);
-       nNodes = query->getNodesCount();
-       nodeID = query->getNodeID();
+       nInstances = query->getInstancesCount();
+       instanceID = query->getInstanceID();
         for (size_t i = 0; i < _bindings.size(); i++) {
             if (_bindings[i].kind == BindInfo::BI_ATTRIBUTE)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_BUILD_ERROR1);
@@ -343,6 +346,6 @@ namespace scidb {
         if (attrType != exprType) {
             _converter = FunctionLibrary::getInstance()->findConverter(exprType, attrType);
         }
-        assert(nNodes > 0 && nodeID < nNodes);
+        assert(nInstances > 0 && instanceID < nInstances);
     }
 }

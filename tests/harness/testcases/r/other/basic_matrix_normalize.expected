@@ -1,0 +1,24 @@
+Query was executed successfully
+
+[[(0),(1)],[(1),(2)]];[[(2),(3)],[(3),(4)]];[[(4)],[(5)]];[[(2),(3)],[(3),(4)]];[[(4),(5)],[(5),(6)]];[[(6)],[(7)]];[[(4),(5)]];[[(6),(7)]];[[(8)]]
+
+Query was executed successfully
+
+[(0),(1),(2),(3),(4)]
+
+Query was executed successfully
+
+[("5"),("6"),("7"),("8"),("9"),("10")]
+
+[(0),(0.182574),(0.365148),(0.547723),(0.730297)]
+
+[An error expected at this place for the query "normalize(I1)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2.]
+
+[An error expected at this place for the query "inverse(I3)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR3.]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

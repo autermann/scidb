@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>analyze</refname>
+    <refpurpose>Analyze load file for chunk size</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> analyze(<replaceable>array</replaceable><optional>, <replaceable>attribute1</replaceable>, <replaceable>attribute2</replaceable>, ...</optional>)</synopsis>
+    <synopsis>analyze(<replaceable>array</replaceable><optional>, <replaceable>attribute1</replaceable>, <replaceable>attribute2</replaceable>, ...</optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The analyze operator helps you decide how to set chunk size when you are creating a SciDB array. The analyze() operator takes as input a source array and a list of attributes in that source array. The operator computes the range of values (the maximum and minimum values), population count, and an estimate of the number of distinct values in the attribute (or combination of attributes). </para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example runs analyze on a 2-attribute, 1-dimensional array. The example uses the file doc/user/examples/num_data.scidb, shown here:<programlisting>{0}[
+(1.48306e+09,1),
+(5.80814e+08,1),
+(1.51079e+09,1),
+(1.16154e+09,1),
+(1.42655e+09,1),
+(1.06341e+09,1),
+(4.9253e+08,1),
+(5.6065e+08,1),
+(1.60886e+08,2),
+(1.37844e+09,1),
+(4.08495e+08,1),
+(5.65393e+07,1),
+(1.47646e+09,1),
+(9.52609e+08,1),
+(1.8548e+09,1),
+(1.42396e+09,1),
+(1.75107e+09,1),
+(1.52007e+09,1),
+(5.4882e+08,1),
+(7.28928e+08,1)
+]</programlisting></para>
+      <procedure>
+        <step>
+          <para>Create an array analyze_array with 1 unbounded dimension:<programlisting>AQL% <command>CREATE ARRAY</command> analyze_array
+&lt;val1:double,val2:double&gt; [line=0:*,10,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Load the file num_data.scidb into analyze_array:<programlisting>AQL% <command>LOAD</command> analyze_array 
+<command>FROM</command> &apos;path/doc/user/examples/num_data.scidb&apos;;</programlisting></para>
+        </step>
+        <step>
+          <para>Analyze the array for chunk sizes:<programlisting>analyze(analyze_array);</programlisting>This query returns:<screen>[(&quot;val&quot;,&quot;5.65393e+07&quot;,&quot;1.8548e+09&quot;,20,20),(&quot;val2&quot;,&quot;1&quot;,&quot;2&quot;,2,20)]</screen>The output array contains one attribute for every attribute in the input. Each attribute of the output contains the attribute name,  maximum value, minimum value, number of distinct elements, and total number of elements.</para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

@@ -49,12 +49,12 @@ project(versions(updarr), version_id)
 --sleep 2
 
 ## ../../tests/basic/update/version9.aql
-filter(scan(updarr@datetime('02/20/2020')), a > 100)
+filter(updarr@datetime('02/20/2020'), a > 100)
   
 --sleep 2
 
 ## ../../tests/basic/update/versionA.aql
-filter(scan(updarr@now()-2), a > 100)
+filter(updarr@now()-2, a > 100)
 
 --sleep 2
 

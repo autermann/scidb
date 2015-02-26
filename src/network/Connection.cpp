@@ -27,41 +27,39 @@
  *      Author: roman.simakov@gmail.com
  */
 
-#include "log4cxx/logger.h"
-#include "boost/bind.hpp"
-#include "boost/make_shared.hpp"
+#include <log4cxx/logger.h>
+#include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
 
-#include "network/NetworkManager.h"
+#include "NetworkManager.h"
 #include "Connection.h"
-#include "system/Exceptions.h"
-#include "query/executor/SciDBExecutor.h"
+#include <system/Exceptions.h>
+#include <query/executor/SciDBExecutor.h>
+#include <util/Notification.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb
 {
-
-
 // Logger for network subsystem. static to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.network"));
-
 
 /***
  * C o n n e c t i o n
  */
-Connection::Connection(NetworkManager& networkManager, NodeID sourceNodeID, NodeID nodeID):
+Connection::Connection(NetworkManager& networkManager, InstanceID sourceInstanceID, InstanceID instanceID):
     BaseConnection(networkManager.getIOService()),
+    _messageQueue(instanceID),
     _networkManager(networkManager),
-    _nodeID(nodeID),
-    _sourceNodeID(sourceNodeID),
+    _instanceID(instanceID),
+    _sourceInstanceID(sourceInstanceID),
     _connectionState(NOT_CONNECTED),
     _isSending(false),
     _logConnectErrors(true)
 {
-   assert(sourceNodeID != INVALID_NODE);
+   assert(sourceInstanceID != INVALID_INSTANCE);
 }
-
 
 void Connection::start()
 {
@@ -82,11 +80,13 @@ void Connection::readMessage()
 {
    LOG4CXX_TRACE(logger, "Reading next message");
 
-   assert(_messageDesc == boost::shared_ptr<MessageDesc>());
+   assert(!_messageDesc);
    _messageDesc = boost::shared_ptr<MessageDesc>(new ServerMessageDesc());
    // XXX TODO: add a timeout after we get the first byte
-   async_read(_socket, asio::buffer(&_messageDesc->_messageHeader, sizeof(_messageDesc->_messageHeader)),
-              bind(&Connection::handleReadMessage, shared_from_this(), asio::placeholders::error,
+   async_read(_socket, asio::buffer(&_messageDesc->_messageHeader,
+                                    sizeof(_messageDesc->_messageHeader)),
+              bind(&Connection::handleReadMessage, shared_from_this(),
+                   asio::placeholders::error,
                    asio::placeholders::bytes_transferred));
 }
 
@@ -107,7 +107,7 @@ void Connection::handleReadMessage(const boost::system::error_code& error, size_
       return;
    }
    assert(bytes_transferr == sizeof(_messageDesc->_messageHeader));
-   assert(_messageDesc->_messageHeader.sourceNodeID != _sourceNodeID);
+   assert(_messageDesc->_messageHeader.sourceInstanceID != _sourceInstanceID);
    // TODO: This must not be an assert but exception of correct handled backward compatibility
    assert(_messageDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER);
 
@@ -117,11 +117,10 @@ void Connection::handleReadMessage(const boost::system::error_code& error, size_
                    asio::placeholders::bytes_transferred));
 
    LOG4CXX_TRACE(logger, "handleReadMessage: messageType=" << _messageDesc->_messageHeader.messageType
-                 << "; nodeID="<< _messageDesc->_messageHeader.sourceNodeID <<
+                 << "; instanceID="<< _messageDesc->_messageHeader.sourceInstanceID <<
                  " ; recordSize=" << _messageDesc->_messageHeader.recordSize <<
                  " ; messageDesc.binarySize=" << _messageDesc->_messageHeader.binarySize);
 }
-
 
 void Connection::handleReadRecordPart(const boost::system::error_code& error, size_t bytes_transferr)
 {
@@ -137,7 +136,7 @@ void Connection::handleReadRecordPart(const boost::system::error_code& error, si
 
    assert(_messageDesc->validate());
    assert(_messageDesc->_messageHeader.recordSize == bytes_transferr);
-   assert(_messageDesc->_messageHeader.sourceNodeID != _sourceNodeID);
+   assert(_messageDesc->_messageHeader.sourceInstanceID != _sourceInstanceID);
 
    if (!_messageDesc->parseRecord(bytes_transferr)) {
       LOG4CXX_ERROR(logger, "Network error in handleReadRecordPart: cannot parse record for msgID="
@@ -184,67 +183,165 @@ void Connection::handleReadBinaryPart(const boost::system::error_code& error, si
    readMessage();
 }
 
-void Connection::sendMessage(boost::shared_ptr<MessageDesc> messageDesc)
+void Connection::sendMessage(boost::shared_ptr<MessageDesc> messageDesc,
+                             NetworkManager::MessageQueueType mqt)
 {
-   {
-      ScopedMutexLock mutexLock(_mutex);
-      _messagesQueue.push_back(messageDesc);
-      LOG4CXX_TRACE(logger, "sendMessage: new message queue size = "
-                    << _messagesQueue.size());
-   }
+    pushMessage(messageDesc, mqt);
    _networkManager.getIOService().post(bind(&Connection::pushNextMessage,
                                             shared_from_this()));
 }
 
+void Connection::pushMessage(boost::shared_ptr<MessageDesc>& messageDesc,
+                             NetworkManager::MessageQueueType mqt)
+{
+    boost::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
+    {
+        ScopedMutexLock mutexLock(_mutex);
+
+        LOG4CXX_TRACE(logger, "pushMessage: send message queue size = "
+                      << _messageQueue.size()
+                      << " for instanceID=" << _instanceID);
+
+       connStatus = _messageQueue.pushBack(mqt, messageDesc);
+       publishQueueSizeIfNeeded(connStatus);
+    }
+    if (connStatus) {
+        _networkManager.getIOService().post(bind(&Connection::publishQueueSize,
+                                                 shared_from_this()));
+    }
+}
+
+boost::shared_ptr<MessageDesc> Connection::popMessage()
+{
+    boost::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
+    boost::shared_ptr<MessageDesc> msg;
+    {
+        ScopedMutexLock mutexLock(_mutex);
+
+        connStatus = _messageQueue.popFront(msg);
+
+        publishQueueSizeIfNeeded(connStatus);
+    }
+    if (connStatus) {
+        _networkManager.getIOService().post(bind(&Connection::publishQueueSize,
+                                                 shared_from_this()));
+    }
+    return msg;
+}
+
+void Connection::setRemoteQueueState(NetworkManager::MessageQueueType mqt,  uint64_t size,
+                                     uint64_t localGenId, uint64_t remoteGenId, 
+                                     uint64_t localSn, uint64_t remoteSn)
+{
+    assert(mqt != NetworkManager::mqtNone);
+    boost::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
+    {
+        ScopedMutexLock mutexLock(_mutex);
+
+        connStatus = _messageQueue.setRemoteState(mqt, size, localGenId, remoteGenId, localSn, remoteSn);
+
+        LOG4CXX_TRACE(logger, "setRemoteQueueSize: remote queue size = "
+                      << size <<" for instanceID="<<_instanceID << " for queue "<<mqt);
+
+        publishQueueSizeIfNeeded(connStatus);
+    }
+    if (connStatus) {
+        _networkManager.getIOService().post(bind(&Connection::publishQueueSize,
+                                                 shared_from_this()));
+    }
+    _networkManager.getIOService().post(bind(&Connection::pushNextMessage,
+                                             shared_from_this()));
+}
+
+bool Connection::publishQueueSizeIfNeeded(const boost::shared_ptr<const NetworkManager::ConnectionStatus>& connStatus)
+{
+    // mutex must be locked
+    if (!connStatus) {
+        return false;
+    }
+    _statusesToPublish[connStatus->getQueueType()] = connStatus;
+    return true;
+}
+
+void Connection::publishQueueSize()
+{
+    InstanceID instanceId = INVALID_INSTANCE;
+    ConnectionStatusMap toPublish;
+    {
+        ScopedMutexLock mutexLock(_mutex);
+        instanceId = _instanceID;
+        toPublish.swap(_statusesToPublish);
+    }
+    for (ConnectionStatusMap::iterator iter = toPublish.begin();
+         iter != toPublish.end(); ++iter) {
+
+        boost::shared_ptr<const NetworkManager::ConnectionStatus>& status = iter->second;
+        NetworkManager::MessageQueueType mqt = iter->first;
+        assert(mqt == status->getQueueType());
+        assert(mqt != NetworkManager::mqtNone);
+        assert(mqt < NetworkManager::mqtMax);
+        LOG4CXX_TRACE(logger, "publishQueueSize: publishing queue size = "
+                      << status->getAvailabeQueueSize()
+                      <<" for instanceID="<< instanceId
+                      <<" for queue type="<< mqt);
+
+        Notification<NetworkManager::ConnectionStatus> event(status);
+        event.publish();
+    }
+}
+
 void Connection::handleSendMessage(const boost::system::error_code& error,
-                size_t bytes_transferred, boost::shared_ptr<MessageDesc> messageDesc)
+                                   size_t bytes_transferred,
+                                   boost::shared_ptr< std::list<shared_ptr<MessageDesc> > >& msgs,
+                                   size_t bytes_sent)
 {
    _isSending = false;
    if (!error) { // normal case
+       assert(msgs);
+       assert(bytes_transferred == bytes_sent);
 
-      LOG4CXX_TRACE(logger, "handleSendMessage: bytes_transferred="
-                    << bytes_transferred
-                    << ", "<< getPeerId() << ", msgID ="
-                    << messageDesc->getMessageType());
-      assert(bytes_transferred == messageDesc->getMessageSize());
-      assert(messageDesc->_messageHeader.sourceNodeID == _sourceNodeID);
+       if (logger->isTraceEnabled()) {
+           for (std::list<shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
+                i != msgs->end(); ++i) {
+               const boost::shared_ptr<MessageDesc>& messageDesc = *i;
+               LOG4CXX_TRACE(logger, "handleSendMessage: bytes_transferredD="
+                             << messageDesc->getMessageSize()
+                             << ", "<< getPeerId()
+                             <<", msgID =" << messageDesc->getMessageType());
+           }
+       }
 
-      messageDesc->_sent.release();
-      {
-         ScopedMutexLock mutexLock(_mutex);
-         if ((!_messagesQueue.empty()) &&
-             _messagesQueue.front() == messageDesc) {
-            _messagesQueue.pop_front();
-         } else {
-            LOG4CXX_TRACE(logger, "handleSendMessage: sent message must have been cancelled"
-                          << ", "<< getPeerId() << ", msgID ="
-                          << messageDesc->getMessageType());
-         }
-      }
-      pushNextMessage();
-      return;
+       pushNextMessage();
+       return;
    }
 
    // errror case
 
-   LOG4CXX_ERROR(logger, "Network error in handleSendMessage #"
-                  << error.value() << "('" << error.message() << "')"
-                  << ", "<< getPeerId() << ", msgID =" << messageDesc->getMessageType());
-    assert(error != asio::error::interrupted);
-    assert(error != asio::error::would_block);
-    assert(error != asio::error::try_again);
+   assert(error != asio::error::interrupted);
+   assert(error != asio::error::would_block);
+   assert(error != asio::error::try_again);
 
-    if (_connectionState == CONNECTED) {
+   LOG4CXX_ERROR(logger, "Network error in handleSendMessage #"
+                 << error.value() << "('" << error.message() << "')"
+                 << ", "<< getPeerId());
+
+   for (std::list<shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
+        i != msgs->end(); ++i) {
+       const boost::shared_ptr<MessageDesc>& messageDesc = *i;
+       _networkManager.abortMessageQuery(messageDesc->getQueryID());
+   }
+
+   if (_connectionState == CONNECTED) {
        abortMessages();
        disconnectInternal();
-    }
-    if (_nodeID == INVALID_NODE) {
+   }
+   if (_instanceID == INVALID_INSTANCE) {
        LOG4CXX_TRACE(logger, "Not recovering connection from "<<getPeerId());
        return;
-    }
+   }
 
-    LOG4CXX_DEBUG(logger, "Recovering connection to " << getPeerId());
-    _networkManager.reconnect(_nodeID);
+   LOG4CXX_DEBUG(logger, "Recovering connection to " << getPeerId());
+   _networkManager.reconnect(_instanceID);
 }
 
 void Connection::pushNextMessage()
@@ -258,29 +355,59 @@ void Connection::pushNextMessage()
       LOG4CXX_TRACE(logger, "Already sending to " << getPeerId());
       return;
    }
-   shared_ptr<MessageDesc> messageDesc;
-   {
-      ScopedMutexLock mutexLock(_mutex);
-      if (!_messagesQueue.empty()) {
-         messageDesc = _messagesQueue.front();
-         assert(messageDesc);
-      }
-   }
-   if(!messageDesc) {
-      LOG4CXX_TRACE(logger, "Nothing to send to " << getPeerId());
-      return;
-   }
-   messageDesc->_messageHeader.sourceNodeID = _sourceNodeID;
+
    vector<asio::const_buffer> constBuffers;
-   messageDesc->writeConstBuffers(constBuffers);
+   boost::shared_ptr< std::list<shared_ptr<MessageDesc> > >  msgs(new std::list<shared_ptr<MessageDesc> >());
+   size_t size(0);
+   const size_t maxSize(32*1024);
+
+   while (true) {
+       shared_ptr<MessageDesc> messageDesc = popMessage();
+       if (!messageDesc) {
+           break;
+       }
+       msgs->push_back(messageDesc);
+       if (messageDesc->getMessageType() != mtAlive) {
+           // mtAlive are useful only if there is no other traffic
+           messageDesc->_messageHeader.sourceInstanceID = _sourceInstanceID;
+           messageDesc->writeConstBuffers(constBuffers);
+           size += messageDesc->getMessageSize();
+           if (size >= maxSize) {
+               break;
+           }
+       }
+   }
+   if (msgs->empty()) {
+       LOG4CXX_TRACE(logger, "Nothing to send to " << getPeerId());
+       return;
+   }
+   if (_instanceID != CLIENT_INSTANCE) {
+       shared_ptr<MessageDesc> controlMsg = getControlMessage();
+       if (controlMsg) {
+           msgs->push_back(controlMsg);
+           controlMsg->writeConstBuffers(constBuffers);
+           controlMsg->_messageHeader.sourceInstanceID = _sourceInstanceID;
+           size += controlMsg->getMessageSize();
+       }
+   }
+   if (size == 0) {
+       assert(!msgs->empty());
+       assert(msgs->front()->getMessageType() == mtAlive);
+       shared_ptr<MessageDesc>& aliveMsg = msgs->front();
+       aliveMsg->writeConstBuffers(constBuffers);
+       aliveMsg->_messageHeader.sourceInstanceID = _sourceInstanceID;
+       size += aliveMsg->getMessageSize();
+   }
 
    asio::async_write(_socket, constBuffers,
                      bind(&Connection::handleSendMessage,
-                          shared_from_this(), asio::placeholders::error,
-                          asio::placeholders::bytes_transferred, messageDesc));
+                          shared_from_this(),
+                          asio::placeholders::error,
+                          asio::placeholders::bytes_transferred,
+                          msgs, size));
    _isSending = true;
-   currentStatistics->sentSize += messageDesc->getMessageSize();
-   currentStatistics->sentMessages++;
+   currentStatistics->sentSize += size;
+   currentStatistics->sentMessages += msgs->size();
 }
 
 MessagePtr
@@ -343,7 +470,7 @@ void Connection::onResolve(shared_ptr<asio::ip::tcp::resolver>& resolver,
        }
        abortMessages();
        disconnectInternal();
-       _networkManager.reconnect(_nodeID);
+       _networkManager.reconnect(_instanceID);
        return;
     }
 
@@ -386,7 +513,7 @@ void Connection::onConnect(shared_ptr<asio::ip::tcp::resolver>& resolver,
       abortMessages();
       disconnectInternal();
       _error = err;
-      _networkManager.reconnect(_nodeID);
+      _networkManager.reconnect(_instanceID);
       return;
    }
 
@@ -481,7 +608,7 @@ void Connection::disconnectInternal()
    LOG4CXX_TRACE(logger, str(format("Number of active client queries %lld") % clientQueries.size()));
    for (std::set<QueryID>::const_iterator i = clientQueries.begin(); i != clientQueries.end(); ++i)
    {
-       assert(_nodeID == CLIENT_NODE);
+       assert(_instanceID == CLIENT_INSTANCE);
        QueryID queryID = *i;
        _networkManager.cancelClientQuery(queryID);
    }
@@ -513,41 +640,30 @@ void Connection::handleReadError(const boost::system::error_code& error)
 Connection::~Connection()
 {
    LOG4CXX_TRACE(logger, "Destroying connection to " << getPeerId());
-
    abortMessages();
    disconnectInternal();
 }
 
 void Connection::abortMessages()
 {
-   MessageQueue mQ;
+    MultiChannelQueue connQ(_instanceID);
    {
       ScopedMutexLock mutexLock(_mutex);
-      mQ.swap(_messagesQueue);
+      connQ.swap(_messageQueue);
    }
 
-   LOG4CXX_TRACE(logger, "Aborting "<< mQ.size()
+   LOG4CXX_TRACE(logger, "Aborting "<< connQ.size()
                  << " buffered connection messages to "
                  << getPeerId());
 
-   std::set<QueryID> queries;
-   for (MessageQueue::iterator iter = mQ.begin();
-        iter != mQ.end(); ++iter) {
-      shared_ptr<MessageDesc>& messageDesc = *iter;
-      queries.insert(messageDesc->getQueryID());
-      messageDesc->_sent.release();
-   }
-   for (std::set<QueryID>::const_iterator iter = queries.begin();
-        iter != queries.end(); ++iter) {
-      _networkManager.abortMessageQuery(*iter);
-   }
+   connQ.abortMessages();
 }
 
 string Connection::getPeerId()
 {
-   string res((_nodeID == CLIENT_NODE)
+   string res((_instanceID == CLIENT_INSTANCE)
               ? std::string("CLIENT")
-              : boost::str(boost::format("node %lld") % _nodeID));
+              : boost::str(boost::format("instance %lld") % _instanceID));
    if (boost::asio::ip::address() != _remoteIp) {
       boost::system::error_code ec;
       string ip(_remoteIp.to_string(ec));
@@ -573,6 +689,342 @@ void Connection::getRemoteIp()
                     << ". Error:" << ec.value() << "('" << ec.message() << "')");
       assert(false);
    }
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::MultiChannelQueue::pushBack(NetworkManager::MessageQueueType mqt,
+                                       const boost::shared_ptr<MessageDesc>& msg)
+{
+    assert(msg);
+    assert(mqt<NetworkManager::mqtMax);
+
+    boost::shared_ptr<Channel>& channel = _channels[mqt];
+    if (!channel) {
+        channel = boost::make_shared<Channel>(_instanceId, mqt);
+    }
+    bool isActiveBefore = channel->isActive();
+
+    boost::shared_ptr<NetworkManager::ConnectionStatus> status = channel->pushBack(msg);
+    ++_size;
+
+    bool isActiveAfter = channel->isActive();
+    if (isActiveBefore != isActiveAfter) {
+        (isActiveAfter ? ++_activeChannelCount : --_activeChannelCount);
+        assert(_activeChannelCount<=NetworkManager::mqtMax);
+    }
+    return status;
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::MultiChannelQueue::popFront(boost::shared_ptr<MessageDesc>& msg)
+{
+    assert(!msg);
+
+    Channel *channel(NULL);
+    uint32_t start = _currChannel;
+    while (true) {
+        ++_currChannel;
+        channel = _channels[_currChannel % NetworkManager::mqtMax].get();
+        if ((_currChannel % NetworkManager::mqtMax) == (start % NetworkManager::mqtMax)) {
+            break;
+        }
+        if (channel==NULL) {
+            continue;
+        }
+        if (!channel->isActive()) {
+            continue;
+        }
+        break;
+    }
+    boost::shared_ptr<NetworkManager::ConnectionStatus> status;
+    if (channel!=NULL && channel->isActive()) {
+
+        status = channel->popFront(msg);
+        assert(msg);
+        --_size;
+
+        _activeChannelCount -= (!channel->isActive());
+        assert(_activeChannelCount<=NetworkManager::mqtMax);
+    }
+    return status;
+}
+
+shared_ptr<MessageDesc> Connection::getControlMessage()
+{
+    shared_ptr<MessageDesc> msgDesc = make_shared<MessageDesc>(mtControl);
+    assert(msgDesc);
+
+    shared_ptr<scidb_msg::Control> record = msgDesc->getRecord<scidb_msg::Control>();
+    google::protobuf::uint64 localGenId=0;
+    google::protobuf::uint64 remoteGenId=0;
+    assert(record);
+    {
+        ScopedMutexLock mutexLock(_mutex);
+ 
+        localGenId = _messageQueue.getLocalGenId();
+        record->set_local_gen_id(localGenId);
+
+        remoteGenId = _messageQueue.getRemoteGenId();
+        record->set_remote_gen_id(remoteGenId);
+
+        LOG4CXX_TRACE(logger, "Control message localGenId=" << localGenId
+                      <<", remoteGenId=" << remoteGenId);
+
+        for (uint32_t mqt = (NetworkManager::mqtNone+1); mqt < NetworkManager::mqtMax; ++mqt) {
+            const google::protobuf::uint64 localSn   = _messageQueue.getLocalSeqNum(NetworkManager::MessageQueueType(mqt));
+            const google::protobuf::uint64 remoteSn  = _messageQueue.getRemoteSeqNum(NetworkManager::MessageQueueType(mqt));
+            const google::protobuf::uint32 id        = mqt;
+            scidb_msg::Control_Channel* entry = record->add_channels();
+            assert(entry);
+            entry->set_id(id);
+            entry->set_local_sn(localSn);
+            entry->set_remote_sn(remoteSn);
+        }
+    }
+    google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>* entries = record->mutable_channels();
+    for(google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>::iterator iter = entries->begin();
+        iter != entries->end(); ++iter) {
+        scidb_msg::Control_Channel& entry = (*iter);
+        assert(entry.has_id());
+        const NetworkManager::MessageQueueType mqt = static_cast<NetworkManager::MessageQueueType>(entry.id());
+        const google::protobuf::uint64 available = _networkManager.getAvailable(NetworkManager::MessageQueueType(mqt));
+        entry.set_available(available);
+    }
+
+    if (logger->isTraceEnabled()) {
+        const google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>& channels = record->channels();
+        for(google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>::const_iterator iter = channels.begin();
+            iter != channels.end(); ++iter) {
+            const scidb_msg::Control_Channel& entry = (*iter);
+            const NetworkManager::MessageQueueType mqt  = static_cast<NetworkManager::MessageQueueType>(entry.id());
+            const uint64_t available    = entry.available();
+            const uint64_t remoteSn     = entry.remote_sn();
+            const uint64_t localSn      = entry.local_sn();
+
+            LOG4CXX_TRACE(logger, "getControlMessage: Available queue size=" << available
+                          << ", instanceID="<<_instanceID
+                          << ", queue="<<mqt
+                          << ", localGenId="<<localGenId
+                          << ", remoteGenId="<<remoteGenId
+                          <<", localSn="<<localSn
+                          <<", remoteSn="<<remoteSn);
+        }
+    }
+    return msgDesc;
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::MultiChannelQueue::setRemoteState(NetworkManager::MessageQueueType mqt,
+                                              uint64_t rSize,
+                                              uint64_t localGenId, uint64_t remoteGenId,
+                                              uint64_t localSn, uint64_t remoteSn)
+{
+    // XXX TODO: consider turning asserts into exceptions
+    boost::shared_ptr<NetworkManager::ConnectionStatus> status;
+    if (mqt>=NetworkManager::mqtMax) {
+        assert(false);
+        return status;
+    }
+    if (remoteGenId > _remoteGenId) {
+        _remoteGenId = remoteGenId;
+    } else if (remoteGenId < _remoteGenId) {
+        assert(false);
+        return status;
+    }
+    if (localGenId > _localGenId) {
+        assert(false);
+        return status;
+    } else if (localGenId < _localGenId) {
+        localSn = 0;
+    }
+
+    boost::shared_ptr<Channel>& channel = _channels[mqt];
+    if (!channel) {
+        channel = boost::make_shared<Channel>(_instanceId, mqt);
+    }
+    bool isActiveBefore = channel->isActive();
+
+    status = channel->setRemoteState(rSize, localSn, remoteSn);
+
+    bool isActiveAfter = channel->isActive();
+    if (isActiveBefore != isActiveAfter) {
+        (isActiveAfter ? ++_activeChannelCount : --_activeChannelCount);
+        assert(_activeChannelCount<=NetworkManager::mqtMax);
+    }
+    return status;
+}
+
+uint64_t
+Connection::MultiChannelQueue::getAvailable(NetworkManager::MessageQueueType mqt) const
+{
+    assert(mqt<NetworkManager::mqtMax);
+    const boost::shared_ptr<Channel>& channel = _channels[mqt];
+    if (!channel) {
+        return NetworkManager::MAX_QUEUE_SIZE;
+    }
+    return channel->getAvailable();
+}
+
+uint64_t
+Connection::MultiChannelQueue::getLocalSeqNum(NetworkManager::MessageQueueType mqt) const
+{
+    assert(mqt<NetworkManager::mqtMax);
+    const boost::shared_ptr<Channel>& channel = _channels[mqt];
+    if (!channel) {
+        return 0;
+    }
+    return channel->getLocalSeqNum();
+}
+
+uint64_t
+Connection::MultiChannelQueue::getRemoteSeqNum(NetworkManager::MessageQueueType mqt) const
+{
+    assert(mqt<NetworkManager::mqtMax);
+    const boost::shared_ptr<Channel>& channel = _channels[mqt];
+    if (!channel) {
+        return 0;
+    }
+    return channel->getRemoteSeqNum();
+}
+
+void
+Connection::MultiChannelQueue::abortMessages()
+{
+    for (Channels::iterator iter = _channels.begin();
+         iter != _channels.end(); ++iter) {
+        boost::shared_ptr<Channel>& channel = (*iter);
+        if (!channel) {
+            continue;
+        }
+        channel->abortMessages();
+    }
+    _activeChannelCount = 0;
+    _size = 0;
+}
+
+void
+Connection::MultiChannelQueue::swap(MultiChannelQueue& other)
+{
+    const InstanceID instanceId = _instanceId;
+    _instanceId = other._instanceId;
+    other._instanceId = instanceId;
+
+    const uint32_t currMqt = _currChannel;
+    _currChannel = other._currChannel;
+    other._currChannel = currMqt;
+
+    const size_t activeCount = _activeChannelCount;
+    _activeChannelCount = other._activeChannelCount;
+    other._activeChannelCount = activeCount;
+
+    const uint64_t size = _size;
+    _size = other._size;
+    other._size = size;
+
+    _channels.swap(other._channels);
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::Channel::pushBack(const boost::shared_ptr<MessageDesc>& msg)
+{
+    if ( !_msgQ.empty() &&  msg->getMessageType() == mtAlive) {
+        // mtAlive are useful only if there is no other traffic
+        assert(_mqt == NetworkManager::mqtNone);
+        return  boost::shared_ptr<NetworkManager::ConnectionStatus>();
+    }
+    const uint64_t spaceBefore = getAvailable();
+    if (spaceBefore <= 0) {
+        throw NetworkManager::OverflowException(_mqt, REL_FILE, __FUNCTION__, __LINE__);
+    }
+    _msgQ.push_back(msg);
+    const uint64_t spaceAfter = getAvailable();
+    boost::shared_ptr<NetworkManager::ConnectionStatus> status = getNewStatus(spaceBefore, spaceAfter);
+    return status;
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::Channel::popFront(boost::shared_ptr<MessageDesc>& msg)
+{
+    boost::shared_ptr<NetworkManager::ConnectionStatus> status;
+    if (!isActive()) {
+        msg.reset();
+        return status;
+    }
+    const uint64_t spaceBefore = getAvailable();
+    msg = _msgQ.front();
+    _msgQ.pop_front();
+    ++_localSeqNum;
+    const uint64_t spaceAfter = getAvailable();
+    status = getNewStatus(spaceBefore, spaceAfter);
+
+    LOG4CXX_TRACE(logger, "popFront: Channel "<< _mqt
+                  << " to " << _instanceId << " "
+                  << ((isActive()) ? "ACTIVE" : "BLOCKED"));
+
+    return status;
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::Channel::setRemoteState(uint64_t rSize, uint64_t localSn, uint64_t remoteSn)
+{
+   const uint64_t spaceBefore = getAvailable();
+    _remoteSize = rSize;
+    _remoteSeqNum = remoteSn;
+    _localSeqNumOnPeer = localSn;
+    const uint64_t spaceAfter = getAvailable();
+    boost::shared_ptr<NetworkManager::ConnectionStatus> status = getNewStatus(spaceBefore, spaceAfter);
+
+    LOG4CXX_TRACE(logger, "setRemoteState: Channel "<< _mqt
+                  << " to " << _instanceId
+                  << ", remoteSize="<<_remoteSize
+                  << ", remoteSeqNum="<<_remoteSeqNum
+                  << ", remoteSeqNumOnPeer="<<_localSeqNumOnPeer);
+    return status;
+}
+
+void
+Connection::Channel::abortMessages()
+{
+    MessageQueue mQ;
+    mQ.swap(_msgQ);
+    LOG4CXX_TRACE(logger, "abortMessages: Aborting "<< mQ.size()
+                  << " buffered connection messages to "
+                  << _instanceId);
+    std::set<QueryID> queries;
+    for (MessageQueue::iterator iter = mQ.begin();
+         iter != mQ.end(); ++iter) {
+        shared_ptr<MessageDesc>& messageDesc = (*iter);
+        queries.insert(messageDesc->getQueryID());
+    }
+    mQ.clear();
+    NetworkManager* networkManager = NetworkManager::getInstance();
+    assert(networkManager);
+    for (std::set<QueryID>::const_iterator iter = queries.begin();
+         iter != queries.end(); ++iter) {
+        networkManager->abortMessageQuery(*iter);
+    }
+}
+
+boost::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::Channel::getNewStatus(const uint64_t spaceBefore,
+                                  const uint64_t spaceAfter)
+{
+    if ((spaceBefore != spaceAfter) && (spaceBefore == 0 || spaceAfter == 0)) {
+        return boost::make_shared<NetworkManager::ConnectionStatus>(_instanceId, _mqt, spaceAfter);
+    }
+    return boost::shared_ptr<NetworkManager::ConnectionStatus>();
+}
+
+uint64_t
+Connection::Channel::getAvailable() const
+{
+    const uint64_t localLimit = _sendQueueLimit;
+    const uint64_t localSize  = _msgQ.size();
+
+    if (localSize >= localLimit) {
+        return 0;
+    }
+    return (localLimit-localSize);
 }
 
 } // namespace

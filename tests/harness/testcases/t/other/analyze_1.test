@@ -1,0 +1,42 @@
+--setup
+--start-query-logging
+create array a1 <val1:double> [x=0:3,2,0,y=0:3,2,0]
+store(build(a1,x+y+2.5),a1)
+
+create array a2 <val1:double> [x=0:3,2,0,y=0:3,2,0]
+load(a2,'../tests/harness/testcases/data/analyze1.txt')
+
+create array a3 <val1:int32> [x=0:3,2,0,y=0:3,2,0]
+store(build(a3,x+y+1),a3)
+
+create array a4 <val1:int64> [x=0:3,2,0,y=0:3,2,0]
+store(build(a4,x+y+1),a4)
+
+create array a5 <val1:string> [x=0:3,2,0,y=0:3,2,0]
+store(build(a5,'a'+string(x)+string(y)),a5)
+
+create array a6 <val1:float> [x=0:3,2,0,y=0:3,2,0]
+store(build(a6,x+y+1.5),a6)
+
+load_library ( 'librational.so' )
+create array a7 <val1:rational> [x=0:3,2,0,y=0:3,2,0]
+load(a7,'../tests/harness/testcases/data/analyze2.txt')
+
+--test
+analyze(a1)
+analyze(a2)
+analyze(a3)
+analyze(a4)
+analyze(a5)
+analyze(a6)
+analyze(a7)
+
+--cleanup
+remove(a1)
+remove(a2)
+remove(a3)
+remove(a4)
+remove(a5)
+remove(a6)
+remove(a7)
+--stop-query-logging

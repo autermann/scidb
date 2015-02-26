@@ -54,10 +54,81 @@ enum
 #include <inttypes.h>
 //
 // This is the struct used to store the data inside SciDB. 
-typedef struct 
+typedef struct _Rational
 {
 	int64_t num;
 	int64_t denom;
+
+    _Rational(int n = 0): num(n), denom(1) {}
+
+    /** C++ operators implementation for aggregating */
+    _Rational operator*(const _Rational& b) const
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(b.num, b.denom);
+        ra *= rb;
+        _Rational r;
+        r.num = ra.numerator();
+        r.denom = ra.denominator();
+        return r;
+    }
+
+    _Rational operator*(uint64_t v) const
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(v);
+        ra *= rb;
+        _Rational r;
+        r.num = ra.numerator();
+        r.denom = ra.denominator();
+        return r;
+    }
+
+    _Rational operator/(uint64_t v) const
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(v);
+        ra /= rb;
+        _Rational r;
+        r.num = ra.numerator();
+        r.denom = ra.denominator();
+        return r;
+    }
+
+    _Rational operator-(const _Rational& b) const
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(b.num, b.denom);
+        ra -= rb;
+        _Rational r;
+        r.num = ra.numerator();
+        r.denom = ra.denominator();
+        return r;
+    }
+
+    bool operator>(const _Rational& b) const
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(b.num, b.denom);
+        return ra > rb;
+    }
+
+    bool operator<(const _Rational& b) const
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(b.num, b.denom);
+        return ra < rb;
+    }
+
+    _Rational& operator+=(const _Rational& b)
+    {
+        rational<int64_t>ra(this->num, this->denom);
+        rational<int64_t>rb(b.num, b.denom);
+        ra += rb;
+        this->num = ra.numerator();
+        this->denom = ra.denominator();
+        return *this;
+    }
 } SciDB_Rational;
 
 //
@@ -72,8 +143,8 @@ typedef struct
 //	  in doubles) and prevent it.
 inline void check_zero ( SciDB_Rational * r )
 {
-		if ((0 == r->denom) && (0 == r->num))
-				r->denom = 1;
+    if ((0 == r->denom) && (0 == r->num))
+            r->denom = 1;
 }
 
 //

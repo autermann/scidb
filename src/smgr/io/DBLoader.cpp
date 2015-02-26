@@ -627,7 +627,7 @@ namespace scidb
                                             (*converters[i])(&v, &strValue, NULL);
                                             fprintf(f, "\"%s\"",  strValue.getString());
                                         } else {
-                                            fprintf(f, "%s",  ValueToString(types[i], chunkIterators[i]->getItem()).c_str());
+                                            fprintf(f, "%s",  ValueToString(types[i], chunkIterators[i]->getItem(), storeFormat).c_str());
                                         }
                                     }
                                 }
@@ -683,10 +683,10 @@ namespace scidb
     }
 
     static void s_fprintCoordinate(FILE *f,
-                                  Coordinate ordinalCoord,
-                                  DimensionDesc const& dimension,
-                                  shared_ptr <ConstItemIterator> const& dimArrayIter,
-                                  FunctionPointer const dimConverter)
+                                   Coordinate ordinalCoord,
+                                   DimensionDesc const& dimension,
+                                   Value const& origCoord, 
+                                   FunctionPointer const dimConverter)
     {
         if (dimension.isInteger())
         {
@@ -694,18 +694,14 @@ namespace scidb
         }
         else
         {
-            Coordinates mappingCoords(1);
-            mappingCoords[0] = ordinalCoord;
-            dimArrayIter->setPosition(mappingCoords);
-            Value& coord = dimArrayIter->getItem();
-            s_fprintValue(f, &coord, dimension.getType(), dimConverter);
+            s_fprintValue(f, &origCoord, dimension.getType(), dimConverter);
         }
     }
 
     static void s_fprintCoordinates(FILE *f,
                                     Coordinates const& coords,
                                     Dimensions const& dims,
-                                    vector<shared_ptr<ConstItemIterator> > const& mappingIterators,
+                                    vector<Value> const& origCoords, 
                                     vector <FunctionPointer> const& dimConverters)
     {
         putc('{', f);
@@ -715,14 +711,13 @@ namespace scidb
             {
                 putc(',', f);
             }
-            s_fprintCoordinate(f, coords[i], dims[i], mappingIterators[i], dimConverters[i]);
+            s_fprintCoordinate(f, coords[i], dims[i], origCoords[i], dimConverters[i]);
         }
         putc('}', f);
     }
 
 
     uint64_t DBLoader::saveWithLabels(Array const& array,
-                                      vector<shared_ptr<Array> > mappingArrays,
                                       std::string const& file,
                                       std::string const& format,
                                       bool append)
@@ -754,7 +749,7 @@ namespace scidb
             vector< TypeId> attTypes(nAttributes);
             vector< FunctionPointer> attConverters(nAttributes);
             vector< FunctionPointer> dimConverters(nDimensions);
-            vector<shared_ptr<ConstItemIterator> > mappingIterators(nDimensions);
+            vector<Value> origPos;
 
             int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS;
 
@@ -779,7 +774,6 @@ namespace scidb
                         TypeLibrary::getType(dt); // force loading of type
                         dimConverters[i] = FunctionLibrary::getInstance()->findConverter(dt, TID_STRING, false);
                     }
-                    mappingIterators[i] = mappingArrays[i]->getItemIterator(0);
                 }
             }
 
@@ -802,6 +796,7 @@ namespace scidb
                 fputc('\n', f);
 
                 Coordinates posCoords(1);
+
                 while (!arrayIterators[0]->end())
                 {
                     // Get iterators for the current chunk
@@ -816,13 +811,14 @@ namespace scidb
                     while (!chunkIterators[0]->end())
                     {
                         Coordinates const& pos = chunkIterators[0]->getPosition();
+                        array.getOriginalPosition(origPos, pos);
                         for (i = 0; i < nDimensions; i++)
                         {
                             if (i != 0)
                             {
                                 fputc(',', f);
                             }
-                            s_fprintCoordinate(f, pos[i], dims[i], mappingIterators[i], dimConverters[i]);
+                            s_fprintCoordinate(f, pos[i], dims[i], origPos[i], dimConverters[i]);
                         }
 
                         for (i = 0; i < nAttributes; i++)
@@ -924,6 +920,7 @@ namespace scidb
                                 if (!chunkIterators[0]->getChunk().isSparse())
                                 {
                                     Coordinates const& pos = chunkIterators[0]->getPosition();
+                                    array.getOriginalPosition(origPos, pos);
                                     int nbr = 0;
                                     for (i = nDimensions-1; pos[i] != ++coord[i]; i--)
                                     {
@@ -963,7 +960,7 @@ namespace scidb
                                     }
                                     if (gap)
                                     {
-                                        s_fprintCoordinates(f, pos, dims, mappingIterators, dimConverters);
+                                        s_fprintCoordinates(f, pos, dims, origPos, dimConverters);
                                         for (i = 0; i < nDimensions; i++)
                                         {
                                             coord[i]=pos[i];
@@ -982,7 +979,7 @@ namespace scidb
                                     {
                                         putc('[', f);
                                     }
-                                    s_fprintCoordinates(f, pos, dims, mappingIterators, dimConverters);
+                                    s_fprintCoordinates(f, pos, dims, origPos, dimConverters);
                                 }
                                 else
                                 {
@@ -998,8 +995,8 @@ namespace scidb
                                         }
                                         startOfArray = false;
                                     }
-
-                                    s_fprintCoordinates(f, chunkIterators[0]->getPosition(), dims, mappingIterators, dimConverters);
+                                    array.getOriginalPosition(origPos, chunkIterators[0]->getPosition());
+                                    s_fprintCoordinates(f, chunkIterators[0]->getPosition(), dims, origPos, dimConverters);
                                 }
                                 putc('(', f);
                                 if (!chunkIterators[0]->isEmpty())
