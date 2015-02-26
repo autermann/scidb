@@ -1,0 +1,20 @@
+--setup
+
+store (build (<v : int64> [I=0:2000,1,0], I), ARRAY1)
+store (build (<v : int64> [I=0:2000,1,0], I), ARRAY2)
+
+--test
+
+--shell --command "../utils/killquery.sh -afl 2 2 'store(apply(join(ARRAY1, cast (ARRAY2, <b:int64>[x=0:2000,1,0])), c, I+b), ABRTEST)'" --store 
+
+# should not exist
+--error --long=20 "scan(ABRTEST)"
+
+# our aborted query should not be listed. 
+#project(list('queries'), name)
+
+--cleanup
+
+remove(ARRAY1)
+remove(ARRAY2)
+--error --long=20 "remove(ABRTEST)"

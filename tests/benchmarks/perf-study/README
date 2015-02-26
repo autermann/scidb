@@ -1,0 +1,107 @@
+
+ This directory contains the various scripts associated with my effort 
+ to understand the performance profile of the new Sparse Chunk storage 
+ model. 
+
+ The idea is to build a range of arrays with a range of data distributions 
+ and then to run a battery of standard tests over each of the arrays. 
+
+ The covariables which cover the range of arrays tested are: 
+
+   1. The degree of sparsity of the Array. We will vary the arrays in 
+      sparsity from compeletely dense, to 0.01% occupancy. In practice, 
+      this means: 100%, 1%, and 0.01%. To ensure that we have an 
+      "apples to apples" comparison, I'll scale the actual amount 
+      of data to be the same in all cases. That is, the logical size of 
+      the 1% array will be 100x the logical size of the dense array, and 
+      the 0.01% array will be 100x the 1% case.   
+
+   2. The distribution of data in the array's attributes. The idea here 
+      is to vary the number of values in the array's attributes. For example,
+      we might have an array with 5 distinct values (albeit the array has
+      16,000,000 cells) all the way through to a uniform random distribution
+      of data. To make the data look at realistic as possible, I've 
+      generated the data using a kinda-sorta-zipfian (power law) 
+      distribution. That is, in one case, 50% of the values are the same, 
+      then 25% of the values are the "next", 12% of the remaining the "next",
+      and so on. Another distribution has 90% of the values being the "first", 
+      then 9% being the "second", 0.9% being the "third" and so on. 
+
+  In order to keep the amount of data being processed in each query more 
+  or less the same I scale the amount of data each query needs to process. 
+  This is achieved by scaling the data volumes included in subarray() results 
+  in the same way that we scale the logical array size
+
+  In order to measure the size of the data storage, the Array_XY.sh scripts 
+  re-initialize the SciDB instance. 
+
+  You will need to set an environment variable: 
+
+  export SCIDB_DATA_DIR=/home/scidb/devdata
+
+  Where "/home/scidb/devdata" is the value of the 'base-path' from the 
+  config.ini entry.
+  
+  The goal is to produce result data that looks like this: 
+
+   Size: 
+   +===============+========+========+=========+
+   | Dist\Sparsity |  100%  |    1%  |  0.01%  |
+   +===============+========+========+=========+
+   |  Uniform      |        |        |         |
+   +===============+========+========+=========+
+   |  Zipf = 0.5   |        |        |         |
+   +===============+========+========+=========+
+   |  Zipf = 0.1   |        |        |         |
+   +===============+========+========+=========+
+
+   And for each of the combinations above: 
+   
+   Time:         version 
+   +==========+============+
+   | Query  1 |            |
+   +==========+============+
+   | Query  2 |            |
+   +==========+============+
+   | Query  3 |            |
+   +==========+============+
+   | Query  4 |            |
+   +==========+============+
+   | Query  5 |            |
+   +==========+============+
+   | Query  6 |            |
+   +==========+============+
+   | Query  7 |            |
+   +==========+============+
+   | Query  8 |            |
+   +==========+============+
+   | Query  9 |            |
+   +==========+============+
+   | Query 10 |            |
+   +==========+============+
+   | Query 11 |            |
+   +==========+============+
+
+  o To run this script (at the moment) you will need to: 
+
+   $ script /tmp/Result_File_Name
+   $ ./run.sh 
+
+  o The above, when it completes, will have written a lot of result data into 
+    a file /tmp/Result_File_Name. This is a pretty dirty hack at the moment, and
+    will be fixed in the future to re-direct output correctly. 
+
+  o Having gotten the result file, to populate the spreadsheet you will need 
+    to look through it. I use the following grep lines to pull out the 
+    results: 
+
+   $ grep "^Q" ./Test_Results | grep -v Query | sed -e "s/^Q1 /\\n\\n\\n\\nQ1 /" | sed -e "s/^Q.* //" > /tmp/F
+   $ grep "\[(\"Array_" ./Test_Results
+   $ grep "storage.data1" ./Test_Results
+
+ o You will need to strip out the prefixed text, but this gets you the data. 
+
+ 
+
+
+  

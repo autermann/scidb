@@ -1,0 +1,15 @@
+--setup
+create immutable empty array A <a:int32> [x=0:2,3,0]
+create immutable empty array B <x:int64> [a(int32)=3,3,0]
+store(build_sparse(A,x+1,x<>1),A)
+
+--test
+redimension_store(A,B)
+--error --code=scidb::SCIDB_SE_STORAGE::SCIDB_LE_CHUNK_ALREADY_EXISTS "store(build_sparse(A,x+1,x=1),A)"
+store(build_sparse(A,x+1,x=1),C)
+--error --code=scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED "redimension_store(C,B)"
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)

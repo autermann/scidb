@@ -1,0 +1,60 @@
+= THIS FILE DESCRIBES HOW TO BUILD SciDB FOR DIFFERENT PLATFORMS =
+
+Before install you need to resolve dependencies. See below how to do it. Then run following commands to build SciDB:
+cmake .
+make
+sudo make install
+
+== DEPENDENCIES RESOLVING ==
+
+=== Ubuntu 10.04 ===
+sudo apt-get install build-essential cmake libboost1.40-all-dev postgresql-8.4 libpqxx3-dev libprotobuf-dev doxygen flex bison liblog4cxx10-dev libcppunit-dev libbz2-dev postgresql-contrib libreadline6-dev python-paramiko python-crypto
+
+=== Ubuntu ===
+sudo apt-get install build-essential cmake libboost1.42-all-dev postgresql-8.4 libpqxx3-dev libprotobuf-dev doxygen flex bison liblog4cxx10-dev libcppunit-dev libbz2-dev postgresql-contrib libreadline6-dev python-paramiko python-crypto
+
+=== Fedora-16 ===
+sudo yum install gcc subversion cmake boost-devel gcc-c++ protobuf protobuf-c-devel protobuf-devel log4cxx-devel doxygen libpqxx-devel flex-devel flex-static bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko
+
+=== OpenSUSE ===
+sudo zypper in flex bison boost-devel gcc-c++ protobuf-devel doxygen libpqxx-devel postgresql postgresql-devel libcppunit-devel zlib-devel libbz2-devel libapr1-devel libapr-util1-devel
+
+// installing log4cxx from sources
+download and unzip file:///home/roman/prj/apache-log4cxx-0.10.0
+//if will be errors with memmove or memcpy function add #include <string.h> into error cpp files.
+//to fix errors with putc or like that add #include <stdio.h> into error cpp files.
+
+./configure
+make
+sudo make install
+
+=== CentOS 6 ===
+sudo yum install gcc subversion cmake boost-devel gcc-c++ doxygen bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko flex apr-devel apr-util-devel postgresql-devel cppunit-devel python-devel
+
+// installing dependencies from sources
+wget http://mirror.uoregon.edu/apache//logging/log4cxx/0.10.0/apache-log4cxx-0.10.0.tar.gz && tar -xf apache-log4cxx-0.10.0.tar.gz
+cd apache-log4cxx-0.10.0
+./configure && make
+//if will be errors with memmove or memcpy function add #include <string.h> into error cpp files.
+//to fix errors with putc or like that add #include <stdio.h> into error cpp files.
+
+sudo make install
+
+wget http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.bz2 && tar -xf protobuf-2.4.1.tar.bz2
+cd protobuf-2.4.1
+./configure && make
+sudo make install
+
+wget http://pqxx.org/download/software/libpqxx/libpqxx-3.1.tar.gz && tar -xf libpqxx-3.1.tar.gz
+cd libpqxx-3.1
+./configure && make
+sudo make install
+
+// For building RPM packages you need to have cmake 2.8 or higher. CentOS 6.1 has cmake 2.6
+// To install it from sources
+wget http://www.cmake.org/files/v2.8/cmake-2.8.6.tar.gz && tar -xf cmake-2.8.6.tar.gz
+cd cmake-2.8.6
+./configure && make
+sudo make install
+
+

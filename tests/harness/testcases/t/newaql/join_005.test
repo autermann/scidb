@@ -1,0 +1,10 @@
+--setup
+
+create array vector3 <a:int64, b:int64> [i=0:8,9,0]
+
+load(vector3, '../tests/harness/testcases/data/vector3.txt')
+
+--aql select * from vector3 A join vector3 B on A.b = B.b
+
+--cleanup
+remove(vector3)

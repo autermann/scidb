@@ -1,0 +1,21 @@
+--setup
+--start-query-logging
+
+--test
+
+list()
+list('arrays')
+list('operators')
+list('types')
+list('functions')
+--igdata "store(list('queries'),query_array)"
+attributes(query_array)
+list('libraries')
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_LIST_ERROR1 "list('error_test')"
+list()
+list('arrays')
+
+--cleanup
+remove(query_array)
+
+--stop-query-logging

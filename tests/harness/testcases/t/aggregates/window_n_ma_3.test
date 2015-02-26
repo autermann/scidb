@@ -1,0 +1,52 @@
+--setup
+--start-query-logging
+create empty array A <a:string null,b:int32 null> [x=-2:8,5,0]
+create array T1 <a:string> [x=-2:8,5,0]
+create array T2 <b:int32> [x=-2:8,5,0]
+store(build_sparse(T1,x+10,x<>2 and x<>5),T1)
+store(build_sparse(T2,x+12,x<>2 and x<>5),T2)
+store(filter(join(T1,T2),1),A)
+
+--test
+--aql update A set a=null, b=null where x=0
+window(A,1,sum(a))
+window(A,1,max(a))
+window(A,1,min(a))
+window(A,1,count(a))
+window(A,1,count(*))
+
+store(build_sparse(T1,x-10,x<>2 and x<>5),T1)
+store(build_sparse(T2,x-12,x<>2 and x<>5),T2)
+store(filter(join(T1,T2),1),A)
+--aql update A set a=null where x=0
+window(A,18,sum(a),max(a))
+window(A,3,max(a),count(a),sum(a),min(a))
+window(A,4,min(a),count(*))
+window(A,2,count(a),count(*))
+window(A,3,count(*),sum(a))
+
+window(A,1,sum(b))
+window(A,1,max(b))
+window(A,1,min(b))
+window(A,1,count(b))
+window(A,1,count(*))
+window(A,1,stdev(b))
+window(A,1,var(b))
+
+store(build_sparse(T1,x+10,x<>2 and x<>5),T1)
+store(build_sparse(T2,x+12,x<>2 and x<>5),T2)
+store(filter(join(T1,T2),1),A)
+--aql update A set b=null where x=0
+window(A,18,sum(b),max(b))
+window(A,3,max(a),var(b),count(a),sum(b),min(a))
+window(A,4,min(a),count(*))
+window(A,1,count(a),count(b))
+window(A,2,count(b),count(*))
+window(A,3,count(*),sum(a))
+window(A,9,var(b),max(a))
+
+--cleanup
+remove(A)
+remove(T1)
+remove(T2)
+--stop-query-logging

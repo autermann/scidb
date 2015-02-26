@@ -1,0 +1,11 @@
+--setup
+create immutable empty array matrix_str<y:double>[x=1:8,4,0, i=1:8,4,0]
+CREATE IMMUTABLE ARRAY vector_str<x:string, y:double>[i=1:8,4,0]
+load(vector_str, '../tests/harness/testcases/data/vector_str.txt')
+
+--test
+redimension_store(vector_str, matrix_str)
+
+--cleanup
+remove(matrix_str)
+remove(vector_str)

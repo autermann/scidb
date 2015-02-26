@@ -1,0 +1,14 @@
+--setup
+
+CREATE ARRAY deltaArray<x:double>[I=0:5,3,0, J=0:5,3,0]
+store(input(deltaArray, '../tests/harness/testcases/data/dense.txt'), deltaArray)
+store(input(deltaArray, '../tests/harness/testcases/data/dense.txt'), deltaArray)
+store(input(deltaArray, '../tests/harness/testcases/data/dense.txt'), deltaArray)
+store(input(deltaArray, '../tests/harness/testcases/data/dense.txt'), deltaArray)
+store(input(deltaArray, '../tests/harness/testcases/data/dense.txt'), deltaArray)
+
+--test
+--aql SELECT * FROM deltaArray@*
+
+--cleanup
+remove(deltaArray)

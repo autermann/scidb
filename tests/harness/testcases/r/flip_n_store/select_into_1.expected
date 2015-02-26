@@ -1,0 +1,78 @@
+SCIDB QUERY : <create array A <a:int64> [x=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array B <x:int64> [a=0:15,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(A,x+10),A)>
+[(10),(11),(12)]
+
+SCIDB QUERY : <select * into B from A>
+[(10),(11),(12)]
+
+SCIDB QUERY : <select a,x from B>
+[(0,10),(1,11),(2,12)]
+
+SCIDB QUERY : <select * into B from A as Az>
+[(10),(11),(12)]
+
+SCIDB QUERY : <select a,x from B>
+[(0,10),(1,11),(2,12)]
+
+SCIDB QUERY : <select count(B)>
+[(3)]
+
+SCIDB QUERY : <select * into B from A where a=11>
+[(),(11),()]
+
+SCIDB QUERY : <select a,x from B>
+[(),(1,11),()]
+
+SCIDB QUERY : <select * into B from A where a<>11>
+[(10),(),(12)]
+
+SCIDB QUERY : <select a,x from B>
+[(0,10),(),(2,12)]
+
+SCIDB QUERY : <select * into B from A where x>0>
+[(),(11),(12)]
+
+SCIDB QUERY : <select a,x from B>
+[(),(1,11),(2,12)]
+
+SCIDB QUERY : <select * into B from A where x<=1>
+[(10),(11),()]
+
+SCIDB QUERY : <select a,x from B>
+[(0,10),(1,11),()]
+
+SCIDB QUERY : <select a into B from A>
+[(10),(11),(12)]
+
+SCIDB QUERY : <select a,x from B>
+[(0,10),(1,11),(2,12)]
+
+SCIDB QUERY : <select x into B from A>
+[(0),(1),(2)]
+
+SCIDB QUERY : <select a,x from B>
+[(0,0),(1,1),(2,2)]
+
+SCIDB QUERY : <select a,x into B from A>
+{9}[(),(0),(1),(2),(),()]
+
+SCIDB QUERY : <select a,x from B>
+{9}[(),(10,0),(11,1),(12,2),(),()]
+
+SCIDB QUERY : <select x,a into B from A>
+{9}[(),(0),(1),(2),(),()]
+
+SCIDB QUERY : <select a,x from B>
+{9}[(),(10,0),(11,1),(12,2),(),()]
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(B)>
+Query was executed successfully
+

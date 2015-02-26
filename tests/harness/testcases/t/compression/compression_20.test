@@ -1,0 +1,138 @@
+--setup
+--start-query-logging
+
+create array Ts_rle <a:double null compression 'rle'> [x=-2:3,2,1]
+create array Ts_d <a:double null compression 'dictionary'> [x=-2:3,2,1]
+create array Ts_ns <a:double null compression 'null suppression'> [x=-2:3,2,1]
+create array Ts_be <a:double null compression 'bitmap encoding'> [x=-2:3,2,1]
+create array Ts_z <a:double null compression 'zlib'> [x=-2:3,2,1]
+create array Ts_bz <a:double null compression 'bzlib'> [x=-2:3,2,1]
+create array Ts_nf <a:double null compression 'null filter'> [x=-2:3,2,1]
+
+
+create empty array eTs_rle <a:double null compression 'rle'> [x=-2:3,2,1]
+create empty array eTs_d <a:double null compression 'dictionary'> [x=-2:3,2,1]
+create empty array eTs_ns <a:double null compression 'null suppression'> [x=-2:3,2,1]
+create empty array eTs_be <a:double null compression 'bitmap encoding'> [x=-2:3,2,1]
+create empty array eTs_z <a:double null compression 'zlib'> [x=-2:3,2,1]
+create empty array eTs_bz <a:double null compression 'bzlib'> [x=-2:3,2,1]
+create empty array eTs_nf <a:double null compression 'null filter'> [x=-2:3,2,1]
+
+
+create array dTs_rle <a:double null default 1.1 compression 'rle'> [x=-2:3,2,1]
+create array dTs_d <a:double null default 1.1 compression 'dictionary'> [x=-2:3,2,1]
+create array dTs_ns <a:double null default 1.1 compression 'null suppression'> [x=-2:3,2,1]
+create array dTs_be <a:double null default 1.1 compression 'bitmap encoding'> [x=-2:3,2,1]
+create array dTs_z <a:double null default 1.1 compression 'zlib'> [x=-2:3,2,1]
+create array dTs_bz <a:double null default 1.1 compression 'bzlib'> [x=-2:3,2,1]
+create array dTs_nf <a:double null default 1.1 compression 'null filter'> [x=-2:3,2,1]
+
+
+create empty array edTs_rle <a:double null default 1.1 compression 'rle'> [x=-2:3,2,1]
+create empty array edTs_d <a:double null default 1.1 compression 'dictionary'> [x=-2:3,2,1]
+create empty array edTs_ns <a:double null default 1.1 compression 'null suppression'> [x=-2:3,2,1]
+create empty array edTs_be <a:double null default 1.1 compression 'bitmap encoding'> [x=-2:3,2,1]
+create empty array edTs_z <a:double null default 1.1 compression 'zlib'> [x=-2:3,2,1]
+create empty array edTs_bz <a:double null default 1.1 compression 'bzlib'> [x=-2:3,2,1]
+create empty array edTs_nf <a:double null default 1.1 compression 'null filter'> [x=-2:3,2,1]
+
+
+--test
+--aql load Ts_rle from '../tests/harness/testcases/data/null_11.txt'
+--aql load Ts_d from '../tests/harness/testcases/data/null_11.txt'
+--aql load Ts_ns from '../tests/harness/testcases/data/null_11.txt'
+--aql load Ts_be from '../tests/harness/testcases/data/null_11.txt'
+--aql load Ts_z from '../tests/harness/testcases/data/null_11.txt'
+--aql load Ts_bz from '../tests/harness/testcases/data/null_11.txt'
+--aql load Ts_nf from '../tests/harness/testcases/data/null_11.txt'
+
+--aql load dTs_rle from '../tests/harness/testcases/data/null_11.txt'
+--aql load dTs_d from '../tests/harness/testcases/data/null_11.txt'
+--aql load dTs_ns from '../tests/harness/testcases/data/null_11.txt'
+--aql load dTs_be from '../tests/harness/testcases/data/null_11.txt'
+--aql load dTs_z from '../tests/harness/testcases/data/null_11.txt'
+--aql load dTs_bz from '../tests/harness/testcases/data/null_11.txt'
+--aql load dTs_nf from '../tests/harness/testcases/data/null_11.txt'
+
+--aql load eTs_rle from '../tests/harness/testcases/data/null_15.txt'
+--aql load eTs_d from '../tests/harness/testcases/data/null_15.txt'
+--aql load eTs_ns from '../tests/harness/testcases/data/null_15.txt'
+--aql load eTs_be from '../tests/harness/testcases/data/null_15.txt'
+--aql load eTs_z from '../tests/harness/testcases/data/null_15.txt'
+--aql load eTs_bz from '../tests/harness/testcases/data/null_15.txt'
+--aql load eTs_nf from '../tests/harness/testcases/data/null_15.txt'
+
+--aql load edTs_rle from '../tests/harness/testcases/data/null_15.txt'
+--aql load edTs_d from '../tests/harness/testcases/data/null_15.txt'
+--aql load edTs_ns from '../tests/harness/testcases/data/null_15.txt'
+--aql load edTs_be from '../tests/harness/testcases/data/null_15.txt'
+--aql load edTs_z from '../tests/harness/testcases/data/null_15.txt'
+--aql load edTs_bz from '../tests/harness/testcases/data/null_15.txt'
+--aql load edTs_nf from '../tests/harness/testcases/data/null_15.txt'
+
+--aql load Ts_rle from '../tests/harness/testcases/data/null_12.txt'
+--aql load Ts_d from '../tests/harness/testcases/data/null_12.txt'
+--aql load Ts_ns from '../tests/harness/testcases/data/null_12.txt'
+--aql load Ts_be from '../tests/harness/testcases/data/null_12.txt'
+--aql load Ts_z from '../tests/harness/testcases/data/null_12.txt'
+--aql load Ts_bz from '../tests/harness/testcases/data/null_12.txt'
+--aql load Ts_nf from '../tests/harness/testcases/data/null_12.txt'
+
+--aql load dTs_rle from '../tests/harness/testcases/data/null_12.txt'
+--aql load dTs_d from '../tests/harness/testcases/data/null_12.txt'
+--aql load dTs_ns from '../tests/harness/testcases/data/null_12.txt'
+--aql load dTs_be from '../tests/harness/testcases/data/null_12.txt'
+--aql load dTs_z from '../tests/harness/testcases/data/null_12.txt'
+--aql load dTs_bz from '../tests/harness/testcases/data/null_12.txt'
+--aql load dTs_nf from '../tests/harness/testcases/data/null_12.txt'
+
+--aql load eTs_rle from '../tests/harness/testcases/data/null_16.txt'
+--aql load eTs_d from '../tests/harness/testcases/data/null_16.txt'
+--aql load eTs_ns from '../tests/harness/testcases/data/null_16.txt'
+--aql load eTs_be from '../tests/harness/testcases/data/null_16.txt'
+--aql load eTs_z from '../tests/harness/testcases/data/null_16.txt'
+--aql load eTs_bz from '../tests/harness/testcases/data/null_16.txt'
+--aql load eTs_nf from '../tests/harness/testcases/data/null_16.txt'
+
+--aql load edTs_rle from '../tests/harness/testcases/data/null_16.txt'
+--aql load edTs_d from '../tests/harness/testcases/data/null_16.txt'
+--aql load edTs_ns from '../tests/harness/testcases/data/null_16.txt'
+--aql load edTs_be from '../tests/harness/testcases/data/null_16.txt'
+--aql load edTs_z from '../tests/harness/testcases/data/null_16.txt'
+--aql load edTs_bz from '../tests/harness/testcases/data/null_16.txt'
+--aql load edTs_nf from '../tests/harness/testcases/data/null_16.txt'
+
+--cleanup
+
+remove(Ts_rle)
+remove(Ts_d)
+remove(Ts_ns)
+remove(Ts_be)
+remove(Ts_z)
+remove(Ts_bz)
+remove(Ts_nf)
+
+remove(eTs_rle)
+remove(eTs_d)
+remove(eTs_ns)
+remove(eTs_be)
+remove(eTs_z)
+remove(eTs_bz)
+remove(eTs_nf)
+
+remove(dTs_rle)
+remove(dTs_d)
+remove(dTs_ns)
+remove(dTs_be)
+remove(dTs_z)
+remove(dTs_bz)
+remove(dTs_nf)
+
+remove(edTs_rle)
+remove(edTs_d)
+remove(edTs_ns)
+remove(edTs_be)
+remove(edTs_z)
+remove(edTs_bz)
+remove(edTs_nf)
+--stop-query-logging

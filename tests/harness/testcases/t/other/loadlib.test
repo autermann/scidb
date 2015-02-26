@@ -1,0 +1,13 @@
+# ticket no. 1410
+
+--setup
+--start-query-logging
+
+--test
+count(list('libraries'))
+--error --code=scidb::SCIDB_SE_PLUGIN_MGR::SCIDB_LE_CANT_LOAD_MODULE "load_library('operators')"
+count(list('libraries'))
+
+--cleanup
+--stop-query-logging
+

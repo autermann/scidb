@@ -1,0 +1,504 @@
+SCIDB QUERY : <create immutable array Ts_rle <a:double null compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_d <a:double null compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_ns <a:double null compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_be <a:double null compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_z <a:double null compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_bz <a:double null compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_nf <a:double null compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_rle <a:double null compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_d <a:double null compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_ns <a:double null compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_be <a:double null compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_z <a:double null compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_bz <a:double null compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_nf <a:double null compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_rle <a:double null default 1.2 compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_d <a:double null default 1.2 compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_ns <a:double null default 1.2 compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_be <a:double null default 1.2 compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_z <a:double null default 1.2 compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_bz <a:double null default 1.2 compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_nf <a:double null default 1.2 compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_rle <a:double null default 1.2 compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_d <a:double null default 1.2 compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_ns <a:double null default 1.2 compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_be <a:double null default 1.2 compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_z <a:double null default 1.2 compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_bz <a:double null default 1.2 compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_nf <a:double null default 1.2 compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_rle2 <a:double null compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_d2 <a:double null compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_ns2 <a:double null compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_be2 <a:double null compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_z2 <a:double null compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_bz2 <a:double null compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array Ts_nf2 <a:double null compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_rle2 <a:double null compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_d2 <a:double null compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_ns2 <a:double null compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_be2 <a:double null compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_z2 <a:double null compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_bz2 <a:double null compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array eTs_nf2 <a:double null compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_rle2 <a:double null default 1.2 compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_d2 <a:double null default 1.2 compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_ns2 <a:double null default 1.2 compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_be2 <a:double null default 1.2 compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_z2 <a:double null default 1.2 compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_bz2 <a:double null default 1.2 compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array dTs_nf2 <a:double null default 1.2 compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_rle2 <a:double null default 1.2 compression 'rle'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_d2 <a:double null default 1.2 compression 'dictionary'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_ns2 <a:double null default 1.2 compression 'null suppression'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_be2 <a:double null default 1.2 compression 'bitmap encoding'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_z2 <a:double null default 1.2 compression 'zlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_bz2 <a:double null default 1.2 compression 'bzlib'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable empty array edTs_nf2 <a:double null default 1.2 compression 'null filter'> [x=-2:3,2,1]>
+Query was executed successfully
+
+SCIDB QUERY : <load Ts_rle from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_d from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_ns from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_be from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_z from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_bz from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_nf from '../tests/basic/data/null_11.txt'>
+[(null),(null),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load dTs_rle from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load dTs_d from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load dTs_ns from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load dTs_be from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load dTs_z from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load dTs_bz from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load dTs_nf from '../tests/basic/data/null_11.txt'>
+[(null),(1.2),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load eTs_rle from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_d from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_ns from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_be from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_z from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_bz from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_nf from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(null),(null),(null)]
+
+SCIDB QUERY : <load edTs_rle from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load edTs_d from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load edTs_ns from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load edTs_be from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load edTs_z from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load edTs_bz from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load edTs_nf from '../tests/basic/data/null_15.txt'>
+[(null),(),(?2),(1.2),(null),(1.2)]
+
+SCIDB QUERY : <load Ts_rle2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_d2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_ns2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_be2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_z2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_bz2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load Ts_nf2 from '../tests/basic/data/null_12.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load dTs_rle2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load dTs_d2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load dTs_ns2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load dTs_be2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load dTs_z2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load dTs_bz2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load dTs_nf2 from '../tests/basic/data/null_12.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load eTs_rle2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_d2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_ns2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_be2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_z2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_bz2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load eTs_nf2 from '../tests/basic/data/null_16.txt'>
+[(null),(?2),(null),(null),(null),(null)]
+
+SCIDB QUERY : <load edTs_rle2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load edTs_d2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load edTs_ns2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load edTs_be2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load edTs_z2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load edTs_bz2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <load edTs_nf2 from '../tests/basic/data/null_16.txt'>
+[(1.2),(?2),(null),(1.2),(1.2),(null)]
+
+SCIDB QUERY : <remove(Ts_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_rle2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_d2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_ns2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_be2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_z2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_bz2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_nf2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_rle2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_d2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_ns2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_be2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_z2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_bz2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_nf2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_rle2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_d2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_ns2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_be2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_z2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_bz2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_nf2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_rle2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_d2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_ns2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_be2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_z2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_bz2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_nf2)>
+Query was executed successfully
+

@@ -1,0 +1,16 @@
+SSDB benchmark:
+--------------
+You can run the SSDB benchmark using the run_LVL.sh scripts.
+where LVL is the dificulty level (tiny, very_small, small, normal) 
+
+The scripts are executed using (example tiny config):
+./run_tiny.sh [-g|-i|-h]
+
+Where:
+
+g	Causes the generation and also the init phase.
+i	Creates the arrays, load the data from ./data, and prepares the different data structures.
+h	Prints this message
+
+No parameter:
+Only Execute the benchmark given all the data is loaded/prepared.

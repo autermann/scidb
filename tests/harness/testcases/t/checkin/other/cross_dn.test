@@ -1,0 +1,12 @@
+--setup
+create immutable array dense <a: double > [x=0:5,3,0, y=0:5,3,0]
+create immutable array vec <a:int32, b:int32> [i=1:10,10,0]
+load(dense,'../tests/harness/testcases/data/dense.txt')
+load(vec,'../tests/harness/testcases/data/vec.txt')
+
+--test
+cross(dense, vec)
+
+--cleanup
+remove (dense)
+remove (vec)

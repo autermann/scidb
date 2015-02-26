@@ -1,0 +1,22 @@
+--setup
+create empty array A <a:string,b:string>[x=0:2,3,0]
+create empty array T <a:string>[x=0:2,3,0]
+create empty array B <b:string>[a(string)=2,1,0]
+
+--test
+store(join(build_sparse(T,'a_'+string(x+1),x=1),build_sparse(T,'b_'+string(x+1),x=1)),A)
+redimension_store(A,B)
+unpack(B,row)
+
+store(join(build_sparse(T,'a_'+string(x+1),x<>1),build_sparse(T,'b_'+string(x+1),x<>1)),A)
+redimension_store(A,B)
+unpack(B,row)
+
+store(join(build_sparse(T,'a_'+string(x+1),x=1),build_sparse(T,'b_'+string(x+1),x=1)),A)
+redimension_store(A,B)
+unpack(B,row)
+
+--cleanup
+remove(A)
+remove(T)
+remove(B)

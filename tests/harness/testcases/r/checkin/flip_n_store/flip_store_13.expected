@@ -1,0 +1,30 @@
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+[{0}(),{1}(2,11),{2}()]
+
+{2}[(11)]
+
+{2}[(2,11)]
+
+[{0}(1,10),{1}(),{2}(3,12)]
+
+{1}[(10)];{3}[(12)]
+
+{1}[(1,10)];{3}[(3,12)]
+
+[{0}(1,10),{1}(2,11),{2}()]
+
+{1}[(10),(11)]
+
+{1}[(1,10),(2,11)]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

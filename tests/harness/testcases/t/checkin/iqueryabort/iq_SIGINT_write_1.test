@@ -1,0 +1,10 @@
+--setup
+--test
+
+--shell --command "../utils/killquery.sh -afl 2 2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'" --store 
+
+--cleanup
+
+# this should fail due to the above abort
+#--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ARRAY_DOESNT_EXIST "remove(ABRTEST)"
+--error --long=20 "remove(ABRTEST)"

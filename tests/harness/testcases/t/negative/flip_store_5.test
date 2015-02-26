@@ -1,0 +1,17 @@
+--setup
+create empty array A <a:string,b:string null> [x=0:*,2,0,y=0:*,2,0]
+create empty array B <b:string> [a(string)=*,2,0]
+create empty array C <b:string> [a(string)=2,2,0]
+load(A,'../tests/harness/testcases/data/redimension_2.txt')
+
+--test
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension(A,B)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension_store(A,B)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension(A,C)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension_store(A,C)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR5 "redimension_store(A,D)"
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)

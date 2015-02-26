@@ -1,0 +1,9 @@
+--setup
+CREATE IMMUTABLE ARRAY xyz <a:double compression 'dictionary'> [x=0:1999,100,0, y=0:1999,100,0]
+load(xyz,'../tests/harness/testcases/data/xyz_small.txt')
+
+--test
+build_sparse(xyz, 1.0000, x=y)
+
+--cleanup
+remove(xyz)

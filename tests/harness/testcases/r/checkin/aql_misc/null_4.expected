@@ -1,0 +1,159 @@
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+datatype = bool
+[(false),(false),(false),(false)]
+
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+datatype = string
+[(""),(""),(""),("")]
+
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+datatype = int32
+[(0),(0),(0),(0)]
+
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+datatype = int8
+[(0),(0),(0),(0)]
+
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+datatype = int16
+[(0),(0),(0),(0)]
+
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+datatype = char
+[('\0'),('\0'),('\0'),('\0')]
+
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+datatype = datetime
+[(null),(null),(null),(null)]
+
+[(null),(?1),(null),(null)]
+
+[(?1),(null),(?1),(null)]
+
+[(null),(null),(null),(?1)]
+
+[(null),(?1),(null),(null)]
+
+[(null),(?1),(?1),(null)]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

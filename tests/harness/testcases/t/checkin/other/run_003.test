@@ -1,0 +1,12 @@
+--setup
+create immutable array mult_sp1 <a:double> [y=0:3,2,0,x=0:8,2,0]
+create immutable array mult_sp2 <a:double> [y=0:8,2,0,x=0:3,2,0]
+load(mult_sp1,'../tests/harness/testcases/data/mult_sp_1.txt')
+load(mult_sp2,'../tests/harness/testcases/data/mult_sp_2.txt')
+
+--test
+multiply(mult_sp1, mult_sp2)
+
+--cleanup
+remove (mult_sp1)
+remove (mult_sp2)

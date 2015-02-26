@@ -1,0 +1,12 @@
+# ticket no. 732
+
+--setup
+create array A <a:int32> [x=0:2,3,0]
+
+--test
+--error --code=scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING "store(build_sparse(A,'test',1),B)"
+--error --code=scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING "store(build(A,'test'),C)"
+list()
+
+--cleanup
+remove(A)

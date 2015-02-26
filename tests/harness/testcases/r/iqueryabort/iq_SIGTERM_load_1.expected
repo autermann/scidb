@@ -1,0 +1,11 @@
+Query was executed successfully
+
+Attempting  to kill (-15) iquery command after 5 seconds...
+
+SUCCESS: kill returned code: 0
+
+"array should be empty (0 rows)..."
+[(0)]
+
+Query was executed successfully
+

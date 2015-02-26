@@ -1,0 +1,29 @@
+SCIDB QUERY : <create array A <a:int32, b:string, c:string> [x=0:2,3,0,y=4:5,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array A2 <a:int32, b:string> [c(string)=6,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array A3 <c:string, a:int32> [b(string)=6,2,0,x=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load(A,'../tests/harness/testcases/data/iquery_5.txt')>
+[[(10,"b_04","c_04")],[(11,"b_14","c_14")],[(12,"b_24","c_24")]];[[(10,"b_05","c_05")],[(11,"b_15","c_15")],[(12,"b_25","c_25")]]
+
+Non-integer dimension labels cannnot be retrieved for an update query
+
+Non-integer dimension labels cannnot be retrieved for an update query
+
+Non-integer dimension labels cannnot be retrieved for an update query
+
+Non-integer dimension labels cannnot be retrieved for an update query
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(A2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(A3)>
+Query was executed successfully
+

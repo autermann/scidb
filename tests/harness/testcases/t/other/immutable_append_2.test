@@ -1,0 +1,17 @@
+--setup
+
+create immutable array bounded <a:int64>[x=0:170,5,0]
+load(bounded,'../tests/harness/testcases/data/unbounded.txt')
+
+--test
+
+store(input(bounded,  '../tests/harness/testcases/data/append.txt'), bounded)
+store(input(bounded,  '../tests/harness/testcases/data/append2.txt'), bounded)
+store(input(bounded,  '../tests/harness/testcases/data/append3.txt'), bounded)
+  
+scan(bounded)  
+
+
+--cleanup
+
+remove(bounded) 

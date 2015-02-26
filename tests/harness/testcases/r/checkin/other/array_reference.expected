@@ -1,0 +1,64 @@
+Query was executed successfully
+
+Query was executed successfully
+
+[("a"),("a"),("a")]
+
+[("a"),("b"),("a")]
+
+[("a"),("b"),("c")]
+
+[(0),(1),(2),(),(),(),(),(),(),()]
+
+[("a"),("b"),("c")]
+
+[("a"),("a"),("a")]
+
+[("a"),("b"),("a")]
+
+[("a"),("b"),("c")]
+
+[(0),(1),(2),(),(),(),(),(),(),()]
+
+[(0),(1),(2),(),(),(),(),(),(),()]
+
+[("a"),("b"),("c")]
+
+[("a"),("b"),("c")]
+
+[An error expected at this place for the query "select * from foo@4". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "select * from foo:z". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_NOT_EXIST. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_NOT_EXIST.]
+
+[An error expected at this place for the query "select * from foo@4:z". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "select * from foo:i". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NO_MAPPING_ARRAY. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NO_MAPPING_ARRAY.]
+
+[("a"),("b"),("c")]
+
+[("a"),("a"),("a")]
+
+[("a"),("b"),("a")]
+
+[("a"),("b"),("c")]
+
+[(0),(1),(2),(),(),(),(),(),(),()]
+
+[(0),(1),(2),(),(),(),(),(),(),()]
+
+[("a"),("b"),("c")]
+
+[("a"),("b"),("c")]
+
+[An error expected at this place for the query "scan(foo@4)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "scan(foo:z)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_NOT_EXIST. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_NOT_EXIST.]
+
+[An error expected at this place for the query "scan(foo@4:z)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "scan(foo:i)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NO_MAPPING_ARRAY. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NO_MAPPING_ARRAY.]
+
+Query was executed successfully
+
+Query was executed successfully
+

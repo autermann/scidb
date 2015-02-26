@@ -1,0 +1,123 @@
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+datatype = bool
+[(),(),(),()]
+
+[(),(),(),()]
+
+[(false),(),(),()]
+
+[(false),(),(),()]
+
+datatype = string
+[(),(),(),()]
+
+[(),(),(),()]
+
+[("a"),("b"),(),()]
+
+[("a"),("b"),(),()]
+
+[("1"),(),(),()]
+
+[("1"),(),(),()]
+
+datatype = int32
+[(),(),(),()]
+
+[(),(),(),()]
+
+[(1),(),(),()]
+
+[(1),(),(),()]
+
+datatype = int8
+[(),(),(),()]
+
+[(),(),(),()]
+
+[(1),(),(),()]
+
+[(1),(),(),()]
+
+datatype = int16
+[(),(),(),()]
+
+[(),(),(),()]
+
+[(1),(),(),()]
+
+[(1),(),(),()]
+
+datatype = char
+[(),(),(),()]
+
+[(),(),(),()]
+
+[('a'),('b'),(),()]
+
+[('a'),('b'),(),()]
+
+datatype = datetime
+[(),(),(),()]
+
+[(),(),(),()]
+
+[]
+
+[]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

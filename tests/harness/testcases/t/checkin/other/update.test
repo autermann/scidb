@@ -1,0 +1,12 @@
+--setup
+CREATE ARRAY dense <a: double > [x=0:5,3,0, y=0:5,3,0]
+load(dense,'../tests/harness/testcases/data/dense.txt')
+
+--test
+store(merge(input(dense, '../tests/harness/testcases/data/dense2.txt'), dense), dense2)
+scan(dense2)
+
+--cleanup
+remove (dense)
+remove (dense2)
+

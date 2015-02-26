@@ -1,0 +1,12 @@
+--setup
+CREATE IMMUTABLE ARRAY vector<x:int64, y:int64>[i=1:4,2,0]
+create immutable empty array matrix<i:int64>[x=0:9,5,0, y=0:9,5,0]
+load(vector, '../tests/harness/testcases/data/vector.txt')
+
+--test
+redimension(vector, matrix)
+redimension_store(vector, matrix)
+
+--cleanup
+remove(vector)
+remove(matrix)

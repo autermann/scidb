@@ -1,0 +1,76 @@
+SCIDB QUERY : <create immutable array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(A,iif(x+y=0,1,x+y)),A)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <count(A)>
+[(1000000)]
+
+SCIDB QUERY : <count(filter(A,a<>0))>
+[(1000000)]
+
+verify results for unique seed value
+SCIDB QUERY : <select * into t1 from sample(A,0.001,2011)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <select * into t2 from sample(A,0.001,2011)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(join(t1,t2),t3)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <count(filter(t3,a<>a_2))>
+[(0)]
+
+test if samples actually have different output
+SCIDB QUERY : <store(sample(A,0.001),s1)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(sample(A,0.001),s2)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(join(s1,s2),s3)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(join(join(count(filter(s1,a<>0)),count(filter(s2,a<>0))),count(filter(project(apply(filter(s3,a<>0 and a_2<>0),a_3,a-a_2),a_3),a_3=0))),r)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <filter(r,count=count_2 and count=count_3)>
+[()]
+
+range should be 1000 +/- 999  (1-1999)
+SCIDB QUERY : <filter(r,count<1 or count>2999)>
+[()]
+
+SCIDB QUERY : <filter(r,count_2<1 or count_2>2999)>
+[()]
+
+size of join should be much smaller
+SCIDB QUERY : <filter(r,count_3>=count or count_3>=count_2)>
+[()]
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(s1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(s2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(s3)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(t1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(t2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(t3)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(r)>
+Query was executed successfully
+

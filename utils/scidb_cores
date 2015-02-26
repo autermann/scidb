@@ -1,0 +1,10 @@
+#!/bin/sh
+
+cores=`ls core*`
+
+
+for i in $cores
+do
+    echo "Processing corefile: $i"
+    gdb scidb --core=$i --eval-command="thread apply all bt" --eval-command="info program" --batch > stack.$i 2>&1
+done

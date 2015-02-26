@@ -1,0 +1,526 @@
+SCIDB QUERY : <create array Ts <a:double> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_rle <a:double compression 'rle'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_d <a:double compression 'dictionary'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_ns <a:double compression 'null suppression'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_be <a:double compression 'bitmap encoding'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_z <a:double compression 'zlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_bz <a:double compression 'bzlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array Ts_nf <a:double compression 'null filter'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs <a:double> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_rle <a:double compression 'rle'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_d <a:double compression 'dictionary'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_ns <a:double compression 'null suppression'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_be <a:double compression 'bitmap encoding'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_z <a:double compression 'zlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_bz <a:double compression 'bzlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array eTs_nf <a:double compression 'null filter'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs <a:double default 1.1> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_rle <a:double default 1.1 compression 'rle'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_d <a:double default 1.1 compression 'dictionary'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_ns <a:double default 1.1 compression 'null suppression'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_be <a:double default 1.1 compression 'bitmap encoding'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_z <a:double default 1.1 compression 'zlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_bz <a:double default 1.1 compression 'bzlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array dTs_nf <a:double default 1.1 compression 'null filter'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs <a:double default 1.1> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_rle <a:double default 1.1 compression 'rle'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_d <a:double default 1.1 compression 'dictionary'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_ns <a:double default 1.1 compression 'null suppression'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_be <a:double default 1.1 compression 'bitmap encoding'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_z <a:double default 1.1 compression 'zlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_bz <a:double default 1.1 compression 'bzlib'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create empty array edTs_nf <a:double default 1.1 compression 'null filter'> [x=-2:3,2,2,y=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <select * into Ts_rle from build(Ts,x)>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into Ts_d from build(Ts,x)>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into Ts_ns from Ts_d>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into Ts_z from Ts_ns>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into Ts_bz from Ts_be>
+[[]]
+
+SCIDB QUERY : <select * into Ts_nf from Ts_z>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into Ts_rle from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_d from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_ns from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_be from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_z from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_bz from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_nf from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_rle from build_sparse(Ts,x+0.6,x<>0)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_d from build_sparse(Ts,x+0.6,x<>x)>
+[[]]
+
+SCIDB QUERY : <select * into Ts_ns from build_sparse(Ts,x+0.6,x<>1 or x<>-1)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_be from build_sparse(Ts,x+0.6,x=0 or x=3)>
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6)]];
+[[{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_z from build_sparse(Ts,x+0.6,x=-1)>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[]]
+
+SCIDB QUERY : <select * into Ts_bz from build_sparse(Ts,x+0.6,x=9)>
+[[]]
+
+SCIDB QUERY : <select * into Ts_nf from build_sparse(Ts,x+0.6,x=x)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_rle from Ts_nf>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_d from Ts_bz>
+[[]]
+
+SCIDB QUERY : <select * into Ts_ns from Ts_rle>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_be from Ts_ns>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_bz from Ts_z>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[]]
+
+SCIDB QUERY : <select * into Ts_nf from Ts_be>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_rle from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_d from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_ns from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_be from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_z from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_bz from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into Ts_nf from build_sparse(Ts,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_rle from build_sparse(eTs,x+0.6,x<>0)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_d from build_sparse(eTs,x+0.6,x<>x)>
+[[]]
+
+SCIDB QUERY : <select * into eTs_ns from build_sparse(eTs,x+0.6,x<>1 or x<>-1)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_be from build_sparse(eTs,x+0.6,x=0 or x=3)>
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6)]];
+[[{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_z from build_sparse(eTs,x+0.6,x=-1)>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]]
+
+SCIDB QUERY : <select * into eTs_bz from build_sparse(eTs,x+0.6,x=9)>
+[[]]
+
+SCIDB QUERY : <select * into eTs_nf from build_sparse(eTs,x+0.6,x=x)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_rle from eTs_nf>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_d from eTs_bz>
+[[]]
+
+SCIDB QUERY : <select * into eTs_ns from eTs_rle>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_be from eTs_ns>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into eTs_bz from eTs_z>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]]
+
+SCIDB QUERY : <select * into eTs_nf from eTs_be>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_rle from build(dTs,x)>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into dTs_d from build(dTs,x)>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into dTs_ns from dTs_d>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into dTs_z from dTs_ns>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into dTs_bz from dTs_be>
+[[]]
+
+SCIDB QUERY : <select * into dTs_nf from dTs_z>
+[[(-2),(-2),(-2)],[(-1),(-1),(-1)],[(0),(0),(0)],[(1),(1),(1)],[(2),(2),(2)],[(3),(3),(3)]]
+
+SCIDB QUERY : <select * into dTs_rle from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_d from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_ns from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_be from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_z from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_bz from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_nf from build_sparse(dTs,x+0.6,true)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_rle from build_sparse(dTs,x+0.6,x<>0)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_d from build_sparse(dTs,x+0.6,x<>x)>
+[[]]
+
+SCIDB QUERY : <select * into dTs_ns from build_sparse(dTs,x+0.6,x<>1 or x<>-1)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_be from build_sparse(dTs,x+0.6,x=0 or x=3)>
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6)]];
+[[{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into dTs_z from build_sparse(dTs,x+0.6,x=-1)>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[]]
+
+SCIDB QUERY : <select * into dTs_bz from build_sparse(dTs,x+0.6,x=9)>
+[[]]
+
+SCIDB QUERY : <select * into dTs_nf from build_sparse(dTs,x+0.6,x=x)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_rle from build_sparse(edTs,x+0.6,x<>0)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_d from build_sparse(edTs,x+0.6,x<>x)>
+[[]]
+
+SCIDB QUERY : <select * into edTs_ns from build_sparse(edTs,x+0.6,x<>1 or x<>-1)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_be from build_sparse(edTs,x+0.6,x=0 or x=3)>
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6)]];
+[[{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_z from build_sparse(edTs,x+0.6,x=-1)>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]]
+
+SCIDB QUERY : <select * into edTs_bz from build_sparse(edTs,x+0.6,x=9)>
+[[]]
+
+SCIDB QUERY : <select * into edTs_nf from build_sparse(edTs,x+0.6,x=x)>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_rle from edTs_nf>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_d from edTs_bz>
+[[]]
+
+SCIDB QUERY : <select * into edTs_ns from edTs_rle>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_be from edTs_ns>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <select * into edTs_bz from edTs_z>
+[[{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]]
+
+SCIDB QUERY : <select * into edTs_nf from edTs_be>
+[[{-2,0}(-1.4),{-2,1}(-1.4),{-2,2}(-1.4),{-1,0}(-0.4),{-1,1}(-0.4),{-1,2}(-0.4)]];
+[[{0,0}(0.6),{0,1}(0.6),{0,2}(0.6),{1,0}(1.6),{1,1}(1.6),{1,2}(1.6)]];
+[[{2,0}(2.6),{2,1}(2.6),{2,2}(2.6),{3,0}(3.6),{3,1}(3.6),{3,2}(3.6)]]
+
+SCIDB QUERY : <remove(Ts)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Ts_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(eTs_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(dTs_nf)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_rle)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_d)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_ns)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_be)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_z)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_bz)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(edTs_nf)>
+Query was executed successfully
+

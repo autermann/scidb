@@ -1,0 +1,8 @@
+Query was executed successfully
+
+[[(2,4),(6,8)],[(22,24),(26,28)]];[[(10,12),(14,16)],[(30,32),(34,36)]];[[(18,20)],[(38,40)]];[[(42,44),(46,48)],[(62,64),(66,68)]];[[(50,52),(54,56)],[(70,72),(74,76)]];[[(58,60)],[(78,80)]];[[(82,84),(86,88)]];[[(90,92),(94,96)]];[[(98,100)]]
+
+[An error expected at this place for the query "select count(*) from expr1 group by i as part". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_NOT_EXIST. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_NOT_EXIST.]
+
+Query was executed successfully
+

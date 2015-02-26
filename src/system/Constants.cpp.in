@@ -1,0 +1,68 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2011 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation version 3 of the License, or
+* (at your option) any later version.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+*
+* END_COPYRIGHT
+*/
+
+/*
+ * @file 
+ *
+ * @author Artyom Smirnov <smirnoffjr@gmail.com>
+ *
+ * @brief This file contains source-wide constants. -D key, defines, and constants in headers forcing
+ *        rebuilding almost all project, so better to store values in cpp file and use extern to this
+ *        constants. So use Constant.h when you need constants. Note some constants generated so edit
+ *        only Constants.cpp.in when you need add/change constants.
+ */
+
+#include <stdint.h>
+#include <string>
+
+namespace scidb
+{
+
+const char* SCIDB_VERSION() { return "@CONFIGURE_SCIDB_VERSION@"; }
+const char* SCIDB_BUILD_TYPE() { return "@CONFIGURE_SCIDB_BUILD_TYPE@"; }
+
+uint32_t SCIDB_VERSION_MAJOR() { return @CONFIGURE_SCIDB_VERSION_MAJOR@; }
+uint32_t SCIDB_VERSION_MINOR() { return @CONFIGURE_SCIDB_VERSION_MINOR@; }
+uint32_t SCIDB_VERSION_PATCH() { return @CONFIGURE_SCIDB_VERSION_PATCH@; }
+uint32_t SCIDB_VERSION_BUILD() { return @CONFIGURE_SCIDB_VERSION_BUILD@; }
+
+const char* SCIDB_VERSION_CODENAME() { return "@CONFIGURE_SCIDB_VERSION_CODENAME@"; }
+
+const char* SCIDB_INSTALL_PREFIX() { return "@CMAKE_INSTALL_PREFIX@"; }
+
+std::string SCIDB_BUILD_INFO_STRING(const char* separator)
+{
+    return std::string("SciDB version: @CONFIGURE_SCIDB_VERSION@") + separator +
+           "Build type: @CONFIGURE_SCIDB_BUILD_TYPE@" + separator +
+           "Copyright (C) 2008-2011 SciDB, Inc.";
+}
+
+extern const size_t MB = 1024*1024;
+
+extern const size_t GB = 1024*MB;
+
+extern const size_t DEFAULT_MEM_THRESHOLD = 100;
+extern const double DEFAULT_DENSE_CHUNK_THRESHOLD = 1.0;
+extern const double DEFAULT_SPARSE_CHUNK_INIT_SIZE = 0.01;
+extern const int DEFAULT_STRING_SIZE_ESTIMATION = 10;
+}

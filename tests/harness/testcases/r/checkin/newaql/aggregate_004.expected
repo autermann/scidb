@@ -1,0 +1,8 @@
+Query was executed successfully
+
+[[(1)]];[[(2)]];[[(3)]];[[(4)]];[[(5)]];[[(6)]];[[(7)]];[[(8)]];[[(9)]]
+
+[An error expected at this place for the query "select * from mult_1 as A where A.a > sum (select A.x from mult_1 as B where A.x = B.x)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_UNEXPECTED_OPERATOR_IN_EXPRESSION. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_UNEXPECTED_OPERATOR_IN_EXPRESSION.]
+
+Query was executed successfully
+

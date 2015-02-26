@@ -1,0 +1,7 @@
+/*! \mainpage SciDB: An Open Source Data Management System for Scientific Research
+
+\section intro_sec About documentation
+    This documentation is generated via doxygen. We hope it helps you to understand internals of SciDB and get some explanation
+    of classes, methods, parameters, etc. We understand that it's not ideal and if you point us for bad descriptions or tell us
+    what you would like to see more well documented it really helps us and point the direction of improvements.
+*/

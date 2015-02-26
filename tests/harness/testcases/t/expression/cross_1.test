@@ -1,0 +1,15 @@
+--setup
+create immutable array A <a:int32>[x=0:2,3,0]
+create immutable array C <a:int32>[x=0:2,3,0]
+store(build(A,x+1),A)
+store(build(A,x+10),B)
+store(build(C,x+100),C)
+
+--test
+cross(A,B)
+cross(A,C)
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)

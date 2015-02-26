@@ -1,0 +1,89 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2012 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation version 3 of the License.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+*
+* END_COPYRIGHT
+*/
+
+/*
+ * LogicalScan.cpp
+ *
+ *  Created on: Mar 9, 2010
+ *      Author: Emad
+ */
+#include "query/Operator.h"
+#include "system/SystemCatalog.h"
+#include "system/Exceptions.h"
+
+
+namespace scidb
+{
+
+class Scan: public  LogicalOperator
+{
+public:
+    Scan(const std::string& logicalName, const std::string& alias):
+                    LogicalOperator(logicalName, alias)
+    {
+        _properties.tile = true;
+        ADD_PARAM_IN_ARRAY_NAME2(PLACEHOLDER_ARRAY_NAME_VERSION|PLACEHOLDER_ARRAY_NAME_INDEX_NAME); //0
+    }
+
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    {
+        assert(inputSchemas.size() == 0);
+        assert(_parameters.size() == 1 || _parameters.size() == 2);
+        assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
+        shared_ptr<OperatorParamArrayReference>& arrayRef = (shared_ptr<OperatorParamArrayReference>&)_parameters[0];
+        assert(arrayRef->getArrayName().find('@') == string::npos);
+
+        if (arrayRef->getVersion() == ALL_VERSIONS)
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ASTERISK_USAGE2, _parameters[0]->getParsingContext());
+
+        ArrayDesc schema;
+        SystemCatalog* systemCatalog = SystemCatalog::getInstance();
+
+        systemCatalog->getArrayDesc(arrayRef->getObjectName(), arrayRef->getVersion(), schema);
+        if (arrayRef->getIndex() != "")
+        {
+            const string &dimName = arrayRef->getIndex();
+            const Dimensions &dims = schema.getDimensions();
+            size_t i, n = dims.size();
+            for (i = 0; i < n && dims[i].getBaseName() != dimName; ++i) ;
+            if (i == n)
+                assert(0);
+
+            if (dims[i].getType() == TID_INT64)
+                assert(0);
+
+            const string &mappingArray = schema.getCoordinateIndexArrayName(i);
+            if (!SystemCatalog::getInstance()->containsArray(mappingArray))
+                assert(0);
+
+            systemCatalog->getArrayDesc(mappingArray, schema);
+        }
+
+        schema.addAlias(arrayRef->getObjectName());
+        return schema;
+    }
+};
+
+DECLARE_LOGICAL_OPERATOR_FACTORY(Scan, "scan")
+
+} //namespace scidb
+

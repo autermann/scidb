@@ -1,0 +1,52 @@
+SCIDB QUERY : <create immutable array A <a:string default 'test' compression 'rle'> [x=0:8,6,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build_sparse(A,x+10,x<>5),A)>
+[{0}("10"),{1}("11"),{2}("12"),{3}("13"),{4}("14")];
+[{6}("16"),{7}("17"),{8}("18")]
+
+SCIDB QUERY : <create empty array B <x:int64 compression 'dictionary'> [a(string)=9,6,0]>
+Query was executed successfully
+
+SCIDB QUERY : <redimension_store(A,B)>
+[(0),(1),(2),(3),(4),(6),(7),(8),(5)]
+
+SCIDB QUERY : <thin(A,0,1)>
+[{0}("10"),{1}("11"),{2}("12"),{3}("13"),{4}("14")];
+[{6}("16"),{7}("17"),{8}("18")]
+
+SCIDB QUERY : <thin(A,0,2)>
+[{0}("10"),{1}("12"),{2}("14")];
+[{3}("16"),{4}("18")]
+
+SCIDB QUERY : <thin(A,0,3)>
+[{0}("10"),{1}("13")];
+[{2}("16")]
+
+SCIDB QUERY : <thin(A,1,2)>
+[{0}("11"),{1}("13")];
+[{3}("17")]
+
+SCIDB QUERY : <thin(A,1,3)>
+[{0}("11"),{1}("14")];
+[{2}("17")]
+
+SCIDB QUERY : <thin(A,2,3)>
+[{0}("12")];
+[{2}("18")]
+
+SCIDB QUERY : <store(thin(B,0,2),C)>
+[(0),(2),(4),(7),(5)]
+
+SCIDB QUERY : <show(C)>
+[("C<x:int64 NOT NULL COMPRESSION 'dictionary',empty_indicator:indicator NOT NULL> [a=0:4,3,0]")]
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(B)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(C)>
+Query was executed successfully
+

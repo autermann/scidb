@@ -1,0 +1,68 @@
+--setup
+--start-query-logging
+create immutable array A <a:string,b:string>[x=0:2,3,0]
+create immutable array T <a:string>[x=0:2,3,0]
+create immutable empty array B <b:string>[a(string)=3,3,0]
+create immutable empty array C <a:string>[b(string)=3,3,0]
+store(join(build(T,'a_'+string(x+1)),build(T,'b_'+string(x+1))),A)
+
+--test
+redimension_store(A,B)
+redimension_store(B,C)
+unpack(B,row)
+unpack(C,row)
+
+rename(B,B1)
+max(B1)
+min(B1)
+subarray(B1,'a_1','a_2')
+between(B1,'a_1','a_3')
+filter(B1,a>'a_1')
+filter(B1,a<'a_2')
+filter(B1,a='a_2')
+filter(B1,a<>'a_2')
+filter(B1,b>'b_1')
+filter(B1,b<'b_2')
+filter(B1,b='b_2')
+filter(B1,b<>'b_2')
+project(B1,b)
+join(B1,B1)
+cross(B1,B1)
+apply(B1,z,a+'_z')
+apply(B1,z,b+'_z')
+count(B1)
+sum(B1)
+sort(B1,b)
+sort(B1,b desc)
+rename(B1,B)
+
+rename(C,C1)
+max(C1)
+min(C1)
+subarray(C1,'b_1','b_2')
+between(C1,'b_1','b_3')
+filter(C1,a>'a_1')
+filter(C1,a<'a_2')
+filter(C1,a='a_2')
+filter(C1,a<>'a_2')
+filter(C1,b>'b_1')
+filter(C1,b<'b_2')
+filter(C1,b='b_2')
+filter(C1,b<>'b_2')
+project(C1,a)
+join(C1,C1)
+cross(C1,C1)
+apply(C1,z,a+'_z')
+apply(C1,z,b+'_z')
+count(C1)
+sum(C1)
+sort(C1,a)
+sort(C1,a desc)
+rename(C1,C)
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)
+remove(T)
+--stop-query-logging

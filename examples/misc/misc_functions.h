@@ -1,0 +1,171 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2012 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation version 3 of the License.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+*
+* END_COPYRIGHT
+*/
+
+/*
+ * @file misc_functions.h
+ *
+ * @author paul@scidb.org
+ *
+ * @brief Misc. functions
+ *
+ *
+ */
+
+#ifndef MISC_FUNCTIONS_H
+#define MISC_FUNCTIONS_H
+
+#include <unistd.h>
+#include <signal.h>
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
+#include <util/Network.h>
+#include "query/TypeSystem.h"
+#include <query/Query.h>
+#include <network/Connection.h>
+#include <network/BaseConnection.h>
+#include <network/NetworkManager.h>
+#include <network/proto/scidb_msg.pb.h>
+#include <log4cxx/logger.h>
+#include "system/ErrorsLibrary.h"
+#include "system/Warnings.h"
+
+enum
+{
+    MISC_FUNCTIONS_ERROR1 = SCIDB_USER_ERROR_CODE_START,
+    MISC_FUNCTIONS_WARNING
+};
+
+void sleepyInt(const Value** args, Value* res, void*)
+{
+    res->setInt64(args[0]->getInt64());
+    sleep(args[1]->getInt32());
+}
+
+void trapOnNotEqual ( const Value** args, Value* res, void*)
+{
+    long int i1 = args[0]->getInt64();
+    long int i2 = args[1]->getInt64();
+
+    if (i1 != i2)
+        throw PLUGIN_USER_EXCEPTION("misc_functions", SCIDB_SE_UDO, MISC_FUNCTIONS_ERROR1);
+
+    res->setInt64(i1);
+}
+
+void exitOnNotEqual ( const Value** args, Value* res, void*)
+{
+    long int i1 = args[0]->getInt64();
+    long int i2 = args[1]->getInt64();
+	if ( i1 == i2 ) { 
+        res->setInt64(i1);
+	} else { 
+		//
+		// Forve an exit
+		//
+		_exit ( 0 );
+	}
+}
+
+void netPauseHandler(const boost::shared_ptr<boost::asio::deadline_timer>& t,
+                     int32_t duration,
+                     const boost::system::error_code& error)
+{
+   // the timer is runnig on the service_io thread (at least currently)
+   // so stop processing network packets for awhile
+   sleep(duration);
+}
+void netPauseOnNotEqual(const Value** args, Value* res, void*)
+{
+   long int i1 = args[0]->getInt64();
+   long int i2 = args[1]->getInt64();
+   res->setInt64(i1);
+   if ( i1 != i2 ) {
+      int32_t duration = (int32_t)args[2]->getInt32();
+      assert(duration > 0);
+      boost::shared_ptr<boost::asio::deadline_timer> timer
+      (new boost::asio::deadline_timer(scidb::getIOService()));
+      timer->expires_from_now(posix_time::seconds(0));
+      timer->async_wait(boost::bind(&netPauseHandler, timer, duration, _1));
+   }
+}
+
+void injectRemoteError(const Value** args, Value* res, void*)
+{
+   NodeID nodeID  = static_cast<NodeID>(args[0]->getInt64());
+   long int errCode = args[1]->getInt64();
+   res->setInt64(-1);
+
+   if (Cluster::getInstance()->getLocalNodeId() != nodeID) {
+      return;
+   }
+
+   std::map<scidb::QueryID, boost::shared_ptr<scidb::Query> > queries = scidb::Query::getQueries();
+   for ( std::map<scidb::QueryID, boost::shared_ptr<scidb::Query> >::const_iterator iter = queries.begin();
+         iter != queries.end(); ++iter) {
+
+      scidb::QueryID queryID = iter->first;
+      
+      LOG4CXX_ERROR(log4cxx::Logger::getRootLogger(),
+                    "Injecting remote error=" << errCode <<" for query="<<queryID);
+      
+      boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
+      boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
+      errorMessage->setQueryID(queryID);
+      errorRecord->set_type(1);
+      errorRecord->set_errors_namespace("scidb");
+      errorRecord->set_short_error_code(SCIDB_SE_INJECTED_ERROR);
+      errorRecord->set_long_error_code(SCIDB_LE_INJECTED_ERROR);
+      errorRecord->set_what_str("Injected error");
+      NetworkManager::getInstance()->broadcast(errorMessage);
+   }
+   res->setInt64(nodeID);
+}
+
+void killNode(const Value** args, Value* res, void*)
+{
+   NodeID nodeID = static_cast<NodeID>(args[0]->getInt64());
+   int   sigNum  = args[1]->getInt32();
+   bool  killParent = args[2]->getBool();
+   res->setInt64(nodeID);
+
+   if (Cluster::getInstance()->getLocalNodeId() != nodeID) {
+      return;
+   }
+   if (killParent) {
+      kill(getppid(), sigNum);
+   }
+   kill(getpid(), sigNum);
+}
+
+void postWarning(const Value** args, Value* res, void*)
+{
+    NodeID nodeID = static_cast<NodeID>(args[0]->getInt64());
+    res->setInt64(nodeID);
+
+    if (Cluster::getInstance()->getLocalNodeId() == nodeID)
+    {
+        scidb::Query::getQueryByID(scidb::Query::getCurrentQueryID())->postWarning(
+                    SCIDB_PLUGIN_WARNING("misc_functions", MISC_FUNCTIONS_WARNING) << nodeID);
+    }
+}
+
+#endif // MISC_FUNCTIONS_H

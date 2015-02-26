@@ -1,0 +1,18 @@
+--setup
+create immutable array tm_m_d_1000_100 < x: double > [ i=1:1000,100,0, j=1:1000,100,0 ]
+--igdata "store ( build ( tm_m_d_1000_100 , i + j ), tm_m_d_1000_100 ) "
+
+create immutable array m_m_d_1000_100 < x: double > [ i=1:1000,100,0, j=1:1000,100,0 ]
+--igdata "store (multiply(tm_m_d_1000_100, tm_m_d_1000_100), m_m_d_1000_100)"
+
+create immutable array er_m_d_1000_100 < x: double > [ i=1:1000,100,0, j=1:1000,100,0 ]
+--igdata "store ( build ( er_m_d_1000_100 , i*j*1000 + (i+j)*500500 + 333833500), er_m_d_1000_100 ) "
+
+--test
+
+--aql SELECT count(*) FROM m_m_d_1000_100 AS t , er_m_d_1000_100 AS e WHERE abs((t.x-e.x)/e.x) > 0.0000001 
+
+--cleanup
+remove (m_m_d_1000_100)
+remove (tm_m_d_1000_100)
+remove (er_m_d_1000_100)

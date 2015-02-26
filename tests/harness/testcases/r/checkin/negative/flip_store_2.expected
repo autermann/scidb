@@ -1,0 +1,20 @@
+Query was executed successfully
+
+Query was executed successfully
+
+[{0}(10)]
+
+{9}[(),(0),()]
+
+[{2}(30)]
+
+{9}[(),(0),()]
+
+[An error expected at this place for the query "redimension_store(A,B)". And it failed with error code = scidb::SCIDB_SE_STORAGE::SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES. Expected error code = scidb::SCIDB_SE_STORAGE::SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES.]
+
+{9}[(),(0),()]
+
+Query was executed successfully
+
+Query was executed successfully
+

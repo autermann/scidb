@@ -1,0 +1,9 @@
+--setup
+CREATE IMMUTABLE ARRAY dense <a: double > [x=0:5,3,0, y=0:5,3,0]
+load(dense, '../tests/harness/testcases/data/dense.txt')
+
+--test
+cross_join(dense as D1, dense as D2, D1.x, D2.y)
+
+--cleanup
+remove(dense)

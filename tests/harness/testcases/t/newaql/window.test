@@ -1,0 +1,18 @@
+--setup
+
+CREATE ARRAY overlap <a: double> [x=0:5,3,1, y=0:5,3,1]
+load(overlap, '../tests/harness/testcases/data/overlap.txt')
+
+--test
+
+--aql select sum(a) from overlap window 3,3 as W
+--aql select count(*) from overlap window 3,3 as W
+--aql select count(W) from overlap window 3,3 as W
+--aql select avg(a) from overlap window 3,3 as W
+--aql select sum(select a from W) from overlap window 3,3 as W
+--aql select sum(W) from overlap window 3,3 as W
+
+
+--cleanup
+remove(overlap)
+

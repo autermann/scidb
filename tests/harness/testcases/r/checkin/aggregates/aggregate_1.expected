@@ -1,0 +1,81 @@
+SCIDB QUERY : <create array A <a:int32> [x=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(A,x+5),A)>
+[(5),(6),(7)]
+
+SCIDB QUERY : <aggregate(A,sum(a))>
+[(18)]
+
+SCIDB QUERY : <aggregate(A,max(a))>
+[(7)]
+
+SCIDB QUERY : <aggregate(A,min(a))>
+[(5)]
+
+SCIDB QUERY : <aggregate(A,count(a))>
+[(3)]
+
+SCIDB QUERY : <aggregate(A,var(a))>
+[(1)]
+
+SCIDB QUERY : <aggregate(A,stdev(a))>
+[(1)]
+
+SCIDB QUERY : <aggregate(A,avg(a))>
+[(6)]
+
+SCIDB QUERY : <aggregate(A,sum(a),max(a))>
+[(18,7)]
+
+SCIDB QUERY : <aggregate(A,max(a),min(a),count(a))>
+[(7,5,3)]
+
+SCIDB QUERY : <aggregate(A,stdev(a),var(a),avg(a))>
+[(1,1,6)]
+
+SCIDB QUERY : <aggregate(A,sum(a),max(a),min(a),count(a),stdev(a),var(a),avg(a))>
+[(18,7,5,3,1,1,6)]
+
+SCIDB QUERY : <aggregate(A,sum(a),x)>
+[(5),(6),(7)]
+
+SCIDB QUERY : <aggregate(A,max(a),x)>
+[(5),(6),(7)]
+
+SCIDB QUERY : <aggregate(A,min(a),x)>
+[(5),(6),(7)]
+
+SCIDB QUERY : <aggregate(A,count(a),x)>
+[(1),(1),(1)]
+
+SCIDB QUERY : <aggregate(A,var(a),x)>
+[(null),(null),(null)]
+
+SCIDB QUERY : <aggregate(A,stdev(a),x)>
+[(null),(null),(null)]
+
+SCIDB QUERY : <aggregate(A,avg(a),x)>
+[(5),(6),(7)]
+
+SCIDB QUERY : <aggregate(A,sum(a),max(a),x)>
+[(5,5),(6,6),(7,7)]
+
+SCIDB QUERY : <aggregate(A,max(a),min(a),count(a),x)>
+[(5,5,1),(6,6,1),(7,7,1)]
+
+SCIDB QUERY : <aggregate(A,stdev(a),var(a),avg(a),x)>
+[(null,null,5),(null,null,6),(null,null,7)]
+
+SCIDB QUERY : <aggregate(A,sum(a),max(a),min(a),count(a),stdev(a),var(a),avg(a),x)>
+[(5,5,5,1,null,null,5),(6,6,6,1,null,null,6),(7,7,7,1,null,null,7)]
+
+SCIDB QUERY : <aggregate(A,sum(a),x,x)>
+[[(5),(0),(0)],[(0),(6),(0)],[(0),(0),(7)]]
+
+SCIDB QUERY : <aggregate(A,sum(a),x,x,x)>
+[[[(5),(0),(0)],[(0),(0),(0)],[(0),(0),(0)]],[[(0),(0),(0)],[(0),(6),(0)],[(0),(0),(0)]],[[(0),(0),(0)],[(0),(0),(0)],[(0),(0),(7)]]]
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+

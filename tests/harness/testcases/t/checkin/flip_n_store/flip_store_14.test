@@ -1,0 +1,21 @@
+--setup
+create empty array A <a:string,b:string> [x=0:*,2,0,y=0:*,2,0]
+create empty array B <a:string> [b(string)=*,2,0]
+create empty array C <a:string> [b(string)=2,2,0]
+load(A,'../tests/harness/testcases/data/redimension_1.txt')
+
+--test
+redimension_store(A,B)
+apply(B,z,b)
+redimension_store(A,C)
+apply(C,z,b)
+--aql update A set b=b+'_v2', a=a+'v2'
+redimension_store(A,B)
+apply(B,z,b)
+redimension_store(A,C)
+apply(C,z,b)
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)

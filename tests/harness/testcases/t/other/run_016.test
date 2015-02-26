@@ -1,0 +1,8 @@
+--setup
+
+--test
+list('operators')
+
+--cleanup
+
+

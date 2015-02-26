@@ -1,0 +1,8 @@
+Query was executed successfully
+
+[An error expected at this place for the query "load(bounded,'../tests/harness/testcases/data/unbounded_empty.txt')". And it failed with long code = 338. Expected long code = 338.]
+
+[(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11)]
+
+Query was executed successfully
+

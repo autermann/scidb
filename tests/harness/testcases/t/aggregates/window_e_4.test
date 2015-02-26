@@ -1,0 +1,30 @@
+--setup
+--start-query-logging
+create empty array A <a:int32> [x=-3:7,3,2]
+store(build_sparse(A,x+10,x<>2 and x<>5),A)
+
+--test
+window(A,1,sum(a))
+window(A,1,max(a))
+window(A,1,min(a))
+window(A,1,avg(a))
+window(A,1,count(a))
+window(A,1,count(*))
+window(A,1,stdev(a))
+window(A,1,var(a))
+
+
+store(build_sparse(A,x-2,x<>0 and x<>4),A)
+window(A,18,sum(a),max(a))
+window(A,3,max(a),var(a),stdev(a),count(a),sum(a),min(a))
+window(A,4,min(a),count(*))
+window(A,1,avg(a),count(a))
+window(A,2,count(a),count(*))
+window(A,3,count(*),sum(a))
+window(A,5,stdev(a),avg(a))
+window(A,9,var(a),stdev(a))
+
+
+--cleanup
+remove(A)
+--stop-query-logging

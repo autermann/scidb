@@ -1,0 +1,12 @@
+--setup
+CREATE IMMUTABLE ARRAY xyz <a:double compression 'dictionary'> [x=0:1999,100,0, y=0:1999,100,0]
+
+load(xyz,'../tests/harness/testcases/data/xyz_small.txt')
+
+--test
+
+sum(apply(aggregate(xyz, var(a), stdev(a), y), s, a_var+a_stdev),s)
+
+--cleanup
+
+remove(xyz)

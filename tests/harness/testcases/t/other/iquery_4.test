@@ -1,0 +1,46 @@
+--setup
+--start-query-logging
+
+create empty array catalogue <code:int64, type:string, price:double, review:string> [id=0:10,3,0]
+create empty array catalogue1 <code:int64 null, type:string null, price:double null, review:string null> [id=0:10,3,0]
+create empty array catalogue2 <code:int64, type:string null, price:double null, review:string> [id=0:10,3,0]
+create immutable empty array catalogue3 <code:int64 null, type:string, price:double, review:string null> [id=0:10,3,0]
+
+load(catalogue,'../tests/harness/testcases/data/iquery_4.txt')
+load(catalogue1,'../tests/harness/testcases/data/iquery_4.txt')
+load(catalogue2,'../tests/harness/testcases/data/iquery_4.txt')
+load(catalogue3,'../tests/harness/testcases/data/iquery_4.txt')
+
+--test
+
+echo ('iquery  -o lcsv+ -aq \'scan ( catalogue )\'')
+--shell --command " iquery  -o lcsv+ -aq 'scan ( catalogue )' " --store
+
+echo ('iquery  -o lsparse -aq \'scan ( catalogue )\'')
+--shell --command " iquery  -o lsparse -aq 'scan ( catalogue )' " --store
+
+echo ('iquery  -o lcsv+ -aq \'scan ( catalogue1 )\'')
+--shell --command " iquery  -o lcsv+ -aq 'scan ( catalogue1 )' " --store
+
+echo ('iquery  -o lsparse -aq \'scan ( catalogue1 )\'')
+--shell --command " iquery  -o lsparse -aq 'scan ( catalogue1 )' " --store
+
+echo ('iquery  -o lcsv+ -aq \'scan ( catalogue2 )\'')
+--shell --command " iquery  -o lcsv+ -aq 'scan ( catalogue2 )' " --store
+
+echo ('iquery  -o lsparse -aq \'scan ( catalogue2 )\'')
+--shell --command " iquery  -o lsparse -aq 'scan ( catalogue2 )' " --store
+
+echo ('iquery  -o lcsv+ -aq \'scan ( catalogue3 )\'')
+--shell --command " iquery  -o lcsv+ -aq 'scan ( catalogue3 )' " --store
+
+echo ('iquery  -o lsparse -aq \'scan ( catalogue3 )\'')
+--shell --command " iquery  -o lsparse -aq 'scan ( catalogue3 )' " --store
+
+
+--cleanup
+remove(catalogue)
+remove(catalogue1)
+remove(catalogue2)
+remove(catalogue3)
+--stop-query-logging

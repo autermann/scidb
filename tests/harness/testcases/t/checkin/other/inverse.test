@@ -1,0 +1,15 @@
+--setup
+create array a10 <x:double> [i=1:10,2,0, j=1:10,2,0]
+store(build(a10,iif(i=j and i>1,1,0)+i+j),a10)
+
+--test
+store(inverse(a10),a10_inv)
+multiply(a10,a10_inv)
+show(a10)
+show(a10_inv)
+repart(filter(multiply(a10, a10_inv), multiply>1.0e-7), <x: double>[i=1:10,10,0, j=1:10,10,0])
+
+--cleanup
+remove(a10)
+remove(a10_inv)
+

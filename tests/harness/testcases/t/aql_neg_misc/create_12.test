@@ -1,0 +1,2 @@
+--test
+--error --code=scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR --aql="create immutable array A <a:int32> [x=-9223372036854775807:0,5,0]"

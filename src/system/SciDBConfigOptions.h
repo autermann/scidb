@@ -1,0 +1,96 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2012 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation version 3 of the License.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+*
+* END_COPYRIGHT
+*/
+
+
+/**
+ * @file
+ *
+ * @brief Config variables and arguments for scidb executable
+ *
+ * @author Artyom Smirnov <smirnoffjr@gmail.com>
+ */
+
+#ifndef SCIDBCONFIG_OPTIONS_H_
+#define SCIDBCONFIG_OPTIONS_H_
+
+namespace scidb
+{
+
+enum 
+{
+	CONFIG_CATALOG_CONNECTION_STRING,
+	CONFIG_LOG4CXX_PROPERTIES,
+	CONFIG_PORT,
+	CONFIG_ADDRESS,
+	CONFIG_COORDINATOR,
+	CONFIG_REGISTER,
+	CONFIG_INITIALIZE,
+	CONFIG_STORAGE_URL,
+	CONFIG_PLUGINS,
+    CONFIG_METADATA,
+	CONFIG_CACHE_SIZE,
+	CONFIG_OPTIMIZER_TYPE,
+	CONFIG_HELP,
+	CONFIG_CONFIGURATION_FILE,
+    CONFIG_SPARSE_CHUNK_INIT_SIZE,
+    CONFIG_SPARSE_CHUNK_THRESHOLD,
+    CONFIG_DENSE_CHUNK_THRESHOLD,
+    CONFIG_STRING_SIZE_ESTIMATION,
+    CONFIG_CHUNK_CLUSTER_SIZE,
+    CONFIG_READ_AHEAD_SIZE,
+    CONFIG_DAEMONIZE,
+    CONFIG_SAVE_RAM,
+    CONFIG_TMP_DIR,
+    CONFIG_EXEC_THREADS,
+    CONFIG_PREFETCHED_CHUNKS,
+    CONFIG_VERSION,
+    CONFIG_MERGE_SORT_BUFFER,
+    CONFIG_MEM_ARRAY_THRESHOLD,
+    CONFIG_NETWORK_BUFFER,
+    CONFIG_ASYNC_IO_BUFFER,
+    CONFIG_STATISTICS_MONITOR,
+    CONFIG_STATISTICS_MONITOR_PARAMS,
+    CONFIG_LOG_LEVEL,
+    CONFIG_CHUNK_RESERVE,
+    CONFIG_MAX_JOBS,
+    CONFIG_USED_CPU_LIMIT,
+    CONFIG_RECONNECT_TIMEOUT,
+    CONFIG_LIVENESS_TIMEOUT,
+    CONFIG_REDUNDANCY,
+    CONFIG_RECOVER,
+    CONFIG_ASYNC_REPLICATION,
+    CONFIG_NO_WATCHDOG,
+    CONFIG_PARALLEL_SORT,
+    CONFIG_RLE_CHUNK_FORMAT,
+    CONFIG_TILE_SIZE,
+    CONFIG_TILES_PER_CHUNK,
+    CONFIG_SYNC_IO_INTERVAL,
+    CONFIG_IO_LOG_THRESHOLD,
+    CONFIG_OUTPUT_PROC_STATS,
+    CONFIG_MAX_MEMORY_LIMIT
+};
+
+void initConfig(int argc, char* argv[]);
+
+}
+
+#endif

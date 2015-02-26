@@ -1,0 +1,18 @@
+# ticket no. 878
+
+--setup
+--start-query-logging
+create array A <a:int64> [x=0:2,3,0]
+store(build(A,x+10),A)
+create empty array B <x:int64> [a=0:15,2,1]
+create empty array C <x:int64> [a=0:15,2,2]
+
+--test
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR3 "redimension_store(A,B)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REDIMENSION_STORE_ERROR3 "redimension_store(A,C)"
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)
+--stop-query-logging

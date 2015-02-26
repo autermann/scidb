@@ -1,0 +1,41 @@
+Query was executed successfully
+
+[[(2),(0)],[(0),(2)]]
+
+Query was executed successfully
+
+Query was executed successfully
+
+SCIDB QUERY : <build(na22, NA)>
+[[(NA),(NA)],[(NA),(NA)]]
+
+SCIDB QUERY : <build(na22, iif(x=y, NA, 0.0))>
+[[(NA),(0)],[(0),(NA)]]
+
+SCIDB QUERY : <store(build(na22, iif(x=0 and y=0, NA, iif(x=y,1,0))), na22)>
+[[(NA),(0)],[(0),(1)]]
+
+SCIDB QUERY : <multiply(na22,scale22)>
+[[(NA),(NA)],[(0),(2)]]
+
+SCIDB QUERY : <multiply(scale22,na22)>
+[[(NA),(0)],[(NA),(2)]]
+
+SCIDB QUERY : <multiply(na22,na22)>
+[[(NA),(NA)],[(NA),(1)]]
+
+SCIDB QUERY : <save(na22,'naSaved.txt', 'store')>
+[[(NA),(0)],[(0),(1)]]
+
+SCIDB QUERY : <load(na22loaded, 'naSaved.txt', -1)>
+[[(NA),(0)],[(0),(1)]]
+
+SCIDB QUERY : <scan(na22loaded)>
+[[(NA),(0)],[(0),(1)]]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

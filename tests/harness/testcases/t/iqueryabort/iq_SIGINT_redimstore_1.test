@@ -1,0 +1,25 @@
+--setup
+
+CREATE IMMUTABLE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,100,0, y=0:1999,100,0]
+CREATE EMPTY ARRAY ABRREDIM <x:int64>[a=0:1999,20,0]
+
+load(ABRLOAD,'../tests/harness/testcases/data/xyz_small.txt')
+
+--test 
+
+scan(ABRLOAD)
+scan(ABRREDIM)
+
+--shell --command "../utils/killquery.sh -afl 2 2 'redimension_store (ABRLOAD, ABRREDIM)'"
+
+--sleep 12
+scan(ABRLOAD)
+--echo "should be empty..."
+scan(ABRREDIM)
+
+--echo "should be no mapping arrays..."
+list('arrays')
+
+--cleanup
+remove(ABRLOAD)
+remove(ABRREDIM)

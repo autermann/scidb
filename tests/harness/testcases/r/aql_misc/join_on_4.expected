@@ -1,0 +1,22 @@
+Query was executed successfully
+
+Query was executed successfully
+
+[(1),(2),(3)]
+
+[("b1"),("b2"),("b3")]
+
+[(1,"b1"),(2,"b2"),(3,"b3")]
+
+[(1,"b1"),(2,"b2"),(3,"b3")]
+
+[(1,"b1",1,"b1"),(2,"b2",2,"b2"),(3,"b3",3,"b3")]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

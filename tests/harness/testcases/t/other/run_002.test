@@ -1,0 +1,12 @@
+--setup
+create immutable array mult_3 <a:double> [y=0:2,3,0, x=0:3,4,0]
+create immutable array mult_4 <a:double> [y=0:3,4,0, x=0:2,3,0]
+load(mult_3,'../tests/harness/testcases/data/mult3.txt')
+load(mult_4,'../tests/harness/testcases/data/mult4.txt')
+
+--test
+multiply(mult_3, mult_4)
+
+--cleanup
+remove (mult_3)
+remove (mult_4)

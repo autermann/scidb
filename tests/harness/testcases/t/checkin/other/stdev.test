@@ -1,0 +1,11 @@
+--setup
+CREATE IMMUTABLE ARRAY dense <a: double > [x=0:5,3,0, y=0:5,3,0]
+load(dense, '../tests/harness/testcases/data/dense.txt')
+
+--test
+stdev(dense)
+stdev(dense,a,y)
+stdev(dense,a,x)
+
+--cleanup
+remove(dense)

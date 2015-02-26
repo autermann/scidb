@@ -1,0 +1,21 @@
+{
+	"hosts": [
+		{
+			"host": "master",
+			"coordinator": true,
+			"init": "/home/ubuntu/scidb/trunk/",
+			"scidb_home": "/tmp/scidb-rd-master",
+			"catalog": {
+				"port": 5432,
+				"dbname": "rd",
+				"user": "rd",
+				"password": "rd"
+			}
+		},
+
+		{
+			"host": "node2",
+			"scidb_home": "/tmp/scidb-rd-node2"
+		}
+	]
+}

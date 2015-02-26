@@ -1,0 +1,24 @@
+# ticket no. 752
+
+--setup
+--start-query-logging
+create empty array A <a:int32, b:string> [x=0:2,3,0]
+create empty array B <b:string, x:int64> [a(int32)=3,3,0]
+create empty array T <a:int32> [x=0:2,3,0]
+create empty array TS <a:string> [x=0:2,3,0]
+store(join(build_sparse(T,x,1),build_sparse(TS,string(x+10),1)),A)
+
+--test
+redimension_store(A,B)
+list()
+--error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_STORE_ERROR1 --aql="update B set b = b + '_new' where x=1"
+list()
+redimension_store(B,A)
+scan(A)
+
+--cleanup
+remove(A)
+remove(B)
+remove(T)
+remove(TS)
+--stop-query-logging

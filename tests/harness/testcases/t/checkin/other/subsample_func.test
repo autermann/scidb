@@ -1,0 +1,10 @@
+--setup
+CREATE ARRAY dense <a: double > [x=0:5,3,0, y=0:5,3,0]
+load(dense,'../tests/harness/testcases/data/dense.txt')
+
+--test
+subarray(dense, first('dense','x') + 1, first('dense','y') + 1, last('dense','x') - 1, last('dense','y') - 1)
+
+--cleanup
+remove (dense)
+

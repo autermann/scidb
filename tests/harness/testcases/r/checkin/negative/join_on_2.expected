@@ -1,0 +1,22 @@
+Query was executed successfully
+
+[[(1),(2),(3)],[(2),(3),(4)],[(3),(4),(5)]];[[(4),(5),(6)],[(5),(6),(7)],[(6),(7),(8)]]
+
+[[(1),(2),(3)],[(2),(3),(4)],[(3),(4),(5)]];[[(4),(5),(6)],[(5),(6),(7)],[(6),(7),(8)]]
+
+Query was executed successfully
+
+[[(-1),(-2),(-3)],[(0),(-1),(-2)],[(1),(0),(-1)]];[[(-4),(-5),(-6)],[(-3),(-4),(-5)],[(-2),(-3),(-4)]]
+
+[An error expected at this place for the query "cross_join(A,B,A.y,B.y,A.y,B.y)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_CROSSJOIN_ERROR1. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_CROSSJOIN_ERROR1.]
+
+[An error expected at this place for the query "cross_join(A,C,A.y,C.q,A.y,C.q)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_CROSSJOIN_ERROR1. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_CROSSJOIN_ERROR1.]
+
+[An error expected at this place for the query "cross_join(A,C,A.y,C.q,A.x,C.p,A.y,C.q)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_CROSSJOIN_ERROR1. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_CROSSJOIN_ERROR1.]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

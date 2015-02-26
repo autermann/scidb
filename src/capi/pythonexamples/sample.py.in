@@ -1,0 +1,129 @@
+#!/usr/bin/python
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2011 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation version 3 of the License, or
+# (at your option) any later version.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+# END_COPYRIGHT
+#
+import csv
+import os
+import sys
+import traceback
+sys.path.append(os.getcwd()) # NOCHECKIN 
+sys.path.append('@CMAKE_INSTALL_PREFIX@' + '/lib')
+import scidbapi as scidb
+
+
+def usage():
+    print >> sys.stderr, "Usage: python sample.py"
+    sys.exit(2)
+
+
+def handleException(inst, exitWhenDone, op=None):
+    traceback.print_exc()
+    if op:
+        print >> sys.stderr, "Exception while ", op
+    print >> sys.stderr, "     Exception Type: %s" % type(inst)     # the exception instance
+    print >> sys.stderr, "     Exception Value: %r" % inst 
+    print >> sys.stderr, ""
+    if(exitWhenDone):
+        exit(2)
+
+
+def main():
+    try: 
+        db = scidb.connect("localhost", 1239)
+    except Exception, inst: 
+        handleException(inst, True, op="connecting")
+
+    # setup by running 3 queries.
+    # the third element of the triples below indicates whether a failure of the query should
+    # terminate the program.  Cleanups, for example, use False for that.
+    # a flag indicating whether they should cause exit on exception
+    queries = (("aql", "drop array simplearray", False),  # False: only a cleanup
+               ("aql", "CREATE immutable ARRAY simplearray < foo:int32, bar:char, baz:string > [ a=0:99, 10,0,  b=0:9, 10,0]", True),
+               ("aql", "load simplearray from '%s/simplearray.data'"% (os.getcwd(),), True))
+
+    for triple in queries:
+        try:
+            result = db.executeQuery(triple[1], triple[0]) 
+        except Exception, inst:
+            handleException(inst, triple[2], op= "Executing query: " + triple[1])
+    
+
+    #
+    # now run the select query and retain the results
+    #
+    print "Executing: select * from simplearray"
+    try: 
+        result = db.executeQuery("select * from simplearray", "aql")
+    except Exception, inst:
+        handleException(inst, True, op="Performing select")
+        # notreached
+    
+    desc = result.array.getArrayDesc()
+    dims = desc.getDimensions()
+    attrs = desc.getAttributes()
+    
+    print("Dimensions")
+    for i in range (dims.size()):
+        print "Dimension[%d] = %d:%d,%d,%d\n" % (i, dims[i].getStartMin(), dims[i].getEndMax(),
+                                                    dims[i].getChunkInterval(), dims[i].getChunkOverlap())
+      
+    print("Attributes")
+    for i in range (attrs.size()):
+        print "attribute %d %s %s" % (attrs[i].getId(), attrs[i].getName(), attrs[i].getType()) 
+
+    print "Array iterators."
+    iters = []
+    for i in range (attrs.size()): 
+        attrid = attrs[i].getId() 
+        iters.append(result.array.getConstIterator(attrid))
+        print "attribute attrid = %d loaded" % (attrid)
+        
+    for i in range(attrs.size()):
+        nc = -1
+        while not iters[i].end():
+            nc += 1
+            currentchunk = iters[i].getChunk()
+            chunkiter = currentchunk.getConstIterator((scidb.swig.ConstChunkIterator.IGNORE_EMPTY_CELLS |
+                                                       scidb.swig.ConstChunkIterator.IGNORE_OVERLAPS))
+            print "Chunk iterator %d loaded." % nc
+            
+            while not chunkiter.end():
+                dataitem = chunkiter.getItem()
+                # look up the value according to its attribute's typestring
+                item = scidb.getTypedValue(dataitem, attrs[i].getType()) # TBD: eliminate 2nd arg, make method on dataitem
+
+                print "Data: %s" % item
+                chunkiter.increment_to_next()
+            
+            iters[i].increment_to_next();
+        
+    try:
+        query="drop array simplearray"
+        db.executeQuery(query, "aql")
+    except Exception, inst:
+        handleException(inst, True, op="Executing query: " + query)
+      
+    db.disconnect()     #Disconnect from the SciDB server. 
+
+
+    print "Done!"
+    sys.exit(0) #success
+
+if __name__ == "__main__":
+    main()

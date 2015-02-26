@@ -1,0 +1,12 @@
+--setup
+create immutable array mult_sp1 <a:double> [y=0:3,2,0,x=0:8,2,0]
+
+# this is a build op test we donot have to load data for this test
+##load(mult_1,'../tests/harness/testcases/data/mult1.txt')
+
+--test
+build(mult_sp1, iif(x > y, 1, 0))
+
+--cleanup
+remove (mult_sp1)
+

@@ -1,0 +1,17 @@
+--setup
+create immutable array A <a:int32>[x=0:2,3,0]
+store(build(A,x+1),A)
+
+--test
+scan(A)
+build(A,x+10)
+filter(A,a>1)
+filter(A,1)
+merge(filter(A,a>1),filter(build(A,x+10),1))
+merge(filter(A,a>1),filter(build(A,x+10),1=1))
+merge(filter(A,a>1),filter(build(A,x+10),0))
+merge(filter(A,a>1),filter(build(A,x+10),-1))
+
+
+--cleanup
+remove(A)

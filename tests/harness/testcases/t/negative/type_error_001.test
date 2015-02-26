@@ -1,0 +1,10 @@
+
+--setup
+create immutable array mult_1 <a:double> [x=0:2,1,0, y=0:2,1,0]
+load(mult_1,'../tests/harness/testcases/data/mult1.txt')
+
+--test
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND "apply(mult_1, Z, x + 'a string')"
+
+--cleanup
+remove (mult_1)

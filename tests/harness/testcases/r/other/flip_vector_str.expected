@@ -1,0 +1,13 @@
+Query was executed successfully
+
+Query was executed successfully
+
+[("five",60.6),("ten",100.1),("three",40.4),("four",8.8),("two",-24.5),("zero",1.1),("nine",1.1),("ten",2.2)]
+
+[[(60.6),(),(),()],[(),(),(),(8.8)],[(),(),(),()],[(),(100.1),(),()]];[[(),(),(),()],[(),(),(),()],[(),(),(1.1),()],[(),(),(),(2.2)]];
+[[{5,3}(40.4)]];[[(),(),(),()],[(-24.5),(),(),()],[(),(1.1),(),()],[(),(),(),()]]
+
+Query was executed successfully
+
+Query was executed successfully
+

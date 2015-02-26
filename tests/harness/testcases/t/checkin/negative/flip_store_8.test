@@ -1,0 +1,13 @@
+--setup
+create immutable array A <a:int32> [x=0:2,3,0]
+create immutable empty array B <x:int64> [a(int32)=3,3,0]
+store(build(A,x+1),A)
+
+--test
+redimension_store(A,B)
+--error --code=scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED "redimension_store(A,B)"
+
+
+--cleanup
+remove(A)
+remove(B)

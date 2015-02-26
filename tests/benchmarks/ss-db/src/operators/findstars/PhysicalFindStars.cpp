@@ -1,0 +1,100 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2012 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation version 3 of the License.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+*
+* END_COPYRIGHT
+*/
+
+/*
+ * 
+ *
+ *  Created on: 
+ *      Author: 
+ */
+
+#include "log4cxx/logger.h"
+#include "query/Operator.h"
+#include "array/Metadata.h"
+#include "array/Array.h"
+//#include "network/NetworkManager.h"
+
+#include "Cook.h"
+#include "PixelProvider.h"
+
+namespace scidb	{
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("Findstars"));
+
+class	PhysicalFindStars: public PhysicalOperator
+{
+public:
+
+PhysicalFindStars(const std::string& logicalName, const std::string& physicalName,
+                  const Parameters& parameters, const ArrayDesc& schema):
+                  PhysicalOperator(logicalName, physicalName, parameters, schema)
+{}
+
+boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,boost::shared_ptr< Query> query)
+{
+  //cout << "hello world!" << endl; flush(cout);
+  boost::shared_ptr<Array> inputArray = inputArrays[0];
+  const ArrayDesc &arrayDesc = inputArray->getArrayDesc();
+  DimensionDesc xDim= arrayDesc.getDimensions()[2];
+  DimensionDesc yDim= arrayDesc.getDimensions()[1];
+  DimensionDesc zDim= arrayDesc.getDimensions()[0];
+  AttributeID aid = 0; // default attribute pix
+  TypeId attType = TID_INT32;
+  int32_t threshold = 1000; // default threashold
+  //FIXME check the input overlap
+  Value value = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate();
+  if (!value.isNull())
+  {
+    threshold = value.getInt32();
+  }
+  Attributes attributes = arrayDesc.getAttributes();
+
+  aid = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectNo();
+  attType = attributes[aid].getType();
+
+  boost::shared_ptr<ConstArrayIterator> aItr = inputArray->getConstIterator(aid);
+  //FIXME Nomral iteration with overlaps.
+    
+  //cout << "[start]" << endl;
+  //flush(cout);
+  boost::shared_ptr<MemArray> outputArray = boost::shared_ptr<MemArray>(new MemArray(_schema));
+  ImageProvider provider(aItr, outputArray, aid);
+  //cout << "Create the Provider" << endl; flush(cout);
+  Cook cook(provider, threshold);
+  //cout << "Trying to process" << endl;flush(cout);
+  while(!aItr->end())
+  {
+    //cout << "Cooking " << aItr->getPosition()[0] << endl; flush(cout);
+    cook.cookRawImage();
+    LOG4CXX_DEBUG(logger, "Cooking image: " << aItr->getPosition()[0]);
+    ++(*aItr);
+    //cout << " .. Done " << endl;
+  }
+  //cout << "[All Done]" << endl;
+  provider.onFinalize();
+  //cout << "-->Finalizing" << endl;
+  return outputArray;
+}
+};
+
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalFindStars, "findstars", "physicalFindStars");
+}

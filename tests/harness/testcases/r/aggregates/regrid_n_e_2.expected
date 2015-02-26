@@ -1,0 +1,74 @@
+SCIDB QUERY : <create empty array A <a:int32 null> [x=0:7,3,2]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build_sparse(A,x+10,x<>2 and x<>5),A)>
+[{0}(10),{1}(11)];
+[{3}(13),{4}(14)];
+[{6}(16),{7}(17)]
+
+SCIDB QUERY : <update A set a=null where x=1>
+[{0}(10)];
+[{3}(13),{4}(14)];
+[{6}(16),{7}(17)]
+
+SCIDB QUERY : <regrid(A,1,sum(a))>
+[(10),(0),(0),(13),(14),(0),(16),(17)]
+
+SCIDB QUERY : <regrid(A,1,max(a))>
+[(10),(null),(null),(13),(14),(null),(16),(17)]
+
+SCIDB QUERY : <regrid(A,1,min(a))>
+[(10),(null),(null),(13),(14),(null),(16),(17)]
+
+SCIDB QUERY : <regrid(A,1,avg(a))>
+[(10),(null),(null),(13),(14),(null),(16),(17)]
+
+SCIDB QUERY : <regrid(A,1,count(a))>
+[(1),(0),(0),(1),(1),(0),(1),(1)]
+
+SCIDB QUERY : <regrid(A,1,count(*))>
+[(1),(1),(0),(1),(1),(0),(1),(1)]
+
+SCIDB QUERY : <regrid(A,1,stdev(a))>
+[(null),(null),(null),(null),(null),(null),(null),(null)]
+
+SCIDB QUERY : <regrid(A,1,var(a))>
+[(null),(null),(null),(null),(null),(null),(null),(null)]
+
+SCIDB QUERY : <store(build_sparse(A,x-2,x<>0 and x<>4),A)>
+[{1}(-1),{2}(0)];
+[{3}(1),{5}(3)];
+[{6}(4),{7}(5)]
+
+SCIDB QUERY : <update A set a=null where x=1>
+[{2}(0)];
+[{3}(1),{5}(3)];
+[{6}(4),{7}(5)]
+
+SCIDB QUERY : <regrid(A,18,sum(a),max(a))>
+[(13,5)]
+
+SCIDB QUERY : <regrid(A,3,max(a),var(a),stdev(a),count(a),sum(a),min(a))>
+[(0,null,null,1,0,0),(3,2,1.41421,2,4,1),(5,0.5,0.707107,2,9,4)]
+
+SCIDB QUERY : <regrid(A,4,min(a),count(*))>
+[(0,3),(3,3)]
+
+SCIDB QUERY : <regrid(A,1,avg(a),count(a))>
+[(null,0),(null,0),(0,1),(1,1),(null,0),(3,1),(4,1),(5,1)]
+
+SCIDB QUERY : <regrid(A,2,count(a),count(*))>
+[(0,1),(2,2),(1,1),(2,2)]
+
+SCIDB QUERY : <regrid(A,3,count(*),sum(a))>
+[(2,0),(2,4),(2,9)]
+
+SCIDB QUERY : <regrid(A,5,stdev(a),avg(a))>
+[(0.707107,0.5),(1,4)]
+
+SCIDB QUERY : <regrid(A,9,var(a),stdev(a))>
+[(4.3,2.07364)]
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+

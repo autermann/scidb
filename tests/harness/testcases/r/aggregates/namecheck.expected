@@ -1,0 +1,207 @@
+SCIDB QUERY : <create array A <a:int32> [x=0:2,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <select * into A from build(A,x+1)>
+[(1),(2),(3)]
+
+SCIDB QUERY : <select * into Tcount from count(A)>
+[(3)]
+
+SCIDB QUERY : <show(Tcount)>
+[("Tcount<count:uint64 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select count(*) into Tcount_s from A>
+[(3)]
+
+SCIDB QUERY : <show(Tcount_s)>
+[("Tcount_s<count:uint64 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select count(a) into Tcount_a from A>
+[(3)]
+
+SCIDB QUERY : <show(Tcount_a)>
+[("Tcount_a<count:uint64 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select * into Tsum from sum(A)>
+[(6)]
+
+SCIDB QUERY : <show(Tsum)>
+[("Tsum<a_sum:int64 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select sum(a) into Tsum_a from A>
+[(6)]
+
+SCIDB QUERY : <show(Tsum_a)>
+[("Tsum_a<sum:int64 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select * into Tmax from max(A)>
+[(3)]
+
+SCIDB QUERY : <show(Tmax)>
+[("Tmax<a_max:int32 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select max(a) into Tmax_a from A>
+[(3)]
+
+SCIDB QUERY : <show(Tmax_a)>
+[("Tmax_a<max:int32 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select * into Tmin from min(A)>
+[(1)]
+
+SCIDB QUERY : <show(Tmin)>
+[("Tmin<a_min:int32 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select min(a) into Tmin_a from A>
+[(1)]
+
+SCIDB QUERY : <show(Tmin_a)>
+[("Tmin_a<min:int32 NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select * into Tavg from avg(A)>
+[(2)]
+
+SCIDB QUERY : <show(Tavg)>
+[("Tavg<a_avg:double NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select avg(a) into Tavg_a from A>
+[(2)]
+
+SCIDB QUERY : <show(Tavg_a)>
+[("Tavg_a<avg:double NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select * into Tvar from var(A)>
+[(1)]
+
+SCIDB QUERY : <show(Tvar)>
+[("Tvar<a_var:double NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select var(a) into Tvar_a from A>
+[(1)]
+
+SCIDB QUERY : <show(Tvar_a)>
+[("Tvar_a<var:double NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select * into Tstdev from stdev(A)>
+[(1)]
+
+SCIDB QUERY : <show(Tstdev)>
+[("Tstdev<a_stdev:double NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <select stdev(a) into Tstdev_a from A>
+[(1)]
+
+SCIDB QUERY : <show(Tstdev_a)>
+[("Tstdev_a<stdev:double NULL> [i=0:0,1,0]")]
+
+SCIDB QUERY : <store(window(A,2,count(*),count(a)),Wcount)>
+[(1,1),(2,2),(2,2)]
+
+SCIDB QUERY : <show(Wcount)>
+[("Wcount<count:uint64 NULL,a_count:uint64 NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <store(window(A,2,sum(a)),Wsum)>
+[(1),(3),(5)]
+
+SCIDB QUERY : <show(Wsum)>
+[("Wsum<a_sum:int64 NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <store(window(A,2,max(a)),Wmax)>
+[(1),(2),(3)]
+
+SCIDB QUERY : <show(Wmax)>
+[("Wmax<a_max:int32 NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <store(window(A,2,min(a)),Wmin)>
+[(1),(1),(2)]
+
+SCIDB QUERY : <show(Wmin)>
+[("Wmin<a_min:int32 NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <store(window(A,2,avg(a)),Wavg)>
+[(1),(1.5),(2.5)]
+
+SCIDB QUERY : <show(Wavg)>
+[("Wavg<a_avg:double NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <store(window(A,2,var(a)),Wvar)>
+[(null),(0.5),(0.5)]
+
+SCIDB QUERY : <show(Wvar)>
+[("Wvar<a_var:double NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <store(window(A,2,stdev(a)),Wstdev)>
+[(null),(0.707107),(0.707107)]
+
+SCIDB QUERY : <show(Wstdev)>
+[("Wstdev<a_stdev:double NULL> [x=0:2,3,0]")]
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tcount)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tcount_s)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tcount_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tsum)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tsum_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tmax)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tmax_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tmin)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tmin_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tavg)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tavg_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tvar)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tvar_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tstdev)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Tstdev_a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wcount)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wsum)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wmax)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wmin)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wavg)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wvar)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Wstdev)>
+Query was executed successfully
+

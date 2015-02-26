@@ -1,0 +1,9 @@
+--setup
+create empty array A_10 <x:double null>[i=1:10,5,0]
+load(A_10, '../tests/harness/testcases/data/A_10.txt')
+
+--test
+scan(A_10)
+
+--cleanup
+remove(A_10)

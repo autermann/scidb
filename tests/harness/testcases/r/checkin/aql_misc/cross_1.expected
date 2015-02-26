@@ -1,0 +1,28 @@
+Query was executed successfully
+
+Query was executed successfully
+
+[(1),(2),(3)]
+
+[(10),(11),(12)]
+
+[(100),(101),(102)]
+
+[(11),(12),(13)]
+
+[(150),(151),(152)]
+
+[[(11,10),(11,11),(11,12)],[(12,10),(12,11),(12,12)],[(13,10),(13,11),(13,12)]]
+
+[[(11,150),(11,151),(11,152)],[(12,150),(12,151),(12,152)],[(13,150),(13,151),(13,152)]]
+
+[[(11,11),(11,12),(11,13)],[(12,11),(12,12),(12,13)],[(13,11),(13,12),(13,13)]]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
