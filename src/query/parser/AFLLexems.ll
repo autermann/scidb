@@ -22,7 +22,6 @@ typedef scidb::AFLParser::token_type token_type;
         scidb::AFLParser::semantic_type* yylval,\
         scidb::AFLParser::location_type* yylloc    \
     )
-
 %}
 
 %option c++
@@ -54,6 +53,7 @@ Whitespace ({Space}+|{OneLineComment})
 IdentifierFirstChar [A-Za-z_\$]
 IdentifierOtherChars [A-Za-z0-9_\$]
 Identifier {IdentifierFirstChar}{IdentifierOtherChars}*
+QuotedIdentifier \"{IdentifierFirstChar}{IdentifierOtherChars}*\"
 
 Digit [0-9]
 Integer    {Digit}+
@@ -107,12 +107,21 @@ Other .
     const AFLKeyword *kw = FindAFLKeyword(yytext);
     if (kw)
     {
-        //yylval->keyword = new std::string(kw->name);
-        //std::cout  << "KEYWORD: " << *yylval->keyword  << std::endl; 
+        //Allocate string for keyword only for non-reserved keywords. It will be freed in identifier_clause
+        //in case of successful parsing (or in bison destructor in case unsuccessfull parsing).
+        if (!kw->reserved)
+        {
+            yylval->keyword = stringsAllocator.allocate(yyleng + 1);
+            strcpy(yylval->keyword, yytext);
+        }
+        else
+        {
+            yylval->keyword = NULL;
+        }
         return kw->tok;
     }
-    yylval->stringVal = new std::string(yytext, yyleng);
-    //std::cout  << "IDENTIFIER: " << *yylval->stringVal << std::endl; 
+    yylval->stringVal = stringsAllocator.allocate(yyleng + 1);
+    strcpy(yylval->stringVal, yytext);
     return token::IDENTIFIER;
 }
 
@@ -127,6 +136,13 @@ Other .
         return token::LEXER_ERROR;
     }
     return token::INTEGER;
+}
+
+{QuotedIdentifier} {
+    std::string str = std::string(yytext, 1, yyleng - 2);  
+    yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
+    strcpy(yylval->stringVal, str.c_str());
+    return token::IDENTIFIER;
 }
 
 {Real} {
@@ -159,9 +175,12 @@ Other .
 
 L?\'(\\.|[^\\\'])*\'    {
     //FIXME: Ugly unescaping.
-    std::string *str = new std::string(yytext, 1, yyleng - 2);
-    boost::replace_all(*str, "\\'", "'");
-    yylval->stringVal = str;  
+    std::string str = std::string(yytext, 1, yyleng - 2);
+    boost::replace_all(str, "\\'", "'");
+
+    yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
+    strcpy(yylval->stringVal, str.c_str());
+
     return token::STRING_LITERAL;
 }
 

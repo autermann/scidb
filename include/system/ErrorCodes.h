@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -474,6 +474,12 @@ ERRCODE(SCIDB_LE_RESOURCE_BUSY,                     398); //Not enough resources
 ERRCODE(SCIDB_LE_NESTING_PROHIBITED,                399); //Operator %1% can not be nested
 ERRCODE(SCIDB_LE_OP_WINDOW_ERROR5,                  400); //Algorithm must be one of %1% 
 ERRCODE(SCIDB_LE_OP_WINDOW_ERROR6,                  401); //Using materialize op without materialized input
+ERRCODE(SCIDB_LE_CONSTANT_EXPRESSION_EXPECTED,      402); //Constant expression expected
+ERRCODE(SCIDB_LE_TYPE_EXPECTED,                     403); //Expected constant or expression with type '%1%'
+ERRCODE(SCIDB_LE_INCORRECT_CHUNK_SIZE,              404); //Chunk size must be between 1 and '%1%'
+ERRCODE(SCIDB_LE_INCORRECT_OVERLAP_SIZE,            405); //Overlap length must be between 0 and %1%
+ERRCODE(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,      406); //Dimension boundaries must be between '%1%' and '%2%'
+ERRCODE(SCIDB_LE_WRONG_LANGUAGE_STRING,             407); //Language string should be AQL or AFL
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%

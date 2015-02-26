@@ -9,7 +9,7 @@
 
         <secondary>operator syntax</secondary>
       </indexterm>The aggregate operator take as input a set of 1 or more
-    values and return a scalar value.</refpurpose>
+    values and returns a SciDB array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -21,6 +21,12 @@
   <refsect1>
     <title>Summary</title>
 
+    <para>SciDB aggregates are functions of several values that produce a
+    scalar value. They are used together with the
+    <literal>aggregate</literal>, <literal>redimension_store</literal>, and
+    <literal>redimension</literal> operators to compute data aggregations,
+    optionally grouped along a specified dimension or dimensions.</para>
+
     <para>The aggregate operator takes the following arguments:</para>
 
     <itemizedlist>
@@ -30,9 +36,9 @@
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">Aggregating operators</emphasis>: this is
+        <para><emphasis role="bold">Aggregating functions</emphasis>: this is
         the aggregation to be performed. You can list one or more aggregating
-        operators. For a list of SciDB aggregating operators, see <link linkend="aggregateList">Aggregates</link>.</para>
+        functions. For a list of SciDB aggregates, see <link linkend="aggregateList">Aggregates</link>.</para>
       </listitem>
 
       <listitem>

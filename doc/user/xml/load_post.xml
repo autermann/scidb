@@ -96,80 +96,32 @@
 
         <step>
           <para>Load the data, specifying a maximum of 99 errors, and saving
-          information to a shadow array: <para><programlisting>AFL% load(intensityFlat,'../examples/intensity_data.bin',-1,
+          information to a shadow array: <para><programlisting>AFL% load(intensityFlat,'../examples/intensity_data.bin',-2,
    '(string, int64, int64 null)',99,shadowArray);  </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
 {0} "High",0,100
 {1} "High",1,100
 {2} "High",2,99
 {3} "High",3,99
 {4} "High",4,98
-{5} "High",0,100
-{6} "High",1,100
-{7} "High",2,99
-{8} "High",3,99
-{9} "High",4,98
-{10} "High",0,100
-{11} "High",1,100
-{12} "High",2,99
-{13} "High",3,99
-{14} "High",4,98
-{15} "High",5,97
-{16} "High",6,null
-{17} "High",7,null
-{18} "Medium",0,100
-{19} "Medium",1,95
-{20} "High",5,97
-{21} "High",6,null
-{22} "High",7,null
-{23} "Medium",0,100
-{24} "Medium",1,95
-{25} "High",5,97
-{26} "High",6,null
-{27} "High",7,null
-{28} "Medium",0,100
-{29} "Medium",1,95
-{30} "Medium",2,89
-{31} "Medium",3,null
-{32} "Medium",4,null
-{33} "Medium",5,80
-{34} "Medium",6,78
-{35} "Medium",2,89
-{36} "Medium",3,null
-{37} "Medium",4,null
-{38} "Medium",5,80
-{39} "Medium",6,78
-{40} "Medium",2,89
-{41} "Medium",3,null
-{42} "Medium",4,null
-{43} "Medium",5,80
-{44} "Medium",6,78
-{45} "Medium",7,77
-{46} "Low",0,100
-{47} "Low",1,85
-{48} "Low",2,71
-{49} "Low",3,60
-{50} "Medium",7,77
-{51} "Low",0,100
-{52} "Low",1,85
-{53} "Low",2,71
-{54} "Low",3,60
-{55} "Medium",7,77
-{56} "Low",0,100
-{57} "Low",1,85
-{58} "Low",2,71
-{59} "Low",3,60
-{60} "Low",4,50
-{61} "Low",5,41
-{62} "Low",6,35
-{63} "Low",7,29
-{65} "Low",4,50
-{66} "Low",5,41
-{67} "Low",6,35
-{68} "Low",7,29
-{70} "Low",4,50
-{71} "Low",5,41
-{72} "Low",6,35
-{73} "Low",7,29
+{5} "High",5,97
+{6} "High",6,null
+{7} "High",7,null
+{8} "Medium",0,100
+{9} "Medium",1,95
+{10} "Medium",2,89
+{11} "Medium",3,null
+{12} "Medium",4,null
+{13} "Medium",5,80
+{14} "Medium",6,78
+{15} "Medium",7,77
+{16} "Low",0,100
+{17} "Low",1,85
+{18} "Low",2,71
+{19} "Low",3,60
+{20} "Low",4,50
+{21} "Low",5,41
+{22} "Low",6,35
+{23} "Low",7,29
 </screen></para></para>
         </step>
 
@@ -181,10 +133,6 @@
    '(string, int64, int64)',99,shadowArray);  </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
 {0} "High",0,25855
 {1} "",0,0
-{5} "High",0,25855
-{6} "",0,0
-{10} "High",0,25855
-{11} "",0,0
 </screen></para></para>
         </step>
 
@@ -192,8 +140,6 @@
           <para>View the data in shadowArray to get details on why the file
           did not load correctly: <para><programlisting>AFL% scan(shadowArray)  </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity,row_offset
 {1} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
-{6} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
-{11} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
 </screen></para></para>
         </step>
       </procedure>

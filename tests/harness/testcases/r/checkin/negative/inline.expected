@@ -1,11 +1,11 @@
 SCIDB QUERY : <build(<a:int64> [x=0:2,0,0], 9)>
-[An error expected at this place for the query "build(<a:int64> [x=0:2,0,0], 9)". And it failed with error code = scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR. Expected error code = scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR.]
+[An error expected at this place for the query "build(<a:int64> [x=0:2,0,0], 9)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_INCORRECT_CHUNK_SIZE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_INCORRECT_CHUNK_SIZE.]
 
 SCIDB QUERY : <build(<a:int64> [x=0:2,1,2], 9)>
 [An error expected at this place for the query "build(<a:int64> [x=0:2,1,2], 9)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK.]
 
 SCIDB QUERY : <build(<a:int64> [x=*:*,5,1], 9)>
-[An error expected at this place for the query "build(<a:int64> [x=*:*,5,1], 9)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED.]
+[An error expected at this place for the query "build(<a:int64> [x=*:*,5,1], 9)". And it failed with error code = scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR. Expected error code = scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR.]
 
 SCIDB QUERY : <build(<a:int64> [x=4:2,1,0], 9)>
 [An error expected at this place for the query "build(<a:int64> [x=4:2,1,0], 9)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW.]

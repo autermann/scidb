@@ -97,5 +97,5 @@ remove(BNI)
 remove(ANI) 
 remove(ANIL) 
 remove(target) 
-
+--shell --command "rm /tmp/scidb_array_a.out" --store
 --stop-query-logging

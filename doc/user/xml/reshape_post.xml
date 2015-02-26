@@ -73,16 +73,18 @@
 
     <itemizedlist>
       <listitem>
-        <para>You can refer to an existing array with the template_array
-        parameter. The new array has the same schema as the template array.
-        The template array is not changed by the reshape operator.</para>
+        <para>You can refer to an existing array with the
+        <replaceable>template_array</replaceable> parameter. The new array has
+        the same schema as the template array. The template array is not
+        changed by the reshape operator.</para>
       </listitem>
     </itemizedlist>
 
     <itemizedlist>
       <listitem>
-        <para>You can declare the schema explicitly with the schema_definition
-        parameter. The examples in this section show this technique.</para>
+        <para>You can declare the schema explicitly with the
+        <replaceable>schema_definition</replaceable> parameter. The examples
+        in this section illustrate this technique.</para>
       </listitem>
     </itemizedlist>
 

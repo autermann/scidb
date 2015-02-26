@@ -186,10 +186,10 @@ SCIDB QUERY : <quantile(filter(B, x< 15 and x>15),100,r)>
 []
 
 SCIDB QUERY : <quantile(filter(B, x< 15 and x>15),100,s,r)>
-[An error expected at this place for the query "quantile(filter(B, x< 15 and x>15),100,s,r)". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "quantile(filter(B, x< 15 and x>15),100,s,r)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <sort(A,x)>
-[An error expected at this place for the query "sort(A,x)". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "sort(A,x)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

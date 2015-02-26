@@ -136,7 +136,7 @@
                   In this case, you will need to specify the dimension data
                   type in the name argument like this:
                   <replaceable>dimension_name</replaceable>(<replaceable>dimension_dataype</replaceable>).
-                  Note that version 13.2 of SciDB and Paradigm4 support
+                  Note that version 13.3 of SciDB and Paradigm4 support
                   non-integer dimensions only partially. Dimension names may
                   only contain alphanumeric characters and underscores
                   (_).</para>
@@ -362,6 +362,13 @@ or
       each type of NULL. For more information on NULL substitution, see the
       <link linkend="substituteOperator">substitute</link> operator
       reference.</para>
+
+      <para>Additionally, you can specify a missing reason code for the
+      default value of an attribute. For example, the following statement
+      specifies a missing reason code of 30 as the default value for
+      the<literal> val3</literal> attribute.<para><programlisting>AFL% create array D&lt;val1:char default 'a', val2:int32 default 1, 
+     val3:int64 null default missing(30)&gt; [i=0:9,10,0];  </programlisting><screen>[("D&lt;val1:char DEFAULT 'a',val2:int32 DEFAULT 1,val3:int64 NULL DEFAULT ?30&gt; [i=0:9,10,0]")]
+</screen></para></para>
     </section>
 
     <section>
@@ -524,7 +531,7 @@ or
       <title>Non-integer Dimensions and Mapping Arrays</title>
 
       <note>
-        <para>Version 13.2 of SciDB only partially supports non-integer
+        <para>Version 13.3 of SciDB only partially supports non-integer
         dimensions.</para>
       </note>
 
@@ -545,7 +552,7 @@ or
 
           <secondary>create array</secondary>
         </indexterm>For example, the array winners has a non-integer dimension
-      named ID: <para><programlisting>AQL% <command>CREATE ARRAY</command> winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0]  </programlisting><programlisting>AFL% show(winners)</programlisting><screen><command>winners</command>
+      named <code>event</code>: <para><programlisting>AQL% <command>CREATE ARRAY</command> winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0];  </programlisting><programlisting>AFL% show(winners)</programlisting><screen><command>winners</command>
 
 &lt; person:string,
 time:double &gt;
@@ -555,10 +562,9 @@ event(string)=3,1000,0]</screen><indexterm>
           <primary>AQL</primary>
 
           <secondary>select</secondary>
-        </indexterm>Each of the dimensions <code>year</code> and
-      <code>event</code> is a special one-dimensional SciDB array mapping each
-      distinct value in the dimension to an integer coordinate.
-      <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners:event; 
+        </indexterm>The dimension <code>event</code> is a special
+      one-dimensional SciDB array mapping each distinct value in the dimension
+      to an integer coordinate. <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners:event; 
 </programlisting><screen>{no} value
 {0} "dash"
 {1} "marathon"

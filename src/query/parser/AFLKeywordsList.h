@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -28,30 +28,31 @@
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  */
 
-AFLKW("and", token::AND)
-AFLKW("or", token::OR)
-AFLKW("array", token::ARRAY)
-AFLKW("as", token::AS)
-AFLKW("compression", token::COMPRESSION)
-AFLKW("create", token::CREATE)
-AFLKW("default", token::DEFAULT)
-AFLKW("empty", token::EMPTY)
-AFLKW("not", token::NOT)
-AFLKW("null", token::NULL_VALUE)
-AFLKW("immutable", token::IMMUTABLE)
-AFLKW("if", token::IF)
-AFLKW("then", token::THEN)
-AFLKW("else", token::ELSE)
-AFLKW("case", token::CASE)
-AFLKW("when", token::WHEN)
-AFLKW("end", token::END)
-AFLKW("agg", token::AGG)
-AFLKW("true", token::TRUE)
-AFLKW("false", token::FALSE)
-AFLKW("NA", token::NA)
-AFLKW("is", token::IS)
-AFLKW("reserve", token::RESERVE)
-AFLKW("asc", token::ASC)
-AFLKW("desc", token::DESC)
-AFLKW("all", token::ALL)
-AFLKW("distinct", token::DISTINCT)
+AFLKW("and", token::AND, true)
+AFLKW("or", token::OR, true)
+AFLKW("array", token::ARRAY, false)
+AFLKW("as", token::AS, false)
+AFLKW("compression", token::COMPRESSION, false)
+AFLKW("create", token::CREATE, false)
+AFLKW("default", token::DEFAULT, false)
+AFLKW("empty", token::EMPTY, true)
+AFLKW("not", token::NOT, true)
+AFLKW("null", token::NULL_VALUE, true)
+AFLKW("immutable", token::IMMUTABLE, false)
+AFLKW("if", token::IF, true)
+AFLKW("then", token::THEN, true)
+AFLKW("else", token::ELSE, true)
+AFLKW("case", token::CASE, true)
+AFLKW("when", token::WHEN, true)
+AFLKW("end", token::END, false)
+AFLKW("agg", token::AGG, true)
+AFLKW("true", token::TRUE, true)
+AFLKW("false", token::FALSE, true)
+AFLKW("NA", token::NA, true)
+AFLKW("is", token::IS, false)
+AFLKW("reserve", token::RESERVE, false)
+AFLKW("asc", token::ASC, false)
+AFLKW("desc", token::DESC, false)
+AFLKW("all", token::ALL, false)
+AFLKW("distinct", token::DISTINCT, false)
+AFLKW("between", token::BETWEEN, false)

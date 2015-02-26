@@ -72,8 +72,8 @@
 
       <listitem>
         <para>In the left-to-right ordering of dimensions in each array, each
-        pair of corresponding dimensions must have the same chunk size, chunk
-        overlap, and dimension starting index.</para>
+        pair of corresponding dimensions must have the same dimension starting
+        index.</para>
       </listitem>
     </itemizedlist>
 
@@ -193,8 +193,8 @@
           version of B. Version 2 is the version resulting from the insert
           operation of the previous step. <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> versions(B)
   </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2013-03-05 17:31:41"
-{2} 2,"2013-03-05 17:31:41"
+{1} 1,"2013-03-18 15:03:42"
+{2} 2,"2013-03-18 15:03:42"
 </screen></para></para>
         </step>
 

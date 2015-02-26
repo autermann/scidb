@@ -1,7 +1,28 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 package org.scidb;
 
 import junit.framework.TestCase;
-import org.scidb.jdbc.ISciDBJDBCResultSetWrapper;
+import org.scidb.jdbc.IResultSetWrapper;
 
 import java.sql.*;
 
@@ -14,7 +35,7 @@ public class JDBCBasicTestCase extends TestCase
         super(s);
         try
         {
-            Class.forName("org.scidb.jdbc.SciDBJDBCDriver");
+            Class.forName("org.scidb.jdbc.Driver");
         }
         catch (ClassNotFoundException e)
         {
@@ -46,40 +67,44 @@ public class JDBCBasicTestCase extends TestCase
     public void testSelectiveQuery() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<a:string>[x=0:3,2,0], '[(\"1\")(\"\")][(\"2\")]')");
+        ResultSet res = st.executeQuery("select * from array(empty<a:string null, c: char null>[x=0:3,2,0], '[(\"1\",\"1\")(\"\", null)][(\"2\")]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
-        assertEquals(2, meta.getColumnCount());
+        assertEquals(3, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
         assertEquals("a", meta.getColumnName(2));
         assertEquals("string", meta.getColumnTypeName(2));
-        assertTrue(resWrapper.isColumnAttribute(2));
+        assertEquals("c", meta.getColumnName(3));
+        assertEquals("char", meta.getColumnTypeName(3));
+        assertTrue(resWrapper.isColumnAttribute(3));
 
         StringBuilder sb = new StringBuilder();
         while(!res.isAfterLast())
         {
-            sb.append(res.getLong("x") + ":" + res.getString("a") + ":");
+            sb.append(res.getLong("x") + ":" + res.wasNull() + ":" + res.getString("a") + ":" + res.wasNull() + ":"
+                    + res.getString("c") + ":" + res.wasNull() + ":");
             res.next();
         }
-        assertEquals("0:1:1::2:2:", sb.toString());
+        assertEquals("0:false:1:false:1:false:1:false::false:null:true:2:false:2:false:null:true:", sb.toString());
     }
 
     public void testSignedIntegerDataTypes() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<i8:int8, i16: int16, i32: int32, i64: int64>" +
-                "[x=0:3,2,0], '[(1, 260, 67000, 10000000), (-1, -260, -67000, -10000000)][]')");
+        ResultSet res = st.executeQuery("select * from array(empty<i8:int8 null, i16: int16 null, i32: int32 null, " +
+                "i64: int64 null>[x=0:3,2,0], '[(1, 260, 67000, 10000000), (-1, -260, -67000, -10000000)]" +
+                "[(null, null, null, null)]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
         assertEquals(5, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
@@ -104,8 +129,9 @@ public class JDBCBasicTestCase extends TestCase
         StringBuilder sbConvertFloat = new StringBuilder();
         while(!res.isAfterLast())
         {
-            sbMain.append(res.getLong("x") + ":" + res.getByte("i8") + ":" + res.getShort("i16") + ":" + res.getInt("i32")
-                    + ":" + res.getLong("i64") + ":" + res.getBigDecimal("i64") + ":");
+            sbMain.append(res.getLong("x") + ":" + res.wasNull() + ":" + res.getByte("i8") + ":" + res.wasNull() + ":" +
+                    res.getShort("i16") + ":" + res.wasNull() + ":" + res.getInt("i32") + ":" + res.wasNull()
+                    + ":" + res.getLong("i64") + ":" + res.getBigDecimal("i64") + ":" + res.wasNull() + ":");
             sbConvert1.append(res.getShort("i8") + ":" + res.getInt("i16") + ":" + res.getLong("i32") + ":"
                     + res.getBigDecimal("i32") + ":");
             sbConvert2.append(res.getInt("i8") + ":" + res.getLong("i16") + ":" + res.getBigDecimal("i16") + ":");
@@ -117,11 +143,11 @@ public class JDBCBasicTestCase extends TestCase
                     res.getFloat("i64") + ":" + res.getDouble("i64") + ":");
             res.next();
         }
-        assertEquals("0:1:260:67000:10000000:10000000:1:-1:-260:-67000:-10000000:-10000000:", sbMain.toString());
-        assertEquals("1:260:67000:67000:-1:-260:-67000:-67000:", sbConvert1.toString());
-        assertEquals("1:260:260:-1:-260:-260:", sbConvert2.toString());
-        assertEquals("1:1:260:67000:-1:-1:-260:-67000:", sbConvert3.toString());
-        assertEquals("1.0:1.0:260.0:260.0:67000.0:67000.0:1.0E7:1.0E7:-1.0:-1.0:-260.0:-260.0:-67000.0:-67000.0:-1.0E7:-1.0E7:", sbConvertFloat.toString());
+        assertEquals("0:false:1:false:260:false:67000:false:10000000:10000000:false:1:false:-1:false:-260:false:-67000:false:-10000000:-10000000:false:2:false:0:true:0:true:0:true:0:null:true:", sbMain.toString());
+        assertEquals("1:260:67000:67000:-1:-260:-67000:-67000:0:0:0:null:", sbConvert1.toString());
+        assertEquals("1:260:260:-1:-260:-260:0:0:null:", sbConvert2.toString());
+        assertEquals("1:1:260:67000:-1:-1:-260:-67000:0:null:null:null:", sbConvert3.toString());
+        assertEquals("1.0:1.0:260.0:260.0:67000.0:67000.0:1.0E7:1.0E7:-1.0:-1.0:-260.0:-260.0:-67000.0:-67000.0:-1.0E7:-1.0E7:0.0:0.0:0.0:0.0:0.0:0.0:0.0:0.0:", sbConvertFloat.toString());
     }
 
     public void testUnsignedIntegerDataTypes() throws SQLException
@@ -134,7 +160,7 @@ public class JDBCBasicTestCase extends TestCase
         assertEquals("build", meta.getTableName(0));
         assertEquals(5, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
@@ -159,8 +185,9 @@ public class JDBCBasicTestCase extends TestCase
         StringBuilder sbConvertFloat = new StringBuilder();
         while(!res.isAfterLast())
         {
-            sbMain.append(res.getLong("x") + ":" + res.getShort("i8") + ":" + res.getInt("i16") + ":" + res.getLong("i32")
-                    + ":" + res.getBigDecimal("i64") + ":");
+            sbMain.append(res.getLong("x") + ":" + res.wasNull() + ":" + res.getShort("i8") + ":" + res.wasNull() +
+                    ":" + res.getInt("i16") + ":" + res.wasNull() + ":" + res.getLong("i32") + ":" + res.wasNull()
+                    + ":" + res.getBigDecimal("i64") + ":" + res.wasNull() + ":");
             sbConvert1.append(res.getInt("i8") + ":" + res.getLong("i16") + ":" + res.getLong("i32") + ":" + res.getBigDecimal("i32") + ":");
             sbConvert2.append(res.getInt("i8") + ":" + res.getLong("i16") + ":" + res.getBigDecimal("i16") + ":");
             sbConvert3.append(res.getLong("i8") + ":" + res.getBigDecimal("i8") + ":");
@@ -170,7 +197,7 @@ public class JDBCBasicTestCase extends TestCase
                     res.getFloat("i64") + ":" + res.getDouble("i64") + ":");
             res.next();
         }
-        assertEquals("0:1:260:67000:10000000:", sbMain.toString());
+        assertEquals("0:false:1:false:260:false:67000:false:10000000:false:", sbMain.toString());
         assertEquals("1:260:67000:67000:", sbConvert1.toString());
         assertEquals("1:260:260:", sbConvert2.toString());
         assertEquals("1:1:", sbConvert3.toString());
@@ -187,7 +214,7 @@ public class JDBCBasicTestCase extends TestCase
         assertEquals("build", meta.getTableName(0));
         assertEquals(3, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
@@ -202,11 +229,11 @@ public class JDBCBasicTestCase extends TestCase
         StringBuilder sbMain = new StringBuilder();
         while(!res.isAfterLast())
         {
-            sbMain.append(res.getLong("x") + ":" + res.getFloat("f") + ":" + res.getDouble("d") + ":" +
-                    (float)res.getDouble("f") + ":");
+            sbMain.append(res.getLong("x") + ":" + res.getFloat("f") + ":" + res.wasNull() + ":" +
+                    res.getDouble("d") + ":" + res.wasNull() + ":" + (float)res.getDouble("f") + ":");
             res.next();
         }
-        assertEquals("0:3.1415927:3.141592653589793:3.1415927:", sbMain.toString());
+        assertEquals("0:3.1415927:false:3.141592653589793:false:3.1415927:", sbMain.toString());
     }
 
     public void testNonEmptyCoordinates() throws SQLException
@@ -218,7 +245,7 @@ public class JDBCBasicTestCase extends TestCase
         assertEquals("build", meta.getTableName(0));
         assertEquals(2, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
@@ -245,7 +272,7 @@ public class JDBCBasicTestCase extends TestCase
         assertEquals("build", meta.getTableName(0));
         assertEquals(2, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
@@ -266,13 +293,13 @@ public class JDBCBasicTestCase extends TestCase
     public void testBooleanTypes() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<b:bool>[x=0:3,2,0], '[(true), (false)][(false), (true)]')");
+        ResultSet res = st.executeQuery("select * from array(empty<b:bool null>[x=0:3,2,0], '[(null),(true)][(false),(null)]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
         assertEquals(2, meta.getColumnCount());
 
-        ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
         assertEquals("x", meta.getColumnName(1));
         assertEquals("int64", meta.getColumnTypeName(1));
         assertFalse(resWrapper.isColumnAttribute(1));
@@ -284,9 +311,9 @@ public class JDBCBasicTestCase extends TestCase
         StringBuilder sbMain = new StringBuilder();
         while(!res.isAfterLast())
         {
-            sbMain.append(res.getLong("x") + ":" + res.getBoolean("b") + ":");
+            sbMain.append(res.getLong("x") + ":" + res.wasNull() + ":" + res.getBoolean("b") + ":" + res.wasNull() + ":");
             res.next();
         }
-        assertEquals("0:true:1:false:2:false:3:true:", sbMain.toString());
+        assertEquals("0:false:false:true:1:false:true:false:2:false:false:false:3:false:false:true:", sbMain.toString());
     }
 }

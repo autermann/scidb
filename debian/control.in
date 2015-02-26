@@ -5,8 +5,8 @@ Maintainer: SciDB support list <support@lists.scidb.org>
 Build-Depends: debhelper (>= 8.0.0), cmake, bison, flex, libcppunit-dev, libbz2-dev, libpqxx3-dev,
                libprotobuf-dev, protobuf-compiler, zlib1g-dev, liblog4cxx10-dev,
                libboost1.46-all-dev, libreadline6-dev, fop, xsltproc, doxygen, python, subversion,
-               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev, libmpich2-dev,
-               mpich2 (>=1.4.1), mpich2 (<<1.4.2), openssh-client
+               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev, scidb-VERSION_MAJOR.VERSION_MINOR-libmpich2-dev (=1.2.1.1-4),
+               scidb-VERSION_MAJOR.VERSION_MINOR-mpich2 (=1.2.1.1-4), openssh-client
 Standards-Version: 3.9.2
 Homepage: http://scidb.org
 
@@ -44,7 +44,7 @@ Description: SciDB querying tool and other utilities (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (>= ${source:Upstream-Version}~)
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (>= ${source:Upstream-Version}~), time
 Description: SciDB developer and tester utilities
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools-dbg
@@ -54,7 +54,7 @@ Description: SciDB developer and tester utilities (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-plugins
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), libscalapack-mpi1 (>=1.8.0), libscalapack-mpi1 (<<1.8.1), libopenmpi1.3 (>=1.4.3), libopenmpi1.3 (<<1.4.4), openmpi-bin (>=1.4.3), openmpi-bin (<<1.4.4), openmpi-common (>=1.4.3), openmpi-common (<<1.4.4), libmpich2-3 (>=1.4.1), libmpich2-3 (<<1.4.2), mpich2 (>=1.4.1), mpich2 (<<1.4.2), openssh-client
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), libscalapack-mpi1 (>=1.8.0), libscalapack-mpi1 (<<1.8.1), libopenmpi1.3 (>=1.4.3), libopenmpi1.3 (<<1.4.4), openmpi-bin (>=1.4.3), openmpi-bin (<<1.4.4), openmpi-common (>=1.4.3), openmpi-common (<<1.4.4), scidb-VERSION_MAJOR.VERSION_MINOR-libmpich2-1.2(=1.2.1.1-4), scidb-VERSION_MAJOR.VERSION_MINOR-mpich2 (=1.2.1.1-4), openssh-client
 Description: SciDB server and client plugins
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-plugins-dbg
@@ -89,7 +89,7 @@ Description: Install entire SciDB
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-all-coord
 Architecture: any
-Depends: scidb-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), libscidbclient-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), scidb-VERSION_MAJOR.VERSION_MINOR-utils (= ${binary:Version}), scidb-VERSION_MAJOR.VERSION_MINOR-plugins (= ${binary:Version}), libscidbclient-VERSION_MAJOR.VERSION_MINOR-python (= ${binary:Version}), scidb-VERSION_MAJOR.VERSION_MINOR-doc (= ${binary:Version}), postgresql-client-8.4, postgresql-8.4, postgresql-contrib-8.4
+Depends: scidb-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), libscidbclient-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), scidb-VERSION_MAJOR.VERSION_MINOR-utils (= ${binary:Version}), scidb-VERSION_MAJOR.VERSION_MINOR-plugins (= ${binary:Version}), libscidbclient-VERSION_MAJOR.VERSION_MINOR-python (= ${binary:Version}), scidb-VERSION_MAJOR.VERSION_MINOR-doc (= ${binary:Version}), postgresql-client-8.4, postgresql-8.4, postgresql-contrib-8.4, sudo
 Description: Install entire SciDB and PostgreSQL
 
 

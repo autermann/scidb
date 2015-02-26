@@ -12,8 +12,6 @@
 #include "query/parser/ParsingContext.h"
 #include "query/parser/QueryParser.h"
 
-#include "util/StackAlloc.h"
-
 typedef scidb::AQLParser::token token;
 typedef scidb::AQLParser::token_type token_type;
 #define yyterminate() return token::EOQ
@@ -39,8 +37,6 @@ typedef scidb::AQLParser::token_type token_type;
 #define YY_USER_INIT \
     yylloc->begin.column = yylloc->begin.line = 1; \
     yylloc->end.column = yylloc->end.line = 1;
-
-scidb::StackAlloc<char> stringsAllocator;
 %}
 
 Space [ \t\r\f]

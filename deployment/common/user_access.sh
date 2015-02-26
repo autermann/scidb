@@ -1,4 +1,24 @@
 #!/bin/bash
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 
 set -eu
 
@@ -26,7 +46,9 @@ function disable_host_checking ()
 
 function selinux_home_ssh ()
 {
-    chcon -R -v -t user_ssh_home_t ~/.ssh
+    if [ selinuxenabled ]; then
+        chcon -R -v -t user_ssh_home_t ~/.ssh
+    fi
 }
 
 # Update right to ~/.ssh directory
@@ -35,11 +57,11 @@ function update_rights ()
     disable_host_checking
     chmod go-rwx,u+rwx ${HOME}/.ssh
     chmod a-x,go-rw,u+rw ${HOME}/.ssh/*
-    if [ "${OS}" = "CentOS 6.3" ]; then
+    if [ "${OS}" = "CentOS 6" ]; then
 	selinux_home_ssh
     fi 
 
-    if [ "${OS}" = "RedHat 6.3" ]; then
+    if [ "${OS}" = "RedHat 6" ]; then
 	selinux_home_ssh
     fi
 }
@@ -48,10 +70,6 @@ mkdir -p ${HOME}/.ssh
 private=${HOME}/.ssh/id_rsa
 public=${HOME}/.ssh/id_rsa.pub
 
-cat ~/.bashrc | grep -v return > ~/.bashrc.new
-cat ~/.bashrc.new > ~/.bashrc
-rm ~/.bashrc.new
-
 if [[ ("1" != `ls ${private} | wc -l || true`) || ("1" != `ls ${public} | wc -l || true`)]]; then
     rm -f ${private}
     rm -f ${public}
@@ -59,5 +77,6 @@ if [[ ("1" != `ls ${private} | wc -l || true`) || ("1" != `ls ${public} | wc -l 
 fi;
 
 add_public_key "${key}"
-add_public_key "`cat ~/.ssh/id_rsa.pub`"
 update_rights
+
+exit 0

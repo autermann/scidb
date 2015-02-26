@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -1572,8 +1572,9 @@ boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
             Dimensions indexMapDim(1);
             Attributes indexMapAttr(1);
             size_t dimSize = attrSet.size();
+            size_t delta   = dimSize>0 ? dimSize - 1 : 0;
             Coordinate start = indexArrayStart;
-            indexMapDim[0] = DimensionDesc("no", start, start, start + dimSize - 1, start + dimSize - 1, dimSize, 0);
+            indexMapDim[0] = DimensionDesc("no", start, start, start + delta, start + delta, dimSize, 0);
             indexMapAttr[0] = AttributeDesc(0, "value", attrSet.getType(), 0, 0);
             ArrayDesc indexMapDesc(indexArrayName, indexMapAttr, indexMapDim, ArrayDesc::LOCAL);
             SystemCatalog::getInstance()->addArray(indexMapDesc, psReplication);

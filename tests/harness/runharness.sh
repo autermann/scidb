@@ -1,4 +1,24 @@
 #!/bin/bash
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 
 set -eu
 
@@ -10,6 +30,15 @@ export DB_USER=${DB_USER}
 export DB_PASSWD=${DB_PASSWD}
 
 export BASE_PATH=${BASE_PATH}
+
+export TEST_TYPE=${TEST_TYPE}
+case ${TEST_TYPE} in
+    release|debug) ;;
+    *) 
+	echo "TEST_TYPE should be 'release' or 'debug' (you provided '${TEST_TYPE}')"
+	exit -1
+	;;
+esac
 
 # linux username (on coordinator host)
 export USERNAME=${USERNAME:=scidb}
@@ -50,6 +79,7 @@ echo <<EOF "Usage:
     USERNAME         (none)                  linux username (for access to coordinator)
     SKIPFILE         disable.tests           file with list of disabled tests
     SCIDB_PATH       ($(dirname 0)/../..)    path to SciDB source code or build
+    TEST_TYPE        (none)                  test type: 'release' or 'debug'
     COORDINATOR      (none)                  coordinator hostname or IP address
     BASE_PATH        (none)                  path to SciDB database
 
@@ -66,7 +96,6 @@ ${SSH} "rm -rf ${BASE_PATH}/000/tests"
 ${SSH} "rm -rf ${BASE_PATH}/000/examples"
 ${SSH} "rm -f  ${BASE_PATH}/000/0/log4j.properties"
 ${SSH} "rm -rf ${BASE_PATH}/000/0/testcases"
-${SSH} "rm -rf ${BASE_PATH}/000/unit"
 ${SSH} "rm -rf ${BASE_PATH}/bin"
 }
 
@@ -91,7 +120,6 @@ ${SSH} "ln -s ${BASE_PATH}/000/tests/harness/testcases ${BASE_PATH}/000/0/testca
 # Other
 ${SCP} ${SCIDB_PATH}/tests/harness/log4j.properties ${USERNAME}@${COORDINATOR}:${BASE_PATH}/000/0
 ${SCP} ${SCIDB_PATH}/tests/examples                 ${USERNAME}@${COORDINATOR}:${BASE_PATH}/000/examples
-${SCP} ${SCIDB_PATH}/tests/unit                     ${USERNAME}@${COORDINATOR}:${BASE_PATH}/000
 }
 
 function run_test ()

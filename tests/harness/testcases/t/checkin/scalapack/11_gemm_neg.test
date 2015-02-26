@@ -7,10 +7,29 @@ load_library('dense_linear_algebra')
 create array Valid<a: double> [r=0:1,32,0, c=0:1,32,0]
 
 --test
-# arg count must be 3
---error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT "gemm(Valid)"
---error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT "gemm(Valid, Valid)"
---error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT "gemm(Valid, Valid, Valid, Valid)"
+#
+# arg count must be 3 or 4
+#
+--error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2 "gemm(Valid)"
+--error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2 "gemm(Valid, Valid)"
+# 3 that succeed: "gemm(Valid, Valid, Valid)"
+# 4 that succeed: "gemm(Valid, Valid, Valid, 'TRANSA=1'); (or TRANSB, ALPHA, BETA)
+# fail because 4th arg is not of type string
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "gemm(Valid, Valid, Valid, Valid)"
+# fail because it does not handle more than 4 arguments
+--error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT3 "gemm(Valid, Valid, Valid, 'TRANSA=1', Valid)"
+--error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT3 "gemm(Valid, Valid, Valid, 'TRANSA=1', 'TRANSB=1')"
+
+# OR arg count can be 4 when the last argument is a properly-formatted named-option string
+# here we will list some illegal strings to demonstrate that the parser will catch them
+# example A: comma separator instead of semicolon
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR46 "gemm(Valid, Valid, Valid, 'TRANSA=1,TRANSB=1')"
+# example B: no such keyword
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR46 "gemm(Valid, Valid, Valid, 'INVENTED=1')"
+# example C: missing =
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR46 "gemm(Valid, Valid, Valid, 'ALPHA 1.0')"
+# there's really an infinity of things that would be wrong, but these should have demonstrated
+# that using a parser not only recognized the error, but gives helpful error messages
 
 # only one attribute allowed
 create array TooManyAttrs <a: double, b: double >               [r=0:1,2,0, c=0:1,2,0]
@@ -54,12 +73,8 @@ create array ColInf<a: double>  [r=0:1,2,0, c=0:*,2,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gemm(ColInf, Valid, Valid)"
 remove(ColInf)
 
-# matrix must be square, temporarily
-create array NonSquare<a: double>  [r=0:0,2,0, c=0:1,2,0]
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gemm(Valid, Valid, NonSquare)"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gemm(Valid, NonSquare, Valid)"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gemm(NonSquare, Valid, Valid)"
-remove(NonSquare)
+# restriction to square matrices has been removed
+# so DLA_ERROR43 should not occur anymore
 
 # dimensions must start at 0, temporarily
 create array StartOne<a: double>  [r=1:1,2,0, c=1:1,2,0]
@@ -134,23 +149,21 @@ remove(ColOverlap)
 # (better for maintenance, and teaching the user, IMHO)
 #
 
-# TEMPORARY all non-square and non-zero starting index cases are
-#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
-#           will be fixed by #2200 and/or #2202
 #
-## sizes must follow matrix-multiply rules
-#create array Square<a: double> [r=0:1, 32,0, c=0:1, 32,0]
-#create array Wide<a: double>   [r=0:1, 32,0, c=0:10,32,0]
-#create array Tall<a: double>   [r=0:10,32,0, c=0:1, 32,0]
-## catch mismatch between A's cols and B's rows
-#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Wide, Square, Square)"
-## catch mismatch between A's rows and C's rows
-#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Tall, Square, Square)"
-## catch mismatch between B's cols and C's cols
-#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Square, Wide, Square)"
-#remove(Square)
-#remove(Wide)
-#remove(Tall)
+# sizes must follow matrix-multiply rules
+#
+create array Square<a: double> [r=0:1, 32,0, c=0:1, 32,0]
+create array Wide<a: double>   [r=0:1, 32,0, c=0:10,32,0]
+create array Tall<a: double>   [r=0:10,32,0, c=0:1, 32,0]
+# catch mismatch between A's cols and B's rows
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Wide, Square, Square)"
+# catch mismatch between A's rows and C's rows
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Tall, Square, Square)"
+# catch mismatch between B's cols and C's cols
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Square, Wide, Square)"
+remove(Square)
+remove(Wide)
+remove(Tall)
 
 # NOTE: cannot test mismatched chunk size when min and max are already set to same value...
 #       the min/max check happens first

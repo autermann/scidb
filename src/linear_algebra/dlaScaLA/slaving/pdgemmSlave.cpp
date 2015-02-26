@@ -2,13 +2,20 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -91,18 +98,6 @@ sl_int_t pdgemmSlave(void* bufs[], size_t sizes[], unsigned count)
     const sl_int_t  LTD_A = std::max(one, numroc_( args.A.DESC.N, args.A.DESC.NB, MYPCOL, /*CSRC_A*/0, NPCOL ));
     const sl_int_t  LTD_B = std::max(one, numroc_( args.B.DESC.N, args.B.DESC.NB, MYPCOL, /*CSRC_B*/0, NPCOL ));
     const sl_int_t  LTD_C = std::max(one, numroc_( args.C.DESC.N, args.C.DESC.NB, MYPCOL, /*CSRC_C*/0, NPCOL ));
-
-    if (false) { // #1986, in progress.  temporarily disable these until the debugging of GEMMPhysical that sets these is complete.
-                 //      this is only to get testing up and running while this is being resolved.
-        SLAVE_ASSERT_ALWAYS(LTD_A == args.B.DESC.LLD);           // trailing(A) == local N == leading(B)
-        SLAVE_ASSERT_ALWAYS(args.A.DESC.LLD == args.C.DESC.LLD); // leading(A) == local M == leading(C)
-        SLAVE_ASSERT_ALWAYS(LTD_A == LTD_C);                     // trailing(B) == local K == trailing(C)
-    } else {
-        // substitute a weaker check that at least the gobal sizes have this constraint
-        SLAVE_ASSERT_ALWAYS(args.A.DESC.N == args.B.DESC.M);     // trailing(A) == local N == leading(B)
-        SLAVE_ASSERT_ALWAYS(args.A.DESC.M == args.C.DESC.M);     // leading(A) == local M == leading(C)
-        SLAVE_ASSERT_ALWAYS(args.B.DESC.N == args.C.DESC.N);     // trailing(B) == local K == trailing(C)
-    }
 
     if(DBG) {
         std::cerr << "##################################################" << std::endl;

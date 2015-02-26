@@ -95,9 +95,13 @@ remove ( Raw_CSVLoad_7 )
 
 remove ( Raw_CSVLoad_8 )
 
---shell --command " rm -rf /tmp/csv2scidb_test_1.load " --store 
---shell --command " rm -rf /tmp/csv2scidb_test_2.load " --store
---shell --command " rm -rf /tmp/csv2scidb_test_3.load " --store
---shell --command " rm -rf /tmp/csv2scidb_test_4.load " --store
+--shell --command "rm -rf /tmp/csv2scidb_test_1.load " --store 
+--shell --command "rm -rf /tmp/csv2scidb_test_2.load " --store
+--shell --command "rm -rf /tmp/csv2scidb_test_3.load " --store
+--shell --command "rm -rf /tmp/csv2scidb_test_4.load " --store
+--shell --command "rm -rf /tmp/csv2scidb_test_5.load " --store 
+--shell --command "rm -rf /tmp/csv2scidb_test_6.load " --store
+--shell --command "rm -rf /tmp/csv2scidb_test_7.load " --store
+--shell --command "rm -rf /tmp/csv2scidb_test_8.load " --store
 
 --stop-query-logging

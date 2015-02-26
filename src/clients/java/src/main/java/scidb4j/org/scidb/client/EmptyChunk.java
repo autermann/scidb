@@ -1,6 +1,27 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 package org.scidb.client;
 
-import org.scidb.io.network.SciDBNetworkMessage.Chunk;
+import org.scidb.io.network.Message.Chunk;
 import org.scidb.util.ByteBufferExtensions;
 
 import java.math.BigInteger;
@@ -34,7 +55,7 @@ public class EmptyChunk implements IChunk
 
     private static Logger log = Logger.getLogger(EmptyChunk.class.getName());
 
-    public EmptyChunk(Chunk msg, Array array) throws SciDBException
+    public EmptyChunk(Chunk msg, Array array) throws Error
     {
         org.scidb.io.network.ScidbMsg.Chunk record = msg.getRecord();
         attributeId = record.getAttributeId();
@@ -78,17 +99,17 @@ public class EmptyChunk implements IChunk
 
             if (compressionMethod != 0)
             {
-                throw new SciDBException("Compressed chunks not yet supported");
+                throw new Error("Compressed chunks not yet supported");
             }
 
             if (!rle)
             {
-                throw new SciDBException("Non RLE chunks not yet supported");
+                throw new Error("Non RLE chunks not yet supported");
             }
 
             if (sparse)
             {
-                throw new SciDBException("Sparse chunks not yet supported");
+                throw new Error("Sparse chunks not yet supported");
             }
 
             segments = new Segment[header.nSegs];

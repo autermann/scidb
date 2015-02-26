@@ -39,6 +39,12 @@ SCIDB QUERY : <CREATE ARRAY m4x4_missing <val1:double,val2:int32 default 5468>[x
 SCIDB QUERY : <load(m4x4_missing, '../examples/m4x4_missing.txt')>
 [[(0,100),(1,99),(2,98),(3,97)],[(4,5468),(5,95),(6,94),(7,93)],[(8,92),(9,91),(),(11,89)],[(12,88),(13,5468),(14,86),(15,85)]]
 
+SCIDB QUERY : <create array D<val1:char default 'a', val2:int32 default 1, val3:int64 null default missing(30)> [i=0:9,10,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(D)>
+[("D<val1:char DEFAULT 'a',val2:int32 DEFAULT 1,val3:int64 NULL DEFAULT ?30> [i=0:9,10,0]")]
+
 SCIDB QUERY : <store(build(<val:double null> [i=0:4,5,0], '[47.0, ?, -21.1, ?100, ?50]',true), A)>
 [Query was executed successfully, ignoring data output by this query.]
 
@@ -133,6 +139,8 @@ SCIDB QUERY : <SELECT * INTO winnerGrid FROM cast(OlympicWinners, < LastName: st
 SCIDB QUERY : <show(winnerGrid)>
 {i} schema
 {0} "winnerGrid<LastName:string,elapsedTime:double> [x=1996:2008,1000,0,y=0:2,1000,0]"
+
+Query was executed successfully
 
 Query was executed successfully
 

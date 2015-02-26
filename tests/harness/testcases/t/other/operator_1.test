@@ -41,7 +41,7 @@ project(unpack(Test1,k),x,b,a)
 project(store(repart(Test1,<a:double NULL,b:string> [x=0:9,4,0]),YY),b)
 project(rank(Test1,b),b_rank)
 project(rank(Test1),a_rank)
---error --code scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "project(rank(Test1),a_rank,b)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "project(rank(Test1),a_rank,b)"
 
 project(quantile(Test1,2),a_quantile,percentage)
 project(quantile(Test1,2,a),percentage)

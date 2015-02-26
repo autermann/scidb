@@ -1,8 +1,33 @@
 #!/bin/bash
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
+
+set -e
 
 function usage()
 {
-    echo "Usage: $0 <rpm|deb> <local|chroot|insource> <result dir> [chroot distro]"
+    echo <<EOF "Usage: 
+    $0 <rpm|deb> insource <result dir> [chroot distro]
+    $0 <rpm|deb> <local|chroot> <Debug|RelWithDebInfo> <result dir> [chroot distro]"
+EOF
     exit 1
 }
 
@@ -16,9 +41,6 @@ function die()
 
 type=$1
 target=$2
-result_dir=$3
-distro=$4
-jobs=$[`getconf _NPROCESSORS_ONLN`+1]
 
 case $type in
     deb|rpm);;
@@ -26,17 +48,33 @@ case $type in
 esac
 
 case $target in
-    local|chroot|insource);;
-    *) usage;;
+    "insource")
+	result_dir=$3
+	distro=$4
+	;;
+    "chroot"|"local")
+	[ "$#" -lt 4 ] && usage
+	build_type=$3
+	result_dir=$4
+	distro=${5-""}
+	;;
+    *) 
+	usage
+	;;
 esac
 
+jobs=$[`getconf _NPROCESSORS_ONLN`+1]
+
+
 if [ "$target" == "chroot" ]; then
-    [ "$#" -lt 4 ] && echo Looks like you forgot chroot distro! Try: centos-6.3-x86_64 or ubuntu-precise-amd64 && usage
+    [ "$#" -lt 4 ] && echo Looks like you forgot chroot distro! Try: centos-6-x86_64 or ubuntu-precise-amd64 && usage
 fi
 
 if [ $target != "insource" ]; then
     build_dir="`mktemp -d /tmp/scidb_packaging.XXXXX`"
     build_src_dir="${build_dir}"/scidb-sources
+else
+    build_dir="`pwd`"
 fi
 
 
@@ -68,6 +106,10 @@ fi
 
 M4="m4 -DVERSION_MAJOR=${VERSION_MAJOR} -DVERSION_MINOR=${VERSION_MINOR} -DVERSION_PATCH=${VERSION_PATCH} -DBUILD=${REVISION}"
 
+if [ $target != "insource" ]; then
+    M4="${M4} -DPACKAGE_BUILD_TYPE=${build_type}"
+fi
+
 echo Preparing result dir
 mkdir -p "${result_dir}" || die Can not create "${result_dir}"
 result_dir=`readlink -f "${result_dir}"`
@@ -97,7 +139,7 @@ fi
 
 if [ "$type" == "deb" ]; then
 
-    debian_dir=${scidb_src_dir}/debian
+    debian_dir=$(readlink -f ${scidb_src_dir}/debian)
     [ ! -d ${debian_dir} ] && die Can not find ${debian_dir}
 
     function deb_prepare_sources ()
@@ -140,13 +182,24 @@ if [ "$type" == "deb" ]; then
         rm -f ${result_dir}/*.deb
         rm -f ${result_dir}/*.changes
 
-        deb_prepare_sources ${debian_dir} ${debian_dir} #XXX should be "." or a specific directory to avoid poluting $scidb_src_dir
+        # dpkg-buildpackage wants to have ./debian in the build tree
+        build_debian_dir=$(readlink -f ${build_dir}/debian)
+        if [ "${build_debian_dir}" != "${debian_dir}" ]; then
+           rm -rf ${build_debian_dir}
+           cp -r ${debian_dir} ${build_debian_dir}
+        fi
+
+        deb_prepare_sources ${build_debian_dir} ${build_debian_dir}
 
         echo Building binary packages locally
-        BUILD_DIR="`pwd`" INSOURCE=1 dpkg-buildpackage -rfakeroot -uc -us -b -j${jobs} || die dpkg-buildpackage failed
-        pushd ..
-            echo Moving result from `pwd` to ${result_dir}
-            mv *.deb *.changes "${result_dir}"
+        pushd ${build_dir}
+           BUILD_DIR="${build_dir}" INSOURCE=1 dpkg-buildpackage -rfakeroot -uc -us -b -j${jobs} || die dpkg-buildpackage failed
+        popd
+
+        # Apparently, dpkg-buildpackage has to generate .deb files in ../ (go figure ...)
+        pushd ${build_dir}/..
+           echo Moving result from ${build_dir}/.. to ${result_dir}
+           mv *.deb *.changes "${result_dir}"
         popd
     fi
 elif [ "$type" == "rpm" ]; then
@@ -190,21 +243,23 @@ elif [ "$type" == "rpm" ]; then
             mv "${build_dir}"/SRPMS/*.rpm "${build_dir}"/RPMS/*/*.rpm "${result_dir}"
         elif [ "$target" == "chroot" ]; then
             echo Building RPM in chroot
-            python ${scidb_src_dir}/utils/chroot_build.py -b -d "${distro}" -r "${result_dir}" -s ${build_dir}/SRPMS/${SCIDB_SRC_RPM}  || die chroot_build.py failed
+            python ${scidb_src_dir}/utils/chroot_build.py -b -d "${distro}" -r "${result_dir}" -s ${build_dir}/SRPMS/${SCIDB_SRC_RPM} || die chroot_build.py failed
         fi
     else
-        echo Cleaning old files
-        rm -rf rpmbuild
+        echo Cleaning old files from ${build_dir}
+        rm -rf ${build_dir}/rpmbuild
 
-	rpm_prepare_sources ${scidb_src_dir} "."
+	rpm_prepare_sources ${scidb_src_dir} ${build_dir}
 
         echo Building binary packages insource
-        rpmbuild --with insource -D"_topdir `pwd`/rpmbuild" -D"_builddir `pwd`" -bb ./scidb.spec  || die rpmbuild failed
+        rpmbuild --with insource -D"_topdir ${build_dir}/rpmbuild" -D"_builddir ${build_dir}" -bb ${build_dir}/scidb.spec || die rpmbuild failed
 
-        pushd rpmbuild/RPMS
-            echo Moving result from `pwd` to ${result_dir}
-            mv */*.rpm "${result_dir}"
-        popd
+        echo Moving result from ${build_dir} to ${result_dir}
+        mv ${build_dir}/rpmbuild/RPMS/*/*.rpm "${result_dir}"
+
+        echo Cleaning files from ${build_dir}
+        rm -rf ${build_dir}/rpmbuild
+
     fi
 fi
 

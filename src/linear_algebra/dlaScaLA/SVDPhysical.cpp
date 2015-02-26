@@ -2,13 +2,20 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -72,114 +79,137 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libmath.ops.g
 
 static const bool DBG = false;
 
-///
-/// A Physical SVD operator implemented using ScaLAPACK
-/// The interesting work is done in invokeMPISvd(), above
-///
+/**
+ *  A Physical SVD operator implemented using ScaLAPACK
+ *  The interesting work is done in invokeMPI(), above
+ */
 class SVDPhysical : public ScaLAPACKPhysical
 {
 public:
     SVDPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
     :
-        ScaLAPACKPhysical(logicalName, physicalName, parameters, schema)
+        ScaLAPACKPhysical(logicalName, physicalName, parameters, schema,
+                          RuleNotHigherThanWide) // see NOTE below
     {
+        // NOTE:
+        // its critical that the last argument to ScaLAPACKPhysical is the process
+        // grid rule 'NotHigherThanWide'.
+        //
+        // Due to the way the ScaLAPACK algorithm calculates the singular values independently
+        // at each processor, if the calculation for a matrix that is taller-than-wide
+        // is distributed over more processes vertically than horizontally, it may
+        // may calculate different singular values in different processes.
+        // By choosing this rule, we make sure the process grid is no taller than
+        // square, and that seems to prevent the problem from occuring.
+        // 
+        // If the problem does occur, scaLAPACK returns INFO equal to min(M,N)+1
+        // and an exception about results that could not be guaranteed accurate were discarded.
+        // There is no known work-around by the user.
     }
-    void invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
-                      shared_ptr<Query>& query,
-                      std::string& whichMatrix,
-                      ArrayDesc& outSchema,
-                      shared_ptr<Array>* result,
-                      slpp::int_t* INFO);
+    shared_ptr<Array> invokeMPI(std::vector< shared_ptr<Array> >& redistributedInputs,
+                                shared_ptr<Query>& query,
+                                std::string& whichMatrix,
+                                ArrayDesc& outSchema);
 
     virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
 };
 
 
-///
-/// Everything about the execute() method concerning the MPI execution of the arrays
-/// is factored into this method.  This does not include the re-distribution of data
-/// chunks into the ScaLAPACK distribution scheme, as the supplied inputArrays
-/// must already be in that scheme.
-///
-/// + determine ScaLAPACK parameters regarding the shape of the process grid
-/// + start and connect to an MPI slave process
-/// + create ScaLAPACK descriptors for the input arrays
-/// + convert the inputArrays into in-memory ScaLAPACK layout in shared memory
-/// + call a "master" routine that passes the ScaLAPACK operator name, parameters,
-///   and shared memory descriptors to the ScaLAPACK MPI process that will do the
-///   actual computation.
-/// + wait for successful completion
-/// + construct an "OpArray" that make and Array API view of the output memory.
-/// + return that output array.
-///
 
 
-/// TODO: fix GEMMPhysical.cpp as well and factor this nicely
+// TODO: fix GEMMPhysical.cpp as well and factor this nicely
 slpp::int_t upToMultiple(slpp::int_t size, slpp::int_t blocksize)
 {
     return (size+blocksize-1)/blocksize * blocksize;
 }
 
-void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
-                              shared_ptr<Query>& query,
-                              std::string& whichMatrix,
-                              ArrayDesc& outSchema,
-                              shared_ptr<Array>* result,
-                              slpp::int_t* INFO)
+shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redistributedInputs,
+                                          shared_ptr<Query>& query,
+                                          std::string& whichMatrix,
+                                          ArrayDesc& outSchema)
 {
-    if(DBG) std::cerr << "invokeMPISvd() reached" << std::endl ;
-    LOG4CXX_DEBUG(logger, "invokeMPISVD()");
+    //
+    // Everything about the execute() method concerning the MPI execution of the arrays
+    // is factored into this method.  This does not include the re-distribution of data
+    // chunks into the ScaLAPACK distribution scheme, as the supplied redistributedInputs
+    // must already be in that scheme.
+    //
+    // + intersects the array chunkGrids with the maximum process grid
+    // + sets up the ScaLAPACK grid accordingly and if not participating, return early
+    // + start and connect to an MPI slave process
+    // + create ScaLAPACK descriptors for the input arrays
+    // + convert the redistributedInputs into in-memory ScaLAPACK layout in shared memory
+    // + call a "master" routine that passes the ScaLAPACK operator name, parameters,
+    //   and shared memory descriptors to the ScaLAPACK MPI process that will do the
+    //   actual computation.
+    // + wait for successful completion
+    // + construct an "OpArray" that make and Array API view of the output memory.
+    // + return that output array.
+    //
+    LOG4CXX_TRACE(logger, "SVDPhysical::invokeMPI() reached");
 
-    // MPI_Init(); -- now done in slave processes
-    // in SciDB we use query->getInstancesCount() & getInstanceID()
-    // and we use a fake scalapack gridinit to set up the grid and where
-    // we are in it.  so the blacs_getinfo calls below are fakes to help
-    // keep the code more similar
+    //
+    // Initialize the (emulated) BLACS and get the proces grid info
+    //
+    bool isParticipatingInScaLAPACK = doBlacsInit(redistributedInputs, query, "SVDPhysical");
+    slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+    if (isParticipatingInScaLAPACK) {
+        blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+        checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "SVDPhysical");
+    }
 
-    //!
-    //!.... Get the (emulated) BLACS info .............................................
-    //!
-    slpp::int_t ICTXT=-1;
-    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
-    checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    //
+    // launch MPISlave if we participate
+    // TODO: move this down into the ScaLAPACK code ... something that does
+    //       the doBlacsInit, launchMPISlaves, and the check that they agree
+    //
+    bool isParticipatingInMPI = launchMPISlaves(query, NPROW*NPCOL);
+    if (isParticipatingInScaLAPACK != isParticipatingInMPI) {
+        LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI():"
+                              << " isParticipatingInScaLAPACK " << isParticipatingInScaLAPACK
+                              << " isParticipatingInMPI " << isParticipatingInMPI);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
+                   << "SVDPhysical::invokeMPI(): internal inconsistency in MPI slave launch.");
+    }
 
-    slpp::int_t instanceID = query->getInstanceID();
-    slpp::int_t MYPE = instanceID ;  // if checkBlacsInfo returns, this assumption is true
-
-    launchMPISlaves(query, NPROW*NPCOL);
+    if (isParticipatingInMPI) {
+        LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): participating in MPI");
+    } else {
+        LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): not participating in MPI");
+        return shared_ptr<Array>(new MemArray(_schema));
+    }
 
     // REFACTOR: this is a pattern in DLAs
     //
     // get dimension information about the input arrays
     //
-    if(DBG) std::cerr << "invokeMPISvd get dim info" << std::endl ;
-    boost::shared_ptr<Array> Ain = (*inputArrays)[0];
+    if(DBG) std::cerr << "invokeMPI get dim info" << std::endl ;
+    boost::shared_ptr<Array> arrayA = redistributedInputs[0];
 
     std::ostringstream tmp;
-    Ain->getArrayDesc().getDimensions()[0].toString(tmp) ;
+    arrayA->getArrayDesc().getDimensions()[0].toString(tmp) ;
     if(DBG) std::cerr << tmp.str() << std::endl;
 
     std::ostringstream tmp2;
-    Ain->getArrayDesc().getDimensions()[1].toString(tmp2) ;
+    arrayA->getArrayDesc().getDimensions()[1].toString(tmp2) ;
     if(DBG) std::cerr << tmp2.str() << std::endl;
 
     // find M,N from input array
-    slpp::int_t M = nRow(Ain);
-    slpp::int_t N = nCol(Ain);
+    slpp::int_t M = nRow(arrayA);
+    slpp::int_t N = nCol(arrayA);
     if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
 
     // find MB,NB from input array, which is the chunk size
 
-    checkInputArray(Ain);
-    //!
-    //!.... Set up ScaLAPACK array descriptors ........................................
-    //!
+    checkInputArray(arrayA);
+    //
+    //.... Set up ScaLAPACK array descriptors ........................................
+    //
 
     // these formulas for LLD (loacal leading dimension) and LTD (local trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
-    const slpp::int_t MB= chunkRow(Ain);
-    const slpp::int_t NB= chunkCol(Ain);
+    const slpp::int_t MB= chunkRow(arrayA);
+    const slpp::int_t NB= chunkCol(arrayA);
     const slpp::int_t one = 1 ;
     slpp::int_t MIN_MN = std::min(M,N);
 
@@ -215,38 +245,38 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
     slpp::desc_t DESC_A;
     descinit_(DESC_A,  M, N,      MB, NB, 0, 0, ICTXT, LLD_A, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_A) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_A) failed, INFO " << descinitINFO
                                                                             << " DESC_A " << DESC_A);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPISvd: descinit(DESC_A) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI: descinit(DESC_A) failed");
     }
-    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_A=" << DESC_A);
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_A=" << DESC_A);
 
     slpp::desc_t DESC_U;
     descinit_(DESC_U,  M, MIN_MN, MB, NB, 0, 0, ICTXT, LLD_U, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_U) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_U) failed, INFO " << descinitINFO
                                                                             << " DESC_U " << DESC_U);
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "descinit(DESC_U) failed");
     }
-    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_U=" << DESC_U);
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_U=" << DESC_U);
 
     slpp::desc_t DESC_VT;
     descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, ICTXT, LLD_VT, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_VT) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_VT) failed, INFO " << descinitINFO
                                                                             << " DESC_VT " << DESC_VT);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPISvd(): descinit(DESC_VT) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI(): descinit(DESC_VT) failed");
     }
-    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_VT=" << DESC_VT);
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_VT=" << DESC_VT);
 
     slpp::desc_t DESC_S; // S is different: global, not distributed, so its LLD(S) == LEN(S) == MIN(M,N)
     descinit_(DESC_S,  MIN_MN, 1, MB, NB, 0, 0, ICTXT, MIN_MN, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_S) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_S) failed, INFO " << descinitINFO
                                                                             << " DESC_S " << DESC_S);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPISvd(): descinit(DESC_S) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI(): descinit(DESC_S) failed");
     }
-    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_S=" << DESC_S);
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_S=" << DESC_S);
 
     //REFACTOR
     if(DBG) {
@@ -307,7 +337,7 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
     double* VT = reinterpret_cast<double*>(shmIpc[BUF_MAT_VT]->get());shmSharedPtr_t VTx(shmIpc[BUF_MAT_VT]);
 
     setInputMatrixToAlgebraDefault(A, nElem[BUF_MAT_A]);
-    extractArrayToScaLAPACK(Ain, A, DESC_A);
+    extractArrayToScaLAPACK(arrayA, A, DESC_A);
     setOutputMatrixToAlgebraDefault(S, nElem[BUF_MAT_S]);
     setOutputMatrixToAlgebraDefault(U, nElem[BUF_MAT_U]);
     setOutputMatrixToAlgebraDefault(VT, nElem[BUF_MAT_VT]);
@@ -319,35 +349,51 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         }
     }
 
-    //!
-    //!.... Call PDGESVD to compute the SVD of A .............................
-    //!
-    if(DBG) std::cerr << "SVD: calling pdgesvd_ M,N:" << M  << "," << N
-                                  << "MB,NB:" << MB << "," << NB << std::endl;
-    LOG4CXX_DEBUG(logger, "MPISVD: calling pdgesvd_ M,N:" << M <<","<< "MB,NB:" << MB << "," << NB);
-
-    if(DBG) std::cerr << "SVDPhysical calling PDGESVD to compute" << std:: endl;
+    //
+    //.... Call PDGESVD to compute the SVD of A .............................
+    //
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI: calling pdgesvdMaster M,N " << M << "," << N << "MB,NB:" << MB << "," << NB);
     boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+    slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-to-1 between instanceID and MPI rank
+    slpp::int_t INFO = DEFAULT_BAD_INFO ;
     pdgesvdMaster(query.get(), _ctx, slave, _ipcName, argsBuf,
                   NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
                   'V', 'V', M, N,
                   A,  one, one,  DESC_A, S,
                   U,  one, one,  DESC_U,
                   VT, one, one, DESC_VT,
-                  *INFO);
-    // NOTE: INFO must not be modified after this, it is an output value
+                  INFO);
 
-    LOG4CXX_DEBUG(logger, "SVD: pdgesvdMaster finished");
-    if(DBG) std::cerr << "SVD: calling pdgesvdMaster finished" << std::endl;
-    if(DBG) std::cerr << "SVD: pdgesvdMaster returned INFO:" << *INFO << std::endl;
-
-    Dimensions const& dims = Ain->getArrayDesc().getDimensions();
+    std::string operatorName("pdgesvd");
+    if (INFO == (std::min(M,N)+1)) {
+        // special error case diagnostic specific to pdgesvd complaining of
+        // eigenvalue heterogeneity.
+        // Only cure known so far is to distribute computation to fewer processes, which is
+        // being done already by the RuleNotHigherThanWide option to the ScaLAPACKPhysical ctor.
+        // We do not know of a user-level workaround at the time this was written.
+        // Additional study of the ScaLAPACK SVD algorithm would be required.
+        std::stringstream ss;
+        ss << operatorName << "() ";
+        ss << "runtime error " << INFO ;
+        ss << "SVD results could not be guaranteed to be accurate. Please report this error if it occurs.";
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED) << ss.str());
+    } else if (INFO > 0) {
+        // special error case diagnostic specific to pdgesvd
+        std::stringstream ss;
+        ss << operatorName << "() ";
+        ss << "runtime error " << INFO ;
+        ss << " DBDSQR did not converge ";
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED) << ss.str());
+    } else {
+        raiseIfBadResultInfo(INFO, "pdgesvd");
+    }
 
     boost::shared_array<char> resPtrDummy(reinterpret_cast<char*>(NULL));
-
     typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
 
-    size_t resultShmIpcIndx = shmIpc.size();
+    shared_ptr<Array> result;
+    size_t resultShmIpcIndx = shmIpc.size(); // by default, we will not hold onto any ShmIpc for a result,
+                                             // modify this if we determine we have output data, below.
     if (whichMatrix == "S" || whichMatrix == "SIGMA" || whichMatrix == "values")
     {
         if(DBG) std::cerr << "sequential values from 'value/S' memory" << std::endl;
@@ -364,6 +410,7 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         //     return shared_ptr<Array>(new MemArray(outSchema));
         //
 
+        // NOTE:
         // The S output vector is not a distributed array like A, U, &VT are
         // The entire S vector is returned on every instance, so we have to make
         // sure that only one instance does the work of converting any particular
@@ -374,39 +421,57 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         //
         // We treat the S vector, as mathematicians do, as a column vector, as this
         // stays consistent with ScaLAPACK.
+        // TODO: move this case after U and VT, as it is easier to understand after
+        //       understanding them, without having to also understand
+        //       the special cases of output from global data and as a vector
 
+        //
+        // an OpArray is a SplitArray that is filled on-the-fly by calling the operator
+        // so all we have to do is create one with an upper-left corner equal to the
+        // global position of the first local block we have.  so we need to map
+        // our "processor" coordinate into that position, which we do by multiplying
+        // by the chunkSize
+        //
+        Dimensions const& dimsS = outSchema.getDimensions();
 
-        // first coordinate for the first chunk that my instance handles
-        uint64_t chunkSize = dims[0].getChunkInterval();
         Coordinates first(1);
-        first[0] = dims[0].getStart() + MYPROW * chunkSize ;
-        if(DBG) std::cerr << "SVD('left'): first:" << first[0] << " = start+ MYPROW:"<<MYPROW<< " * chunksz:"<< chunkSize << std::endl ;
+        first[0] = dimsS[0].getStart() + MYPROW * dimsS[0].getChunkInterval();
 
         Coordinates last(1);
-        last[0] = dims[0].getStart() + MIN_MN - 1;
-        if(DBG) std::cerr << "SVD('left'): last:" << last[0] << " = start+ MIN_MN - 1"<<MIN_MN<< std::endl;
+        last[0] = dimsS[0].getStart() + MIN_MN - 1;
 
-        Coordinates iterDelta(1);
-        iterDelta[0] = NPROW * chunkSize ;
-        if(DBG) std::cerr << "SVD('left'): inter:" << iterDelta[0] << " = NPROW:"<<NPROW<<" * chunksz:"<<chunkSize << std::endl;
+        // the process grid may be larger than the size of output in chunks...
+        // e.g gesvd(<1x40 matrix>, 'U') results in a 1x1 result from only one process,
+        // even though all processes on which the 40 columns are distributed have to participate in the
+        // calculation
+        // first coordinate for the first chunk that my instance handles
+        bool isParticipatingInOutput = first[0] <= last[0];
 
-        reformatOp_t      pdelgetOp(Sx, DESC_S, dims[0].getStart(), 0, true);
+        // unlike the U and VT matrices, which are distributed in ScaLAPACK, the S vector is *replicated* on
+        // every ScaLAPACK processing grid column.
+        // If all instances return their copy of it, there will be too much data returned.
+        // Therefore we further restrict OpArray to take data from only a single column of the ScaLAPACK processor grid.
+        // That is sufficient, and any more produces an error
+        isParticipatingInOutput = isParticipatingInOutput && (MYPCOL==0) ;
 
-        if(MYPCOL==0) {
-            // return results only from the first column of instances
-            if(DBG) std::cerr << "SVD('left') instance @ MYPROW,MYPCOL: "<<MYPROW<<","<<MYPCOL
-                      << " returns chunks of S" << std::endl;
-            *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                                  first, last, iterDelta, query));
-            resultShmIpcIndx = BUF_MAT_S;
+        if(isParticipatingInOutput) {
+            Coordinates iterDelta(1);
+            iterDelta[0] = NPROW * dimsS[0].getChunkInterval();
+
+            LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(S): Creating OpArray from "<<first[0]<<" to "<<last[0]<<" delta "<<iterDelta[0]);
+            reformatOp_t      pdelgetOp(Sx, DESC_S, dimsS[0].getStart(), 0, /*isGlobal*/true);
+            result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+                                                                 first, last, iterDelta, query));
+            resultShmIpcIndx = BUF_MAT_S; // this ShmIpc memory cannot be released at the end of the method
         } else {
-            // vector has been output by first column or first row, whichever is shorter
-            // so return an empty array.  (We still had to do our part to generate
-            // the global vector, so we can't return the empty array at the top of execute
-            // like we do for completely non-participatory instances.)
-            if(DBG) std::cerr << "MYPROW,MYPCOL: "<<MYPROW<<","<<MYPCOL
-                      << " does not return chunks of S" << std::endl;
-            *result = shared_ptr<Array>(new MemArray(outSchema)); // empty array
+            // In this case, instance corresponds to one of the ScaLAPACK processor grid columns after the first one.
+            // returning any data from this copy of the S vector is not compatible with SplitArray from which
+            // OpArray is derived.
+            // (note that these nodes still participated in the global generation of the S vector, it is merely that
+            //  the ScaLAPACK algorithm produces replicas of it due to the way the algorithm works).
+            LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(SIGMA): at process grid ("<<MYPROW<<","<<MYPCOL<<") Creating empty MemArray");
+            result = shared_ptr<Array>(new MemArray(outSchema)); // empty array to return
+            assert(resultShmIpcIndx == shmIpc.size());
         }
     }
 
@@ -426,25 +491,35 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         // our "processor" coordinate into that position, which we do by multiplying
         // by the chunkSize
         //
+        Dimensions const& dimsU = outSchema.getDimensions();
+
         Coordinates first(2);
-        first[0] = dims[0].getStart() + MYPROW * dims[0].getChunkInterval();
-        first[1] = dims[1].getStart() + MYPCOL * dims[1].getChunkInterval();
+        first[0] = dimsU[0].getStart() + MYPROW * dimsU[0].getChunkInterval();
+        first[1] = dimsU[1].getStart() + MYPCOL * dimsU[1].getChunkInterval();
 
         Coordinates last(2);
-        last[0] = dims[0].getStart() + dims[0].getLength() - 1;
-        last[1] = dims[1].getStart() + dims[1].getLength() - 1;
+        last[0] = dimsU[0].getStart() + dimsU[0].getLength() - 1;
+        last[1] = dimsU[1].getStart() + dimsU[1].getLength() - 1;
 
-        Coordinates iterDelta(2);
-        iterDelta[0] = NPROW * dims[0].getChunkInterval();
-        iterDelta[1] = NPCOL * dims[1].getChunkInterval();
-
-        if(DBG) std::cerr << "SVD(left) SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
-        LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
-
-        resultShmIpcIndx = BUF_MAT_U;
-        reformatOp_t      pdelgetOp(Ux, DESC_U, dims[0].getStart(), dims[1].getStart());
-        *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                              first, last, iterDelta, query));
+        // the process grid may be larger than the size of output in chunks...
+        // e.g gesvd(<1x40 matrix>, 'U') results in a 1x1 result from only one process,
+        // even though all processes on which the 40 columns are distributed have to participate in the
+        // calculation
+        bool isParticipatingInOutput = first[0] <= last[0] && first[1] <= last[1] ;
+        if (isParticipatingInOutput) {
+            Coordinates iterDelta(2);
+            iterDelta[0] = NPROW * dimsU[0].getChunkInterval();
+            iterDelta[1] = NPCOL * dimsU[1].getChunkInterval();
+            LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(U): Creating OpArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]);
+            reformatOp_t      pdelgetOp(Ux, DESC_U, dimsU[0].getStart(), dimsU[1].getStart());
+            result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+                                                                 first, last, iterDelta, query));
+            resultShmIpcIndx = BUF_MAT_U;  // this ShmIpc memory cannot be released at the end of the method
+        } else {
+            LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(U): participated, but not in output array, creating empty output array: first ("<<first[0]<<","<<first[1]<<"), last(" << last[0] <<"," <<last[1]<<")");
+            result = shared_ptr<Array>(new MemArray(outSchema));   // empty array to return
+            assert(resultShmIpcIndx == shmIpc.size());
+        }
     }
 
     else if (whichMatrix == "VT" || whichMatrix == "right")
@@ -455,89 +530,80 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         }
 
         if(DBG) std::cerr << "reformat ScaLAPACK svd right to scidb array , start" << std::endl ;
+
+        // see corresponding comment (on OpArray) in prior else if clause
+        Dimensions const& dimsVT = outSchema.getDimensions();
+
         Coordinates first(2);
-        first[0] = dims[0].getStart() + MYPROW * dims[0].getChunkInterval();
-        first[1] = dims[1].getStart() + MYPCOL * dims[1].getChunkInterval();
+        first[0] = dimsVT[0].getStart() + MYPROW * dimsVT[0].getChunkInterval();
+        first[1] = dimsVT[1].getStart() + MYPCOL * dimsVT[1].getChunkInterval();
 
         // TODO JHM ; clean up use of last
         Coordinates last(2);
-        last[0] = dims[0].getStart() + dims[0].getLength() - 1;
-        last[1] = dims[1].getStart() + dims[1].getLength() - 1;
+        last[0] = dimsVT[0].getStart() + dimsVT[0].getLength() - 1;
+        last[1] = dimsVT[1].getStart() + dimsVT[1].getLength() - 1;
 
-        Coordinates iterDelta(2);
-        iterDelta[0] = NPROW * dims[0].getChunkInterval();
-        iterDelta[1] = NPCOL * dims[1].getChunkInterval();
-
-        if(DBG) std::cerr << "SVD(right) SplitArray: "<<first[0]<<","<<first[1]<<" to " << last[0] <<"," <<last[1]<< std::endl;
-        LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
-
-        resultShmIpcIndx = BUF_MAT_VT;
-        reformatOp_t    pdelgetOp(VTx, DESC_VT, dims[0].getStart(), dims[1].getStart());
-        *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                              first, last, iterDelta, query));
+        // the process grid may be larger than the size of output in chunks...
+        // see comment in the 'U' case above for an example.
+        bool isParticipatingInOutput = first[0] <= last[0] && first[1] <= last[1] ;
+        if (isParticipatingInOutput) {
+            Coordinates iterDelta(2);
+            iterDelta[0] = NPROW * dimsVT[0].getChunkInterval();
+            iterDelta[1] = NPCOL * dimsVT[1].getChunkInterval();
+            LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(VT): Creating OpArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]);
+            reformatOp_t    pdelgetOp(VTx, DESC_VT, dimsVT[0].getStart(), dimsVT[1].getStart());
+            result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+                                                                 first, last, iterDelta, query));
+            resultShmIpcIndx = BUF_MAT_VT; // this ShmIpc memory cannot be released at the end of the method
+        } else {
+            LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(VT): participated, but not in output array, creating empty output array: first ("<<first[0]<<","<<first[1]<<"), last(" << last[0] <<"," <<last[1]<<")");
+            result = shared_ptr<Array>(new MemArray(outSchema));   // empty array to return
+            assert(resultShmIpcIndx == shmIpc.size());
+        }
     }
 
+    // TODO: common pattern in ScaLAPACK operators: factor to base class
     releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
     resetMPI();
 
-
+    return result;
 }
 
 
-///
-/// + converts inputArrays to psScaLAPACK distribution
-/// + intersects the array chunkGrid with the maximum process grid
-/// + sets up the ScaLAPACK grid accordingly and if not participating, return early
-/// + calls invokeMPISvd()
-/// + returns the output OpArray.
-/// 
 shared_ptr<Array> SVDPhysical::execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
 {
+    //
+    // + converts inputArrays to psScaLAPACK distribution
+    // + intersects the array chunkGrid with the maximum process grid
+    // + sets up the ScaLAPACK grid accordingly and if not participating, return early
+    // + calls invokeMPI()
+    // + returns the output OpArray.
+    //
     const bool DBG = false ;
     if(DBG) std::cerr << "SVDPhysical::execute() begin ---------------------------------------" << std::endl;
 
     // redistribute input arrays to ScaLAPACK block-cyclic
-    std::vector<shared_ptr<Array> > redistInputs = redistributeInputArrays(inputArrays, query);
+    std::vector<shared_ptr<Array> > redistributedInputs = redistributeInputArrays(inputArrays, query,  "SVDPhysical");
     LOG4CXX_DEBUG(logger, "SVDPhysical::execute():"
-                           << " chunksize (" << redistInputs[0]->getArrayDesc().getDimensions()[0].getChunkInterval()
-                           << ", "           << redistInputs[0]->getArrayDesc().getDimensions()[1].getChunkInterval()
+                           << " chunksize (" << redistributedInputs[0]->getArrayDesc().getDimensions()[0].getChunkInterval()
+                           << ", "           << redistributedInputs[0]->getArrayDesc().getDimensions()[1].getChunkInterval()
                            << ")");
 
-    //!
-    //!.... Initialize the (imitation)BLACS used by the instances to calculate sizes
-    //!     AS IF they are MPI processes (which they are not)
-    //!
-    bool doesParticipate = doBlacsInit(redistInputs, query);
-    if (!doesParticipate) {
-        return shared_ptr<Array>(new MemArray(_schema));
-    }
-
     //
-    // invokeMPISVD()
+    // invokeMPI()
     //
     string whichMatrix = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
-    shared_ptr<Array> result;
-    slpp::int_t INFO = DEFAULT_BAD_INFO ;
 
-    invokeMPISvd(&redistInputs, query, whichMatrix, _schema, &result, &INFO);
-
-    if (INFO != 0) {
-        std::stringstream ss; ss << "svd error: pdgesvd_ INFO is: " << INFO << std::endl ;
-        if(DBG) std::cerr << ss.str() << std::endl ;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str());
-    }
+    shared_ptr<Array> result = invokeMPI(redistributedInputs, query, whichMatrix, _schema);
 
     // return the scidb array
-    if(DBG) std::cerr << "SVDPhysical::execute success" << std::endl ;
-    LOG4CXX_DEBUG(logger, "SVDPhysical::execute success");
-
-    Dimensions const& rdims = result->getArrayDesc().getDimensions();
+    Dimensions const& resultDims = result->getArrayDesc().getDimensions();
     if (whichMatrix == "values") {
-        if(DBG) std::cerr << "returning result array size: " << rdims[0].getLength() << std::endl ;
+        if(DBG) std::cerr << "returning result array size: " << resultDims[0].getLength() << std::endl ;
     } else if ( whichMatrix == "left" || whichMatrix == "right" ) {
-        if(DBG) std::cerr << "returning result array size: " << rdims[1].getLength() <<
-                     "," << rdims[0].getLength() << std::endl ;
+        if(DBG) std::cerr << "returning result array size: " << resultDims[1].getLength() <<
+                     "," << resultDims[0].getLength() << std::endl ;
     }
 
     if(DBG) std::cerr << "SVDPhysical::execute end ---------------------------------------" << std::endl;

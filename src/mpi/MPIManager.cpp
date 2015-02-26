@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -51,7 +51,9 @@ bool startsWith(const std::string& left, const std::string& right)
   return (0 == left.compare(0, right.size(), right));
 }
 
-MpiManager::MpiManager() : _isReady(false)
+MpiManager::MpiManager()
+  : _isReady(false),
+    _mpiResourceTimeout(scidb::getLivenessTimeout())
 {
     const time_t MIN_CLEANUP_PERIOD = 5; //sec
     scidb::Scheduler::Work workItem = boost::bind(&MpiManager::initiateCleanup);
@@ -182,8 +184,14 @@ void MpiManager::initMpi()
     cleanup();
 }
 
+bool MpiManager::checkForError(scidb::QueryID queryId, double startTime, double timeout)
+{
+    Query::validateQueryPtr(Query::getQueryByID(queryId));
+    return (!mpi::hasExpired(startTime, timeout));
+}
+
 boost::shared_ptr<MpiOperatorContext> MpiManager::checkAndSetCtx(scidb::QueryID queryId,
-                                                     const boost::shared_ptr<MpiOperatorContext>& ctx)
+                                                                 const boost::shared_ptr<MpiOperatorContext>& ctx)
 {
     LOG4CXX_TRACE(logger, "MpiManager::checkAndSetCtx: queryID="<<queryId << ", ctx=" << ctx.get());
     ScopedMutexLock lock(_mutex);
@@ -196,9 +204,18 @@ boost::shared_ptr<MpiOperatorContext> MpiManager::checkAndSetCtx(scidb::QueryID 
     //           each scalapack operator is followed by a blocking SG and the operator tree is executed sequentially
     //           in a depth-first order. The other sources of concurrency such as ParrallelAccumulatorArray, Physica(Redimension)Store
     //           should not be a problem for the same reason (of blocking SG).
-    if (_ctxMap.find(queryId) == _ctxMap.end() && _ctxMap.size() != 0) {
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_RESOURCE_BUSY)
-               << "too many queries");
+    const double start = mpi::getTimeInSecs();
+    const double timeout(_mpiResourceTimeout);
+    bool waitResult(true);
+    while (_ctxMap.find(queryId) == _ctxMap.end() && _ctxMap.size() != 0) {
+        if (!waitResult) {
+            // we alredy unsuccessfully tried to wait
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_RESOURCE_BUSY)
+                   << "too many queries");
+        }
+        Event::ErrorChecker ec =
+           boost::bind(&MpiManager::checkForError, queryId, start, timeout);
+        waitResult = _event.wait(_mutex, ec);
     }
     std::pair<ContextMap::iterator, bool> res = _ctxMap.insert(ContextMap::value_type(queryId, ctx));
     if (res.second) {

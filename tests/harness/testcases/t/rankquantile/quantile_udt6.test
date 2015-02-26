@@ -27,7 +27,7 @@ quantile(B,2,b)
 quantile(B,4,b)
 quantile(B,10,b)
 quantile(filter(B,x<>1),5,b)
---error --code scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(filter(B,x<>1),10,a,b)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(filter(B,x<>1),10,a,b)"
 --reset-format
 
 --cleanup

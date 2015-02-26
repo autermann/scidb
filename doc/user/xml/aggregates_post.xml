@@ -516,7 +516,7 @@ i 1 <command>PRECEDING</command> <command>AND</command> 1 <command>FOLLOWING</co
       aggregates. You can also calculate aggregates "in-line" as part of other
       data management or rearrangement steps: the redimension and
       redimension_store operators support this type of usage. Those operators
-      are used to transform a source array into a result array with difference
+      are used to transform a source array into a result array with different
       schema or dimensions. In those cases, aggregates can be useful in
       summarizing multiple elements from the source array that are mapped to a
       single element in the destination array.</para>
@@ -536,7 +536,7 @@ time:double &gt;
 
 [year=1996:2008,13,0,
 event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, use the following AQL
-      statement with the -olcsv+ format: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners;
+      statement with the -o lcsv+ format: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners;
 </programlisting><screen>{year,event} person,country,time
 {1996,"dash"} "Bailey","Canada",9.84
 {1996,"marathon"} "Thugwane","USA",7956
@@ -552,7 +552,7 @@ event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, u
 {2008,"steeplechase"} "Kipruto","Kenya",490.34
 </screen></para></para>
 
-      <para>To create the schema for the desired array, using the following
+      <para>To create the schema for the desired array, execute the following
       AQL statement:</para>
 
       <para><programlisting>AQL% <command>CREATE ARRAY</command> perCountryMedalCount &lt;medalCount: uint64 null&gt; [country(string)=20,20,0];  </programlisting><para>Notice that the sole dimension is country, which is an attribute
@@ -622,7 +622,7 @@ event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, u
 
       <para>If you specify multiple attributes, all attributes are used for
       sorting. Array elements are sorted first by the first attribute, and
-      then for each value of the the first attribute, they are sorted by the
+      then for each value of the first attribute, they are sorted by the
       second attribute, and so on for each specified attribute.</para>
 
       <para>If multiple elements have the same attribute value—for an

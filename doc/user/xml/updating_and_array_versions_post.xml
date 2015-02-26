@@ -17,7 +17,7 @@
     <listitem>
       <para>Some statements change the metadata of an array in place, without
       changing the data and without producing a result array. For example, the
-      the AFL <code>rename()</code> operator changes the name of an array, but
+      AFL <code>rename()</code> operator changes the name of an array, but
       does not produce a result array (which means that you cannot use the
       <code>rename()</code> operator as an operand in any other AFL
       operator.)</para>
@@ -81,6 +81,10 @@
         <primary>AQL</primary>
 
         <secondary>insert into</secondary>
+      </indexterm><indexterm>
+        <primary>insert</primary>
+
+        <secondary>literals</secondary>
       </indexterm>The AQL INSERT statement can modify an array's contents by
     changing values in existing cells, inserting values in empty cells, or
     both.<programlisting>AQL% <command>INSERT 
@@ -320,9 +324,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
     SciDB stored every version of m4x4 created by the <code>
     <command>UPDATE</command> </code> command. You can see these versions with
     <code>versions</code>:<para><programlisting>AFL% versions(m4x4);  </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2013-03-05 17:30:37"
-{2} 2,"2013-03-05 17:30:37"
-{3} 3,"2013-03-05 17:30:37"
+{1} 1,"2013-03-20 13:36:30"
+{2} 2,"2013-03-20 13:36:30"
+{3} 3,"2013-03-20 13:36:30"
 </screen>You
     can see the contents of any previous version of the array by using the
     version number:<para><programlisting>AFL% scan(m4x4@1);  </programlisting><screen>[

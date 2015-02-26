@@ -1,24 +1,24 @@
 /*
- **
- * BEGIN_COPYRIGHT
- *
- * This file is part of SciDB.
- * Copyright (C) 2008-2012 SciDB, Inc.
- *
- * SciDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation version 3 of the License.
- *
- * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
- * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
- * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU General Public License for the complete license terms.
- *
- * You should have received a copy of the GNU General Public License
- * along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
- *
- * END_COPYRIGHT
- */
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 
 /**
  *  
@@ -102,24 +102,25 @@ void
 usage ( const char * execName, const long int nChunkLen )
 {
     fprintf(stdout, 
-        "%s: Utility for conversion of CSV file to SciDB input text format\n"
-        "\tUsage: csv2scidb [options] [ < input-file ] [ > output-file ]\n"
-        "\tDefault: -f 0 -c %ld -q\n"
-        "\tOptions:\n"
-        "\t  -v version of utility\n"
-        "\t  -i PATH\tinput file\n"
-        "\t  -o PATH\toutput file\n"
-        "\t  -a PATH\tappended output file\n"
-        "\t  -c INT\tlength of chunk\n"
-        "\t  -f INT\tstarting coordinate\n"
-        "\t  -n INT\tnumber of instances\n"
-        "\t  -d char\tdelimiter - default ,\n"
-        "\t  -p STR\ttype pattern - N number, S string, s nullable-string, \n"
-        "\t     C char, c nullable-char\n"
-        "\t  -q Quote the input line exactly, simply wrap it in ()\n"
-        "\t  -s N\tskip N lines at the beginning of the file\n"
-        "\t  -h \tprints this helpful error message\n"
-        "\t You cannot specify both -q and a set of -p options.\n",
+        "%s: Convert CSV file to SciDB input text format.\n"
+        "Usage:   csv2scidb [options] [ < input-file ] [ > output-file ]\n"
+        "Default: -f 0 -c %ld -q\n"
+        "Options:\n"
+        "  -v        version information\n"
+        "  -i PATH   input file\n"
+        "  -o PATH   output file\n"
+        "  -a PATH   appended output file\n"
+        "  -c INT    length of chunk\n"
+        "  -f INT    starting coordinate\n"
+        "  -n INT    number of instances\n"
+        "  -d CHAR   delimiter: defaults to ,\n"
+        "  -p STR    type pattern: N number, S string, s nullable-string,\n"
+        "            C char, c nullable-char\n"
+        "  -q        quote the input line exactly by wrapping it in ()\n"
+        "  -s N      skip N lines at the beginning of the file\n"
+        "  -h        prints this helpful message\n"
+        "\n"
+        "Note: the -q and -p options are mutually exclusive.\n",
         execName, nChunkLen);
 }
 
@@ -217,8 +218,10 @@ main(int argc, char* argv[]) {
                         return EXIT_FAILURE;
                 }
             }
-        } else if (strcmp(argv[i], "-v") == 0) {
-            printf("csv2scidb utility version %s, build type is %s\n", scidb::SCIDB_VERSION(), scidb::SCIDB_BUILD_TYPE());
+        } else if (strcmp(argv[i], "-v")==0) {
+            printf("SciDB File Conversion Utility Version: %s\n",scidb::SCIDB_VERSION_PUBLIC());
+            printf("Build Type: %s\n",scidb::SCIDB_BUILD_TYPE());
+            printf("%s\n",scidb::SCIDB_COPYRIGHT());
             return EXIT_SUCCESS;
         } else if (strcmp(argv[i], "-q") == 0) {
             if (true == quoteLineOrTypeString[0]) { 

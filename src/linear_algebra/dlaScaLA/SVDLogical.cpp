@@ -2,13 +2,20 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -173,7 +180,9 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                   TID_INT64);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "u", TID_DOUBLE, 0, 0);
-        return ArrayDesc("U", atts, outDims);
+        ArrayDesc result("U", atts, outDims);
+        log4cxx_debug_dimensions("SVDLogical::inferSchema(U)", result.getDimensions());
+        return result;
     }
     else if (whichMatrix == "VT" || whichMatrix == "right")
     {
@@ -190,7 +199,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    Coordinate(0),  // curStart
                                    Coordinate(minRowCol - 1), // end
                                    Coordinate(minRowCol - 1), // curEnd
-                                   dims[1].getChunkInterval(), // inherit
+                                   dims[0].getChunkInterval(), // inherit
                                    ZERO_OUTPUT_OVERLAP,
                                    TID_INT64);
 
@@ -210,7 +219,9 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                 dims[1].getFuncMapScale());
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "v", TID_DOUBLE, 0, 0);
-        return ArrayDesc("VT", atts, outDims);
+        ArrayDesc result("VT", atts, outDims);
+        log4cxx_debug_dimensions("SVDLogical::inferSchema(VT)", result.getDimensions());
+        return result;
     }
     else if (whichMatrix == "S" || whichMatrix == "SIGMA" || whichMatrix == "values")
     {
@@ -224,12 +235,14 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    Coordinate(0),  // curStart
                                    Coordinate(minRowCol - 1), // end
                                    Coordinate(minRowCol - 1), // curEnd
-                                   dims[1].getChunkInterval(), // inherit
+                                   dims[0].getChunkInterval(), // inherit
                                    ZERO_OUTPUT_OVERLAP,
                                    TID_INT64);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "sigma", TID_DOUBLE, 0, 0);
-        return ArrayDesc("SIGMA", atts, outDims);
+        ArrayDesc result("SIGMA", atts, outDims);
+        log4cxx_debug_dimensions("SVDLogical::inferSchema(SIGMA)", result.getDimensions());
+        return result;
     } else {
         throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR33);
     }

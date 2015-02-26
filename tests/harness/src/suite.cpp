@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -178,13 +178,34 @@ int Suite :: collectSubSuites (string parentdir, string sid)
 	string suite_dir_fullpath = parentdir + "/" + converted_sid;
 	string suite_file_fullpath = parentdir + "/" + converted_sid + ".suite";
 
-	/* check directory after 'sid' conversion */
+	/* check directory after 'sid' conversion
+         * TODO:
+         * this entire routine is confusing because some checks are done up here, and
+         * some later, when they could have been handled in a more streamlined
+         * way.
+         * NOTE:
+         * an important case this code is trying to get right is when a directory
+         * contains a subdirectory and also a .suite file of matching name.
+         * So it wants to check when the directory form doesn't exist or
+         * should be ignored because its a directory and not a plain file.
+         * In reality, I think both checks are superfluous and we just want to
+         * see whether the suite form of the name is present.
+         * EXAMPLE: the following files/directories exist:
+         * foo/bar/
+         * foo/bar.suite
+         */
 	if (!bfs::exists (suite_dir_fullpath) || !bfs::is_directory (suite_dir_fullpath))
 	{
 		/* check .suite file after 'sid' conversion */
-		if (!bfs::exists (suite_file_fullpath) || !bfs::is_regular (suite_file_fullpath))
+		if (!bfs::exists (suite_file_fullpath))
 		{
-			LOG4CXX_WARN (_logger, "suiteid [" << sid << "] is a not a valid directory ID or .suite file path before/after conversion. A '.' is not allowed in a file/directory name under basic test case directory t/");
+			LOG4CXX_WARN (_logger, "suiteid [" << sid << "] is not a .suite file path after conversion.");
+			LOGGER_POP_NDCTAG;
+			return FAILURE;
+                }
+                else if (!bfs::is_regular (suite_file_fullpath))
+		{
+			LOG4CXX_WARN (_logger, "suiteid [" << sid << "] A '.' is not allowed in a file/directory name under test case directory t/");
 			LOGGER_POP_NDCTAG;
 			return FAILURE;
 		}
@@ -208,23 +229,30 @@ int Suite :: collectSubSuites (string parentdir, string sid)
 
 		_subSuites.push_back (suite_dir_fullpath);
 
+                /* its a directory, examine each entry and decide whether to recurse */
 		bfs::directory_iterator end_iter;
 		for (bfs::directory_iterator dir_iter(suite_dir_fullpath); dir_iter != end_iter; dir_iter++)
 		{
 			bfs::path p (dir_iter->path ());
 
 			/* ignore hidden files and directories (e.g. ".svn") */
-			if (p.stem () == "")
+			if (p.stem().string() == "")
+			{
 				continue;
+			}
 
 			/* if it is a non-empty directory then traverse recursively */
 			if (bfs :: is_directory (p))
 			{
 				if (!bfs :: is_empty (p))
 #if (BOOST_FS_VER==2)
-					collectSubSuites ("", p.directory_string ());
+					collectSubSuites (p.directory_string (), "");
 #else
-					collectSubSuites ("", p.string ());
+                                        // p.directory_string() does not exist for
+                                        // boost 1.46 aka BOOST_FS_VER==3
+                                        // using p.string() as the directory part
+                                        // avoids collectSubSuites from prepending another '/'
+					collectSubSuites (p.string (), "");
 #endif
 			}
 		}

@@ -295,7 +295,7 @@ SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross(NID,xgrid(re
 [An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE.]
 
 SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)>
-[An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <remove(normal)>
 Query was executed successfully

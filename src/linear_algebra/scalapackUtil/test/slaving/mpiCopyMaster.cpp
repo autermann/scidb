@@ -2,23 +2,31 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
 
 // defacto std
 #include <boost/make_shared.hpp>
+#include <boost/numeric/conversion/cast.hpp>
+#include <log4cxx/logger.h>
 
 // scidb import
 #include <array/Metadata.h>
-#include <log4cxx/logger.h>
 #include <mpi/MPILauncher.h>
 #include <mpi/MPIManager.h>
 #include <mpi/MPISlaveProxy.h>
@@ -110,15 +118,20 @@ void mpiCopyMaster(//general args
     slave->sendCommand(cmd, ctx);       // at this point the command and ipcName are sent
                                         // our slave finds and maps the buffers by name
                                         // based on ipcName
-    if(DBG) std::cerr << "mpiCopyMaster: calling slave->waitForStatus(ctx)" << std::endl ;
-    slave->waitForStatus(ctx);
-    if(DBG) std::cerr << "mpiCopyMaster: slave->waitForStatus(ctx) complete" << std::endl ;
 
-    //-------------------- Get the result
+    // TODO: factor this ScaLAPACK pattern (here to end)
+    LOG4CXX_DEBUG(logger, "mpiCopyMaster(): calling slave->waitForStatus(ctx)");
+    int64_t status = slave->waitForStatus(ctx, false); // raise=false so we can customize the exception message
+    LOG4CXX_DEBUG(logger, "mpiCopyMaster(): slave->waitForStatus(ctx) returned " << status);
+
+    // assign the result
+    INFO = boost::numeric_cast<sl_int_t, int64_t>(status);
+
+    // slaving cleanups
     cmd.clear();
     cmd.setCmd(string("EXIT"));
     slave->sendCommand(cmd, ctx);
-    slave->waitForExit(ctx); // wait for the slave to disconnect
+    slave->waitForExit(ctx);
 }
 
 } // namespace scidb

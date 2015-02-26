@@ -1,3 +1,24 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 
 #ifndef PDGEMM_MASTER__H
 #define PDGEMM_MASTER__H
@@ -52,10 +73,10 @@ void pdgemmMaster(Query* query,  // or do I need only the ctx?
                    // the follow argument types match the ScaLAPACK FORTRAN-compatible ones:
                    const char &TRANSA, const char &TRANSB,
                    const sl_int_t& M, const sl_int_t &N, const sl_int_t &K,
-                   double *ALPHA,
-                   double *A, const sl_int_t &IA, const sl_int_t &JA, const sl_desc_t& DESC_A,
-                   double *B,  const sl_int_t &IB,  const sl_int_t &JB,  const sl_desc_t& DESC_B,
-                   double *BETA,
+                   const double *ALPHA,
+                   const double *A, const sl_int_t &IA, const sl_int_t &JA, const sl_desc_t& DESC_A,
+                   const double *B,  const sl_int_t &IB,  const sl_int_t &JB,  const sl_desc_t& DESC_B,
+                   const double *BETA,
                    double *C, const sl_int_t &IC, const sl_int_t &JC, const sl_desc_t& DESC_C,
                    sl_int_t &INFO);
 

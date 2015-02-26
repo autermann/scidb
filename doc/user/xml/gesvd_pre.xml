@@ -119,6 +119,13 @@
 
       <procedure>
         <step>
+          <para>Ensure that the <literal>dense_linear_algebra</literal>
+          library is loaded.<para>
+              <programlisting>AFL% load_library('dense_linear_algebra');  </programlisting>
+            </para></para>
+        </step>
+
+        <step>
           <para>Construct a rotation matrix, A, that rotates by <symbol
           role="symbolfont">π</symbol>/6.<programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:1,32,0,j=0:1,32,0],
     iif(i=j,sqrt(3)/2, iif(i=1,0.5,-0.5))),A); --output-format=dense --chunkify=yes</programlisting></para>

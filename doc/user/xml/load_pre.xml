@@ -101,7 +101,7 @@
 
         <step>
           <para>Load the data, specifying a maximum of 99 errors, and saving
-          information to a shadow array: <programlisting language="test">--afl load(intensityFlat,'../examples/intensity_data.bin',-1,
+          information to a shadow array: <programlisting language="test">--afl load(intensityFlat,'../examples/intensity_data.bin',-2,
    '(string, int64, int64 null)',99,shadowArray); --output-format=dcsv</programlisting></para>
         </step>
 

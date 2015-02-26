@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -742,7 +742,9 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			_c.selfTesting = true;
 
 		if (vm.count("version")) {
-			cout << "scidbtestharness version " << scidb::SCIDB_VERSION() << ", build type is " << scidb::SCIDB_BUILD_TYPE() << endl << "Copyright (C) 2008-2011 SciDB, Inc." << endl;
+            cout << "SciDB Test Harness Version: " << scidb::SCIDB_VERSION_PUBLIC() << endl
+                 << "Build Type: "                 << scidb::SCIDB_BUILD_TYPE()     << endl
+                 << scidb::SCIDB_COPYRIGHT()                                        << endl;
 			exit (0);
     }
 	}

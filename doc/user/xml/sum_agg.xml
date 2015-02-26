@@ -6,7 +6,13 @@
   <refnamediv id="sumAggregate">
     <refname>sum</refname>
 
-    <refpurpose>Sum aggregate</refpurpose>
+    <refpurpose><indexterm>
+        <primary>sum</primary>
+      </indexterm><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>sum</secondary>
+      </indexterm>Sum aggregate</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,18 +24,12 @@
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>sum</primary>
-      </indexterm><indexterm>
-        <primary>aggregates</primary>
+    <para>The sum aggregate calculates the cumulative sum of a group of
+    values.</para>
 
-        <secondary>sum</secondary>
-      </indexterm>The sum aggregate calculates the cumulative sum of a group
-    of values.</para>
-
-    <para>The sum of an empty set is 0. The standard deviation of a set that
-    contains only NULL values is also 0. If the set contains NULL and NOT NULL
-    values, the result is the sum of all the NOT NULL values.</para>
+    <para>The sum of an empty set is 0. The sum of a set that contains only
+    NULL values is also 0. If the set contains NULL and NOT NULL values, the
+    result is the sum of all the NOT NULL values.</para>
   </refsect1>
 
   <refsect1>

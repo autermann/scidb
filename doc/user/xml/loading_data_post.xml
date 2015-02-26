@@ -572,7 +572,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
             <row>
               <entry><literal>-p DB_PORT</literal></entry>
 
-              <entry>SciDB coordinator port. Default=1239</entry>
+              <entry><indexterm>
+                  <primary>port numbers</primary>
+                </indexterm>SciDB coordinator port. Default=1239</entry>
             </row>
 
             <row>
@@ -783,7 +785,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
           SSH. The program requires that each node in the cluster has SSH
           configured on the same port; use -P to indicate that port. Use -u to
           indicate the SSH user name. Use -k to supply the SSH Key/Identify
-          file used to authenticate the the SSH user on the remote node.
+          file used to authenticate the SSH user on the remote node.
           (loadcsv.py requires that password-less SSH is configured for every
           node in the cluster.)</para>
 
@@ -1117,7 +1119,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         <listitem>
           <para>There are no end-of-cell delimiters. The first byte of the
           representation of the first attribute value of cell N begins
-          immediately after the the last byte of the last attribute of cell
+          immediately after the last byte of the last attribute of cell
           N-1.</para>
         </listitem>
 
@@ -1302,7 +1304,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 </screen></para>
 
       <para>The following example shows the string lengths for strings in the
-      intensityFlat array:<para><programlisting>AQL% <command>SELECT</command> exposure, strlen(exposure) <command>FROM</command> </programlisting><screen>{i} exposure,expr
+      intensityFlat array:<para><programlisting>AQL% <command>SELECT</command> exposure, strlen(exposure) <command>FROM</command> intensityFlat;  </programlisting><screen>{i} exposure,expr
 {0} "High",4
 {1} "High",4
 {2} "High",4

@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -43,29 +43,6 @@ namespace scidb
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.mpi"));
 
-static double getTimeInSecs()
-{
-    struct timespec ts;
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        assert(false);
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
-    }
-    return (ts.tv_sec + ts.tv_nsec*1e-9);
-}
-
-static bool checkForTimeout(double startTime, double timeout,
-                            uint64_t launchId, MpiOperatorContext* ctx)
-{
-    if (timeout < 0) {
-        return true;
-    }
-    if ((getTimeInSecs() - startTime) > timeout) {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
-            << "MPI slave process failed to communicate in time";
-    }
-    return true;
-}
-
 static bool checkLauncher(double startTime, double timeout,
                           uint64_t launchId, MpiOperatorContext* ctx)
 {
@@ -74,8 +51,11 @@ static bool checkLauncher(double startTime, double timeout,
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
                 << "MPI launcher process";
     }
-    checkForTimeout(startTime, timeout, launchId, ctx);
 
+    if (mpi::hasExpired(startTime, timeout)) {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
+        << "MPI slave process failed to communicate in time";
+    }
     return true;
 }
 
@@ -87,8 +67,8 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
     }
 
     MpiOperatorContext::LaunchErrorChecker errChecker =
-        boost::bind(&checkLauncher, getTimeInSecs(),
-                    static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT), _1, _2);
+       boost::bind(&checkLauncher, mpi::getTimeInSecs(),
+                   static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT), _1, _2);
     boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
@@ -235,8 +215,9 @@ int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx,
     }
 
     if (raise && result->status() != 0) {
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED)
-               << result->status());
+        std::stringstream ss;
+        ss << "MPI Slave Execution returned status " << result->status();
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED) << ss.str());
     }
     return result->status();
 }
@@ -249,7 +230,7 @@ void MpiSlaveProxy::waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx)
     }
 
     MpiOperatorContext::LaunchErrorChecker errChecker =
-       boost::bind(&checkLauncher, getTimeInSecs(),
+       boost::bind(&checkLauncher, mpi::getTimeInSecs(),
                    static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT), _1, _2);
     boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);

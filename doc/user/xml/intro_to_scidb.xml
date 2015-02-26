@@ -62,7 +62,7 @@
     arrays with one or more non-integer dimensions, such as variable-length
     strings (<emphasis>alpha</emphasis>,<emphasis> beta</emphasis>,<emphasis>
     gamma</emphasis>, ...) or floating-point values (1.2, 2.76, 4.3, ...).
-    Version 13.2 of SciDB and Paradigm4 support non-int64 dimensions only
+    Version 13.3 of SciDB and Paradigm4 support non-int64 dimensions only
     partially.</para>
 
     <para>When the total number of values or cardinality of a dimension is
@@ -560,10 +560,10 @@
     actual string is shown in<emphasis> italics</emphasis>. Optional arguments
     are shown in square brackets [].</para>
 
-    <para>AQL commands are shown in <command>
-        <code>FIXED-WIDTH BOLD CAPS</code>
-      </command>. When necessary, a line of code may be preceded by the
-    <code>AQL%</code> or <code>AFL%</code> prompt to show which language the
-    query is issued from.</para>
+    <para>AQL commands are shown in <emphasis role="bold">
+        <literal>FIXED-WIDTH BOLD CAPS</literal>
+      </emphasis>. When necessary, a line of code may be preceded by the
+    <literal>AQL%</literal> or <literal>AFL%</literal> prompt to show which
+    language the query is issued from.</para>
   </section>
 </chapter>

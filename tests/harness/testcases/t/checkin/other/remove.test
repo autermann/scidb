@@ -3,6 +3,6 @@
 --setup
 
 --test
---error --code=scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "remove(<b:int32> [x=0:2,3,0])"
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "remove(<b:int32> [x=0:2,3,0])"
 
 --cleanup

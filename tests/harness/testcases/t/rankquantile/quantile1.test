@@ -71,8 +71,8 @@ quantile(filter(B, x< 15 and x>15),2,s)
 quantile(filter(B, x< 15 and x>15),100,s)
 quantile(filter(B, x< 15 and x>15),100,r)
 
---error --code scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(filter(B, x< 15 and x>15),100,s,r)"
---error --code scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "sort(A,x)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(filter(B, x< 15 and x>15),100,s,r)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "sort(A,x)"
 
 --reset-format
 --cleanup

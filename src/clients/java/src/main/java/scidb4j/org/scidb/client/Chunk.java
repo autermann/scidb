@@ -1,3 +1,24 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 package org.scidb.client;
 
 import java.math.BigInteger;
@@ -5,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.logging.Logger;
 
+import org.scidb.io.network.Message;
 import org.scidb.util.ByteBufferExtensions;
 
 public class Chunk implements IChunk
@@ -34,7 +56,7 @@ public class Chunk implements IChunk
 
     private static Logger log = Logger.getLogger(Chunk.class.getName());
 
-    public Chunk(org.scidb.io.network.SciDBNetworkMessage.Chunk msg, Array array) throws SciDBException
+    public Chunk(Message.Chunk msg, Array array) throws Error
     {
         org.scidb.io.network.ScidbMsg.Chunk record = msg.getRecord();
         attributeId = record.getAttributeId();
@@ -75,17 +97,17 @@ public class Chunk implements IChunk
 
             if (compressionMethod != 0)
             {
-                throw new SciDBException("Compressed chunks not yet supported");
+                throw new Error("Compressed chunks not yet supported");
             }
 
             if (!rle)
             {
-                throw new SciDBException("Non RLE chunks not yet supported");
+                throw new Error("Non RLE chunks not yet supported");
             }
 
             if (sparse)
             {
-                throw new SciDBException("Sparse chunks not yet supported");
+                throw new Error("Sparse chunks not yet supported");
             }
 
             header = new Header(chunkData);
@@ -199,7 +221,7 @@ public class Chunk implements IChunk
         return segments[curSeg].isNull;
     }
 
-    public long getInt64() throws SciDBException
+    public long getInt64() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -207,11 +229,11 @@ public class Chunk implements IChunk
             return chunkData.getLong();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public int getInt32() throws SciDBException
+    public int getInt32() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -219,11 +241,11 @@ public class Chunk implements IChunk
             return chunkData.getInt();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public short getInt16() throws SciDBException
+    public short getInt16() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -231,11 +253,11 @@ public class Chunk implements IChunk
             return chunkData.getShort();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public byte getInt8() throws SciDBException
+    public byte getInt8() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -243,11 +265,11 @@ public class Chunk implements IChunk
             return chunkData.get();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public BigInteger getUint64() throws SciDBException
+    public BigInteger getUint64() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -255,11 +277,11 @@ public class Chunk implements IChunk
             return ByteBufferExtensions.getUnsignedLong(chunkData);
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public long getUint32() throws SciDBException
+    public long getUint32() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -267,11 +289,11 @@ public class Chunk implements IChunk
             return ByteBufferExtensions.getUnsignedInt(chunkData);
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public int getUint16() throws SciDBException
+    public int getUint16() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -279,11 +301,11 @@ public class Chunk implements IChunk
             return ByteBufferExtensions.getUnsignedShort(chunkData);
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public short getUint8() throws SciDBException
+    public short getUint8() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -291,11 +313,11 @@ public class Chunk implements IChunk
             return ByteBufferExtensions.getUnsignedByte(chunkData);
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public char getChar() throws SciDBException
+    public char getChar() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -303,11 +325,11 @@ public class Chunk implements IChunk
             return (char) chunkData.get();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public float getFloat() throws SciDBException
+    public float getFloat() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -315,11 +337,11 @@ public class Chunk implements IChunk
             return chunkData.getFloat();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public double getDouble() throws SciDBException
+    public double getDouble() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -327,11 +349,11 @@ public class Chunk implements IChunk
             return chunkData.getDouble();
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public boolean getBoolean() throws SciDBException
+    public boolean getBoolean() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -341,11 +363,11 @@ public class Chunk implements IChunk
             return (b & (1 << (p & 7))) != 0;
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 
-    public String getString() throws SciDBException
+    public String getString() throws Error
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -363,7 +385,7 @@ public class Chunk implements IChunk
             return new String(chars);
         } else
         {
-            throw new SciDBException("Current item is NULL");
+            throw new Error("Current item is NULL");
         }
     }
 

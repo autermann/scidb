@@ -96,7 +96,7 @@ SCIDB QUERY : <sort(A asc)>
 [An error expected at this place for the query "sort(A asc)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE.]
 
 SCIDB QUERY : <sort(A, desc)>
-[An error expected at this place for the query "sort(A, desc)". And it failed with error code = scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR. Expected error code = scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR.]
+[An error expected at this place for the query "sort(A, desc)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <sort(B,s)>
 {n} r,s

@@ -1,14 +1,28 @@
 #!/bin/bash
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 
 set -eu
 
 SCIDB_VER="${1}"
-
-function centos63_ccache()
-{
-wget -c http://dl.fedoraproject.org/pub/epel/6/x86_64/ccache-3.1.6-2.el6.x86_64.rpm
-yum install -y ccache-3.1.6-2.el6.x86_64.rpm || true
-}
 
 function ubuntu1204 ()
 {
@@ -16,7 +30,8 @@ echo "Prepare Ubuntu 12.04 for build SciDB"
 apt-get update
 
 # Build dependencies:
-apt-get install -y build-essential cmake libboost1.46-all-dev libpqxx-3.1 libpqxx3-dev libprotobuf7 libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-1.12-1 libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 libmpich2-dev mpich2 expect
+apt-get install -y build-essential cmake libboost1.46-all-dev libpqxx-3.1 libpqxx3-dev libprotobuf7 libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-1.12-1 libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 expect debhelper sudo
+
 apt-get install -y git git-svn
 
 # Reduce rebuild time:
@@ -33,39 +48,40 @@ apt-get install -y time
 echo "DONE"
 }
 
-function centos63 ()
+function centos6 ()
 {
-echo "Prepare CentOS 6.3 for build SciDB"
+echo "Prepare CentOS 6 for build SciDB"
 
+INSTALL="yum install --enablerepo=scidb3rdparty -y"
 # Build dependencies:
-yum install -y gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make scidb-boost-${SCIDB_VER}-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel
+${INSTALL} gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make scidb-boost-${SCIDB_VER}-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel sudo
 
-yum install -y git git-svn
+${INSTALL} git git-svn
+
 # Reduce build time
-yum install -y wget
-centos63_ccache
+${INSTALL} ccache
 
 # Documentation
-yum install -y fop libxslt docbook-style-xsl
+${INSTALL} fop libxslt docbook-style-xsl
 
 # Testing:
-yum install -y postgresql postgresql-server postgresql-contrib python-argparse
+${INSTALL} postgresql postgresql-server postgresql-contrib python-argparse
 echo "DONE"
 }
 
 function redhat63 ()
 {
-echo "We do not support build SciDB under RedHat 6.3. Please use CentOS 6.3 instead"
+echo "We do not support build SciDB under RedHat 6. Please use CentOS 6 instead"
 exit 1
 }
 
 OS=`./os_detect.sh`
 
-if [ "${OS}" = "CentOS 6.3" ]; then
-    centos63
+if [ "${OS}" = "CentOS 6" ]; then
+    centos6
 fi
 
-if [ "${OS}" = "RedHat 6.3" ]; then
+if [ "${OS}" = "RedHat 6" ]; then
     redhat63
 fi
 

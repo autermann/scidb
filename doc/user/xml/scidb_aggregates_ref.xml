@@ -12,7 +12,7 @@
 
       <secondary>reference</secondary>
     </indexterm>This chapter lists SciDB aggregates. Aggregates take as input
-  a set of 1 or more values and return a scalar value. SciDB aggregates have
+  a set of 1 or more values and return a SciDB array. SciDB aggregates have
   the syntax aggregate_call_N where an aggregate call is one of the
   following:<itemizedlist>
       <listitem>
@@ -75,9 +75,11 @@ AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<
   <xi:include href="approxdc_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="avg_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="avg_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="count_agg_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="count_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="max_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 

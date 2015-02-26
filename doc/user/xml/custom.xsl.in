@@ -49,6 +49,7 @@
 <xsl:attribute name="background-color">#E0E0E0</xsl:attribute>
   <xsl:attribute name="text-align">start</xsl:attribute>
   <xsl:attribute name="wrap-option">wrap</xsl:attribute>
+  <xsl:attribute name="font-size">8pt</xsl:attribute>
 </xsl:attribute-set>
 
 <xsl:param name="section.autolabel" select="1"/>

@@ -2,20 +2,19 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2012 SciDB, Inc.
+# Copyright (C) 2008-2013 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
 #
 # SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 # INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 # NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-# the GNU General Public License for the complete license terms.
+# the AFFERO GNU General Public License for the complete license terms.
 #
-# You should have received a copy of the GNU General Public License
-# along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 #
 # END_COPYRIGHT
 ########################################
@@ -39,12 +38,12 @@ if (USE_LOCAL_MPI)
    set(MPICH2_SUFFIX "")
 
    if(${DISTRO_NAME_VER} MATCHES "Ubuntu-12.04")
-       set(LOCAL_MPI_PATH "/usr")
+       set(LOCAL_MPI_PATH "/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/mpich2")
        set(MPI_INCLUDE "-I ${LOCAL_MPI_PATH}/include/mpich2")
        set(MPICH2_SUFFIX ".mpich2")
    endif()
 
-   if(${DISTRO_NAME_VER} MATCHES "CentOS-6.3")
+   if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
        set(LOCAL_MPI_PATH "/usr/lib64/mpich2")
        set(MPI_INCLUDE "-I /usr/include/mpich2-x86_64")
    endif()

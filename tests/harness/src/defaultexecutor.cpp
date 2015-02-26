@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -52,6 +52,7 @@
 # include <boost/program_options/options_description.hpp>
 # include <boost/program_options/variables_map.hpp>
 # include <boost/program_options/parsers.hpp>
+# include <boost/scoped_array.hpp>
 
 # include "global.h"
 # include "helper.h"
@@ -1719,6 +1720,59 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
 	return SUCCESS;
 }
 
+void DefaultExecutor :: parseEnvironmentVariables (string &line, int line_number)
+{
+        /* Code for substituting environment variables */
+        if (boost::starts_with (line, "--shell"))
+        {
+                return;
+        }
+
+        char *env_value = NULL;
+        size_t env_end = string::npos;
+        size_t env_start = line.find ("${");
+        if (env_start != string::npos)
+        {
+                LOG4CXX_DEBUG (_logger, "Checking and substituting environment variables for line: " << line);
+        }
+        while (env_start != string::npos)
+        {
+                env_end = line.find ("}", env_start + 2);
+                if (env_end == string::npos)
+                {
+                        throw_PARSEERROR ("Missing '}' in environment variable.");
+                }
+                if (env_end == env_start+2)
+                {
+                        throw_PARSEERROR ("No variable name specified \"${}\".");
+                }
+
+                boost::scoped_array<char> env_var_ptr (new char [env_end - env_start - 1]);
+                line.copy (env_var_ptr.get(), env_end - env_start - 2, env_start + 2);
+                env_var_ptr.get() [env_end - env_start - 2] = '\0';
+                if (line.find ("${", env_start + 2) <= env_end)
+                {
+                        throw_PARSEERROR ("Illegal variable name: '" << env_var_ptr.get() << "'.");
+                }
+
+                env_value = getenv (env_var_ptr.get());
+                if (env_value)
+                {
+                        line.replace (env_start, env_end - env_start + 1, env_value);
+                        LOG4CXX_DEBUG (_logger, "Environment variable '" << env_var_ptr.get() << "' substituted with '" << env_value << "'.");
+                        if (strcmp (env_value,"") == 0)
+                        {
+                                 env_start --; // required when the next environment variable is immediately after this (value=empty) one
+                        }
+                }
+                else
+                {
+                        throw_PARSEERROR ("Environment variable '" << env_var_ptr.get() << "' not found.");
+                }
+                env_start = line.find ("${", env_start+1);
+        }
+}
+
 int DefaultExecutor :: parseTestCaseFile (void)
 {
 	LOG4CXX_INFO (_logger, "Parsing test case file : " << _ie.tcfile);
@@ -1768,6 +1822,8 @@ int DefaultExecutor :: parseTestCaseFile (void)
 			/* if blank line or a comment */
 			if (line.empty() || boost::starts_with (line, "#"))
 				continue;
+
+			parseEnvironmentVariables(line, line_number);
 
 			/* TODO : first join multiple lines if it is a multiline command */
 			vector<string> tokens;
@@ -2665,7 +2721,11 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 	_ctime = _ctime.substr(0,_ctime.size()-1);
 
 	if (strcasecmp (ie.logDestination.c_str (), LOGDESTINATION_CONSOLE) != 0)
-		cout << "[" << ie.test_sequence_number << "][" << _ctime << "]: " << ie.testID << " ______________________________________________________________ Executing\n" << std::flush;
+	{
+		const char * underlines30 = "______________________________";  // 30, more than enough
+		cout << "[" << ie.test_sequence_number << "][" << _ctime << "]: " << ie.testID
+                     << " " << underlines30 << " Executing" << std::endl << std::flush;
+	}
 
 	copyToLocal (ie);
 

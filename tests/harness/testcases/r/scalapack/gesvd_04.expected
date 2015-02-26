@@ -3206,7 +3206,7 @@ SCIDB QUERY : <count(gesvd(M8x8_default, 'right'))>
 {i} count
 {0} 1024
 
-gesvd negative tests : array should have samilar chunking on both the dimensions
+gesvd negative tests : array should have same chunking on both the dimensions
 SCIDB QUERY : <gesvd(M3x3c32x16, 'values')>
 [An error expected at this place for the query "gesvd(M3x3c32x16, 'values')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
 
@@ -3217,13 +3217,13 @@ SCIDB QUERY : <gesvd(M3x3c32x16, 'right')>
 [An error expected at this place for the query "gesvd(M3x3c32x16, 'right')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
 
 SCIDB QUERY : <gesvd(Mc32x16_UB, 'values')>
-[An error expected at this place for the query "gesvd(Mc32x16_UB, 'values')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43.]
+[An error expected at this place for the query "gesvd(Mc32x16_UB, 'values')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
 
 SCIDB QUERY : <gesvd(Mc32x16_UB, 'left')>
-[An error expected at this place for the query "gesvd(Mc32x16_UB, 'left')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43.]
+[An error expected at this place for the query "gesvd(Mc32x16_UB, 'left')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
 
 SCIDB QUERY : <gesvd(Mc32x16_UB, 'right')>
-[An error expected at this place for the query "gesvd(Mc32x16_UB, 'right')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43.]
+[An error expected at this place for the query "gesvd(Mc32x16_UB, 'right')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
 
 using repart to make it work
 SCIDB QUERY : <gesvd(repart(M3x3c32x16, <a:double> [x=0:2,32,0, y=0:2,32,0]), 'values')>

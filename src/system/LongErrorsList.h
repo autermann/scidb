@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -24,21 +24,21 @@ ERRMSG(SCIDB_E_NO_ERROR,                             "No errors");
 
 ERRMSG(SCIDB_LE_UNKNOWN_ERROR,                       "Unknown error: %1%");
 
-ERRMSG(SCIDB_LE_ERRNS_ALREADY_REGISTERED,            "Error namespace '%1%' already registered");
-ERRMSG(SCIDB_LE_ERRNS_CANT_BE_REGISTERED,            "Error namespace '%1%' cannot be unregistered");
+ERRMSG(SCIDB_LE_ERRNS_ALREADY_REGISTERED,            "Namespace '%1%' is already registered");
+ERRMSG(SCIDB_LE_ERRNS_CANT_BE_REGISTERED,            "Namespace '%1%' cannot be unregistered");
 
 ERRMSG(SCIDB_LE_AGGREGATE_NOT_FOUND,                 "Aggregate name '%1%' is not registered in the system");
 ERRMSG(SCIDB_LE_AGGREGATE_DOESNT_SUPPORT_ASTERISK,   "Aggregate '%1%' does not support asterisk");
 ERRMSG(SCIDB_LE_AGGREGATE_DOESNT_SUPPORT_TYPE,       "Aggregate '%1%' does not support input type '%2%'");
 ERRMSG(SCIDB_LE_UNHANDLED_VAR_PARAMETER,             "Operator '%1%' cannot handle variable number of parameters");
-ERRMSG(SCIDB_LE_NO_MEMORY_FOR_VALUE,                 "No memory for new value");
+ERRMSG(SCIDB_LE_NO_MEMORY_FOR_VALUE,                 "Not enough memory for new value");
 ERRMSG(SCIDB_LE_THREAD_EVENT_ERROR,                  "Error state '%1%' detected in event wait");
 ERRMSG(SCIDB_LE_THREAD_SEMAPHORE_ERROR,              "Error state '%1%' detected in semaphore enter");
 ERRMSG(SCIDB_LE_CANT_LOAD_MODULE,                    "Cannot load module '%1%', dlopen returned '%2%");
-ERRMSG(SCIDB_LE_TOO_NEW_MODULE,                      "This plugin is not supported by this version of SciDB. The plugin is version %1% is %2%.%3%.%4%.%5% but but SciDB version is %6%");
+ERRMSG(SCIDB_LE_TOO_NEW_MODULE,                      "This plugin is not supported by this version of SciDB. The plugin is version %1% is %2%.%3%.%4%.%5% but SciDB version is %6%");
 ERRMSG(SCIDB_LE_CANT_FIND_SYMBOL,                    "Cannot find symbol '%1%', dlsym returned '%2%'");
-ERRMSG(SCIDB_LE_INPUTS_MUST_BE_BEFORE_PARAMS,        "Error in operator '%1%'. All inputs must be before other parameters");
-ERRMSG(SCIDB_LE_VAR_MUST_BE_AFTER_PARAMS,            "Error in operator '%1%'. Variadic parameters must appear last");
+ERRMSG(SCIDB_LE_INPUTS_MUST_BE_BEFORE_PARAMS,        "Error in operator '%1%'. All inputs must appear before other parameters");
+ERRMSG(SCIDB_LE_VAR_MUST_BE_AFTER_PARAMS,            "Error in operator '%1%'. Optional parameters must appear last");
 ERRMSG(SCIDB_LE_UNEXPECTED_GETREPARTSCHEMA,          "Unexpected getRepartSchema that is not overwritten");
 ERRMSG(SCIDB_LE_PWRITE_ERROR,                        "pwrite failed to write %1% byte(s) to the position %2% with error %3%");
 ERRMSG(SCIDB_LE_PREAD_ERROR,                         "pread failed to read %1% byte(s) from position %2% with error %3%");
@@ -144,7 +144,7 @@ ERRMSG(SCIDB_LE_INVALID_SHEDULER_PERIOD,            "Invalid period for Schedule
 ERRMSG(SCIDB_LE_CONNECTION_ERROR2,                  "Connection error while sending");
 ERRMSG(SCIDB_LE_CANT_OPEN_PATH,                     "Cannot open path '%1%'");
 ERRMSG(SCIDB_LE_DIRECTORY_EXPECTED,                 "Path '%1%' is not directory");
-ERRMSG(SCIDB_LE_BINDING_NOT_SUPPORTED,              "This binding not supported");
+ERRMSG(SCIDB_LE_BINDING_NOT_SUPPORTED,              "This binding is not supported");
 ERRMSG(SCIDB_LE_WRONG_ATTRIBUTE_TYPE,               "Attribute '%1%' has incorrect datatype (source: %2%, destination: %3%)");
 ERRMSG(SCIDB_LE_WRONG_ATTRIBUTE_FLAGS,              "Attribute '%1%' has incorrect properties");
 ERRMSG(SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE,        "Source attribute '%1%' must be of type '%2%'");
@@ -152,7 +152,7 @@ ERRMSG(SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_FLAGS,       "Source attribute '%1%' must
 ERRMSG(SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE,   "Destination attribute '%1%' must be of type '%2%'");
 ERRMSG(SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_FLAGS,  "Destination attribute '%1%' must not have special properties");
 ERRMSG(SCIDB_LE_WRONG_SOURCE_DIMENSION_TYPE,        "Source dimension '%1%' must be of type '%2%'");
-ERRMSG(SCIDB_LE_WRONG_DESTINATION_DIMENSION_TYPE,   "Destination dimenstion '%1%' must be of type '%2%'");
+ERRMSG(SCIDB_LE_WRONG_DESTINATION_DIMENSION_TYPE,   "Destination dimension '%1%' must be of type '%2%'");
 ERRMSG(SCIDB_LE_DIMENSIONS_DONT_MATCH,              "Dimensions '%1%' and '%2%' do not match");
 ERRMSG(SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION,   "No data provided for destination dimension '%1%'");
 ERRMSG(SCIDB_LE_UNEXPECTED_DESTINATION_ATTRIBUTE,   "No data provided for destination attribute '%1%'");
@@ -175,7 +175,7 @@ ERRMSG(SCIDB_LE_EXPLAIN_ERROR2,                     "Second parameter of 'explai
 ERRMSG(SCIDB_LE_OPERATION_NOT_FOUND,                "Operation '%1%' not defined for type '%2%'");
 ERRMSG(SCIDB_LE_NO_MAPPING_FOR_COORDINATE,          "No mapping for such coordinate value");
 ERRMSG(SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER,"An undefined distribution cannot have a mapper");
-ERRMSG(SCIDB_LE_SPECIFIC_DISTRIBUTION_REQUIRED,     "Specific requirements must be provided IFF required distribution is specific");
+ERRMSG(SCIDB_LE_SPECIFIC_DISTRIBUTION_REQUIRED,     "The chunk distribution requirement 'SpecifyAnyOrder' does not match what is provided");
 ERRMSG(SCIDB_LE_CANT_GET_SYSTEM_TIME,               "Cannot get system time");
 ERRMSG(SCIDB_LE_TIMER_RETURNED_UNEXPECTED_ERROR,    "Timer (expires_from_now) returned unexpected error '%1%'");
 ERRMSG(SCIDB_LE_TIMER_RETURNED_UNEXPECTED_ERROR2,   "Timer handler returned unexpected error '%1%'");
@@ -191,8 +191,8 @@ ERRMSG(SCIDB_LE_CANT_MERGE_CHUNKS_WITH_VARYING_SIZE,"Merge of chunks with varyin
 ERRMSG(SCIDB_LE_CANT_UPDATE_READ_ONLY_CHUNK,        "Chunk is read-only and cannot be updated");
 ERRMSG(SCIDB_LE_TYPE_MISMATCH_BETWEEN_AGGREGATE_AND_CHUNK,"Type mismatch between aggregate and chunk");
 ERRMSG(SCIDB_LE_AGGREGATE_STATE_MUST_BE_NULLABLE,   "Aggregate NULL flag must be TRUE");
-ERRMSG(SCIDB_LE_EXTRACT_EXPECTED_FIXED_SIZE_ATTRIBUTE,"Extract attribute should be fixed size");
-ERRMSG(SCIDB_LE_EXTRACT_UNEXPECTED_BOOLEAN_ATTRIBUTE,"Extract attribute cannot have boolean type");
+ERRMSG(SCIDB_LE_EXTRACT_EXPECTED_FIXED_SIZE_ATTRIBUTE,"extractData expects fixed-size attribute");
+ERRMSG(SCIDB_LE_EXTRACT_UNEXPECTED_BOOLEAN_ATTRIBUTE,"extractData does not expect a boolean attribute");
 ERRMSG(SCIDB_LE_WRONG_NUMBER_OF_DIMENSIONS,         "Wrong number of dimensions");
 ERRMSG(SCIDB_LE_UNALIGNED_COORDINATES,              "Coordinates should be aligned on chunk boundary");
 ERRMSG(SCIDB_LE_CANT_ALLOCATE_MEMORY,               "Failed to allocate memory");
@@ -218,7 +218,7 @@ ERRMSG(SCIDB_LE_INVALID_INSTANCE_ID,                    "Invalid instance ID: '%
 ERRMSG(SCIDB_LE_ARRAYS_NOT_CONFORMANT,              "Arrays are not conformant");
 ERRMSG(SCIDB_LE_UNTERMINATED_CHARACTER_CONSTANT,    "Unterminated character constant");
 ERRMSG(SCIDB_LE_UNTERMINATED_STRING_LITERAL,        "Unterminated string literal");
-ERRMSG(SCIDB_LE_BAD_LITERAL,                        "Bad literal");
+ERRMSG(SCIDB_LE_BAD_LITERAL,                        "Invalid literal");
 ERRMSG(SCIDB_LE_OP_STORE_ERROR1,                    "Arrays with user-defined coordinates can only be updated using REDIMENSION_STORE");
 ERRMSG(SCIDB_LE_OP_REDIMENSION_ERROR1,              "Destination array for REDIMENSION must have EMPTY flag TRUE");
 ERRMSG(SCIDB_LE_NO_MEMORY_TO_ALLOCATE_MATRIX,       "Not enough memory to allocate matrix");
@@ -258,7 +258,7 @@ ERRMSG(SCIDB_LE_OP_CAST_ERROR7,                     "Dimension chunk size doesn'
 ERRMSG(SCIDB_LE_OP_CAST_ERROR8,                     "Dimension chunk overlap doesn't match");
 ERRMSG(SCIDB_LE_OP_CONCAT_ERROR1,                   "Arrays with open boundary cannot be concatenated");
 ERRMSG(SCIDB_LE_OP_CROSSJOIN_ERROR1,                "Dimension should be specified only once in JOIN ON list");
-ERRMSG(SCIDB_LE_OP_DELDIM_ERROR1,                   "Cannot delete last dimension of array");
+ERRMSG(SCIDB_LE_OP_DELDIM_ERROR1,                   "Cannot delete the only dimension of array");
 ERRMSG(SCIDB_LE_OP_DELDIM_ERROR2,                   "Only dimension with length 1 can be removed");
 ERRMSG(SCIDB_LE_OP_REDIMENSION_ERROR2,              "The result of an aggregate cannot be transformed into a dimension");
 ERRMSG(SCIDB_LE_OP_REDIMENSION_STORE_ERROR1,        "Resulting array has no dimensions");
@@ -288,8 +288,8 @@ ERRMSG(SCIDB_LE_OP_INVERSE_ERROR5,                  "Only 2-D matrices can be in
 ERRMSG(SCIDB_LE_OP_INVERSE_ERROR6,                  "Inversion only works on square matrices");
 ERRMSG(SCIDB_LE_OP_INVERSE_ERROR7,                  "Cannot invert an unbounded matrix");
 ERRMSG(SCIDB_LE_NO_CURRENT_POSITION,                "No current position");
-ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR2,                 "Matrix must have 1 attrbiute");
-ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR3,                 "Array must be rectangular matrix");
+ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR2,                 "Matrix must have 1 attribute");
+ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR3,                 "Both input arrays to multiply must be 2-dimensional");
 ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR4,                 "Cannot multiply unbounded matrices");
 ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR5,                 "Matrix dimensions must match");
 ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR6,                 "Matrix chunk sizes in the joint dimension must match");
@@ -310,7 +310,7 @@ ERRMSG(SCIDB_LE_OP_REVERSE_ERROR1,                  "Only fixed-size array can b
 ERRMSG(SCIDB_LE_OP_SLICE_ERROR1,                    "Input array has too few dimensions for slice");
 ERRMSG(SCIDB_LE_OP_SLICE_ERROR2,                    "Slice coordinate is out of bounds");
 ERRMSG(SCIDB_LE_OP_SORT_ERROR2,                     "Column index is out of range");
-ERRMSG(SCIDB_LE_OP_SORT_ERROR3,                     "Cannot jump on more than one chunk forward");
+ERRMSG(SCIDB_LE_OP_SORT_ERROR3,                     "Cannot jump more than one chunk forward");
 ERRMSG(SCIDB_LE_OP_SORT_ERROR4,                     "Chunk out of window");
 ERRMSG(SCIDB_LE_OP_THIN_ERROR1,                     "Step must be divider of chunk size");
 ERRMSG(SCIDB_LE_OP_THIN_ERROR2,                     "Starting position is out of bounds");
@@ -319,13 +319,13 @@ ERRMSG(SCIDB_LE_OP_THIN_ERROR4,                     "Step must be smaller than c
 ERRMSG(SCIDB_LE_OP_THIN_ERROR5,                     "Step must be positive number");
 ERRMSG(SCIDB_LE_OP_TRANSPOSE_ERROR1,                "Cannot transpose an unbounded array");
 ERRMSG(SCIDB_LE_OP_UNPACK_ERROR1,                   "Size of of array is not multiple of chunk size");
-ERRMSG(SCIDB_LE_OP_XGRID_ERROR1,                    "Cannot xgrid an unbounded array");
+ERRMSG(SCIDB_LE_OP_XGRID_ERROR1,                    "Cannot use xgrid on an unbounded array");
 ERRMSG(SCIDB_LE_OP_XGRID_ERROR2,                    "Xgrid arguments must be positive");
 ERRMSG(SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,  "Dimension start cannot be unbounded");
 ERRMSG(SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW,          "Upper boundary of dimension must be greater than lower boundary");
 ERRMSG(SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,       "Chunk overlap cannot be larger than chunk size");
 ERRMSG(SCIDB_LE_DIMENSIONS_NOT_SPECIFIED,           "Must specify at least one element in the array");
-ERRMSG(SCIDB_LE_PIN_UNPIN_DISBALANCE,               "pin/unpin disbalance or race condition during close");
+ERRMSG(SCIDB_LE_PIN_UNPIN_DISBALANCE,               "pin/unpin unbalanced, or race condition during close");
 ERRMSG(SCIDB_LE_COMPRESS_METHOD_NOT_DEFINED,        "Compression method is not defined for the chunk");
 ERRMSG(SCIDB_LE_STORAGE_DESCRIPTOR_INVALID_FORMAT,  "Invalid format of storage description file");
 ERRMSG(SCIDB_LE_CHUNK_NOT_FOUND,                    "Chunk not found");
@@ -347,7 +347,7 @@ ERRMSG(SCIDB_LE_CANT_GENERATE_UTC_TIME,             "Unable to generate UTC time
 ERRMSG(SCIDB_LE_CANT_CREATE_SG_WITH_UNDEFINED_DISTRIBUTION,"Cannot create an SG with undefined distribution");
 ERRMSG(SCIDB_LE_MALFORMED_AGGREGATE,                "Malformed or unsupported aggregate");
 ERRMSG(SCIDB_LE_CANT_LOCK_DATABASE,                 "Failed to get exclusive access to the database");
-ERRMSG(SCIDB_LE_DATABASE_HEADER_CORRUPTED,          "Database header is corrupted");
+ERRMSG(SCIDB_LE_DATABASE_HEADER_CORRUPTED,          "Database header has been corrupted");
 ERRMSG(SCIDB_LE_CANT_DECOMPRESS_CHUNK,              "Failed to decompress chunk");
 ERRMSG(SCIDB_LE_CHUNK_NOT_PINNED,                   "Accessed chunk should be pinned");
 ERRMSG(SCIDB_LE_CHUNK_FILE_HAS_INVALID_NAME,        "Chunk file has invalid name");
@@ -369,7 +369,7 @@ ERRMSG(SCIDB_LE_CANT_ACCESS_INDEX_ARRAY,            "Index array inaccessible in
 ERRMSG(SCIDB_LE_CANT_UNLOAD_MODULE,                 "Cannot unload module '%1%'. The module is not loaded");
 ERRMSG(SCIDB_LE_OP_REDIMENSION_STORE_ERROR6,        "Aggregate '%1%' doesn't match with any attribute");
 ERRMSG(SCIDB_LE_SUBSTITUTE_FAILED,                  "Failed to substitute missing reason '%1%'");
-ERRMSG(SCIDB_LE_REMOVE_NOT_POSSIBLE,                "Remove of array is not possible because it is still in use");
+ERRMSG(SCIDB_LE_REMOVE_NOT_POSSIBLE,                "Removal of array is not possible because it is still in use");
 ERRMSG(SCIDB_LE_TRUNCATION,                         "Varying size type with length %1% cannot be converted to fixed size type with limit %2%"); 
 ERRMSG(SCIDB_LE_LOOKUP_BAD_PARAM,                   "Number of attributes in pattern array of LOOKUP should match number of dimensions in source array"); 
 ERRMSG(SCIDB_LE_INVALID_STORAGE_HEADER,             "Invalid storage header format");
@@ -377,11 +377,11 @@ ERRMSG(SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION,  "Mismatched storage format v
 ERRMSG(SCIDB_LE_OP_CROSSJOIN_ERROR2,                "Joined dimensions should be specified for both arrays");
 ERRMSG(SCIDB_LE_OP_NORMALIZE_ERROR3,                "Attribute must be of double type");
 ERRMSG(SCIDB_LE_EXPLICIT_EMPTY_FLAG_NOT_ALLOWED,    "Explicit empty flag attribute not allowed. Use EMPTY keyword");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR9,                     "Dimension type doesn't match");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR9,                     "Dimension type of %1% does not match type of %2%");
 ERRMSG(SCIDB_LE_INCONSISTENT_ARRAY_DESC,            "Array descriptor is inconsistent");
 ERRMSG(SCIDB_LE_FUNC_MAP_TRANSFORMATION_NOT_POSSIBLE, "Unable to perform requested functional mapping transformation");
 ERRMSG(SCIDB_LE_OP_REDIMENSION_STORE_ERROR7,        "Too many duplicates for REDIMENSION_STORE with synthetic dimension: increase chunk size");
-ERRMSG(SCIDB_LE_QUERY_ALREADY_COMMITED,              "Operation not possible because the query (%1%) already commited");
+ERRMSG(SCIDB_LE_QUERY_ALREADY_COMMITED,              "Operation not possible because the query (%1%) has already been commited");
 ERRMSG(SCIDB_LE_NETWORK_QUEUE_FULL,                  "Network queue is full");
 ERRMSG(SCIDB_LE_CAN_NOT_CHANGE_MAPPING,             "Cannot change coordinates mapping for non-versioned array %1%");
 ERRMSG(SCIDB_LE_INVALID_MESSAGE_FORMAT,             "Invalid message format for type %1%");
@@ -391,28 +391,28 @@ ERRMSG(SCIDB_LE_SYSCALL_ERROR,                      "Invocation of %1% failed wi
 ERRMSG(SCIDB_LE_NON_FQ_PATH_ERROR,                  "Path %1% is not fully qualified");
 ERRMSG(SCIDB_LE_UNKNOWN_CTX,                        "Unknown/unexpected context type '%1%'");
 ERRMSG(SCIDB_LE_CANT_LOCK_FILE,                     "Failed to get exclusive access to the file %1%");
-ERRMSG(SCIDB_LE_TEMPLATE_PARSE_ERROR,               "Failed to parser template at position %1%");
-ERRMSG(SCIDB_LE_TEMPLATE_FIXED_SIZE_TYPE,           "Length should not be explcitly specified for fixed size type %1%");
+ERRMSG(SCIDB_LE_TEMPLATE_PARSE_ERROR,               "Failed to parse template at position %1%");
+ERRMSG(SCIDB_LE_TEMPLATE_FIXED_SIZE_TYPE,           "Length should not be explicitly specified for fixed size type %1%");
 ERRMSG(SCIDB_LE_FILE_WRITE_ERROR,                   "Failed to write file: %1%");
 ERRMSG(SCIDB_LE_FILE_READ_ERROR,                    "Failed to read file: %1%");
 ERRMSG(SCIDB_LE_UNSUPPORTED_FORMAT,                 "Unsupported format: %1%");
 ERRMSG(SCIDB_LE_MULTIPLE_DIMENSION_SPECIFICATION,   "Same dimension specified multiple times");
 ERRMSG(SCIDB_LE_NOT_ENOUGH_DIMENSIONS_IN_SPECIFICATION,"Not all dimensions were specified");
-ERRMSG(SCIDB_LE_PARTITION_NAME_NOT_UNIQUE,          "Partition name should be unique");
+ERRMSG(SCIDB_LE_PARTITION_NAME_NOT_UNIQUE,          "Partition name must be unique");
 ERRMSG(SCIDB_LE_PARTITION_NAME_NOT_SPECIFIED,       "Partition name not specified");
 ERRMSG(SCIDB_LE_UNKNOWN_PARTITION_NAME,             "Unknown partition name");
 ERRMSG(SCIDB_LE_OP_WINDOW_ERROR3,                   "PRECEDING and FOLLOWING must be non-negative values");
 ERRMSG(SCIDB_LE_WRONG_OVER_USAGE,                   "OVER keyword can only be applied to aggregates");
 ERRMSG(SCIDB_W_MISSING_REASON_OUT_OF_BOUNDS,        "Missing reason cannot be imported in binary file");
 ERRMSG(SCIDB_LE_DDL_CANT_BE_NESTED,                 "DDL operators cannot be nested");
-ERRMSG(SCIDB_LE_NO_OPERATOR_RESULT,                 "Nested operator not returned any result to parent");
+ERRMSG(SCIDB_LE_NO_OPERATOR_RESULT,                 "Nested operator did not return any result to parent");
 ERRMSG(SCIDB_LE_CATALOG_NEWER_THAN_SCIDB,           "Cannot connect SciDB with metadata version %1% to catalog with metadata version %2%");
 ERRMSG(SCIDB_LE_CATALOG_METADATA_UPGRADE_ERROR,     "Catalog metadata upgrade failed with error: %1%");
 ERRMSG(SCIDB_LE_DDL_SHOULDNT_HAVE_INPUTS,           "DDL operators cannot accept input arrays");
 ERRMSG(SCIDB_LE_UNSUPPORTED_INPUT_ARRAY,            "Operator %1% does not support the given virtual input array. Consider splitting the query and using store() to create a temporary result");
 ERRMSG(SCIDB_LE_OP_WINDOW_ERROR4,                   "Window size should be greater than 1");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR15,                   "Expected boolean constant for empty indicator");
-ERRMSG(SCIDB_LE_OP_INPUT_ERROR16,                   "Number errors exceeds threshold");
+ERRMSG(SCIDB_LE_OP_INPUT_ERROR16,                   "Number of errors exceeds threshold");
 ERRMSG(SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE,        "Chunk size must be positive");
 ERRMSG(SCIDB_LE_OPERATION_FAILED_WITH_ERRNO,        "Operation %1% failed with errno %2%");
 ERRMSG(SCIDB_LE_OP_RLE_EXPECTED,                    "Chunk expected to be in RLE format");
@@ -421,6 +421,12 @@ ERRMSG(SCIDB_LE_RESOURCE_BUSY,                      "Not enough resources: %1%")
 ERRMSG(SCIDB_LE_NESTING_PROHIBITED,                 "Operator %1% can not be nested");
 ERRMSG(SCIDB_LE_OP_WINDOW_ERROR5,                   "Algorithm must be one of %1%");
 ERRMSG(SCIDB_LE_OP_WINDOW_ERROR6,                   "Using materialize op without materialized input");
+ERRMSG(SCIDB_LE_CONSTANT_EXPRESSION_EXPECTED,       "Constant expression expected");
+ERRMSG(SCIDB_LE_TYPE_EXPECTED,                      "Expected constant or expression with type '%1%'");
+ERRMSG(SCIDB_LE_INCORRECT_CHUNK_SIZE,               "Chunk size must be between 1 and '%1%'");
+ERRMSG(SCIDB_LE_INCORRECT_OVERLAP_SIZE,             "Overlap length must be between 0 and %1%");
+ERRMSG(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,       "Dimension boundaries must be between '%1%' and '%2%'");
+ERRMSG(SCIDB_LE_WRONG_LANGUAGE_STRING,              "Language string should be AQL or AFL");
 //Next ERRMSG
 
 ERRMSG(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,          "Execution of query '%1%' failed with error %2%");

@@ -25,11 +25,11 @@
     <para>Join combines the attributes of two input arrays at matching
     dimension values. The two arrays must have the same dimension start
     coordinates, the same chunk size, and the same chunk overlap. The join
-    result has the same dimension names as the first input. If the the
-    left-hand and right-hand arrays do not have the same dimension size, join
-    will return an array with the same dimensions as the smaller input array.
-    If a cell in either the left or right array is empty, the corresponding
-    cell in the result is also empty.</para>
+    result has the same dimension names as the first input. If the left-hand
+    and right-hand arrays do not have the same dimension size, join will
+    return an array with the same dimensions as the smaller input array. If a
+    cell in either the left or right array is empty, the corresponding cell in
+    the result is also empty.</para>
   </refsect1>
 
   <refsect1>

@@ -45,26 +45,36 @@
 
       <procedure>
         <step>
-          <para>Create a 4<symbol role="symbolfont">×</symbol>4 array called
-          rank_array:<programlisting language="test">--afl CREATE ARRAY rank_array &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no</programlisting></para>
+          <para>Assume that you have the following 4<symbol
+          role="symbolfont">×</symbol>4 matrix called
+          rank_matrix:<programlisting language="test">--afl CREATE ARRAY rank_matrix &lt;val:int64&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no --show-query=no
+--afl store(build(rank_matrix, '[[9,1,0,6], [1,3,7,7], [2,3,9,8], [5,9,5,9]]',true),rank_matrix);
+    --show-query=no --output-format=dense --chunkify=yes
+</programlisting></para>
         </step>
 
         <step>
-          <para>Put random values of 0–6 into rank_array:<programlisting
-          language="test">--afl store(build(rank_array,random()%7/1.0),rank_array); --show-output-in-test-file=no
-   --output-format=dense --chunkify=yes</programlisting></para>
+          <para>Rank the elements in rank_matrix by dimension
+          i:<programlisting language="test">--afl rank(rank_matrix,val,i); --show-output=no</programlisting><screen>[
+[(9,4),(1,2),(0,1),(6,3)],
+[(1,1),(3,2),(7,<emphasis role="bold">3</emphasis>),(7,<emphasis role="bold">3</emphasis>)],
+[(2,1),(3,2),(9,4),(8,3)],
+[(5,1),(9,<emphasis role="bold">3</emphasis>),(5,1),(9,<emphasis role="bold">3</emphasis>)]
+]</screen>Notice that the first value for each cell is the value of the
+          <emphasis role="bold">val</emphasis> attribute, and the second value
+          is the rank. Ties are marked in bold.</para>
         </step>
 
         <step>
-          <para>Rank the elements in rank_array by dimension i:<programlisting
-          language="test">--afl rank(rank_array,val,i); --show-output-in-test-file=no
-   --output-format=dense --chunkify=yes</programlisting></para>
-        </step>
-
-        <step>
-          <para>Rank the elements in rank_array by dimension j:<programlisting
-          language="test">--afl rank(rank_array,val,j); --show-output-in-test-file=no
-   --output-format=dense --chunkify=yes</programlisting></para>
+          <para>Rank all the elements of the matrix:<programlisting
+          language="test">--afl rank(rank_matrix,val); --show-output=no</programlisting><screen>[
+[(9,<emphasis role="bold">13</emphasis>),(1,<emphasis role="bold">2</emphasis>),(0,1),(6,9)],
+[(1,<emphasis role="bold">2</emphasis>),(3,<emphasis role="bold">5</emphasis>),(7,<emphasis
+                role="bold">10</emphasis>),(7,<emphasis role="bold">10</emphasis>)],
+[(2,4),(3,<emphasis role="bold">5</emphasis>),(9,<emphasis role="bold">13</emphasis>),(8,12)],
+[(5,7),(9,<emphasis role="bold">13</emphasis>),(5,7),(9,<emphasis role="bold">13</emphasis>)]
+]</screen>Notice that the four occurrences of '9' are all ranked the same, as
+          '13', which is the highest rank in the data set.</para>
         </step>
       </procedure>
     </informalexample>

@@ -68,7 +68,7 @@ quantile(ABC,2)
 quantile(ABC,3,g)
 quantile(ABC,4,a)
 quantile(ABC,4,e)
---error --code scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(ABC,4,a,g)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(ABC,4,a,g)"
 --reset-format
 
 --cleanup

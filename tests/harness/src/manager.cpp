@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -329,10 +329,16 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 	_ctime = _ctime.substr(0,_ctime.size()-1);
 
 	/* throw this line on console only if other log is going to the harness.log file */
+        const char * periods30 = "..............................";  // 30, more than enough
  	if (strcasecmp (ie.logDestination.c_str (), LOGDESTINATION_CONSOLE) != 0)
-		cout << "[" << ie.test_sequence_number << "][" << _ctime << "]: " << ie.testID << " .............................................................. " << result_str << endl << std::flush;
+	{
+		cout << "[" << ie.test_sequence_number << "][" << _ctime << "]: " << ie.testID
+                     << " " << periods30 << " " << result_str << std::endl << std::flush;
+	}
 	else
-		LOG4CXX_INFO (logger, ie.testID << " .............................................................. " << result_str);
+	{
+		LOG4CXX_INFO (logger, ie.testID << " " << periods30 << " " << result_str);
+	}
 
 	IndividualTestInfo ti(ie, g_test_ei);
 	g_rptr->writeTestcaseExecutionInfo (ti);

@@ -57,7 +57,7 @@ SCIDB QUERY : <quantile(filter(B,x<>1),5,b)>
 [(0,"(1/3)"),(0.2,"(1/3)"),(0.4,"(1/3)"),(0.6,"(1/3)"),(0.8,"(1/3)"),(1,"(1/3)")]
 
 SCIDB QUERY : <quantile(filter(B,x<>1),10,a,b)>
-[An error expected at this place for the query "quantile(filter(B,x<>1),10,a,b)". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "quantile(filter(B,x<>1),10,a,b)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

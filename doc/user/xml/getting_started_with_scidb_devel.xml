@@ -5,33 +5,40 @@
 <chapter remap="h1" xml:id="iqueryClient">
   <title>Getting Started with SciDB Development</title>
 
+  <para><indexterm>
+      <primary>iquery</primary>
+    </indexterm>The <literal>iquery</literal> executable is the basic
+  command-line tool for communicating with SciDB. <literal>iquery</literal> is
+  the default SciDB client used to issue AQL and AFL commands. Start the
+  <literal>iquery</literal> client by typing <literal>iquery</literal> at the
+  command line when a SciDB session is active:</para>
+
+  <para>
+    <programlisting>scidb.py startall <replaceable>dbname</replaceable>
+iquery</programlisting>
+  </para>
+
+  <para><indexterm>
+      <primary>AQL</primary>
+    </indexterm>By default, <literal>iquery</literal> opens an AQL command
+  prompt:<programlisting>AQL%</programlisting></para>
+
+  <para><indexterm>
+      <primary>AFL</primary>
+    </indexterm>You can then enter AQL queries at the command prompt. To
+  switch to AFL queries, use the <code>set lang</code>
+  command:<programlisting>AQL% set lang afl;</programlisting></para>
+
+  <para>AQL and AFL statements end with a semicolon (;). If you forget the
+  terminating semicolon, iquery presents a prompt (<emphasis
+  role="bold">CON&gt;</emphasis>) where you can enter the terminating
+  semicolon and run the query.</para>
+
   <section xml:id="UsingtheiqueryClient">
     <title>Using the iquery Client</title>
 
-    <para><indexterm>
-        <primary>iquery</primary>
-      </indexterm>The <literal>iquery</literal> executable is the basic
-    command-line tool for communicating with SciDB. <literal>iquery</literal>
-    is the default SciDB client used to issue AQL and AFL commands. Start the
-    <literal>iquery</literal> client by typing <literal>iquery</literal> at
-    the command line when a SciDB session is active:<programlisting>scidb.py startall <replaceable>dbname</replaceable>
-iquery</programlisting></para>
-
-    <para><indexterm>
-        <primary>AQL</primary>
-      </indexterm>By default, <literal>iquery</literal> opens an AQL command
-    prompt:<programlisting>AQL%</programlisting></para>
-
-    <para><indexterm>
-        <primary>AFL</primary>
-      </indexterm>You can then enter AQL queries at the command prompt. To
-    switch to AFL queries, use the <code>set lang</code>
-    command:<programlisting>AQL% set lang afl;</programlisting></para>
-
-    <para>AQL statements end with a semicolon (;).</para>
-
-    <para>To see the internal <literal>iquery</literal> commands reference
-    type <literal>help</literal> at the prompt:<programlisting>AQL% help;
+    <para>To see the internal <literal>iquery</literal> commands reference,
+    type <literal>help</literal> at the AQL or AFL prompt:<programlisting>AQL% help;
 set            - List current options
 set lang afl   - Set AFL as querying language
 set lang aql   - Set AQL as querying language
@@ -52,12 +59,14 @@ quit or exit   - End iquery session</programlisting></para>
     <para>AQL is the default language for <literal>iquery</literal>. To switch
     to AFL, use the -a flag:<programlisting>iquery -aq "<replaceable>my AFL statement</replaceable>"</programlisting></para>
 
-    <para>Each invocation of <literal>iquery</literal> connects to the SciDB
-    coordinator instance, passes in a query, and prints out the coordinator
-    instance's response. <literal>iquery</literal> connects by default to
-    SciDB on port 1239. If you use a port number that is not the default,
-    specify it using the "-p" option with <literal>iquery</literal>. For
-    example, to use port 9999 to run an AFL query contained in the file
+    <para><indexterm>
+        <primary>port numbers</primary>
+      </indexterm>Each invocation of <literal>iquery</literal> connects to the
+    SciDB coordinator instance, passes in a query, and prints out the
+    coordinator instance's response. <literal>iquery</literal> connects by
+    default to SciDB on port 1239. If you use a port number that is not the
+    default, specify it using the "-p" option with <literal>iquery</literal>.
+    For example, to use port 9999 to run an AFL query contained in the file
     <literal>my_filename</literal> do this:<programlisting>iquery -af <replaceable>my_input_filename</replaceable> -p 9999</programlisting></para>
 
     <para>The query result will be printed to stdout. Use -r flag to redirect
@@ -69,6 +78,8 @@ quit or exit   - End iquery session</programlisting></para>
         <primary>output options</primary>
       </indexterm><indexterm>
         <primary>query output</primary>
+      </indexterm><indexterm>
+        <primary>formatting, output</primary>
       </indexterm>Available options for output format are csv, csv+, dcsv,
     dense, lcsv+, sparse, and lsparse. These options are described in the
     following table:</para>
@@ -131,8 +142,9 @@ quit or exit   - End iquery session</programlisting></para>
           <row>
             <entry>lsparse</entry>
 
-            <entry>Sparse SciDB array format and a boolean flag attribute
-            EmptyTag showing if a cell is empty.</entry>
+            <entry>Sparse SciDB array format and a boolean flag attribute,
+            <emphasis role="bold">EmptyTag</emphasis>, showing if a cell is
+            empty.</entry>
           </row>
 
           <row>
@@ -166,6 +178,17 @@ quit or exit   - End iquery session</programlisting></para>
           </thead>
 
           <tbody>
+            <row>
+              <entry>
+                <code>-w [ --precision ]</code>
+
+                <replaceable>precision</replaceable>
+              </entry>
+
+              <entry>Precision for printing floating point numbers. Default is
+              6.</entry>
+            </row>
+
             <row>
               <entry>
                 <code>-c [ --host ]</code>
@@ -592,5 +615,42 @@ make,type,price,mpg,kpl
 </programlisting></para>
       </step>
     </procedure>
+  </section>
+
+  <section>
+    <title>Reserved Words</title>
+
+    <para><indexterm>
+        <primary>reserved words</primary>
+      </indexterm><indexterm>
+        <primary>keywords</primary>
+      </indexterm>In SciDB, there are keywords that are designated as
+    reserved. You cannot use these words as identifiers (such as array names,
+    dimension names, or attribute names). The lists are
+    language-dependent.</para>
+
+    <para>The following words are reserved when using AFL.<screen>agg     and
+case    else
+empty   false
+if      NA
+not     null
+or      then
+true    when</screen></para>
+
+    <para><indexterm>
+        <primary>AQL</primary>
+
+        <secondary>reserved words</secondary>
+      </indexterm>The following words are reserved when using AQL.<screen>and         cancel       case
+cross       else         empty
+false       fixed        from
+group       if           insert
+into        join         not
+null        on           or
+order       redimension  regrid
+rename      select       set
+then        true         unload
+update      variable     when
+where       window</screen></para>
   </section>
 </chapter>

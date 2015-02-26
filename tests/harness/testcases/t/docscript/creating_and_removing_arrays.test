@@ -24,6 +24,12 @@ CREATE ARRAY m4x4_missing <val1:double,val2:int32 default 5468>[x=0:3,4,0,y=0:3,
 load(m4x4_missing, '../examples/m4x4_missing.txt')  
 --set-format dcsv
 --start-igdata
+create array D<val1:char default 'a', val2:int32 default 1, val3:int64 null default missing(30)> [i=0:9,10,0]  
+--set-format dense
+--stop-igdata
+show(D) 
+--set-format dcsv
+--start-igdata
 store(build(<val:double null> [i=0:4,5,0], '[47.0, ?, -21.1, ?100, ?50]',true), A)  
 --set-format dense
 --stop-igdata
@@ -40,7 +46,7 @@ apply(arrayB,MRcode, missing(val))
 --start-igdata
 --aql CREATE ARRAY open <val:double>[I=0:9,10,0,J=0:*,10,0]  
 --aql CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]  
---aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0] 
+--aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0]  
 --aql LOAD winnersFlat FROM '../examples/olympic_data.scidb'  
 redimension_store(winnersFlat,winners)  
 --stop-igdata
@@ -64,6 +70,7 @@ remove(products)
 remove(product_null)
 remove(product_dflt)
 remove(m4x4_missing)
+remove(D)
 remove(A)
 remove(arrayB)
 remove(open)

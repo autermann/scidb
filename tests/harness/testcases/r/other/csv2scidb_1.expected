@@ -218,11 +218,19 @@ Query was executed successfully
 SCIDB QUERY : <remove ( Raw_CSVLoad_8 )>
 Query was executed successfully
 
-SCIDB QUERY : < rm -rf /tmp/csv2scidb_test_1.load >
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_1.load >
 
-SCIDB QUERY : < rm -rf /tmp/csv2scidb_test_2.load >
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_2.load >
 
-SCIDB QUERY : < rm -rf /tmp/csv2scidb_test_3.load >
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_3.load >
 
-SCIDB QUERY : < rm -rf /tmp/csv2scidb_test_4.load >
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_4.load >
+
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_5.load >
+
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_6.load >
+
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_7.load >
+
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_8.load >
 

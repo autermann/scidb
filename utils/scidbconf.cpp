@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -41,41 +41,44 @@ void printUsage()
            "\tOptions:\n"
            "\t\t[-A|--all] all configuration information\n"
            "\t\t[-v|--version] version\n"
-           "\t\t[-bt|--buildType] build type\n");
+           "\t\t[-bt|--buildType] build type\n"
+           "\t\t[--copyright] copyright information\n");
    exit(1);
 }
 
 void printHeader()
 {
-   const char *scidbHeader = "SciDB Configuration Information:";
-   const char *copyright   = "Copyright (C) 2008-2012 SciDB, Inc.";
-   printf("%s\n%s\n\n", scidbHeader, copyright);
+   printf("SciDB Configuration Information:\n");
 }
 
 void printVersion()
 {
-   printf("Version: %s\n", scidb::SCIDB_VERSION());
+   printf("Version: %s\n",scidb::SCIDB_VERSION_PUBLIC());
 }
 
 void printBuildType()
 {
-   printf("Build Type: %s\n", scidb::SCIDB_BUILD_TYPE());
+   printf("Build Type: %s\n",scidb::SCIDB_BUILD_TYPE());
+}
+
+void printCopyright()
+{
+   printf("%s\n",scidb::SCIDB_COPYRIGHT());
 }
 
 typedef void (*Action)();
 typedef std::map<std::string, Action> OptionDispatchMap;
 /**
  * Build a dispatch table for all known options except for {-A,--all}
- * @param dispatchTable[in/out] a map of options to actions
+ * @param map[in/out]: a map of options to actions.
  */
-void initOptionDispatch(OptionDispatchMap& dispatchTable)
+void initOptionDispatch(OptionDispatchMap& map)
 {
-   Action f = &printVersion;
-   dispatchTable["-v"] = f;
-   dispatchTable["--version"] = f;
-   f = &printBuildType;
-   dispatchTable["-bt"] = f;
-   dispatchTable["--buildType"] = f;
+   map["-v"]          = &printVersion;
+   map["--version"]   = &printVersion;
+   map["-bt"]         = &printBuildType;
+   map["--buildType"] = &printBuildType;
+   map["--copyright"] = &printCopyright;
 }
 
 typedef std::set<Action> Actions;

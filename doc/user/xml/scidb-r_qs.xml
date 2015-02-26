@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<article>
+  <info>
+    <title>SciDB-R Quick Start</title>
+
+    <author>
+      <personname>
+        <firstname>Version</firstname>
+
+        <surname>13.3</surname>
+      </personname>
+    </author>
+
+    <copyright>
+      <year>2013 Paradigm4, Inc.</year>
+    </copyright>
+  </info>
+
+  <section>
+    <title>SciDB-R Introduction</title>
+
+    <para>This guide is meant to help R users begin working with
+    SciDB-R.</para>
+
+    <para><emphasis role="bold">SciDB</emphasis> is an all-in-one data
+    management and advanced analytics platform. It provides massively scalable
+    complex analytics inside a next-generation database with data versioning
+    to support the needs of commercial and scientific applications. SciDB
+    organizes data in <emphasis>n</emphasis>-dimensional arrays. Its features
+    include ACID transactions, parallel processing, distributed storage,
+    efficient sparse array storage, and native linear algebra
+    operations.</para>
+
+    <para>SciDB-R lets you remain an R programmer, but expands R’s power to
+    include SciDB’s massive-scale data management and analytical capabilities.
+    With SciDB-R, you can do all of the following <emphasis>from inside an R
+    program</emphasis>:<itemizedlist>
+        <listitem>
+          <para>Use SciDB as a storage backend</para>
+        </listitem>
+
+        <listitem>
+          <para>Use SciDB to offload large computations to a cluster</para>
+        </listitem>
+
+        <listitem>
+          <para>Use SciDB to filter and join data before performing
+          analytics</para>
+        </listitem>
+
+        <listitem>
+          <para>Use SciDB to share data among multiple users, all with ACID
+          guarantees</para>
+        </listitem>
+
+        <listitem>
+          <para>Use SciDB to perform multidimensional windowing and
+          aggregation</para>
+        </listitem>
+
+        <listitem>
+          <para>Use SciDB’s massively scalable analytical capabilities,
+          including statistical methods, correlation, and dense and sparse
+          linear algebra operations</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>This quick start document tells you how to use a Virtual Machine
+    (VM) with both SciDB and R installed. You can use this image to quickly
+    and easily get started using the SciDB package for R.</para>
+
+    <para>We also provide the following documents:<itemizedlist>
+        <listitem>
+          <para><emphasis>SciDB and R</emphasis> describes the R front-end to
+          SciDB. Link: <ulink
+          url="https://github.com/Paradigm4/SciDBR/blob/master/inst/doc/scidb.pdf">https://github.com/Paradigm4/SciDBR/blob/master/inst/doc/scidb.pdf</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis>SciDB Quick Start</emphasis> provides a quick
+          introduction to SciDB.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis>SciDB User's Guide</emphasis> provides a complete
+          guide to SciDB. Link: <ulink
+          url="http://www.scidb.org/forum/viewtopic.php?f=16&amp;t=364">Download
+          SciDB Releases</ulink>.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>For more information:<itemizedlist>
+        <listitem>
+          <para>Consult <ulink
+          url="https://www.virtualbox.org/">https://www.virtualbox.org/</ulink>
+          for more information about VirtualBox.</para>
+        </listitem>
+
+        <listitem>
+          <para>See the <ulink url="www.scidb.org/forum">SciDB forum</ulink>
+          for help from the user community about SciDB and the SciDB package
+          for R.</para>
+        </listitem>
+
+        <listitem>
+          <para>See the <ulink
+          url="http://cran.us.r-project.org/">Comprehensive R Archive
+          Network</ulink> (CRAN) for details about R.</para>
+        </listitem>
+      </itemizedlist></para>
+  </section>
+
+  <section>
+    <title>Download and start the image</title>
+
+    <procedure>
+      <step>
+        <para>Download the image provided by Paradigm4 at the following
+        URL:</para>
+
+        <para>
+          <ulink
+          url="http://downloads.paradigm4.com/QuickStart/13.3/SciDB13.3-CentOS6.3-VirtualBox4.1.12-withR.ova">http://downloads.paradigm4.com/QuickStart/13.3/SciDB13.3-CentOS6.3-VirtualBox4.1.12-withR.ova</ulink>
+        </para>
+
+        <para>Download the .ova file to a partition with at least 8GB of
+        available space.</para>
+      </step>
+
+      <step>
+        <para>Open VirtualBox and click <emphasis role="bold">File
+        </emphasis>| <emphasis role="bold">Import Appliance</emphasis> and
+        select the downloaded file.</para>
+      </step>
+
+      <step>
+        <para>Start the VirtualBox image.</para>
+      </step>
+    </procedure>
+  </section>
+
+  <section>
+    <title>Test the RStudio URL</title>
+
+    <para>By default, the VM is configured to use "bridged" networking. This
+    configuration presents the VM as if it were just a new computer to
+    whatever network the host machine is connected to, with DHCP network
+    configuration. The VM may or may not be able to obtain an IP address with
+    this approach.</para>
+
+    <para>If the VM can obtain IP addresses, you will see them listed after
+    you start the image. The start screen lists the following
+    information:</para>
+
+    <screen>Welcome to the SciDB VM!
+
+A simple SciDB web interface is available by directing your browser to:
+http://192.168.56.101:8080
+:
+:</screen>
+
+    <para>Note that your URL may be different. If you see valid IP addresses,
+    you can continue to section 4.</para>
+
+    <para>However, if the VM is not able to obtain IP addresses using bridged
+    networking, your screen will look similar to the following:</para>
+
+    <screen>Welcome to the SciDB VM!
+
+A simple SciDB web interface is available by directing your browser to:
+http://:8080
+:
+:</screen>
+
+    <para>If you see this screen, perform the following steps to set up a
+    Host-only Network for VirtualBox.</para>
+
+    <procedure>
+      <step>
+        <para>Power off the VM.</para>
+      </step>
+
+      <step>
+        <para>From the VirtualBox menu, select click <emphasis
+        role="bold">File </emphasis>| <emphasis
+        role="bold">Preferences</emphasis>.</para>
+      </step>
+
+      <step>
+        <para>Select <emphasis role="bold">Network</emphasis> and add a
+        Host-only Network if you do not already have one. You can use all of
+        the default settings.</para>
+      </step>
+
+      <step>
+        <para>Click <emphasis role="bold">OK</emphasis>.</para>
+      </step>
+
+      <step>
+        <para>Select your SciDB-R VM, and click <emphasis
+        role="bold">Settings</emphasis>.</para>
+      </step>
+
+      <step>
+        <para>Select <emphasis role="bold">Network</emphasis>, and for
+        <literal>Adapter 1</literal>, change from <emphasis
+        role="bold">Bridged Adapter</emphasis> to <emphasis
+        role="bold">Host-only Adapter</emphasis>.</para>
+      </step>
+
+      <step>
+        <para>The name will be populated with the Host-only Network adapter
+        that you added in step 3. Click <emphasis role="bold">OK</emphasis>
+        and then restart the VM.</para>
+      </step>
+    </procedure>
+  </section>
+
+  <section>
+    <title>Connect to RStudio</title>
+
+    <para>If you open a web browser to the RStudio URL, after you log in, you
+    will see the following screen:</para>
+
+    <mediaobject>
+      <imageobject>
+        <imagedata align="center" fileref="../graphics/rstudio_login.png"
+                   scale="50" valign="top"/>
+      </imageobject>
+    </mediaobject>
+
+    <para>To get started, see the "Connecting to SciDB and Running Queries "
+    section in the <emphasis>SciDB and R</emphasis> guide.</para>
+  </section>
+
+  <section>
+    <title>Connect to the SciDB Web Interface</title>
+
+    <para>If you open a web browser to the SciDB web interface, you will see
+    the following screen:</para>
+
+    <mediaobject>
+      <imageobject>
+        <imagedata align="center" fileref="../graphics/scidb_login.png"
+                   scale="50" valign="top"/>
+      </imageobject>
+    </mediaobject>
+
+    <para>If you run a query, you will see something similar to the
+    following:</para>
+
+    <para>
+      <mediaobject>
+        <imageobject>
+          <imagedata align="center" fileref="../graphics/web1.png" scale="50"
+                     valign="top"/>
+        </imageobject>
+      </mediaobject>
+    </para>
+
+    <para>If you click the <emphasis role="bold">Upload file</emphasis>
+    button, you will see the following dialog box:</para>
+
+    <para>
+      <mediaobject>
+        <imageobject>
+          <imagedata align="center" fileref="../graphics/web2.png" scale="50"
+                     valign="top"/>
+        </imageobject>
+      </mediaobject>
+    </para>
+
+    <para/>
+  </section>
+</article>

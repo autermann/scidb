@@ -1,5 +1,25 @@
 #!/bin/bash
 #
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
+#
 
 if [[ "$#" < 1 ]] ; then
     echo "$0: usage: $0 directory-containing-setup.py"
@@ -25,9 +45,9 @@ MAKEFLAGS="-j1" \
     ${SETUP_DIR}/setup.py \
         --verbose  \
         --mpibindir="${2}" \
-        --mpirun=/usr/bin/mpiexec.hydra \
-        --mpicc="mpicc${5}" \
-        --mpif90="mpif90${5}" \
+        --mpirun="${2}/mpiexec.hydra" \
+        --mpicc="${2}/mpicc${5}" \
+        --mpif90="${2}/mpif90${5}" \
         --mpiincdir="${1}" \
         --lapacklib="${3} ${4}" \
         --noopt="-fPIC -g -O0" \

@@ -24,7 +24,7 @@ scan(B)
 --error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(A,C)"
 --error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(A,D)"
 --error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(repart(D,<val:double> [x=0:3,2,0]),D)"
---error --code scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "insert(B, repart(D,<sal:double> [x=0:3,2,0]))"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "insert(B, repart(D,<sal:double> [x=0:3,2,0]))"
 --error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAY_DOESNT_EXIST "insert(B,ZZ)"
 
 insert(repart(D,<val:double> [x=0:3,2,0]),B)

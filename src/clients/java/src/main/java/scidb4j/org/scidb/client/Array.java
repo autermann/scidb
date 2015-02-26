@@ -1,10 +1,31 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 package org.scidb.client;
+
+import org.scidb.io.network.Message;
+import org.scidb.io.network.Network;
 
 import java.io.IOException;
 import java.util.logging.Logger;
-
-import org.scidb.io.network.SciDBNetwork;
-import org.scidb.io.network.SciDBNetworkMessage;
 
 /**
  * SciDB client-side array which reads chunks from network
@@ -15,7 +36,7 @@ public class Array
 
     private long queryId;
     private Schema schema;
-    private SciDBNetwork net;
+    private Network net;
     private IChunk[] chunks;
     private EmptyChunk _emptyBitmap;
 
@@ -26,7 +47,7 @@ public class Array
      * @param schema Array schema
      * @param net Network object
      */
-    public Array(long queryId, Schema schema, SciDBNetwork net)
+    public Array(long queryId, Schema schema, Network net)
     {
         this.queryId = queryId;
         this.schema = schema;
@@ -56,23 +77,23 @@ public class Array
     /**
      * Fetch new chunks for each attribute
      * @throws IOException
-     * @throws SciDBException
+     * @throws Error
      */
-    public void fetch() throws IOException, SciDBException
+    public void fetch() throws IOException, Error
     {
         log.fine(String.format("Fetching chunks"));
         for (Schema.Attribute att: schema.getAttributes())
         {
-            SciDBNetworkMessage msg = new SciDBNetworkMessage.Fetch(queryId, att.getId(), schema.getName());
+            Message msg = new Message.Fetch(queryId, att.getId(), schema.getName());
             net.write(msg);
             msg = net.read();
 
             if (!att.isEmptyIndicator())
             {
-                chunks[att.getId()] = (IChunk) new Chunk((SciDBNetworkMessage.Chunk) msg, this);
+                chunks[att.getId()] = (IChunk) new Chunk((Message.Chunk) msg, this);
             } else
             {
-                _emptyBitmap = new EmptyChunk((SciDBNetworkMessage.Chunk) msg, this);
+                _emptyBitmap = new EmptyChunk((Message.Chunk) msg, this);
                 chunks[att.getId()] = (IChunk) _emptyBitmap;
             }
         }

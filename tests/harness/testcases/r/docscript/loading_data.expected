@@ -14,24 +14,25 @@ marathon,2004,Baldini,7855
 marathon,2008,Wanjiru,7596
 
 SCIDB QUERY : <csv2scidb -h >
-csv2scidb: Utility for conversion of CSV file to SciDB input text format
-	Usage: csv2scidb [options] [ < input-file ] [ > output-file ]
-	Default: -f 0 -c 1000000 -q
-	Options:
-	  -v version of utility
-	  -i PATH	input file
-	  -o PATH	output file
-	  -a PATH	appended output file
-	  -c INT	length of chunk
-	  -f INT	starting coordinate
-	  -n INT	number of instances
-	  -d char	delimiter - default ,
-	  -p STR	type pattern - N number, S string, s nullable-string, 
-	     C char, c nullable-char
-	  -q Quote the input line exactly, simply wrap it in ()
-	  -s N	skip N lines at the beginning of the file
-	  -h 	prints this helpful error message
-	 You cannot specify both -q and a set of -p options.
+csv2scidb: Convert CSV file to SciDB input text format.
+Usage:   csv2scidb [options] [ < input-file ] [ > output-file ]
+Default: -f 0 -c 1000000 -q
+Options:
+  -v        version information
+  -i PATH   input file
+  -o PATH   output file
+  -a PATH   appended output file
+  -c INT    length of chunk
+  -f INT    starting coordinate
+  -n INT    number of instances
+  -d CHAR   delimiter: defaults to ,
+  -p STR    type pattern: N number, S string, s nullable-string,
+            C char, c nullable-char
+  -q        quote the input line exactly by wrapping it in ()
+  -s N      skip N lines at the beginning of the file
+  -h        prints this helpful message
+
+Note: the -q and -p options are mutually exclusive.
 
 SCIDB QUERY : <cat ../examples/olympic_data.scidb >
 {0}[

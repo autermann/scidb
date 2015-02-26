@@ -20,3 +20,5 @@ save(storage_array,'/tmp/storage_array.txt',-2,'dcsv')
 remove(array1)
 remove(array2)
 remove(storage_array)
+--shell --command "rm /tmp/storage_array.txt" --store
+

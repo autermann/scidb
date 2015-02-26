@@ -190,6 +190,65 @@ SCIDB QUERY : <gemm(intRows22c32, intRows22c32, build(ident22c32,0))>
 {1,0} 15
 {1,1} 22
 
+next 4 results should be identical -- the number 5
+SCIDB QUERY : <gemm(intRows12c32, intRows21c32, build(ident11c32,0))>
+{r,c} gemm
+{0,0} 5
+
+SCIDB QUERY : <gemm(intRows21c32, intRows21c32, build(ident11c32,0),'TRANSA=1')>
+{r,c} gemm
+{0,0} 5
+
+SCIDB QUERY : <gemm(intRows12c32, intRows12c32, build(ident11c32,0),'TRANSB=1')>
+{r,c} gemm
+{0,0} 5
+
+SCIDB QUERY : <gemm(intRows21c32, intRows12c32, build(ident11c32,0),'TRANSA=1;TRANSB=1')>
+{r,c} gemm
+{0,0} 5
+
+next 4 results should be identical -- the matrix [[1,2],[2,4]]
+SCIDB QUERY : <gemm(intRows21c32, intRows12c32, build(ident22c32,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 4
+
+SCIDB QUERY : <gemm(intRows12c32, intRows12c32, build(ident22c32,0),'TRANSA=1')>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 4
+
+SCIDB QUERY : <gemm(intRows21c32, intRows21c32, build(ident22c32,0),'TRANSB=1')>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 4
+
+SCIDB QUERY : <gemm(intRows12c32, intRows21c32, build(ident22c32,0),'TRANSA=1;TRANSB=1')>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 4
+
+next output should be [13]
+SCIDB QUERY : <gemm(intRows21c32, intRows12c32, build(ident11c32,1), 'TRANSA=1;TRANSB=1;ALPHA=2.0;BETA=3.0')>
+{r,c} gemm
+{0,0} 13
+
+next output should be [[5,7],[7,11]]
+SCIDB QUERY : <gemm(intRows12c32, intRows21c32, build(ident22c32,1), 'TRANSA=1;TRANSB=1;ALPHA=2.0;BETA=3.0')>
+{r,c} gemm
+{0,0} 5
+{0,1} 7
+{1,0} 7
+{1,1} 11
+
 next output (by rows) should be 7, 15, 10, 22
 SCIDB QUERY : <transpose(gemm(intRows22c32, intRows22c32, build(ident22c32,0)))>
 {c,r} gemm
@@ -197,6 +256,13 @@ SCIDB QUERY : <transpose(gemm(intRows22c32, intRows22c32, build(ident22c32,0)))>
 {0,1} 15
 {1,0} 10
 {1,1} 22
+
+SCIDB QUERY : <join(join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))), join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))))>
+{r,c} gemm,gemm,gemm,gemm
+{0,0} 7,7,7,7
+{0,1} 10,10,10,10
+{1,0} 15,15,15,15
+{1,1} 22,22,22,22
 
 SCIDB QUERY : <remove(ident11c32)>
 Query was executed successfully

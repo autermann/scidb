@@ -116,6 +116,11 @@
 
       <procedure>
         <step>
+          <para>Ensure that the <literal>dense_linear_algebra</literal>
+          library is loaded.<programlisting language="test">--afl load_library('dense_linear_algebra'); --show-output=no</programlisting></para>
+        </step>
+
+        <step>
           <para>Create matrices <emphasis><emphasis
           role="bold">A</emphasis></emphasis>, <emphasis><emphasis
           role="bold">B</emphasis></emphasis>, and <emphasis><emphasis

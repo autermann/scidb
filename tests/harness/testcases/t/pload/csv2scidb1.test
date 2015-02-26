@@ -16,6 +16,6 @@
  --cleanup
 remove ( Raw_CSVLoad_1 )
 
-#--shell --command " rm -rf /tmp/csv2scidb_test_1.load " --store
+ --shell --command "rm-rf /tmp/csv2scidb_test_1.txt" --store
 
  --stop-query-logging

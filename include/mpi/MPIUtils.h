@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -337,6 +337,20 @@ namespace mpi
     };
 
     std::ostream& operator<<(std::ostream& os, scidb::mpi::Command& cmd);
+
+    /**
+     * @return current time in seconds as provided by clock_gettime(CLOCK_REALTIME, ...)
+     * @throws std::system_error on failure
+     */
+    double getTimeInSecs();
+
+    /**
+     * @param startTime in seconds
+     * @param timeout in seconds
+     * @return true if timeout>=0 and (current_time - startTime) >= timeout
+     *         false otherwise
+     */
+    bool hasExpired(double startTimeSec, double timeoutSec);
 }
 }
 

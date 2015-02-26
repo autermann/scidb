@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -23,7 +23,7 @@
 /**
  * @file Metadata.cpp
  *
- * @brief Structures for fetching and updating metadata of cluster.
+ * @brief Structures for fetching and updating cluster metadata.
  *
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  */
@@ -49,30 +49,21 @@ namespace scidb
 /*
  * For std::vector < uint64_t >
  */
-std::ostream& operator<<(std::ostream& stream,const Coordinates& ob)
+std::ostream& operator<<(std::ostream& stream,const Coordinates& coords)
 {
-        stream << "{";
-        for (size_t i=0,n=ob.size(); i<n; i++)
-        {
-                if (i)
-                        stream << ", " << ob[i];
-                else
-                        stream << ob[i];
-        }
-        stream << "}";
-        return stream;
-}
-
-
-std::ostream& operator<<(std::ostream& stream, const CoordsToStr& w)
-{
-    stream << w._co;
+    stream << '{';
+    insertRange(stream,coords,", ");
+    stream << '}';
     return stream;
 }
 
-ObjectNames::ObjectNames()
+std::ostream& operator<<(std::ostream& stream,const CoordsToStr& w)
 {
+    return stream << w._co;
 }
+
+ObjectNames::ObjectNames()
+{}
 
 ObjectNames::ObjectNames(const std::string &baseName):
     _baseName(baseName)
@@ -81,10 +72,9 @@ ObjectNames::ObjectNames(const std::string &baseName):
 }
 
 ObjectNames::ObjectNames(const std::string &baseName, const NamesType &names):
-        _names(names),
-        _baseName(baseName)
-{
-}
+    _names(names),
+    _baseName(baseName)
+{}
 
 void ObjectNames::addName(const std::string &name)
 {
@@ -100,7 +90,8 @@ void ObjectNames::addName(const std::string &name)
 
 void ObjectNames::addAlias(const std::string &alias, const std::string &name)
 {
-    if (alias.size() != 0) {
+    if (!alias.empty())
+    {
         string trimmedAlias = alias;
         trim(trimmedAlias);
         assert(trimmedAlias != "");
@@ -115,7 +106,8 @@ void ObjectNames::addAlias(const std::string &alias, const std::string &name)
 
 void ObjectNames::addAlias(const std::string &alias)
 {
-    if (alias.size() != 0) {
+    if (!alias.empty())
+    {
         string trimmedAlias = alias;
         trim(trimmedAlias);
         assert(trimmedAlias != "");
@@ -154,35 +146,26 @@ const std::string& ObjectNames::getBaseName() const
 
 bool ObjectNames::operator==(const ObjectNames &o) const
 {
-    return (_names == o._names);
+    return _names == o._names;
+}
+
+std::ostream& operator<<(std::ostream& stream,const ObjectNames::NamesType::value_type& pair)
+{
+    stream << pair.first;
+    return insertRange(stream,pair.second,", ");
 }
 
 std::ostream& operator<<(std::ostream& stream, const ObjectNames::NamesType &ob)
 {
-    for (ObjectNames::NamesType::const_iterator nameIt = ob.begin(); nameIt != ob.end(); ++nameIt)
-    {
-        if (nameIt != ob.begin())
-            stream << ", ";
-
-        stream << (*nameIt).first;
-
-        for (ObjectNames::AliasesType::const_iterator aliasIt = (*nameIt).second.begin(); aliasIt != (*nameIt).second.end(); ++aliasIt)
-        {
-            if (aliasIt != (*nameIt).second.begin())
-                stream << ", ";
-
-            stream << (*aliasIt);
-        }
-    }
-
-    return stream;
+    return insertRange(stream,ob,", ");
 }
 
 void printNames (std::ostream& stream, const ObjectNames::NamesType &ob)
 {
     for (ObjectNames::NamesType::const_iterator nameIt = ob.begin(); nameIt != ob.end(); ++nameIt)
     {
-        if (nameIt != ob.begin()) {
+        if (nameIt != ob.begin())
+        {
             stream << ", ";
         }
         stream << (*nameIt).first;
@@ -193,14 +176,13 @@ void printNames (std::ostream& stream, const ObjectNames::NamesType &ob)
  * Class ArrayDesc
  */
 ArrayDesc::ArrayDesc() :
-        _accessCount(0),
-        _arrId(0),
-        _uAId(0),
-        _versionId(0),
-        _name(""),
-        _bitmapAttr(NULL),
-        _flags(0),
-        _ps(psUndefined)
+    _accessCount(0),
+    _arrId(0),
+    _uAId(0),
+    _versionId(0),
+    _bitmapAttr(NULL),
+    _flags(0),
+    _ps(psUndefined)
 {}
 
 ArrayDesc::ArrayDesc(const std::string &name,
@@ -244,22 +226,21 @@ ArrayDesc::ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
     initializeDimensions();
 }
 
-
-ArrayDesc::ArrayDesc(ArrayDesc const& other)
+ArrayDesc::ArrayDesc(ArrayDesc const& other) :
+    _accessCount(0),
+    _arrId(other._arrId),
+    _uAId(other._uAId),
+    _versionId(other._versionId),
+    _name(other._name),
+    _attributes(other._attributes),
+    _attributesWithoutBitmap(other._attributesWithoutBitmap),
+    _dimensions(other._dimensions),
+    _bitmapAttr(other._bitmapAttr != NULL ? &_attributes[other._bitmapAttr->getId()] : NULL),
+    _flags(other._flags),
+    _comment(other._comment),
+    _ps(other._ps)
 {
-    _arrId = other._arrId;
-    _uAId = other._uAId;
-    _versionId = other._versionId;
-    _name = other._name;
-    _attributes = other._attributes;
-    _attributesWithoutBitmap = other._attributesWithoutBitmap;
-    _dimensions = other._dimensions;
-    _bitmapAttr = (other._bitmapAttr != NULL) ? &_attributes[other._bitmapAttr->getId()] : NULL;
-    _flags = other._flags;
-    _comment = other._comment;
-    _accessCount = 0;
     initializeDimensions();
-    _ps = other._ps;
 }
 
 bool ArrayDesc::operator ==(ArrayDesc const& other) const
@@ -270,7 +251,6 @@ bool ArrayDesc::operator ==(ArrayDesc const& other) const
         _dimensions == other._dimensions &&
         _flags == other._flags;
 }
-
 
 ArrayDesc& ArrayDesc::operator = (ArrayDesc const& other)
 {
@@ -306,7 +286,6 @@ void ArrayDesc::initializeDimensions()
         logicalChunkSize *= _dimensions[i].getChunkInterval();
     }
 }
-
 
 void ArrayDesc::trim()
 {
@@ -376,7 +355,8 @@ uint64_t ArrayDesc::getChunkNumber(Coordinates const& pos) const
 {
     Dimensions const& dims = _dimensions;
     uint64_t no = 0;
-    /// The goal here is to produce good hash function without using array dimension sizes (which can be changed in case of unboundary arrays)
+    /// The goal here is to produce a good hash function without using array
+    /// dimension sizes (which can be changed in case of unboundary arrays)
     for (size_t i = 0, n = pos.size(); i < n; i++)
     {
         // 1013 is prime number close to 1024. 1024*1024 is assumed to be optimal chunk size for 2-d array.
@@ -675,6 +655,7 @@ void printSchema(std::ostream& stream,const ArrayDesc& ob)
     printSchema(stream, ob.getDimensions());
     stream << ']';
 }
+
 std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob)
 {
     if (!ob.getComment().empty()) {
@@ -701,9 +682,8 @@ std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob)
  * Class AttributeDesc
  */
 AttributeDesc::AttributeDesc() :
-        _id(0),
-        _name(""),
-        _type( TypeId( TID_VOID)),
+    _id(0),
+    _type( TypeId( TID_VOID)),
     _flags(0),
     _defaultCompressionMethod(0),
     _reserve(
@@ -713,8 +693,7 @@ AttributeDesc::AttributeDesc() :
         0
 #endif
     )
-{
-}
+{}
 
 AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId type, int16_t flags,
                              uint16_t defaultCompressionMethod,
@@ -798,16 +777,17 @@ bool AttributeDesc::operator ==(AttributeDesc const& other) const
 
 AttributeID AttributeDesc::getId() const
 {
-        return _id;
+    return _id;
 }
 
 const std::string& AttributeDesc::getName() const
 {
-        return _name;
+    return _name;
 }
+
 const std::set<std::string>& AttributeDesc::getAliases() const
 {
-        return _aliases;
+    return _aliases;
 }
 
 void AttributeDesc::addAlias(const string& alias)
@@ -827,7 +807,7 @@ bool AttributeDesc::hasAlias(const std::string& alias) const
 
  TypeId AttributeDesc::getType() const
 {
-        return _type;
+    return _type;
 }
 
 int AttributeDesc::getFlags() const
@@ -837,17 +817,17 @@ int AttributeDesc::getFlags() const
 
 bool AttributeDesc::isNullable() const
 {
-        return (_flags & IS_NULLABLE) != 0;
+    return (_flags & IS_NULLABLE) != 0;
 }
 
 bool AttributeDesc::isEmptyIndicator() const
 {
-        return (_flags & IS_EMPTY_INDICATOR) != 0;
+    return (_flags & IS_EMPTY_INDICATOR) != 0;
 }
 
 uint16_t AttributeDesc::getDefaultCompressionMethod() const
 {
-        return _defaultCompressionMethod;
+    return _defaultCompressionMethod;
 }
 
 Value const& AttributeDesc::getDefaultValue() const
@@ -857,12 +837,12 @@ Value const& AttributeDesc::getDefaultValue() const
 
 int16_t AttributeDesc::getReserve() const
 {
-        return _reserve;
+    return _reserve;
 }
 
 std::string const& AttributeDesc::getComment() const
 {
-        return _comment;
+    return _comment;
 }
 
 size_t AttributeDesc::getSize() const
@@ -888,13 +868,7 @@ const std::string& AttributeDesc::getDefaultValueExpr() const
 
 std::ostream& operator<<(std::ostream& stream,const Attributes& atts)
 {
-  for (size_t i=0,n=atts.size(); i<n; i++)
-  {
-        stream << atts[i];
-        if (i != n-1)
-                stream << ',';
-  }
-  return stream;
+    return insertRange(stream,atts,',');
 }
 
 std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
@@ -931,23 +905,25 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
  */
 
 DimensionDesc::DimensionDesc() :
-        ObjectNames(),
+    ObjectNames(),
 
-        _startMin(0),
-        _currStart(0),
-        _currEnd(0),
-        _endMax(0),
-        
-        _chunkInterval(0),
-        _chunkOverlap(0),
-        
-        _funcMapOffset(0),
-        _funcMapScale(1),
+    _startMin(0),
+    _currStart(0),
+    _currEnd(0),
+    _endMax(0),
 
-        _type(TID_INT64),     
-        _flags(0),
-        _isInteger(true)
-{}
+    _chunkInterval(0),
+    _chunkOverlap(0),
+
+    _funcMapOffset(0),
+    _funcMapScale(1),
+
+    _type(TID_INT64),
+    _flags(0),
+    _isInteger(true)
+{
+    validate();
+}
 
 DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordinate end, uint32_t chunkInterval,
                              uint32_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
@@ -970,6 +946,7 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordina
     _comment(comment),
     _isInteger(type == TID_INT64)
 {
+    validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names, Coordinate start, Coordinate end,
@@ -993,10 +970,11 @@ DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names
     _comment(comment),
     _isInteger(type == TID_INT64)
 {
+    validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coordinate currStart, Coordinate currEnd,
-                             Coordinate endMax, uint32_t chunkInterval, uint32_t chunkOverlap, TypeId type, int flags, 
+                             Coordinate endMax, uint32_t chunkInterval, uint32_t chunkOverlap, TypeId type, int flags,
                              std::string const& mappingArrayName, std::string const& comment,
                              Coordinate funcMapOffset, Coordinate funcMapScale) :
     ObjectNames(name),
@@ -1015,6 +993,7 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coord
     _comment(comment),
     _isInteger(type == TID_INT64)
 {
+    validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names, Coordinate startMin,
@@ -1037,6 +1016,7 @@ DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names
     _comment(comment),
     _isInteger(type == TID_INT64)
 {
+    validate();
 }
 
 std::string const& DimensionDesc::getMappingArrayName() const
@@ -1048,8 +1028,6 @@ std::string const& DimensionDesc::getComment() const
 {
     return _comment;
 }
-
-
 
 bool DimensionDesc::operator == (DimensionDesc const& other) const
 {
@@ -1095,12 +1073,12 @@ Coordinate DimensionDesc::getHighBoundary() const
 
 Coordinate DimensionDesc::getStart() const
 {
-        return _startMin;
+    return _startMin;
 }
 
 uint64_t DimensionDesc::getLength() const
 {
-        return _startMin == MIN_COORDINATE || _endMax == MAX_COORDINATE ? INFINITE_LENGTH : (_endMax - _startMin + 1);
+    return _startMin == MIN_COORDINATE || _endMax == MAX_COORDINATE ? INFINITE_LENGTH : (_endMax - _startMin + 1);
 }
 
 uint64_t DimensionDesc::getCurrLength() const
@@ -1136,32 +1114,32 @@ uint64_t DimensionDesc::getCurrLength() const
 
 Coordinate DimensionDesc::getStartMin() const
 {
-        return _startMin;
+    return _startMin;
 }
 
 Coordinate DimensionDesc::getCurrStart() const
 {
-        return _currStart;
+    return _currStart;
 }
 
 Coordinate DimensionDesc::getCurrEnd() const
 {
-        return _currEnd;
+    return _currEnd;
 }
 
 Coordinate DimensionDesc::getEndMax() const
 {
-        return _endMax;
+    return _endMax;
 }
 
 uint32_t DimensionDesc::getChunkInterval() const
 {
-        return _chunkInterval;
+    return _chunkInterval;
 }
 
 uint32_t DimensionDesc::getChunkOverlap() const
 {
-        return _chunkOverlap;
+    return _chunkOverlap;
 }
 
 TypeId  DimensionDesc::getType() const
@@ -1169,31 +1147,35 @@ TypeId  DimensionDesc::getType() const
     return _type;
 }
 
+void DimensionDesc::validate() const
+{
+    if (_startMin > _endMax)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW);
+    }
+}
+
 void printSchema (std::ostream& stream,const Dimensions& dims)
 {
-  for (size_t i=0,n=dims.size(); i<n; i++)
-  {
-      printSchema(stream, dims[i]);
-      if (i != n-1) {
-          stream << ',';
-      }
-  }
+    for (size_t i=0,n=dims.size(); i<n; i++)
+    {
+        printSchema(stream, dims[i]);
+        if (i != n-1)
+        {
+            stream << ',';
+        }
+    }
 }
 
 std::ostream& operator<<(std::ostream& stream,const Dimensions& dims)
 {
-  for (size_t i=0,n=dims.size(); i<n; i++)
-  {
-        stream << dims[i];
-        if (i != n-1)
-                stream << ',';
-  }
-  return stream;
+    return insertRange(stream,dims,',');
 }
 
 std::ostream& operator<<(std::ostream& stream,const DimensionDesc& dim)
 {
-    if (!dim.getComment().empty()) {
+    if (!dim.getComment().empty())
+    {
         stream << "\n--- " << dim.getComment() << "\n";
     }
     if (dim.isInteger())
@@ -1226,12 +1208,13 @@ std::ostream& operator<<(std::ostream& stream,const DimensionDesc& dim)
                << dim.getChunkInterval() << ',' << dim.getChunkOverlap();
     }
 
-        return stream;
+    return stream;
 }
 
 void printSchema (std::ostream& stream,const DimensionDesc& dim)
 {
-    if (!dim.getComment().empty()) {
+    if (!dim.getComment().empty())
+    {
         stream << "\n--- " << dim.getComment() << "\n";
     }
     if (dim.isInteger())
@@ -1272,12 +1255,11 @@ void printSchema (std::ostream& stream,const DimensionDesc& dim)
  * Class InstanceDesc
  */
 InstanceDesc::InstanceDesc() :
-        _instance_id(0),
-        _host(""),
-        _port(0),
-        _online(~0)
-{
-}
+    _instance_id(0),
+    _host(""),
+    _port(0),
+    _online(~0)
+{}
 
 InstanceDesc::InstanceDesc(const std::string &host, uint16_t port, const std::string &path) :
         _host(host),
@@ -1301,38 +1283,37 @@ InstanceDesc::InstanceDesc(uint64_t instance_id, const std::string &host,
 
 uint64_t InstanceDesc::getInstanceId() const
 {
-        return _instance_id;
+    return _instance_id;
 }
 
 const std::string& InstanceDesc::getHost() const
 {
-        return _host;
+    return _host;
 }
 
 const std::string& InstanceDesc::getPath() const
 {
-        return _path;
+    return _path;
 }
 
 uint16_t InstanceDesc::getPort() const
 {
-        return _port;
+    return _port;
 }
 
 uint64_t InstanceDesc::getOnlineSince() const
 {
-        return _online;
+    return _online;
 }
 
 std::ostream& operator<<(std::ostream& stream,const InstanceDesc& instance)
 {
-
     stream << "instance { id = " << instance.getInstanceId()
-           << ", host = " << instance.getHost() << ", port = " << instance.getPort()
+           << ", host = " << instance.getHost()
+           << ", port = " << instance.getPort()
            << ", has been on-line since " << instance.getOnlineSince()
            << ", path = " << instance.getPath();
-
-  return stream;
+    return stream;
 }
 
 } // namespace

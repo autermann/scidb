@@ -66,7 +66,7 @@ SCIDB QUERY : <insert(repart(D,<val:double> [x=0:3,2,0]),D)>
 [An error expected at this place for the query "insert(repart(D,<val:double> [x=0:3,2,0]),D)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH.]
 
 SCIDB QUERY : <insert(B, repart(D,<sal:double> [x=0:3,2,0]))>
-[An error expected at this place for the query "insert(B, repart(D,<sal:double> [x=0:3,2,0]))". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "insert(B, repart(D,<sal:double> [x=0:3,2,0]))". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <insert(B,ZZ)>
 [An error expected at this place for the query "insert(B,ZZ)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAY_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAY_DOESNT_EXIST.]

@@ -47,7 +47,7 @@ Enter your AQL query:
 <%
 try
 {   
-    Class.forName("org.scidb.jdbc.SciDBJDBCDriver");
+    Class.forName("org.scidb.jdbc.Driver");
     if(request.getParameter("query") != null)
     {
         String queryString = request.getParameter("query");
@@ -59,7 +59,7 @@ try
             ResultSetMetaData meta = res.getMetaData();
             out.print("<table>");
             out.print("<tr>");
-            for (int i = 0; i < meta.getColumnCount(); i++)
+            for (int i = 1; i <= meta.getColumnCount(); i++)
             {
                 out.print("<th>");
                 out.print(meta.getColumnName(i) + "(" + meta.getColumnTypeName(i) + ")");
@@ -69,7 +69,7 @@ try
             while(!res.isAfterLast())
             {
                 out.print("<tr>");
-                for (int i = 0; i < meta.getColumnCount(); i++)
+                for (int i = 1; i <= meta.getColumnCount(); i++)
                 {
                     String t = meta.getColumnTypeName(i);
                     out.print("<td>");

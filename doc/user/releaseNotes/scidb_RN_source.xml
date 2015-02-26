@@ -10,10 +10,10 @@
     <title>SciDB Release Notes</title>
 
     <author>
-      <personname><firstname>Version</firstname><surname>13.1</surname></personname>
+      <personname><firstname>Version</firstname><surname>13.2</surname></personname>
     </author>
 
-    <pubdate>1/31/2013</pubdate>
+    <pubdate>2/28/2013</pubdate>
 
     <copyright>
       <year>2008 - 2013 SciDB, Inc.</year>
@@ -34,28 +34,27 @@
 
   <para/>
 
-  <para>The 13.1 release:</para>
+  <para>The 13.2 release supports three platforms: Ubuntu 12.04, RHEL 6.3, and
+  CentOS 6.3. This version:</para>
 
   <itemizedlist>
     <listitem>
-      <para>Adds support for ScaLAPACK (Scalable Linear Algebra PACKage) on
-      the RHEL 6.3 and CentOS 6.3 platforms. Previously, this support was
-      available for Ubuntu 12.04 only.</para>
+      <para>Enables installing a new version of SciDB without removing older
+      versions of already installed SciDB.</para>
     </listitem>
 
     <listitem>
-      <para>Significantly improves the performance of selected operators such
-      as redimension and redimension_store.</para>
+      <para>Enables SciDB to be installed on CentOS and RedHat, without
+      changing existing boost library, if any.</para>
     </listitem>
 
     <listitem>
-      <para>Adds a Best Practices section to the SciDB User Guide that
-      provides guidelines on performance tuning for your SciDB
-      installation.</para>
+      <para>Correctly handles strings with length between 128 bytes and 256
+      bytes.</para>
     </listitem>
   </itemizedlist>
 
-  <para>The 13.1 release has the following known limitations:<itemizedlist>
+  <para>The 13.2 release has the following known limitations:<itemizedlist>
       <listitem>
         <para>Support for non-integer dimensions is incomplete: it works only
         for selected operators, and may use a large amount of memory. Reducing
@@ -74,10 +73,6 @@
         <para>Some operators may consume more memory than specified. Plan to
         leave margins when specifying the parameters controlling memory
         usage.</para>
-      </listitem>
-
-      <listitem>
-        <para>Strings with quotations may not be loaded correctly.</para>
       </listitem>
     </itemizedlist></para>
 

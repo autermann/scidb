@@ -102,3 +102,7 @@ other.loadlib
 
 #re-enable after solving ticket 2258
 other.random_check
+
+#re-enable after solving ticket 2329
+docscript/quickStart
+

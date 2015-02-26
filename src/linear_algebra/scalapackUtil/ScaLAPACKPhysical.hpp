@@ -1,3 +1,24 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 ///
 /// ScaLAPACKPhysical.hpp
 ///
@@ -16,9 +37,9 @@
 // SciDB
 #include <query/Query.h>
 
-// more SciDB
+// MPI/ScaLAPACK
 #include <mpi/MPIPhysical.hpp>                    // NOTE: there are many handy helpers in this lower level, worth perusing
-
+#include <scalapackUtil/dimUtil.hpp>
 // local
 #include "scalapackFromCpp.hpp"   // TODO JHM : rename slpp::int_t
 
@@ -68,7 +89,7 @@ void setOutputMatrixToAlgebraDefault(float_tt* dst, size_t numVal) {
 }
 
 void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPROW, slpp::int_t NPCOL,
-                                                                 slpp::int_t MYPROW, slpp::int_t MYPCOL) ;
+                                                                 slpp::int_t MYPROW, slpp::int_t MYPCOL, const std::string& callerLabel) ;
 
 ///
 /// ScaLAPACK computation routines are only efficient for a certain
@@ -84,49 +105,60 @@ public:
 
     /**
      * @see     MPIPhysical::MPIPhysical
+     * 
+     * @param rule                  certain operators have constraints on the shape of their processor grid
      */
-    ScaLAPACKPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+    enum GridSizeRule_e             {RuleInputUnion=0, RuleNotHigherThanWide};
+    ScaLAPACKPhysical(const std::string& logicalName, const std::string& physicalName,
+                      const Parameters& parameters, const ArrayDesc& schema,
+                      GridSizeRule_e gridRule=RuleInputUnion)
     :
-        MPIPhysical(logicalName, physicalName, parameters, schema)
+        MPIPhysical(logicalName, physicalName, parameters, schema),
+        _gridRule(gridRule)
     {
     }
 
     // standard API
     virtual bool                    changesDistribution(const std::vector<ArrayDesc> & inputSchemas) const
-    { return true; }
+                                    { return true; }
 
     virtual ArrayDistribution       getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                           const std::vector< ArrayDesc> & inputSchemas) const
-    { return ArrayDistribution(psScaLAPACK); }
+                                    { return ArrayDistribution(psScaLAPACK); }
 
     virtual bool                    requiresRepart(ArrayDesc const& inputSchema) const;
     virtual ArrayDesc               getRepartSchema(ArrayDesc const& inputSchema) const;
 
     // extending API
-    std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query);
+    std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query, const std::string& callerLabel);
     /**
      * Initialize the ScaLAPACK BLACS (Basic Linear Algebra Communications Systems).
      * @param redistInputs  The final inputs to the operator (already repartitioned and redistributed
      * @param query         Current query
      * @return              Whether the instance participates in the ScaLAPACK computation or may instead
      */
-    bool                            doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query);
+    bool                            doBlacsInit(std::vector< shared_ptr<Array> >& redistributedInputs, shared_ptr<Query>& query, const std::string& callerLabel);
 
     /**
      * compute the correct ScaLAPACK BLACS process grid size for a particular set of input Arrays (Matrices)
-     * @param redistInputs  the matrices
-     * @return              the BLACS grid size
+     * @param redistributedInputs   the matrices
+     * @param query                 current query 
+     * @param callerLabel           identify the context of the call, essential for nested operator debugging
+     * @return                      the BLACS grid size
      */
-    virtual procRowCol_t            getBlacsGridSize(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query);
+    virtual procRowCol_t            getBlacsGridSize(std::vector< shared_ptr<Array> >& redistributedInputs, shared_ptr<Query>& query, const std::string& callerLabel);
+
+    /**
+     * a standard way to test INFO returned by a slave,
+     * logging and raising any error in a standardized way.
+     * @param INFO          the ScaLAPACK INFO value as returned by MPISlaveProxy::waitForStatus()
+     * @param operatorName  the ScaLAPACK operator name, e.g "pdgemm" or "pdgesvd" (do not include "Master" suffix)
+     */
+    void                            raiseIfBadResultInfo(sl_int_t INFO, const std::string& operatorName) const ;
 
 protected:
     /// routines that make dealing with matrix parameters
     /// more readable and less error prone
-
-    size_t nRow(boost::shared_ptr<Array>& array) const;
-    size_t nCol(boost::shared_ptr<Array>& array) const;
-    size_t chunkRow(boost::shared_ptr<Array>& array) const;
-    size_t chunkCol(boost::shared_ptr<Array>& array) const;
 
     /// a structure to retrieve matrix parameters as a short vector -> 1/2 as many LOC as above
     /// very handy for the operators
@@ -137,31 +169,12 @@ protected:
     matSize_t getMatChunkSize(boost::shared_ptr<Array>& array) const;
 
     void checkInputArray(boost::shared_ptr<Array>& Ain) const ;
+
+private:
+    GridSizeRule_e          _gridRule;  // some operators need special rules for determining the
+                                        // best way to map their matrices to the processor grid
 };
 
-inline size_t ScaLAPACKPhysical::nRow(boost::shared_ptr<Array>& array) const
-{
-    assert(array->getArrayDesc().getDimensions().size() >= 1);
-    return array->getArrayDesc().getDimensions()[0].getLength();
-}
-
-inline size_t ScaLAPACKPhysical::nCol(boost::shared_ptr<Array>& array) const
-{
-    assert(array->getArrayDesc().getDimensions().size() >= 2);
-    return array->getArrayDesc().getDimensions()[1].getLength();
-}
-
-inline size_t ScaLAPACKPhysical::chunkRow(boost::shared_ptr<Array>& array) const
-{
-    assert(array->getArrayDesc().getDimensions().size() >= 1);
-    return array->getArrayDesc().getDimensions()[0].getChunkInterval();
-}
-
-inline size_t ScaLAPACKPhysical::chunkCol(boost::shared_ptr<Array>& array) const
-{
-    assert(array->getArrayDesc().getDimensions().size() >= 2);
-    return array->getArrayDesc().getDimensions()[1].getChunkInterval();
-}
 
 inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(boost::shared_ptr<Array>& array) const
 {
@@ -183,7 +196,6 @@ inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatChunkSize(boost::sh
     result.at(1) = array->getArrayDesc().getDimensions()[1].getChunkInterval();
     return result;
 }
-
 
 } // namespace
 

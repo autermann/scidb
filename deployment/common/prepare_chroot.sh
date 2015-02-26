@@ -1,4 +1,24 @@
 #!/bin/bash
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 
 set -eu
 
@@ -14,26 +34,10 @@ echo "${username} ALL = NOPASSWD:/usr/sbin/mock, NOPASSWD:/bin/which, NOPASSWD:R
 chmod a-wx,o-r,ug+r ${CHROOT_SUDOERS}
 }
 
-function update_mock_config ()
+function centos6 ()
 {
-    MOCK_CONFIG=/etc/mock/centos-6.3-x86_64.cfg
-#if [ "0" == `cat ${MOCK_CONFIG} | grep scidb | wc -l` ]; then
-    NEW_MOCK_CONFIG=${MOCK_CONFIG}.new
-    REPO_FILE=/etc/yum.repos.d/SciDB.repo
-    head -n-1 "${MOCK_CONFIG}" > ${NEW_MOCK_CONFIG}
-    echo "" >> ${NEW_MOCK_CONFIG}
-    cat ${REPO_FILE} >> ${NEW_MOCK_CONFIG}
-    echo "\"\"\"" >> ${NEW_MOCK_CONFIG}
-    cat ${NEW_MOCK_CONFIG} > ${MOCK_CONFIG}
-    rm ${NEW_MOCK_CONFIG}
-#fi;
-}
-
-function centos63 ()
-{
-yum install -y gcc make rpm-build mock python-argparse git git-svn
+yum install --enablerepo=scidb3rdparty -y gcc make rpm-build mock python-argparse git git-svn
 chroot_sudoers_mock
-update_mock_config
 }
 
 function chroot_sudoers_pbuilder ()
@@ -55,15 +59,15 @@ chroot_sudoers_pbuilder
 
 function redhat63 ()
 {
-echo "We do not support build SciDB under RedHat 6.3. Please use CentOS 6.3 instead"
+echo "We do not support build SciDB under RedHat 6. Please use CentOS 6 instead"
 exit 1
 }
 
-if [ "${OS}" = "CentOS 6.3" ]; then
-    centos63
+if [ "${OS}" = "CentOS 6" ]; then
+    centos6
 fi
 
-if [ "${OS}" = "RedHat 6.3" ]; then
+if [ "${OS}" = "RedHat 6" ]; then
     redhat63
 fi
 

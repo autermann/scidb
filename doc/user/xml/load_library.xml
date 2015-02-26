@@ -20,22 +20,25 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>Load a SciDB plugin. The act of loading a plugin shared library
-    first registers the library in the SciDB system catalogs. Then it opens
-    and examines the shared library to store its contents with SciDB's
-    internal extension management subsystem. Shared library module which are
-    registered with the SciDB instance will be loaded at system start
-    time.</para>
+    <para>Load a SciDB plugin. The act of loading a library first registers
+    the library in the SciDB system catalogs. Then it opens and examines the
+    shared library to store its contents with SciDB's internal extension
+    management subsystem.</para>
+
+    <para>Shared library modules which are registered with the SciDB instance
+    will be loaded at system start time.</para>
 
     <para>To unload a library, see the <link
-    linkend="unloadLibrary">unload_library operator reference</link>.</para>
+    linkend="unloadLibrary">unload_library</link> operator reference.</para>
   </refsect1>
 
   <refsect1>
     <title>Example</title>
 
     <informalexample>
-      <programlisting>load_library('librational')</programlisting>
+      <para>This example loads the example plugin, librational.so</para>
+
+      <programlisting>load_library('rational')</programlisting>
     </informalexample>
   </refsect1>
 </refentry>

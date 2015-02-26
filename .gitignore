@@ -57,3 +57,27 @@ tests/harness/arg_separator
 tests/unit/unit_tests
 scidbpython.cxx
 
+doc/api/Doxyfile
+doc/user/pdf/
+doc/user/scidb-userguide*
+doc/user/xml/custom.xsl
+revision
+src/clients/java/.idea/
+src/clients/java/build/
+src/clients/java/configure.properties
+src/clients/java/depcache/
+src/clients/java/deps/
+src/clients/java/dist/
+src/clients/java/out/
+src/clients/java/report/
+src/clients/java/src/main/java/main.iml
+src/clients/java/src/main/java/scidb4j/org/scidb/io/network/ScidbMsg.java
+src/clients/java/src/main/jsp/scidb-example/WEB-INF/
+src/system/System.h
+src/system/catalog/data/CatalogMetadata.h
+tests/harness/testcases/Report.xml
+tests/harness/testcases/r/checkin/update/updatedelta.timer
+tests/harness/testcases/t/client/basic.py
+tests/harness/testcases/t/disable.tests
+tests/harness/testcases/t/disable1i.tests
+

@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -57,10 +57,11 @@ inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName)
             attr.getDefaultValueExpr());
     }
     Dimensions newDimensions(1);
-    newDimensions[0] = DimensionDesc(dimName, 0, 0, arrayLength-1, arrayLength-1, dims[dims.size()-1].getChunkInterval(), 0);
+    size_t end = arrayLength>0 ? arrayLength - 1 : 0;
+    newDimensions[0] = DimensionDesc(dimName, 0, 0, end, end, dims[dims.size()-1].getChunkInterval(), 0);
 	return ArrayDesc(desc.getName(), newAttributes, newDimensions);
 }
-    
+
 /**
  * @brief The operator: old_unpack().
  *

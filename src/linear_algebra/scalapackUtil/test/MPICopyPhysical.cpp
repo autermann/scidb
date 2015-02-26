@@ -2,13 +2,20 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -80,28 +87,27 @@ public:
     // another operator called ???
 
     virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
-    virtual void invokeMPICopy(std::vector< shared_ptr<Array> >* inputArrays, shared_ptr<Query>& query,
-                               ArrayDesc& outSchema, shared_ptr<Array>* result, slpp::int_t* INFO);
+    virtual shared_ptr<Array>  invokeMPI(std::vector< shared_ptr<Array> >& redistributedInputs, shared_ptr<Query>& query,
+                                         ArrayDesc& outSchema);
 };
 
-/// + determine ScaLAPACK parameters regarding the shape of the process grid
-/// + start and connect to an MPI slave process
-/// + create ScaLAPACK descriptors for the input arrays
-/// + convert the inputArrays into in-memory ScaLAPACK layout in shared memory
-/// + call a "master" routine that passes the ScaLAPACK operator name, parameters,
-///   and shared memory descriptors to the ScaLAPACK MPI process that will do the
-///   actual computation.
-/// + wait for successful completion
-/// + construct an "OpArray" that make and Array API view of the output memory.
-/// + return that output array.
-
-void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArrays,
-                                    shared_ptr<Query>& query,
-                                    ArrayDesc& outSchema,
-                                    shared_ptr<Array>* result,
-                                    slpp::int_t* INFO)
+shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redistributedInputs,
+                                              shared_ptr<Query>& query,
+                                              ArrayDesc& outSchema)
 {
-    if(DBG) std::cerr << "invokeMPICopy reached" << std::endl ;
+    // + intersects the array chunkGrids with the maximum process grid
+    // + sets up the ScaLAPACK grid accordingly and if not participating, return early
+    // + start and connect to an MPI slave process
+    // + create ScaLAPACK descriptors for the input arrays
+    // + convert the redistributedInputs into in-memory ScaLAPACK layout in shared memory
+    // + call a "master" routine that passes the ScaLAPACK operator name, parameters,
+    //   and shared memory descriptors to the ScaLAPACK MPI process that will do the
+    //   actual computation.
+    // + wait for successful completion
+    // + construct an "OpArray" that make and Array API view of the output memory.
+    // + return that output array.
+
+    if(DBG) std::cerr << "MPICopyPhysical::invokeMPI(): reached" << std::endl ;
 
     // MPI_Init(); -- now done in slave processes
     // in SciDB we use query->getInstancesCount() & getInstanceID()
@@ -109,25 +115,43 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     // we are in it.  so the blacs_getinfo calls below are fakes to help
     // keep the code more similar
 
-    //!
-    //!.... Get the (emulated) BLACS info .............................................
-    //!
-    slpp::int_t ICTXT=-1;
-    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
-    checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    //
+    // Initialize the (emulated) BLACS and get the proces grid info
+    //
+    bool isParticipatingInScaLAPACK = doBlacsInit(redistributedInputs, query, "MPICopyPhysical");
+    slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+    if (isParticipatingInScaLAPACK) {
+        blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+        checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "MPICopyPhysical");
+    }
 
-    slpp::int_t instanceID = query->getInstanceID();
-    slpp::int_t MYPE = instanceID ;  // if checkBlacsInfo returns, this assumption is true
+    //
+    // launch MPISlave if we participate
+    // TODO: move this down into the ScaLAPACK code ... something that does
+    //       the doBlacsInit, launchMPISlaves, and the check that they agree
+    //
+    bool isParticipatingInMPI = launchMPISlaves(query, NPROW*NPCOL);
+    if (isParticipatingInScaLAPACK != isParticipatingInMPI) {
+        LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI():"
+                              << " isParticipatingInScaLAPACK " << isParticipatingInScaLAPACK
+                              << " isParticipatingInMPI " << isParticipatingInMPI);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
+                   << "MPICopyPhysical::invokeMPI(): internal inconsistency in MPI slave launch.");
+    }
 
-    launchMPISlaves(query, NPROW*NPCOL);
+    if (isParticipatingInMPI) {
+        LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): participating in MPI");
+    } else {
+        LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): not participating in MPI");
+        return shared_ptr<Array>(new MemArray(_schema));
+    }
 
     // REFACTOR: this is a pattern in DLAs
     //
     // get dimension information about the input arrays
     //
-    if(DBG) std::cerr << "invokeMPICopy get dim info" << std::endl ;
-    boost::shared_ptr<Array> Ain = (*inputArrays)[0];
+    if(DBG) std::cerr << "invokeMPI get dim info" << std::endl ;
+    boost::shared_ptr<Array> Ain = redistributedInputs[0];
 
     std::ostringstream tmp;
     Ain->getArrayDesc().getDimensions()[0].toString(tmp) ;
@@ -144,9 +168,9 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
 
 
     checkInputArray(Ain);
-    //!
-    //!.... Set up ScaLAPACK array descriptors ........................................
-    //!
+    //
+    //.... Set up ScaLAPACK array descriptors ........................................
+    //
 
     // these formulas for LLD (loacal leading dimension) and LTD (local trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
@@ -173,21 +197,21 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     slpp::desc_t DESC_IN;
     descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPICopy: descinit(DESC_IN) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: descinit(DESC_IN) failed, INFO " << descinitINFO
                                                                                  << " DESC_IN " << DESC_IN);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPICopy: descinit(DESC_IN) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPI: descinit(DESC_IN) failed");
     }
-    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPICopy: DESC_IN " << DESC_IN);
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI: DESC_IN " << DESC_IN);
 
     if(DBG) std::cerr << "descinit_ DESC_OUT" << std::endl;
     slpp::desc_t DESC_OUT;
     descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LLD_OUT, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPICopy: descinit(DESC_IN) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: descinit(DESC_IN) failed, INFO " << descinitINFO
                                                                                 << " DESC_OUT " << DESC_OUT);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPICopy: descinit(DESC_OUT) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPI: descinit(DESC_OUT) failed");
     }
-    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPICopy: DESC_OUT " << DESC_OUT);
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI: DESC_OUT " << DESC_OUT);
 
     // create ScaLAPACK array descriptors
     slpp::int_t MP = LLD_IN;
@@ -242,27 +266,19 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
         }
     }
 
-    //!
-    //!.... Call the master wrapper
-    //!
-    if(DBG) std::cerr << "MPICopyPhysical: calling mpiCopyMaster M,N:" << M  << "," << N
-                                              << "MB,NB:" << MB << "," << NB << std::endl;
-    LOG4CXX_DEBUG(logger, "MPICopyPhysical: calling mpiCopyMaster M,N:" << M <<","<< "MB,NB:" << MB << "," << NB);
-
-    if(DBG) std::cerr << "MPICopyPhysical calling mpiCopyMaster" << std:: endl;
+    //
+    //.... Call the master wrapper
+    //
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): calling mpiCopyMaster M,N " << M << "," << N << "MB,NB:" << MB << "," << NB);
     boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+    slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-1 between instanceID and MPI rank
+    slpp::int_t INFO = DEFAULT_BAD_INFO ;
     mpiCopyMaster(query.get(), _ctx, slave, _ipcName, argsBuf,
                   NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
-                  IN,  DESC_IN, OUT, DESC_OUT, *INFO);
-
-    LOG4CXX_DEBUG(logger, "MPICopy: mpiCopyMaster finished");
-    if(DBG) std::cerr << "MPICopy: calling mpiCopyMaster finished" << std::endl;
-    if(DBG) std::cerr << "MPICopy: mpiCopyMaster returned INFO:" << *INFO << std::endl;
-
-    Dimensions const& dims = Ain->getArrayDesc().getDimensions();
+                  IN,  DESC_IN, OUT, DESC_OUT, INFO);
+    raiseIfBadResultInfo(INFO, "mpiCopy");
 
     boost::shared_array<char> resPtrDummy(reinterpret_cast<char*>(NULL));
-
     typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
 
     // Only in MPICopy
@@ -283,6 +299,7 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     // our "processor" coordinate into that position, which we do by multiplying
     // by the chunkSize
     //
+    Dimensions const& dims = Ain->getArrayDesc().getDimensions();
     Coordinates first(2);
     first[0] = dims[0].getStart() + MYPROW * dims[0].getChunkInterval();
     first[1] = dims[1].getStart() + MYPCOL * dims[1].getChunkInterval();
@@ -296,28 +313,26 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     iterDelta[1] = NPCOL * dims[1].getChunkInterval();
 
     if(DBG) std::cerr << "MPICopy OUT SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
-    LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
 
     reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStart(), dims[1].getStart());
-    *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                          first, last, iterDelta, query));
+    shared_ptr<Array> result  = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+                                                                            first, last, iterDelta, query));
     releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
     resetMPI();
-
-    if(DBG) std::cerr << "invoke: returning from invokeMPICopy with INFO:" << *INFO << std::endl ;
+ 
+    return result;
 }
 
 
-///
-/// + converts inputArrays to psScaLAPACK distribution
-/// + intersects the array chunkGrid with the maximum process grid
-/// + sets up the ScaLAPACK grid accordingly and if not participating, return early
-/// + calls invokeMPICopy()
-/// + returns the output OpArray.
-/// 
 shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
 {
+    //
+    // + converts inputArrays to psScaLAPACK distribution
+    // + calls invokeMPI()
+    // + returns the output OpArray.
+    // 
     const bool DBG = false ;
 
     if(DBG) std::cerr << "MPICopyPhysical::execute() begin ---------------------------------------" << std::endl;
@@ -333,9 +348,9 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     slpp::int_t instanceID = query->getInstanceID();
 
     // redistribute input arrays to ScaLAPACK block-cyclic
-    std::vector<shared_ptr<Array> > redistInputs = redistributeInputArrays(inputArrays, query);
+    std::vector<shared_ptr<Array> > redistributedInputs = redistributeInputArrays(inputArrays, query, "MPICopyPhysical");
 
-    shared_ptr<Array> input = redistInputs[0];
+    shared_ptr<Array> input = redistributedInputs[0];
     Dimensions const& dims = input->getArrayDesc().getDimensions();
     size_t nRows = dims[0].getLength();
     size_t nCols = dims[1].getLength();
@@ -343,10 +358,10 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         return shared_ptr<Array>(new MemArray(_schema));
     }
 
-    //!
-    //!.... Initialize the (imitation)BLACS used by the instances to calculate sizes
-    //!     AS IF they are MPI processes (which they are not)
-    //!
+    //
+    //.... Initialize the (imitation)BLACS used by the instances to calculate sizes
+    //     AS IF they are MPI processes (which they are not)
+    //
     const ProcGrid* procGrid = query->getProcGrid();
 
     procRowCol_t MN = { nRows, nCols};
@@ -414,7 +429,7 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     }
 
 
-    LOG4CXX_DEBUG(logger, "MPICopy: preparing to extractData, nRows=" << nRows << ", nCols = " << nCols);
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::execute(): preparing to extractData, nRows=" << nRows << ", nCols = " << nCols);
 
     Coordinates first(2);
     first[0] = dims[0].getStart() + MYPROW * dims[0].getChunkInterval();
@@ -424,33 +439,16 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     last[0] = dims[0].getStart() + dims[0].getLength() - 1;
     last[1] = dims[1].getStart() + dims[1].getLength() - 1;
 
-    if(DBG) std::cerr << "@@@ calling invokeMPICopy()" << std::endl ;
-    LOG4CXX_DEBUG(logger, "*@@@ calling invokeMPICopy()");
-
-    const slpp::int_t DEFAULT_BAD_RESULT = -99;  // scalapack negative errors are the position of the bad argument
-    slpp::int_t INFO = DEFAULT_BAD_RESULT ;
-    shared_ptr<Array> result;
-
-    invokeMPICopy(&redistInputs, query, _schema, &result, &INFO);
-    if(DBG) std::cerr << "@@@ execute: post invokeMPICopy, INFO:" << INFO << std::endl ;
-
-    if (INFO != 0) {
-        std::stringstream ss; ss << "MPI op failure: MPICopy INFO is: " << INFO << std::endl ;
-        if(DBG) std::cerr << ss.str() << std::endl ;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str());
-    }
+    shared_ptr<Array> result = invokeMPI(redistributedInputs, query, _schema);
 
     // return the scidb array
-    if(DBG) std::cerr << "invokeMPICopy returning result" << std::endl ;
-    LOG4CXX_DEBUG(logger, "invokeMPICopy returning result");
-
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::execute(): returning result");
     Dimensions const& rdims = result->getArrayDesc().getDimensions();
 
     if(DBG) {
         std::cerr << "returning result array size: " << rdims[0].getLength() <<
                                                  "," << rdims[1].getLength() << std::endl ;
     }
-    if(DBG) std::cerr << "SVDPhysical::execute() end ---------------------------------------" << std::endl;
     return result;
 }
 

@@ -60,3 +60,5 @@ SCIDB QUERY : <sort( Raw_CSVLoad_1,symbl )>
 SCIDB QUERY : <remove ( Raw_CSVLoad_1 )>
 Query was executed successfully
 
+SCIDB QUERY : <rm-rf /tmp/csv2scidb_test_1.txt>
+

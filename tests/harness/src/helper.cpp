@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -915,7 +915,9 @@ int tokenize_commandline (const string str, vector<string> &token_list)
 	else
 	{
 		LOGGER_POP_NDCTAG;
-		throw SystemError (FILE_LINE_FUNCTION, "arg_separator could not exit normally. Please check opening and closing single/double quotes.");
+		std::stringstream ss;
+		ss << "tokenize_commandline: arg_separator failed when processing '" << str << "' Please check quoting." ;
+		throw SystemError (FILE_LINE_FUNCTION, ss.str());
 	}
 	
 	LOGGER_POP_NDCTAG;

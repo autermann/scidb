@@ -576,3 +576,5 @@ Query was executed successfully
 SCIDB QUERY : <remove(target)>
 Query was executed successfully
 
+SCIDB QUERY : <rm /tmp/scidb_array_a.out>
+

@@ -3,9 +3,9 @@
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter id="ChangingArraySchemas">
-  <title>Changing Array Schemas: Transforming Your SciDB Array</title>
+  <title>Changing Array Schemas</title>
 
-  <para>This chapter describes several ways to transform arrays:</para>
+  <para>This chapter describes several ways to transform SciDB arrays:</para>
 
   <itemizedlist>
     <listitem>

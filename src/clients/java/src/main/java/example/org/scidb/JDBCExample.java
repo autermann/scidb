@@ -1,6 +1,27 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 package org.scidb;
 
-import org.scidb.jdbc.ISciDBJDBCResultSetWrapper;
+import org.scidb.jdbc.IResultSetWrapper;
 
 import java.io.IOException;
 import java.sql.DriverManager;
@@ -16,7 +37,7 @@ class JDBCExample
     {
         try
         {
-            Class.forName("org.scidb.jdbc.SciDBJDBCDriver");
+            Class.forName("org.scidb.jdbc.Driver");
         }
         catch (ClassNotFoundException e)
         {
@@ -35,8 +56,8 @@ class JDBCExample
             System.out.println("Source array name: " + meta.getTableName(0));
             System.out.println(meta.getColumnCount() + " columns:");
 
-            ISciDBJDBCResultSetWrapper resWrapper = res.unwrap(ISciDBJDBCResultSetWrapper.class);
-            for (int i = 0; i < meta.getColumnCount(); i++)
+            IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
+            for (int i = 1; i <= meta.getColumnCount(); i++)
             {
                 System.out.println(meta.getColumnName(i) + " - " + meta.getColumnTypeName(i) + " - is attribute:" + resWrapper.isColumnAttribute(i));
             }

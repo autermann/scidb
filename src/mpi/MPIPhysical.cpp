@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -92,14 +92,15 @@ void MPIPhysical::setQuery(const boost::shared_ptr<Query>& query)
 
 bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves)
 {
-    if(DBG) std::cerr << "launchNewMPISlave slave creation" << std::endl ;
+    LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(query, maxSlaves: " << maxSlaves << ") called.");
 
     assert(maxSlaves <= query->getInstancesCount());
 
     _launchId = _ctx->getNextLaunchId(); // bump the launch ID by 1
 
     // check if our logical ID is within the set of instances that will have a corresponding slave
-    if ( query->getInstanceID() < maxSlaves) {
+    InstanceID iID = query->getInstanceID();
+    if ( iID < maxSlaves) {
 
         uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
         assert(lastIdInUse < _launchId);
@@ -107,7 +108,6 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
         Cluster* cluster = Cluster::getInstance();
         const boost::shared_ptr<const InstanceMembership> membership =
            cluster->getInstanceMembership();
-
         const string& installPath = MpiManager::getInstallPath(membership);
 
         boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(_launchId, query, installPath));
@@ -122,19 +122,19 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
         }
 
         //-------------------- Get the handshake
-        if(DBG) std::cerr << "launchNewMPISlave slave waitForHandshake 1" << std::endl ;
-        if(DBG) std::cerr << "-------------------------------------" << std::endl ;
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): slave->waitForHandshake() 1 called.");
         slave->waitForHandshake(_ctx);
-        if(DBG) std::cerr << "launchNewMPISlave slave waitForHandshake 1 done" << std::endl ;
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): slave->waitForHandshake() 1 returned.");
 
         // After the handshake the old slave must be gone
-        if(DBG) std::cerr << "launchNewMPISlave lastLaunchIdInUse=" << lastIdInUse << std::endl ;
-        if(DBG) std::cerr << "launchNewMPISlave _launchId=" << _launchId << std::endl ;
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves():"
+                               << " lastLaunchIdInUse=" << lastIdInUse
+                               << " launchId=" << _launchId);
 
         boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(lastIdInUse);
         if (oldSlave) {
             assert(lastIdInUse == oldSlave->getLaunchId());
-            if(DBG) std::cerr << "launchNewMPISlave oldSlave->destroy()" << std::endl ;
+            LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): oldSlave->destroy() & .reset()");
             oldSlave->destroy();
             oldSlave.reset();
         }
@@ -142,13 +142,15 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
 
         _ipcName = mpi::getIpcName(installPath, cluster->getUuid(), query->getQueryID(),
                                    cluster->getLocalInstanceId(), _launchId);
+
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << "slave started.");
         return true;
     } else {
         assert(query->getCoordinatorID() != COORDINATOR_INSTANCE);
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << "slave bypass.");
+        return false;
     }
-    return false;
 }
-
 
 
 // XXX TODO: consider returning std::vector<scidb::SharedMemoryPtr>
@@ -158,33 +160,36 @@ std::vector<MPIPhysical::SMIptr_t> MPIPhysical::allocateMPISharedMemory(size_t n
                                                                         size_t numElems[],
                                                                         string dbgNames[])
 {
-	if(DBG) {
-		std::cerr << "SHM ALLOCATIONS:@@@@@@@@@@@@@@@@@@@" << std::endl ;
-		for(size_t ii=0; ii< numBufs; ii++) {
-		    std::cerr << "numElems["<<ii<<"] "<< dbgNames[ii] << " len = " << numElems[0] << std::endl;
-		}
-	}
+    LOG4CXX_DEBUG(logger, "MPIPhysical::allocateMPISharedMemory(numBufs "<<numBufs<<",,,)");
 
-	std::vector<SMIptr_t> shmIpc(numBufs);
+    if(logger->isTraceEnabled()) {
+        LOG4CXX_TRACE(logger, "MPIPhysical::allocateMPISharedMemory(): allocations are: ");
+        for(size_t ii=0; ii< numBufs; ii++) {
+            LOG4CXX_TRACE(logger, "MPIPhysical::allocateMPISharedMemory():"
+                                   << " elemSizes["<<ii<<"] "<< dbgNames[ii] << " len " << numElems[ii]);
+        }
+    }
 
-	for(size_t ii=0; ii<numBufs; ii++) {
-		std::stringstream suffix;
-		suffix << "." << ii ;
-		std::string ipcNameFull= _ipcName + suffix.str();
-		LOG4CXX_TRACE(logger, "IPC name = " << ipcNameFull);
-		shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcNameFull)); // can I get 'em off ctx instead?
-		_ctx->addSharedMemoryIpc(_launchId, shmIpc[ii]);
+    std::vector<SMIptr_t> shmIpc(numBufs);
 
-		try {
-			shmIpc[ii]->create(SharedMemoryIpc::RDWR);
-			shmIpc[ii]->truncate(elemSizes[ii] * numElems[ii]);
-		} catch(SharedMemoryIpc::SystemErrorException& e) {
-			std::stringstream ss; ss << "shared_memory_mmap " << e.what();
-			throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str()) ;
-		} catch(SharedMemoryIpc::InvalidStateException& e) {
-			throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
-		}
-	}
+    for(size_t ii=0; ii<numBufs; ii++) {
+        std::stringstream suffix;
+        suffix << "." << ii ;
+        std::string ipcNameFull= _ipcName + suffix.str();
+        LOG4CXX_TRACE(logger, "IPC name = " << ipcNameFull);
+        shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcNameFull)); // can I get 'em off ctx instead?
+        _ctx->addSharedMemoryIpc(_launchId, shmIpc[ii]);
+
+        try {
+            shmIpc[ii]->create(SharedMemoryIpc::RDWR);
+            shmIpc[ii]->truncate(elemSizes[ii] * numElems[ii]);
+        } catch(SharedMemoryIpc::SystemErrorException& e) {
+            std::stringstream ss; ss << "shared_memory_mmap " << e.what();
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str()) ;
+        } catch(SharedMemoryIpc::InvalidStateException& e) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
+        }
+    }
     return shmIpc;
 }
 

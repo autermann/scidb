@@ -2,13 +2,20 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -154,7 +161,7 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     slpp::int_t instanceID = query->getInstanceID();
 
     // redistribute input arrays to ScaLAPACK block-cyclic
-    std::vector<shared_ptr<Array> > redistInputs = redistributeInputArrays(inputArrays, query);
+    std::vector<shared_ptr<Array> > redistInputs = redistributeInputArrays(inputArrays, query, "MPIRankPhysical");
 
     shared_ptr<Array> input = redistInputs[0];
     Dimensions const& dims = input->getArrayDesc().getDimensions();
@@ -164,10 +171,10 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         return shared_ptr<Array>(new MemArray(_schema));
     }
 
-    //!
-    //!.... Initialize the (imitation)BLACS used by the instances to calculate sizes
-    //!     AS IF they are MPI processes (which they are not)
-    //!
+    //
+    //.... Initialize the (imitation)BLACS used by the instances to calculate sizes
+    //     AS IF they are MPI processes (which they are not)
+    //
     const ProcGrid* procGrid = query->getProcGrid();
 
     procRowCol_t MN = { nRows, nCols};
@@ -298,9 +305,9 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     // we are in it.  so the blacs_getinfo calls below are fakes to help
     // keep the code more similar
 
-    //!
-    //!.... Get the (emulated) BLACS info .............................................
-    //!
+    //
+    //.... Get the (emulated) BLACS info .............................................
+    //
     slpp::int_t ICTXT=-1;
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
 
@@ -428,9 +435,9 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
                << " 64 or 128 is suggested.");
     }
 
-    //!
-    //!.... Set up ScaLAPACK array descriptors ........................................
-    //!
+    //
+    //.... Set up ScaLAPACK array descriptors ........................................
+    //
 
     // these formulas for LD (leading dimension) and TD (trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
@@ -569,9 +576,9 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
         IN[ii] = MYPE ; // change it to what we think the rank will be when it really gets to MPI
     }      
 
-    //!
-    //!.... Call the master wrapper
-    //!
+    //
+    //.... Call the master wrapper
+    //
     if(DBG) std::cerr << "MPIRankPhysical: calling mpiRankMaster M,N:" << M  << "," << N
                                   << "MB,NB:" << MB << "," << NB << std::endl;
     LOG4CXX_DEBUG(logger, "MPIRankPhysical: calling mpiRankMaster M,N:" << M <<","<< "MB,NB:" << MB << "," << NB);

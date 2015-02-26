@@ -83,8 +83,8 @@ remove(tmp)
 gemm(intRows11c32,   ident11c32, build(ident11c32,0))
 gemm(ident11c32,   intRows11c32, build(ident11c32,0))
 gemm(intRows11c32, intRows11c32, build(ident11c32,0))
-# TEMPORARY all non-square and non-zero starting index cases are
-#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+# TEMPORARY all non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR44
 #           will be fixed by #2200 and/or #2202
 #
 ## 11ncz1
@@ -96,8 +96,8 @@ gemm(intRows11c32, intRows11c32, build(ident11c32,0))
 gemm(intRows22c32,   ident22c32, build(ident22c32,0))
 gemm(ident22c32,   intRows22c32, build(ident22c32,0))
 gemm(intRows22c32, intRows22c32, build(ident22c32,0))
-# TEMPORARY all non-square and non-zero starting index cases are
-#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+# TEMPORARY all non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR44
 #           will be fixed by #2200 and/or #2202
 #
 ## 22nzc32
@@ -113,15 +113,21 @@ gemm(intRows22c32, intRows22c32, build(ident22c32,0))
 # NOT YET -- not supporting chunksize < min(size,32) yet
 #repart(gemm(fileDense66c33, fileDense66c33, build(fileDense66c33,0)), output66c66)
 
-# TEMPORARY all non-square and non-zero starting index cases are
-#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+# nonsquare matrices
+# 12 * 21 -> 11
+--echo next 4 results should be identical -- the number 5
+gemm(intRows12c32, intRows21c32, build(ident11c32,0))
+# same computation with transposeA flag
+gemm(intRows21c32, intRows21c32, build(ident11c32,0),'TRANSA=1')
+# same computation with transposeB flag
+gemm(intRows12c32, intRows12c32, build(ident11c32,0),'TRANSB=1')
+# same computation with both transposeA and B flags
+gemm(intRows21c32, intRows12c32, build(ident11c32,0),'TRANSA=1;TRANSB=1')
+
+#--echo next 2 results should be identical -- the number 5
+# TEMPORARY all non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR44
 #           will be fixed by #2200 and/or #2202
-#
-## nonsquare matrices
-## 12 * 21 -> 11
-##--echo next 2 results should be identical -- the number 5
-#gemm(intRows12c32, intRows21c32, build(ident11c32,0))
-#
 ## nonsquare matrices, non 0-based indices for input
 ## 12 * 21 -> 11
 ##gemm(intRows12nzc32, intRows21nzc32, build(ident11c32,0))
@@ -131,11 +137,19 @@ gemm(intRows22c32, intRows22c32, build(ident22c32,0))
 ##gemm(intRows12nzc32, intRows21nzc32, build(ident11nzc32,0))
 
 ## nonsquare matrices, reverse order
-## 21 * 12 -> 22
-## broken: rectangular chunksize-1 multiply
-##--echo next 2 results should be identical
-#gemm(intRows21c32, intRows12c32, build(ident22c32,0))
-#
+# 21 * 12 -> 22
+--echo next 4 results should be identical -- the matrix [[1,2],[2,4]]
+gemm(intRows21c32, intRows12c32, build(ident22c32,0))
+# same computation with transposeA flag
+gemm(intRows12c32, intRows12c32, build(ident22c32,0),'TRANSA=1')
+# same computation with transposeB flag
+gemm(intRows21c32, intRows21c32, build(ident22c32,0),'TRANSB=1')
+# same computation with transposeA and B flags
+gemm(intRows12c32, intRows21c32, build(ident22c32,0),'TRANSA=1;TRANSB=1')
+
+# TEMPORARY all non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR44
+#           will be fixed by #2200 and/or #2202
 ## nonsquare matrices, reverse order, non 0-based indices for input
 ## 21 * 12 -> 22
 ##gemm(intRows21nzc32, intRows12nzc32, build(ident22c32,0))
@@ -144,14 +158,36 @@ gemm(intRows22c32, intRows22c32, build(ident22c32,0))
 ## 21 * 12 -> 22
 ##gemm(intRows21nzc32, intRows12nzc32, build(ident22nzc32,0))
 
+#
+#                  t  t
+# demo full alpha A  B  + beta C functionality
+#
+
+# the result of the following should be:
+#   2*([1,2]t * [1,2]) + 3*1
+# = 2*5 + 3*1 = 13
+--echo next output should be [13]
+gemm(intRows21c32, intRows12c32, build(ident11c32,1), 'TRANSA=1;TRANSB=1;ALPHA=2.0;BETA=3.0')
+#
+# the result of the following should be
+#    2 * [[1,2],[2,4]] + 3 [[1,1],[1,1]]
+#     =  [[2,4],[4,8]] +   [[3,3],[3,3]]
+#     =  [[5,7],[7,11]]
+--echo next output should be [[5,7],[7,11]]
+gemm(intRows12c32, intRows21c32, build(ident22c32,1), 'TRANSA=1;TRANSB=1;ALPHA=2.0;BETA=3.0')
+
+# TODO: TEMPORARY all non-zero starting index cases are errors
+#       when that is fixed, repeat the test above
+
+
+
 # show that gemm's output has RANDOM access
 # (transpose() is an exampe that currently requires RANDOM access)
 --echo next output (by rows) should be 7, 15, 10, 22
 transpose(gemm(intRows22c32, intRows22c32, build(ident22c32,0)))
 
 # make sure we can cascade gemm operators
-# (when we can handle this)
-# join(join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))), join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))))
+join(join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))), join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))))
 
 --cleanup
 

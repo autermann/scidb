@@ -91,7 +91,7 @@ SCIDB QUERY : <project(rank(Test1),a_rank)>
 {x} a_rank
 
 SCIDB QUERY : <project(rank(Test1),a_rank,b)>
-[An error expected at this place for the query "project(rank(Test1),a_rank,b)". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "project(rank(Test1),a_rank,b)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <project(quantile(Test1,2),a_quantile,percentage)>
 {quantile} a_quantile,percentage

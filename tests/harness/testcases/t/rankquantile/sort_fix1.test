@@ -22,7 +22,7 @@ sort(A,r)
 sort(A, r desc)
 --error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE "sort(A desc)"
 --error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE "sort(A asc)"
---error --code scidb::SCIDB_SE_PARSER::SCIDB_LE_QUERY_PARSING_ERROR "sort(A, desc)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "sort(A, desc)"
 
 sort(B,s)
 sort(B, s desc)

@@ -19,7 +19,7 @@
     <listitem>
       <para>Some statements change the metadata of an array in place, without
       changing the data and without producing a result array. For example, the
-      the AFL <code>rename()</code> operator changes the name of an array, but
+      AFL <code>rename()</code> operator changes the name of an array, but
       does not produce a result array (which means that you cannot use the
       <code>rename()</code> operator as an operand in any other AFL
       operator.)</para>
@@ -83,6 +83,10 @@
         <primary>AQL</primary>
 
         <secondary>insert into</secondary>
+      </indexterm><indexterm>
+        <primary>insert</primary>
+
+        <secondary>literals</secondary>
       </indexterm>The AQL INSERT statement can modify an array's contents by
     changing values in existing cells, inserting values in empty cells, or
     both.<programlisting>AQL% <command>INSERT 

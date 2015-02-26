@@ -2,20 +2,19 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2012 SciDB, Inc.
+# Copyright (C) 2008-2013 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
 #
 # SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 # INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 # NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-# the GNU General Public License for the complete license terms.
+# the AFFERO GNU General Public License for the complete license terms.
 #
-# You should have received a copy of the GNU General Public License
-# along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 #
 # END_COPYRIGHT
 ########################################
@@ -119,7 +118,7 @@ set(CMAKE_C_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0 -DCLEAN_EXIT")
 set(CMAKE_C_FLAGS_VALGRIND "-g -O0 -DCLEAN_EXIT")
 
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fno-f2c")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I/usr/include/mpi")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/mpich2/include/mpi")
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${ALL_FLAGS}")
 set(CMAKE_Fortran_FLAGS_RELWITHDEBINFO "${CMAKE_Fortran_RELWITHDEBINFO} -DNDEBUG -ggdb3")
 set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -DDEBUG")  # Just for detection debug mode in code
@@ -323,11 +322,26 @@ file(GLOB MISC_FILES_SRC
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/cdash
                                                            ${CMAKE_BINARY_DIR}/cdash)
 
+# NOTE: doc must be copied before tests, because test/examples is a link into
+# doc. This does not seem to cause a problem when the source and destination
+# are in the same volume.
+# However, when they are in different volumes, copy_directory seems to check
+# and detect that the link "tests/examples" to "../doc/tests/examples is not
+# valid (the first time), and the copy of tests stops with an error, and
+# without copying the rest of tests.
+# To confuse matters, doc is then copied, and the second time this is tried,
+# it succeeds.
+#
+# This is a workaround.  The 'right' fix is that source code repositories
+# should not have links in them.
+#
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/doc
+                                                           ${CMAKE_BINARY_DIR}/doc)
+
+
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/tests
                                                            ${CMAKE_BINARY_DIR}/tests)
 
-execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/doc
-                                                           ${CMAKE_BINARY_DIR}/doc)
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/version
                                                  ${CMAKE_BINARY_DIR}/version)

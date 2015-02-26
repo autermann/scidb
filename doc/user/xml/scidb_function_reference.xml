@@ -1,15 +1,47 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
 <chapter>
   <title>SciDB Function Reference</title>
-  <para>
-  <indexterm><primary>functions</primary></indexterm>
-This chapter lists the SciDB functions that are available for use in SciDB expressions. Expressions can be used in the following types of syntaxes:</para>
+
+  <para><indexterm>
+      <primary>functions</primary>
+    </indexterm> This chapter lists the SciDB functions that are available for
+  use in SciDB expressions. Expressions can be used in the following types of
+  syntaxes:</para>
+
   <para><emphasis role="bold">AQL Syntax:</emphasis><synopsis><command>SELECT</command> <replaceable>expression</replaceable> <command>FROM</command> <replaceable>array</replaceable>;
 
 <command>SELECT</command> <replaceable>expression1</replaceable> <command>FROM</command> <replaceable>array</replaceable> <command>WHERE</command> <replaceable>expression2</replaceable>;</synopsis></para>
+
   <para><emphasis role="bold">AFL Syntax:</emphasis><synopsis>operator(<replaceable>array</replaceable>,<replaceable>expression</replaceable>);</synopsis></para>
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="algebraic_functions.xml" encoding="UTF-8"/>
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="comparison_functions.xml" encoding="UTF-8"/>
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="transcendental_functions_post.xml" encoding="UTF-8"/>
+
+  <para>SciDB contains the following categories of functions:<itemizedlist>
+      <listitem>
+        <para><link linkend="algebraicFunctions">Algebraic
+        Functions</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="comparisonFunctions">Comparison
+        Functions</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="temporalFunctions">Temporal
+        Functions</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="trigonometricFunctions">Trigonometric and
+        Transcendental Functions</link></para>
+      </listitem>
+    </itemizedlist></para>
+
+  <xi:include href="algebraic_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="comparison_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="temporal_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="transcendental_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
 </chapter>

@@ -54,7 +54,7 @@
 
 %type <node> start statement create_array_statement immutable_modifier array_attribute
     distinct typename array_attribute_list array_dimension array_dimension_list
-    dimension_boundary dimension_boundaries nullable_modifier empty_modifier
+    dimension_boundary_end dimension_boundaries nullable_modifier empty_modifier
     default default_value compression reserve schema 
     select_statement select_list into_clause path_expression
     identifier_clause expr filter_clause atom constant constant_string constant_int64
@@ -72,9 +72,7 @@
     thin_clause thin_dimension thin_dimensions_list named_array_source array_source
     group_by_clause redimension_clause fixed_window_sole_clause variable_window_sole_clause
     rename_array_statement cancel_query_statement order_by_clause order_by_list
-    insert_into_statement insert_into_source
-
-%type <boolean> negative_index
+    insert_into_statement insert_into_source asterisk
 
 %type <keyword> non_reserved_keywords
 
@@ -277,89 +275,56 @@ array_dimension_list:
     ;
     
 array_dimension:
-    identifier_clause '=' dimension_boundaries ',' INTEGER ',' INTEGER
+    identifier_clause '=' dimension_boundaries ',' expr ',' expr
     {
-        if ($5 <= 0 || $5 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            YYABORT;
-        }
-
-        if ($7 < 0 || $7 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            YYABORT;
-        }
-    
-        $$ = new AstNode(dimension, CONTEXT(@1),
+        $$ = new AstNode(dimension, CONTEXT(@$),
             dimensionArgCount, 
             $1,
             $3,
-            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@5), $5),
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@7), $7));
+            $5,
+            $7);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
     | identifier_clause
     {
-        $$ = new AstNode(dimension, CONTEXT(@1),
+        $$ = new AstNode(dimension, CONTEXT(@$),
             dimensionArgCount, 
             $1,
-            new AstNode(dimensionBoundaries, CONTEXT(@1),
+            new AstNode(dimensionBoundaries, CONTEXT(@$),
                 dimensionBoundaryArgCount,
-                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), 0),
-                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE)),
+                new AstNodeInt64(int64Node, CONTEXT(@$), 0),
+                new AstNode(asterisk, CONTEXT(@$), 0)),
             NULL,
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+            new AstNodeInt64(int64Node, CONTEXT(@$), 0));
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
-    | identifier_clause '(' distinct typename ')' '=' dimension_boundary ',' INTEGER ',' INTEGER
+    | identifier_clause '(' distinct typename ')' '=' dimension_boundary_end ',' expr ',' expr
     {
-        if ($9 <= 0 || $9 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            delete $4;
-            delete $7;
-            YYABORT;
-        }
-
-        if ($11 < 0 || $11 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            delete $4;
-            delete $7;
-            YYABORT;
-        }
-
-        $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
+        $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
             $3,
             $4,
             $7,
-            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@8), $9),
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@10), $11));
+            $9,
+            $11);
+
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
     }
     | identifier_clause '(' distinct typename ')'
     {
-        $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
+        $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
             $3,
             $4,
-            new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE),
+            new AstNode(asterisk, CONTEXT(@$), 0),
             NULL,
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+            new AstNodeInt64(int64Node, CONTEXT(@$), 0));
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
@@ -367,44 +332,18 @@ array_dimension:
     ;
 
 dimension_boundaries:
-    dimension_boundary ':' dimension_boundary
+    expr ':' dimension_boundary_end
     {
-        $$ = new AstNode(dimensionBoundaries, CONTEXT(@1),
+        $$ = new AstNode(dimensionBoundaries, CONTEXT(@$),
             dimensionBoundaryArgCount,
             $1,
             $3);        
     }
     ;
 
-dimension_boundary:
-    negative_index INTEGER
-    {
-        if ($2 <= MIN_COORDINATE || $2 >= MAX_COORDINATE)
-        {
-            glue.error(@2, "Dimension boundaries must be between -4611686018427387903 and 4611686018427387903");
-            YYABORT;
-        }
-        $$ = new AstNodeInt64(dimensionBoundary, CONTEXT(@1), $1 ? -$2 : $2);
-    }
-    | '*'
-    {
-        $$ = new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE);
-    }
-    ;
-
-negative_index:
-    '-'
-    {
-        $$ = true;
-    }
-    | '+'
-    {
-        $$ = true;
-    }
-    |
-    {
-        $$ = false;
-    }
+dimension_boundary_end:
+    expr
+    | asterisk
     ;
 
 distinct:
@@ -485,10 +424,7 @@ select_list:
     
 select_list_item:
     named_expr
-    | '*'
-    {
-        $$ = new AstNode(asterisk, CONTEXT(@1), 0);
-    }
+    | asterisk
     ;
 
 into_clause:
@@ -757,9 +693,9 @@ timestamp_clause:
     {
         $$ = $2;
     }
-    | '@' '*'
+    | '@' asterisk
     {
-        $$ = new AstNode(asterisk, CONTEXT(@1), 0);
+        $$ = $2;
     }
     |
     {
@@ -1191,13 +1127,13 @@ function:
             NULL,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
     }
-    | identifier_clause '(' '*' ')'
+    | identifier_clause '(' asterisk ')'
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
             $1,
             new AstNode(functionArguments, CONTEXT(@2), 1,
-                new AstNode(asterisk, CONTEXT(@1), 0)),
+                $3),
             NULL,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
     }
@@ -1243,20 +1179,71 @@ anonymous_schema:
 case_expr:
     CASE case_arg case_when_clause_list case_default END
     {
-        $$ = new AstNode(caseClause, CONTEXT(@1), caseClauseArgCount, $2, $3, $4);
+        //Here we rewriting IIFs list to expression which emulate CASE
+        //Three main rewrites:
+        //1. If we have case_arg then we should add compare operator to IIF's first function_argument
+        //2. Each next IIF going to previous IIF's third argument
+        //3. If we have case_default then we should add it to last IIF's third argument
+        AstNode* iifNode = NULL;
+        AstNode* currentIif = NULL;
+        AstNode* lastIif = NULL;
+        bool first = true;
+        for(size_t i = 0; i < $3->getChildsCount(); ++i)
+        {
+            currentIif = $3->getChild(i);
+            if (!iifNode)
+            {
+                iifNode = currentIif;
+            }
+
+            if ($2)
+            {
+                //Updating first parameter of IIF
+                currentIif->getChild(functionArgParameters)->setChild(0,
+                    makeBinaryScalarOp(
+                        "=", first ? $2 : $2->clone(), //We should avoid using same nodes in different branches, so clone it
+                        currentIif->getChild(functionArgParameters)->getChild(0),
+                        currentIif->getChild(functionArgParameters)->getParsingContext()));
+            }
+            else
+            {
+                if (function != currentIif->getChild(functionArgParameters)->getChild(0)->getType())
+                {
+                    glue.error(
+                        currentIif->getChild(functionArgParameters)->getChild(0)->getParsingContext(),
+                        "Function or scalar operator expected");
+                    delete $2;
+                    delete $3;
+                    delete $4;
+                    YYABORT;
+                }                
+            }
+            
+            if(lastIif)
+            {
+                //Filling third parameter of IIF
+                lastIif->getChild(functionArgParameters)->setChild(2, currentIif);
+            }
+            lastIif = currentIif;
+            first = false;
+        }
+
+        if ($4)
+        {
+            //Filling third parameter of IIF for ELSE clause
+            lastIif->getChild(functionArgParameters)->setChild(2, $4);            
+        }
+
+        $$ = iifNode;
     }
     ;
 
 case_arg:
     expr
-    {
-        $$ = $1;
-    }
     |
     {
         $$ = NULL;
     }
-    ;
 
 case_when_clause_list:
     case_when_clause
@@ -1273,7 +1260,18 @@ case_when_clause_list:
 case_when_clause:
     WHEN expr THEN expr
     {
-        $$ = new AstNode(caseWhenClause, CONTEXT(@1), caseWhenClauseArgCount, $2, $4);
+        //$$ = new AstNode(caseWhenClause, CONTEXT(@1), caseWhenClauseArgCount, $2, $4);
+        $$ = new AstNode(function, CONTEXT(@$),
+                functionArgCount,
+                new AstNodeString(identifierClause, CONTEXT(@$), "iif"),
+                new AstNode(functionArguments, CONTEXT(@$), 3,
+                    $2, //will be updated in case_expr
+                    $4,
+                    new AstNodeNull(null, CONTEXT(@$)) //will be filled in case_expr
+                ),
+                NULL,
+                new AstNodeBool(boolNode, CONTEXT(@$), false)
+            );
     }
     ;
 
@@ -1524,6 +1522,13 @@ sort_quirk:
     |
     {
         $$ = NULL;
+    }
+    ;
+
+asterisk:
+    '*'
+    {
+        $$ = new AstNode(asterisk, CONTEXT(@1), 0);
     }
     ;
 

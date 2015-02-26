@@ -1,4 +1,24 @@
 #!/usr/bin/python
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2013 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 
 import sys
 import argparse
@@ -68,6 +88,7 @@ class UbuntuChroot():
     distroname = 'ubuntu'
     pbuilder_tgz_dir='/var/cache/pbuilder'
     ubuntu_mirror='deb http://archive.ubuntu.com/ubuntu/ %s restricted main multiverse universe'
+    scidb_3rdparty_mirror='deb http://downloads.paradigm4.com/ ubuntu12.04/3rdparty/'
     logfile = '/tmp/pbuilder.log'
 
     def __init__(self, release, arch):
@@ -77,13 +98,14 @@ class UbuntuChroot():
         self.release = release
         self.arch = arch
         self.tgz = self.pbuilder_tgz_dir+'/'+release+'-'+arch+'.tgz'
-        self.mirror = self.ubuntu_mirror % release
+        self.mirror = '|'.join([(self.ubuntu_mirror % release), self.scidb_3rdparty_mirror])
 
     def init(self):
         pbargs = ['pbuilder', '--create',
             '--basetgz', self.tgz,
             '--architecture', self.arch,
             '--othermirror', self.mirror,
+            '--allow-untrusted',
             '--distribution', self.release,
             '--override-config',
             '--logfile', self.logfile]
@@ -97,6 +119,7 @@ class UbuntuChroot():
             '--basetgz', self.tgz,
             '--distribution', self.release,
             '--othermirror', self.mirror,
+            '--allow-untrusted',
             '--architecture', self.arch,
             '--override-config',
             '--logfile', self.logfile]
@@ -110,6 +133,7 @@ class UbuntuChroot():
             '--basetgz', self.tgz,
             '--distribution', self.release,
             '--othermirror', self.mirror,
+            '--allow-untrusted',
             '--architecture', self.arch,
             '--buildresult', buildresult,
             '--debbuildopts', '-j%i'%jobs,
@@ -126,6 +150,7 @@ class UbuntuChroot():
             '--basetgz', self.tgz,
             '--distribution', self.release,
             '--othermirror', self.mirror,
+            '--allow-untrusted',
             '--architecture', self.arch,
             '--override-config']
         info("Logging into %s" % self.tgz)

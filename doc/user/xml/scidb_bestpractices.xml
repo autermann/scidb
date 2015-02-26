@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<section>
+<section id="tuningSciDB">
   <title>Tuning your SciDB Installation</title>
 
   <para><indexterm>
@@ -38,12 +38,12 @@
         <listitem>
           <para><parameter role="bold">smgr-cache-size
           </parameter>(megabytes). The amount of memory that the storage
-          manager cache may use. This is a global cache that is used by all
-          queries and stays occupied when the system is quiescent. This cache
-          is populated with chunks of persistent arrays that were recently
-          read or recorded. On systems with a very large amount of memory,
-          setting this parameter to a large value will allow one to
-          essentially run SciDB read queries "out of memory."</para>
+          manager cache may use. This is a cache that is used by all queries
+          and stays occupied when the system is quiescent. This cache is
+          populated with chunks of persistent arrays that were recently read
+          or recorded. On systems with a very large amount of memory, setting
+          this parameter to a large value will allow one to essentially run
+          SciDB read queries "out of memory."</para>
         </listitem>
 
         <listitem>
@@ -80,6 +80,13 @@
           several reasons—the allocation will fail with an exception.</para>
         </listitem>
       </itemizedlist></para>
+
+    <note>
+      <para>These parameters are per-instance. For example, if you set
+      <parameter role="bold">smgr-cache-size</parameter> to 25 Gigabytes, you
+      are allowing the storage manager cache <emphasis>on each instance
+      </emphasis>to use up to 25 Gigabytes of memory.</para>
+    </note>
 
     <para>When setting values for these parameters, keep in mind the following
     guidelines:<screen>(MAX_NUMBER_OF_QUERIES * 

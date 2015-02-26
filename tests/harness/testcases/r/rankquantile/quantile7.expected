@@ -154,7 +154,7 @@ SCIDB QUERY : <quantile(ABC,4,e)>
 {0}[{0}(0,false),{1}(0.25,false),{2}(0.5,false),{3}(0.75,true),{4}(1,true)]
 
 SCIDB QUERY : <quantile(ABC,4,a,g)>
-[An error expected at this place for the query "quantile(ABC,4,a,g)". And it failed with error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_INTERNAL::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+[An error expected at this place for the query "quantile(ABC,4,a,g)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

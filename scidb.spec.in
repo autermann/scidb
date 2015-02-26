@@ -39,13 +39,13 @@ BuildRequires: mpich2-devel
 BuildRequires: lapack-devel
 BuildRequires: blas-devel
 BuildRequires: openssh-clients
+BuildRequires: cppunit-devel
 Requires: %{scidb_boost}-filesystem      = %{scidb_boost_version}
 Requires: %{scidb_boost}-serialization   = %{scidb_boost_version}
 Requires: %{scidb_boost}-system          = %{scidb_boost_version}
 Requires: %{scidb_boost}-program-options = %{scidb_boost_version}
 Requires: %{scidb_boost}-thread          = %{scidb_boost_version}
 Requires: %{scidb_boost}-regex           = %{scidb_boost_version}
-Requires: %{scidb_boost}-date-time       = %{scidb_boost_version}
 Requires: python-paramiko
 Requires: python-crypto
 Requires: python-argparse
@@ -95,6 +95,7 @@ SciDB querying tool and other utilities (debug symbols)
 Summary: SciDB developer and tester utilities
 Group: Applications/Databases
 Requires: %{libscidbclient} >= %{version}-%{release} 
+Requires: time
 %description -n %{scidb}-dev-tools
 SciDB developer and tester utilities
 
@@ -171,6 +172,7 @@ Requires: %{libscidbclient}-python = %{version}-%{release}
 Requires: %{scidb}-doc = %{version}-%{release}
 Requires: postgresql-server >= 8.4, postgresql-server < 8.5
 Requires: postgresql-contrib >= 8.4, postgresql-server < 8.5
+Requires: sudo
 %description -n %{scidb}-all-coord
 Install entire SciDB and PostgreSQL
 
@@ -181,14 +183,15 @@ Install entire SciDB and PostgreSQL
 
 %build
 %if %{without insource}
-cmake . -DSWIG_EXECUTABLE=/usr/bin/swig2 -DSCIDB_DOC_TYPE=API -DBUILD_USER_DOC=1
+cmake . -DSWIG_EXECUTABLE=/usr/bin/swig2 -DSCIDB_DOC_TYPE=API -DBUILD_USER_DOC=1 -DCMAKE_BUILD_TYPE=PACKAGE_BUILD_TYPE
 %endif
 make %{?_smp_mflags}
 
 %install
 for p in %{scidb} %{scidb}-dbg %{libscidbclient} %{libscidbclient}-dbg %{scidb}-utils %{scidb}-utils-dbg %{scidb}-dev-tools %{scidb}-dev-tools-dbg %{scidb}-plugins %{scidb}-plugins-dbg %{libscidbclient}-python %{libscidbclient}-python-dbg %{scidb}-dev %{scidb}-doc; do
     COMPONENT=$(echo $p | sed -e "s/%{scidb}/scidb/" | sed -e "s/%{libscidbclient}/libscidbclient/")
-    cmake -DCMAKE_INSTALL_PREFIX=%{buildroot}/$(grep CMAKE_INSTALL_PREFIX CMakeCache.txt|sed 's/.*=//') -DCMAKE_INSTALL_COMPONENT=$COMPONENT -P cmake_install.cmake | tail -n+2 | awk '{print $3}'|sed "s|%{buildroot}/||"|sort|uniq > "/tmp/rpm-$p-files"
+    scidb_install_prefix=${SCIDB_INSTALL_PREFIX:=$(grep CMAKE_INSTALL_PREFIX CMakeCache.txt|sed 's/.*=//')}
+    cmake -DCMAKE_INSTALL_PREFIX=%{buildroot}/${scidb_install_prefix} -DCMAKE_INSTALL_COMPONENT=$COMPONENT -P cmake_install.cmake | tail -n+2 | awk '{print $3}'|sed "s|%{buildroot}/||"|sort|uniq > "/tmp/rpm-$p-files"
 done
 
 %files -f /tmp/rpm-%{scidb}-files

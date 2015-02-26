@@ -1,0 +1,19 @@
+--setup
+--aql select * into A from array(<a:int32>[x=0:9,10,0], '[1,2,3,4,5,6,7,8,9,10]')
+
+--test
+
+--aql select case a when 1 then 11 end from A
+--aql select case a when 1 then 11 when 10 then 1010 end from A
+--aql select case a when 1 then 11 when 10 then 1010 else 33 end from A
+--aql select case when a between 1 and 5 then 111 when a between 6 and 10 then 222 end from A
+--aql select case when a between 1 and 3 then 111 when a between 4 and 6 then 222 else 333 end from A
+
+apply(A, z, case a when 1 then 11 end)
+apply(A, z, case a when 1 then 11 when 10 then 1010 end)
+apply(A, z, case a when 1 then 11 when 10 then 1010 else 33 end)
+apply(A, z, case when a between 1 and 5 then 111 when a between 6 and 10 then 222 end)
+apply(A, z, case when a between 1 and 3 then 111 when a between 4 and 6 then 222 else 333 end)
+
+--cleanup
+--aql drop array A

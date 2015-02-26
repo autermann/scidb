@@ -74,8 +74,8 @@
 
       <listitem>
         <para>In the left-to-right ordering of dimensions in each array, each
-        pair of corresponding dimensions must have the same chunk size, chunk
-        overlap, and dimension starting index.</para>
+        pair of corresponding dimensions must have the same dimension starting
+        index.</para>
       </listitem>
     </itemizedlist>
 

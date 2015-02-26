@@ -117,10 +117,11 @@ add_executable(arg_separator ${arg_separator_sources})
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "arg_separator" arg_separator)
 set_target_properties(arg_separator PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
 
-set(DISABLE_TESTS "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable.tests")
-set(DISABLE_TESTS_1I "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable1i.tests")
-set(DISABLE_TESTS_IN "${DISABLE_TESTS}.in")
-set(DISABLE_TESTS_1I_IN "${DISABLE_TESTS_1I}.in")
+set(DISABLE_TESTS "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/disable.tests")
+set(DISABLE_TESTS_IN "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable.tests.in")
+
+set(DISABLE_TESTS_1I "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/disable1i.tests")
+set(DISABLE_TESTS_1I_IN "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable1i.tests.in")
 
 # list_1 and run_016 disabled until we get scalapack building
 # on all platforms

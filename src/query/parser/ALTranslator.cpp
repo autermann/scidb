@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -62,6 +62,16 @@ namespace scidb
 {
 
 static shared_ptr<LogicalQueryPlanNode> passCreateArray(AstNode *ast, const shared_ptr<Query> &query);
+
+/**
+ * Convert expression AST to Physical expression and evaluate it
+ *
+ * @param ast Input AST
+ * @param targetType Desired output type
+ * @param query Current query context
+ * @return Evaluated value
+ */
+static Value passConstantExpression(AstNode *ast, TypeId targetType, const shared_ptr<Query> &query);
 
 static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName, bool addEmpty, bool immutable,
                        const shared_ptr<Query> &query, std::string const& comment = std::string());
@@ -400,7 +410,7 @@ static shared_ptr<LogicalQueryPlanNode> passCreateArray(AstNode *ast, const shar
     return make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), op);
 }
 
-static int64_t estimateChunkInterval(const AstNodes& nodes)
+static int64_t estimateChunkInterval(const AstNodes& nodes, const shared_ptr<Query> &query)
 {
     const int64_t targetChunkSize = 500000;
     int64_t knownChunksSize = 1;
@@ -411,14 +421,20 @@ static int64_t estimateChunkInterval(const AstNodes& nodes)
         if (dimNode->getType() == dimension)
         {
             if (dimNode->getChild(dimensionArgChunkInterval))
-                knownChunksSize *= dimNode->getChild(dimensionArgChunkInterval)->asNodeInt64()->getVal();
+                knownChunksSize *=
+                		passConstantExpression(
+                				dimNode->getChild(dimensionArgChunkInterval),
+                				TID_INT64, query).getInt64();
             else
                 ++unkownChunksCount;
         }
         else
         {
             if (dimNode->getChild(nIdimensionArgChunkInterval))
-                knownChunksSize *= dimNode->getChild(nIdimensionArgChunkInterval)->asNodeInt64()->getVal();
+                knownChunksSize *=
+                		passConstantExpression(
+                				dimNode->getChild(nIdimensionArgChunkInterval),
+                				TID_INT64, query).getInt64();
             else
                 ++unkownChunksCount;
         }
@@ -431,7 +447,36 @@ static int64_t estimateChunkInterval(const AstNodes& nodes)
     return pow(targetChunkSize / knownChunksSize, 1.0/unkownChunksCount);
 }
 
-static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const string &arrayName, set<string> &usedNames)
+static Value passConstantExpression(AstNode *ast, TypeId targetType, const shared_ptr<Query> &query)
+{
+	Expression pExpr;
+	try
+	{
+		pExpr.compile(AstToLogicalExpression(ast), query, false, targetType);
+	}
+	catch (const scidb::Exception &e)
+	{
+		//Rewrite possible type exceptions to get error location in query
+        if (SCIDB_SE_TYPE == e.getShortErrorCode())
+        {
+        	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_TYPE_EXPECTED,
+        			ast->getParsingContext()) << targetType;
+        }
+        throw;
+	}
+	catch (...)
+	{
+		throw;
+	}
+	if (!pExpr.isConstant())
+	{
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_CONSTANT_EXPRESSION_EXPECTED,
+                ast->getParsingContext());
+	}
+    return pExpr.evaluate();
+}
+
+static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const string &arrayName, set<string> &usedNames, const shared_ptr<Query> &query)
 {
     dimensions.reserve(ast->getChildsCount());
 
@@ -454,21 +499,60 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
         if (dimNode->getType() == dimension)
         {
             const AstNode *boundaries = dimNode->getChild(dimensionArgBoundaries);
-            int64_t dim_l = boundaries->getChild(dimensionBoundaryArgLowBoundary)->asNodeInt64()->getVal();
-            const int64_t dim_h =  boundaries->getChild(dimensionBoundaryArgHighBoundary)->asNodeInt64()->getVal();
-            const int64_t dim_o = dimNode->getChild(dimensionArgChunkOverlap)->asNodeInt64()->getVal();
+
+            const int64_t dim_o = passConstantExpression(dimNode->getChild(dimensionArgChunkOverlap), TID_INT64, query).getInt64();
+            const int64_t dim_l = passConstantExpression(boundaries->getChild(dimensionBoundaryArgLowBoundary), TID_INT64, query).getInt64();
+
+            if (dim_l <= MIN_COORDINATE || dim_l >= MAX_COORDINATE)
+            {
+            	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
+            			boundaries->getChild(dimensionBoundaryArgLowBoundary)->getParsingContext())
+            					<< MIN_COORDINATE << MAX_COORDINATE;
+            }
+
+            int64_t dim_h;
+            if (asterisk == boundaries->getChild(dimensionBoundaryArgHighBoundary)->getType())
+            {
+            	dim_h = MAX_COORDINATE;
+            }
+            else
+            {
+            	dim_h = passConstantExpression(boundaries->getChild(dimensionBoundaryArgHighBoundary), TID_INT64, query).getInt64();
+				if (dim_h <= MIN_COORDINATE || dim_h >= MAX_COORDINATE)
+				{
+					throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
+							boundaries->getChild(dimensionBoundaryArgHighBoundary)->getParsingContext())
+									<< MIN_COORDINATE << MAX_COORDINATE;
+				}
+            }
+
+            if (dim_o < 0 || dim_o > std::numeric_limits<uint32_t>::max())
+            {
+            	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_OVERLAP_SIZE,
+            			dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext())
+            					<< std::numeric_limits<uint32_t>::max();
+
+            }
 
             int64_t dim_i = 0;
             if (dimNode->getChild(dimensionArgChunkInterval))
             {
-                dim_i = dimNode->getChild(dimensionArgChunkInterval)->asNodeInt64()->getVal();
+                dim_i = passConstantExpression(dimNode->getChild(dimensionArgChunkInterval), TID_INT64, query).getInt64();
+
+                if (dim_i <= 0 || dim_i > std::numeric_limits<uint32_t>::max())
+                {
+                	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_CHUNK_SIZE,
+                			dimNode->getChild(dimensionArgChunkInterval)->getParsingContext())
+                					<< std::numeric_limits<uint32_t>::max();
+                }
             }
             else
             {
                 if (!estimatedChunkLength)
-                    estimatedChunkLength = estimateChunkInterval(ast->getChilds());
+                    estimatedChunkLength = estimateChunkInterval(ast->getChilds(), query);
                 dim_i = estimatedChunkLength;
             }
+
 
             if (dim_l == MAX_COORDINATE)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,
@@ -485,19 +569,49 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
         }
         else
         {
-            const string &dimTypeName =  dimNode->getChild(nIdimensionArgTypeName)->asNodeString()->getVal();
-            const int64_t boundary = dimNode->getChild(nIdimensionArgBoundary)->asNodeInt64()->getVal();
-            const int64_t dim_o = dimNode->getChild(nIdimensionArgChunkOverlap)->asNodeInt64()->getVal();
+            const string &dimTypeName = dimNode->getChild(nIdimensionArgTypeName)->asNodeString()->getVal();
+            const int64_t dim_o = passConstantExpression(dimNode->getChild(nIdimensionArgChunkOverlap), TID_INT64, query).getInt64();
+
+            int64_t boundary;
+            if (asterisk == dimNode->getChild(nIdimensionArgBoundary)->getType())
+            {
+            	boundary = MAX_COORDINATE;
+            }
+            else
+            {
+            	boundary = passConstantExpression(dimNode->getChild(nIdimensionArgBoundary), TID_INT64, query).getInt64();
+                if (boundary <= MIN_COORDINATE || boundary >= MAX_COORDINATE)
+                {
+                	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
+                			dimNode->getChild(nIdimensionArgBoundary)->getParsingContext())
+                					<< MIN_COORDINATE << MAX_COORDINATE;
+                }
+            }
+
+            if (dim_o < 0 || dim_o > std::numeric_limits<uint32_t>::max())
+            {
+            	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_OVERLAP_SIZE,
+            			dimNode->getChild(nIdimensionArgChunkOverlap)->getParsingContext())
+            					<< std::numeric_limits<uint32_t>::max();
+
+            }
 
             int64_t dim_i = 0;
             if (dimNode->getChild(nIdimensionArgChunkInterval))
             {
-                dim_i = dimNode->getChild(nIdimensionArgChunkInterval)->asNodeInt64()->getVal();
+                dim_i = passConstantExpression(dimNode->getChild(nIdimensionArgChunkInterval), TID_INT64, query).getInt64();
+
+                if (dim_i <= 0 || dim_i > std::numeric_limits<uint32_t>::max())
+                {
+                	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_CHUNK_SIZE,
+                			dimNode->getChild(nIdimensionArgChunkInterval)->getParsingContext())
+                					<< std::numeric_limits<uint32_t>::max();
+                }
             }
             else
             {
                 if (!estimatedChunkLength)
-                    estimatedChunkLength = estimateChunkInterval(ast->getChilds());
+                    estimatedChunkLength = estimateChunkInterval(ast->getChilds(), query);
                 dim_i = estimatedChunkLength;
             }
 
@@ -640,7 +754,7 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
     }
 
     Dimensions dimensions;
-    passDimensionsList(ast->getChild(schemaArgDimensionsList), dimensions, arrayName, usedNames);
+    passDimensionsList(ast->getChild(schemaArgDimensionsList), dimensions, arrayName, usedNames, query);
 
     int flags = 0;
     if (immutable)
@@ -1316,7 +1430,7 @@ static bool matchOperatorParam(AstNode *ast, const OperatorParamPlaceholders &pl
     {
         string placeholdersString;
         placeholdersToString(placeholders, placeholdersString);
-        throw USER_QUERY_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_WRONG_OPERATOR_ARGUMENT2, paramCtxt)
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_WRONG_OPERATOR_ARGUMENT2, paramCtxt)
             << placeholdersString;
     }
 
@@ -3734,7 +3848,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                         
                         //Now prepare dimensions
                         Dimensions redimensionDims;
-                        passDimensionsList(grwAsClause->getChild(0), redimensionDims, "", usedNames);
+                        passDimensionsList(grwAsClause->getChild(0), redimensionDims, "", usedNames, query);
                         
                         //Ok. Adding schema parameter
                         ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims, 0);

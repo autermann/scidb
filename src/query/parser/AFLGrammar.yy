@@ -35,8 +35,8 @@
 %union {
     int64_t int64Val;
     double realVal;    
-    std::string* stringVal;
-    //std::string* keyword;
+    char* stringVal;
+    char* keyword;
     class AstNode* node;
     bool boolean;
 }
@@ -50,22 +50,25 @@
 %left '+' '-'
 %left '*' '/' '%'
 %right '^'
-%left UNARY
+%left UNARY_MINUS
 
 %type <node>    start statement create_array_statement immutable_modifier identifier_clause array_attribute
     distinct typename array_attribute_list array_dimension array_dimension_list
-    dimension_boundary dimension_boundaries
+    dimension_boundary_end dimension_boundaries
     function function_argument_list function_argument nullable_modifier empty_modifier
-    default default_value compression reserve null_value expression atom constant
+    default default_value compression reserve null_value expr reduced_expr common_expr atom constant
     constant_string constant_int64 constant_real constant_NA reference function_alias schema
     constant_bool sort_quirk timestamp_clause index_clause
+    beetween_expr
+    case_expr case_arg case_when_clause_list case_when_clause case_default
+    asterisk
 
-%type <boolean> negative_index
+%type <keyword> non_reserved_keywords
 
-%destructor { delete $$; $$ = NULL; } IDENTIFIER STRING_LITERAL <node>
+%destructor { delete $$; $$ = NULL; } <node>
 
-%token ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END AGG
-    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC ALL DISTINCT
+%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END AGG
+    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC ALL DISTINCT BETWEEN
 
 %token    EOQ         0 "end of query"
 %token    EOL            "end of line"
@@ -141,11 +144,16 @@ empty_modifier:
 identifier_clause:
     IDENTIFIER
     {
-        $$ = new AstNodeString(identifierClause, CONTEXT(@1), *$1);
+        $$ = new AstNodeString(identifierClause, CONTEXT(@1), $1);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
+    | non_reserved_keywords
+    {
+        $$ = new AstNodeString(identifierClause, CONTEXT(@1), $1);
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
+    }    
     ;
 
 array_attribute_list:
@@ -161,11 +169,11 @@ array_attribute_list:
     ;
 
 array_attribute:
-    IDENTIFIER ':' typename nullable_modifier default compression reserve
+    identifier_clause ':' typename nullable_modifier default compression reserve
     {
         $$ = new AstNode(attribute, CONTEXT(@1),
             attributeArgCount, 
-            new AstNodeString(attributeName, CONTEXT(@1), *$1),
+            $1,
             $3,
             $4,
             $5,
@@ -173,7 +181,6 @@ array_attribute:
             $7);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
     ;
 
@@ -215,7 +222,7 @@ default_value:
         $$ = makeUnaryScalarOp("-", $2, CONTEXT(@1));
     }
     // Wrap complex expression to avoid conflict with '>'
-    | '(' expression ')'
+    | '(' expr ')'
     {
        $$ = $2;
     }
@@ -274,78 +281,45 @@ array_dimension_list:
     ;
 
 array_dimension:
-    identifier_clause '=' dimension_boundaries ',' INTEGER ',' INTEGER
+    identifier_clause '=' dimension_boundaries ',' expr ',' expr
     {
-        if ($5 <= 0 || $5 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            YYABORT;
-        }
-
-        if ($7 < 0 || $7 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            YYABORT;
-        }
-    
-        $$ = new AstNode(dimension, CONTEXT(@1),
+        $$ = new AstNode(dimension, CONTEXT(@$),
             dimensionArgCount, 
             $1,
             $3,
-            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@5), $5),
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@7), $7));
+            $5,
+            $7);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
     | identifier_clause
     {
-        $$ = new AstNode(dimension, CONTEXT(@1),
+        $$ = new AstNode(dimension, CONTEXT(@$),
             dimensionArgCount, 
             $1,
-            new AstNode(dimensionBoundaries, CONTEXT(@1),
+            new AstNode(dimensionBoundaries, CONTEXT(@$),
                 dimensionBoundaryArgCount,
-                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), 0),
-                new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE)),
+                new AstNodeInt64(int64Node, CONTEXT(@$), 0),
+                new AstNode(asterisk, CONTEXT(@$), 0)),
             NULL,
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+            new AstNodeInt64(int64Node, CONTEXT(@$), 0));
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }    
-    | identifier_clause '(' distinct typename ')' '=' dimension_boundary ',' INTEGER ',' INTEGER
+    | identifier_clause '(' distinct typename ')' '=' dimension_boundary_end ',' expr ',' expr
     {
-        if ($9 <= 0 || $9 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            delete $4;
-            delete $7;
-            YYABORT;
-        }
-
-        if ($11 < 0 || $11 > std::numeric_limits<uint32_t>::max())
-        {
-            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
-            delete $1;
-            delete $3;
-            delete $4;
-            delete $7;
-            YYABORT;
-        }
-
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
             nIdimensionArgCount,
             $1,
             $3,
             $4,
             $7,
-            new AstNodeInt64(dimensionChunkInterval, CONTEXT(@8), $9),
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@10), $11));
+            $9,
+            $11);
+
+        $$->setComment(glue._docComment);
+        glue._docComment.clear();
     }
     | identifier_clause '(' distinct typename ')'
     {
@@ -354,9 +328,9 @@ array_dimension:
             $1,
             $3,
             $4,
-            new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE),
+            new AstNode(asterisk, CONTEXT(@$), 0),
             NULL,
-            new AstNodeInt64(dimensionChunkOverlap, CONTEXT(@1), 0));
+            new AstNodeInt64(int64Node, CONTEXT(@$), 0));
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
@@ -364,7 +338,7 @@ array_dimension:
     ;
 
 dimension_boundaries:
-    dimension_boundary ':' dimension_boundary
+    expr ':' dimension_boundary_end
     {
         $$ = new AstNode(dimensionBoundaries, CONTEXT(@1),
             dimensionBoundaryArgCount,
@@ -373,35 +347,9 @@ dimension_boundaries:
     }
     ;
 
-dimension_boundary:
-    negative_index INTEGER
-    {
-        if ($2 <= MIN_COORDINATE || $2 >= MAX_COORDINATE)
-        {
-            glue.error(@2, "Dimension boundaries must be between -4611686018427387903 and 4611686018427387903");
-            YYABORT;
-        }
-        $$ = new AstNodeInt64(dimensionBoundary, CONTEXT(@1), $1 ? -$2 : $2);
-    }
-    | '*'
-    {
-        $$ = new AstNodeInt64(dimensionBoundary, CONTEXT(@1), MAX_COORDINATE);
-    }
-    ;
-
-negative_index:
-    '-'
-    {
-        $$ = true;
-    }
-    | '+'
-    {
-        $$ = true;
-    }
-    |
-    {
-        $$ = false;
-    }
+dimension_boundary_end:
+    expr
+    | asterisk
     ;
 
 distinct:
@@ -421,40 +369,32 @@ distinct:
     ;
 
 //FIXME: need more flexible way
-typename:
-    IDENTIFIER
-    {
-        $$ = new AstNodeString(attributeTypeName, CONTEXT(@1), *$1);
-        delete $1;
-    }
-    ;
+typename: identifier_clause;
     
 /**
  * This rule for recognizing scalar function as well as array operators. What is it will be 
  * decided on pass stage (Pass.cpp) when getting scalar UDF and operators metadata. 
  */
 function:
-    IDENTIFIER '(' ')' function_alias
+    identifier_clause '(' ')' function_alias
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), *$1),
+            $1,
             new AstNode(functionArguments, CONTEXT(@2), 0),
             $4,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
     }
-    | IDENTIFIER '(' function_argument_list ')' function_alias
+    | identifier_clause '(' function_argument_list ')' function_alias
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), *$1),
+            $1,
             $3,
             $5,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
     }
-    | IDENTIFIER AS IDENTIFIER
+    | identifier_clause AS identifier_clause
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
@@ -462,29 +402,26 @@ function:
             new AstNode(functionArguments, CONTEXT(@1), 1,            
                 new AstNode(reference, CONTEXT(@1), referenceArgCount,
                     NULL,
-                    new AstNodeString(objectName, CONTEXT(@1), *$1),
+                    $1,
                     NULL,
                     NULL,
                     NULL,
                     NULL
                     )
              ),
-            new AstNodeString(functionAlias, CONTEXT(@3), *$3),
+            $3,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
-        delete $3;
     }
     // Little aggregate syntax sugar. Now only COUNT using asterisc to count all attributes.
-    | IDENTIFIER '(' '*' ')' function_alias
+    | identifier_clause '(' asterisk ')' function_alias
     {
         $$ = new AstNode(function, CONTEXT(@1),
             functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), *$1),
+            $1,
             new AstNode(functionArguments, CONTEXT(@2), 1,
-                new AstNode(asterisk, CONTEXT(@1), 0)),
+                $3),
             $5,
             new AstNodeBool(boolNode, CONTEXT(@1), false));
-        delete $1;
     }
     | reference AS identifier_clause
     {
@@ -500,10 +437,9 @@ function:
     ;
     
 function_alias:
-    AS IDENTIFIER
+    AS identifier_clause
     {
-        $$ = new AstNodeString(functionAlias, CONTEXT(@2), *$2),
-        delete $2;
+        $$ = $2;
     }
     |
     {
@@ -524,7 +460,7 @@ function_argument_list:
     ;
 
 function_argument:
-    expression
+    expr
     /*
     Serialized schema from coordinator's physical plan for sending it to nodes  
     and construct physical operators there. See passAPFunction function in Pass.cpp
@@ -539,95 +475,171 @@ function_argument:
     }
     ;
     
-expression:
-    atom
-    | '-' expression %prec UNARY
+expr:
+    common_expr
+    | beetween_expr
+    | '-' expr %prec UNARY_MINUS
     {
         $$ = makeUnaryScalarOp("-", $2, CONTEXT(@1));
     }
-    | expression '+' expression
+    | expr '+' expr
     {
         $$ = makeBinaryScalarOp("+", $1, $3, CONTEXT(@1));
     }
-    | expression '-' expression
+    | expr '-' expr
     {
         $$ = makeBinaryScalarOp("-", $1, $3, CONTEXT(@1));
     }
-    | expression '*' expression
+    | expr '*' expr
     {
         $$ = makeBinaryScalarOp("*", $1, $3, CONTEXT(@1));
     }
-    | expression '^' expression
+    | expr '^' expr
     {
         $$ = makeBinaryScalarOp("^", $1, $3, CONTEXT(@1));
     }
-    | expression '=' expression
+    | expr '=' expr
     {
         $$ = makeBinaryScalarOp("=", $1, $3, CONTEXT(@1));
     }
-    | expression '/' expression
+    | expr '/' expr
     {
         $$ = makeBinaryScalarOp("/", $1, $3, CONTEXT(@1));
     }
-    | expression '%' expression
+    | expr '%' expr
     {
         $$ = makeBinaryScalarOp("%", $1, $3, CONTEXT(@1));
     }
-    | expression '<' expression
+    | expr '<' expr
     {
         $$ = makeBinaryScalarOp("<", $1, $3, CONTEXT(@1));
     }
-    | expression LSEQ expression
+    | expr LSEQ expr
     {
         $$ = makeBinaryScalarOp("<=", $1, $3, CONTEXT(@1));
     }
-    | expression NEQ expression
+    | expr NEQ expr
     {
         $$ = makeBinaryScalarOp("<>", $1, $3, CONTEXT(@1));
     }
-    | expression GTEQ expression
+    | expr GTEQ expr
     {
         $$ = makeBinaryScalarOp(">=", $1, $3, CONTEXT(@1));
     }
-    | expression '>' expression
+    | expr '>' expr
     {
         $$ = makeBinaryScalarOp(">", $1, $3, CONTEXT(@1));
     }
-    | NOT expression
+    | NOT expr
     {
         $$ = makeUnaryScalarOp("not", $2, CONTEXT(@2));
     }
-    | expression AND expression
+    | expr AND expr
     {
         $$ = makeBinaryScalarOp("and", $1, $3, CONTEXT(@1));
     }
-    | expression OR expression
+    | expr OR expr
     {
         $$ = makeBinaryScalarOp("or", $1, $3, CONTEXT(@1));
     }
-    | expression IS NULL_VALUE
+    | expr IS NULL_VALUE
     {
         $$ = makeUnaryScalarOp("is_null", $1, CONTEXT(@1));
     }
-    | expression IS NOT NULL_VALUE
+    | expr IS NOT NULL_VALUE
     {
         $$ = makeUnaryScalarOp("not",
                  makeUnaryScalarOp("is_null", $1, CONTEXT(@1)),
                  CONTEXT(@1));
     }
     ;
-    
 
+//Expression rule without boolean ops for using where it causing problems, for example
+//reduce/reduce conflict in BETWEEN
+//
+// NOTE: If you changing this rules, don't forget update expr!
+//
+reduced_expr:
+    common_expr
+    | '-' reduced_expr %prec UNARY_MINUS
+    {
+        $$ = makeUnaryScalarOp("-", $2, CONTEXT(@1));
+    }
+    | reduced_expr '+' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("+", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '-' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("-", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '*' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("*", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '^' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("^", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '=' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("=", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '/' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("/", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '%' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("%", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '<' reduced_expr
+    {
+        $$ = makeBinaryScalarOp("<", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr LSEQ reduced_expr
+    {
+        $$ = makeBinaryScalarOp("<=", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr NEQ reduced_expr
+    {
+        $$ = makeBinaryScalarOp("<>", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr GTEQ reduced_expr
+    {
+        $$ = makeBinaryScalarOp(">=", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr '>' reduced_expr
+    {
+        $$ = makeBinaryScalarOp(">", $1, $3, CONTEXT(@1));
+    }
+    | reduced_expr IS NULL_VALUE
+    {
+        $$ = makeUnaryScalarOp("is_null", $1, CONTEXT(@1));
+    }
+    | reduced_expr IS NOT NULL_VALUE
+    {
+        $$ = makeUnaryScalarOp("not",
+                 makeUnaryScalarOp("is_null", $1, CONTEXT(@1)),
+                 CONTEXT(@1));
+    }
+    ;
+
+// Common part for expr and reduced_expr. 
+common_expr:
+    atom
+    ;
 
 atom:
     constant
     | function
     | reference
-    | '(' expression ')'
+    | case_expr
+    | '(' expr ')'
     {
-        $$ = $2; 
+        $$ = $2;
     }
-    ;
+    ;    
 
 constant:
     constant_int64
@@ -641,8 +653,7 @@ constant:
 constant_string:
     STRING_LITERAL
     {
-        $$ = new AstNodeString(stringNode, CONTEXT(@1), *$1);
-        delete $1;
+        $$ = new AstNodeString(stringNode, CONTEXT(@1), $1);
     }
     ;
     
@@ -670,39 +681,36 @@ constant_NA:
 //General rule for implicit scans, arrays, attributes and dimensions. We don't know exactly what it is
 //and don't know what operator required in this position, so decision will be made on pass stage. 
 reference:
-    IDENTIFIER timestamp_clause index_clause sort_quirk
+    identifier_clause timestamp_clause index_clause sort_quirk
     {
         $$ = new AstNode(reference, CONTEXT(@1), referenceArgCount,
             NULL,
-            new AstNodeString(objectName, CONTEXT(@1), *$1),
+            $1,
             $2,
             $4,
             $3
         );
-        delete $1;
     }
-    | IDENTIFIER '.' IDENTIFIER sort_quirk
+    | identifier_clause '.' identifier_clause sort_quirk
     {
         $$ = new AstNode(reference, CONTEXT(@1), referenceArgCount,
-            new AstNodeString(arrayName, CONTEXT(@1), *$1),
-            new AstNodeString(objectName, CONTEXT(@3), *$3),
+            $1,
+            $3,
             NULL,
             $4,
             NULL
         );
-        delete $1;
-        delete $3;
     }
     ;
 
 timestamp_clause:
-    '@' expression
+    '@' expr
     {
         $$ = $2;
     }
-    | '@' '*'
+    | '@' asterisk
     {
-        $$ = new AstNode(asterisk, CONTEXT(@1), 0);
+        $$ = $2;
     }
     |
     {
@@ -711,10 +719,9 @@ timestamp_clause:
     ;
 
 index_clause:
-    ':' IDENTIFIER
+    ':' identifier_clause
     {
-        $$ = new AstNodeString(stringNode, CONTEXT(@2), *$2);
-        delete $2;
+        $$ = $2;
     }
     |
     {
@@ -730,6 +737,127 @@ schema:
             $5
         );
     }
+
+case_expr:
+    CASE case_arg case_when_clause_list case_default END
+    {
+        //Here we rewriting IIFs list to expression which emulate CASE
+        //Three main rewrites:
+        //1. If we have case_arg then we should add compare operator to IIF's first function_argument
+        //2. Each next IIF going to previous IIF's third argument
+        //3. If we have case_default then we should add it to last IIF's third argument
+        AstNode* iifNode = NULL;
+        AstNode* currentIif = NULL;
+        AstNode* lastIif = NULL;
+        bool first = true;
+        for(size_t i = 0; i < $3->getChildsCount(); ++i)
+        {
+            currentIif = $3->getChild(i);
+            if (!iifNode)
+            {
+                iifNode = currentIif;
+            }
+
+            if ($2)
+            {
+                //Updating first parameter of IIF
+                currentIif->getChild(functionArgParameters)->setChild(0,
+                    makeBinaryScalarOp(
+                        "=", first ? $2 : $2->clone(), //We should avoid using same nodes in different branches, so clone it
+                        currentIif->getChild(functionArgParameters)->getChild(0),
+                        currentIif->getChild(functionArgParameters)->getParsingContext()));
+            }
+            else
+            {
+                if (function != currentIif->getChild(functionArgParameters)->getChild(0)->getType())
+                {
+                    glue.error(
+                        currentIif->getChild(functionArgParameters)->getChild(0)->getParsingContext(),
+                        "Function or scalar operator expected");
+                    delete $2;
+                    delete $3;
+                    delete $4;
+                    YYABORT;
+                }                
+            }
+            
+            if(lastIif)
+            {
+                //Filling third parameter of IIF
+                lastIif->getChild(functionArgParameters)->setChild(2, currentIif);
+            }
+            lastIif = currentIif;
+            first = false;
+        }
+
+        if ($4)
+        {
+            //Filling third parameter of IIF for ELSE clause
+            lastIif->getChild(functionArgParameters)->setChild(2, $4);            
+        }
+
+        $$ = iifNode;
+    }
+    ;
+
+case_arg:
+    expr
+    |
+    {
+        $$ = NULL;
+    }
+
+case_when_clause_list:
+    case_when_clause
+    {
+        $$ = new AstNode(caseWhenClauseList, CONTEXT(@1), 1, $1);
+    }
+    | case_when_clause_list case_when_clause
+    {
+        $1->addChild($2);
+        $$ = $1;    
+    }
+    ;
+
+case_when_clause:
+    WHEN expr THEN expr
+    {
+        //$$ = new AstNode(caseWhenClause, CONTEXT(@1), caseWhenClauseArgCount, $2, $4);
+        $$ = new AstNode(function, CONTEXT(@$),
+                functionArgCount,
+                new AstNodeString(identifierClause, CONTEXT(@$), "iif"),
+                new AstNode(functionArguments, CONTEXT(@$), 3,
+                    $2, //will be updated in case_expr
+                    $4,
+                    new AstNodeNull(null, CONTEXT(@$)) //will be filled in case_expr
+                ),
+                NULL,
+                new AstNodeBool(boolNode, CONTEXT(@$), false)
+            );
+    }
+    ;
+
+case_default:
+    ELSE expr
+    {
+        $$ = $2;
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
+beetween_expr:
+    expr BETWEEN reduced_expr AND reduced_expr %prec BETWEEN
+    {
+        $$ = makeBinaryScalarOp("and",
+                makeBinaryScalarOp(">=", $1, $3, CONTEXT(@1)),
+                makeBinaryScalarOp("<=", $1->clone(), $5, CONTEXT(@1)),
+                CONTEXT(@1)
+                );
+    }
+    ;
 
 // Dummy rule for getting approximately position of optional token (e.g. NOT NULL, 
 // UPDATABLE, NOT EMPTY)
@@ -752,7 +880,31 @@ sort_quirk:
         $$ = NULL;
     }
     ;
+
+asterisk:
+    '*'
+    {
+        $$ = new AstNode(asterisk, CONTEXT(@1), 0);
+    }
+    ;
  
+non_reserved_keywords:
+    ALL
+    | ARRAY
+    | AS
+    | ASC
+    | BETWEEN
+    | COMPRESSION
+    | CREATE
+    | DESC
+    | DEFAULT
+    | DISTINCT
+    | END
+    | IMMUTABLE
+    | IS
+    | RESERVE
+    ;
+
 %%
 
 void scidb::AFLParser::error(const AFLParser::location_type& loc,

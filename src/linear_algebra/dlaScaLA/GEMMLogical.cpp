@@ -2,30 +2,48 @@
 **
 * BEGIN_COPYRIGHT
 *
-* PARADIGM4 INC.
-* This file is part of the Paradigm4 Enterprise SciDB distribution kit
-* and may only be used with a valid Paradigm4 contract and in accord
-* with the terms and conditions specified by that contract.
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
-* Copyright © 2010 - 2012 Paradigm4 Inc.
-* All Rights Reserved.
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
 
+// C++
+// std C
+#include <stdlib.h>
+// de-facto standards
 #include <boost/numeric/conversion/cast.hpp>
-
+// SciDB
+#include <log4cxx/logger.h>
 #include <query/Operator.h>
 #include <query/OperatorLibrary.h>
 #include <system/Exceptions.h>
 #include <system/SystemCatalog.h>
 #include <system/BlockCyclic.h>
 
+// MPI/ScaLAPACK
+#include <scalapackUtil/dimUtil.hpp>
+#include <scalapackUtil/ScaLAPACKLogical.hpp>
+// local
+#include "GEMMOptions.hpp"
 #include "DLAErrors.h"
-#include "scalapackUtil/ScaLAPACKLogical.hpp"
 
 
 using namespace scidb;
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_linear_algebra.ops.gemm"));
 
 namespace scidb
 {
@@ -79,61 +97,82 @@ public:
         ADD_PARAM_INPUT()
         ADD_PARAM_INPUT()
         ADD_PARAM_INPUT()
-        // TODO: add arguments for TRANSA, TRANSB, possibly via:
-        //       ADD_PARAM_CONSTANT("string") and later:
-        //       const string& transAStr = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_STRING).getString();
-        //       possibly more flexible if the argument is a bool or zero vs nonzero integer
-        // TOOD: Note that TRANS is standard ScaLAPACK shorthand for transpose / conjugate transpose
-        //       in the case of complex numbers.
-        //
-        // TODO: add arguments for ALPHA, BETA, possibly via ADD_PARAM_CONSTANT("double") ?
-        // also need two doubles for Alpha, Beta
-        // TODO: note that ALPHA and BETA are arguments from the PDGEMM ScaLAPACK call and to
-        //       see that for documentation on their meaning.  Give a pointer to the netlib
-        //       refernce page.
+        ADD_PARAM_VARIES(); // a string that contains the named TRANS[A|B], ALPHA, and/or BETA options
+        // TODO: Note that TRANS is the standard ScaLAPACK shorthand for transpose or conjugate transpose
+        // TODO: Once checked in, give S.Marcus the pointer to the TRANS,ALPHA,BETA doc from ScaLAPACK
+        //       and have him include the pointer to the netlib page "for more detail"
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query);
+
+    typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > ParamPlaceholders_t ;
+    ParamPlaceholders_t nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas);
 };
+
+// required by ADD_PARAM_VARIES()
+GEMMLogical::ParamPlaceholders_t GEMMLogical::nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+{
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+    res.push_back(END_OF_VARIES_PARAMS());
+    switch (_parameters.size()) {
+    case 0:
+        res.push_back(PARAM_CONSTANT("string"));
+        break;
+    default:
+        break;
+    }
+
+    return res;
+}
 
 ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
 {
-    // TODO: refactor and re-use checks on schemas by parameterizing the restrictions
-    //       many of these restrictions apply equally well to SVD and other operators.
-    //       Parameterize and refactor those restrictions to ScaLAPACKPhysical.
-    //
+    LOG4CXX_TRACE(logger, "GEMMLogical::inferSchema(): begin.");
 
     enum dummy  {ROW=0, COL=1};
     enum dummy2 {AA=0, BB, CC, NUM_MATRICES};  // which matrix: f(AA,BB,CC) = alpha AA BB + beta CC
 
+    //
+    // array checks (first 3 arguments)
+    //
     assert(schemas.size() == NUM_MATRICES);
-
-    //
-    // per-array checks
-    //
     checkScaLAPACKInputs(schemas, query, NUM_MATRICES, NUM_MATRICES);
 
+    //
+    // get the optional 4th argument: the parameters string: ( TRANSA, TRANSB, ALPHA, BETA)
+    //
+    string namedOptionStr;
+    switch (_parameters.size()) {
+    case 0:
+        break;
+    case 1:
+        typedef boost::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
+        namedOptionStr = evaluate(reinterpret_cast<ParamType_t&>(_parameters[0])->getExpression(), query, TID_STRING).getString();
+        break;
+    default:
+        assert(false) ; // NOTREACHED
+        // scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT3 is thrown before this
+        // line reached, this assert is only to ensure that it stays that way
+        break;
+    }
+    GEMMOptions options(namedOptionStr);  // convert option string to the 4 values
 
     //
     // cross-matrix constraints:
     //
 
     // check: cross-argument sizes
-    const Dimensions& dimsAA = schemas[AA].getDimensions();
-    const Dimensions& dimsBB = schemas[BB].getDimensions();
-    const Dimensions& dimsCC = schemas[CC].getDimensions();
-
-    if (dimsAA[COL].getLength() != dimsBB[ROW].getLength()) {
+    if (nCol(schemas[AA], options.transposeA) != nRow(schemas[BB], options.transposeB)) {
         throw (PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR4)
-               << "(first matrix trailing dimension must match second matrix leading dimension)");
+               << "first matrix columns must equal second matrix rows (after optional transposes) ");
     }
-    if (dimsAA[ROW].getLength() != dimsCC[ROW].getLength()) {
+    if (nRow(schemas[AA], options.transposeA) != nRow(schemas[CC])) {
         throw (PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR4)
-               << "(first and third matrix must have the same leading dimension)");
+               << "first and third matrix must have equal number of rows (after optional 1st matrix transpose)");
     }
-    if (dimsBB[COL].getLength() != dimsCC[COL].getLength()) {
+    if (nCol(schemas[BB], options.transposeB) != nCol(schemas[CC])) {
         throw (PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR4)
-               << "(first and third matrix must have the same trailing dimension)");
+               << "first and third matrix must have equal number of columns (after optional 1st matrix transpose)");
     }
 
     // TODO: check: ROWS * COLS is not larger than largest ScaLAPACK fortran INTEGER
@@ -147,8 +186,10 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
     // inputs look good, create and return the output schema
     // note that the output has the dimensions and name bases of the third argument C
     // so that we can iterate on C, by repeating the exact same query,
-    // we are SUPER careful not to change its dim names if they are already distinct.
+    // NOTE: we are SUPER careful not to change its dim names if they are already distinct.
+    //       to make the iteration as simple as possible
     //
+    const Dimensions& dimsCC = schemas[CC].getDimensions();
     
     std::pair<string, string> distinctNames = ScaLAPACKDistinctDimensionNames(dimsCC[ROW].getBaseName(),
                                                                               dimsCC[COL].getBaseName());
@@ -182,6 +223,8 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
                                  dimsCC[COL].getFuncMapScale());
 
     Attributes atts(1); atts[0] = AttributeDesc(AttributeID(0), "gemm", TID_DOUBLE, 0, 0);
+
+    LOG4CXX_TRACE(logger, "GEMMLogical::inferSchema(): end.");
     return ArrayDesc("GEMM", atts, outDims);
 }
 

@@ -27,13 +27,10 @@ doc.ug_loadingData_specialValues
 doc.ug_loadingData_errors
 other.repart_setopt
 perf.repart
-#next 4 are now for 64instance clusters only (4 instance ones are o1to96)
-scalapack.64instance.10_gemm_driver_allstd_o1to288c32
-scalapack.64instance.20_svd_doSvd_o1to288c32
-scalapack.64instance.31_svd_driver_random_t1to4_o1to1024c32
-scalapack.64instance.35_svd_driver_allstd_o1to288c32
+# scalapack.64instance are needed for scale-up testing on salty, but take too long to run anywhere else
+scalapack.64instance
+scalapack.disabled
 scalapack.perf
-scalapack.perf.30_svd_doSvd_2_M
 scalapack.smallest_sizes
 update.kill
 # second sorted list below needs to be merged into the sorted list above
@@ -64,18 +61,6 @@ other.basic_matrix_inverse
 
 # re-enable after solving ticket 2234
 docscript.load
-
-# re-enable after solving ticket 2235
-injecterror.inject_2_redim
-
-# re-enable after solving ticket 2236
-injecterror.inject_2_store
-
-# re-enable after solving ticket 2237
-injecterror.inject_2_update
-
-# re-enable after solving ticket 2238
-injecterror.inject_4_mapping
 
 # re-enable after solving ticket 2239
 iqueryabort.abort_load
@@ -112,3 +97,9 @@ other.loadlib
 
 #re-enable after solving ticket 2258
 other.random_check
+
+#re-enable after solving ticket 2329
+docscript/quickStart
+
+# for not-debug builds this line would be replaced by list of disabled tests
+@CONFIGURE_DISABLE_TESTS_NOT_DEBUG@

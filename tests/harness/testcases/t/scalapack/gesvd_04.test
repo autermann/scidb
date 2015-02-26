@@ -49,18 +49,13 @@ count(gesvd(M8x8_default, 'values'))
 count(gesvd(M8x8_default, 'left'))
 count(gesvd(M8x8_default, 'right'))
 
---echo gesvd negative tests : array should have samilar chunking on both the dimensions
+--echo gesvd negative tests : array should have same chunking on both the dimensions
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M3x3c32x16, 'values')"
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M3x3c32x16, 'left')"
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M3x3c32x16, 'right')"
-# TEMPORARY all non-square and non-zero starting index cases are
-#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
-#           will be fixed by #2200 and/or #2202
-# unbounded dimensions behave as non-square so have to change the error code from 41 (for unbounded)
-#   to 43 (for not square, because it is actually unbounded, even though it used to say M3x3...UB, that was quite misleading)
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(Mc32x16_UB, 'values')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(Mc32x16_UB, 'left')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(Mc32x16_UB, 'right')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(Mc32x16_UB, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(Mc32x16_UB, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(Mc32x16_UB, 'right')"
 
 --echo using repart to make it work
 gesvd(repart(M3x3c32x16, <a:double> [x=0:2,32,0, y=0:2,32,0]), 'values')

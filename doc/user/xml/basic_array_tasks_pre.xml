@@ -5,7 +5,32 @@
 <chapter>
   <title>Basic Array Tasks</title>
 
-  <section>
+  <para>This chapter contains the following sections:</para>
+
+  <itemizedlist>
+    <listitem>
+      <para><link linkend="selectData">Selecting Data From an
+      Array</link></para>
+    </listitem>
+
+    <listitem>
+      <para><link linkend="arrayJoins">Array Joins</link></para>
+    </listitem>
+
+    <listitem>
+      <para><link linkend="aliases">Aliases</link></para>
+    </listitem>
+
+    <listitem>
+      <para><link linkend="nestedQueries">Nested Subqueries</link></para>
+    </listitem>
+
+    <listitem>
+      <para><link linkend="dataSampling">Data Sampling</link></para>
+    </listitem>
+  </itemizedlist>
+
+  <section id="selectData">
     <title>Selecting Data From an Array</title>
 
     <para><indexterm>
@@ -20,16 +45,16 @@
         <secondary>select</secondary>
       </indexterm>The AQL Data Manipulation Language (DML) provides queries to
     access and operate on array data. The basis for selecting data from a
-    SciDB array is the AQL <code><command>SELECT</command></code> statement
-    with <code><command>INTO</command></code>,
-    <code><command>FROM</command></code>, and
-    <code><command>WHERE</command></code> clauses.</para>
+    SciDB array is the AQL <command>SELECT</command>
+    statement with <command>INTO</command>,
+    <command>FROM</command>, and
+    <command>WHERE</command> clauses.</para>
 
     <section>
       <title>SELECT Statement Syntax</title>
 
-      <para>The syntax of the <code> <command>SELECT</command> </code>
-      statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable>
+      <para>The syntax of the <command>SELECT</command> statement
+      is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable>
        [<command>INTO</command> <replaceable>target_array</replaceable>]
        <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
        [<command>WHERE</command> <replaceable>expression</replaceable>]
@@ -40,7 +65,7 @@
             <term><replaceable>expression</replaceable></term>
 
             <listitem>
-              <para><code><command>SELECT</command></code>
+              <para><command>SELECT</command>
               <replaceable>expression</replaceable> can select individual
               attributes and dimensions, as well as constants and expressions.
               The wildcard character * means select all attributes.</para>
@@ -51,10 +76,9 @@
             <term><replaceable>target_array</replaceable></term>
 
             <listitem>
-              <para>The <code><command>INTO</command></code> clause can create
-              an array to store the output of the query. The target array may
-              also be a pre-existing array in the current SciDB
-              namespace.</para>
+              <para>The <command>INTO</command> clause can create an array to
+              store the output of the query. The target array may also be a
+              pre-existing array in the current SciDB namespace.</para>
             </listitem>
           </varlistentry>
 
@@ -63,8 +87,8 @@
             <replaceable>source_array</replaceable></term>
 
             <listitem>
-              <para>The <code><command>FROM</command></code> clause takes a
-              SciDB array or array expression as argument. The
+              <para>The <command>FROM</command> clause takes a SciDB array or
+              array expression as argument. The
               <replaceable>array_expression</replaceable> argument is an
               expression or subquery that returns an array result. The
               <replaceable>source_array</replaceable> is an array that has
@@ -77,7 +101,7 @@
 
             <listitem>
               <para>The <replaceable>expression</replaceable> argument of the
-              <code><command>WHERE</command></code> clause allows to you
+              <command>WHERE</command> clause allows to you
               specify parameters that filter the query.</para>
             </listitem>
           </varlistentry>
@@ -87,21 +111,23 @@
     <section>
       <title>The SELECT Statement</title>
 
-      <para>AQL expressions in the <code> <command>SELECT</command> </code>
-      list or the <code> <command>WHERE</command> </code> clause are standard
-      expressions over the attributes and dimensions of the array. The
-      simplest <code> <command>SELECT</command> </code> statement is
-      <code><command>SELECT</command> *</code>, which selects all data from a
-      specified array or array expression. Consider two arrays, <code>A</code>
-      and <code>B</code>: <programlisting language="test">
+      <para>AQL expressions in the <command>SELECT</command>
+      list or the <command>WHERE</command> clause
+      are standard expressions over the attributes and dimensions of the
+      array. The simplest <command>SELECT</command> 
+      statement is <command>SELECT *</command>, which
+      selects all data from a specified array or array expression. Consider
+      two arrays, <code>A</code> and <code>B</code>: <programlisting
+      language="test">
 --aql CREATE ARRAY A &lt;val_a:double&gt;[i=0:9,10,0]; --show-output=no
 --aql CREATE ARRAY B &lt;val_b:double&gt;[j=0:9,10,0]; --show-output=no
 
 --afl load(A, '../examples/A.scidb'); --show-output=no --show-query=no
 --afl load(B, '../examples/B.scidb'); --show-output=no --show-query=no
 </programlisting> These arrays contain data. To see all the data stored in the
-      array, you can use the following <code><command>SELECT</command></code>
-      statement: <programlisting language="test">
+      array, you can use the following
+      <command>SELECT</command> statement: <programlisting
+      language="test">
 --aql SELECT * FROM A; --output-format=auto
 </programlisting> <programlisting language="test">
 --aql SELECT * FROM B; --output-format=auto 
@@ -117,15 +143,15 @@
 --aql SELECT * FROM show(B); --output-format=auto 
 </programlisting></para>
 
-      <para>To refine the result of the <command> <code>SELECT</code>
-      </command> statement, use an argument that specifies part of an array
-      result. <command> <code>SELECT</code> </command> can take array
+      <para>To refine the result of the <command>SELECT</command>
+      statement, use an argument that specifies part of an array
+      result. <command>SELECT</command> can take array
       dimensions or attributes as arguments: <programlisting language="test">
 --aql SELECT j from B; --output-format=auto
 --aql SELECT val_b from B; --output-format=auto 
-</programlisting> The <command> <code>SELECT</code> </command> statement can
-      also take an expression as an argument. For example, you can scale
-      attribute values by a certain amount:</para>
+</programlisting> The <command>SELECT</command> statement can also take an
+      expression as an argument. For example, you can scale attribute values
+      by a certain amount:</para>
 
       <programlisting language="test">
 SELECT val_b/10 FROM B; --output-format=auto
@@ -135,7 +161,7 @@ SELECT val_b/10 FROM B; --output-format=auto
           <primary>AQL</primary>
 
           <secondary>where</secondary>
-        </indexterm>The <code> <command>WHERE</command> </code> clause can
+        </indexterm>The <command>WHERE</command> clause can
       also use built-in functions to create expressions. For example, you can
       choose just the middle three cells of array B with the greater-than and
       less-than functions with the <code>and</code> operator: <programlisting
@@ -143,19 +169,19 @@ SELECT val_b/10 FROM B; --output-format=auto
 --aql SELECT j FROM B WHERE j &gt; 3 and j &lt; 7; --output-format=auto
 </programlisting> You can also select an expression of the attribute values
       for the middle three cells of B by providing an expression for the
-      argument of both <code><command>SELECT</command></code> and
-      <code><command>WHERE</command></code>. For example, this statement
+      argument of both <command>SELECT</command> and
+      <command>WHERE</command>. For example, this statement
       returns the square root of the middle three cells of array
       <code>B</code>: <programlisting language="test">
 --aql SELECT sqrt(val_b) FROM B WHERE j&gt;3 and j&lt;7; --output-format=auto
-</programlisting> The <code><command>FROM</command></code> clause can take an
-      array or any operation that outputs an array as an argument. The
-      <code><command>INTO</command></code> clause stores the output of a
+</programlisting> The <command>FROM</command> clause can
+      take an array or any operation that outputs an array as an argument. The
+      <command>INTO</command> clause stores the output of a
       query.</para>
     </section>
   </section>
 
-  <section>
+  <section id="arrayJoins">
     <title>Array Joins</title>
 
     <para><indexterm>
@@ -211,12 +237,12 @@ SELECT val_b/10 FROM B; --output-format=auto
         <primary>AQL</primary>
 
         <secondary>join</secondary>
-      </indexterm>The <code> <command>JOIN ... ON</command> </code> predicate
-    calculates the multidimensional join of two arrays after applying the
-    constraints specified in the <command><code>ON</code></command> clause.
-    The <command><code>ON</code></command> clause lists one or more
-    constraints in the form of equality predicates on dimensions or
-    attributes. The syntax is: <synopsis><command>SELECT</command> <replaceable>expression</replaceable> <optional><command>INTO</command> <replaceable>target_array</replaceable></optional>
+      </indexterm>The <command>JOIN ... ON</command>
+    predicate calculates the multidimensional join of two arrays after
+    applying the constraints specified in the <command>ON</command> clause.
+    The <command>ON</command> clause lists one or more constraints in the form
+    of equality predicates on dimensions or attributes. The syntax is:
+    <synopsis><command>SELECT</command> <replaceable>expression</replaceable> <optional><command>INTO</command> <replaceable>target_array</replaceable></optional>
      <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
     [ <command>JOIN</command> <replaceable>expression</replaceable> | <replaceable>attribute</replaceable> ]
      <command>ON</command> <replaceable>dimension</replaceable> | <replaceable>attribute</replaceable></synopsis></para>
@@ -227,8 +253,9 @@ SELECT val_b/10 FROM B; --output-format=auto
     less the matched dimensions. If no predicate is specified, the result is
     the full cross product array.</para>
 
-    <para>An attribute predicate in the <code><command>ON</command></code>
-    clause is used to filter the output of the multidimensional array.</para>
+    <para>An attribute predicate in the
+    <command>ON</command> clause is used to filter the
+    output of the multidimensional array.</para>
 
     <para>For example, consider a 2-dimensional array <code>m3x3</code>schema
     and attributes values: <programlisting language="test">--aql CREATE ARRAY m3x3&lt;a:double&gt; [i=1:3,3,0,j=1:3,3,0]; 
@@ -248,7 +275,7 @@ SELECT val_b/10 FROM B; --output-format=auto
 </programlisting></para>
   </section>
 
-  <section remap="h3">
+  <section id="aliases">
     <title>Aliases</title>
 
     <para><indexterm>
@@ -280,7 +307,7 @@ SELECT val_b/10 FROM B; --output-format=auto
 </programlisting></para>
   </section>
 
-  <section remap="h3">
+  <section id="nestedQueries">
     <title>Nested Subqueries</title>
 
     <para><indexterm>
@@ -291,9 +318,10 @@ SELECT val_b/10 FROM B; --output-format=auto
         <secondary>nesting</secondary>
       </indexterm>You can nest AQL queries to refine query results.</para>
 
-    <para>For example, you can nest <code> <command>SELECT</command> </code>
-    statements before a <code> <command>WHERE</command> </code> clause to
-    select a subset of the query output.<programlisting language="test">--aql SELECT pow(c,2) FROM
+    <para>For example, you can nest <command>SELECT</command> statements before
+    a <command>WHERE</command> 
+    clause to select a subset of the query output.<programlisting
+    language="test">--aql SELECT pow(c,2) FROM
 (SELECT A.val_a + B.val_b AS c FROM A,B) WHERE i &gt; 5; --output-format=auto 
 </programlisting></para>
 
@@ -313,7 +341,7 @@ SELECT val_b/10 FROM B; --output-format=auto
       </orderedlist></para>
   </section>
 
-  <section remap="h3">
+  <section id="dataSampling">
     <title>Data Sampling</title>
 
     <para><indexterm>

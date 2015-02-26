@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -103,8 +103,9 @@ public:
         attributes[9] = AttributeDesc((AttributeID)9, "keepcost",  TID_INT32, 0, 0);    /* top-most, releasable (via malloc_trim) space */
 
         vector<DimensionDesc> dimensions(1);
-        const size_t numNodes = Cluster::getInstance()->getInstanceMembership()->getInstances().size();
-        dimensions[0] = DimensionDesc("InstanceId", 0, 0, numNodes - 1 , numNodes - 1 , numNodes, 0);
+        size_t numNodes = Cluster::getInstance()->getInstanceMembership()->getInstances().size();
+        size_t end      = numNodes>0 ? numNodes-1 : 0;
+        dimensions[0] = DimensionDesc("InstanceId", 0, 0, end, end , numNodes, 0);
 
         return ArrayDesc("mstat", attributes, dimensions);
     }

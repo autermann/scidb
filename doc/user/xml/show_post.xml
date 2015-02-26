@@ -18,14 +18,24 @@
 
   <refsynopsisdiv>
     <synopsis>show(<replaceable>named_array</replaceable>);</synopsis>
+
+    <para>or</para>
+
+    <synopsis>show('<replaceable>query</replaceable>'[,'afl']);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para>The show operator returns an array's schema. The argument
-    <replaceable>named_array</replaceable> must be an array that was
+    <para>The <literal>show</literal> operator returns an array's schema. The
+    argument <replaceable>named_array</replaceable> must be an array that was
     previously created and stored in SciDB.</para>
+
+    <para>You can also use <literal>show</literal> to return the schema for a
+    query. This can be useful to preview the schema for a query, instead of
+    having to first save the result of the query to an array. Use the optional
+    string, <emphasis role="bold">'afl'</emphasis>, if the query is written in
+    AFL.</para>
 
     <para>You can use the show operator in the FROM clause of an AQL SELECT
     statement, as a stand-alone operator in a AFL statement, or as an operand
@@ -33,7 +43,7 @@
   </refsect1>
 
   <refsect1>
-    <title>Example</title>
+    <title>Examples</title>
 
     <informalexample>
       <para>This example shows the schema for an array, creates and stores an
@@ -69,6 +79,33 @@
           <para>Show the schema for the abridged array: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(championsAbridged);  </programlisting><screen>{i} schema
 {0} "championsAbridged&lt;person:string&gt; [year=1996:2008,13,0,event(string)=3,3,0]"
 </screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example illustrates the usage of <literal>show</literal> to
+      return schema for queries.</para>
+
+      <procedure>
+        <step>
+          <para>Create two arrays, and fill them with some
+          data.<para><programlisting>AFL% store(build(&lt;val1:int64&gt; [i=0:4,5,0, j=0:0,1,0], i),A);  </programlisting><screen>[[(0)],[(1)],[(2)],[(3)],[(4)]]
+</screen><programlisting>AFL% store(build(&lt;val2:int64&gt; [i=0:0,1,0, j=0:4,5,0], 10-j),B);  </programlisting><screen>[[(10),(9),(8),(7),(6)]]
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>View the schema of the result of multiplying A and B.
+          <para><programlisting>AFL% show('multiply(A,B)','afl');  </programlisting><screen>[("not empty Multiply&lt;multiply:int64&gt; [i=0:4,5,0,j=0:4,5,0]")]
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>You can use the show operator to view the output type of an
+          aggregate. <para><programlisting>AFL% show('select sum(val1) from A');  </programlisting><screen>[("not empty A@1&lt;sum:int64 NULL DEFAULT null&gt; [i=0:0,1,0]")]
+</screen><para><programlisting>AFL% show('select stdev(val1) from A');  </programlisting><screen>[("not empty A@1&lt;stdev:double NULL DEFAULT null&gt; [i=0:0,1,0]")]
+</screen></para></para></para>
         </step>
       </procedure>
     </informalexample>

@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -431,7 +431,9 @@ namespace scidb
         typedef std::map<scidb::QueryID, boost::shared_ptr<MpiOperatorContext> >  ContextMap;
         ContextMap   _ctxMap;
         scidb::Mutex _mutex;
+        scidb::Event _event;
         bool _isReady;
+        uint32_t _mpiResourceTimeout;
         boost::shared_ptr<scidb::Scheduler> _cleanupScheduler;
 	size_t _mpiType;
 	std::string _mpiInstallDir;
@@ -443,6 +445,9 @@ namespace scidb
         static void initMpiLinks(const std::string& installPath,
                                  const std::string& mpiPath,
                                  const std::string& pluginPath);
+        static bool checkForError(scidb::QueryID queryId,
+                                  double startTime,
+                                  double timeout);
     public:
         /**
          * @param installPath this instance install/data path

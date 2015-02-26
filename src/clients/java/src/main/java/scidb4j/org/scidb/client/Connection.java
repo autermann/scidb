@@ -1,20 +1,40 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 package org.scidb.client;
 
 import java.io.IOException;
 import java.net.SocketException;
 import java.util.logging.*;
 
-import org.scidb.io.network.SciDBNetwork;
-import org.scidb.io.network.SciDBNetworkMessage;
-import org.scidb.io.network.SciDBNetworkMessage.Error;
-import org.scidb.io.network.SciDBNetworkMessage.QueryResult;
+import org.scidb.io.network.Message;
+import org.scidb.io.network.Network;
+import org.scidb.io.network.Message.QueryResult;
 
 /**
  * SciDB connection
  */
 public class Connection
 {
-    private SciDBNetwork net;
+    private Network net;
     private boolean afl = false;
     private long queryId = 0;
     private WarningCallback warningCallback;
@@ -26,17 +46,17 @@ public class Connection
      */
     public Connection()
     {
-        net = new SciDBNetwork();
+        net = new Network();
     }
 
     /**
      * Connect to specified SciDB instance
      * @param host Host name
      * @param port Port number
-     * @throws SciDBException
+     * @throws Error
      * @throws IOException
      */
-    public void connect(String host, int port) throws SciDBException, IOException
+    public void connect(String host, int port) throws Error, IOException
     {
         net.connect(host, port);
     }
@@ -63,31 +83,31 @@ public class Connection
      * Prepare query
      * @param queryString Query string
      * @return Result with prepared query ID
-     * @throws SciDBException
+     * @throws Error
      * @throws IOException
      */
-    public SciDBResult prepare(String queryString) throws SciDBException, IOException
+    public Result prepare(String queryString) throws Error, IOException
     {
         log.fine(String.format("Preparing query '%s'", queryString));
-        SciDBNetworkMessage msg = new SciDBNetworkMessage.Query(0, queryString, afl, "", false);
+        Message msg = new Message.Query(0, queryString, afl, "", false);
         net.write(msg);
         msg = net.read();
 
         switch (msg.getHeader().messageType)
         {
-            case SciDBNetworkMessage.mtQueryResult:
+            case Message.mtQueryResult:
                 log.fine("Got result from server");
-                SciDBResult res = new SciDBResult((QueryResult) msg, this);
+                Result res = new Result((QueryResult) msg, this);
                 queryId = res.getQueryId(); 
                 return res;
 
-            case SciDBNetworkMessage.mtError:
+            case Message.mtError:
                 log.fine("Got error message from server");
-                throw new SciDBException((Error) msg);
+                throw new Error((Message.Error) msg);
 
             default:
                 log.severe("Got unhandled network message during execution");
-                throw new SciDBException(String.format("Can not handle network message '%s'",
+                throw new Error(String.format("Can not handle network message '%s'",
                         msg.getHeader().messageType));
         }
     }
@@ -123,37 +143,37 @@ public class Connection
      * Execute prepared query
      * @return Array result
      * @throws IOException
-     * @throws SciDBException
+     * @throws Error
      */
-    public Array execute() throws IOException, SciDBException
+    public Array execute() throws IOException, Error
     {
         if (queryId == 0)
         {
-            throw new SciDBException("Query not prepared");
+            throw new Error("Query not prepared");
         }
         
         log.fine(String.format("Executing query"));
-        SciDBNetworkMessage msg = new SciDBNetworkMessage.Query(queryId, "", afl, "", true);
+        Message msg = new Message.Query(queryId, "", afl, "", true);
         net.write(msg);
         msg = net.read();
 
         switch (msg.getHeader().messageType)
         {
-            case SciDBNetworkMessage.mtQueryResult:
+            case Message.mtQueryResult:
                 log.fine("Got result from server");
-                SciDBResult res = new SciDBResult((QueryResult) msg, this);
+                Result res = new Result((QueryResult) msg, this);
                 if (res.isSelective())
                     return new Array(res.getQueryId(), res.getSchema(), net);
                 else
                     return null;
 
-            case SciDBNetworkMessage.mtError:
+            case Message.mtError:
                 log.fine("Got error message from server");
-                throw new SciDBException((Error) msg);
+                throw new Error((Message.Error) msg);
 
             default:
                 log.severe("Got unhandled network message during execution");
-                throw new SciDBException(String.format("Can not handle network message '%s'",
+                throw new Error(String.format("Can not handle network message '%s'",
                         msg.getHeader().messageType));
         }
     }
@@ -161,26 +181,26 @@ public class Connection
     /**
      * Commit query
      */
-    public void commit() throws IOException, SciDBException
+    public void commit() throws IOException, Error
     {
-        net.write(new SciDBNetworkMessage.CompleteQuery(queryId));
-        SciDBNetworkMessage msg = net.read();
+        net.write(new Message.CompleteQuery(queryId));
+        Message msg = net.read();
 
         switch (msg.getHeader().messageType)
         {
-            case SciDBNetworkMessage.mtError:
-                Error err = (Error) msg;
+            case Message.mtError:
+                Message.Error err = (Message.Error) msg;
                 if (err.getRecord().getLongErrorCode() != 0)
                 {
                     log.fine("Got error message from server");
-                    throw new SciDBException((Error) msg);
+                    throw new Error((Message.Error) msg);
                 }
                 log.fine("Query completed successfully");
                 break;
 
             default:
                 log.severe("Got unhandled network message during query completing");
-                throw new SciDBException(String.format("Can not handle network message '%s'",
+                throw new Error(String.format("Can not handle network message '%s'",
                         msg.getHeader().messageType));
         }
     }
@@ -188,26 +208,26 @@ public class Connection
     /**
      * Rollback query
      */
-    public void rollback() throws IOException, SciDBException
+    public void rollback() throws IOException, Error
     {
-        net.write(new SciDBNetworkMessage.AbortQuery(queryId));
-        SciDBNetworkMessage msg = net.read();
+        net.write(new Message.AbortQuery(queryId));
+        Message msg = net.read();
 
         switch (msg.getHeader().messageType)
         {
-            case SciDBNetworkMessage.mtError:
-                Error err = (Error) msg;
+            case Message.mtError:
+                Message.Error err = (Message.Error) msg;
                 if (err.getRecord().getLongErrorCode() != 0)
                 {
                     log.fine("Got error message from server");
-                    throw new SciDBException((Error) msg);
+                    throw new Error((Message.Error) msg);
                 }
                 log.fine("Query aborted successfully");
                 break;
 
             default:
                 log.severe("Got unhandled network message during query aborting");
-                throw new SciDBException(String.format("Can not handle network message '%s'",
+                throw new Error(String.format("Can not handle network message '%s'",
                         msg.getHeader().messageType));
         }
     }

@@ -1,3 +1,24 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
 #ifndef OP_ARRAY_H_
 #define OP_ARRAY_H_
 
@@ -7,14 +28,19 @@
 // END_COPYRIGHT
 //
 
-///
-/// @file OpArray.h
-///
-/// @brief The implementation of the array delegating all functionality to a
-///        template operator which supplies the vales at a given coordinate.
-///
+/**
+ *
+ *  @file OpArray.h
+ *
+ *  @brief The implementation of the array delegating all functionality to a
+ *         template operator which supplies the vales at a given coordinate.
+ *
+ */
 
+// de-facto standards
+#include <log4cxx/logger.h>
 
+// SciDB APIs
 #include <array/DelegateArray.h>        // for SplitArray
 
 using namespace std;            // TODO: fix me
@@ -22,27 +48,33 @@ using namespace boost;          // TODO: fix me
 
 namespace scidb
 {
+static log4cxx::LoggerPtr OP_ARRAY_logger(log4cxx::Logger::getLogger("scidb.linear_algebra.oparray"));   // prefixed since this is in a header
 
-/// This template class takes an template operand Op_tt, which
-/// represents a function f(coord), and turn it into an Array
-/// which generates dense chunks by calling the function.
-/// When Op_tt::operator()(row, col) is inline, this is extremely efficient.
-/// [There is also an Op_tt::operator()(index) 1D case]
-///
-/// It is implemented as a thin wrapper over SplitArray, by overriding
-/// SplitArray::ArrayIterator::getChunk() to fill the values of the chunk
-/// from the Op_tt instead of from a pointer-to-memory that SplitArray
-/// uses.
-///
-/// See .../scalapackUtil/reformat.hpp for an example of the Op_tt class
-///
-/// It was originally designed to support the reformatting of ScaLAPACK
-/// output to look like an Array.
-///
-/// However, with some further generalization, this code could be extended to work with
-/// arbitrary array dimensions, be moved into the SciDB tree, and re-base
-/// SplitArray off of it, rather than the other way around
-///
+
+
+/**
+ *  This template class takes an template operand Op_tt, which
+ *  represents a function f(coord), and turn it into an Array
+ *  which generates dense chunks by calling the function.
+ *  When Op_tt::operator()(row, col) is inline, this is extremely efficient.
+ *  [There is also an Op_tt::operator()(index) 1D case]
+ *
+ *  It is implemented as a thin wrapper over SplitArray, by overriding
+ *  SplitArray::ArrayIterator::getChunk() to fill the values of the chunk
+ *  from the Op_tt instead of from a pointer-to-memory that SplitArray
+ *  uses.
+ *
+ *  See .../scalapackUtil/reformat.hpp for an example of the Op_tt class
+ *
+ *  It was originally designed to support the reformatting of ScaLAPACK
+ *  output to look like an Array.
+ *
+ *  However, with some further generalization, this code could be extended to work with
+ *  arbitrary array dimensions, be moved into the SciDB tree, and re-base
+ *  SplitArray off of it, rather than the other way around
+ *
+
+ */
 template<class Op_tt>
 class OpArray : public SplitArray
 {
@@ -117,6 +149,12 @@ OpArray<Op_tt>::OpArray(ArrayDesc const& desc,
     _op(op),
     _delta(delta)
 {
+    Dimensions const& dims = desc.getDimensions();
+    if(OP_ARRAY_logger->isDebugEnabled()) {
+        for (size_t i=0; i<dims.size(); i++) {
+            LOG4CXX_DEBUG(OP_ARRAY_logger, "OpArray<>::OpArray() dims["<<i<<"] from " << dims[i].getStartMin() << " to " << dims[i].getEndMax());
+        }
+    }
 }
 
 template<class Op_tt>
@@ -199,14 +237,12 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
 
     if (!chunkInitialized) {
-        chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
         if(DBG >= DBG_DETAIL) {
-            std::cerr << dbgPrefix << "START" << std::endl;
+            std::cerr << dbgPrefix << "START chunk" << std::endl;
             std::cerr << dbgPrefix << " addr.coords.size():" << addr.coords.size() << std::endl;
             std::cerr << dbgPrefix << " dims.size():" << dims.size() << std::endl;
         }
-        const size_t nDims = dims.size(); // OpArray dims
-        if(DBG >= DBG_DETAIL) std::cerr << dbgPrefix << " nDims:" << nDims << std::endl;
+        chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
 
         const boost::shared_ptr<scidb::Query> localQueryPtr(_array._query.lock());  // duration of getChunk() short enough
         boost::shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(localQueryPtr, ChunkIterator::SEQUENTIAL_WRITE);
@@ -214,6 +250,7 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
         Coordinates const& first = chunk.getFirstPosition(false);
         if(DBG >= DBG_DETAIL) std::cerr << dbgPrefix << " FIRST is: " << first << "*******" << std::endl;
         // the last dimension
+        const size_t nDims = dims.size(); // OpArray dims
         int64_t colsTillEnd = (_array.till())[nDims-1] - first[nDims-1] + 1 ;
         int64_t chunkCols =  int64_t(dims[nDims-1].getChunkInterval());
         int64_t colCount = std::max(0L, std::min(colsTillEnd, chunkCols));

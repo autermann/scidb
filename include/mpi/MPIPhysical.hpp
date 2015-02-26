@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -115,21 +115,23 @@ public:
 protected:
     // TODO James : speak to Tigor about whether these methods might be implemented on the _ctx instead of around it.
 
-    ///
-    /// Launches a new set of MPI processes
-    /// May be orchestrated from only 1 of the N processes, such as from the coordinator
-    /// Caller should not depend on that.
-    /// @param query
-    /// @param maxSlaves
-    /// @xxxxx (sets state): _launchId, _mustLaunch, _ctx, _launcher, _ipcName
-    /// @return true if this instance participates in the computation and should handshake with a slave; false otherwise
+    /**
+     *  Launches a new set of MPI processes
+     *  May be orchestrated from only 1 of the N processes, such as from the coordinator
+     *  Caller should not depend on that.
+     *  @param query
+     *  @param maxSlaves
+     *  @xxxxx (sets state): _launchId, _mustLaunch, _ctx, _launcher, _ipcName
+     *  @return true if this instance participates in the computation and should handshake with a slave; false otherwise
+     */
     bool launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves);
 
-    /// @param numBufs : how many to allocate
-    /// @param elemSize : sizeof(float) or sizeof(double) or sizeof(complex)
-    /// @param sizes : how large to make each buffer
-    /// @param fill value (could make this a template function)
-    /// @returns std::vector<SMIptr_t> shmIpc(NUM_BUFS)
+    /** @param numBufs : how many to allocate
+     *  @param elemSize : sizeof(float) or sizeof(double) or sizeof(complex)
+     *  @param sizes : how large to make each buffer
+     *  @param fill value (could make this a template function)
+     *  @returns std::vector<SMIptr_t> shmIpc(NUM_BUFS)
+     */
     typedef boost::shared_ptr<SharedMemoryIpc> SMIptr_t ;
     std::vector<SMIptr_t> allocateMPISharedMemory(size_t numBufs, size_t  elemSize[], size_t sizes[],
                                                   string dbgNames[]);

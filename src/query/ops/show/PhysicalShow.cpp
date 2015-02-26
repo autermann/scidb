@@ -3,19 +3,19 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2012 SciDB, Inc.
+* Copyright (C) 2008-2013 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation version 3 of the License.
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
 *
 * SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
-* the GNU General Public License for the complete license terms.
+* the AFFERO GNU General Public License for the complete license terms.
 *
-* You should have received a copy of the GNU General Public License
-* along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -32,6 +32,7 @@
 #include "query/OperatorLibrary.h"
 #include "array/MemArray.h"
 #include "system/SystemCatalog.h"
+#include "query/QueryProcessor.h"
 
 using namespace std;
 using namespace boost;
@@ -56,13 +57,41 @@ public:
 
     void preSingleExecute(boost::shared_ptr<Query> query)
     {
-        assert(_parameters.size() == 1);
-
         stringstream ss;
 
         ArrayDesc desc;
-        // we want to "show" only the persistent contents (i.e. the catalog contents)
-        printSchema(ss, ((const shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema());
+
+        if (_parameters[0]->getParamType() == PARAM_SCHEMA)
+        {
+        	desc = ((const shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        }
+        else if (_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION)
+        {
+    		string queryString =
+    				((const shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])
+    				->getExpression()->evaluate().getString();
+    		bool afl = false;
+        	if (_parameters.size() == 2)
+        	{
+                string lang = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])
+                		->getExpression()->evaluate().getString();
+    			std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
+                afl = lang == "afl";
+        	}
+
+            boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+            boost::shared_ptr<Query> innerQuery = Query::createDetached();
+            innerQuery->init(INVALID_QUERY_ID-1,
+                             query->mapLogicalToPhysical(query->getCoordinatorID()),
+                             query->mapLogicalToPhysical(query->getInstanceID()),
+                             query->getCoordinatorLiveness());
+            innerQuery->queryString = queryString;
+
+            queryProcessor->parseLogical(innerQuery, afl);
+            desc = queryProcessor->inferTypes(innerQuery);
+        }
+
+        printSchema(ss, desc);
 
         boost::shared_ptr<ArrayIterator> arrIt = _result->getIterator(0);
         Coordinates coords;

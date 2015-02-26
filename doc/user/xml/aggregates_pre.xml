@@ -496,7 +496,7 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
       aggregates. You can also calculate aggregates "in-line" as part of other
       data management or rearrangement steps: the redimension and
       redimension_store operators support this type of usage. Those operators
-      are used to transform a source array into a result array with difference
+      are used to transform a source array into a result array with different
       schema or dimensions. In those cases, aggregates can be useful in
       summarizing multiple elements from the source array that are mapped to a
       single element in the destination array.</para>
@@ -517,11 +517,11 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
 </programlisting>
 
       <para>To examine the data in the "winners" array, use the following AQL
-      statement with the -olcsv+ format: <programlisting language="test">
+      statement with the -o lcsv+ format: <programlisting language="test">
 --aql SELECT * FROM winners;
 </programlisting></para>
 
-      <para>To create the schema for the desired array, using the following
+      <para>To create the schema for the desired array, execute the following
       AQL statement:</para>
 
       <programlisting language="test">
@@ -587,7 +587,7 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
 
       <para>If you specify multiple attributes, all attributes are used for
       sorting. Array elements are sorted first by the first attribute, and
-      then for each value of the the first attribute, they are sorted by the
+      then for each value of the first attribute, they are sorted by the
       second attribute, and so on for each specified attribute.</para>
 
       <para>If multiple elements have the same attribute value—for an
