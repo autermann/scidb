@@ -35,6 +35,25 @@
   Language (AQL) and Array Functional Language (AFL)—and an overview of
   transactions in SciDB.</para>
 
+  <section xml:id="ConventionsUsedinthisDocument">
+    <title>Conventions Used in This Document</title>
+
+    <para><indexterm>
+        <primary>document conventions</primary>
+      </indexterm><indexterm>
+        <primary>conventions</primary>
+      </indexterm>Code to be typed in verbatim is shown in
+    <literal>fixed-width font</literal>. Code that is to be replaced with an
+    actual string is shown in<emphasis> italics</emphasis>. Optional arguments
+    are shown in square brackets [].</para>
+
+    <para>AQL commands are shown in <emphasis role="bold">
+        <literal>FIXED-WIDTH BOLD CAPS</literal>
+      </emphasis>. When necessary, a line of code may be preceded by the
+    <literal>AQL%</literal> or <literal>AFL%</literal> prompt to show which
+    language the query is issued from.</para>
+  </section>
+
   <section id="section_arrayDataModel" xml:id="ArrayDataModel">
     <title>Array Data Model</title>
 
@@ -134,6 +153,167 @@
     <para>Another advantage of SciDB array indexing is that your data is
     clustered: data that logically belongs together is stored close together
     on disk.</para>
+  </section>
+
+  <section xml:id="InstallingSciDB">
+    <title>Terminology</title>
+
+    <para>The following terms are used to describe the SciDB installation and
+    administration process:</para>
+
+    <variablelist>
+      <?dbfo term-width="1.5in"?>
+
+      <varlistentry>
+        <term>
+          <emphasis>Array</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>arrays</primary>
+
+              <secondary>definition</secondary>
+            </indexterm>A data structure that is used to store SciDB data. An
+          array has any number of dimensions and attributes. Comparing with
+          the relational model, arrays act like tables, array cells act like
+          rows, dimensions and attributes both act like columns, while the set
+          of all dimensions acts like the primary key. For more details, see
+          <xref linkend="section_arrayDataModel"/>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Matrix</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>matrix</primary>
+
+              <secondary>definition</secondary>
+            </indexterm>A SciDB array that has two dimensions and one numeric
+          attribute. Linear algebra is performed on matrices.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Single server</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>server</primary>
+
+              <secondary>single</secondary>
+            </indexterm>A configuration that consists of a single machine with
+          a processor that may contain multiple cores, memory and attached
+          storage. A single server may be virtual or physical.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Virtual server</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>server</primary>
+
+              <secondary>virtual</secondary>
+            </indexterm>A server that shares hardware rather than having
+          dedicated hardware.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Coordinator server</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>coordinator server</primary>
+            </indexterm>In a configuration that has multiple servers, exactly
+          one server functions as the coordinator, and contains the
+          <emphasis>coordinator instance</emphasis>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>SciDB instance</emphasis>
+        </term>
+
+        <listitem>
+          <para>An independent SciDB group of processes, that is, a single
+          running SciDB. There may be a many-to-one mapping between SciDB
+          instances and a server.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Coordinator instance</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>instances</primary>
+
+              <secondary>coordinator</secondary>
+            </indexterm><indexterm>
+              <primary>coordinator instance</primary>
+            </indexterm>A SciDB instance that resides on the coordinator
+          server. There is a single coordinator instance for a SciDB cluster.
+          A coordinator instance coordinates query activity in addition to
+          participating in query execution.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Worker instance</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>instances</primary>
+
+              <secondary>worker</secondary>
+            </indexterm><indexterm>
+              <primary>worker instance</primary>
+            </indexterm>A SciDB instance that only participates in query
+          execution.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Cluster</emphasis>
+        </term>
+
+        <listitem>
+          <para>A group of one or more single servers connected by TCP/IP,
+          working together as a single system. A cluster can be a private grid
+          or a public cloud.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>SciDB cluster</emphasis>
+        </term>
+
+        <listitem>
+          <para>A collection of SciDB instances (one coordinator and zero or
+          more worker instances) form a SciDB cluster.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
   </section>
 
   <section xml:id="BasicArchitecture">
@@ -584,22 +764,279 @@
     iterator interface.</para>
   </section>
 
-  <section xml:id="ConventionsUsedinthisDocument">
-    <title>Conventions Used in This Document</title>
+  <section xml:id="DataModelInstall">
+    <title>Visualizing a Completed SciDB Installation</title>
 
     <para><indexterm>
-        <primary>document conventions</primary>
+        <primary>architecture</primary>
       </indexterm><indexterm>
-        <primary>conventions</primary>
-      </indexterm>Code to be typed in verbatim is shown in
-    <literal>fixed-width font</literal>. Code that is to be replaced with an
-    actual string is shown in<emphasis> italics</emphasis>. Optional arguments
-    are shown in square brackets [].</para>
+        <primary>SciDB</primary>
 
-    <para>AQL commands are shown in <emphasis role="bold">
-        <literal>FIXED-WIDTH BOLD CAPS</literal>
-      </emphasis>. When necessary, a line of code may be preceded by the
-    <literal>AQL%</literal> or <literal>AFL%</literal> prompt to show which
-    language the query is issued from.</para>
+        <secondary>architecture</secondary>
+      </indexterm>This section describes the pieces of a completed SciDB
+    installation.</para>
+
+    <section xml:id="DM_IC">
+      <title>The SciDB Installation and Its Clusters</title>
+
+      <para>The chapter describes the process for creating one SciDB
+      Installation, which consists of one or more SciDB clusters. The
+      following conceptual data model diagram expresses this
+      graphically.</para>
+
+      <figure>
+        <title>SciDB Cluster</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="100"
+                       fileref="../graphics/dm_InstallationHasClusters.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      Each SciDB cluster name is unique.</para>
+
+      <note>
+        <para>The data models shown in this chapter are purely conceptual.
+        They do not describe any physical data characteristics or connote any
+        particular meta-model such as relational, object-oriented, etc. For a
+        complete description of this notation, see Mastering Data Modeling: A
+        User-Driver Approach by John Carlis et al. (Addison-Wesley,
+        2001)</para>
+      </note>
+    </section>
+
+    <section xml:id="DM_CSI">
+      <title>The SciDB Cluster, Servers, and Instances</title>
+
+      <para><indexterm>
+          <primary>cluster</primary>
+        </indexterm><indexterm>
+          <primary>SciDB</primary>
+
+          <secondary>cluster</secondary>
+        </indexterm>Each SciDB cluster consists of one or more servers, each
+      of which can host one or more server instances.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>SciDB Servers and Instances</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="350"
+                       fileref="../graphics/dm_clusterHasServerHasInstance.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB Installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. <indexterm class="startofrange"
+          id="portnumbers">
+          <primary>port numbers</primary>
+        </indexterm>Each instance is hosted by one server. Each instance has a
+      port number. Each instance has a unique combination of server and port
+      number. (That is, two instances can have the same port number, but only
+      if they are hosted by different servers.)</para>
+    </section>
+
+    <section xml:id="DM_CI_WI">
+      <title>The Coordinator Instance and Worker Instances</title>
+
+      <para>Every instance is either a coordinator instance, a worker
+      instance, or both. Each SciDB cluster will have exactly one coordinator
+      instance.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>SciDB Instances: Coordinator and Workers</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="400"
+                       fileref="../graphics/dm_instanceBeCoordinatorOrWorker.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <note>
+        <para>A worker instance can also serve as the coordinator instance.
+        Such an instance is typically referred to as the coordinator instance,
+        but it can share in the workload of SciDB queries like any other
+        worker instance.</para>
+      </note>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) An
+      instance can be a coordinator instance, a worker instance, or both.
+      Every coordinator instance is an instance. Every worker instance is an
+      instance. Each coordinator instance coordinates the work of one SciDB
+      cluster, and each SciDB cluster can be coordinated by one coordinator
+      instance.</para>
+    </section>
+
+    <section xml:id="DM_CS_WS">
+      <title>The Coordinator Server and Worker Servers</title>
+
+      <para><indexterm>
+          <primary>coordinator server</primary>
+        </indexterm><indexterm>
+          <primary>instances</primary>
+
+          <secondary>worker</secondary>
+        </indexterm><indexterm>
+          <primary>worker server</primary>
+        </indexterm>Whichever server hosts the coordinator instance is known
+      as the coordinator server. The other servers as known as worker servers.
+      In most contexts, the distinction between the coordinator server and
+      worker servers is immaterial, and they are collectively known as
+      servers. The installation instructions in this chapter direct you to
+      install Postgres on the coordinator server. Although the coordinator
+      server must host the coordinator instance, it can also host other
+      (worker) instances.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>SciDB Servers: Coordinator and Workers</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="400"
+                       fileref="../graphics/dm_serverBeCoordinatorOrWorker.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) An
+      instance can be a coordinator instance, a worker instance, or both. Each
+      coordinator instance coordinates the work of one SciDB cluster, and each
+      SciDB cluster can be coordinated by one coordinator instance. A server
+      can be a coordinator server or a worker server. The coordinator server
+      hosts the coordinator instance (and because every coordinator instance
+      is an instance, might also host other instances). The coordinator server
+      will ultimately host the Postgres installation.</para>
+    </section>
+
+    <section xml:id="DM_DP_D">
+      <title>Disk Partitions and Directories</title>
+
+      <para><indexterm>
+          <primary>partitions</primary>
+        </indexterm><indexterm>
+          <primary>disk partitions</primary>
+        </indexterm>When two or more instances are hosted by the same server,
+      each of those instances requires its own directory to store SciDB
+      database files. Those directories could be on the same disk
+      partition.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>Disk Partitions and Directories</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="350"
+                       fileref="../graphics/dm_disksAndPartitions.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      <indexterm class="endofrange" startref="portnumbers">
+          <primary>port numbers</primary>
+        </indexterm>Each instance has a port number. Each instance has a
+      unique combination of server and port number. (That is, two instances
+      can have the same port number, but only if they are hosted by different
+      servers.) There are disk partitions. Each disk partition belongs to one
+      server, and has a unique mount point and can have multiple directories.
+      Each directory in on one disk partition, has a directory name, and can
+      contain data for exactly one instance. Each instance stores its SciDB
+      data on one directory.</para>
+    </section>
+
+    <section xml:id="DM_Complete">
+      <title>Complete SciDB Installation</title>
+
+      <para>The complete data model described in the preceding sections is
+      shown below. The model can help you visualize important distinctions
+      that arise during the installation process. For example, some steps of
+      the installation apply to all servers, whereas others apply only to the
+      coordinator server. Likewise, some steps apply only to the coordinator
+      instance, whereas other steps apply to all instances.</para>
+
+      <para>The complete model is here:</para>
+
+      <figure>
+        <title>SciDB Installation</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="400"
+                       fileref="../graphics/dm_installFull.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <?dbfo-need height="1.5in" ?>
+
+      <note>
+        <para>Remember, this is merely a conceptual model to help you
+        understand the building blocks of the installation process. It is a
+        conceptual model—not intended to connote any physical data layout or
+        any particular meta-model such as relational or object-oriented. For
+        that matter, it presents a somewhat simplified view of a SciDB
+        configuration, which is all you need to begin the installation
+        process.</para>
+      </note>
+    </section>
   </section>
 </chapter>

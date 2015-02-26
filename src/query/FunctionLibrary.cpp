@@ -45,6 +45,7 @@
 #include "query/FunctionLibrary.h"
 #include "util/PluginManager.h"
 #include "query/TileFunctions.h"
+#include "query/Aggregate.h"
 
 using namespace std;
 using namespace boost;
@@ -882,8 +883,31 @@ FunctionPointer FunctionLibrary::findConverter(
     return cnv->func;
 }
 
+void FunctionLibrary::functionCheck(const FunctionDescription& functionDesc)
+{
+#ifndef SCIDB_CLIENT
+    //If function args count is 1 its signature can match some aggregate
+    if (functionDesc.getInputArgs().size() == 1)
+    {
+        try
+        {
+            AggregateLibrary::getInstance()->createAggregate(
+                    functionDesc.getName(),
+                    TypeLibrary::getType(functionDesc.getInputArgs()[0]));
+            throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANNOT_ADD_FUNCTION)
+                << functionDesc.getName();
+        }
+        catch (const Exception &e)
+        {
+            //Looks like there are no such aggregates
+        }
+    }
+#endif
+}
+
 void FunctionLibrary::addFunction(const FunctionDescription& functionDesc)
 {
+    functionCheck(functionDesc);
     // TODO: implement the check of ability to add function
     _sFunctionMap[functionDesc.getName()][functionDesc.getInputArgs()] = functionDesc;
     _functionLibraries.addObject(functionDesc.getMangleName());
@@ -891,6 +915,7 @@ void FunctionLibrary::addFunction(const FunctionDescription& functionDesc)
 
 void FunctionLibrary::addVFunction(const FunctionDescription& functionDesc)
 {
+    functionCheck(functionDesc);
     // TODO: implement the check of ability to add function
     _vFunctionMap[functionDesc.getName()][functionDesc.getInputArgs()] = functionDesc;
     _functionLibraries.addObject(functionDesc.getMangleName());

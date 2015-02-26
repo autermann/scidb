@@ -969,6 +969,12 @@ public:
                                      Coordinates const& intCoords,
                                      const boost::shared_ptr<Query>& query) const;
 
+    /**
+     * Scan entire array and print contents to logger
+     * DEBUG build only.  Otherwise a nullop
+     */
+    void printArrayToLogger() const;
+
  protected:
     /// The query context for this array
     boost::weak_ptr<Query> _query;

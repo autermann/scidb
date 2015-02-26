@@ -71,9 +71,6 @@ namespace scidb
 {
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.catalog"));
 
-    static const int WAIT_LOCK_TIMEOUT = 5; // 5 seconds
-
-    boost::mt19937 _rng;
     Mutex SystemCatalog::_pgLock;
 
     SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
@@ -92,9 +89,10 @@ namespace scidb
       _instanceRole(instanceRole),
       _lockMode(lockMode),
       _timestamp(timestamp),
-      _immutableArrayId(0)
+      _immutableArrayId(0),
+      _isLocked(false)
      {}
-    
+
      SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
                                       QueryID  queryId,
                                       InstanceID   instanceId,
@@ -109,7 +107,8 @@ namespace scidb
       _instanceRole(instanceRole),
       _lockMode(lockMode),
       _timestamp(StorageManager::getInstance().getCurrentTimestamp()),
-      _immutableArrayId(SystemCatalog::getInstance()->findArrayByName(arrayName))
+      _immutableArrayId(SystemCatalog::getInstance()->findArrayByName(arrayName)),
+      _isLocked(false)
      {}
 
      std::string SystemCatalog::LockDesc::toString()
@@ -332,8 +331,8 @@ namespace scidb
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
-                ("int", treat_direct)
-                ("int", treat_direct)
+                ("bigint", treat_direct)
+                ("bigint", treat_direct)
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
                 ("varchar", treat_string)
@@ -534,8 +533,8 @@ namespace scidb
                 ("varchar", treat_string)
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
-                ("int", treat_direct)
-                ("int", treat_direct)
+                ("bigint", treat_direct)
+                ("bigint", treat_direct)
                 ("varchar", treat_string)
                 ("int", treat_direct)
                 ("varchar", treat_string)
@@ -566,10 +565,6 @@ namespace scidb
 
             tr.commit();
             *oldArrayDesc = array_desc;
-            boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
-            if (query) {
-                query->arrayDescByNameCache.erase(oldArrayDesc->getName());
-            }
         } 
         catch (const broken_connection &e)
         {
@@ -661,9 +656,6 @@ namespace scidb
 
         ScopedMutexLock mutexLock(_pgLock);
 
-        if (_arrDescCache.find(array_id) != _arrDescCache.end()) {
-            return true;
-        }
         LOG4CXX_TRACE(logger, "Failed to find array_id = " << array_id << " locally.");
         assert(_connection);
 
@@ -819,15 +811,6 @@ namespace scidb
 
         ScopedMutexLock mutexLock(_pgLock);
 
-        boost::shared_ptr<const ArrayDesc> dummy;
-        boost::shared_ptr<const ArrayDesc>& ad(query ? query->arrayDescByNameCache[array_name] : dummy);
-        if (ad) {
-            assert(ad->getName() == array_name);
-            array_desc = *ad;
-            assert(array_desc.getUAId()!=0);
-            return;
-        }
-
         LOG4CXX_TRACE(logger, "Failed to find array_name = " << array_name << " locally.");
         assert(_connection);
 
@@ -945,8 +928,8 @@ namespace scidb
                             i.at("currstart").as(int64_t()),
                             i.at("currend").as(int64_t()),
                             i.at("endmax").as(int64_t()),
-                            i.at("chunk_interval").as(size_t()),
-                            i.at("chunk_overlap").as(size_t()),
+                            i.at("chunk_interval").as(int64_t()),
+                            i.at("chunk_overlap").as(int64_t()),
                             i.at("type").as(string()),
                             i.at("flags").as(int()),
                             i.at("mapping_array_name").as(string()),
@@ -956,17 +939,15 @@ namespace scidb
                             ));
                 }
             }
-
-            boost::shared_ptr<ArrayDesc> newDesc(new ArrayDesc(array_id, uaid, vid,
-                                                               query_res1[0].at("name").as(string()),
-                                                               attributes,
-                                                               dimensions,
-                                                               flags,
-                                                               query_res1[0].at("comment").as(string())));
-            newDesc->setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
+            ArrayDesc newDesc(array_id, uaid, vid,
+                              query_res1[0].at("name").as(string()),
+                              attributes,
+                              dimensions,
+                              flags,
+                              query_res1[0].at("comment").as(string()));
+            newDesc.setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
-            ad = newDesc;
-            array_desc = *ad;
+            array_desc = newDesc;
         }
         catch (const broken_connection &e)
         {
@@ -1010,12 +991,6 @@ namespace scidb
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( id = " << array_id << ")");
         ScopedMutexLock mutexLock(_pgLock);
 
-        std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator adIter = _arrDescCache.find(array_id);
-        if (adIter != _arrDescCache.end() && !((adIter->second)->isInvalidated())) {
-            assert(adIter->second->getId() == array_id);
-            assert(adIter->second->getUAId() != 0);
-            return adIter->second;
-        } 
         LOG4CXX_TRACE(logger, "Failed to find array_id = " << array_id << " locally.");
         assert(_connection);
         boost::shared_ptr<ArrayDesc> newDesc;
@@ -1114,8 +1089,8 @@ namespace scidb
                             i.at("currstart").as(int64_t()),
                             i.at("currend").as(int64_t()),
                             i.at("endmax").as(int64_t()),
-                            i.at("chunk_interval").as(size_t()),
-                            i.at("chunk_overlap").as(size_t()),
+                            i.at("chunk_interval").as(int64_t()),
+                            i.at("chunk_overlap").as(int64_t()),
                             i.at("type").as(string()),
                             i.at("flags").as(int()),
                             i.at("mapping_array_name").as(string()),
@@ -1133,12 +1108,6 @@ namespace scidb
                                                                  query_res1[0].at("comment").as(string())));
             newDesc->setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
-            if (adIter != _arrDescCache.end()) { 
-                *(adIter->second) = *newDesc;
-                newDesc = adIter->second;
-            } else {
-                _arrDescCache[array_id] = newDesc;
-            }
         }
         catch (const broken_connection &e)
         {
@@ -1249,19 +1218,6 @@ namespace scidb
             totalNewArrays -= tr.prepared("cleanup-mapping-arrays").exec().affected_rows();; 
 
             tr.commit();
-
-            std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.begin();
-            size_t prefixLen = array_name.size();
-
-            while (i != _arrDescCache.end()) { 
-                boost::shared_ptr<ArrayDesc>& desc = i->second;
-                std::string const& name = desc->getName();
-                if (name == array_name || (name.compare(0, prefixLen, array_name) && name[prefixLen] == '@')) { 
-                    _arrDescCache.erase(i++);
-                } else { 
-                    ++i;
-                }
-            }
         }
         catch (const broken_connection &e)
         {
@@ -1309,7 +1265,6 @@ namespace scidb
             totalNewArrays -= tr.prepared("delete-array-id")(array_id).exec().affected_rows();
 
             tr.commit();
-            _arrDescCache.erase(array_id);
         }
         catch (const broken_connection &e)
         {
@@ -1332,44 +1287,6 @@ namespace scidb
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when deleting array";
         }
     }
-
-    void SystemCatalog::invalidateArrayCache(const ArrayID array_id)
-    {
-        LOG4CXX_TRACE(logger, "SystemCatalog::invlaidateArrayCache( array_id = " << array_id << ")");
-        ScopedMutexLock mutexLock(_pgLock);
-
-        std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.find(array_id);
-        if (i != _arrDescCache.end()) { 
-            i->second->invalidate();
-        }
-    }
-
-    void SystemCatalog::deleteArrayCache(const ArrayID array_id)
-    {
-        LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayCache( array_id = " << array_id << ")");
-        ScopedMutexLock mutexLock(_pgLock);
-
-        _arrDescCache.erase(array_id);
-    }
-
-    void SystemCatalog::invalidateArrayCache(std::string const& array_name)
-    {
-        LOG4CXX_TRACE(logger, "SystemCatalog::invlaidateArrayCache( array_name = " << array_name << ")");
-        ScopedMutexLock mutexLock(_pgLock);
-
-        size_t prefixLen = array_name.size();
-        
-        for (std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.begin();
-             i != _arrDescCache.end(); 
-             ++i) 
-        { 
-            boost::shared_ptr<ArrayDesc>& desc = i->second;
-            std::string const& name = desc->getName();
-            if (name == array_name || (name.compare(0, prefixLen, array_name) && name[prefixLen] == '@')) { 
-                desc->invalidate();
-            }
-        }
-    } 
 
     VersionID SystemCatalog::createNewVersion(const ArrayID array_id, const ArrayID version_array_id)
     {
@@ -1676,9 +1593,9 @@ namespace scidb
                 highBoundary[j++] = i.at("currEnd").as(int64_t());
             }
 
-            if (0 == j)
+            if (0 == j) {
                 throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAYID_DOESNT_EXIST) <<array_id ;
-
+            }
             tr.commit();
             return highBoundary;
         }
@@ -1734,9 +1651,9 @@ namespace scidb
                 lowBoundary[j++] = i.at("currStart").as(int64_t());
             }
 
-            if (0 == j)
+            if (0 == j) {
                 throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAYID_DOESNT_EXIST) <<array_id ;
-
+            }
             tr.commit();
             return lowBoundary;
         }
@@ -1800,7 +1717,6 @@ namespace scidb
                 tr.prepared("update-high-boundary")(high[i])(array_id)(i).exec();
             }
             tr.commit();
-            invalidateArrayCache(array_id);
         }
         catch (const broken_connection &e)
         {
@@ -2287,6 +2203,18 @@ namespace scidb
             }
             else if (_metadataVersion < METADATA_VERSION)
             {
+                if (Config::getInstance()->getOption<bool>(CONFIG_ENABLE_CATALOG_UPGRADE) == false)
+                {
+                    string const& configName = Config::getInstance()->getOptionName(CONFIG_ENABLE_CATALOG_UPGRADE);
+                    ostringstream message;
+                    message <<"In order to proceed, SciDB needs to perform an upgrade of the system "<<
+                              "catalog. This is not reversible. To confirm, please restart the system "<<
+                              "with the setting \'"<<configName<<"\' set to 'true'";
+                    LOG4CXX_ERROR(logger, message.str());
+                    std::cerr<<message.str()<<"\n";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_NEED_UPGRADE_CONFIRMATION);
+                }
+
                 LOG4CXX_WARN(logger, "Catalog metadata version (" << _metadataVersion
                         << ") lower than SciDB metadata version (" << METADATA_VERSION
                         << "). Trying to upgrade catalog...");
@@ -2551,7 +2479,7 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
          lockInsertSql = "insert into array_version_lock"
          " (array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
-         "  (select AVL.array_name from array_version_lock as AVL where AVL.array_name=$1::VARCHAR and AVL.lock_mode>$9))";
+         "  (select AVL.array_name from array_version_lock as AVL where AVL.array_name=$1::VARCHAR and AVL.query_id<>$3 and AVL.lock_mode>$9))";
 
       } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
           if (lockDesc->getLockMode() == LockDesc::CRT) {
@@ -2571,7 +2499,7 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
          lockInsertSql = "insert into array_version_lock"
          " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
-         "  (select array_name from array_version_lock where array_name=$1::VARCHAR))";
+         "  (select array_name from array_version_lock where array_name=$1::VARCHAR and query_id<>$3))";
       } else {
          assert(false);
          throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "lock mode";
@@ -2581,7 +2509,7 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
             lockInsertSql = "insert into array_version_lock"
             " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
             "(select $1::VARCHAR,$2,$3,$4,$5,$6,$7,$8 where not exists"
-            "  (select array_name from array_version_lock where array_name=$1::VARCHAR))";
+            "  (select array_name from array_version_lock where array_name=$1::VARCHAR and query_id<>$3))";
       } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
          lockInsertSql = "insert into array_version_lock"
          " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
@@ -2599,221 +2527,236 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
 bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, ErrorChecker& errorChecker)
 {
     boost::function<bool()> work = boost::bind(&SystemCatalog::_lockArray,
-            this, cref(lockDesc), ref(errorChecker));
+                                               this, cref(lockDesc), ref(errorChecker));
     return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
 }
 
 bool SystemCatalog::_lockArray(const boost::shared_ptr<LockDesc>& lockDesc, ErrorChecker& errorChecker)
 {
    assert(lockDesc);
-   LOG4CXX_DEBUG(logger, "SystemCatalog::lockArray: "<<lockDesc->toString());
+   LOG4CXX_TRACE(logger, "SystemCatalog::lockArray: "<<lockDesc->toString());
    try
    {
       assert(_connection);
       string lockInsertSql = getLockInsertSql(lockDesc);
 
       string lockTableSql = "LOCK TABLE array_version_lock";
-      while (true)
       {
-         {
-            ScopedMutexLock mutexLock(_pgLock);
-            work tr(*_connection);
-            result query_res;
+          ScopedMutexLock mutexLock(_pgLock);
+          work tr(*_connection);
+          result query_res;
 
-            _connection->prepare(lockTableSql, lockTableSql);
-            tr.prepared(lockTableSql).exec();
+          _connection->prepare(lockTableSql, lockTableSql);
+          tr.prepared(lockTableSql).exec();
 
-            if (lockDesc->getLockMode() == LockDesc::RD) {
+          if (lockDesc->getLockMode() == LockDesc::RD) {
 
-                if (lockDesc->getInstanceRole() == LockDesc::COORD) {
-                    string uniquePrefix("COORD-RD-");
-                    _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
-                    ("varchar", treat_string)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct);
+              if (lockDesc->getInstanceRole() == LockDesc::COORD) {
+                  string uniquePrefix("COORD-RD-");
+                  _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
+                  ("varchar", treat_string)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct);
 
-                    query_res = tr.prepared(uniquePrefix+lockInsertSql)
-                    (lockDesc->getArrayName())
-                    (lockDesc->getArrayId())
-                    (lockDesc->getQueryId())
-                    (lockDesc->getInstanceId())
-                    (lockDesc->getArrayVersionId())
-                    (lockDesc->getArrayVersion())
-                    ((int)lockDesc->getInstanceRole())
-                    ((int)lockDesc->getLockMode())
-                    ((int)LockDesc::RD)
-                    ((int)LockDesc::COORD).exec();
-                } else { assert(false);}
-            } else if (lockDesc->getLockMode() == LockDesc::WR
-                       || lockDesc->getLockMode() == LockDesc::CRT) {
+                  query_res = tr.prepared(uniquePrefix+lockInsertSql)
+                  (lockDesc->getArrayName())
+                  (lockDesc->getArrayId())
+                  (lockDesc->getQueryId())
+                  (lockDesc->getInstanceId())
+                  (lockDesc->getArrayVersionId())
+                  (lockDesc->getArrayVersion())
+                  ((int)lockDesc->getInstanceRole())
+                  ((int)lockDesc->getLockMode())
+                  ((int)LockDesc::RD)
+                  ((int)LockDesc::COORD).exec();
+              } else { assert(false);}
+          } else if (lockDesc->getLockMode() == LockDesc::WR
+                     || lockDesc->getLockMode() == LockDesc::CRT) {
 
-                if (lockDesc->getInstanceRole() == LockDesc::COORD) {
-                    string uniquePrefix("COORD-WR-");
-                    _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
-                    ("varchar", treat_string)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct);
+              if (lockDesc->getInstanceRole() == LockDesc::COORD) {
+                  string uniquePrefix("COORD-WR-");
+                  _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
+                  ("varchar", treat_string)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct);
 
-                    query_res = tr.prepared(uniquePrefix+lockInsertSql)
-                    (lockDesc->getArrayName())
-                    (lockDesc->getArrayId())
-                    (lockDesc->getQueryId())
-                    (lockDesc->getInstanceId())
-                    (lockDesc->getArrayVersionId())
-                    (lockDesc->getArrayVersion())
-                    ((int)lockDesc->getInstanceRole())
-                    ((int)lockDesc->getLockMode())
-                    ((int)LockDesc::INVALID_MODE).exec();
+                  query_res = tr.prepared(uniquePrefix+lockInsertSql)
+                  (lockDesc->getArrayName())
+                  (lockDesc->getArrayId())
+                  (lockDesc->getQueryId())
+                  (lockDesc->getInstanceId())
+                  (lockDesc->getArrayVersionId())
+                  (lockDesc->getArrayVersion())
+                  ((int)lockDesc->getInstanceRole())
+                  ((int)lockDesc->getLockMode())
+                  ((int)LockDesc::INVALID_MODE).exec();
 
-                } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
-                    assert(lockDesc->getLockMode() != LockDesc::CRT);
-                    string uniquePrefix("WORKER-WR-");
-                    _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
-                    ("varchar", treat_string)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct);
+              } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
+                  assert(lockDesc->getLockMode() != LockDesc::CRT);
+                  string uniquePrefix("WORKER-WR-");
+                  _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
+                  ("varchar", treat_string)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct);
 
-                    query_res = tr.prepared(uniquePrefix+lockInsertSql)
-                    (lockDesc->getArrayName())
-                    (lockDesc->getQueryId())
-                    (lockDesc->getInstanceId())
-                    ((int)LockDesc::WORKER)
-                    ((int)LockDesc::WR)
-                    ((int)LockDesc::CRT).exec();
+                  query_res = tr.prepared(uniquePrefix+lockInsertSql)
+                  (lockDesc->getArrayName())
+                  (lockDesc->getQueryId())
+                  (lockDesc->getInstanceId())
+                  ((int)LockDesc::WORKER)
+                  ((int)LockDesc::WR)
+                  ((int)LockDesc::CRT).exec();
 
-                    if (query_res.affected_rows() == 1) {
-                        string lockReadSql = "select array_id, array_version_id, array_version"
-                        " from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and instance_id=$3";
+                  if (query_res.affected_rows() == 1) {
+                      string lockReadSql = "select array_id, array_version_id, array_version"
+                      " from array_version_lock where array_name=$1::VARCHAR and query_id=$2 and instance_id=$3";
 
-                        _connection->prepare(lockReadSql, lockReadSql)
-                        ("varchar", treat_string)
-                        ("bigint", treat_direct)
-                        ("bigint", treat_direct);
-                        
-                        result query_res_read = tr.prepared(lockReadSql)
-                        (lockDesc->getArrayName())
-                        (lockDesc->getQueryId())
-                        (lockDesc->getInstanceId()).exec();
+                      _connection->prepare(lockReadSql, lockReadSql)
+                      ("varchar", treat_string)
+                      ("bigint", treat_direct)
+                      ("bigint", treat_direct);
 
-                        assert(query_res_read.size() == 1);
+                      result query_res_read = tr.prepared(lockReadSql)
+                      (lockDesc->getArrayName())
+                      (lockDesc->getQueryId())
+                      (lockDesc->getInstanceId()).exec();
 
-                        lockDesc->setArrayVersion(query_res_read[0].at("array_version").as(VersionID()));
-                        lockDesc->setArrayId(query_res_read[0].at("array_id").as(ArrayID()));
-                        lockDesc->setArrayVersionId(query_res_read[0].at("array_version_id").as(ArrayID()));
-                    }
-               } else { assert(false); }
-            }  else if (lockDesc->getLockMode() == LockDesc::RM) {
+                      assert(query_res_read.size() == 1);
 
-               assert(lockDesc->getInstanceRole() == LockDesc::COORD);
+                      lockDesc->setArrayVersion(query_res_read[0].at("array_version").as(VersionID()));
+                      lockDesc->setArrayId(query_res_read[0].at("array_id").as(ArrayID()));
+                      lockDesc->setArrayVersionId(query_res_read[0].at("array_version_id").as(ArrayID()));
+                  }
+              } else { assert(false); }
+          }  else if (lockDesc->getLockMode() == LockDesc::RM) {
 
-               string uniquePrefix("RM-");
-               _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
-               ("varchar", treat_string)
-               ("bigint", treat_direct)
-               ("bigint", treat_direct)
-               ("bigint", treat_direct)
-               ("bigint", treat_direct)
-               ("bigint", treat_direct)
-               ("integer", treat_direct)
-               ("integer", treat_direct);
+              assert(lockDesc->getInstanceRole() == LockDesc::COORD);
 
-               query_res = tr.prepared(uniquePrefix+lockInsertSql)
-               (lockDesc->getArrayName())
-               (lockDesc->getArrayId())
-               (lockDesc->getQueryId())
-               (lockDesc->getInstanceId())
-               (lockDesc->getArrayVersionId())
-               (lockDesc->getArrayVersion())
-               ((int)lockDesc->getInstanceRole())
-               ((int)lockDesc->getLockMode()).exec();
-            }  else if (lockDesc->getLockMode() == LockDesc::RNF) {
-                if (lockDesc->getInstanceRole() == LockDesc::COORD) {
+              string uniquePrefix("RM-");
+              _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
+              ("varchar", treat_string)
+              ("bigint", treat_direct)
+              ("bigint", treat_direct)
+              ("bigint", treat_direct)
+              ("bigint", treat_direct)
+              ("bigint", treat_direct)
+              ("integer", treat_direct)
+              ("integer", treat_direct);
 
-                    string uniquePrefix("COORD-RNF-");
-                    _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
-                    ("varchar", treat_string)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct);
+              query_res = tr.prepared(uniquePrefix+lockInsertSql)
+              (lockDesc->getArrayName())
+              (lockDesc->getArrayId())
+              (lockDesc->getQueryId())
+              (lockDesc->getInstanceId())
+              (lockDesc->getArrayVersionId())
+              (lockDesc->getArrayVersion())
+              ((int)lockDesc->getInstanceRole())
+              ((int)lockDesc->getLockMode()).exec();
+          }  else if (lockDesc->getLockMode() == LockDesc::RNF) {
+              if (lockDesc->getInstanceRole() == LockDesc::COORD) {
 
-                    query_res = tr.prepared(uniquePrefix+lockInsertSql)
-                    (lockDesc->getArrayName())
-                    (lockDesc->getArrayId())
-                    (lockDesc->getQueryId())
-                    (lockDesc->getInstanceId())
-                    (lockDesc->getArrayVersionId())
-                    (lockDesc->getArrayVersion())
-                    ((int)lockDesc->getInstanceRole())
-                    ((int)lockDesc->getLockMode()).exec();
+                  string uniquePrefix("COORD-RNF-");
+                  _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
+                  ("varchar", treat_string)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct);
 
-                } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
+                  query_res = tr.prepared(uniquePrefix+lockInsertSql)
+                  (lockDesc->getArrayName())
+                  (lockDesc->getArrayId())
+                  (lockDesc->getQueryId())
+                  (lockDesc->getInstanceId())
+                  (lockDesc->getArrayVersionId())
+                  (lockDesc->getArrayVersion())
+                  ((int)lockDesc->getInstanceRole())
+                  ((int)lockDesc->getLockMode()).exec();
 
-                    string uniquePrefix("WORKER-RNF-");
-                    _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
-                    ("varchar", treat_string)
-                    ("bigint", treat_direct)
-                    ("bigint", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct)
-                    ("integer", treat_direct);
+              } else if (lockDesc->getInstanceRole() == LockDesc::WORKER) {
 
-                    query_res = tr.prepared(uniquePrefix+lockInsertSql)
-                    (lockDesc->getArrayName())
-                    (lockDesc->getQueryId())
-                    (lockDesc->getInstanceId())
-                    ((int)LockDesc::WORKER)
-                    ((int)LockDesc::COORD)
-                    ((int)LockDesc::RNF).exec();
-                } else { assert(false); }
-            } else {
-               assert(false);
-            }
-            if (query_res.affected_rows() == 1) {
-               tr.commit();
-               return true;
-            }
-            if (lockDesc->getInstanceRole() == LockDesc::WORKER &&
-                query_res.affected_rows() != 1) {
-               // workers must error out immediately
-               assert(query_res.affected_rows()==0);
-               tr.commit();
-               return false;
-            }
-            tr.commit();
-         }
-         if (errorChecker && !errorChecker()) {
-             return false;
-         }
-         uint32_t nsec = _rng();
-         nsec = 1 + nsec%WAIT_LOCK_TIMEOUT;
-         sleep(nsec);
+                  string uniquePrefix("WORKER-RNF-");
+                  _connection->prepare(uniquePrefix+lockInsertSql, lockInsertSql)
+                  ("varchar", treat_string)
+                  ("bigint", treat_direct)
+                  ("bigint", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct)
+                  ("integer", treat_direct);
+
+                  query_res = tr.prepared(uniquePrefix+lockInsertSql)
+                  (lockDesc->getArrayName())
+                  (lockDesc->getQueryId())
+                  (lockDesc->getInstanceId())
+                  ((int)LockDesc::WORKER)
+                  ((int)LockDesc::COORD)
+                  ((int)LockDesc::RNF).exec();
+              } else { assert(false); }
+          } else {
+              assert(false);
+          }
+          if (query_res.affected_rows() == 1) {
+              tr.commit();
+              lockDesc->setLocked(true);
+              LOG4CXX_DEBUG(logger, "SystemCatalog::lockArray: locked "<<lockDesc->toString());
+              return true;
+          }
+          if (lockDesc->getInstanceRole() == LockDesc::WORKER &&
+              query_res.affected_rows() != 1) {
+              // workers must error out immediately
+              assert(query_res.affected_rows()==0);
+              tr.commit();
+              return false;
+          }
+          tr.commit();
       }
+      if (errorChecker && !errorChecker()) {
+          return false;
+      }
+      throw LockBusyException(REL_FILE, __FUNCTION__, __LINE__);
    }
-   catch (const broken_connection &e)
+   catch (const pqxx::unique_violation &e)
+   {
+       if (!lockDesc->isLocked()) {
+           assert(false);
+           throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
+       }
+
+       // On coordinator we may try to acquire the same lock
+       // multiple times. If the lock is already acquired,
+       // we should just return success.
+       // XXX tigor 6/20/2013 TODO: Technically, just checking isLocked()
+       // before running the query should be sufficient.
+       // After debugging we should/can switch to doing just that.
+
+       assert(lockDesc->getInstanceRole() == LockDesc::COORD);
+
+       return true;
+   }
+   catch (const pqxx::broken_connection &e)
    {
        throw;
    }
-   catch (const sql_error &e)
+   catch (const pqxx::sql_error &e)
    {
       LOG4CXX_ERROR(logger, "SystemCatalog::lockArray: postgress exception:"<< e.what());
       LOG4CXX_ERROR(logger, "SystemCatalog::lockArray: query:"<< e.query());
@@ -2821,19 +2764,9 @@ bool SystemCatalog::_lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Erro
                     << ((!lockDesc) ? string("lock:NULL") : lockDesc->toString()));
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
    }
-   catch (const Exception &e)
+   catch (const pqxx::failure &e)
    {
-      throw;
-   }
-   catch (const std::exception &e)
-   {
-      throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-   }
-   catch (...)
-   {
-      throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR)
-      << "Unknown exception locking array: "
-      << ((!lockDesc) ? string("lock:NULL") : lockDesc->toString());
+       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
    }
    return false;
 }
@@ -2886,19 +2819,9 @@ bool SystemCatalog::_unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
                     << ((!lockDesc) ? string("lock:NULL") : lockDesc->toString()));
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
    }
-   catch (const Exception &e)
+   catch (const pqxx::failure &e)
    {
-      throw;
-   }
-   catch (const std::exception &e)
-   {
-      throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-   }
-   catch (...)
-   {
-      throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR)
-      << "Unknown exception unlocking array: "
-      << ((!lockDesc) ? string("lock:NULL") : lockDesc->toString());
+       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
    }
    return rc;
 }
@@ -2913,6 +2836,7 @@ bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
 bool SystemCatalog::_updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
 {
    assert(lockDesc);
+
    LOG4CXX_TRACE(logger, "SystemCatalog::updateArrayLock: "<<lockDesc->toString());
    bool rc = false;
    try
@@ -3231,7 +3155,6 @@ void SystemCatalog::_renameArray(const string &old_array_name, const string &new
           throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << old_array_name;
       }
       tr.commit();
-      invalidateArrayCache(old_array_name);
    }
    catch (const broken_connection &e)
    {

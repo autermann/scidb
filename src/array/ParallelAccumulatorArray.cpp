@@ -48,44 +48,67 @@ namespace scidb
     ConstChunk const* ParallelAccumulatorArray::ChunkPrefetchJob::getResult()
     {
         wait(true, false);
-        if (!resultChunk) {
+        if (!_resultChunk) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
         }
-        return resultChunk;
+        return _resultChunk;
     }
 
     void ParallelAccumulatorArray::ChunkPrefetchJob::cleanup()
     {
-        iterator.reset();
+        _iterator.reset();
     }
 
-    ParallelAccumulatorArray::ChunkPrefetchJob::ChunkPrefetchJob(const boost::shared_ptr<ParallelAccumulatorArray>& array,
-                                                                 AttributeID attr,
-                                                                 const boost::shared_ptr<Query>& query)
-        : Job(query), _arrayLink(array), attrId(attr), resultChunk(NULL), iterator(array->pipe->getConstIterator(attrId)) {}
+    ParallelAccumulatorArray::ChunkPrefetchJob::~ChunkPrefetchJob()
+    {
+        LOG4CXX_TRACE(logger, "ChunkPrefetchJob::~ChunkPrefetchJob "<<this);
+    }
 
+    ParallelAccumulatorArray::ChunkPrefetchJob::ChunkPrefetchJob(const shared_ptr<ParallelAccumulatorArray>& array,
+                                                                 AttributeID attr,
+                                                                 const shared_ptr<Query>& query)
+    : Job(query),
+      _queryLink(query),
+      _arrayLink(array),
+      _iterator(array->pipe->getConstIterator(attr)),
+      _attrId(attr),
+      _resultChunk(NULL)
+    {
+        assert(query);
+    }
 
     void ParallelAccumulatorArray::ChunkPrefetchJob::run()
     {
         static int pass = 0; // DEBUG ONLY
         pass++;
         StatisticsScope sScope(_statistics);
-        boost::shared_ptr<ParallelAccumulatorArray> arrayPtr = _arrayLink.lock();
-        if (!arrayPtr) {
+
+        _query = _queryLink.lock();
+        if (!_query) {
             return;
         }
-        ParallelAccumulatorArray& acc = *arrayPtr;
+        shared_ptr<ParallelAccumulatorArray> acc = _arrayLink.lock();
+        if (!acc) {
+            return;
+        }
+
         try {
-            if (iterator->setPosition(pos)) {
-                ConstChunk const& inputChunk = iterator->getChunk();
+            if (_iterator->setPosition(_pos)) {
+                ConstChunk const& inputChunk = _iterator->getChunk();
+
                 if (inputChunk.isMaterialized()) {
-                    resultChunk = &inputChunk;
+                    _resultChunk = &inputChunk;
                 } else {
-                    Address addr(attrId, inputChunk.getFirstPosition(false));
-                    accChunk.initialize(&acc, &acc.desc, addr, inputChunk.getCompressionMethod());
-                    accChunk.setBitmapChunk((Chunk*)&inputChunk);
-                    boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|ChunkIterator::IGNORE_EMPTY_CELLS);
-                    boost::shared_ptr<ChunkIterator> dst = accChunk.getIterator(_query, (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
+                    Address addr(_attrId, inputChunk.getFirstPosition(false));
+                    _accChunk.initialize(acc.get(), &acc->desc, addr, inputChunk.getCompressionMethod());
+                    _accChunk.setBitmapChunk((Chunk*)&inputChunk);
+                    shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE |
+                                                                                            ChunkIterator::IGNORE_EMPTY_CELLS);
+                    shared_ptr<ChunkIterator> dst = _accChunk.getIterator(_query,
+                                                                                (src->getMode() & ChunkIterator::TILE_MODE) |
+                                                                                ChunkIterator::NO_EMPTY_CHECK |
+                                                                                (inputChunk.isSparse() ? ChunkIterator::SPARSE_CHUNK : 0) |
+                                                                                ChunkIterator::SEQUENTIAL_WRITE);
                     bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
                     src->setVectorMode(vectorMode);
                     dst->setVectorMode(vectorMode);
@@ -98,12 +121,12 @@ namespace scidb
                         }
                         ++(*src);
                     }
-                    if (!vectorMode && !acc.desc.hasOverlap()) {
-                        accChunk.setCount(count);
+                    if (!vectorMode && !acc->desc.hasOverlap()) {
+                        _accChunk.setCount(count);
                     }
                     dst->flush();
-                    resultChunk = &accChunk;
-                }
+                    _resultChunk = &_accChunk;
+             }
             } else {
                 _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
             }
@@ -112,11 +135,10 @@ namespace scidb
         }
     }
 
-
-ParallelAccumulatorArray::ParallelAccumulatorArray(boost::shared_ptr<Array> array)
+    ParallelAccumulatorArray::ParallelAccumulatorArray(const shared_ptr<Array>& array)
     : StreamArray(array->getArrayDesc(), false),
-      pipe(array),
       iterators(array->getArrayDesc().getAttributes().size()),
+      pipe(array),
       activeJobs(iterators.size()),
       completedJobs(iterators.size())
     {
@@ -124,29 +146,31 @@ ParallelAccumulatorArray::ParallelAccumulatorArray(boost::shared_ptr<Array> arra
             LOG4CXX_FATAL(logger, "Array descriptor arrId = " << array->getArrayDesc().getId()
                           << " name = " << array->getArrayDesc().getId()
                           << " has no attributes ");
-            assert(0);
+            assert(false);
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INCONSISTENT_ARRAY_DESC);
         }
     }
 
-void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
- {
-    PhysicalOperator::getGlobalQueueForOperators();
-    size_t nAttrs = iterators.size();
-    assert(nAttrs>0);
-    for (size_t i = 0; i < nAttrs; i++) {
-       iterators[i] = pipe->getConstIterator(i);
+    void ParallelAccumulatorArray::start(const shared_ptr<Query>& query)
+    {
+        PhysicalOperator::getGlobalQueueForOperators();
+        size_t nAttrs = iterators.size();
+        assert(nAttrs>0);
+        for (size_t i = 0; i < nAttrs; i++) {
+            iterators[i] = pipe->getConstIterator(i);
+        }
+        int nPrefetchedChunks = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
+        do {
+            for (size_t i = 0; i < nAttrs; i++) {
+                shared_ptr<ChunkPrefetchJob> job = make_shared<ChunkPrefetchJob>(shared_from_this(), i, query);
+                doNewJob(job);
+            }
+        } while ((nPrefetchedChunks -= nAttrs) > 0);
     }
-    int nPrefetchedChunks = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
-    do {
-       for (size_t i = 0; i < nAttrs; i++) {
-          doNewJob(boost::shared_ptr<ChunkPrefetchJob>(new ChunkPrefetchJob(shared_from_this(), i, query)));
-       }
-    } while ((nPrefetchedChunks -= nAttrs) > 0);
- }
 
     ParallelAccumulatorArray::~ParallelAccumulatorArray()
     {
+        LOG4CXX_TRACE(logger, "ParallelAccumulatorArray::~ParallelAccumulatorArray "<<this << ", active jobs #="<<activeJobs.size());
         for (size_t i = 0; i < activeJobs.size(); i++) {
             list< shared_ptr<ChunkPrefetchJob> >& jobs = activeJobs[i];
             for (list< shared_ptr<ChunkPrefetchJob> >::iterator j = jobs.begin(); j != jobs.end(); ++j) {
@@ -155,7 +179,7 @@ void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
         }
     }
 
-    void ParallelAccumulatorArray::doNewJob(boost::shared_ptr<ChunkPrefetchJob> job)
+    void ParallelAccumulatorArray::doNewJob(shared_ptr<ChunkPrefetchJob>& job)
     {
         AttributeID attrId = job->getAttributeID();
         if (!iterators[attrId]->end()) {
@@ -169,6 +193,7 @@ void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
 
     ConstChunk const* ParallelAccumulatorArray::nextChunk(AttributeID attId, MemChunk& chunk)
     {
+        //XXX TODO: should this method be synchronized ?
         if (completedJobs[attId]) {
             doNewJob(completedJobs[attId]);
             completedJobs[attId].reset();

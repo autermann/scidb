@@ -34,32 +34,51 @@
 #include <string>
 #include <vector>
 
-#include "Atomic.h"
-#include "Semaphore.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
+#include <util/Atomic.h>
+#include <util/Semaphore.h>
 
 namespace scidb
 {
-
 
 /**
  * Base virtual class for job executed by ThreadPool.
  */
 class Query;
+class WorkQueue;
+class SerializationCtx;
 
 class Job
 {
 private:
     Semaphore _done;
     Atomic<bool> _removed;
-protected:
-    boost::shared_ptr<Exception> _error; 
-    boost::shared_ptr<Query> _query;
 
-    // This method must be implemented in children
+ protected:
+    typedef boost::function<void()> Handler;
+    boost::shared_ptr<Exception> _error;
+    boost::shared_ptr<Query> _query; //XXX TODO: make it a weak_ptr ?
+
+    // When a job is executed multiple times using executeOnQueue(),
+    // _wq, _wqSCtx, _currHandler need to be set accordingly
+    // _wq, _wqSCtx are set by the WorkQueue invoking executeOnQueue()
+    // _currHandler must be set by the job algorithm prior
+    // to scheduling the next invocation of executeOnQueue()
+   
+    boost::weak_ptr<WorkQueue> _wq;
+    boost::weak_ptr<SerializationCtx> _wqSCtx;
+    Handler _currHandler;
+
+    /// This method must be implemented in child classes
+    /// It gets invoked by Job::execute() when this job is executed directly on a JobQueue or
+    /// by Job::executeOnQueue() when this job is executed on a WorkQueue
     virtual void run() = 0;
 
 public:
-    Job(boost::shared_ptr<Query> query): _removed(false), _query(query)
+    Job(boost::shared_ptr<Query> query)
+    : _removed(false),
+      _query(query)
     {
     }
     virtual ~Job()
@@ -69,17 +88,32 @@ public:
     {
         return _query;
     }
+
+    /**
+     * The (pool) threads servicing this Job's JobQueue call this method
+     */
     void execute();
 
-    // Waits until job is done
+    /**
+     * If this job is enqueued onto a WorkQueue in a form of a WorkItem,
+     * this method is called. A given job can be executed multiple times
+     * (presumable to execute different steps of an algorithm) using this method.
+     * @param wq the WorkQueue executing this job
+     * @throw WorkQueue::PushBackException if this job is re-enqueued onto another under the overflow condition
+     * @see WorkQueue::PushBackException
+     */
+    void executeOnQueue(boost::weak_ptr<WorkQueue>& wq,
+                        boost::shared_ptr<SerializationCtx>& sCtx);
+
+    /// Waits until job is done
     bool wait(bool propagateException = false, bool allowMultipleWaits = true);
 
-    // Force to skip job execution
+    /// Force to skip job execution
     void skip()
     {
         _removed = true;
     }
-    
+
     void rethrow();
 };
 

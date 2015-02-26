@@ -164,6 +164,11 @@ namespace scidb
             fd = ::open(filePath, O_RDWR|O_TRUNC|O_EXCL|O_CREAT|O_LARGEFILE, 0666);
         }
         if (fd < 0) {
+            // For certain types of transient errors, we can throw a USER EXCEPTION
+            if (errno == EMFILE)
+            {
+                throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_TOO_MANY_OPEN_FILES);
+            }
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_OPEN_FILE) << filePath << errno;
         }
         unlink(filePath); // remove array when it will be closed

@@ -481,7 +481,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                     Attributes indexMapAttr(1);
                     Coordinate from = dim.getStart();
                     Coordinate till = dim.getEndMax();
-                    uint32_t chunkInterval = uint32_t(till-from+1);
+                    int64_t chunkInterval = (till-from+1);
                     indexMapDim[0] = DimensionDesc("no", from, from, till, till, chunkInterval, 0);
                     indexMapAttr[0] = AttributeDesc(0, "value", dim.getType(), 0, 0);
                     ArrayDesc mappingArrayDesc(mappingArrayName,
@@ -627,7 +627,10 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             } 
             if (hdr.magic != OPAQUE_CHUNK_MAGIC) { 
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR10);
-            }                        
+            }
+            if (hdr.version != SCIDB_OPAQUE_FORMAT_VERSION) { 
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MISMATCHED_OPAQUE_FORMAT_VERSION) << hdr.version << SCIDB_OPAQUE_FORMAT_VERSION;
+            }
             if (hdr.flags & OpaqueChunkHeader::ARRAY_METADATA)  { 
                 string arrayDescStr;
                 arrayDescStr.resize(hdr.size);

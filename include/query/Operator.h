@@ -1164,6 +1164,11 @@ public:
     friend std::ostream& operator<<(std::ostream& stream, const ArrayDistribution& dist);
 };
 
+/**
+ * A class used to loosely represent a rectilinear box that contains data, allows for computations like reshaping,
+ * intersections, and data size estimation. Used by the optimizer to reason about the size of the results returned
+ * by queries.
+ */
 class PhysicalBoundaries
 {
 private:
@@ -1188,53 +1193,172 @@ public:
     static PhysicalBoundaries createEmpty(size_t numDimensions);
 
     /**
-     * Create a new set of boundaries that span numDimensions dimensions but contain 0 cells (fully sparse array).
-     * @return boundaries with numDimensions nonintersecting coordinates.
+     * Given a set of dimensions, return the maximum number of cells in each chunk, no overlap.
+     * @param dims a list of array dimensions
+     * @return the product of the chunk sizes.
      */
-    static uint64_t getCellNumber(Coordinates const & in, Dimensions const& dims);
     static uint64_t getCellsPerChunk (Dimensions const& dims);
+
+    /**
+     * Given a set of array attributes, compute the estimated size of a single cell of this array. Uses
+     * CONFIG_STRING_SIZE_ESTIMATION for variable-length types.
+     * @param attrs a list of array attributes
+     * @return the sum of the attribute sizes
+     */
     static uint32_t getCellSizeBytes(const Attributes& attrs);
+
+    /**
+     * Compute the number of logical cells that are enclosed in the bounding box between start and end.
+     * @return the product of (end[i] - start[i] + 1) for all i from 0 to end.size(), not to exceed INFINITE_LENGTH
+     */
+    static uint64_t getNumCells (Coordinates const& start, Coordinates const& end);
+
+    /**
+     * Given a position in the space given by currentDims, wrap the coordinates around a new space given by newDims
+     * and return the position of the corresponding cell.
+     * @param in a set of coordinates
+     * @param currentDims a list of array dimensions, must match in
+     * @param newDims another list of array dimensions
+     * @return the coordinates of the cell C that corresponds to in in newDims, if possible. The result may be incorrect
+     * if the volume of the region specified by newDims is lower than the volume of currentDims. The result may be
+     * a set of MAX_COORDINATE values if currentDims are unbounded.
+     */
     static Coordinates reshapeCoordinates (Coordinates const& in, Dimensions const& currentDims, Dimensions const& newDims);
 
+    /**
+     * Within the space given by dims, compute the row-major-order number of the cell at coords.
+     * @param coords the position of a cell
+     * @param dims a set of dimensions
+     * @return the row-major-order position of coords, not to exceed INFINITE_LENGTH
+     */
+    static uint64_t getCellNumber (Coordinates const& coords, Dimensions const& dims);
+
+    /**
+     * Within the space given by dims, compute the coordinate of the cellNum-th cell.
+     * @param[in|out] cellNum the number of a cell in row-major order
+     * @param dims a set of dimensions
+     * @param strictCheck if true will throw an assert-like exception if cellNum exceeds the volume provided by dims,
+     *                    if false - silently return a partial result.
+     * @return the coordinates obtained by wrapping cellNum around the space of dims, at most a set of MAX_COORDINATE
+     *         positions; divides cellNum appropriately so the remaining component, if not 0, can be examined
+     */
+    static Coordinates getCoordinates(uint64_t& cellNum, Dimensions const& dims, bool strictCheck = true);
+
+    /**
+     * Noop. Required to satisfy the PhysicalQueryPlanNode default ctor.
+     */
     PhysicalBoundaries()
     {}
+
+    /**
+     * Create a new bounding box.
+     * @param start the upper-left coordinates
+     * @param end the lower-right coordinates
+     * @param density the percentage of the box that is occupied with data (between 0 and 1)
+     */
     PhysicalBoundaries(Coordinates const& start, Coordinates const& end, double density = 1.0);
+
     ~PhysicalBoundaries()
     {}
 
+    /**
+     * @return the upper-left coordinates of the box
+     */
     const Coordinates & getStartCoords() const
     {
         return _startCoords;
     }
 
+    /**
+     * @return the lower-right coordinates of the box
+     */
     const Coordinates & getEndCoords() const
     {
         return _endCoords;
     }
 
+    /**
+     * @return the density of the data in the box
+     */
     double getDensity() const
     {
         return _density;
     }
 
+    /**
+     * @return true if the box is volume-less
+     */
     bool isEmpty() const;
 
+    /**
+     * Determine if a coordinate along a particular dimension is inside the box.
+     * @param in a coordinate value
+     * @param dimensionNum the dimension along which to check
+     * @return true if getStartCoords()[dimensionNum] <= in <= getEndCoords()[dimensionNum]; false otherwise.
+     */
     bool isInsideBox (Coordinate const& in, size_t const& dimensionNum) const;
 
-    static uint64_t getNumCells (Coordinates const& start, Coordinates const& end);
+    /**
+     * Compute the number of logical cells that are enclosed in the bounding box between getStartCoords() and
+     * getEndCoords()
+     * @return the volume of the bounding box, not to exceed INFINITE_LENGTH
+     */
     uint64_t getNumCells() const;
-    uint64_t getRawCellNumber(Coordinates const & in) const;
-    Coordinates coordsFromRawCellNumber (uint64_t cellNumber) const;
 
+    /**
+     * Given a set of dimensions, compute the maximum number of chunks that may reside inside this bounding
+     * box.
+     * @param dims the dimensions used for array start, end and chunk interval
+     * @return the number of chunks inside this
+     */
     uint64_t getNumChunks(Dimensions const& dims) const;
+
+    /**
+     * Given a schema, estimate the total size, in bytes that an array would occupy in this bounding box.
+     * @param schema an array shape
+     * @return the estimate size of this bounding box area.
+     */
     double getSizeEstimateBytes(const ArrayDesc& schema) const;
 
+    /**
+     * Intersect this with other and return the result as a new object.
+     * @param other a different bounding box, must have the same number of dimensions.
+     * @return the bounding box intersection, with maximum possible density
+     */
     PhysicalBoundaries intersectWith (PhysicalBoundaries const& other) const;
+
+    /**
+     * Merge this with other and return the result as a new object.
+     * @param other a different bounding box, must have the same number of dimensions.
+     * @return the bounding box union, with maximum possible density
+     */
     PhysicalBoundaries unionWith (PhysicalBoundaries const& other) const;
+
+    /**
+     * Compute the cartesian product of tis and other and return the result as a new object.
+     * @param other a different bounding box.
+     * @return the bounding box cartesian product, with the product of the densities
+     */
     PhysicalBoundaries crossWith (PhysicalBoundaries const& other) const;
+
+    /**
+     * Wrap this bounding box around a new set of dimensions, return the result as a new object.
+     * @param oldDims the current dimensions - must match the number of dimensions in this
+     * @param newDims the new dimensions
+     * @return the reshaped bounding box
+     */
     PhysicalBoundaries reshape(Dimensions const& oldDims, Dimensions const& newDims) const;
 
+    /**
+     * Write this into a buffer
+     * @return the serialized form
+     */
     shared_ptr<SharedBuffer> serialize() const;
+
+    /**
+     * Construct a PhysicalBoundaries from a buffer
+     * @param buf the result of a previous PhysicalBoundaries::serialize call
+     */
     static PhysicalBoundaries deSerialize(shared_ptr<SharedBuffer> const& buf);
 
     /**
@@ -1258,6 +1382,12 @@ public:
      */
     PhysicalBoundaries trimToDims(Dimensions const& dims) const;
 
+    /**
+     * Output a human-readable string description of bounds onto stream
+     * @param stream where to write
+     * @param bounds the boundaries to record
+     * @return the stream with the boundaries data appended to the end
+     */
     friend std::ostream& operator<<(std::ostream& stream, const PhysicalBoundaries& bounds);
 };
 
@@ -2426,6 +2556,45 @@ boost::shared_ptr<AttributeMultiMap> buildSortedMultiIndex( shared_ptr<Array> sr
                                                             Coordinate indexStart = 0,
                                                             uint64_t maxElements = 0);
 
+/**
+ * It is common practice that in implementing some PhysicalOperator's execute() method, some code is extracted to a sub-routine.
+ * This structure defines some commonly used variables.
+ * The expected use case is that a CommonVariablesInExecute object is defined in execute(), and passed by reference to the sub-routine.
+ */
+struct CommonVariablesInExecute
+{
+    shared_ptr<Array>& _inputArray;
+    shared_ptr<Array>& _outputArray;
+    shared_ptr<Query>& _query;
+
+    ArrayDesc const& _inputSchema;
+    Attributes const& _inputAttrsWithET;
+    Attributes const& _inputAttrsWithoutET;
+    Dimensions const& _inputDims;
+
+    ArrayDesc const& _outputSchema;
+    Attributes const& _outputAttrsWithET;
+    Attributes const& _outputAttrsWithoutET;
+    Dimensions const& _outputDims;
+
+    CommonVariablesInExecute(
+            shared_ptr<Array>& inputArray,
+            shared_ptr<Array>& outputArray,
+            shared_ptr<Query>& query
+            )
+    : _inputArray(inputArray),
+      _outputArray(outputArray),
+      _query(query),
+      _inputSchema(inputArray->getArrayDesc()),
+      _inputAttrsWithET(inputArray->getArrayDesc().getAttributes(false)),
+      _inputAttrsWithoutET(inputArray->getArrayDesc().getAttributes(true)),
+      _inputDims(inputArray->getArrayDesc().getDimensions()),
+      _outputSchema(outputArray->getArrayDesc()),
+      _outputAttrsWithET(outputArray->getArrayDesc().getAttributes(false)),
+      _outputAttrsWithoutET(outputArray->getArrayDesc().getAttributes(true)),
+      _outputDims(outputArray->getArrayDesc().getDimensions())
+    {}
+};
 
 } // namespace
 

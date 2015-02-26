@@ -46,7 +46,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <system/Utils.h>
-#include "query/TypeSystem.h"
+#include <query/TypeSystem.h>
 
 namespace scidb
 {
@@ -130,31 +130,61 @@ struct CoordinatesLess
 
 /**
  * Compare two coordinates and return a number indicating how they differ.
- * @param c1 the left side of the comparsion
- * @param c2 the right side of the comparsion
- * @param nDims the optional number of dimensions to use (could be less than size of coords).
+ * @param c1                the left side of the comparison
+ * @param c2                the right side of the comparison
+ * @param rowMajorOrder     whether rowMajorOrder or columnMajorOrder is used
  * @return some negative value if c1 is less than c2;
  *         some positive value if c2 is less than c1,
- *         0 oif both are equal.
+ *         0 if both are equal.
  */
-inline int64_t coordinatesCompare(Coordinates const& c1, Coordinates const& c2, size_t nDims = 0)
+inline int64_t coordinatesCompare(Coordinates const& c1, Coordinates const& c2, bool rowMajorOrder = true)
 {
-    if(nDims == 0)
-    {
-        nDims = c1.size();
-    }
-    assert(c1.size() == nDims && c2.size() == nDims);
-    for(size_t i = 0; i < nDims; i++ )
-    {
-        int64_t res = c1[i] - c2[i];
-        if (res != 0)
+    assert(c1.size() == c2.size());
+
+    if (rowMajorOrder) {
+        for(size_t i = 0; i < c1.size(); i++ )
         {
-            return res;
+            int64_t res = c1[i] - c2[i];
+            if (res != 0)
+            {
+                return res;
+            }
+        }
+    }
+    else {
+        for(size_t i = c1.size(); i-- > 0; )
+        {
+            int64_t res = c1[i] - c2[i];
+            if (res != 0)
+            {
+                return res;
+            }
         }
     }
     return 0;
 }
 
+/**
+ * Comparator of two Coordinates, using row-major ordering.
+ */
+struct CoordinatesComparatorRMO
+{
+    bool operator()(Coordinates const& c1, Coordinates const& c2)
+    {
+        return coordinatesCompare(c1, c2) < 0;
+    }
+};
+
+/**
+ * Comparator of two Coordinates, using column-major ordering.
+ */
+struct CoordinatesComparatorCMO
+{
+    bool operator()(Coordinates const& c1, Coordinates const& c2)
+    {
+        return coordinatesCompare(c1, c2, false) < 0;
+    }
+};
 
 typedef std::set<Coordinates, CoordinatesLess> CoordinateSet;
 
@@ -1323,7 +1353,7 @@ public:
      */
     DimensionDesc(const std::string &name,
                   Coordinate start, Coordinate end,
-                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  int64_t chunkInterval, int64_t chunkOverlap,
                   TypeId type = TID_INT64,
                   int flags = 0,
                   std::string const& mappingArrayName = std::string(),
@@ -1345,7 +1375,7 @@ public:
      */
     DimensionDesc(const std::string &baseName, const NamesType &names,
                   Coordinate start, Coordinate end,
-                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  int64_t chunkInterval, int64_t chunkOverlap,
                   TypeId type = TID_INT64,
                   int flags = 0,
                   std::string const& mappingArrayName = std::string(),
@@ -1372,7 +1402,7 @@ public:
     DimensionDesc(const std::string &name,
                   Coordinate startMin, Coordinate currStart,
                   Coordinate currEnd, Coordinate endMax,
-                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  int64_t chunkInterval, int64_t chunkOverlap,
                   TypeId type = TID_INT64,
                   int flags = 0,
                   std::string const& mappingArrayName =std::string(),
@@ -1402,7 +1432,7 @@ public:
     DimensionDesc(const std::string &baseName, const NamesType &names,
                   Coordinate startMin, Coordinate currStart,
                   Coordinate currEnd, Coordinate endMax,
-                  uint32_t chunkInterval, uint32_t chunkOverlap,
+                  int64_t chunkInterval, int64_t chunkOverlap,
                   TypeId type = TID_INT64,
                   int flags = 0,
                   std::string const& mappingArrayName = std::string(),
@@ -1475,13 +1505,13 @@ public:
      * Get length of chunk in this dimension (not including overlaps)
      * @return step of partitioning array into chunks for this dimension
      */
-    uint32_t getChunkInterval() const;
+    int64_t getChunkInterval() const;
 
     /**
      * Get chunk overlap in this dimension, so given base coordinate Xi,
      * chunk stores interval of array Ai=[Xi-getChunkOverlap(), Xi+getChunkInterval()+getChunkOverlap()]
      */
-    uint32_t getChunkOverlap() const;
+    int64_t getChunkOverlap() const;
 #ifndef SWIG
     /**
      * Get name of the persistent array from which this dimension was taken
@@ -1631,8 +1661,19 @@ private:
     Coordinate _currEnd;
     Coordinate _endMax;
 
-    uint32_t _chunkInterval;
-    uint32_t _chunkOverlap;
+    /**
+     * The length of the chunk along this dimension, excluding overlap.
+     * 
+     * Chunk Interval is often used as part of coordinate math and coordinates are signed int64. To make life easier
+     * for everyone, chunk interval is also signed for the moment. Same with position_t in RLE.h.
+     */
+    int64_t _chunkInterval;
+    
+    /**
+     * The length of just the chunk overlap along this dimension.
+     * Signed to make coordinate math easier.
+     */
+    int64_t _chunkOverlap;
 
     ArrayDesc* _array;
 

@@ -58,13 +58,16 @@ MessageHandleJob::MessageHandleJob(const boost::shared_ptr<MessageDesc>& message
   sourceId(INVALID_INSTANCE),
   _mustValidateQuery(true)
 {
+    assert(_messageDesc->getSourceInstanceID() != CLIENT_INSTANCE);
+
     LOG4CXX_TRACE(logger, "Creating a new job for message of type=" << _messageDesc->getMessageType()
                   << " from instance=" << _messageDesc->getSourceInstanceID()
                   << " for queryID=" << _messageDesc->getQueryID());
 
     const QueryID queryID = _messageDesc->getQueryID();
     if (queryID != 0) {
-        _query = Query::getQueryByID(queryID, _messageDesc->getMessageType() == mtPreparePhysicalPlan);
+        const bool isCreateNewQuery = (_messageDesc->getMessageType() == mtPreparePhysicalPlan);
+        _query = Query::getQueryByID(queryID, isCreateNewQuery);
     } else {
         LOG4CXX_TRACE(logger, "Creating fake query: type=" << _messageDesc->getMessageType()
                       << ", for message from instance=" << _messageDesc->getSourceInstanceID());
@@ -76,6 +79,7 @@ MessageHandleJob::MessageHandleJob(const boost::shared_ptr<MessageDesc>& message
                                        Cluster::getInstance()->getLocalInstanceId(),
                                        myLiveness);
     }
+    assert(_query);
     if (_messageDesc->getMessageType() == mtChunkReplica) {
         NetworkManager::getInstance()->registerMessage(messageDesc, NetworkManager::mqtReplication);
     }
@@ -91,13 +95,249 @@ MessageHandleJob::~MessageHandleJob()
     }
 }
 
-void MessageHandleJob::handleInvalidMessage()
+void MessageHandleJob::dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
+                                boost::shared_ptr<WorkQueue>& workQueue)
 {
+    assert(workQueue);
+    assert(requestQueue);
+
     const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
-    LOG4CXX_ERROR(logger, "Unknown/unexpected message type " << messageType);
-    throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE) << messageType;
+
+    if(messageType >= mtSystemMax || messageType <= mtNone) {
+        assert(false);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE)
+               << messageType);
+    }
+
+    const QueryID queryID = _messageDesc->getQueryID();
+    const InstanceID instanceId = _messageDesc->getSourceInstanceID();
+
+    LOG4CXX_TRACE(logger, "Dispatching message of type=" << messageType
+                  << ", for queryID=" << queryID
+                  << ", from instanceID=" << instanceId);
+
+    // Set the initial message handler
+    _currHandler = boost::bind(_msgHandlers[messageType], this);
+
+    switch (messageType)
+    {
+    case mtChunkReplica:
+    {
+        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
+        boost::shared_ptr<scidb_msg::Chunk> chunkRecord = _messageDesc->getRecord<scidb_msg::Chunk>();
+        ArrayID arrId = chunkRecord->array_id();
+        LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: mtReplicaChunk sourceId="<<sourceId
+                      << ", arrId="<<arrId
+                      << ", queryID="<<_query->getQueryID());
+        if (arrId <= 0) {
+            assert(false);
+            stringstream ss;
+            ss << "Invalid ArrayID=0 from InstanceID="<<instanceId<<" for QueryID="<<queryID;
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << ss.str());
+        }
+        shared_ptr<ReplicationContext> replicationCtx = _query->getReplicationContext();
+
+        assert(replicationCtx->_chunkReplicasReqs[sourceId].increment() > 0);
+
+        if (logger->isTraceEnabled()) {
+            const uint64_t available = NetworkManager::getInstance()->getAvailable(NetworkManager::mqtReplication);
+            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: Replication queue available="<<available);
+        }
+        shared_ptr<Job> thisJob(shared_from_this());
+        replicationCtx->enqueueInbound(arrId, thisJob);
+        return;
+    }
+    break;
+    case mtChunk:
+    case mtAggregateChunk:
+    {
+        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
+        _query->chunkReqs[sourceId].increment();
+        boost::shared_ptr<WorkQueue> q = _query->getOperatorQueue();
+        assert(q);
+        if (logger->isTraceEnabled()) {
+            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: Operator queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
+        enqueue(q);
+        return;
+    }
+    break;
+    case mtBufferSend:
+    {
+        boost::shared_ptr<WorkQueue> q = _query->getBufferReceiveQueue();
+        assert(q);
+        if (logger->isTraceEnabled()) {
+            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: BufferSend queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
+        enqueue(q);
+        return;
+    }
+    case mtRecoverChunk:
+    case mtResourcesFileExistsRequest:
+    case mtResourcesFileExistsResponse:
+    {
+        _mustValidateQuery = false;
+    }
+    break;
+    case mtError:
+    case mtAbort:
+    case mtCommit:
+    {
+        _mustValidateQuery = false;
+        boost::shared_ptr<WorkQueue> q = _query->getErrorQueue();
+        if (logger->isTraceEnabled() && q) {
+            LOG4CXX_TRACE(logger, "Error queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
+        // We must not drop query-state-change messages to properly complete a query.
+        // Therefore, in a unlikely event of the error queue being full, we will stall
+        // the network thread until the queue drains. The queue is expected to drain (without a deadlock)
+        // because mtError,mtAbort,mtCommit handlers do not require any network communication.
+        const bool handleOverflow = false;
+        boost::function<void()> work = boost::bind(&MessageHandleJob::enqueue, this, q, handleOverflow);
+        Query::runRestartableWork<void, scidb::WorkQueue::OverflowException>(work);
+        return;
+    }
+    break;
+    case mtFetch:
+    {
+        // XXX TODO: There is one special case for mtFetch - when a sort2 operation uses a RemoteArray
+        // on the coordinator to pull presorted data from the worker instances for merging.
+        boost::shared_ptr<scidb_msg::Fetch> fetchRecord = _messageDesc->getRecord<scidb_msg::Fetch>();
+        const uint32_t objType = fetchRecord->obj_type();
+        const uint32_t remoteArrayType(0);
+        if (objType == remoteArrayType) {
+            break;
+        }
+    }
+    // fall through
+    case mtPreparePhysicalPlan:
+    case mtExecutePhysicalPlan:
+    {
+        enqueue(requestQueue);
+        return;
+    }
+    break;
+    default:
+    break;
+    };
+    enqueue(workQueue);
+    return;
 }
 
+/// @note No operations mutating this object are allowed to be called
+/// after enqueue() returns, the consistency of object is not guaranteed either.
+/// This is because a different thread may already be using this object.
+void MessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q, bool handleOverflow)
+{
+    static const char *funcName = "MessageHandleJob::enqueue: ";
+    LOG4CXX_TRACE(logger, funcName << "message of type="
+                  <<  _messageDesc->getMessageType()
+                  << ", for queryID=" << _messageDesc->getQueryID()
+                  << ", from instanceID=" << _messageDesc->getSourceInstanceID());
+    if (!q) {
+        LOG4CXX_WARN(logger,  funcName << "Dropping message of type=" <<  _messageDesc->getMessageType()
+                      << ", for queryID=" << _messageDesc->getQueryID()
+                      << ", from instanceID=" << _messageDesc->getSourceInstanceID()
+                      << " because the query appears deallocated");
+        return;
+    }
+
+    shared_ptr<Job> thisJob(shared_from_this());
+    WorkQueue::WorkItem work = boost::bind(&Job::executeOnQueue, thisJob, _1, _2);
+    thisJob.reset();
+    assert(work);
+    try {
+        q->enqueue(work);
+    } catch (const WorkQueue::OverflowException& e) {
+        if (handleOverflow) {
+            LOG4CXX_ERROR(logger,  funcName <<
+                          "Overflow exception from the message queue ("
+                          << q.get()
+                          <<"): " << e.what());
+            assert(_query);
+            _query->handleError(e.copy());
+        }
+        throw;
+    }
+}
+
+void MessageHandleJob::run()
+{
+    static const char *funcName = "MessageHandleJob::run: ";
+    assert(_messageDesc);
+    assert(_messageDesc->getMessageType() < mtSystemMax);
+    boost::function<void()> func = boost::bind(&Query::destroyFakeQuery, _query.get());
+    Destructor<boost::function<void()> > fqd(func);
+
+    const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
+    LOG4CXX_TRACE(logger, funcName << "Starting message handling: type=" << messageType
+                  << ", queryID=" << _messageDesc->getQueryID());
+    try
+    {
+        Query::setCurrentQueryID(_query->getQueryID());
+        StatisticsScope sScope(&_query->statistics);
+
+        if (_mustValidateQuery) {
+            Query::validateQueryPtr(_query);
+        }
+
+        if (messageType < 0 || messageType >= mtSystemMax) {
+            handleInvalidMessage();
+            return;
+        }
+
+        // Execute the current handler
+        assert(_currHandler);
+
+        _currHandler();
+
+        LOG4CXX_TRACE(logger, funcName << "Finishing message handling: type=" << messageType);
+    }
+    catch ( const Exception& e)
+    {
+        StatisticsScope sScope(_query ? &_query->statistics : NULL);
+
+        assert(_messageDesc);
+        LOG4CXX_ERROR(logger, funcName << "Error occurred in message handler: "
+                      << e.what()
+                      << ", messageType = " << messageType
+                      << ", sourceInstance = " << _messageDesc->getSourceInstanceID()
+                      << ", queryID="<<_messageDesc->getQueryID());
+        assert(messageType != mtCancelQuery);
+
+        if (!_query) {
+            assert(false);
+            LOG4CXX_DEBUG(logger, funcName << "Query " << _messageDesc->getQueryID() << " is already destructed");
+        } else {
+
+            if (messageType == mtExecutePhysicalPlan || messageType == mtPreparePhysicalPlan) {
+                LOG4CXX_DEBUG(logger, funcName << "Execution of query " << _messageDesc->getQueryID() << " is aborted on worker");
+                _query->done(e.copy());
+            } else {
+                LOG4CXX_DEBUG(logger, funcName << "Handle error for query " << _messageDesc->getQueryID());
+                _query->handleError(e.copy());
+            }
+
+            if (messageType != mtError && messageType != mtAbort) {
+
+                boost::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, _messageDesc->getQueryID());
+
+                if (_query->getPhysicalCoordinatorID() != COORDINATOR_INSTANCE) {
+                    NetworkManager::getInstance()->sendMessage(_query->getPhysicalCoordinatorID(), errorMessage);
+                }
+                if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceInstanceID()) {
+                    NetworkManager::getInstance()->sendMessage(_messageDesc->getSourceInstanceID(), errorMessage);
+                }
+            }
+        }
+    }
+}
+
+/// Map of initial handler routines for each message type
 MessageHandleJob::MsgHandler MessageHandleJob::_msgHandlers[scidb::mtSystemMax] = {
     // mtNone,
     &MessageHandleJob::handleInvalidMessage,
@@ -139,8 +379,8 @@ MessageHandleJob::MsgHandler MessageHandleJob::_msgHandlers[scidb::mtSystemMax] 
     &MessageHandleJob::handleWait,
     // mtBarrier,
     &MessageHandleJob::handleBarrier,
-    // mtMPISend,
-    &MessageHandleJob::handleMPISend,
+    // mtBufferSend,
+    &MessageHandleJob::handleBufferSend,
     // mtAlive,
     &MessageHandleJob::handleInvalidMessage,
     // mtPrepareQuery,
@@ -158,208 +398,22 @@ MessageHandleJob::MsgHandler MessageHandleJob::_msgHandlers[scidb::mtSystemMax] 
     // mtSystemMax // must be last
 };
 
-void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
+void MessageHandleJob::handleInvalidMessage()
 {
-    assert(jobQueue);
-
+    static const char *funcName = "MessageHandleJob::handleInvalidMessage: ";
     const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
-
-    if(messageType >= mtSystemMax || messageType <= mtNone) {
-        assert(false);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE)
-               << messageType);
-    }
-    const QueryID queryID = _messageDesc->getQueryID();
-    const InstanceID instanceId = _messageDesc->getSourceInstanceID();
-
-    LOG4CXX_TRACE(logger, "Dispatching message of type=" << messageType
-                  << ", for queryID=" << queryID
-                  << ", from instanceID=" << instanceId);
-
-    switch (messageType)
-    {
-    case mtChunkReplica:
-    {
-        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
-        boost::shared_ptr<scidb_msg::Chunk> chunkRecord = _messageDesc->getRecord<scidb_msg::Chunk>();
-        ArrayID arrId = chunkRecord->array_id();
-        LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: mtReplicaChunk sourceId="<<sourceId
-                      << ", arrId="<<arrId
-                      << ", queryID="<<_query->getQueryID());
-        if (arrId <= 0) {
-            assert(false);
-            stringstream ss;
-            ss << "Invalid ArrayID=0 from InstanceID="<<instanceId<<" for QueryID="<<queryID;
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                   << ss.str());
-        }
-        shared_ptr<ReplicationContext> replicationCtx = _query->getReplicationContext();
-
-        assert(replicationCtx->_chunkReplicasReqs[sourceId].increment() > 0);
-
-        if (logger->isTraceEnabled()) {
-            const uint64_t available = NetworkManager::getInstance()->getAvailable(NetworkManager::mqtReplication);
-            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: Replication queue available="<<available);
-        }
-        replicationCtx->enqueueInbound(arrId, shared_from_this());
-        return;
-    }
-    break;
-    case mtChunk:
-    case mtAggregateChunk:
-    {
-        sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
-        _query->chunkReqs[sourceId].increment();
-        boost::shared_ptr<WorkQueue> q = _query->getOperatorQueue();
-        assert(q);
-        if (logger->isTraceEnabled()) {
-            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: Operator queue size="<<q->size()
-                          << " for query ("<<queryID<<")");
-        }
-        enqueue(q);
-        return;
-    }
-    break;
-    case mtMPISend:
-    {
-        boost::shared_ptr<WorkQueue> q = _query->getMpiReceiveQueue();
-        assert(q);
-        if (logger->isTraceEnabled()) {
-            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: MPISend queue size="<<q->size()
-                          << " for query ("<<queryID<<")");
-        }
-        enqueue(q);
-        return;
-    }
-    case mtRecoverChunk:
-    case mtResourcesFileExistsRequest:
-    case mtResourcesFileExistsResponse:
-    {
-        _mustValidateQuery = false;
-    }
-    break;
-    case mtError:
-    case mtAbort:
-    case mtCommit:
-    {
-        _mustValidateQuery = false;
-        boost::shared_ptr<WorkQueue> q = _query->getErrorQueue();
-        if (logger->isTraceEnabled() && q) {
-            LOG4CXX_TRACE(logger, "Error queue size="<<q->size()
-                          << " for query ("<<queryID<<")");
-        }
-        enqueue(q);
-        return;
-    }
-    default:
-    break;
-    };
-
-    jobQueue->pushJob(shared_from_this());
-    return;
-}
-
-void MessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
-{
-    LOG4CXX_TRACE(logger, "MessageHandleJob::enqueue message of type="
-                  <<  _messageDesc->getMessageType()
-                  << ", for queryID=" << _messageDesc->getQueryID()
-                  << ", from instanceID=" << _messageDesc->getSourceInstanceID());
-    if (!q)
-    {
-        LOG4CXX_WARN(logger, "Dropping message of type=" <<  _messageDesc->getMessageType()
-                      << ", for queryID=" << _messageDesc->getQueryID()
-                      << ", from instanceID=" << _messageDesc->getSourceInstanceID()
-                      << " because the query appears deallocated");
-        return;
-    }
-
-    WorkQueue::WorkItem work = boost::bind(&MessageHandleJob::run, shared_from_this());
-    assert(work);
-    try {
-        q->enqueue(work);
-    } catch (const WorkQueue::OverflowException& e) {
-        LOG4CXX_ERROR(logger, "Overflow exception from the message queue (" << q.get()
-                      <<"): "<<e.what());
-        // XXX TODO: deal with this exception
-        assert(false);
-        throw;
-    }
-}
-
-void MessageHandleJob::run()
-{
-    assert(_messageDesc);
-    assert(_messageDesc->getMessageType() < mtSystemMax);
-    boost::function<void()> func = boost::bind(&Query::destroyFakeQuery, _query.get());
-    Destructor<boost::function<void()> > fqd(func);
-
-    const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
-    LOG4CXX_TRACE(logger, "Starting message handling: type=" << messageType
-                  << ", queryID=" << _messageDesc->getQueryID());
-    try
-    {
-        Query::setCurrentQueryID(_query->getQueryID());
-        StatisticsScope sScope(&_query->statistics);
-
-        if (_mustValidateQuery) {
-            Query::validateQueryPtr(_query);
-        }
-
-        if (messageType < 0 || messageType >= mtSystemMax) {
-            handleInvalidMessage();
-            return;
-        }
-
-        MsgHandler handler = _msgHandlers[messageType];
-        assert(handler);
-
-        (this->*handler)();
-
-        LOG4CXX_TRACE(logger, "Finishing message handling: type=" << messageType);
-    }
-    catch ( const Exception& e)
-    {
-       assert(_query);
-       StatisticsScope sScope(_query ? &_query->statistics : NULL);
-
-       assert(messageType != mtCancelQuery);
-
-       LOG4CXX_ERROR(logger, "Error occurred in message handler: "
-                     << e.what()
-                     << ", messageType = " << messageType
-                     << ", sourceInstance = " << _messageDesc->getSourceInstanceID()
-                     << ", queryID="<<_messageDesc->getQueryID());
-
-       if (messageType != mtError && messageType != mtAbort && _query->getPhysicalCoordinatorID() != COORDINATOR_INSTANCE)
-       {
-           boost::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, _messageDesc->getQueryID());
-           NetworkManager::getInstance()->sendMessage(_query->getPhysicalCoordinatorID(), errorMessage);
-       }
-       if (_query) {
-          if (messageType == mtExecutePhysicalPlan || messageType == mtPreparePhysicalPlan) {
-              LOG4CXX_DEBUG(logger, "Execution of query " << _messageDesc->getQueryID() << " is aborted on worker");
-             _query->done(e.copy());
-          } else {
-              LOG4CXX_DEBUG(logger, "Handle error for query " << _messageDesc->getQueryID());
-              _query->handleError(e.copy());
-          }
-       } else {
-           LOG4CXX_DEBUG(logger, "Query " << _messageDesc->getQueryID() << " is already destructed");
-       }
-       if (e.getShortErrorCode() == SCIDB_SE_THREAD || e.getShortErrorCode() == SCIDB_SE_INTERNAL)
-       {
-           e.raise();
-       }
-    }
+    LOG4CXX_ERROR(logger,  funcName << "Unknown/unexpected message type " << messageType);
+    assert(false);
+    throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE) << messageType;
 }
 
 void MessageHandleJob::handlePreparePhysicalPlan()
 {
+    static const char *funcName = "MessageHandleJob::handlePreparePhysicalPlan: ";
     boost::shared_ptr<scidb_msg::PhysicalPlan> ppMsg = _messageDesc->getRecord<scidb_msg::PhysicalPlan>();
     const string physicalPlan = ppMsg->physical_plan();
 
-    LOG4CXX_DEBUG(logger, "Preparing physical plan: queryID="
+    LOG4CXX_DEBUG(logger,  funcName << "Preparing physical plan: queryID="
                   << _messageDesc->getQueryID() << ", physicalPlan='" << physicalPlan << "'");
 
     boost::shared_ptr<InstanceLiveness> coordinatorLiveness;
@@ -390,18 +444,24 @@ void MessageHandleJob::handlePreparePhysicalPlan()
     boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
 
     queryProcessor->parsePhysical(physicalPlan, _query);
-    LOG4CXX_DEBUG(logger, "Physical plan was parsed")
+    LOG4CXX_DEBUG(logger,  funcName << "Physical plan was parsed")
 
     boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtNotify);
     messageDesc->setQueryID(_messageDesc->getQueryID());
     networkManager.sendMessage(_messageDesc->getSourceInstanceID(), messageDesc);
-    LOG4CXX_DEBUG(logger, "Coordinator is notified about ready for physical plan running")
+    LOG4CXX_DEBUG(logger,  funcName << "Coordinator is notified about ready for physical plan running")
 }
 
 void MessageHandleJob::handleExecutePhysicalPlan()
 {
+   static const char *funcName = "MessageHandleJob::handleExecutePhysicalPlan: ";
    try {
-      LOG4CXX_DEBUG(logger, "Running physical plan: queryID=" << _messageDesc->getQueryID())
+
+      if  (_query->isCoordinator()) {
+          handleInvalidMessage();
+      }
+
+      LOG4CXX_DEBUG(logger,  funcName << "Running physical plan: queryID=" << _messageDesc->getQueryID())
 
       currentStatistics->receivedSize += _messageDesc->getMessageSize();
       currentStatistics->receivedMessages++;
@@ -410,7 +470,7 @@ void MessageHandleJob::handleExecutePhysicalPlan()
       _query->start();
       try {
          queryProcessor->execute(_query);
-         LOG4CXX_DEBUG(logger, "Query was executed");
+         LOG4CXX_DEBUG(logger,  funcName << "Query was executed");
       } catch (const std::bad_alloc& e) {
           throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_MEMORY_ALLOCATION_ERROR) << e.what();
       }
@@ -424,7 +484,7 @@ void MessageHandleJob::handleExecutePhysicalPlan()
    }
    catch (const scidb::Exception& e)
    {
-      LOG4CXX_ERROR(logger, "Query ID=" << _query->getQueryID()
+      LOG4CXX_ERROR(logger,  funcName << "QueryID = " << _query->getQueryID()
                     << " encountered the error: "
                     << e.what());
       e.raise();
@@ -433,10 +493,17 @@ void MessageHandleJob::handleExecutePhysicalPlan()
 
 void MessageHandleJob::handleQueryResult()
 {
+    static const char *funcName = "MessageHandleJob::handleQueryResult: ";
+    if  (!_query->isCoordinator()) {
+        handleInvalidMessage();
+    }
+
     const string arrayName = _messageDesc->getRecord<scidb_msg::QueryResult>()->array_name();
 
-    LOG4CXX_DEBUG(logger, "Received query result from instance#" << _messageDesc->getSourceInstanceID()
-                  << ", queryID=" << _messageDesc->getQueryID() << ", arrayName=" << arrayName)
+    LOG4CXX_DEBUG(logger,  funcName << "Received query result from instance#"
+                  << _messageDesc->getSourceInstanceID()
+                  << ", queryID=" << _messageDesc->getQueryID()
+                  << ", arrayName=" << arrayName)
 
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
@@ -447,17 +514,20 @@ void MessageHandleJob::handleQueryResult()
 
 void MessageHandleJob::sgSync()
 {
+    static const char *funcName = "MessageHandleJob::sgSync: ";
     sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
     if (_query->chunkReqs[sourceId].decrement()) {
         boost::shared_ptr<MessageDesc> syncMsg = boost::make_shared<MessageDesc>(mtSyncResponse);
         syncMsg->setQueryID(_messageDesc->getQueryID());
         networkManager.sendMessage(_messageDesc->getSourceInstanceID(), syncMsg);
-        LOG4CXX_TRACE(logger, "Sync confirmation was sent to instance #" << _messageDesc->getSourceInstanceID());
+        LOG4CXX_TRACE(logger, funcName << "Sync confirmation was sent to instance #"
+                      << _messageDesc->getSourceInstanceID());
     }
 }
 
 void MessageHandleJob::_handleChunkOrAggregateChunk(bool isAggregateChunk)
 {
+    static const char *funcName = "MessageHandleJob::_handleChunkOrAggregateChunk: ";
     boost::shared_ptr<scidb_msg::Chunk> chunkRecord = _messageDesc->getRecord<scidb_msg::Chunk>();
     assert(!chunkRecord->eof());
     assert(_query);
@@ -472,7 +542,7 @@ void MessageHandleJob::_handleChunkOrAggregateChunk(bool isAggregateChunk)
             currentStatistics->receivedMessages++;
         }
 
-        LOG4CXX_TRACE(logger, "Next chunk message was received")
+        LOG4CXX_TRACE(logger, funcName << "Next chunk message was received")
         boost::shared_ptr<SGContext> sgCtx = dynamic_pointer_cast<SGContext>(_query->getOperatorContext());
         if (sgCtx == NULL) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_CTX)
@@ -501,17 +571,18 @@ void MessageHandleJob::_handleChunkOrAggregateChunk(bool isAggregateChunk)
                 );
 
         sgSync();
-        LOG4CXX_TRACE(logger, "Chunk was stored")
+        LOG4CXX_TRACE(logger, funcName << "Chunk was stored")
     }
     catch(const Exception& e)
     {
-        sgSync();
+        sgSync(); //XXX TODO: this should be removed, because the error message will be sent as a result of throw
         throw;
     }
 }
 
 void MessageHandleJob::handleReplicaSyncResponse()
 {
+    static const char *funcName = "MessageHandleJob::handleReplicaSyncResponse: ";
     shared_ptr<ReplicationContext> replicationCtx(_query->getReplicationContext());
     sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
     boost::shared_ptr<scidb_msg::DummyQuery> responseRecord = _messageDesc->getRecord<scidb_msg::DummyQuery>();
@@ -524,13 +595,15 @@ void MessageHandleJob::handleReplicaSyncResponse()
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << ss.str());
     }
-    LOG4CXX_TRACE(logger, "MessageHandleJob::handleReplicaSyncResponse() arrId="<<arrId
-                  << ", source="<<sourceId << ", queryID="<<_query->getQueryID());
+    LOG4CXX_TRACE(logger, funcName << "arrId="<<arrId
+                  << ", source="<<sourceId
+                  << ", queryID="<<_query->getQueryID());
     replicationCtx->replicationAck(sourceId, arrId);
 }
 
 void MessageHandleJob::handleReplicaChunk()
 {
+    static const char *funcName = "MessageHandleJob::handleReplicaChunk: ";
     assert(static_cast<MessageType>(_messageDesc->getMessageType()) == mtChunkReplica);
     assert(sourceId != INVALID_INSTANCE);
     assert(_query);
@@ -539,7 +612,7 @@ void MessageHandleJob::handleReplicaChunk()
     ArrayID arrId = chunkRecord->array_id();
     assert(arrId>0);
 
-    LOG4CXX_TRACE(logger, "MessageHandleJob::handleReplicaChunk() arrId="<<arrId
+    LOG4CXX_TRACE(logger, funcName << "arrId="<<arrId
                   << ", source="<<sourceId << ", queryID="<<_query->getQueryID());
 
     shared_ptr<ReplicationContext> replicationCtx(_query->getReplicationContext());
@@ -550,6 +623,8 @@ void MessageHandleJob::handleReplicaChunk()
         // last replication message for this arrId from sourceId
         assert(replicationCtx->_chunkReplicasReqs[sourceId].test());
         // when all eofs are received the work queue for this arrId can be removed
+
+        _query->validate(); // to make sure no previous errors in replication
 
         // ack the eof message back to sourceId
         boost::shared_ptr<MessageDesc> responseMsg = boost::make_shared<MessageDesc>(mtReplicaSyncResponse);
@@ -639,6 +714,10 @@ void MessageHandleJob::handleRemoteChunk()
 
 void MessageHandleJob::handleFetchChunk()
 {
+    static const char *funcName = "MessageHandleJob::handleFetchChunk: ";
+    if  (_query->isCoordinator()) {
+        handleInvalidMessage();
+    }
     boost::shared_ptr<scidb_msg::Fetch> fetchRecord = _messageDesc->getRecord<scidb_msg::Fetch>();
     const QueryID queryID = _messageDesc->getQueryID();
 
@@ -647,10 +726,28 @@ void MessageHandleJob::handleFetchChunk()
     const uint32_t attributeId = fetchRecord->attribute_id();
     const bool positionOnly = fetchRecord->position_only();
     const uint32_t objType = fetchRecord->obj_type();
-    LOG4CXX_TRACE(logger, "Fetching remote chunk of " << attributeId << " attribute in context of " << queryID << " query")
+    LOG4CXX_TRACE(logger, funcName << "Fetching remote chunk of "
+                  << attributeId << " attribute in context of "
+                  << queryID << " query");
+
+    if (objType>1) {
+        stringstream ss;
+        ss << "Invalid ArrayID=0 from InstanceID="
+           << _messageDesc->getSourceInstanceID()
+           <<" for QueryID="<<queryID;
+        assert(false);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << ss.str());
+    }
 
     boost::shared_ptr<Array> resultArray = _query->getCurrentResultArray();
-    assert(resultArray); //XXX TODO: this needs to be an exception
+    if (!resultArray) {
+        // the query must be deallocated, validate() should fail
+        _query->validate();
+        assert(false);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "cannot find result array");
+    }
     boost::shared_ptr<ConstArrayIterator> iter = resultArray->getConstIterator(attributeId);
 
     boost::shared_ptr<MessageDesc> chunkMsg;
@@ -662,7 +759,8 @@ void MessageHandleJob::handleFetchChunk()
             const ConstChunk* chunk = &iter->getChunk();
             boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
             boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-            if (chunk->isRLE() && resultArray->getArrayDesc().getEmptyBitmapAttribute() != NULL && !chunk->getAttributeDesc().isEmptyIndicator()) {
+            if (chunk->isRLE() && resultArray->getArrayDesc().getEmptyBitmapAttribute() != NULL &&
+                !chunk->getAttributeDesc().isEmptyIndicator()) {
                 emptyBitmap = chunk->getEmptyBitmap();
             }
             chunk->compress(*buffer, emptyBitmap);
@@ -679,8 +777,9 @@ void MessageHandleJob::handleFetchChunk()
                 chunkRecord->add_coordinates(coordinates[i]);
             }
             ++(*iter);
-        }
-        else {
+
+        } else {
+
             chunkMsg = boost::make_shared<MessageDesc>(mtRemoteChunk);
             chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
         }
@@ -720,7 +819,7 @@ void MessageHandleJob::handleFetchChunk()
             query->clearWarnings();
         }
 
-        LOG4CXX_TRACE(logger, "Prepared message with chunk data")
+        LOG4CXX_TRACE(logger, funcName << "Prepared message with chunk data");
     }
     else
     {
@@ -730,16 +829,17 @@ void MessageHandleJob::handleFetchChunk()
         chunkRecord->set_eof(true);
         chunkRecord->set_obj_type(objType);
         chunkRecord->set_attribute_id(attributeId);
-        LOG4CXX_TRACE(logger, "Prepared message with information that there are no unread chunks")
+        LOG4CXX_TRACE(logger, funcName << "Prepared message with information that there are no unread chunks");
     }
 
     networkManager.sendMessage(_messageDesc->getSourceInstanceID(), chunkMsg);
 
-    LOG4CXX_TRACE(logger, "Remote chunk was sent to client")
+    LOG4CXX_TRACE(logger, funcName << "Remote chunk was sent to client");
 }
 
 void MessageHandleJob::handleSyncRequest()
 {
+    static const char *funcName = "MessageHandleJob::handleSyncRequest: ";
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
@@ -749,41 +849,49 @@ void MessageHandleJob::handleSyncRequest()
         boost::shared_ptr<MessageDesc> syncMsg = boost::make_shared<MessageDesc>(mtSyncResponse);
         syncMsg->setQueryID(_messageDesc->getQueryID());
         networkManager.sendMessage(_messageDesc->getSourceInstanceID(), syncMsg);
-        LOG4CXX_TRACE(logger, "Sync confirmation was sent to instance #" << _messageDesc->getSourceInstanceID());
+        LOG4CXX_TRACE(logger, funcName << "Sync confirmation was sent to instance #"
+                      << _messageDesc->getSourceInstanceID());
     }
 }
 
 
 void MessageHandleJob::handleBarrier()
 {
+    static const char *funcName = "MessageHandleJob::handleBarrier: ";
     boost::shared_ptr<scidb_msg::DummyQuery> barrierRecord = _messageDesc->getRecord<scidb_msg::DummyQuery>();
 
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
-    LOG4CXX_TRACE(logger, "handling barrier message in query " << _messageDesc->getQueryID())
+    LOG4CXX_TRACE(logger, funcName << "handling barrier message in query "
+                  << _messageDesc->getQueryID());
     _query->semSG[barrierRecord->payload_id()].release();
 }
 
 
 void MessageHandleJob::handleSyncResponse()
 {
+    static const char *funcName = "MessageHandleJob::handleSyncResponse: ";
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
-    LOG4CXX_TRACE(logger, "Receiving confirmation for sync message and release syncSG in query" << _messageDesc->getQueryID())
+    LOG4CXX_TRACE(logger, funcName << "Receiving confirmation for sync message and release syncSG in query"
+                  << _messageDesc->getQueryID())
 
     // Signaling to query to release SG semaphore inside physical operator and continue to work
     _query->syncSG.release();
 }
 
+// must run on _query->errorQueue
 void MessageHandleJob::handleError()
 {
+    static const char *funcName = "MessageHandleJob::handleError: ";
     boost::shared_ptr<scidb_msg::Error> errorRecord = _messageDesc->getRecord<scidb_msg::Error>();
     const string errorText = errorRecord->what_str();
     const int32_t errorCode = errorRecord->long_error_code();
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
-    LOG4CXX_ERROR(logger, "Error on processing query " << _messageDesc->getQueryID()
+    LOG4CXX_ERROR(logger, funcName
+                  << " Error on processing query " << _messageDesc->getQueryID()
                   << " on instance " << _messageDesc->getSourceInstanceID()
                   << ". Query coordinator ID: " << _query->getPhysicalCoordinatorID()
                   << ". Message errorCode: " << errorCode
@@ -812,45 +920,44 @@ void MessageHandleJob::handleError()
     }
 }
 
+// must run on _query->errorQueue
 void MessageHandleJob::handleAbortQuery()
 {
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
     if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceInstanceID()
-        || _query->getCoordinatorID() == COORDINATOR_INSTANCE) {
-        shared_ptr<Exception> e = (SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK,
-                                                         SCIDB_LE_UNKNOWN_MESSAGE_TYPE)
-                                   << mtAbort);
-        e->raise();
+        || _query->isCoordinator()) {
+        handleInvalidMessage();
     }
     _query->handleAbort();
 }
 
+// must run on _query->errorQueue
 void MessageHandleJob::handleCommitQuery()
 {
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
     if (_query->getPhysicalCoordinatorID() != _messageDesc->getSourceInstanceID()
-        || _query->getCoordinatorID() == COORDINATOR_INSTANCE) {
-        shared_ptr<Exception> e = (SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK,
-                                                         SCIDB_LE_UNKNOWN_MESSAGE_TYPE)
-                                   << mtCommit);
-        e->raise();
+        || _query->isCoordinator()) {
+        handleInvalidMessage();
     }
     _query->handleCommit();
 }
 
 void MessageHandleJob::handleNotify()
 {
+    static const char *funcName = "MessageHandleJob::handleNotify: ";
+    if  (!_query->isCoordinator()) {
+        handleInvalidMessage();
+    }
+
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
-    LOG4CXX_DEBUG(logger, "Notify on processing query "
+    LOG4CXX_DEBUG(logger, funcName << "Notify on processing query "
                   << _messageDesc->getQueryID() << " from instance "
-                  << _messageDesc->getSourceInstanceID())
-
-    assert(_query->getCoordinatorID() == COORDINATOR_INSTANCE);
+                  << _messageDesc->getSourceInstanceID());
 
     _query->results.release();
 }
@@ -858,17 +965,20 @@ void MessageHandleJob::handleNotify()
 
 void MessageHandleJob::handleWait()
 {
+    static const char *funcName = "MessageHandleJob::handleWait: ";
+    if  (_query->isCoordinator()) {
+        handleInvalidMessage();
+    }
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
-    LOG4CXX_DEBUG(logger, "Wait on processing query " << _messageDesc->getQueryID())
-
-    assert(_query->getCoordinatorID() != COORDINATOR_INSTANCE);
+    LOG4CXX_DEBUG(logger, funcName << "Wait on processing query "
+                  << _messageDesc->getQueryID())
 
     _query->results.release();
 }
 
 
-void MessageHandleJob::handleMPISend()
+void MessageHandleJob::handleBufferSend()
 {
     boost::shared_ptr<scidb_msg::DummyQuery> msgRecord = _messageDesc->getRecord<scidb_msg::DummyQuery>();
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
@@ -884,7 +994,8 @@ void MessageHandleJob::handleMPISend()
 
 void MessageHandleJob::handleResourcesFileExists()
 {
-    LOG4CXX_TRACE(logger, "MessageHandleJob::handleResourcesFileExists");
+    static const char *funcName = "MessageHandleJob::handleResourcesFileExists: ";
+    LOG4CXX_TRACE(logger, funcName << " called"); 
     Resources::getInstance()->handleFileExists(_messageDesc);
 }
 

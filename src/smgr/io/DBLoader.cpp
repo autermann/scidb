@@ -188,6 +188,12 @@ namespace scidb
 
     int DBLoader::defaultPrecision = 6;
 
+    static void checkStreamError(FILE *f)
+    {
+        int rc = ferror(f);
+        if (rc)
+            throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << rc;
+    }
 
     static void s_fprintValue(FILE *f, const Value* v, TypeId const& valueType, FunctionPointer const converter, int precision = 6)
     {
@@ -571,6 +577,7 @@ namespace scidb
                 fputc('\n', f);
             }
         }
+        checkStreamError(f);
         return n;
     }
 
@@ -908,6 +915,7 @@ namespace scidb
                 fputc('\n', f);
             }
         }
+        checkStreamError(f);
         return n;
     }
 
@@ -918,6 +926,7 @@ namespace scidb
         vector< boost::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
         uint64_t n;
         OpaqueChunkHeader hdr;
+        hdr.version = SCIDB_OPAQUE_FORMAT_VERSION;
         hdr.signature = OpaqueChunkHeader::calculateSignature(desc);
         hdr.magic = OPAQUE_CHUNK_MAGIC;
         
@@ -1105,6 +1114,7 @@ namespace scidb
         if (nMissingReasonOverflows > 0) { 
             query->postWarning(SCIDB_WARNING(SCIDB_W_MISSING_REASON_OUT_OF_BOUNDS));
         }
+        checkStreamError(f);
         return n;
     }
 
@@ -1113,9 +1123,7 @@ namespace scidb
                             const boost::shared_ptr<Query>& query,
                             string const& format, bool append)
     {
-        ArrayDesc desc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, desc);
-        boost::shared_ptr<DBArray> dbArr(DBArray::newDBArray(desc.getId(),query));
+        boost::shared_ptr<DBArray> dbArr(DBArray::newDBArray(arrayName,query));
         return save(*dbArr, file, query, format, append);
     }
 #else
@@ -1144,7 +1152,7 @@ namespace scidb
         } else {
             f = fopen(file.c_str(), isBinary ? append ? "ab" : "wb" : append ? "a" : "w");
             if (NULL == f) {
-                int error = ferror(f);
+                int error = errno;
                 LOG4CXX_DEBUG(logger, "Attempted to open output file '" << file << "' and failed with ferror = " << error);
                 if (!f)
                     throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_OPEN_FILE) << file << error;
@@ -1156,10 +1164,11 @@ namespace scidb
             flc.l_len = 1;
             
             int rc = fcntl(fileno(f), F_SETLK, &flc);
-            if (rc != 0 && errno == EACCES) { 
-                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_LOCK_FILE) << file;
+            if (rc == -1) {
+                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_LOCK_FILE) << file << errno;
             }
         }
+
         if (compareStringsIgnoreCase(format, "lcsv+") == 0 || compareStringsIgnoreCase(format, "lsparse") == 0
             || compareStringsIgnoreCase(format, "dcsv") == 0)
         {
@@ -1178,8 +1187,17 @@ namespace scidb
         {
             n = saveTextFormat(array, desc, f, format);
         }
-        if (f != stdout && f != stderr) {
-            fclose(f);
+
+        int rc(0);
+        if (f == stdout || f == stderr) {
+            rc = ::fflush(f);
+        } else {
+            rc = ::fclose(f);
+        }
+        if (rc != 0) {
+            int err = errno;
+            assert(err!= EBADF);
+            throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << err;
         }
         return n;
     }

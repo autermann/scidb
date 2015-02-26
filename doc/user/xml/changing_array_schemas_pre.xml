@@ -66,17 +66,17 @@
         <?dbfo keep-together="always" ?>
 
         <tgroup cols="6">
-          <colspec colname="c1"/>
+          <colspec colwidth="15*"/>
 
-          <colspec colname="cgen1"/>
+          <colspec colwidth="15*"/>
 
-          <colspec colname="c2"/>
+          <colspec colwidth="15*"/>
 
-          <colspec colname="c3"/>
+          <colspec colwidth="15*"/>
 
-          <colspec colname="c4"/>
+          <colspec colwidth="15*"/>
 
-          <colspec colname="c5"/>
+          <colspec colwidth="15*"/>
 
           <tbody>
             <row>

@@ -38,6 +38,13 @@
 namespace scidb
 {
 
+#define CHECK_LEXEM_SIZE(size) \
+    if ( (size) > STACK_ALLOC_BLOCK_SIZE)\
+    {\
+        _glue.error(*yylloc, boost::str(boost::format("Lexem size can not be greater than '%d'") % STACK_ALLOC_BLOCK_SIZE));\
+        return token::LEXER_ERROR;\
+    }
+
 class AstNode;
 class ParsingContext;
 

@@ -118,11 +118,15 @@ void initConfig(int argc, char* argv[])
         (CONFIG_PREFETCHED_CHUNKS, 'q', "prefetch-queue-size", "PREFETCHED_CHUNKS", "", Config::INTEGER,
                 "Number of prefetch chunks for each query", 4, false)
         (CONFIG_MAX_JOBS, 'j', "jobs", "MAX_JOBS", "", Config::INTEGER,
-                "Max. number of queries/jobs that can be processed in parallel", 5, false)
+         "Max. number of queries that can be processed in parallel", 5, false)
         (CONFIG_USED_CPU_LIMIT, 'x', "used-cpu-limit", "USED_CPU_LIMIT", "", Config::INTEGER,
                 "Max. number of threads for concurrent processing of one chunk", 0, false)
         (CONFIG_MERGE_SORT_BUFFER, 0, "merge-sort-buffer", "MERGE_SORT_BUFFER", "", Config::INTEGER,
                 "Maximal size for in-memory sort buffer (Mb)", 128, false)
+        (CONFIG_MERGE_SORT_NSTREAMS, 0, "merge-sort-nstreams", "MERGE_SORT_NSTREAMS", "", Config::INTEGER,
+                "Number of streams to merge at each level of sort", 8, false)
+        (CONFIG_MERGE_PIPELINE_LIMIT, 0, "merge-sort-pipeline-limit", "MERGE_SORT_PIPELINE_LIMIT", "", Config::INTEGER,
+         "Max number of outstanding sorted runs before merging", 32, false)
         (CONFIG_NETWORK_BUFFER, 'n', "network-buffer", "NETWORK_BUFFER", "", Config::INTEGER,
                 "Size of memory used for network buffers (Mb)", 512, false)
         (CONFIG_ASYNC_IO_BUFFER, 0, "async-io-buffer", "ASYNC_IO_BUFFER", "", Config::INTEGER,
@@ -189,6 +193,10 @@ void initConfig(int argc, char* argv[])
         (CONFIG_MPI_IF, 0, "mpi-if", "MPI_IF", "", Config::STRING, "Network interface to use for MPI traffic", string(""), false)
         (CONFIG_MPI_TYPE, 0, "mpi-type", "MPI_TYPE", "", Config::STRING, "MPI installation type [mpich2-1.2 | mpich2-1.4].", DEFAULT_MPI_TYPE(), false)
         (CONFIG_CATALOG_RECONNECT_TRIES, 0, "catalog-reconnect-tries", "CONFIG_CATALOG_RECONNECT_TRIES", "", Config::INTEGER, "Count of tries of catalog reconnection", 5, false)
+        (CONFIG_QUERY_MAX_SIZE, 0, "query-max-size", "CONFIG_QUERY_MAX_SIZE", "", Config::INTEGER, "Max number of bytes in query string", 16 * 1024 * 1024, false)
+        (CONFIG_MAX_REQUESTS, 0, "requests", "MAX_REQUESTS", "", Config::INTEGER,
+         "Max. number of client query requests queued for execution. Any requests in excess of the limit are returned to the client with an error.", 1000, false)
+        (CONFIG_ENABLE_CATALOG_UPGRADE, 0, "enable-catalog-upgrade", "ENABLE_CATALOG_UPGRADE", "", Config::BOOLEAN, "Set to true to enable the automatic upgrade of SciDB catalog", false, false)
         ;
 
     cfg->addHook(configHook);

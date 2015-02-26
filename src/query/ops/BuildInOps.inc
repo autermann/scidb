@@ -46,6 +46,10 @@ LOGICAL_BUILDIN_OPERATOR(LogicalLoad);
 LOGICAL_BUILDIN_OPERATOR(LogicalProject);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalProject);
 
+// Cumulate
+LOGICAL_BUILDIN_OPERATOR(LogicalCumulate);
+PHYSICAL_BUILDIN_OPERATOR(PhysicalCumulate);
+
 // Scan
 LOGICAL_BUILDIN_OPERATOR(LogicalScan);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalScan);
@@ -350,4 +354,8 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalVariableWindow);
 // splitarraytest
 LOGICAL_BUILDIN_OPERATOR(LogicalSplitArrayTest);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalSplitArrayTest);
+
+// consume
+LOGICAL_BUILDIN_OPERATOR(LogicalConsume);
+PHYSICAL_BUILDIN_OPERATOR(PhysicalConsume);
 

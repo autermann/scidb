@@ -29,6 +29,7 @@
  */
 
 #include "UnpackArray.h"
+#include "query/Operator.h"
 
 namespace scidb {
 
@@ -249,21 +250,18 @@ namespace scidb {
 
     Coordinate UnpackArray::in2out(Coordinates const& inPos)  const
     {
-        Coordinate offset = 0;
-        for (size_t i = 0, n = dims.size(); i < n; i++) {
-            offset *= dims[i].getLength();
-            offset += inPos[i] - dims[i].getStart();
+        uint64_t cellNo = PhysicalBoundaries::getCellNumber(inPos, dims);
+        if (cellNo >= INFINITE_LENGTH)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal inconsistency reshaping coordinates";
         }
-        return offset;
+        return cellNo;
     }
 
     void UnpackArray::out2in(Coordinate outPos, Coordinates& inPos)  const
     {
-        for (int i = dims.size(); --i >= 0;) {
-            inPos[i] = dims[i].getStart() + (outPos % dims[i].getLength());
-            outPos /= dims[i].getLength();
-        }
-        assert(outPos == 0);
+        uint64_t offset = outPos;
+        inPos = PhysicalBoundaries::getCoordinates(offset, dims);
     }
 
     DelegateChunk* UnpackArray::createChunk(DelegateArrayIterator const* iterator, AttributeID id) const

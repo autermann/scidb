@@ -19,6 +19,5 @@
 # END_COPYRIGHT
 ########################################
 
-add_subdirectory(api)
-add_subdirectory(user)
-
+add_subdirectory(api EXCLUDE_FROM_ALL)
+add_subdirectory(user EXCLUDE_FROM_ALL)

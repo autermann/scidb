@@ -51,7 +51,7 @@
 *> \ingroup aux_blas
 *
 *  =====================================================================
-      LOGICAL FUNCTION LSAME(CA,CB)
+      LOGICAL FUNCTION SCIDB_LSAME(CA,CB)
 *
 *  -- Reference BLAS level1 routine (version 3.1) --
 *  -- Reference BLAS is a software package provided by Univ. of Tennessee,    --
@@ -73,8 +73,8 @@
 *
 *     Test if the characters are equal
 *
-      LSAME = CA .EQ. CB
-      IF (LSAME) RETURN
+      SCIDB_LSAME = CA .EQ. CB
+      IF (SCIDB_LSAME) RETURN
 *
 *     Now test for equivalence if both characters are alphabetic.
 *
@@ -116,7 +116,7 @@
           IF (INTA.GE.225 .AND. INTA.LE.250) INTA = INTA - 32
           IF (INTB.GE.225 .AND. INTB.LE.250) INTB = INTB - 32
       END IF
-      LSAME = INTA .EQ. INTB
+      SCIDB_LSAME = INTA .EQ. INTB
 *
 *     RETURN
 *

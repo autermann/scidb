@@ -88,10 +88,6 @@ namespace scidb
         {
             return boost::shared_ptr<DBArray>(new DBArray(desc, query));
         }
-        static boost::shared_ptr<DBArray> newDBArray(ArrayID id, const boost::shared_ptr<Query>& query)
-        {
-            return boost::shared_ptr<DBArray>(new DBArray(id, query));
-        }
         static boost::shared_ptr<DBArray> newDBArray(std::string const& name, const boost::shared_ptr<Query>& query)
         {
             return boost::shared_ptr<DBArray>(new DBArray(name, query));
@@ -99,7 +95,6 @@ namespace scidb
 
       private:
         DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query);
-        DBArray(ArrayID id, const boost::shared_ptr<Query>& query);
         DBArray(std::string const& name, const boost::shared_ptr<Query>& query);
         DBArray();
         DBArray(const DBArray& other);

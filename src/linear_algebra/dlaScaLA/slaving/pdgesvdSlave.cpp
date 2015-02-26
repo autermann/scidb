@@ -30,7 +30,6 @@
 #include <boost/scoped_array.hpp>
 
 // SciDB
-#include <scalapackUtil/reformat.hpp>
 
 // local
 #include "pdgesvdSlave.hpp"
@@ -48,11 +47,11 @@ enum dbgdummy { DBG=0 };
 //
 // forward decls
 //
-sl_int_t            pdgesvdSlave2(const sl_int_t ICTXT,  PdgesvdArgs args,
+slpp::int_t            pdgesvdSlave2(const slpp::int_t ICTXT,  PdgesvdArgs args,
                                   void* bufs[], size_t sizes[], unsigned count);
-scidb::PdgesvdArgs  pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t NPCOL,
-                                                       sl_int_t MYPROW, sl_int_t MYPCOL, sl_int_t MYPNUM,
-                                      sl_int_t order);
+scidb::PdgesvdArgs  pdgesvdGenTestArgs(slpp::int_t ICTXT, slpp::int_t NPROW, slpp::int_t NPCOL,
+                                       slpp::int_t MYPROW, slpp::int_t MYPCOL, slpp::int_t MYPNUM,
+                                       slpp::int_t order);
 
 
 /// TODO: I think there is a version of this in scalapackTools.h to use instead
@@ -64,7 +63,7 @@ scidb::PdgesvdArgs  pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t 
 /// become a method on ScaLAPACK operator.
 ///
 ///
-static void getSlInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, sl_int_t& MYPROW, sl_int_t& MYPCOL, sl_int_t& MYPNUM)
+static void getSlInfo(const slpp::int_t ICTXT, slpp::int_t& NPROW, slpp::int_t& NPCOL, slpp::int_t& MYPROW, slpp::int_t& MYPCOL, slpp::int_t& MYPNUM)
 {
     if(DBG) std::cerr << "getSlInfo: ICTXT: " << ICTXT << std::endl;
 
@@ -94,7 +93,7 @@ static void getSlInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, sl
 ///
 enum dummy {BUF_A=1, BUF_S, BUF_U, BUF_VT, NUM_BUFS };  // used by both pdgesvdSlave and ...Slave2
 
-sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOverwriteArgs)
+slpp::int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOverwriteArgs)
 {
     // TODO:  exit()S and SLAVE_ASSERT()s need to use MPI_abort() / blacs_abort() instead
 
@@ -125,7 +124,7 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOv
     // take a COPY of args, because we may have to overwrite it (for debug) when overwriteArgs is set
     // NOTE bufs[BUF_ARGS] should not be referenced after this point
     if(debugOverwriteArgs) {
-        sl_int_t NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM;
+        slpp::int_t NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM;
         getSlInfo(ICTXT/*in*/, NPROW/*in*/, NPCOL/*in*/, MYPROW/*out*/, MYPCOL/*out*/, MYPNUM/*out*/);
 
         size_t matrixCells = sizes[1]/sizeof(double);
@@ -145,10 +144,10 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOv
 /// up into the "mpi_slave_xxx" files, the existing pdgesvdSlave() routine will create the context
 /// and then call this routine.
 ///
-sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], size_t sizes[], unsigned count)
+slpp::int_t pdgesvdSlave2(const slpp::int_t ICTXT, PdgesvdArgs args, void* bufs[], size_t sizes[], unsigned count)
 {
     // find out where I am in the scalapack grid
-    sl_int_t NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM;
+    slpp::int_t NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM;
     getSlInfo(ICTXT/*in*/, NPROW/*in*/, NPCOL/*in*/, MYPROW/*out*/, MYPCOL/*out*/, MYPNUM/*out*/);
 
     if(NPROW != args.NPROW || NPCOL != args.NPCOL ||
@@ -165,26 +164,26 @@ sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], siz
     }
 
     // setup MB,NB
-    const sl_int_t& M = args.A.DESC.M ;
-    const sl_int_t& N = args.A.DESC.N ;
-    const sl_int_t& MB = args.A.DESC.MB ;
-    const sl_int_t& NB = args.A.DESC.NB ;
+    const slpp::int_t& M = args.A.DESC.M ;
+    const slpp::int_t& N = args.A.DESC.N ;
+    const slpp::int_t& MB = args.A.DESC.MB ;
+    const slpp::int_t& NB = args.A.DESC.NB ;
 
-    const sl_int_t& LLD_A = args.A.DESC.LLD ;
-    const sl_int_t one = 1 ;
-    const sl_int_t  LTD_A = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_A*/0, NPCOL )); 
+    const slpp::int_t& LLD_A = args.A.DESC.LLD ;
+    const slpp::int_t one = 1 ;
+    const slpp::int_t  LTD_A = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_A*/0, NPCOL ));
 
-    const sl_int_t& MP = LLD_A ;
-    const sl_int_t& NQ = LTD_A ;
+    const slpp::int_t& MP = LLD_A ;
+    const slpp::int_t& NQ = LTD_A ;
 
 
     // size check A, S, U, VT
-    sl_int_t SIZE_A = MP * NQ ;
-    sl_int_t SIZE_S = std::min(M, N);
-    sl_int_t size_p = std::max(one, numroc_( SIZE_S, MB, MYPROW, /*RSRC_A*/0, NPROW ));
-    sl_int_t size_q = std::max(one, numroc_( SIZE_S, NB, MYPCOL, /*RSRC_A*/0, NPCOL ));
-    sl_int_t SIZE_U = MP * size_q;
-    sl_int_t SIZE_VT= size_p * NQ;
+    slpp::int_t SIZE_A = MP * NQ ;
+    slpp::int_t SIZE_S = std::min(M, N);
+    slpp::int_t size_p = std::max(one, numroc_( SIZE_S, MB, MYPROW, /*RSRC_A*/0, NPROW ));
+    slpp::int_t size_q = std::max(one, numroc_( SIZE_S, NB, MYPCOL, /*RSRC_A*/0, NPCOL ));
+    slpp::int_t SIZE_U = MP * size_q;
+    slpp::int_t SIZE_VT= size_p * NQ;
 
     if(DBG) {
         std::cerr << "##################################################" << std::endl;
@@ -266,7 +265,7 @@ sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], siz
 
 
     if(DBG) std::cerr << "pdgesvdSlave calling PDGESVD to get work size" << std:: endl;
-    sl_int_t INFO = 0;
+    slpp::int_t INFO = 0;
     double LWORK_DOUBLE;
     pdgesvd_(args.jobU, args.jobVT, args.M, args.N,
              A,  args.A.I,  args.A.J,  args.A.DESC, S,
@@ -274,7 +273,7 @@ sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], siz
              VT, args.VT.I, args.VT.J, args.VT.DESC,
              &LWORK_DOUBLE, -1, INFO);
 
-    sl_int_t LWORK = int(LWORK_DOUBLE); // get the cast from SVDPhysical.cpp
+    slpp::int_t LWORK = int(LWORK_DOUBLE); // get the cast from SVDPhysical.cpp
     // ALLOCATE an array WORK size LWORK
     boost::scoped_array<double> WORKtmp(new double[LWORK]);
     double* WORK = WORKtmp.get();
@@ -291,7 +290,7 @@ sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], siz
              WORK, LWORK, INFO);
 
 
-    sl_int_t numToPrintAtStart=4 ;
+    slpp::int_t numToPrintAtStart=4 ;
     if (MYPNUM==0 && DBG) {
         int ii; // used in 2nd loop
         for(ii=0; ii < std::min(SIZE_S, numToPrintAtStart); ii++) {
@@ -299,7 +298,7 @@ sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], siz
         }
         // now skip to numToPrintAtStart before the end, (without repeating) and print to the end
         // to see if the test cases are producing zero eigenvalues (don't want that)
-        sl_int_t numToPrintAtEnd=4;
+        slpp::int_t numToPrintAtEnd=4;
         for(int ii=std::max(ii, SIZE_S-numToPrintAtEnd); ii < SIZE_S; ii++) {
             std::cerr << "pdgesvdSlave: S["<<ii<<"] = " << S[ii] << std::endl;
         }
@@ -337,9 +336,9 @@ sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], siz
 /// It makes up parameters for a pdgesvd call that are appropriate to the
 /// processor grid and order of matrix being decomposed
 ///
-scidb::PdgesvdArgs pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t NPCOL,
-                                                      sl_int_t MYPROW, sl_int_t MYPCOL, sl_int_t MYPNUM,
-                                      sl_int_t order)
+scidb::PdgesvdArgs pdgesvdGenTestArgs(slpp::int_t ICTXT, slpp::int_t NPROW, slpp::int_t NPCOL,
+                                      slpp::int_t MYPROW, slpp::int_t MYPCOL, slpp::int_t MYPNUM,
+                                      slpp::int_t order)
 {
     scidb::PdgesvdArgs result;
 
@@ -347,7 +346,10 @@ scidb::PdgesvdArgs pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t N
     const slpp::int_t M=order;
     const slpp::int_t N=order;
     const slpp::int_t MIN_MN=order;
-    const slpp::int_t BLKSZ=32;   // NOCHECKIN
+    const slpp::int_t BLKSZ=slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE; // we are making up an array descriptor, not receiving one
+                                                                  // as is normal for functions in a xxxxSlave.cpp file.  It is only because
+                                                                  // its a test routine that SCALAPACK_EFFICIENT_BLOCK_SIZE is referenced here
+                                                                  // Normally it is only used at the xxxxxPhysical.cpp operator level.
     const slpp::int_t one = 1 ;
     const char jobU = 'V';
     const char jobVT = 'V';
@@ -360,7 +362,7 @@ scidb::PdgesvdArgs pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t N
     slpp::int_t LLD_VT = std::max(one, numroc_( order, BLKSZ, MYPROW, RSRC, NPROW ));
 
     // WARNING -- note I never checked INFO from descinits !!
-    sl_int_t INFO = 0;
+    slpp::int_t INFO = 0;
 
     slpp::desc_t DESC_A;
     descinit_(DESC_A, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_A, INFO);

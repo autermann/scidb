@@ -386,9 +386,9 @@ namespace scidb
          * @param query performing the operation
          * @return the pointer to the chunk.
          */
-        virtual PersistentChunk* readChunk(ArrayDesc const& desc,
-                                           StorageAddress const& addr,
-                                           const boost::shared_ptr<Query>& query) = 0;
+        virtual boost::shared_ptr<PersistentChunk> readChunk(ArrayDesc const& desc,
+                                                             StorageAddress const& addr,
+                                                             const boost::shared_ptr<Query>& query) = 0;
 
         /**
          * Load chunk body from the storage.
@@ -396,6 +396,13 @@ namespace scidb
          * @param chunk loaded chunk
          */
         virtual void loadChunk(ArrayDesc const& desc, PersistentChunk* chunk) = 0;
+
+        /**
+         * Indicate to the storage module that a chunk is no
+         * longer in use and the resources it requires can be freed
+         * @param chunk to free
+         */
+        virtual void freeChunk(PersistentChunk* chunk) = 0;
 
         /**
          * Get latch for the specified chunk
@@ -411,10 +418,10 @@ namespace scidb
          * @param query performing the operation
          * @throw SystemException if the chunk with such address already exists
          */
-        virtual PersistentChunk* createChunk(ArrayDesc const& desc,
-                                             StorageAddress const& addr,
-                                             int compressionMethod,
-                                             const boost::shared_ptr<Query>& query) = 0;
+        virtual boost::shared_ptr<PersistentChunk> createChunk(ArrayDesc const& desc,
+                                                               StorageAddress const& addr,
+                                                               int compressionMethod,
+                                                               const boost::shared_ptr<Query>& query) = 0;
 
         /**
          * Clone a persistent chunk; create a chunk in the target array which acts as a "pointer" to some chunk in the source array.

@@ -29,6 +29,7 @@
  */
 
 #include <query/Operator.h>
+#include <array/SortArray.h>
 #include <system/Exceptions.h>
 
 namespace scidb {
@@ -77,7 +78,7 @@ public:
         _globalOperatorName = std::pair<std::string, std::string>("sort2", "physicalSort2");
 	}
 
-	std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
 	{
 		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
 		res.push_back(PARAM_IN_ATTRIBUTE_NAME("void"));
@@ -85,59 +86,34 @@ public:
 		res.push_back(END_OF_VARIES_PARAMS());
 		return res;
 	}
-
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    
+        ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
 	{
-        //Let's always call the output dimension "n". Because the input dimension no longer has any meaning!
-        //It could've been "time", or "latitude", or "price" but after the sort it has no value.
 
-        //Right now we always return an unbounded arary. You can use subarray to bound it if you need to
-        //(but you should not need to very often!!). TODO: if we return bounded arrays, some logic inside
-        //MergeSortArray gives bad results. We should fix this some day.
-
-        //As far as chunk sizes, they can be a pain! So we allow the user to specify an optional chunk size
-        //as part of the sort op.
-
-        //If the user does not specify a chunk size, we'll use MIN( max_logical_size, 1 million).
-        assert(schemas.size() >= 1);
-        ArrayDesc const& schema = schemas[0];
-        size_t chunkSize = 0;
-        for(size_t i =0; i<_parameters.size(); i++)
-        {
-            if(_parameters[i]->getParamType()==PARAM_LOGICAL_EXPRESSION)
+            //As far as chunk sizes, they can be a pain! So we allow the user to specify an optional chunk size
+            //as part of the sort op.
+            
+            assert(schemas.size() >= 1);
+            ArrayDesc const& schema = schemas[0];
+            size_t chunkSize = 0;
+            for(size_t i =0; i<_parameters.size(); i++)
             {
-                chunkSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
-                                             query, TID_INT64).getInt64();
-                if(chunkSize <= 0)
+                if(_parameters[i]->getParamType()==PARAM_LOGICAL_EXPRESSION)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE);
+                    chunkSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
+                                         query, TID_INT64).getInt64();
+                    if(chunkSize <= 0)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE);
+                    }
+                    break;
                 }
-                break;
             }
-        }
 
-        size_t inputSchemaSize = schema.getSize();
-        if (chunkSize == 0)
-        {   //not set by user
+            // Use a SortArray object to build the schema
+            SortArray sorter(schema, chunkSize);
 
-            //1M is a good/recommended chunk size for most one-dimensional arrays -- unless you are using
-            //large strings or UDTs
-            chunkSize = 1000000;
-
-            //If there's no way that the input has one million elements - reduce the chunk size further.
-            //This is ONLY done for aesthetic purposes - don't want to see one million "()" on the screen.
-            //In fact, sometimes it can become a liability...
-            if(inputSchemaSize<chunkSize)
-            {
-                //make chunk size at least 1 to avoid errors
-                chunkSize = std::max<size_t>(inputSchemaSize,1);
-            }
-        }
-
-        Dimensions newDims(1);
-        newDims[0] = DimensionDesc("n", 0, 0, MAX_COORDINATE, MAX_COORDINATE, chunkSize, 0);
-
-        return ArrayDesc(schema.getName(), addEmptyTagAttribute(schema.getAttributes()), newDims);
+            return sorter.getOutputArrayDesc();
 	}
 };
 

@@ -54,11 +54,11 @@ bool startsWith(const std::string& left, const std::string& right)
 
 MpiManager::MpiManager()
   : _isReady(false),
-    _mpiResourceTimeout(scidb::getLivenessTimeout())
+    _mpiResourceTimeout(MPI_RESOURCE_TIMEOUT_SEC)
 {
-    const time_t MIN_CLEANUP_PERIOD = 5; //sec
+    const time_t MIN_CLEANUP_PERIOD_SEC = 5;
     scidb::Scheduler::Work workItem = boost::bind(&MpiManager::initiateCleanup);
-    _cleanupScheduler = scidb::getScheduler(workItem, MIN_CLEANUP_PERIOD);
+    _cleanupScheduler = scidb::getScheduler(workItem, MIN_CLEANUP_PERIOD_SEC);
 
     string mpiTypeStr = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_TYPE);
     assert(!mpiTypeStr.empty());
@@ -191,20 +191,26 @@ bool MpiManager::checkForError(scidb::QueryID queryId, double startTime, double 
     return (!mpi::hasExpired(startTime, timeout));
 }
 
-boost::shared_ptr<MpiOperatorContext> MpiManager::checkAndSetCtx(scidb::QueryID queryId,
-                                                                 const boost::shared_ptr<MpiOperatorContext>& ctx)
+boost::shared_ptr<MpiOperatorContext>
+MpiManager::checkAndSetCtx(const boost::shared_ptr<Query>& query,
+                           const boost::shared_ptr<MpiOperatorContext>& ctx)
 {
+    const scidb::QueryID queryId = query->getQueryID();
     LOG4CXX_TRACE(logger, "MpiManager::checkAndSetCtx: queryID="<<queryId << ", ctx=" << ctx.get());
     ScopedMutexLock lock(_mutex);
     if (!_isReady) {
+        assert(ctx);
         initMpi();
     }
-    // XXX TODO: Currently we cannot run more than query which use scalapack concurrently
-    //           The issue is that blacs_gridinfo_() from src/linear_algebra/dlaScaLA/scalapackEmulation/blacs_info_fake.c
+    // XXX TODO: Currently we cannot run more than one query which use scalapack concurrently.
+    //           The issue is that scidb_blacs_gridinfo_() from src/linear_algebra/dlaScaLA/scalapackEmulation/blacs_info_fake.c
     //           uses a set of static variables. Note though that cascading scalapack operators is allowed because
     //           each scalapack operator is followed by a blocking SG and the operator tree is executed sequentially
-    //           in a depth-first order. The other sources of concurrency such as ParrallelAccumulatorArray, Physica(Redimension)Store
+    //           in a depth-first order. The other sources of concurrency such as
+    //           ParrallelAccumulatorArray, Physical(Redimension)Store
     //           should not be a problem for the same reason (of blocking SG).
+    //           This also implies that MpiOperatorContext must be inserted by the operator first (not by the slave messages).
+    //           Hence, assert(ctx) above.
     const double start = mpi::getTimeInSecs();
     const double timeout(_mpiResourceTimeout);
     bool waitResult(true);
@@ -218,8 +224,38 @@ boost::shared_ptr<MpiOperatorContext> MpiManager::checkAndSetCtx(scidb::QueryID 
            boost::bind(&MpiManager::checkForError, queryId, start, timeout);
         waitResult = _event.wait(_mutex, ec);
     }
+    return checkAndSetCtxAsync(query, ctx);
+}
+
+boost::shared_ptr<MpiOperatorContext>
+MpiManager::checkAndSetCtxAsync(const boost::shared_ptr<Query>& query,
+                                const boost::shared_ptr<MpiOperatorContext>& ctx)
+{
+    const scidb::QueryID queryId = query->getQueryID();
+
+    LOG4CXX_TRACE(logger, "MpiManager::checkAndSetCtxAsync: queryID="<<queryId << ", ctx=" << ctx.get());
+    ScopedMutexLock lock(_mutex);
+
+    query->validate();
+
     std::pair<ContextMap::iterator, bool> res = _ctxMap.insert(ContextMap::value_type(queryId, ctx));
-    if (res.second) {
+    if (res.second) { // did it get inserted ?
+        assert((*res.first).second == ctx);
+        try {
+            if (!ctx) {
+                assert(false);
+                throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+                       << "MpiManager::checkAndSetCtxAsync");
+            }
+            boost::shared_ptr<MpiErrorHandler> eh(new MpiErrorHandler(ctx));
+            Query::Finalizer f = boost::bind(&MpiErrorHandler::finalize, eh, _1);
+            query->pushFinalizer(f);
+            query->pushErrorHandler(eh);
+        } catch (const scidb::Exception& e) {
+            removeCtx(queryId);
+            cleanup();
+            throw;
+        }
         cleanup();
     }
     return (*res.first).second;
@@ -230,6 +266,164 @@ bool MpiManager::removeCtx(scidb::QueryID queryId)
     LOG4CXX_DEBUG(logger, "MpiManager::removeCtx: queryID="<<queryId);
     ScopedMutexLock lock(_mutex);
     return (_ctxMap.erase(queryId) > 0);
+}
+
+void MpiOperatorContext::setSlave(const boost::shared_ptr<MpiSlaveProxy>& slave)
+{
+    setSlaveInternal(slave->getLaunchId(), slave);
+}
+
+void
+MpiOperatorContext::setSlaveInternal(uint64_t launchId,
+                                     const boost::shared_ptr<MpiSlaveProxy>& slave)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = getIter(launchId);
+    iter->second->_slave = slave;
+}
+
+void
+MpiOperatorContext::setLauncherInternal(uint64_t launchId,
+                                        const boost::shared_ptr<MpiLauncher>& launcher)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = getIter(launchId);
+    iter->second->_launcher = launcher;
+}
+
+bool
+MpiOperatorContext::addSharedMemoryIpc(uint64_t launchId,
+                                       const boost::shared_ptr<SharedMemoryIpc>& ipc)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = getIter(launchId);
+    bool isInserted = iter->second->_shmIpcs.insert(ipc).second;
+    assert(isInserted);
+    return isInserted;
+}
+
+boost::shared_ptr<MpiSlaveProxy>
+MpiOperatorContext::getSlave(uint64_t launchId)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = _launches.find(launchId);
+    if (iter == _launches.end()) {
+        return boost::shared_ptr<MpiSlaveProxy>();
+    }
+    return iter->second->_slave;
+}
+
+boost::shared_ptr<MpiLauncher>
+MpiOperatorContext::getLauncher(uint64_t launchId)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = _launches.find(launchId);
+    if (iter == _launches.end()) {
+        return boost::shared_ptr<MpiLauncher>();
+    }
+    return iter->second->_launcher;
+}
+
+boost::shared_ptr<SharedMemoryIpc>
+MpiOperatorContext::getSharedMemoryIpc(uint64_t launchId, const std::string& name)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = _launches.find(launchId);
+    if (iter == _launches.end()) {
+        return boost::shared_ptr<SharedMemoryIpc>();
+    }
+    boost::shared_ptr<SharedMemoryIpc> key(new SharedMemory(name));
+    LaunchInfo::ShmIpcSet::iterator ipcIter = iter->second->_shmIpcs.find(key);
+    if (ipcIter == iter->second->_shmIpcs.end()) {
+        return boost::shared_ptr<SharedMemoryIpc>();
+    }
+    return (*ipcIter);
+}
+
+boost::shared_ptr<scidb::ClientMessageDescription>
+MpiOperatorContext::popMsg(uint64_t launchId,
+                           LaunchErrorChecker& errChecker)
+{
+    ScopedMutexLock lock(_mutex);
+    LaunchMap::iterator iter = _launches.find(launchId);
+    while ((iter == _launches.end()) ||
+           (!iter->second->_msg)) {
+        Event::ErrorChecker ec =
+        boost::bind(&MpiOperatorContext::checkForError, this, launchId, errChecker);
+        _event.wait(_mutex, ec);
+        iter = _launches.find(launchId);
+    }
+    boost::shared_ptr<scidb::ClientMessageDescription> msg;
+    (iter->second->_msg).swap(msg);
+    return msg;
+}
+
+void
+MpiOperatorContext::pushMsg(uint64_t launchId,
+                            const boost::shared_ptr<scidb::ClientMessageDescription>& msg)
+{
+    ScopedMutexLock lock(_mutex);
+    const bool dontUpdateLastInUse = false;
+    LaunchMap::iterator iter = getIter(launchId, dontUpdateLastInUse);
+    iter->second->_msg = msg;
+
+    _event.signal();
+}
+
+void MpiOperatorContext::clear(LaunchCleaner& cleaner)
+{
+    if (cleaner) {
+        for (LaunchMap::iterator iter = _launches.begin();
+             iter != _launches.end(); ++iter) {
+            cleaner(iter->first, iter->second.get());
+        }
+    }
+    _launches.clear();
+}
+
+bool
+MpiOperatorContext::checkForError(uint64_t launchId, LaunchErrorChecker& errChecker)
+{
+    Query::validateQueryPtr(_query.lock());
+
+    LaunchMap::iterator iter = _launches.find(launchId);
+    if (iter != _launches.end() && iter->second->_msg) {
+        // the message is ready, we must have missed the signal on timeout
+        return false;
+    }
+    if (errChecker && !errChecker(launchId, this)) {
+        return false;
+    }
+    return true;
+}
+
+MpiOperatorContext::LaunchMap::iterator
+MpiOperatorContext::getIter(uint64_t launchId, bool updateLastLaunchId)
+{
+    LaunchMap::iterator iter = _launches.find(launchId);
+    if (iter == _launches.end()) {
+
+        if (_lastLaunchIdInUse >= launchId) {
+            // When we are populating a new context from the operator,
+            // the last launch ID in use is not allowed to decrease.
+            // The contract is that the launch IDs must strictly increase.
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "MPI-based operator context does not allow for decreasing launch IDs");
+        }
+        if (_launches.size() > 1) {
+            // each launch must be serialized by the coordinator,
+            // workers also process launches serially, so at any moment
+            // there can be messages from at most 2 launches (slaves).
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "MPI-based operator context is corrupted");
+        }
+        boost::shared_ptr<LaunchInfo> linfo(new LaunchInfo);
+        iter = _launches.insert(make_pair(launchId, linfo)).first;
+    }
+    if (updateLastLaunchId) {
+        _lastLaunchIdInUse = std::max(_lastLaunchIdInUse,launchId);
+    }
+    return iter;
 }
 
 MessagePtr MpiMessageHandler::createMpiSlaveCommand(MessageID id)
@@ -277,23 +471,38 @@ void MpiMessageHandler::processMessage(uint64_t launchId,
                                        const boost::shared_ptr<scidb::Query>& query)
 {
     try {
+        boost::shared_ptr<MpiOperatorContext> emptyCtx;
         boost::shared_ptr<MpiOperatorContext> ctx =
-            MpiManager::getInstance()->checkAndSetCtx(query->getQueryID(),
-                                                      boost::shared_ptr<MpiOperatorContext>());
-        query->validate();
+            MpiManager::getInstance()->checkAndSetCtxAsync(query, emptyCtx);
+        assert(ctx);
 
         if (!ctx) {
+            // the context did not exist before this call
+            // XXX TODO: Currently, we do not allow more than one MPI query to execute concurrently.
+            //           The serialization is implemented in MpiManager::checkAndSetCtx() called by MPIPhysical.
+            //           That method can block for a long time; therefore, we must not call it
+            //           when processing a client message (on the network thread).
+            //           So, to still guarantee the serialized query execution,
+            //           MPIPhysical::launchSlaves() inserts a barrier which guarantees
+            //           that all instances insert a new MpiOperatorContext before any slaves are spawned
+            //           (and any slave message are sent). Here, we error out if the context is not already set.
+            //           When the serialized access restriction is lifted, we should be able to remove the barrier
+            //           and allow MpiMessageHandler::processMessage() insert a new context if it does not exist.
+            assert(false);
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                    << "MPI-based operator context not found");
         }
-        LOG4CXX_DEBUG(logger, "MpiManager::processMessage: queryID="<< query->getQueryID()
+        ctx->pushMsg(launchId, cliMsg);
+
+        LOG4CXX_DEBUG(logger, "MpiMessageHandler::processMessage: queryID="<< query->getQueryID()
                       << ", ctx = " << ctx.get()
                       << ", launchId = " << launchId
                       << ", messageType = " << cliMsg->getMessageType()
                       << ", queryID = " << cliMsg->getQueryId());
-        ctx->pushMsg(launchId, cliMsg);
-    } catch (const scidb::Exception& e) {
-        LOG4CXX_ERROR(logger, "MpiManager::processMessage:"
+    }
+    catch (const scidb::Exception& e)
+    {
+        LOG4CXX_ERROR(logger, "MpiMessageHandler::processMessage:"
                       " Error occurred in slave message handler: "
                       << e.what()
                       << ", messageType = " << cliMsg->getMessageType()
@@ -318,8 +527,11 @@ void MpiErrorHandler::finalize(const boost::shared_ptr<Query>& query)
 {
     MpiManager::getInstance()->removeCtx(query->getQueryID());
 
-    uint64_t launchId = _ctx->getNextLaunchId()-1;
-    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(launchId);
+    const uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
+
+    LOG4CXX_TRACE(logger, "MpiErrorHandler::finalize: destorying last slave for launch = " << lastIdInUse);
+
+    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(lastIdInUse);
     if (slave) {
         slave->destroy();
     }
@@ -370,11 +582,11 @@ static void getQueryId(std::set<scidb::QueryID>* queryIds,
     LOG4CXX_DEBUG(logger, "Next query ID: "<<q->getQueryID());
 }
 
-void MpiErrorHandler::processLauncherPidFile(const std::string& installPath,
+void MpiErrorHandler::cleanupLauncherPidFile(const std::string& installPath,
                                              const std::string& clusterUuid,
                                              const std::string& fileName)
 {
-    const char *myFuncName = "MpiErrorHandler::processLauncherPidFile";
+    const char *myFuncName = "MpiErrorHandler::cleanupLauncherPidFile";
     std::vector<pid_t> pids;
     if (!mpi::readPids(fileName, pids)) {
         LOG4CXX_WARN(logger, myFuncName << ": cannot read pids for: "<<fileName);
@@ -390,11 +602,11 @@ void MpiErrorHandler::processLauncherPidFile(const std::string& installPath,
     }
 }
 
-void MpiErrorHandler::processSlavePidFile(const std::string& installPath,
+void MpiErrorHandler::cleanupSlavePidFile(const std::string& installPath,
                                           const std::string& clusterUuid,
                                           const std::string& fileName)
 {
-    const char *myFuncName = "MpiErrorHandler::processSlavePidFile";
+    const char *myFuncName = "MpiErrorHandler::cleanupSlavePidFile";
     std::vector<pid_t> pids;
     if (!mpi::readPids(fileName, pids)) {
         LOG4CXX_WARN(logger, myFuncName << ": cannot read pids for: "<<fileName);
@@ -523,9 +735,9 @@ void MpiErrorHandler::cleanAll()
         assert(static_cast<size_t>(n) <= len);
 
         if (fileName.compare(n, len-n, mpi::LAUNCHER_BIN)==0) {
-            processLauncherPidFile(installPath, uuid, pidDirName+"/"+fileName);
+            cleanupLauncherPidFile(installPath, uuid, pidDirName+"/"+fileName);
         } else if (fileName.compare(n, len-n, mpi::SLAVE_BIN)==0) {
-            processSlavePidFile(installPath, uuid, pidDirName+"/"+fileName);
+            cleanupSlavePidFile(installPath, uuid, pidDirName+"/"+fileName);
         }
     }
 }
@@ -577,14 +789,16 @@ bool MpiErrorHandler::killProc(const std::string& installPath,
     const char *myFuncName = "MpiErrorHandler::killProc";
     bool doesProcExist = false;
     if (pid > 0) {
-      if (!MpiManager::getInstance()->canRecognizeProc(installPath, clusterUuid, pid)) {
+        if (!MpiManager::getInstance()->canRecognizeProc(installPath, clusterUuid, pid)) {
             return doesProcExist;
         }
-        LOG4CXX_DEBUG(logger, myFuncName << ": killing pid ="<<pid);
+        LOG4CXX_DEBUG(logger, myFuncName << ": killing pid = "<<pid);
     } else {
-        LOG4CXX_DEBUG(logger, myFuncName << ": killing process group pid ="<<pid);
+        LOG4CXX_DEBUG(logger, myFuncName << ": killing process group pid = "<<pid);
     }
     assert(pid != ::getpid());
+    assert(pid != ::getppid());
+    assert(pid > 1 || pid < -1);
 
     // kill proc
     int rc = ::kill(pid, SIGKILL);
@@ -596,11 +810,11 @@ bool MpiErrorHandler::killProc(const std::string& installPath,
                    << "kill" << rc << err << pid);
         }
         if (err!=ESRCH) {
-            LOG4CXX_ERROR(logger, myFuncName << ": failed to kill pid ="
-                          << pid << "err=" << err);
+            LOG4CXX_ERROR(logger, myFuncName << ": failed to kill pid = "
+                          << pid << " err = " << err);
         } else {
-            LOG4CXX_DEBUG(logger, myFuncName << ": failed to kill pid ="
-                          << pid << "err=" << err);
+            LOG4CXX_DEBUG(logger, myFuncName << ": failed to kill pid = "
+                          << pid << " err = " << err);
         }
     }
     doesProcExist = (rc==0 || err!=ESRCH);
@@ -622,10 +836,9 @@ bool MpiManager::canRecognizeProc(const std::string& installPath,
         LOG4CXX_WARN(logger, myFuncName << ": cannot read:" << pidFileName);
         return false;
     }
-    if (procName == mpi::getSlaveBinFile(installPath)) {
-        return true;
-    }
-    if (procName != getLauncherBinFile(installPath) &&
+
+    if (procName != mpi::getSlaveBinFile(installPath) &&
+        procName != getLauncherBinFile(installPath) &&
         procName != getDaemonBinFile(installPath)) {
         return false;
     }

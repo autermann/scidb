@@ -269,9 +269,10 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
         shmIpc.reset();
     }
 
-    // rm pid file
-    scidb::File::remove(pidFile.c_str(), false);
-
+    const string clusterUuid = Cluster::getInstance()->getUuid();
+    MpiErrorHandler::cleanupLauncherPidFile(_installPath,
+                                            clusterUuid,
+                                            pidFile);
     // rm log file
     if (!logger->isTraceEnabled() && !_inError) {
         string logFileName = mpi::getLauncherLogFile(_installPath, _queryId, _launchId);
@@ -281,13 +282,15 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
     if (WIFSIGNALED(status)) {
         LOG4CXX_ERROR(logger, "SciDB MPI launcher (pid="<<pid<<") terminated by signal = "
                       << WTERMSIG(status) << (WCOREDUMP(status)? ", core dumped" : ""));
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPI launcher process";
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
+              << "MPI launcher process";
 
     } else if (WIFEXITED(status)) {
         int rc = WEXITSTATUS(status);
         if (rc != 0) {
             LOG4CXX_ERROR(logger, "SciDB MPI launcher (pid="<<_pid<<") exited with status = " << rc);
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPI launcher process";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
+                  << "MPI launcher process";
 
         } else {
             LOG4CXX_DEBUG(logger, "SciDB MPI launcher (pid="<<_pid<<") exited with status = " << rc);
@@ -295,7 +298,7 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
         }
     }
     throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
-            	 << "MpiLauncher::completeLaunch");
+           << "MpiLauncher::completeLaunch");
 }
 
  void MpiLauncher::handleKillTimeout(boost::shared_ptr<boost::asio::deadline_timer>& killTimer,

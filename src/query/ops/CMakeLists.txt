@@ -80,6 +80,8 @@ set(ops_lib_src
     aggregates/LogicalWindow.cpp
     aggregates/WindowArray.cpp
     aggregates/PhysicalWindow.cpp
+    aggregates/LogicalCumulate.cpp
+    aggregates/PhysicalCumulate.cpp
     join/JoinArray.cpp
     join/MapJoinArray.cpp
     join/LogicalJoin.cpp
@@ -99,7 +101,6 @@ set(ops_lib_src
     sort/PhysicalSort.cpp
     sort2/LogicalSort.cpp
     sort2/PhysicalSort.cpp
-    sort2/MergeSortArray.cpp
     list/ListArrayBuilder.cpp
     list/LogicalList.cpp
     list/PhysicalList.cpp
@@ -209,6 +210,8 @@ set(ops_lib_src
     insert/PhysicalInsert.cpp
     test/splitarray/LogicalSplitArrayTest.cpp
     test/splitarray/PhysicalSplitArrayTest.cpp
+    consume/LogicalConsume.cpp
+    consume/PhysicalConsume.cpp
 )
 
 file(GLOB_RECURSE ops_lib_include "*.h")

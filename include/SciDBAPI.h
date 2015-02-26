@@ -153,6 +153,17 @@ public:
      * Commit and free resources if query already finished.
      */
     virtual void completeQuery(QueryID queryID, void* connection = NULL) const = 0;
+
+#ifndef SCIDB_CLIENT
+    // Server-side function
+    // XXX TODO: the client API must NOT be the same as the server API
+    //           the interfaces must be divorced
+    virtual void retryPrepareQuery(const std::string& queryString,
+                                   bool afl,
+                                   const std::string& programOptions,
+                                   QueryResult& queryResult) const = 0;
+#endif
+
 };
 
 

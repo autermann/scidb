@@ -29,14 +29,6 @@
  *  csv2scidb is a utility tool designed to convert data in .csv formated 
  *  files into the ASCII load format that SciDB can understand
  * 
- *  This code is trash. It is so bad it infects code around it. Every line in 
- *  this file should be inscribed into a tablet made of charcoal and 
- *  blasted into the sun. Every copy should be hunted down and destroyed 
- *  with similar extreme prejudice. And the program's author should be 
- *  told to get into some other line of work, like baking, or dog walking, 
- *  where his capacity to inflict monstrosities like this on the world is 
- *  severely curtailed. 
- * 
  *  TODO: Add support for binary formats, although I suspect that doing so 
  *        will require a re-write. 
  * 

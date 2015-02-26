@@ -330,7 +330,7 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
             query->getCoordinatorID() == COORDINATOR_INSTANCE &&
             !rootNode->isAgg() && !rootNode->isDdl())
         {
-            // RemoteMergedArray uses the Query::_currentResultArray
+            // RemoteMergedArray uses the Query::_currentResultArray as its local (stream) array
             // so make sure to set it in advance
             query->setCurrentResultArray(currentResultArray);
             currentResultArray = RemoteMergedArray::create(currentResultArray->getArrayDesc(),
@@ -353,7 +353,7 @@ void QueryProcessorImpl::notify(boost::shared_ptr<Query> query)
    if (query->getCoordinatorID() != COORDINATOR_INSTANCE)
     {
         QueryID queryID = query->getQueryID();
-        LOG4CXX_DEBUG(logger, "Sending notification in queryID: " << queryID << " to instance #" << query->getCoordinatorID())
+        LOG4CXX_DEBUG(logger, "Sending notification in queryID: " << queryID << " to coord instance #" << query->getCoordinatorID())
         boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtNotify);
         messageDesc->setQueryID(queryID);
         NetworkManager::getInstance()->send(query->getCoordinatorID(), messageDesc);

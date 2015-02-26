@@ -112,6 +112,17 @@ public:
                                 ArrayDesc& outSchema);
 
     virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
+
+private:
+    bool        producesU(std::string& whichMatrix) const {
+                    return whichMatrix == "U" || whichMatrix == "left";
+                }
+    bool        producesVT(std::string& whichMatrix) const {
+                    return whichMatrix == "VT" || whichMatrix == "right";
+                }
+    bool        producesSigma(std::string& whichMatrix) const {
+                    return whichMatrix == "S" || whichMatrix == "SIGMA" || whichMatrix == "values";
+                }
 };
 
 
@@ -154,7 +165,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     bool isParticipatingInScaLAPACK = doBlacsInit(redistributedInputs, query, "SVDPhysical");
     slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
     if (isParticipatingInScaLAPACK) {
-        blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+        scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
         checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "SVDPhysical");
     }
 
@@ -216,7 +227,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     const slpp::int_t RSRC = 0 ;
     const slpp::int_t CSRC = 0 ;
     // LLD(A)
-    slpp::int_t LLD_A = std::max(one, numroc_( M, MB, MYPROW, RSRC, NPROW ));
+    slpp::int_t LLD_A = std::max(one, scidb_numroc_( M, MB, MYPROW, RSRC, NPROW ));
     if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW << std::endl;
     if(DBG) std::cerr << "--> LLD_A = " << LLD_A << std::endl;
 
@@ -224,17 +235,17 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     slpp::int_t LLD_U = LLD_A;
 
     // LLD(VT)
-    slpp::int_t LLD_VT = std::max(one, numroc_( MIN_MN, MB, MYPROW, RSRC, NPROW ));
+    slpp::int_t LLD_VT = std::max(one, scidb_numroc_( MIN_MN, MB, MYPROW, RSRC, NPROW ));
     if(DBG) std::cerr << "MIN_MN:"<<MIN_MN <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW << std::endl;
     if(DBG) std::cerr << "-->LLD_VT = " << LLD_VT << std::endl;
 
     // LTD(A)
-    slpp::int_t LTD_A = std::max(one, numroc_( N, NB, MYPCOL, CSRC, NPCOL ));
+    slpp::int_t LTD_A = std::max(one, scidb_numroc_( N, NB, MYPCOL, CSRC, NPCOL ));
     if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->LTD_A = " << LTD_A << std::endl;
 
      // LTD(U)
-    slpp::int_t LTD_U = std::max(one, numroc_( MIN_MN, NB, MYPCOL, CSRC, NPCOL ));
+    slpp::int_t LTD_U = std::max(one, scidb_numroc_( MIN_MN, NB, MYPCOL, CSRC, NPCOL ));
     if(DBG) std::cerr << "MIN_MN:"<<MIN_MN <<" NB:"<<NB << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->LTD_U = " << LTD_U << std::endl;
 
@@ -243,36 +254,36 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
 
     slpp::desc_t DESC_A;
-    descinit_(DESC_A,  M, N,      MB, NB, 0, 0, ICTXT, LLD_A, descinitINFO);
+    scidb_descinit_(DESC_A,  M, N,      MB, NB, 0, 0, ICTXT, LLD_A, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_A) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_A) failed, INFO " << descinitINFO
                                                                             << " DESC_A " << DESC_A);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI: descinit(DESC_A) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI: scidb_descinit(DESC_A) failed");
     }
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_A=" << DESC_A);
 
     slpp::desc_t DESC_U;
-    descinit_(DESC_U,  M, MIN_MN, MB, NB, 0, 0, ICTXT, LLD_U, descinitINFO);
+    scidb_descinit_(DESC_U,  M, MIN_MN, MB, NB, 0, 0, ICTXT, LLD_U, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_U) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_U) failed, INFO " << descinitINFO
                                                                             << " DESC_U " << DESC_U);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "descinit(DESC_U) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "scidb_descinit(DESC_U) failed");
     }
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_U=" << DESC_U);
 
     slpp::desc_t DESC_VT;
-    descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, ICTXT, LLD_VT, descinitINFO);
+    scidb_descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, ICTXT, LLD_VT, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_VT) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_VT) failed, INFO " << descinitINFO
                                                                             << " DESC_VT " << DESC_VT);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI(): descinit(DESC_VT) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI(): scidb_descinit(DESC_VT) failed");
     }
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_VT=" << DESC_VT);
 
     slpp::desc_t DESC_S; // S is different: global, not distributed, so its LLD(S) == LEN(S) == MIN(M,N)
-    descinit_(DESC_S,  MIN_MN, 1, MB, NB, 0, 0, ICTXT, MIN_MN, descinitINFO);
+    scidb_descinit_(DESC_S,  MIN_MN, 1, MB, NB, 0, 0, ICTXT, MIN_MN, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: descinit(DESC_S) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_S) failed, INFO " << descinitINFO
                                                                             << " DESC_S " << DESC_S);
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPI(): descinit(DESC_S) failed");
     }
@@ -280,7 +291,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
 
     //REFACTOR
     if(DBG) {
-        std::cerr << "#### pdgesvdMaster #########################################" << std::endl;
+        std::cerr << "#### SVDPhysical::invokeMPI #########################################" << std::endl;
         std::cerr << "MB:" << MB << std::endl;
         std::cerr << "NB:" << NB << std::endl;
         std::cerr << "MYPROW:" << MYPROW << std::endl;
@@ -337,16 +348,30 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     double* VT = reinterpret_cast<double*>(shmIpc[BUF_MAT_VT]->get());shmSharedPtr_t VTx(shmIpc[BUF_MAT_VT]);
 
     setInputMatrixToAlgebraDefault(A, nElem[BUF_MAT_A]);
-    extractArrayToScaLAPACK(arrayA, A, DESC_A);
-    setOutputMatrixToAlgebraDefault(S, nElem[BUF_MAT_S]);
-    setOutputMatrixToAlgebraDefault(U, nElem[BUF_MAT_U]);
-    setOutputMatrixToAlgebraDefault(VT, nElem[BUF_MAT_VT]);
+
+    extractArrayToScaLAPACK(arrayA, A, DESC_A, NPROW, NPCOL, MYPROW, MYPCOL);
+
+    // only bother clearing the output matrices we are going to use
+    // TODO: clear only the parts that might not be set by the svd computation,
+    //       but that's a bit of work depending on whether the input matrix is
+    //       over- or under-determined, things like that
+    if (producesSigma(whichMatrix)) {
+        setOutputMatrixToAlgebraDefault(S, nElem[BUF_MAT_S], logger);
+    }
+    if (producesSigma(whichMatrix)) {
+        setOutputMatrixToAlgebraDefault(U, nElem[BUF_MAT_U], logger);
+    }
+    if (producesSigma(whichMatrix)) {
+        setOutputMatrixToAlgebraDefault(VT, nElem[BUF_MAT_VT], logger);
+    }
 
     // debug that the reformat worked correctly:
     if(DBG) {
+        LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI: debug reformatted array start");
         for(int ii=0; ii < SIZE_A; ii++) {
             std::cerr << "("<< MYPROW << "," << MYPCOL << ") A["<<ii<<"] = " << A[ii] << std::endl;
         }
+        LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI: debug reformatted array end");
     }
 
     //
@@ -394,7 +419,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     shared_ptr<Array> result;
     size_t resultShmIpcIndx = shmIpc.size(); // by default, we will not hold onto any ShmIpc for a result,
                                              // modify this if we determine we have output data, below.
-    if (whichMatrix == "S" || whichMatrix == "SIGMA" || whichMatrix == "values")
+    if (producesSigma(whichMatrix))
     {
         if(DBG) std::cerr << "sequential values from 'value/S' memory" << std::endl;
         for(int ii=0; ii < MIN_MN; ii++) {
@@ -475,7 +500,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
         }
     }
 
-    else if (whichMatrix == "U" || whichMatrix == "left")
+    else if (producesU(whichMatrix))
     {
         if(DBG) std::cerr << "--------------------------------------" << std::endl;
         if(DBG) std::cerr << "sequential values from 'left/U' memory" << std::endl;
@@ -522,7 +547,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
         }
     }
 
-    else if (whichMatrix == "VT" || whichMatrix == "right")
+    else if (producesVT(whichMatrix))
     {
         if(DBG) std::cerr << "sequential values from 'right/VT' memory" << std::endl;
         for(int ii=0; ii < SIZE_VT; ii++) {

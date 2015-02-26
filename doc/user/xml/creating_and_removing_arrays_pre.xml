@@ -823,6 +823,8 @@ or
         <primary>AQL</primary>
 
         <secondary>select into</secondary>
+      </indexterm><indexterm>
+        <primary>select statement</primary>
       </indexterm>An array name is its unique identifier. You can use the AQL
     <code> <command>SELECT ... INTO</command> </code> statement to copy an
     array into another array with a new name. <programlisting language="test">SELECT * INTO OlympicWinners FROM winners;

@@ -1,10 +1,7 @@
 --setup
 --start-query-logging
 
---aql drop array intensityFlatShadow
---aql drop array intensityFlat
---aql drop array intensityFlatBadCells
---shell --command " csv2scidb -s 1 -p SNN < ../tests/harness/testcases/data/doc/int4error.csv > ../tests/harness/testcases/data/doc/int4error.scidb " --store
+--shell --command " csv2scidb -s 1 -p SNN < $DOC_DATA/int4error.csv > $DOC_DATA/int4error.scidb " --store
 
 --test
 --aql CREATE ARRAY intensityFlat < exposure:string,elapsedTime:int64,measuredIntensity:int64 null > [i=0:6,1000000,0]
@@ -16,8 +13,8 @@
 --aql SELECT * FROM intensityFlatBadCells
 
 --cleanup
-drop array intensityFlat
-drop array intensityFlatShadow
-drop array intensityFlatBadCells
+--aql drop array intensityFlat
+--aql drop array intensityFlatShadow
+--aql drop array intensityFlatBadCells
 
 --stop-query-logging

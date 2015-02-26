@@ -83,11 +83,7 @@ void MPIPhysical::setQuery(const boost::shared_ptr<Query>& query)
     }
     PhysicalOperator::setQuery(query);
     _ctx = boost::shared_ptr<MpiOperatorContext>(new MpiOperatorContext(query));
-    _ctx = MpiManager::getInstance()->checkAndSetCtx(query->getQueryID(),_ctx);
-    shared_ptr<MpiErrorHandler> eh(new MpiErrorHandler(_ctx));
-    query->pushErrorHandler(eh);
-    Query::Finalizer f = boost::bind(&MpiErrorHandler::finalize, eh, _1);
-    query->pushFinalizer(f);
+    _ctx = MpiManager::getInstance()->checkAndSetCtx(query,_ctx);
 }
 
 bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves)
@@ -95,6 +91,11 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
     LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(query, maxSlaves: " << maxSlaves << ") called.");
 
     assert(maxSlaves <= query->getInstancesCount());
+
+    // This barrier guarantees MPIPhysical::setQuery is called on all instances
+    // before any slaves are launched. It can be removed when we stop serializing MPI queries.
+    syncBarrier(0, query);
+    syncBarrier(1, query);
 
     _launchId = _ctx->getNextLaunchId(); // bump the launch ID by 1
 
@@ -111,12 +112,12 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
         const string& installPath = MpiManager::getInstallPath(membership);
 
         boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(_launchId, query, installPath));
-        _ctx->setSlave(_launchId, slave);
+        _ctx->setSlave(slave);
 
         _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
         if (_mustLaunch) {
             _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
-            _ctx->setLauncher(_launchId, _launcher);
+            _ctx->setLauncher(_launcher);
             std::vector<std::string> args;
             _launcher->launch(args, membership, maxSlaves);
         }
@@ -143,15 +144,14 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
         _ipcName = mpi::getIpcName(installPath, cluster->getUuid(), query->getQueryID(),
                                    cluster->getLocalInstanceId(), _launchId);
 
-        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << "slave started.");
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << " slave started.");
         return true;
     } else {
         assert(query->getCoordinatorID() != COORDINATOR_INSTANCE);
-        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << "slave bypass.");
+        LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << " slave bypass.");
         return false;
     }
 }
-
 
 // XXX TODO: consider returning std::vector<scidb::SharedMemoryPtr>
 // XXX TODO: which would require supporting different types of memory (double, char etc.)

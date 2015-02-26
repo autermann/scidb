@@ -28,6 +28,7 @@ import datetime
 import errno
 import exceptions
 import os
+import signal
 import subprocess
 import sys
 import string
@@ -108,6 +109,13 @@ def parseOptions(filename, section_name):
       printError("config file parser error in file: %s, reason: %s" % (filename, e))
       sys.exit(1)
    return options
+
+# from http://www.chiark.greenend.org.uk/ucgi/~cjwatson/blosxom/2009-07-02
+def subprocess_setup():
+    # Python installs a SIGPIPE handler by default. This is usually not what
+    # non-Python subprocesses expect.
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
 #
 # Execute OS command
 # This is a wrapper method for subprocess.Popen()
@@ -170,6 +178,7 @@ def executeIt(cmdList,
        printDebug("Executing: "+str(cmdList))
 
        p = subprocess.Popen(cmdList,
+                            preexec_fn=subprocess_setup,
                             env=my_env, cwd=cwd,
                             stdin=stdIn, stderr=stdErr, stdout=stdOut,
                             shell=useShell, executable=cmd)
@@ -397,19 +406,19 @@ def cleanup(scidbEnv):
     rm_rf(scidbEnv.build_path+"/*", scidbEnv.args.force)
     os.chdir(curr_dir)
 
-def generateConfigFile(scidbEnv, db_name, data_path, instance_num, no_watchdog, configFile):
+def generateConfigFile(scidbEnv, db_name, host, port, data_path, instance_num, no_watchdog, configFile):
     if os.access(configFile, os.R_OK):
         os.remove(configFile)
     fd = open(configFile,"w")
-    print >>fd, "[%s]"%(db_name)
-    print >>fd, "server-0=localhost,%d"%(instance_num-1)
-    print >>fd, "db_user=%s"  %(db_name)
-    print >>fd, "db_passwd=%s"%(db_name)
+    print >>fd, "[%s]"            %(db_name)
+    print >>fd, "server-0=%s,%d"  %(host,instance_num-1)
+    print >>fd, "db_user=%s"      %(db_name)
+    print >>fd, "db_passwd=%s"    %(db_name)
     print >>fd, "install_root=%s" %(scidbEnv.install_path)
     print >>fd, "pluginsdir=%s"   %(os.path.join(scidbEnv.install_path,"lib/scidb/plugins"))
     print >>fd, "logconf=%s"      %(os.path.join(scidbEnv.install_path,"share/scidb/log1.properties"))
     print >>fd, "base-path=%s"    %(data_path)
-    print >>fd, "base-port=1239"
+    print >>fd, "base-port=%d"    %(port)
     print >>fd, "interface=eth0"
     if no_watchdog:
         print >>fd, "no-watchdog=true"
@@ -423,6 +432,22 @@ def getConfigFile(scidbEnv):
 def getDataPath(configFile, dbName):
     configOpts=parseOptions(configFile, dbName)
     return str(configOpts["base-path"])
+
+def getCoordHost(configFile, dbName):
+    configOpts=parseOptions(configFile, dbName)
+    return str(configOpts["server-0"]).split(",")[0]
+
+def getCoordPort(configFile, dbName):
+    configOpts=parseOptions(configFile, dbName)
+    return str(configOpts["base-port"])
+
+def getDBUser(configFile, dbName):
+    configOpts=parseOptions(configFile, dbName)
+    return str(configOpts["db_user"])
+
+def getDBPasswd(configFile, dbName):
+    configOpts=parseOptions(configFile, dbName)
+    return str(configOpts["db_passwd"])
 
 def install(scidbEnv):
     configFile = getConfigFile(scidbEnv)
@@ -444,6 +469,8 @@ def install(scidbEnv):
     cmdList=["/usr/bin/make", "install"]
     ret = executeIt(cmdList)
 
+    os.chdir(curr_dir)
+
     if scidbEnv.args.light:
         return
 
@@ -458,9 +485,11 @@ def install(scidbEnv):
         data_path=os.path.join(scidbEnv.stage_path, "DB-"+db_name)
         data_path=os.environ.get("SCIDB_DATA_PATH", data_path)
         instance_num=int(os.environ.get("SCIDB_INSTANCE_NUM","4"))
+        port=int(os.environ.get("SCIDB_PORT","1239"))
+        host=os.environ.get("SCIDB_HOST","localhost")
         no_watchdog=os.environ.get("SCIDB_NO_WATCHDOG","false")
         no_watchdog=(no_watchdog in ['true', 'True', 'on', 'On'])
-        generateConfigFile(scidbEnv, db_name, data_path, instance_num, no_watchdog, configFile)
+        generateConfigFile(scidbEnv, db_name, host, port, data_path, instance_num, no_watchdog, configFile)
 
     # Create log4j config files
 
@@ -476,7 +505,7 @@ def install(scidbEnv):
     if platform.startswith("CentOS 6"):
         # boost dependencies should be installed here
 
-        boostLibs  = os.path.join("/opt/scidb",version,"lib","libboost*.so.*")
+        boostLibs  = os.path.join("/opt/scidb",version,"3rdparty","boost","lib","libboost*.so.*")
         libPathTgt = os.path.join(scidbEnv.install_path,"lib")
 
         # Move boost libs into the install location
@@ -551,8 +580,12 @@ def runTests(scidbEnv, testsPath, commands=[]):
     curr_dir=os.getcwd()
 
     configFile = getConfigFile(scidbEnv)
-    db_name=os.environ.get("SCIDB_NAME","mydb")
-    dataPath = getDataPath(configFile, db_name)
+    db_name   = os.environ.get("SCIDB_NAME","mydb")
+    dataPath  = getDataPath(configFile, db_name)
+    coordHost = getCoordHost(configFile, db_name)
+    coordPort = getCoordPort(configFile, db_name)
+    dbUser    = getDBUser(configFile, db_name)
+    dbPasswd  = getDBPasswd(configFile, db_name)
 
     version = getScidbVersion(scidbEnv)
 
@@ -562,9 +595,13 @@ def runTests(scidbEnv, testsPath, commands=[]):
     testBin = os.path.join(scidbEnv.install_path,"bin","scidbtestharness")
 
     cmdList=["export", "SCIDB_NAME=%s"%db_name,";",
+             "export", "SCIDB_HOST=%s"%coordHost,";",
+             "export", "SCIDB_PORT=%s"%coordPort,";",
              "export", "SCIDB_BUILD_PATH=%s"%scidbEnv.build_path,";",
              "export", "SCIDB_INSTALL_PATH=%s"%scidbEnv.install_path,";",
              "export", "SCIDB_DATA_PATH=%s"%dataPath, ";",
+             "export", "SCIDB_DB_USER=%s"%dbUser, ";",
+             "export", "SCIDB_DB_PASSWD=%s"%dbPasswd, ";",
              ".", testEnv, ";"]
     for cmd in commands:
        cmdList.extend([cmd,";"])
@@ -776,6 +813,8 @@ SCIDB_MAKE_JOBS - number of make jobs to spawn (the -j parameter of make)""")
 Re-create SciDB Postgres user. Install and initialize SciDB.
 Environment variables:
 SCIDB_NAME      - the name of the SciDB database to be installed, default = mydb
+SCIDB_HOST      - coordinator host DNS/IP, default = localhost
+SCIDB_PORT      - coordinator TCP port, default = 1239
 SCIDB_PG_USER   - OS user under which the Postgres DB is running, default = postgres
 SCIDB_DATA_PATH - the common directory path prefix used to create SciDB instance directories (aka base-path).
                   It is overidden by the command arguments, default is $SCIDB_BUILD_PATH/DB-$SCIDB_NAME
@@ -819,7 +858,8 @@ SCIDB_NAME - the name of the SciDB database to stop, default = mydb""")
     """%(prog)s [-h | options]\n
 Run scidbtestharness for a given set of tests
 The results are stored in $SCIDB_BUILD_PATH/tests/harness/run.tests.log
-Environment variables:"""+
+Environment variables:
+SCIDB_NAME - the name of the SciDB database to be tested, default = mydb"""+
 "\n%s/tests/harness/scidbtestharness_env.sh is source'd to create the environment for scidbtestharness"%(scidbEnv.build_path))
     group = subParser.add_mutually_exclusive_group()
     group.add_argument('--all', action='store_true', help="run all scidbtestharness tests")
@@ -834,6 +874,7 @@ Environment variables:"""+
 Run scidbtestharness for a given set of tests of a given plugin."""+
 " The results are stored in %s/$SCIDB_PLUGIN_TESTS/run.tests.log"%(pluginBuildPathStr)+
 """\nEnvironment variables:
+SCIDB_NAME - the name of the SciDB database on which to test the plugin, default = mydb+
 SCIDB_PLUGIN_TESTS - the subdirectory wrt the plugin build path where the the scidbtestharness rootdir is located, default = test"""+
 "\nSCIDB_BUILD_PATH and SCIDB_DATA_PATH are exported into the environment"+
 "\n%s/tests/harness/scidbtestharness_env.sh is source'd to create the environment for scidbtestharness."%("$SCIDB_BUILD_PATH")+

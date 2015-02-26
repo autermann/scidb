@@ -1475,21 +1475,21 @@ AffyId,quantile,percentage,response_quantile
 38,8,0.888889,31.6988
 38,9,1,31.6988
 
-SCIDB QUERY : <remove(md_expo_quant)>
-Query was executed successfully
-
-SCIDB QUERY : <remove(md_expo_quant_ID)>
-Query was executed successfully
-
-SCIDB QUERY : <remove(md_expo_quant2_ID)>
-Query was executed successfully
-
-SCIDB QUERY : <remove(md_expo_quant_AffyId)>
+SCIDB QUERY : <remove(expo)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(md_expo)>
 Query was executed successfully
 
-SCIDB QUERY : <remove(expo)>
+SCIDB QUERY : <remove(md_expo_quant_AffyId)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(md_expo_quant2_ID)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(md_expo_quant_ID)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(md_expo_quant)>
 Query was executed successfully
 

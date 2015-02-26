@@ -31,7 +31,7 @@
 #include <boost/foreach.hpp>
 #include <array/DelegateArray.h>
 #include <array/FileArray.h>
-#include <query/ops/sort2/MergeSortArray.h>
+#include <array/MergeSortArray.h>
 #include "RankCommon.h"
 #include <sys/time.h>
 

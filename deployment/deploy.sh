@@ -45,8 +45,8 @@ Building packages:
   deploy.sh build_deps  <packages_path>
 
 SciDB control on remote machines:
-  deploy.sh scidb_install    <packages_path> <coordinator-host> [host ...]
-  deploy.sh scidb_remove     <packages_path> <coordinator-host> [host ...]
+  deploy.sh scidb_install    {<packages_path>|<ScidbVersion>} <coordinator-host> [host ...]
+  deploy.sh scidb_remove     {<packages_path>|<ScidbVersion>} <coordinator-host> [host ...]
   deploy.sh scidb_prepare    <scidb_os_user> <scidb_os_passwd> <db_user> <db_passwd>
                              <database> <base_path>
                              <instance_count> <no_watchdog> <redundancy> <chunk-segment-size>
@@ -96,12 +96,16 @@ make
 
 ./deploy.sh scidb_install /tmp/my_packages_path localhost
 
-6) Configure SciDB cluster on localhost with 4 instances redundancy=1, default chunk-segment-size,
+6) Install SciDB release to a cluster
+
+./deploy.sh scidb_install 13.6 coordinator-host host1 host2
+
+7) Configure SciDB cluster on localhost with 4 instances redundancy=1, default chunk-segment-size,
    and data directory root at ~/scidb-data
 
 ./deploy.sh scidb_prepare my_username \"\" mydb mydb mydb ~/scidb-data 4 1 default localhost
 
-7) Start SciDB:
+8) Start SciDB:
 
 ./deploy.sh scidb_start my_username mydb localhost"
 EOF
@@ -156,6 +160,8 @@ Commands:
                        This command is useful only for populating a package repository (e.g. downloads.paradig4.com)
 
   scidb_install        Install SciDB packages in <packages_path> on <coordinator-host> and <host ...>.
+                       or
+                       Install SciDB release <ScidbVersion> on <coordinator-host> and <host ...>.
                        The required repositories for the SciDB packages are expected to be already registered on all hosts.
                        The first host is the cluster coordinator, and some packages are installed only on the coordinator.
 
@@ -195,7 +201,13 @@ echo "Source path: ${source_path}"
 echo "Script common path: ${bin_path}"
 echo "Build path: ${build_path}"
 
-SCIDB_VER=${SCIDB_VERSION:=`awk -F . '{print $1"."$2}' ${source_path}/version`}
+# If we are in the source tree there is a file ../version with the version number
+if [ -f "${source_path}/version" ]; then
+    SCIDB_VER=${SCIDB_VERSION:=`awk -F . '{print $1"."$2}' ${source_path}/version`}
+else
+# If we are in a /opt/scidb/<VER>/deployment tree then ../ is the version number
+    SCIDB_VER=`basename ${source_path}`
+fi
 echo "SciDB version: ${SCIDB_VER}"
 
 SCP="scp -r -q -o StrictHostKeyChecking=no"
@@ -375,7 +387,7 @@ function push_and_pull_packages ()
     local push=${5}
     configure_package_manager ${hostname} 1
     local path_local=`readlink -f ${1}`
-    local path_remote=`readlink -f ${4}`
+    local path_remote="${4}"
     local scp_args_remote="${username}@${hostname}:${path_remote}/*"
     if [ $push == 1 ]; then
 	remote_no_password "${username}" "" "${hostname}" "rm -rf ${path_remote}"
@@ -413,6 +425,15 @@ function register_3rdparty_scidb_repository ()
     local hostname=${1}
     echo "Register SciDB 3rdparty repository on ${hostname}"
     remote root "" ${hostname} "./register_3rdparty_scidb_repository.sh"
+}
+
+# Register released SciDB repository on remote host
+function register_scidb_repository ()
+{
+    local release=${1}
+    local hostname=${2}
+    echo "Register SciDB repository ${release} on ${hostname}"
+    remote root "" ${hostname} "./register_scidb_repository.sh ${release}"
 }
 
 # Stop virtual bridge on remote host
@@ -473,7 +494,17 @@ function scidb_remove()
     remote root "" "${hostname}" "${remove} `package_names ${packages} | xargs`"
 }
 
-# Install SciDB to remote host
+# Remove SciDB Release from remote host
+function scidb_remove_release()
+{
+    local release=${1}
+    local hostname=${2}
+    local with_coordinator=${3}
+
+    remote root "" "${hostname}" "./scidb_remove_release.sh ${release} ${with_coordinator}"
+}
+
+# Install SciDB to remote host from a package directory
 function scidb_install()
 {
     local hostname=${2}
@@ -488,6 +519,16 @@ function scidb_install()
 	packages="$(ls ${packages_path}/*.${kind} | grep -v coord | xargs)"
     fi;
     remote root "" "${hostname}" "./scidb_install.sh" "${packages}"
+}
+
+# Install SciDB to remote host from a release on 
+function scidb_install_release()
+{
+    local release=${1}
+    local hostname=${2}
+    local with_coordinator=${3}
+    register_scidb_repository "${release}" "${hostname}"
+    remote root "" "${hostname}" "./scidb_install_release.sh ${release} ${with_coordinator}"
 }
 
 # Generate SciDB config
@@ -659,7 +700,7 @@ case ${1} in
 	fi
 	path_local=`readlink -f ${2}`
 	username=${3}
-	path_remote=`readlink -f ${4}`
+	path_remote="${4}"
 	shift 4
 	for hostname in $@; do
 	    push_and_pull_packages ${path_local} ${username} ${hostname} ${path_remote} 0
@@ -671,7 +712,7 @@ case ${1} in
 	fi
 	path_local=`readlink -f ${2}`
 	username=${3}
-	path_remote=`readlink -f ${4}`
+	path_remote="${4}"
 	shift 4
 	for hostname in $@; do
 	    push_and_pull_packages ${path_local} ${username} ${hostname} ${path_remote} 1
@@ -751,25 +792,49 @@ case ${1} in
 	if [ $# -lt 3 ]; then
 	    print_usage_exit 1
 	fi
-	packages_path=${2}
+	path_or_ver=${2}
 	coordinator=${3}
 	echo "Coordinator IP: ${coordinator}"
 	shift 3
-	scidb_install ${packages_path} ${coordinator} 1
-	for hostname in $@; do
-	    scidb_install ${packages_path} ${hostname} 0
-	done;
+	if [[ ${path_or_ver} =~ ^[0-9\.]+$ ]]; then
+	    # Its an install from release:
+	    releaseNum=${path_or_ver}
+	    scidb_install_release ${releaseNum} ${coordinator} 1
+	    for hostname in $@; do
+		scidb_install_release ${releaseNum} ${hostname} 0
+	    done;
+	else
+	    # Its an install from a package directory
+	    packages_path=${path_or_ver}
+	    scidb_install ${packages_path} ${coordinator} 1
+	    for hostname in $@; do
+		scidb_install ${packages_path} ${hostname} 0
+	    done;
+	fi
 	;;
     scidb_remove)
 	if [ $# -lt 3 ]; then
 	    print_usage_exit 1
 	fi
-	packages_path=${2}
-	shift 2
-	hostname
-	for hostname in $@; do
-	    scidb_remove ${packages_path} ${hostname}
-	done;
+	path_or_ver=${2}
+	coordinator=${3}
+	echo "Coordinator IP: ${coordinator}"
+	shift 3
+	if [[ ${path_or_ver} =~ ^[0-9\.]+$ ]]; then
+	    # Its remove a release:
+	    releaseNum=${path_or_ver}
+	    scidb_remove_release ${releaseNum} ${coordinator} 1
+	    for hostname in $@; do
+		scidb_remove_release ${releaseNum} ${hostname} 0
+	    done;
+	else
+	    # Its package remove packages in package directory
+	    packages_path=${path_or_ver}
+	    scidb_remove ${packages_path} ${coordinator}
+	    for hostname in $@; do
+		scidb_remove ${packages_path} ${hostname}
+	    done;
+	fi
 	;;
     scidb_prepare)
 	if [ $# -lt 12 ]; then

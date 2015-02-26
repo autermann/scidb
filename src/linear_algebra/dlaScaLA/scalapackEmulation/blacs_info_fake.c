@@ -41,8 +41,8 @@ int S_mycol = -1;
  * NOTE: this is iso C, not C++, to avoid name-mangling, so it will
  *       have the same symbol as the FORTRAN version
  */
-void blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
-                                  int *myrow, int *mycol)
+void scidb_blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
+                                        int *myrow, int *mycol)
 {
     *contxt = S_contxt;
     *nprow = S_nprow;
@@ -51,8 +51,8 @@ void blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
     *mycol= S_mycol;
 }
 
-void set_fake_blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
-                              int *myrow, int *mycol)
+void scidb_set_blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
+                               int *myrow, int *mycol)
 {
     S_contxt = *contxt;
     S_nprow = *nprow;

@@ -41,7 +41,7 @@ namespace scidb
 /// become a method on ScaLAPACK operator.
 ///
 ///
-void getSlaveBLACSInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, sl_int_t& MYPROW, sl_int_t& MYPCOL, sl_int_t& MYPNUM)
+void getSlaveBLACSInfo(const slpp::int_t ICTXT, slpp::int_t& NPROW, slpp::int_t& NPCOL, slpp::int_t& MYPROW, slpp::int_t& MYPCOL, slpp::int_t& MYPNUM)
 {
     // TODO JHM ; disable cerr debugs before checkin
     std::cerr << "blacs_gridinfo_" << std::endl;

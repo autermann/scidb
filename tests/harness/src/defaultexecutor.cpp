@@ -633,16 +633,13 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 	{
         _outputfileStream.close ();
     }
-	if (exit_code >= 0)
+	LOG4CXX_INFO (_logger, "Shell command exited with Exit code = " << exit_code << ".");
+	if (exit_code == 0)
 	{
-		LOG4CXX_INFO (_logger, "Shell command exited with Exit code = " << exit_code << ".");
-	}
-	else
-	{
-		LOG4CXX_INFO (_logger, "Shell command could not exit normally.");
-	}
-	
-	return exit_code;
+	return SUCCESS;
+    }	
+	LOG4CXX_INFO (_logger, "Hence this is a test case failure...");
+	return FAILURE;
 }
 
 int DefaultExecutor :: Echo (const string &args)

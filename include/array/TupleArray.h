@@ -111,7 +111,7 @@ class TupleArray : public Array
 	friend class TupleChunkIterator;
 	friend class TupleArrayIterator;
   public:
-	void sort(vector<Key> const& keys);
+        void sort(boost::shared_ptr<TupleComparator> tcomp);
 
 	virtual ArrayDesc const& getArrayDesc() const;
 

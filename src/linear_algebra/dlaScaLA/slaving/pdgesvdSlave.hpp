@@ -61,14 +61,14 @@ namespace scidb {
 class PdgesvdArgs {
 public:
     friend std::ostream& operator<<(std::ostream& os, const PdgesvdArgs& a);
-    sl_int_t    NPROW;  // all ops will need these two to set up scalapack via blacs_init
-    sl_int_t    NPCOL;
-    sl_int_t    MYPROW; // all ops will need these to check the that the fake blacs_get_info
-    sl_int_t    MYPCOL; // and the real one returned identical values
-    sl_int_t    MYPNUM; // and the same for blacs_pnum()
+    slpp::int_t    NPROW;  // all ops will need these two to set up scalapack via blacs_init
+    slpp::int_t    NPCOL;
+    slpp::int_t    MYPROW; // all ops will need these to check the that the fake blacs_get_info
+    slpp::int_t    MYPCOL; // and the real one returned identical values
+    slpp::int_t    MYPNUM; // and the same for blacs_pnum()
 
     char jobU, jobVT ;
-    sl_int_t M, N;  
+    slpp::int_t M, N;
 
     ScalapackArrayArgs A;
     ScalapackArrayArgs U;
@@ -90,7 +90,7 @@ inline std::ostream& operator<<(std::ostream& os, const PdgesvdArgs& a)
 }
 
 /// @ return the INFO output by pdgesvd_()
-sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOverwriteArgs=false);
+slpp::int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOverwriteArgs=false);
 
 } // namespace scidb
 

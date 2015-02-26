@@ -73,7 +73,7 @@ public:
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
 	{
-        int64_t queryID = evaluate(shared_dynamic_cast<OperatorParamLogicalExpression>(
+        int64_t queryID = evaluate(dynamic_pointer_cast<OperatorParamLogicalExpression>(
             _parameters[0])->getExpression(), query, TID_INT64).getInt64();
         try
         {

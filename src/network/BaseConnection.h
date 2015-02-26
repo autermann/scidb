@@ -79,7 +79,7 @@ enum MessageType
     mtNotify,
     mtWait,
     mtBarrier,
-    mtMPISend,
+    mtBufferSend,
     mtAlive,
     mtPrepareQuery,
     mtResourcesFileExistsRequest,

@@ -332,7 +332,7 @@ int SciDBTestHarness :: createLogger (void)
          * We are creating scidb.log under <root-dir>/log/
          */
 		bfs::remove (scidblogfile.c_str ());
-		scidblogfile = _c.logDir + "/" + scidblogfile;
+		scidblogfile = _c.logDir + "/" + "harness_connection.log";
 
 		/* also remove log/scidb.log. log4cxx will internally create it */
 		bfs::remove (scidblogfile.c_str ());
@@ -468,7 +468,7 @@ int SciDBTestHarness :: validateParameters (void)
 	}
 
 	_c.harnessLogFile = _c.logDir + "/" + DEFAULT_HARNESSLOGFILE;
-	if (creat (_c.harnessLogFile.c_str (), S_IRUSR|S_IWUSR) == -1)
+	if (creat (_c.harnessLogFile.c_str (), S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) == -1)
 	{
 		stringstream ss;
 		ss << "Failed to create a file " << _c.harnessLogFile;
@@ -504,7 +504,7 @@ int SciDBTestHarness :: validateParameters (void)
 	}
 
 	_c.reportFilename = _c.rootDir + "/" + _c.reportFilename;
-	if (creat (_c.reportFilename.c_str (), S_IRUSR|S_IWUSR) == -1)
+	if (creat (_c.reportFilename.c_str (), S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) == -1)
 	{
 		stringstream ss;
 		ss << "Failed to create report file " << _c.reportFilename;

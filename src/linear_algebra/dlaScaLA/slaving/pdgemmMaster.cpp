@@ -57,16 +57,16 @@ void pdgemmMaster(Query* query,  // or do I need only the ctx?
                    boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                    const string& ipcName, // can this be in the ctx too?
                    void*  argsBuf,
-                   const sl_int_t& NPROW, const sl_int_t& NPCOL,
-                   const sl_int_t& MYPROW, const sl_int_t& MYPCOL, const sl_int_t& MYPNUM,
+                   const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
+                   const slpp::int_t& MYPROW, const slpp::int_t& MYPCOL, const slpp::int_t& MYPNUM,
                    const char &TRANSA, const char &TRANSB,
-                   const sl_int_t& M, const sl_int_t &N, const sl_int_t &K,
+                   const slpp::int_t& M, const slpp::int_t &N, const slpp::int_t &K,
                    const double* ALPHA,
-                   const double* A, const sl_int_t& IA, const sl_int_t& JA, const sl_desc_t& DESC_A,
-                   const double* B, const sl_int_t& IB,  const sl_int_t& JB,  const sl_desc_t& DESC_B,
+                   const double* A, const slpp::int_t& IA, const slpp::int_t& JA, const slpp::desc_t& DESC_A,
+                   const double* B, const slpp::int_t& IB,  const slpp::int_t& JB,  const slpp::desc_t& DESC_B,
                    const double* BETA,
-                   double* C, const sl_int_t& IC, const sl_int_t& JC, const sl_desc_t& DESC_C,
-                   sl_int_t& INFO)  // real pdgemm has no info!!!
+                   double* C, const slpp::int_t& IC, const slpp::int_t& JC, const slpp::desc_t& DESC_C,
+                   slpp::int_t& INFO)  // real pdgemm has no info!!!
 {
     enum dummy { DBG=0 };
     static const char ARG_NUM_SHM_BUFFERS[] = "4";  // ARGS + AA, BB, CC
@@ -134,7 +134,7 @@ void pdgemmMaster(Query* query,  // or do I need only the ctx?
     LOG4CXX_DEBUG(logger, "pdgemmMaster(): slave->waitForStatus(ctx) returned " << status);
 
     // assign the result
-    INFO = boost::numeric_cast<sl_int_t, int64_t>(status);
+    INFO = boost::numeric_cast<slpp::int_t, int64_t>(status);
 
     // slaving cleanups
     cmd.clear();

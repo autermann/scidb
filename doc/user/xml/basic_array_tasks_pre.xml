@@ -37,7 +37,7 @@
 
         <secondary>selecting</secondary>
       </indexterm><indexterm>
-        <primary>selecting data</primary>
+        <primary>select statement</primary>
       </indexterm><indexterm>
         <primary>AQL</primary>
 
@@ -127,10 +127,8 @@
 --afl load(B, '../tests/harness/testcases/data/doc/B.scidb'); --show-output=no --show-query=no
 </programlisting> These arrays contain data. To see all the data stored in the
       array, you can use the following <command>SELECT</command> statement:
-      <programlisting language="test">
---aql SELECT * FROM A; --output-format=auto
-</programlisting> <programlisting language="test">
---aql SELECT * FROM B; --output-format=auto 
+      <programlisting language="test">--aql SELECT * FROM A; --output-format=auto
+</programlisting> <programlisting language="test">--aql SELECT * FROM B; --output-format=auto 
 </programlisting><indexterm>
           <primary>AQL</primary>
 
@@ -146,15 +144,13 @@
       <para>To refine the result of the <command>SELECT</command> statement,
       use an argument that specifies part of an array result.
       <command>SELECT</command> can take array dimensions or attributes as
-      arguments: <programlisting language="test">
---aql SELECT j from B; --output-format=auto
+      arguments: <programlisting language="test">--aql SELECT j from B; --output-format=auto
 --aql SELECT val_b from B; --output-format=auto 
 </programlisting> The <command>SELECT</command> statement can also take an
       expression as an argument. For example, you can scale attribute values
       by a certain amount:</para>
 
-      <programlisting language="test">
-SELECT val_b/10 FROM B; --output-format=auto
+      <programlisting language="test">SELECT val_b/10 FROM B; --output-format=auto
 </programlisting>
 
       <para><indexterm>
@@ -169,14 +165,12 @@ SELECT val_b/10 FROM B; --output-format=auto
       functions to create expressions. For example, you can choose just the
       middle three cells of array B with the greater-than and less-than
       functions with the <code>and</code> operator: <programlisting
-      language="test">
---aql SELECT j FROM B WHERE j &gt; 3 and j &lt; 7; --output-format=auto
+      language="test">--aql SELECT j FROM B WHERE j &gt; 3 and j &lt; 7; --output-format=auto
 </programlisting> You can also select an expression of the attribute values
       for the middle three cells of B by providing an expression for the
       argument of both <command>SELECT</command> and <command>WHERE</command>.
       For example, this statement returns the square root of the middle three
-      cells of array <code>B</code>: <programlisting language="test">
---aql SELECT sqrt(val_b) FROM B WHERE j&gt;3 and j&lt;7; --output-format=auto
+      cells of array <code>B</code>: <programlisting language="test">--aql SELECT sqrt(val_b) FROM B WHERE j&gt;3 and j&lt;7; --output-format=auto
 </programlisting> The <command>FROM</command> clause can take an array or any
       operation that outputs an array as an argument. The
       <command>INTO</command> clause stores the output of a query.</para>

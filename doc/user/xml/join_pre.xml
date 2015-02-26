@@ -21,6 +21,16 @@
   <refsect1>
     <title>Summary</title>
 
+    <para>The following table shows the relationship between input and output
+    cells.</para>
+
+    <mediaobject>
+      <imageobject>
+        <imagedata align="left" contentwidth="400"
+                   fileref="../graphics/join.png"/>
+      </imageobject>
+    </mediaobject>
+
     <para>Join combines the attributes of two input arrays at matching
     dimension values. The two arrays must have the same dimension start
     coordinates, the same chunk size, and the same chunk overlap. The join
@@ -29,6 +39,53 @@
     return an array with the same dimensions as the smaller input array. If a
     cell in either the left or right array is empty, the corresponding cell in
     the result is also empty.</para>
+
+    <para>Note the following:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">join </emphasis>performs an inner join
+          on dimension values.</para>
+        </listitem>
+
+        <listitem>
+          <para>Dimensions are not matched by name, but by their order (first
+          of <replaceable>left_array</replaceable> with first of
+          <replaceable>right_array</replaceable>, and so on).</para>
+        </listitem>
+
+        <listitem>
+          <para>During the operation, compatibility of dimensions means the
+          following:<itemizedlist>
+              <listitem>
+                <para>Same number of dimensions</para>
+              </listitem>
+
+              <listitem>
+                <para>Same dimension boundaries for each corresponding
+                pair</para>
+              </listitem>
+
+              <listitem>
+                <para>Same chunk and overlap values for each corresponding
+                pair</para>
+              </listitem>
+
+              <listitem>
+                <para>Same starting index value for each corresponding
+                pair</para>
+              </listitem>
+            </itemizedlist></para>
+        </listitem>
+
+        <listitem>
+          <para>In the result array, the dimension names match the dimension
+          names of <replaceable>left_array</replaceable>.</para>
+        </listitem>
+
+        <listitem>
+          <para>If the matching dimensions are not the same size, the smaller
+          one appears in the result array.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

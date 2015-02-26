@@ -41,8 +41,8 @@ namespace scidb {
 using namespace boost;
 using namespace std;
 
-typedef uint32_t Overlap;
-typedef uint32_t Interval;
+typedef int64_t Overlap;
+typedef int64_t Interval;
 typedef size_t   Size;
 
 typedef vector<Overlap>  OverlapVector;

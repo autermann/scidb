@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
 
---shell --command " csv2scidb -s 1 -p SNSN < ../tests/harness/testcases/data/doc/olympic_data.csv > ../tests/harness/testcases/data/doc/olympic_data.scidb" --store
+--shell --command " csv2scidb -s 1 -p SNSN < $DOC_DATA/olympic_data.csv > $DOC_DATA/olympic_data.scidb" --store
 
 --test
 --aql CREATE ARRAY winnersFlat < event:string,year:int64,person:string,time:double > [i=0:*,1000000,0]

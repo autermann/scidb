@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" [
 <!ENTITY % myents SYSTEM "scidb_ug.ent">
-<!ENTITY scidb_version "13.3">
-<!ENTITY scidb_revision "6310">
+<!ENTITY scidb_version "13.6">
+<!ENTITY scidb_revision "6474">
 ]>
 <chapter id="creatingArraysChapter">
   <title>Creating and Removing SciDB Arrays</title>
@@ -854,6 +854,8 @@ event(string)=3,1000,0]</screen><indexterm>
         <primary>AQL</primary>
 
         <secondary>select into</secondary>
+      </indexterm><indexterm>
+        <primary>select statement</primary>
       </indexterm>An array name is its unique identifier. You can use the AQL
     <code> <command>SELECT ... INTO</command> </code> statement to copy an
     array into another array with a new name. <para> This means that both <code>winners</code> and

@@ -66,6 +66,11 @@ public:
         void start();
         bool isStarted();
         virtual ~Thread();
+        /**
+         * Put this thread to sleep
+         * @param nanoSec number of nanoseconds to sleep
+         */
+        static void nanoSleep(uint64_t nanoSec);
 };
 
 /**

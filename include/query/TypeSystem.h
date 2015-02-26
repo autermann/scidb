@@ -81,6 +81,151 @@ const char TID_VOID[] = "void";
 const char TID_BINARY[] = "binary";
 const char TID_FIXED_STRING[] = "string_*";
 
+/**
+ * TypeEnum is provided to have efficient type comparison.
+ * In an inner loop, comparing TypeId is much slower than comparing TypeEnum.
+ */
+enum TypeEnum
+{
+    TE_INDICATOR,
+    TE_CHAR,
+    TE_INT8,
+    TE_INT16,
+    TE_INT32,
+    TE_INT64,
+    TE_UINT8,
+    TE_UINT16,
+    TE_UINT32,
+    TE_UINT64,
+    TE_FLOAT,
+    TE_DOUBLE,
+    TE_BOOL,
+    TE_STRING,
+    TE_DATETIME,
+    TE_DATETIMETZ,
+    TE_VOID,
+    TE_BINARY,
+    TE_FIXED_STRING
+};
+
+/**
+ * Convert TypeId to TypeEnum.
+ */
+inline TypeEnum typeId2TypeEnum(TypeId tid)
+{
+    if (tid==TID_INDICATOR) {
+        return TE_INDICATOR;
+    }
+    else if (tid==TID_CHAR) {
+        return TE_CHAR;
+    }
+    else if (tid==TID_INT8) {
+        return TE_INT8;
+    }
+    else if (tid==TID_INT16) {
+        return TE_INT16;
+    }
+    else if (tid==TID_INT32) {
+        return TE_INT32;
+    }
+    else if (tid==TID_INT64) {
+        return TE_INT64;
+    }
+    else if (tid==TID_UINT8) {
+        return TE_UINT8;
+    }
+    else if (tid==TID_UINT16) {
+        return TE_UINT16;
+    }
+    else if (tid==TID_UINT32) {
+        return TE_UINT32;
+    }
+    else if (tid==TID_UINT64) {
+        return TE_UINT64;
+    }
+    else if (tid==TID_FLOAT) {
+        return TE_FLOAT;
+    }
+    else if (tid==TID_DOUBLE) {
+        return TE_DOUBLE;
+    }
+    else if (tid==TID_BOOL) {
+        return TE_BOOL;
+    }
+    else if (tid==TID_STRING) {
+        return TE_STRING;
+    }
+    else if (tid==TID_DATETIME) {
+        return TE_DATETIME;
+    }
+    else if (tid==TID_DATETIMETZ) {
+        return TE_DATETIMETZ;
+    }
+    else if (tid==TID_VOID) {
+        return TE_VOID;
+    }
+    else if (tid==TID_BINARY) {
+        return TE_BINARY;
+    }
+    else if (tid==TID_FIXED_STRING) {
+        return TE_FIXED_STRING;
+    }
+
+    assert(false);
+    return TE_VOID;
+}
+
+/**
+ * Convert TypeEnum to TypeId.
+ */
+inline TypeId typeEnum2TypeId(TypeEnum te)
+{
+    switch (te)
+    {
+    case TE_INDICATOR:
+        return TID_INDICATOR;
+    case TE_CHAR:
+        return TID_CHAR;
+    case TE_INT8:
+        return TID_INT8;
+    case TE_INT16:
+        return TID_INT16;
+    case TE_INT32:
+        return TID_INT32;
+    case TE_INT64:
+        return TID_INT64;
+    case TE_UINT8:
+        return TID_UINT8;
+    case TE_UINT16:
+        return TID_UINT16;
+    case TE_UINT32:
+        return TID_UINT32;
+    case TE_UINT64:
+        return TID_UINT64;
+    case TE_FLOAT:
+        return TID_FLOAT;
+    case TE_DOUBLE:
+        return TID_DOUBLE;
+    case TE_BOOL:
+        return TID_BOOL;
+    case TE_STRING:
+        return TID_STRING;
+    case TE_DATETIME:
+        return TID_DATETIME;
+    case TE_DATETIMETZ:
+        return TID_DATETIMETZ;
+    case TE_VOID:
+        return TID_VOID;
+    case TE_BINARY:
+        return TID_BINARY;
+    case TE_FIXED_STRING:
+        return TID_FIXED_STRING;
+    default:
+        assert(false);
+    }
+    return TID_VOID;
+}
+
 #define IS_VARLEN(type) (type==TID_STRING || type==TID_BINARY ? true : false)
 
 #define BUILTIN_TYPE_CNT 17
@@ -680,6 +825,85 @@ public:
     BUILTIN_METHODS(float, Float)
     BUILTIN_METHODS(double, Double)
     BUILTIN_METHODS(bool, Bool)
+
+    /**
+     * Setter of a scidb::Value, given its built-in value.
+     */
+    template<class T>
+    static void setBuiltInValue(Value& v, T t, TypeEnum te)
+    {
+        switch(te)
+        {
+        case TE_CHAR:
+            v.setChar(t); break;
+        case TE_INT8:
+            v.setInt8(t); break;
+        case TE_INT16:
+            v.setInt16(t); break;
+        case TE_INT32:
+            v.setInt32(t); break;
+        case TE_INT64:
+            v.setInt64(t); break;
+        case TE_UINT8:
+            v.setUint8(t); break;
+        case TE_UINT16:
+            v.setUint16(t); break;
+        case TE_UINT32:
+            v.setUint32(t); break;
+        case TE_UINT64:
+            v.setUint64(t); break;
+        case TE_DATETIME:
+            v.setDateTime(t); break;
+        case TE_FLOAT:
+            v.setFloat(t); break;
+        case TE_DOUBLE:
+            v.setDouble(t); break;
+        case TE_BOOL:
+            v.setBool(t); break;
+        default:
+            assert(false);
+        }
+    }
+
+    /**
+     * Getter of a scidb::Value, given its built-in value.
+     */
+    template<class T>
+    static T getBuiltInValue(Value& v, TypeEnum te)
+    {
+        switch(te)
+        {
+        case TE_CHAR:
+            return v.getChar();
+        case TE_INT8:
+            return v.getInt8();
+        case TE_INT16:
+            return v.getInt16();
+        case TE_INT32:
+            return v.getInt32();
+        case TE_INT64:
+            return v.getInt64();
+        case TE_UINT8:
+            return v.getUint8();
+        case TE_UINT16:
+            return v.getUint16();
+        case TE_UINT32:
+            return v.getUint32();
+        case TE_UINT64:
+            return v.getUint64();
+        case TE_DATETIME:
+            return v.getDateTime();
+        case TE_FLOAT:
+            return v.getFloat();
+        case TE_DOUBLE:
+            return v.getDouble();
+        case TE_BOOL:
+            return v.getBool();
+        default:
+            assert(false);
+        }
+        return T();
+    }
 
 	/**
  	* Return (char *) to to the contents of the Value object

@@ -40,8 +40,8 @@ SCIDB QUERY : <select * from attributes(D)>
 {0} 'name','string',false
 {1} 'start','int64',false
 {2} 'length','uint64',false
-{3} 'chunk_interval','int32',false
-{4} 'chunk_overlap','int32',false
+{3} 'chunk_interval','uint64',false
+{4} 'chunk_overlap','uint64',false
 {5} 'low','int64',false
 {6} 'high','int64',false
 {7} 'type','string',false

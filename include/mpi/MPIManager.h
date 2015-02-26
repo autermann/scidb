@@ -89,74 +89,38 @@ namespace scidb
         virtual ~MpiOperatorContext() {}
 
         /// Get a launcher for a given launch ID
-        boost::shared_ptr<MpiLauncher> getLauncher(uint64_t launchId)
-        {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = _launches.find(launchId);
-            if (iter == _launches.end()) {
-                return boost::shared_ptr<MpiLauncher>();
-            }
-            return iter->second->_launcher;
-        }
+        boost::shared_ptr<MpiLauncher> getLauncher(uint64_t launchId);
 
         /// Set a launcher for a given launch ID
-        void setLauncher(uint64_t launchId, const boost::shared_ptr<MpiLauncher>& launcher)
+        void setLauncher(const boost::shared_ptr<MpiLauncher>& launcher)
         {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = getIter(launchId);
-            iter->second->_launcher = launcher;
+            setLauncherInternal(launcher->getLaunchId(), launcher);
         }
 
+        /// for internal use
+        void setLauncherInternal(uint64_t launchId, const boost::shared_ptr<MpiLauncher>& launcher);
+
         /// Get a slave for a given launch ID
-        boost::shared_ptr<MpiSlaveProxy> getSlave(uint64_t launchId)
-        {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = _launches.find(launchId);
-            if (iter == _launches.end()) {
-                return boost::shared_ptr<MpiSlaveProxy>();
-            }
-            return iter->second->_slave;
-        }
+        boost::shared_ptr<MpiSlaveProxy> getSlave(uint64_t launchId);
 
         /// Get the launch ID of the last slave (in which this instance participated)
         uint64_t getLastLaunchIdInUse() const
         {
+            //XXX mutex ?
             return _lastLaunchIdInUse;
         }
 
         /// Set a slave proxy for a given launch ID
-        void setSlave(uint64_t launchId, const boost::shared_ptr<MpiSlaveProxy>& slave)
-        {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = getIter(launchId);
-            iter->second->_slave = slave;
-        }
+        void setSlave(const boost::shared_ptr<MpiSlaveProxy>& slave);
+
+        /// for internal use
+        void setSlaveInternal(uint64_t launchId, const boost::shared_ptr<MpiSlaveProxy>& slave);
 
         /// Get a shared memory IPC object for a given launch ID
-        boost::shared_ptr<SharedMemoryIpc> getSharedMemoryIpc(uint64_t launchId, const std::string& name)
-        {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = _launches.find(launchId);
-            if (iter == _launches.end()) {
-                return boost::shared_ptr<SharedMemoryIpc>();
-            }
-            boost::shared_ptr<SharedMemoryIpc> key(new SharedMemory(name));
-            LaunchInfo::ShmIpcSet::iterator ipcIter = iter->second->_shmIpcs.find(key);
-            if (ipcIter == iter->second->_shmIpcs.end()) {
-                return boost::shared_ptr<SharedMemoryIpc>();
-            }
-            return (*ipcIter);
-        }
+        boost::shared_ptr<SharedMemoryIpc> getSharedMemoryIpc(uint64_t launchId, const std::string& name);
 
         /// Set a shared memory IPC object for a given launch ID
-        bool addSharedMemoryIpc(uint64_t launchId, const boost::shared_ptr<SharedMemoryIpc>& ipc)
-        {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = getIter(launchId);
-            bool isInserted = iter->second->_shmIpcs.insert(ipc).second;
-            assert(isInserted);
-            return isInserted;
-        }
+        bool addSharedMemoryIpc(uint64_t launchId, const boost::shared_ptr<SharedMemoryIpc>& ipc);
 
         typedef boost::function<bool (uint64_t, MpiOperatorContext*)> LaunchErrorChecker;
         /**
@@ -165,36 +129,13 @@ namespace scidb
          * @return the next message; the client context referenced by the message does not change for the same launch ID
          */
         boost::shared_ptr<scidb::ClientMessageDescription> popMsg(uint64_t launchId,
-                                                                  LaunchErrorChecker& errChecker)
-        {
-            ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = _launches.find(launchId);
-            while ((iter == _launches.end()) ||
-                   (!iter->second->_msg)) {
-                Event::ErrorChecker ec =
-                boost::bind(&MpiOperatorContext::checkForError, this, launchId, errChecker);
-                _event.wait(_mutex, ec);
-                iter = _launches.find(launchId);
-            }
-            boost::shared_ptr<scidb::ClientMessageDescription> msg;
-            (iter->second->_msg).swap(msg);
-            return msg;
-        }
-
+                                                                  LaunchErrorChecker& errChecker);
         /**
          * Add the next message from the slave
          * @param launchId the launch ID corresponding to the slave
          * @param the next message
          */
-        void pushMsg(uint64_t launchId, const boost::shared_ptr<scidb::ClientMessageDescription>& msg)
-        {
-            ScopedMutexLock lock(_mutex);
-            const bool dontUpdateLastInUse = false;
-            LaunchMap::iterator iter = getIter(launchId, dontUpdateLastInUse);
-            iter->second->_msg = msg;
-
-             _event.signal();
-        }
+        void pushMsg(uint64_t launchId, const boost::shared_ptr<scidb::ClientMessageDescription>& msg);
 
         /**
          * Must be called when the launch related state is no longer in use
@@ -236,62 +177,15 @@ namespace scidb
         typedef boost::function<void (uint64_t, LaunchInfo*)> LaunchCleaner;
         typedef std::map<uint64_t, boost::shared_ptr<LaunchInfo> > LaunchMap;
 
-        void clear(LaunchCleaner& cleaner)
-        {
-            if (cleaner) {
-                for (LaunchMap::iterator iter = _launches.begin();
-                     iter != _launches.end(); ++iter) {
-                    cleaner(iter->first, iter->second.get());
-                }
-            }
-            _launches.clear();
-        }
+        void clear(LaunchCleaner& cleaner);
 
     private:
 
-        bool checkForError(uint64_t launchId, LaunchErrorChecker& errChecker)
-        {
-            Query::validateQueryPtr(_query.lock());
+        bool checkForError(uint64_t launchId, LaunchErrorChecker& errChecker);
 
-            LaunchMap::iterator iter = _launches.find(launchId);
-            if (iter != _launches.end() && iter->second->_msg) {
-                // the message is ready, we must have missed the signal on timeout
-                return false;
-            }
-            if (errChecker && !errChecker(launchId, this)) {
-                return false;
-            }
-            return true;
-        }
+        LaunchMap::iterator getIter(uint64_t launchId, bool updateLastLaunchId=true);
 
-        LaunchMap::iterator getIter(uint64_t launchId, bool updateLastLaunchId=true)
-        {
-            LaunchMap::iterator iter = _launches.find(launchId);
-            if (iter == _launches.end()) {
-
-                if(updateLastLaunchId && (_lastLaunchIdInUse > launchId)) {
-                    // When we are populating a new context from the operator,
-                    // the last launch ID in use can not decrease.
-                    // The contract is that the launch IDs must strictly increase.
-                    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                           << "MPI-based operator context does not allow for decreasing launch IDs");
-                }
-                if (_launches.size() > 1) {
-                    // each launch must be serialized by the coordinator,
-                    // workers also process launches serially, so at any moment
-                    // there can be messages from at most 2 launches (slaves).
-                    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                           << "MPI-based operator context is corrupted");
-                }
-                boost::shared_ptr<LaunchInfo> linfo(new LaunchInfo);
-                iter = _launches.insert(make_pair(launchId, linfo)).first;
-                if(updateLastLaunchId) {
-                    _lastLaunchIdInUse = std::max(_lastLaunchIdInUse,launchId);
-                }
-            }
-            return iter;
-        }
-
+    private:
         boost::weak_ptr<scidb::Query> _query;
         LaunchMap _launches;
         scidb::Event _event;
@@ -370,7 +264,7 @@ namespace scidb
                    << "Client context is not set in MPI slave handler");
         }
         boost::function<void()> f = boost::bind(&ClientContext::disconnect, cliCtx);
-        scidb::Destructor<boost::function<void()> >  ctxCleaner(f);
+        scidb::Destructor<boost::function<void()> >  clientCtxCleaner(f);
         f.clear();
 
         if (!isExpectedMsg) {
@@ -406,7 +300,7 @@ namespace scidb
         assert(query);
         try {
             processMessage(launchId, cliMsg, query);
-            ctxCleaner.disarm();
+            clientCtxCleaner.disarm();
         } catch (const scidb::Exception& e) {
             query->handleError(e.copy());
         }
@@ -424,12 +318,16 @@ namespace scidb
         scidb::Mutex _mutex;
         scidb::Event _event;
         bool _isReady;
+        // currently MPI queries are serialized
+        // after _mpiResourceTimeout seconds waiting a blocked query will error out
         uint32_t _mpiResourceTimeout;
         boost::shared_ptr<scidb::Scheduler> _cleanupScheduler;
 	size_t _mpiType;
 	std::string _mpiInstallDir;
 	std::string _mpiDaemonBin;
 	std::string _mpiLauncherBin;
+        // time to wait until another scalapack/mpi query completes
+        static const uint32_t MPI_RESOURCE_TIMEOUT_SEC=10;
 
         void initMpi();
         static void initiateCleanup();
@@ -501,8 +399,12 @@ namespace scidb
 
         static const std::string& getInstallPath(
             const boost::shared_ptr<const scidb::InstanceMembership>& membership);
-        boost::shared_ptr<MpiOperatorContext> checkAndSetCtx(scidb::QueryID queryId,
+
+        /// @note Enforces only a single context at a time (i.e. serializes queries which call this method).
+        boost::shared_ptr<MpiOperatorContext> checkAndSetCtx(const boost::shared_ptr<scidb::Query>& query,
                                                              const boost::shared_ptr<MpiOperatorContext>& ctx);
+        boost::shared_ptr<MpiOperatorContext> checkAndSetCtxAsync(const boost::shared_ptr<scidb::Query>& query,
+                                                                  const boost::shared_ptr<MpiOperatorContext>& ctx);
         bool removeCtx(scidb::QueryID queryId);
 
 	MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
@@ -565,6 +467,9 @@ namespace scidb
         static void killAllMpiProcs();
 
         /**
+         * @param installPath this instance install/data path
+         * @param clusterUuid SciDB cluster UUID
+         * @param pid of the process to kill
          * @return true if the process with pid is a valid SciDB process
          *         and ::kill() either succeeded or failed unexpectedly;
          *         otherwise false
@@ -572,6 +477,26 @@ namespace scidb
         static bool killProc(const std::string& installPath,
                              const std::string& clusterUuid,
                              pid_t pid);
+        /**
+         * Read the launcher pid (=pgrp) from the file and try to kill
+         * launcher's process group. If any procs exist, the file is removed.
+         * @param installPath this instance install/data path
+         * @param clusterUuid SciDB cluster UUID
+         * @param fileName of the MPI launcher
+         */
+        static void cleanupLauncherPidFile(const std::string& installPath,
+                                           const std::string& clusterUuid,
+                                           const std::string& fileName);
+        /**
+         * Read the slave pid & ppid from the file and try to kill
+         * the corresponding procs. If the procs no longer exist, the file is removed.
+         * @param installPath this instance install/data path
+         * @param clusterUuid SciDB cluster UUID
+         * @param fileName of the MPI slave
+         */
+        static void cleanupSlavePidFile(const std::string& installPath,
+                                        const std::string& clusterUuid,
+                                        const std::string& fileName);
 
         private:
         MpiErrorHandler(const MpiErrorHandler&);
@@ -579,12 +504,6 @@ namespace scidb
 
         static void clean(scidb::QueryID queryId, uint64_t launchId,
                           MpiOperatorContext::LaunchInfo* info);
-        static void processLauncherPidFile(const std::string& installPath,
-                                           const std::string& clusterUuid,
-                                           const std::string& fileName);
-        static void processSlavePidFile(const std::string& installPath,
-                                        const std::string& clusterUuid,
-                                        const std::string& fileName);
         boost::shared_ptr<MpiOperatorContext> _ctx;
     };
 

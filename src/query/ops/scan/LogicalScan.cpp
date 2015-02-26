@@ -82,9 +82,9 @@ public:
         shared_ptr<OperatorParamArrayReference>& arrayRef = (shared_ptr<OperatorParamArrayReference>&)_parameters[0];
         assert(arrayRef->getArrayName().find('@') == string::npos);
 
-        if (arrayRef->getVersion() == ALL_VERSIONS)
+        if (arrayRef->getVersion() == ALL_VERSIONS) {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ASTERISK_USAGE2, _parameters[0]->getParsingContext());
-
+        }
         ArrayDesc schema;
         SystemCatalog* systemCatalog = SystemCatalog::getInstance();
 
@@ -96,16 +96,22 @@ public:
             const Dimensions &dims = schema.getDimensions();
             size_t i, n = dims.size();
             for (i = 0; i < n && dims[i].getBaseName() != dimName; ++i) ;
-            if (i == n)
-                assert(0);
-
-            if (dims[i].getType() == TID_INT64)
-                assert(0);
-
+            if (i == n) {
+                assert(false);
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) <<
+                      (string("dimension ")+dimName+string(" not found"));
+            }
+            if (dims[i].getType() == TID_INT64) {
+                assert(false);
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) <<
+                      string("Non-integer dimensions expected");
+            }
             const string &mappingArray = schema.getMappingArrayName(i);
-            if (!SystemCatalog::getInstance()->containsArray(mappingArray))
-                assert(0);
-
+            if (!SystemCatalog::getInstance()->containsArray(mappingArray)) {
+                assert(false);
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) <<
+                      (string("dimension mapping array ")+mappingArray+string(" not found"));
+            }
             systemCatalog->getArrayDesc(mappingArray, schema);
         }
 

@@ -208,18 +208,18 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     slpp::int_t IC = query->getInstancesCount();
     slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
     std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
-    std::cerr << "(execute) set_fake_blacs_gridinfo_(ctx:"<< ICTXT
+    std::cerr << "(execute) scidb_set_blacs_gridinfo_(ctx:"<< ICTXT
                                    << ", nprow:"<<blacsGridSize.row
                                    << ", npcol:"<<blacsGridSize.col << "," << std::endl;
     std::cerr << "                         myRow:"<<myGridPos.row
                                      << ", myCol:" << myGridPos.col << ")" << std::endl;
-    set_fake_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
+    scidb_set_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "scidb_blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
         std::cerr << "   -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
         std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }
@@ -311,9 +311,9 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     slpp::int_t ICTXT=-1;
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
 
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "(invoke) blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "(invoke) scidb_blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
         std::cerr << "-> NPROW: " << NPROW  << ", NPCOL: " << NPCOL << std::endl;
         std::cerr << "-> MYPROW:" << MYPROW << ", MYPCOL:" << MYPCOL << std::endl;
     }
@@ -442,13 +442,13 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     // these formulas for LD (leading dimension) and TD (trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
     const slpp::int_t one = 1 ;
-    slpp::int_t LD_IN = std::max(one, numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
+    slpp::int_t LD_IN = std::max(one, scidb_numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
     if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
     if(DBG) std::cerr << "--> LD_IN = " << LD_IN << std::endl;
 
     slpp::int_t LD_OUT = LD_IN; // because its a copy operation
 
-    slpp::int_t TD_IN = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
+    slpp::int_t TD_IN = std::max(one, scidb_numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
     if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->TD_IN = " << TD_IN << std::endl;
 
@@ -456,20 +456,20 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
 
     slpp::desc_t DESC_IN;
-    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN,  *INFO);
+    scidb_descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN,  *INFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: descinit(DESC_IN) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: scidb_descinit(DESC_IN) failed, INFO " << descinitINFO
                                                                                  << " DESC_IN " << DESC_IN);
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPIRankPhysical::invokeMPIRank: descinit(DESC_IN) failed");
     }
     LOG4CXX_DEBUG(logger, "MPIRankPhysical::invokeMPIRank(): DESC_IN " << DESC_IN);
 
     slpp::desc_t DESC_OUT;
-    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_OUT, *INFO);
+    scidb_descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_OUT, *INFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: descinit(DESC_OUT) failed, INFO " << descinitINFO
+        LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: scidb_descinit(DESC_OUT) failed, INFO " << descinitINFO
                                                                                  << " DESC_OUT " << DESC_OUT);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPIRankPhysical::invokeMPIRank: descinit(DESC_OUT) failed");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPIRankPhysical::invokeMPIRank: scidb_descinit(DESC_OUT) failed");
     }
     LOG4CXX_DEBUG(logger, "MPIRankPhysical::invokeMPIRank(): DESC_OUT " << DESC_OUT);
 
@@ -556,7 +556,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     Coordinates coordFirst = getStart(Ain);
     Coordinates coordLast = getEndMax(Ain);
 
-    scidb::ReformatToScalapack pdelsetOp(IN, DESC_IN, coordFirst[0], coordFirst[1]);
+    scidb::ReformatToScalapack pdelsetOp(IN, DESC_IN, coordFirst[0], coordFirst[1], NPROW, NPCOL, MYPROW, MYPCOL);
 
     if(DBG) std::cerr << "extract data from SciDB Ain to ScaLAPACK double* IN" << std::endl ;
     LOG4CXX_DEBUG(logger, "extract data from SciDB Ain to ScaLAPACK double* IN");

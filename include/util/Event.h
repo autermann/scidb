@@ -114,7 +114,8 @@ public:
                 }
                 if (e != ETIMEDOUT) 
                 {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_THREAD_EVENT_ERROR) << e;
+                    assert(false);
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_THREAD_EVENT_ERROR) << e;
                 }
                 if (!errorChecker()) {
                    return false;
@@ -124,6 +125,7 @@ public:
         else
         {
             if (pthread_cond_wait(&_cond, &cs._mutex)) {
+                assert(false);
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_cond_wait";
             }
         }
@@ -133,8 +135,10 @@ public:
     void signal()
     { 
         signaled = true;
-        if (pthread_cond_broadcast(&_cond))
+        if (pthread_cond_broadcast(&_cond)) {
+            assert(false);
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_cond_broadcast";
+        }
     }
 };
 

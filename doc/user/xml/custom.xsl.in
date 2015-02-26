@@ -40,7 +40,7 @@
 </xsl:attribute-set>
 
 <xsl:param name="generate.section.toc.level" select="1"/>
-
+<xsl:param name="hyphenate">false</xsl:param>
 <!-- SJM: set up email tag to generate nice-looking links -->
 <xsl:param name="email.mailto.enabled" select="1" />
 <xsl:param name="email.delimiters.enabled" select="0" />

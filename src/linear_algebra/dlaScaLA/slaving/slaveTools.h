@@ -42,7 +42,7 @@ namespace scidb {
 /// @param MYPCOL column of this process in the process grid
 /// @param MYPNUM index of the process in the process grid
 ///
-void getSlaveBLACSInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, sl_int_t& MYPROW, sl_int_t& MYPCOL, sl_int_t& MYPNUM);
+void getSlaveBLACSInfo(const slpp::int_t ICTXT, slpp::int_t& NPROW, slpp::int_t& NPCOL, slpp::int_t& MYPROW, slpp::int_t& MYPCOL, slpp::int_t& MYPNUM);
 
 
 } // namespace scidb
@@ -54,7 +54,7 @@ void getSlaveBLACSInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, s
     {                                       \
         if (!(expr)) {                      \
             std::cerr << #expr << "false at: " <<  __FILE__ << " : " << __LINE__  << std::endl; \
-            sl_int_t ICTXT;                 \
+            slpp::int_t ICTXT;              \
             blacs_get_(-1, 0, ICTXT);       \
             if(ICTXT < 1) {                 \
                 ::abort();                  \

@@ -49,11 +49,7 @@ class PhysicalMatch: public PhysicalOperator
         return DistributionRequirement(DistributionRequirement::Collocated);
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
-    {
-        return inputBoundaries[0];
-    }
+    //TODO: when this operator works as expected and is debugged - add a correct getOutputBoundaries implementation here
 
     /***
      * Match is a pipelined operator, hence it executes by returning an iterator-based array to the consumer

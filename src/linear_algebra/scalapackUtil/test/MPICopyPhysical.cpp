@@ -121,7 +121,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     bool isParticipatingInScaLAPACK = doBlacsInit(redistributedInputs, query, "MPICopyPhysical");
     slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
     if (isParticipatingInScaLAPACK) {
-        blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+        scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
         checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "MPICopyPhysical");
     }
 
@@ -179,7 +179,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     const slpp::int_t one = 1 ;
 
     // LLD(IN)
-    slpp::int_t LLD_IN = std::max(one, numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
+    slpp::int_t LLD_IN = std::max(one, scidb_numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
     if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
     if(DBG) std::cerr << "--> LLD_IN = " << LLD_IN << std::endl;
 
@@ -187,29 +187,29 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     slpp::int_t LLD_OUT = LLD_IN; // because its a copy operation
 
     // LTD(IN)
-    slpp::int_t LTD_IN = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
+    slpp::int_t LTD_IN = std::max(one, scidb_numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
     if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->LTD_IN = " << LTD_IN << std::endl;
 
     // create ScaLAPACK array descriptors
     slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
-    if(DBG) std::cerr << "descinit_ DESC_IN" << std::endl;
+    if(DBG) std::cerr << "scidb_descinit_ DESC_IN" << std::endl;
     slpp::desc_t DESC_IN;
-    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, descinitINFO);
+    scidb_descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: descinit(DESC_IN) failed, INFO " << descinitINFO
-                                                                                 << " DESC_IN " << DESC_IN);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPI: descinit(DESC_IN) failed");
+        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: scidb_descinit(DESC_IN) failed, INFO " << descinitINFO
+                               << " DESC_IN " << DESC_IN);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPI: scidb_descinit(DESC_IN) failed");
     }
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI: DESC_IN " << DESC_IN);
 
-    if(DBG) std::cerr << "descinit_ DESC_OUT" << std::endl;
+    if(DBG) std::cerr << "scidb_descinit_ DESC_OUT" << std::endl;
     slpp::desc_t DESC_OUT;
-    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LLD_OUT, descinitINFO);
+    scidb_descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LLD_OUT, descinitINFO);
     if (descinitINFO != 0) {
-        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: descinit(DESC_IN) failed, INFO " << descinitINFO
-                                                                                << " DESC_OUT " << DESC_OUT);
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPI: descinit(DESC_OUT) failed");
+        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: scidb_descinit(DESC_IN) failed, INFO " << descinitINFO
+                               << " DESC_OUT " << DESC_OUT);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPI: scidb_descinit(DESC_OUT) failed");
     }
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI: DESC_OUT " << DESC_OUT);
 
@@ -255,9 +255,9 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     shmSharedPtr_t OUTx(shmIpc[resultShmIpcIndx]);
 
     setInputMatrixToAlgebraDefault(IN, nElem[1]);
-    extractArrayToScaLAPACK(Ain, IN, DESC_IN);
+    extractArrayToScaLAPACK(Ain, IN, DESC_IN, NPROW, NPCOL, MYPROW, MYPCOL);
 
-    setOutputMatrixToAlgebraDefault(OUT, nElem[2]);
+    setOutputMatrixToAlgebraDefault(OUT, nElem[2], logger);
 
     // debug that the reformat worked correctly:
     if(DBG) {
@@ -329,9 +329,10 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
 shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
 {
     //
-    // + converts inputArrays to psScaLAPACK distribution
+    // + converts inputArray[0] to psScaLAPACK distribution
     // + calls invokeMPI()
     // + returns the output OpArray.
+    // NOTE: only one input is allowed.
     // 
     const bool DBG = false ;
 
@@ -349,6 +350,10 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
 
     // redistribute input arrays to ScaLAPACK block-cyclic
     std::vector<shared_ptr<Array> > redistributedInputs = redistributeInputArrays(inputArrays, query, "MPICopyPhysical");
+
+     if (redistributedInputs.size() != 1) {
+         throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical must have only one input");
+    }
 
     shared_ptr<Array> input = redistributedInputs[0];
     Dimensions const& dims = input->getArrayDesc().getDimensions();
@@ -397,19 +402,19 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
 
     if(DBG) {
         std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
-        std::cerr << "(execute) set_fake_blacs_gridinfo_(ctx:"<< ICTXT
+        std::cerr << "(execute) scidb_set_blacs_gridinfo_(ctx:"<< ICTXT
                                    << ", nprow:"<<blacsGridSize.row
                                    << ", npcol:"<<blacsGridSize.col << "," << std::endl;
         std::cerr << "(execute)                           myRow:" << myGridPos.row
                                    << ", myCol:" << myGridPos.col << ")" << std::endl;
     }
-    set_fake_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
+    scidb_set_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "scidb_blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
         std::cerr << "   -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
         std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }

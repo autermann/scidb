@@ -802,9 +802,9 @@ def start(srv, liid):
    threadsClause = ''
 
    if d.get('redundancy'):
-	  repl = "--redundancy=%s" % d.get('redundancy')
+	  redundancy = "--redundancy=%s" % d.get('redundancy')
    else:
-	  repl = ''
+	  redundancy = ''
    # end if
 
    if d.get('tmp-path'):
@@ -814,9 +814,21 @@ def start(srv, liid):
    # end if
 
    if d.get('merge-sort-buffer'):
-	  mergeSortClause = d.get('merge-sort-buffer')
+	  mergeSortClause = "--merge-sort-buffer=%s" % d.get('merge-sort-buffer')
    else:
-	  mergeSortClause = '512'
+	  mergeSortClause = ''
+   # end if
+
+   if d.get('merge-sort-nstreams'):
+           mergeSortNstreamClause = "--merge-sort-nstreams=%s" % d.get('merge-sort-nstreams')
+   else:
+           mergeSortNstreamClause = ''
+   # end if
+
+   if d.get('merge-sort-pipeline-limit'):
+           mergeSortPipelineLimitClause = "--merge-sort-pipeline-limit=%s" % d.get('merge-sort-pipeline-limit')
+   else:
+           mergeSortPipelineLimitClause = ''
    # end if
 
    if d.get('smgr-cache-size'):
@@ -960,6 +972,12 @@ def start(srv, liid):
 	  repRecvQSize = ''
    # end if
 
+   if d.get('requests'):
+           requests = "--requests=%s" % d.get('requests')
+   else:
+           requests = ''
+   # end if
+
    if d.get('enable-delta-encoding') in ['true', 'True', 'on', 'On']:
 	  deltaClause = "--enable-delta-encoding"
    else:
@@ -989,7 +1007,12 @@ def start(srv, liid):
    else:
 	  materializeWindowThreshholdTypeClause = ''
    # end if
-
+   
+   if d.get('enable-catalog-upgrade') in  ['true', 'True', 'on', 'On']:
+      upgradeClause = "--enable-catalog-upgrade"
+   else:
+      upgradeClause = ''
+   # end if
 
    relink_binary(srv, liid)
    print "Starting SciDB server."
@@ -998,17 +1021,42 @@ def start(srv, liid):
    @CONFIGURE_SCIDB_PY_VALGRIND@
 
    cmdList += [ getInstanceDataPath(srv,liid)+'/'+binFile(srv, liid),
-			  "-i", srv[1],
-			  "-p", str(basePort+liid),
-			  saveRamClause,  "--merge-sort-buffer", mergeSortClause,
-						  "--cache", smgrCacheSize, noWatchDogClause,
-			  "-k", "-l", logconf, sitClause, wrtClause,
-			  "--plugins", pluginsdir, repl, tmpPathClause, mpiClause, mpiTypeClause,
-              materializeWindowThreshholdTypeClause,
-			  memArrayClause] + threadsClause.split() + [netbuffClause, plsortClause,
-              rlechunkClause, clusterClause, reserveClause, liveness, repartAlgo, repartDenseOpenOnce, repartDisableTileMode, memLimit,
-			  repSendQSize, repRecvQSize, malloc_mmap_threshold, mmap_count_limit, deltaClause,
-			  lsbClause, "-s", getInstanceDataPath(srv,liid) + '/storage.cfg']
+                "-i", srv[1],
+                "-p", str(basePort+liid),
+                saveRamClause,
+                mergeSortClause,
+                mergeSortNstreamClause,
+                mergeSortPipelineLimitClause,
+                "--cache", smgrCacheSize,
+                noWatchDogClause,
+                "-k", "-l", logconf,
+                sitClause,
+                wrtClause,
+                "--plugins", pluginsdir,
+                redundancy,
+                tmpPathClause,
+                mpiClause,
+                mpiTypeClause,
+                materializeWindowThreshholdTypeClause,
+                memArrayClause] + threadsClause.split() + [ netbuffClause,
+                plsortClause,
+                rlechunkClause,
+                clusterClause,
+                reserveClause,
+                liveness,
+                repartAlgo,
+                repartDenseOpenOnce,
+                repartDisableTileMode,
+                memLimit,
+                repSendQSize,
+                repRecvQSize,
+                requests,
+                malloc_mmap_threshold,
+                mmap_count_limit,
+                deltaClause,
+                lsbClause,
+                upgradeClause,
+                "-s", getInstanceDataPath(srv,liid) + '/storage.cfg']
 
    cmdList=[" ".join(cmdList)]
    executeIt(cmdList, srv, liid, waitFlag=False,

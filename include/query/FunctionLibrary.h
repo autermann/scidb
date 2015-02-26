@@ -109,6 +109,14 @@ private:
                        ConversionCost& cost,
                        bool& swapInputs);
 
+    /**
+     * Checks function before adding
+     * Throws exception if something wrong
+     *
+     * @param functionDesc
+     */
+    void functionCheck(const FunctionDescription& functionDesc);
+
 public:
     FunctionLibrary();
 

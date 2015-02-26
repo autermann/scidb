@@ -91,7 +91,7 @@ public:
         ScaLAPACKPhysical(logicalName, physicalName, parameters, schema)
     {
     }
-    shared_ptr<Array> invokeMPI(std::vector< shared_ptr<Array> >& redistributedInputs,
+    shared_ptr<Array> invokeMPI(std::vector< shared_ptr<Array> >& inputArrays,
                                 const GEMMOptions options, shared_ptr<Query>& query,
                                 ArrayDesc& outSchema);
 
@@ -104,7 +104,7 @@ char getTransposeCode(bool transpose) {
     return transpose ? 'T' : 'N' ;
 }
 
-shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redistributedInputs,
+shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inputArrays,
                                           const GEMMOptions options, shared_ptr<Query>& query,
                                           ArrayDesc& outSchema)
 {
@@ -131,7 +131,7 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
 
     LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): begin");
 
-    size_t numArray = redistributedInputs.size();
+    size_t numArray = inputArrays.size();
     if (numArray != NUM_MATRICES) {  // for now ... may make CC optional when beta is 0, later
         LOG4CXX_ERROR(logger, "GEMMPhysical::invokeMPI(): " << numArray << " != NUM_MATRICES " << size_t(NUM_MATRICES));
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
@@ -141,10 +141,10 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     //
     // Initialize the (emulated) BLACS and get the proces grid info
     //
-    bool isParticipatingInScaLAPACK = doBlacsInit(redistributedInputs, query, "GEMMPhysical");
+    bool isParticipatingInScaLAPACK = doBlacsInit(inputArrays, query, "GEMMPhysical");
     slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
     if (isParticipatingInScaLAPACK) {
-        blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+        scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
         checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "GEMMPhysical");
     }
 
@@ -166,40 +166,76 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): participating in MPI");
     } else {
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): not participating in MPI");
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): only participating in redistribute of the input");
+
+        // redistribute to psScaLAPACK
+        // NOTE: this must be kept in sync with the particpatingInMPI version of the redistribute, below
+        // NOTE: this redistribution must be kept in sync with the particpatingInMPI redistributeInputArrays, above
+        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
+        PartitioningSchemaDataForScaLAPACK schemeData(getBlacsGridSize(inputArrays, query, "GEMMPhysical"), firstChunkSize);
+        for(size_t mat=0; mat < numArray; mat++ ) {
+            std::stringstream labelStream;
+            labelStream << "GEMMPhysical input[" << mat << "]";
+            shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[mat], schemeData, query, labelStream.str());
+            bool wasConverted = (tmpRedistedInput != inputArrays[mat]) ;  // only when redistribute was actually done (sometimes optimize away)
+            if(wasConverted) {
+                // free potentially large amount of memory, e.g. when inputArrays[mat] was significantly memory-materialized
+                inputArrays[mat].reset();
+            }
+            // TODO: validate that the redistribute brought no chunks to the instance by
+            //       getting an array iterator and make sure it returns no chunks
+            //       (factor to ScaLAPACKPhysical.cpp)
+
+            // after validating, we don't need tmpRedistedInput anymore, either
+            tmpRedistedInput.reset();
+        }
+        return shared_ptr<Array>(new MemArray(_schema,query)); // NOTE: must not happen before redistribute is done.
     }
 
-    // REFACTOR: this is a pattern in DLAs
     //
     // get dimension information about the input arrays
+    // TODO: REFACTOR, this is a pattern in DLAs
     //
-    boost::shared_ptr<Array> inArray[NUM_MATRICES];
-    for(size_t i=0; i < numArray; i++ ) {
-        inArray[i] = redistributedInputs[i] ;
-    }
-
-    // TODO JHM : checkArray/Inputs must make sure we are only using 2D arrays
-    //            and/or convert 1d arrays to nrows x 1
 
     // matrix sizes from arrays A,B,C
-    matSize_t size[NUM_MATRICES];
-    matSize_t blockSize[NUM_MATRICES];
+    matSize_t size[NUM_MATRICES];       // does not change even after redistributeInputArray
     for(size_t i=0; i < numArray; i++ ) {
-        size[i] = getMatSize(inArray[i]);
+        size[i] = getMatSize(inputArrays[i]);
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
                                << " size["<<i<<"] " << size[i][R] << "," << size[i][C]);
 
-        blockSize[i] = getMatChunkSize(inArray[i]);
-        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
-                              << " blockSize["<<i<<"] " << blockSize[i][R] << "," << blockSize[i][C]);
+   }
+
+
+
+    // TODO JHM : convert 1d arrays to nrows x 1 so we can use vectors as input to GEMM without requiring
+    //            the user to add a dimension of size 1.
+    for(size_t i=0; i < numArray; i++ ) {
+        // TODO JHM : check inputArrays[i] to make sure we are only using 2D arrays,
+        //            that may or may not be done by checkInputArrays
+        checkInputArray(inputArrays[i]);  // check block size constraints, etc
     }
 
-    for(size_t i=0; i < numArray; i++ ) {
-        checkInputArray(inArray[i]);  // check block size constraints, etc
-    }
     //
     //.... Set up ScaLAPACK array descriptors ........................................
     //
+
+    // we would like to do the automatic repart() [not yet implemented] inside the same loop as the
+    // redistribute() and extractToScaLAPACK() in order to release each array after it is consumed.
+    // unfortunately, we have made some of the routines below dependent on the MB,NB we are going to use,
+    // which has recently become determined by the chunkSize of the inputArrays[] since it is no longer
+    // a fixed value, but may vary over a legal range.
+    // but when automatic repart() is done, we will want to use the chunksize of the output of the repart().
+    // so we will need to decide by this point what the MB,NB is going to be, even if we haven't reparted
+    // to it yet.
+    // to make it clear we mean ScaLAPACK MB,NB (which may become different from the inputArray[i] chunkSize in the future, we will
+    // call the array of ScaLAPACK MB,NB pairs,  MB_NB[].
+    matSize_t MB_NB[NUM_MATRICES];  // this one should be moved after redistributeInputArrays() for when it really reparts
+    for(size_t i=0; i < numArray; i++ ) {
+        MB_NB[i] = getMatChunkSize(inputArrays[i]);
+        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
+                              << " using MB_NB["<<i<<"] " << MB_NB[i][R] << "," << MB_NB[i][C]);
+    }
 
     // these formulas for LLD (local leading dimension) and LTD (local trailing dimension)
     // are found in the headers of the ScaLAPACK functions such as pdgemm_()
@@ -211,11 +247,11 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     for(size_t i=0; i < numArray; i++ ) {
         slpp::int_t RSRC = 0 ;
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
-                              << " M["<<i<<"][R]"<<size[i][R] <<" MB["<<i<<"][R]:"<<blockSize[i][R]
-                              << " N["<<i<<"][R]"<<size[i][C] <<" NB["<<i<<"][R]:"<<blockSize[i][C]
+                              << " M["<<i<<"][R]"<<size[i][R] <<" MB["<<i<<"][R]:"<<MB_NB[i][R]
+                              << " N["<<i<<"][R]"<<size[i][C] <<" NB["<<i<<"][R]:"<<MB_NB[i][C]
                               << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW);
-        LLD[i] = std::max(one, numroc_( size[i][R], blockSize[i][R], MYPROW, RSRC, NPROW ));
-        LTD[i] = std::max(one, numroc_( size[i][C], blockSize[i][C], MYPCOL, RSRC, NPCOL ));
+        LLD[i] = std::max(one, scidb_numroc_( size[i][R], MB_NB[i][R], MYPROW, RSRC, NPROW ));
+        LTD[i] = std::max(one, scidb_numroc_( size[i][C], MB_NB[i][C], MYPCOL, RSRC, NPCOL ));
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
                               << " LLD["<<i<<"] = " << LLD[i]
                               << " LTD["<<i<<"] = " << LTD[i]);
@@ -226,22 +262,22 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     slpp::desc_t DESC[NUM_MATRICES];
     for(size_t i=0; i < numArray; i++ ) {
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
-                              << " descinit_(DESC["<<i<<"], M=" << size[i][R] << ", N=" << size[i][C]
-                              << ", MB=" << blockSize[i][R] << ", NB=" << blockSize[i][R]
+                              << " scidb_descinit_(DESC["<<i<<"], M=" << size[i][R] << ", N=" << size[i][C]
+                              << ", MB=" << MB_NB[i][R] << ", NB=" << MB_NB[i][R]
                               << ", IRSRC=" << 0 << ", ICSRC=" << 0 << ", ICTXT=" << ICTXT
                               << ", LLD=" << LLD[i]);
 
         slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
-        descinit_(DESC[i], size[i][R], size[i][C], blockSize[i][R], blockSize[i][C], 0, 0, ICTXT, LLD[i], descinitINFO);
+        scidb_descinit_(DESC[i], size[i][R], size[i][C], MB_NB[i][R], MB_NB[i][C], 0, 0, ICTXT, LLD[i], descinitINFO);
         if (descinitINFO != 0) {
-            LOG4CXX_ERROR(logger, "GEMMPhysical::invokeMPI(): descinit(DESC) failed, INFO " << descinitINFO
+            LOG4CXX_ERROR(logger, "GEMMPhysical::invokeMPI(): scidb_descinit(DESC) failed, INFO " << descinitINFO
                                                                                     << " DESC " << DESC);
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
-                       << "GEMMPhysical::invokeMPI(): descinit(DESC) failed");
+                       << "GEMMPhysical::invokeMPI(): scidb_descinit(DESC) failed");
         }
 
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
-                              << " descinit_() returned DESC["<<i<<"] " << DESC[i]);
+                              << " scidb_descinit_() returned DESC["<<i<<"] " << DESC[i]);
 
         // debugging for #1986 ... when #instances is prime, process grid is a row.  When small chunk sizes are used,
         // desc.LLD is being set to a number larger than the chunk size ... I don't understand or expect this.
@@ -279,17 +315,62 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
 
     std::vector<MPIPhysical::SMIptr_t> shmIpc = allocateMPISharedMemory(NUM_BUFS, bufElemBytes, bufNumElem, bufDbgNames);
 
+    // the following used to determine the PDGEMM() "K" argument just prior to pdgemm,
+    // but now it has to be done before inputArrays[AA] is .reset() in the following loop.
     //
-    // Zero inputs, to emulate a sparse matrix implementation (but slower)
-    // and then extract the non-missing info onto that.
+    // Comments on PDGEMM input "K", taken from the netlib PDGEMM argument header:
+    // If transa = 'T' or 'C'(true), it is the number of rows in submatrix A."
+    // If transa = 'N'(false), it is the number of columns in submatrix A."
+    slpp::int_t K = nCol(inputArrays[AA], options.transposeA);
+
+    // the following also used to be done just prior to pdgemm,
+    // but now must be done before inputArrays[CC] is .reset() in the following loop.
+    // it must also now be a copy, and not a reference, for the same reason.
+    Dimensions const dimsCC = inputArrays[CC]->getArrayDesc().getDimensions();
+
+    // now for each input matrix, do the following:
+    // 1. redistribute to psScaLAPACK (when not already correct).
+    // 2. if actual conversion happened, release the inputArray, which might be a lot of memory, e.g. when inputArray[i] is materialized.
+    // 2. zero the ScaLAPACK local block-cyclic storage in shared mem. (so that empty cells will become zeros).
+    // 3. extract the (redistributed array) where not-empty, into the ScaLAPACK local matrix memory.
+    // 4. release the redistributed array, which might be a lot of memory since SG is currently materializing.
     //
+    // The only caller of this routine is the execute() method, and neither the execute() method, nor the executor that calls it,
+    // access the inputArrays after calling execute, which is why we can reset() the shared_ptrs to the arrays after consuming the
+    // arrrays into the ScaLAPACK memory.
+    //
+    // redistribute to psScaLAPACK, and convert to ScaLAPACK format.
+    // NOTE: this redistribution must be kept in sync with the particpatingInMPI redistributeInputArrays, above
+
+    procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
+    PartitioningSchemaDataForScaLAPACK schemeData(getBlacsGridSize(inputArrays, query, "GEMMPhysical"), firstChunkSize);
+
     double* asDoubles[NUM_MATRICES];
     for(size_t mat=0; mat < numArray; mat++ ) {
-        asDoubles[mat] = reinterpret_cast<double*>(shmIpc[mat+1]->get());
-        size_t buf= mat+1; // TODO: this would be less error prone if I were to put the arg buf after the data bufs
+        std::stringstream labelStream;
+        labelStream << "GEMMPhysical input[" << mat << "]";
+        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[mat], schemeData, query, labelStream.str());
+
+        bool wasConverted = (tmpRedistedInput != inputArrays[mat]) ;  // only when redistribute was actually done (sometimes optimize away)
+        if(wasConverted) {
+            // free potentially large amount of memory, e.g. when inputArrays[mat] was significantly memory-materialized
+            inputArrays[mat].reset();
+        }
+        // TODO would be nice if we could allocate the ScaLAPACK memory after dropping the input array
+        //      in case the physical memory for the shmem can be reclaimed from the reset inputArrays[mat]
+
+        size_t buf= mat+1;          // buffer 0 is command buffer, buffers[1..n] correspond to inputs[0..n-1]
         assert(buf < NUM_BUFS);
-        setInputMatrixToAlgebraDefault(asDoubles[mat], bufNumElem[buf]);  // note mat C is also an output
-        extractArrayToScaLAPACK(inArray[mat], asDoubles[mat], DESC[mat]);
+
+        asDoubles[mat] = reinterpret_cast<double*>(shmIpc[buf]->get());
+
+        setInputMatrixToAlgebraDefault(asDoubles[mat], bufNumElem[buf]);  // note asDoubles[CC] is input and output to/from ScaLAPACK
+        extractArrayToScaLAPACK(tmpRedistedInput, asDoubles[mat], DESC[mat],NPROW, NPCOL, MYPROW, MYPCOL);
+
+        tmpRedistedInput.reset(); // and drop this array before iterating on the loop to the next repart/redist
+        if (!wasConverted) {
+            inputArrays[mat].reset(); // and now we reset() the input, which was skipped earlier.
+        }
 
         if(DBG) { // that the reformat worked correctly
             for(int ii=0; ii < matrixLocalSize[mat]; ii++) {
@@ -309,15 +390,11 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): calling pdgemm_ M,N,K:" << size[AA][R]  << ","
                                                                   << size[BB][R] << ","
                                                                   << size[CC][C]
-                           << " MB,NB:" << blockSize[AA][R] << "," << blockSize[AA][C]);
+                           << " MB,NB:" << MB_NB[AA][R] << "," << MB_NB[AA][C]);
 
     if(DBG) std::cerr << "GEMMPhysical::invokeMPI(): calling pdgemm to compute" << std:: endl;
     boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
 
-    // note on the value of K, from docs on PDGEMM:
-    // If transa = 'T' or 'C'(true), it is the number of rows in submatrix A."
-    // If transa = 'N'(false), it is the number of columns in submatrix A."
-    slpp::int_t K = nCol(inArray[AA], options.transposeA);
     slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-to-1 between instanceID and MPI rank
     slpp::int_t INFO = DEFAULT_BAD_INFO ;
     pdgemmMaster(query.get(), _ctx, slave, _ipcName, shmIpc[BUF_ARGS]->get(),
@@ -353,14 +430,13 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     // our "processor" coordinate into that position, which we do by multiplying
     // by the chunkSize
     //
-    Dimensions const& dims = inArray[CC]->getArrayDesc().getDimensions();
     Coordinates first(2);
-    first[R] = dims[R].getStart() + MYPROW * blockSize[CC][R];
-    first[C] = dims[C].getStart() + MYPCOL * blockSize[CC][C];
+    first[R] = dimsCC[R].getStart() + MYPROW * MB_NB[CC][R];
+    first[C] = dimsCC[C].getStart() + MYPCOL * MB_NB[CC][C];
 
     Coordinates last(2);
-    last[R] = dims[R].getStart() + size[CC][R] - 1;
-    last[C] = dims[C].getStart() + size[CC][C] - 1;
+    last[R] = dimsCC[R].getStart() + size[CC][R] - 1;
+    last[C] = dimsCC[C].getStart() + size[CC][C] - 1;
 
     shared_ptr<Array> result;
     // the process grid may be larger than the size of output in chunks... e.g multiplying A(1x100) * B(100x1) -> C(1x1)
@@ -368,16 +444,16 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     if (isParticipatingInOutput) {
         // there is in fact some output in our shared memory... hook it up to an OpArray
         Coordinates iterDelta(2);
-        iterDelta[0] = NPROW * blockSize[CC][R];
-        iterDelta[1] = NPCOL * blockSize[CC][C];
+        iterDelta[0] = NPROW * MB_NB[CC][R];
+        iterDelta[1] = NPCOL * MB_NB[CC][C];
 
-        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): participated, creating output array: first ("<<first[R]<<","<<first[C]<<"), last(" << last[R] <<"," <<last[C]<<")");
-        reformatOp_t      pdelgetOp(Cx, DESC[CC], dims[R].getStart(), dims[C].getStart());
+        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():Creating OpArray from ("<<first[R]<<","<<first[C]<<") to (" << last[R] <<"," <<last[C]<<") delta:"<<iterDelta[R]<<","<<iterDelta[C]);
+        reformatOp_t      pdelgetOp(Cx, DESC[CC], dimsCC[R].getStart(), dimsCC[C].getStart());
         result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
                                                              first, last, iterDelta, query));
         assert(resultShmIpcIndx == BUF_MAT_CC);
     } else {
-        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): participated, but not in output array, creating empty output array: first ("<<first[R]<<","<<first[C]<<"), last(" << last[R] <<"," <<last[C]<<")");
+        LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): instance participated, but does not output: creating empty MemArray: first ("<<first[R]<<","<<first[C]<<"), last(" << last[R] <<"," <<last[C]<<")");
         result = shared_ptr<Array>(new MemArray(_schema,query));  // same as when we don't participate at all
         resultShmIpcIndx = shmIpc.size();                   // indicate we don't want to hold on to buffer BUF_MAT_CC after all
     }
@@ -388,7 +464,8 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     resetMPI();
 
     LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI() end");
-    return result;
+
+    return result;  // TODO: repart() prefers a materialized result or needs setopt(repart-dense-open-once)
 }
 
 
@@ -416,14 +493,11 @@ shared_ptr<Array> GEMMPhysical::execute(std::vector< shared_ptr<Array> >& inputA
 
     GEMMOptions options(namedOptionStr);
 
-    // redistribute input arrays to ScaLAPACK block-cyclic
-    std::vector<shared_ptr<Array> > redistributedInputs = redistributeInputArrays(inputArrays, query, "GEMMPhysical");
-
     //
     // invokeMPI()
     //
     shared_ptr<Array> result;
-    result = invokeMPI(redistributedInputs, options, query, _schema);
+    result = invokeMPI(inputArrays, options, query, _schema);
 
     // return the scidb array
     LOG4CXX_DEBUG(logger, "GEMMPhysical::execute(): (successful) end");

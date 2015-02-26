@@ -158,6 +158,16 @@ function collect_test ()
 echo "Collect scidbtestharness result"
 rm -rf ${TESTCASES}
 ${SCP} ${USERNAME}@${COORDINATOR}:${BASE_PATH}/000/tests/harness/testcases ${TESTCASES}
+
+# Generate the scidb.py tar file with logs and core files, and copy it over.
+${SSH} "${BASE_PATH}/bin/scidb.py dbginfo ${DB_NAME} \
+       >${BASE_PATH}/000/scidb-dbginfo.log"
+${SCP} ${USERNAME}@${COORDINATOR}:${BASE_PATH}/000/scidb-dbginfo.log \
+       ${USERNAME}@${COORDINATOR}:${BASE_PATH}/000/0/all*tar ${TESTCASES}/log
+
+# Clean up,
+${SSH} "rm ${BASE_PATH}/000/scidb-dbginfo.log ${BASE_PATH}/000/0/*tar \
+           ${BASE_PATH}/000/*/*tgz"
 }
 
 if [ $# -ne 1 ]; then

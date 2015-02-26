@@ -37,7 +37,7 @@
 
 #
 # To use APT repo with such layout you should create file like this:
-# 
+#
 # /etc/apt/sources.list.d/scidb.list
 #
 # with contents:
@@ -56,7 +56,7 @@ function usage
 
 repotype="${1,,}"
 
-# 
+#
 # Check directory if it have files for building repo
 # Params:
 #   $1 - directory for checking
@@ -69,13 +69,9 @@ function check_apt_dir
     if [ -f "$1/.skip" ]; then
         echo "Found '$1/.skip'. Will not scan '$1'."
         return 1
-    fi 
+    fi
     if [ "`find "$1" -maxdepth 1 -type f -iname \*.deb | wc -l`" = 0 ]; then
         echo "ERROR: Can not find .deb files in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
-        exit 1
-    fi
-    if [ "`find "$1" -maxdepth 1 -type f -iname \*.changes | wc -l`" = 0 ]; then
-        echo "ERROR: Can not find .changes files in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
         exit 1
     fi
     return 0
@@ -86,7 +82,7 @@ function check_yum_dir
     if [ -f "$1/.skip" ]; then
         echo "Found '$1/.skip'. Will not scan '$1'."
         return 1
-    fi 
+    fi
     if [ "`find "$1" -maxdepth 1 -type f -iname \*.rpm | wc -l`" = 0 ]; then
         echo "ERROR: Can not find .rpm files in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
         exit 1

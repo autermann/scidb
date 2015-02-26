@@ -23,6 +23,13 @@
   </refsynopsisdiv>
 
   <refsect1>
+    <title>Library</title>
+
+    <para>The <code>gesvd</code> operator resides in the Dense Linear Algebra
+    library. Run the following query to load this library:<programlisting>AFL% load_library('dense_linear_algebra');</programlisting></para>
+  </refsect1>
+
+  <refsect1>
     <title>Summary</title>
 
     <para>For a matrix <emphasis>M</emphasis>, GESVD returns the matrix
@@ -70,9 +77,6 @@
     role="bold">VT</emphasis></emphasis>) is <emphasis
     role="bold">MIN</emphasis> <symbol role="symbolfont">×
     </symbol><emphasis>n</emphasis>.</para>
-
-    <para>To use the <literal>gesvd</literal> operator, you must first load
-    the <literal>dense_linear_algebra</literal> library.</para>
   </refsect1>
 
   <refsect1>

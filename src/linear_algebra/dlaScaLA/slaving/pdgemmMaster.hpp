@@ -68,17 +68,17 @@ void pdgemmMaster(Query* query,  // or do I need only the ctx?
                    const string& ipcName, // can this be in the ctx too?
                    void * argsBuf,
                    // the following args are common to all scalapack slave operators:
-                   const sl_int_t& NPROW, const sl_int_t& NPCOL,
-                   const sl_int_t& MYPROW, const sl_int_t& MYPCOL, const sl_int_t& MYPNUM,
+                   const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
+                   const slpp::int_t& MYPROW, const slpp::int_t& MYPCOL, const slpp::int_t& MYPNUM,
                    // the follow argument types match the ScaLAPACK FORTRAN-compatible ones:
                    const char &TRANSA, const char &TRANSB,
-                   const sl_int_t& M, const sl_int_t &N, const sl_int_t &K,
+                   const slpp::int_t& M, const slpp::int_t &N, const slpp::int_t &K,
                    const double *ALPHA,
-                   const double *A, const sl_int_t &IA, const sl_int_t &JA, const sl_desc_t& DESC_A,
-                   const double *B,  const sl_int_t &IB,  const sl_int_t &JB,  const sl_desc_t& DESC_B,
+                   const double *A, const slpp::int_t &IA, const slpp::int_t &JA, const slpp::desc_t& DESC_A,
+                   const double *B,  const slpp::int_t &IB,  const slpp::int_t &JB,  const slpp::desc_t& DESC_B,
                    const double *BETA,
-                   double *C, const sl_int_t &IC, const sl_int_t &JC, const sl_desc_t& DESC_C,
-                   sl_int_t &INFO);
+                   double *C, const slpp::int_t &IC, const slpp::int_t &JC, const slpp::desc_t& DESC_C,
+                   slpp::int_t &INFO);
 
 } // namespace scidb
 #endif // PDGEMM_MASTER__H

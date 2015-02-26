@@ -45,14 +45,6 @@ namespace scidb
         return SystemCatalog::getInstance()->getArrayDesc(_desc.getId())->getName();
     }
 
-    DBArray::DBArray(ArrayID id, const boost::shared_ptr<Query>& query)
-    {
-        assert(query);
-        _query = query;
-        SystemCatalog::getInstance()->getArrayDesc(id, _desc);
-        query->sharedLock(getRealName());
-    }
-
     DBArray::DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query) 
     : _desc(desc)
     {

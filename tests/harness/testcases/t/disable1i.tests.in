@@ -20,40 +20,17 @@
 
 # Disable suite containing very large data
 bigdata
-# NEED COMMENT
-aql_misc.update_versions
-# NEED COMMENTS
-checkin.other.sample_1
-checkin.other.sample_2
-# NEED COMMENTS
-checkin.other.bernoulli_1
-checkin.other.bernoulli_3
-checkin.other.bernoulli_3
-# NEED COMMENTS
-checkin.other.scidbLoadCsv_01_basic
-checkin.other.scidbLoadCsv_02_non_int_dimensions
-# NEED COMMENT
-checkin.newaql.aggregate_004
-# NEED COMMENT
-checkin.other.update
-# NEED COMMENT
-checkin.other.xgrid_dn
 # next needs conversion to chunksize 32x32
 checkin.scalapack.20_svd_oldVals
 # next has output that is currently too verbose
 checkin.scalapack.31_svd_doSvdWithMetrics_verySmall
-# NEED COMMENT
-checkin.update.version1
+# very long execution time and queries need to be updated for syntax
 data_model
-# NEED COMMENTS
+# re-enable after solving #3406
 doc.redimension_2
-doc.redimension_store_1
-# NEED COMMENTS
+# re-enable after solving #3407
 doc.ug_loadingData_CSV
 doc.ug_loadingData_binary
-doc.ug_loadingData_opaque
-doc.ug_loadingData_specialValues
-doc.ug_loadingData_errors
 # NEED COMMENT
 perf.repart
 # 40_svd_tickets @ 18min is too slow to leave enabled during functional freeze
@@ -66,8 +43,6 @@ scalapack.disabled
 scalapack.perf
 # DIR may come back into service sometime
 scalapack.smallest_sizes
-# NEED COMMENT
-update.kill
 
 #
 # PART II
@@ -90,19 +65,8 @@ docscript.load
 
 # re-enable after solving ticket 2235
 injecterror.inject_2_redim
-
-# re-enable after solving ticket 2236
 injecterror.inject_2_store
-
-# re-enable after solving ticket 2237
 injecterror.inject_2_update
-
-# re-enable after solving ticket 2238
-# tigor: re-enabling to repro
-# injecterror.inject_4_mapping
-
-# re-enable after solving ticket 2239
-iqueryabort.abort_load
 
 #re-enable after solving ticket 2200, test is on rectangular inputs
 scalapack.gemm_01
@@ -110,17 +74,6 @@ scalapack.gemm_01
 #re-enable after solving ticket 2200, test is on rectangular inputs
 scalapack.gesvd_01
 
-#re-enable after solving ticket 2222
-scalapack.gemm_sparse_dense
-
-#re-enable after solving ticket 2174
-other.bernoulli_2
-
 #re-enable after solving ticket 2232
 docscript.allversions
 
-#re-enable after solving ticket 2258
-other.random_check
-
-#re-enable after solving ticket 2329
-docscript.quickStart

@@ -400,6 +400,8 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <primary>AQL</primary>
 
           <secondary>select</secondary>
+        </indexterm><indexterm>
+          <primary>select statement</primary>
         </indexterm>There are, however, some characteristics of arrays beyond
       these basics. These include the chunk size and chunk overlap value of
       each dimension. Before you choose values for these parameters, you can
@@ -1275,6 +1277,8 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <primary>AQL</primary>
 
           <secondary>select</secondary>
+        </indexterm><indexterm>
+          <primary>select statement</primary>
         </indexterm>Each value in the file must conform to a datatype
       recognized by SciDB. This includes native types, types defined in SciDB
       extensions, and user-defined types. For a complete list of the types

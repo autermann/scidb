@@ -20,12 +20,17 @@
 * END_COPYRIGHT
 */
 #include "RedimensionCommon.h"
+#include <array/SortArray.h>
 
 namespace scidb
 {
 
 using namespace std;
 using namespace boost;
+
+const size_t redimensionDefaultChunkSize = 10*1024;
+
+log4cxx::LoggerPtr RedimensionCommon::logger(log4cxx::Logger::getLogger("scidb.array.RedimensionCommon"));
 
 void RedimensionCommon::setupMappings(ArrayDesc const& srcArrayDesc,
                                        vector<AggregatePtr> & aggregates,
@@ -115,6 +120,310 @@ void RedimensionCommon::setupMappings(ArrayDesc const& srcArrayDesc,
     }
 }
 
+
+size_t RedimensionCommon::mapChunkPosToId(Coordinates const& chunkPos,
+                                          ChunkIdMaps& maps)
+{
+    size_t retval;
+    ChunkToIdMap::iterator it = maps._chunkPosToIdMap.find(chunkPos);
+    if (it == maps._chunkPosToIdMap.end())
+    {
+        retval = maps._chunkPosToIdMap.size();
+        maps._chunkPosToIdMap[chunkPos] = retval;
+        maps._idToChunkPosMap[retval] = chunkPos;
+    }
+    else
+    {
+        retval = it->second;
+    }
+    return retval;
+}
+
+
+Coordinates& RedimensionCommon::mapIdToChunkPos(size_t id, ChunkIdMaps& maps)
+{
+    return maps._idToChunkPosMap[id];
+}
+
+
+shared_ptr<MemArray> RedimensionCommon::initializeRedimensionedArray(
+    shared_ptr<Query> const& query,
+    Attributes const& srcAttrs,
+    Attributes const& destAttrs,
+    vector<size_t> const& attrMapping,
+    vector<AggregatePtr> const& aggregates,
+    vector< shared_ptr<ArrayIterator> >& redimArrayIters,
+    vector< shared_ptr<ChunkIterator> >& redimChunkIters,
+    size_t& redimCount)
+{
+    // Create a 1-D MemArray called 'redimensioned' to hold the redimensioned records.
+    // Each cell in the array corresponds to a cell in the destination array,
+    // where its position within the destination array is determined by two
+    // additional attributes: the destination chunk identifier, and the
+    // position within the destination chunk.
+
+    // The schema is adapted from destArrayDesc, with the following differences:
+    //    (a) An aggregate field's type is replaced with the source field type, but still uses the name of the dest attribute.
+    //        The motivation is that multiple dest aggregate attribute may come from the same source attribute,
+    //        in which case storing under the source attribute name would cause a conflict.
+    //    (b) Two additional attributes are appended to the end:
+    //        (1) 'tmpDestChunkPosition', that stores the location of the item in the dest chunk
+    //        (2) 'tmpDestChunkId', that stores the id of the destination chunk
+    //
+    // The data is derived from the inputarray as follows.
+    //    (a) They are "redimensioned".
+    //    (b) Each record is stored as a distinct record in the MemArray. For an aggregate field, no aggregation is performed;
+    //        For a synthetic dimension, just use dimStartSynthetic.
+    //
+    // Local aggregation will be performed at a later step, when generating the MemArray called 'beforeRedistribute'.
+    // Global aggregation will be performed at the redistributeAggregate() step.
+    //
+
+    Dimensions dimsRedimensioned(1);
+    Attributes attrsRedimensioned;
+    for (size_t i=0; i<destAttrs.size(); ++i) {
+        // For aggregate field, store the source data but under the name of the dest attribute.
+        // The motivation is that multiple dest aggregate attribute may come from the same source attribute,
+        // in which case storing under the source attribute name would cause conflict.
+        //
+        // An optimization is possible in this special case, to only store the source attribute once.
+        // But some unintuitive bookkeeping would be needed.
+        // We decide to skip the optimization at least for now.
+        if (aggregates[i]) {
+            AttributeDesc const& srcAttrForAggr = srcAttrs[ attrMapping[i] ];
+            attrsRedimensioned.push_back(AttributeDesc(i, 
+                                                       destAttrs[i].getName(), 
+                                                       srcAttrForAggr.getType(),
+                                                       srcAttrForAggr.getFlags(), 
+                                                       srcAttrForAggr.getDefaultCompressionMethod()));
+        } else {
+            attrsRedimensioned.push_back(destAttrs[i]);
+        }
+    }
+    attrsRedimensioned.push_back(AttributeDesc(destAttrs.size(), "tmpDestPositionInChunk", TID_INT64, 0, 0));
+    attrsRedimensioned.push_back(AttributeDesc(destAttrs.size()+1, "tmpDestChunkId", TID_INT64, 0, 0));
+    dimsRedimensioned[0] = DimensionDesc("Row", 0, MAX_COORDINATE, redimensionDefaultChunkSize, 0);
+
+    Attributes attrsRedimensionedWithET(attrsRedimensioned);
+    attrsRedimensionedWithET.push_back(AttributeDesc(attrsRedimensioned.size(),
+                                                     DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+                                                     TID_INDICATOR,
+                                                     AttributeDesc::IS_EMPTY_INDICATOR,
+                                                     0));
+    ArrayDesc schemaRedimensioned("", 
+                                  attrsRedimensionedWithET, 
+                                  dimsRedimensioned, 
+                                  ArrayDesc::LOCAL|ArrayDesc::TEMPORARY);
+    shared_ptr<MemArray> redimensioned(new MemArray(schemaRedimensioned, query));
+
+    // Initialize the iterators
+    redimCount = 0;
+    redimArrayIters.resize(attrsRedimensioned.size());
+    redimChunkIters.resize(attrsRedimensioned.size());
+    for (size_t i = 0; i < attrsRedimensioned.size(); i++)
+    {
+        redimArrayIters[i] = redimensioned->getIterator(i);
+    }
+
+    return redimensioned;
+}
+
+
+void RedimensionCommon::appendItemToRedimArray(vector<Value> const& item,
+                                               shared_ptr<Query> const& query,
+                                               vector< shared_ptr<ArrayIterator> >& redimArrayIters,
+                                               vector< shared_ptr<ChunkIterator> >& redimChunkIters,
+                                               size_t& redimCount)
+{
+    // if necessary, refresh the chunk iterators
+    if (redimCount % redimensionDefaultChunkSize == 0)
+    {
+        Coordinates chunkPos(1);
+        int chunkMode = ChunkIterator::SEQUENTIAL_WRITE;
+        chunkPos[0] = redimCount;
+        for (size_t i = 0; i < redimArrayIters.size(); i++)
+        {
+            Chunk& chunk = redimArrayIters[i]->newChunk(chunkPos, 0);
+            redimChunkIters[i] = chunk.getIterator(query, chunkMode);
+            chunkMode |= ChunkIterator::NO_EMPTY_CHECK;  // creat iterator without this flag only for first attr
+        }
+    }
+
+    // append the item to the current chunks
+    for (size_t i = 0; i < item.size(); i++)
+    {
+        redimChunkIters[i]->writeItem(item[i]);
+    }
+    redimCount++;
+
+    // flush the current chunks, or advance the iters
+    if (redimCount % redimensionDefaultChunkSize == 0)
+    {
+        for (size_t i = 0; i < redimChunkIters.size(); i++)
+        {
+            redimChunkIters[i]->flush();
+            redimChunkIters[i].reset();
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < redimChunkIters.size(); i++)
+        {
+            ++(*redimChunkIters[i]);
+        }
+    }
+}
+
+
+bool RedimensionCommon::updateSyntheticDimForRedimArray(shared_ptr<Query> const& query,
+                                                        ArrayCoordinatesMapper const& coordMapper,
+                                                        ChunkIdMaps& chunkIdMaps,
+                                                        size_t dimSynthetic,
+                                                        shared_ptr<MemArray>& redimensioned)
+{
+    // If there is a synthetic dimension, and if there are duplicates, modify the values
+    // (so that the duplicates get distinct coordinates in the synthetic dimension).
+    //
+
+    queue< pair<position_t, position_t> > updates;
+    bool needsResort = false;
+    size_t currChunkId;
+    size_t nextChunkId;
+    position_t prevPosition;
+    position_t currPosition;
+    Coordinates currPosCoord(coordMapper.getDims().size());
+    size_t chunkIdAttr = redimensioned->getArrayDesc().getAttributes(true).size() - 1;
+    size_t posAttr = chunkIdAttr - 1;
+    shared_ptr<ConstArrayIterator> arrayChunkIdIter = redimensioned->getConstIterator(chunkIdAttr);
+    shared_ptr<ArrayIterator> arrayPosIter = redimensioned->getIterator(posAttr);
+    SCIDB_ASSERT(!arrayChunkIdIter->end());
+    SCIDB_ASSERT(!arrayPosIter->end());
+    shared_ptr<ConstChunkIterator> chunkChunkIdIter = arrayChunkIdIter->getChunk().getConstIterator();
+    shared_ptr<ConstChunkIterator> chunkPosReadIter = arrayPosIter->getChunk().getConstIterator();
+    shared_ptr<ChunkIterator> chunkPosWriteIter;
+    Coordinates lows(coordMapper.getDims().size()), intervals(coordMapper.getDims().size());
+
+    // initialize the previous position value, current chunk id, and lows and intervals
+    prevPosition = chunkPosReadIter->getItem().getInt64();
+    currChunkId = chunkChunkIdIter->getItem().getInt64();
+    coordMapper.chunkPos2LowsAndIntervals(mapIdToChunkPos(currChunkId, chunkIdMaps), 
+                                          lows, 
+                                          intervals);
+    coordMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, currPosCoord);
+    ++(*chunkPosReadIter);
+    ++(*chunkChunkIdIter);
+
+    // scan array from beginning to end
+    while (!arrayChunkIdIter->end())
+    {
+        while (!chunkChunkIdIter->end())
+        {
+            // Are we processing a new output chunk id?
+            nextChunkId = chunkChunkIdIter->getItem().getInt64();
+            if (nextChunkId != currChunkId)
+            {
+                prevPosition = chunkPosReadIter->getItem().getInt64();
+                currChunkId = nextChunkId;
+                coordMapper.chunkPos2LowsAndIntervals(mapIdToChunkPos(currChunkId, chunkIdMaps), 
+                                                      lows, 
+                                                      intervals);
+                coordMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, currPosCoord);
+                goto nextitem;
+            }
+
+            // Are we processing a run of identical positions?
+            currPosition = chunkPosReadIter->getItem().getInt64();
+            if (currPosition == prevPosition)
+            {
+                // found a duplicate --- add an update to the list
+                pair<position_t, position_t> pu;
+
+                currPosCoord[dimSynthetic]++;
+                pu.first = chunkPosReadIter->getPosition()[0];
+                pu.second = coordMapper.coord2posWithLowsAndIntervals(lows, 
+                                                                      intervals,
+                                                                      currPosCoord);
+                updates.push(pu);
+
+                // make sure the number of duplicates is less than chunk interval (for the synthetic dim)
+                if ((currPosCoord[dimSynthetic] - lows[dimSynthetic]) >= 
+                    intervals[dimSynthetic]) 
+                {
+                    throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_REDIMENSION_STORE_ERROR7);
+                }
+            }
+            else
+            {
+                prevPosition = currPosition;
+                coordMapper.pos2coordWithLowsAndIntervals(lows, intervals, currPosition, currPosCoord);
+            }
+
+        nextitem:
+            ++(*chunkPosReadIter);
+            ++(*chunkChunkIdIter);
+        }
+
+        // At the end of a chunk, process any updates we have accumulated...
+        if (updates.size() > 0)
+        {
+            chunkPosWriteIter = arrayPosIter->updateChunk().getIterator(query,
+                                                                        ChunkIterator::APPEND_CHUNK |
+                                                                        ChunkIterator::NO_EMPTY_CHECK);
+            while (updates.size() > 0)
+            {
+                Coordinates updatePos(1);
+                Value updateVal;
+
+                updatePos[0] = updates.front().first;
+                updateVal.setInt64(updates.front().second);
+                chunkPosWriteIter->setPosition(updatePos);
+                chunkPosWriteIter->writeItem(updateVal);
+
+                updates.pop();
+            }
+            chunkPosWriteIter->flush();
+            chunkPosWriteIter.reset();
+        }
+
+        // Goto next chunk
+        ++(*arrayPosIter);
+        ++(*arrayChunkIdIter);
+        if (!arrayChunkIdIter->end())
+        {
+            chunkChunkIdIter = arrayChunkIdIter->getChunk().getConstIterator();
+            chunkPosReadIter = arrayPosIter->getChunk().getConstIterator();
+        }
+    }
+
+    return needsResort;
+}
+
+
+void RedimensionCommon::appendItemToBeforeRedistribution(ArrayCoordinatesMapper const& coordMapper,
+                                                         Coordinates const& lows,
+                                                         Coordinates const& intervals,
+                                                         position_t prevPosition,
+                                                         vector< shared_ptr<ChunkIterator> >& chunkItersBeforeRedist,
+                                                         StateVector& stateVector)
+{
+    // Do nothing if stateVector has nothing in it
+    if (stateVector.isValid())
+    {
+        Coordinates outputCoord(lows.size());
+
+        coordMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, outputCoord);
+        vector<Value> const& destItem = stateVector.get();
+        for (size_t a = 0; a < chunkItersBeforeRedist.size(); ++a) {
+            bool rc = chunkItersBeforeRedist[a]->setPosition(outputCoord);
+            if (!rc) {
+                throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_INVALID_REDIMENSION_POSITION) << CoordsToStr(outputCoord);
+            }
+            chunkItersBeforeRedist[a]->writeItem(destItem[a]);
+        }
+    }
+}
+
+
 shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& srcArray,
                                                       vector<size_t> const& attrMapping,
                                                       vector<size_t> const& dimMapping,
@@ -166,57 +475,33 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
         }
     }
 
-    // Create a RowCollection.
-    // Each row corresponds to a chunk in the destination array.
+    // Initialize 'redimensioned' array
+    shared_ptr<MemArray> redimensioned;
+    vector< shared_ptr<ArrayIterator> > redimArrayIters;
+    vector< shared_ptr<ChunkIterator> > redimChunkIters;
+    size_t redimCount = 0;
+    redimensioned = initializeRedimensionedArray(query, 
+                                                 srcAttrs, 
+                                                 destAttrs, 
+                                                 attrMapping, 
+                                                 aggregates,
+                                                 redimArrayIters,
+                                                 redimChunkIters,
+                                                 redimCount);
 
-    // The schema is adapted from destArrayDesc, with the following differences:
-    //    (a) An aggregate field's type is replaced with the source field type, but still uses the name of the dest attribute.
-    //        The motivation is that multiple dest aggregate attribute may come from the same source attribute,
-    //        in which case storing under the source attribute name would cause a conflict.
-    //    (b) An additional attribute is appended at the end, called 'tmpRowCollectionPosition', that stores the location of the item in the dest array.
-    //
-    // The data is derived from the inputarray as follows.
-    //    (a) They are "redimensioned".
-    //    (b) Each record is stored as a distinct record in the RowCollection. For an aggregate field, no aggregation is performed;
-    //        For a synthetic dimension, just use dimStartSynthetic.
-    //
-    // Local aggregation will be performed at a later step, when generating the MemArray called 'beforeRedistribute'.
-    // Global aggregation will be performed at the redistributeAggregate() step.
-    //
-    Attributes attrsRowCollection;
-    for (size_t i=0; i<destAttrs.size(); ++i) {
-        // For aggregate field, store the source data but under the name of the dest attribute.
-        // The motivation is that multiple dest aggregate attribute may come from the same source attribute,
-        // in which case storing under the source attribute name would cause conflict.
-        //
-        // An optimization is possible in this special case, to only store the source attribute once.
-        // But some unintuitive bookkeeping would be needed.
-        // We decide to skip the optimization at least for now.
-        if (aggregates[i]) {
-            AttributeDesc const& srcAttrForAggr = srcAttrs[ attrMapping[i] ];
-            attrsRowCollection.push_back(AttributeDesc(i, destAttrs[i].getName(), srcAttrForAggr.getType(),
-                    srcAttrForAggr.getFlags(), srcAttrForAggr.getDefaultCompressionMethod()));
-        } else {
-            attrsRowCollection.push_back(destAttrs[i]);
-        }
-    }
-    attrsRowCollection.push_back(AttributeDesc(destAttrs.size(), "tmpRowCollectionPosition", TID_INT64, 0, 0));
-    RowCollection<Coordinates> rowCollection(query, "", attrsRowCollection);
-
-    //
-    // Iterate through the input array, generate the output data, and append to the RowCollection.
+    // Iterate through the input array, generate the output data, and append to the MemArray.
     // Note: For an aggregate field, its source value (in the input array) is used.
     // Note: The synthetic dimension is not handled here. That is, multiple records, that will be differentiated along the synthetic dimension,
-    //       are all appended to the RowCollection with the same 'position'.
+    //       are all appended to the 'redimensioned' array with the same 'position'.
     //
     size_t iterAttr = 0;    // one of the attributes from the input array that needs to be iterated
 
     vector< shared_ptr<ConstArrayIterator> > srcArrayIterators(srcAttrs.size());
     vector< shared_ptr<ConstChunkIterator> > srcChunkIterators(srcAttrs.size());
 
+    // Initialie the source array iters
     for (size_t i = 0; i < destAttrs.size(); i++) {
         size_t j = attrMapping[i];
-
         if (!isFlipped(j)) {
             if (!srcArrayIterators[iterAttr]) {
                 iterAttr = j;
@@ -240,7 +525,9 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
         srcArrayIterators[0] = srcArray->getConstIterator(0);
     }
 
+    // Start scanning the input
     ArrayCoordinatesMapper arrayCoordinatesMapper(destDims);
+    ChunkIdMaps arrayChunkIdMaps;
 
     while (!srcArrayIterators[iterAttr]->end())
     {
@@ -251,13 +538,14 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
             }
         }
 
+        // Initialize the dest 
         Coordinates chunkPos;
 
         // Loop through the chunks content
         while (!srcChunkIterators[iterAttr]->end()) {
             Coordinates const& srcPos = srcChunkIterators[iterAttr]->getPosition();
             Coordinates destPos(destDims.size());
-            vector<Value> valuesInRowCollection(destAttrs.size()+1);
+            vector<Value> valuesInRedimArray(destAttrs.size()+2);
 
             // Get the destPos for this item -- for the SYNTHETIC dim, use the same value (dimStartSynthetic) for all.
             for (size_t i = 0; i < destDims.size(); i++) {
@@ -292,42 +580,52 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
             chunkPos = destPos;
             _schema.getChunkPositionFor(chunkPos);
 
-            // Build data (except the last field, i.e. position) to be written to the RowCollection.
+            // Build data (except the last two fields, i.e. position/chunkid) to be written
             for (size_t i = 0; i < destAttrs.size(); i++) {
                 size_t j = attrMapping[i];
                 if ( isFlipped(j) ) { // if flipped from a dim and ...
                     if (destAttrs[i].getType() == TID_INT64) { // ... if this is an INT64 dim
-                        valuesInRowCollection[i].setInt64( srcPos[turnOff(j, FLIP)] );
+                        valuesInRedimArray[i].setInt64( srcPos[turnOff(j, FLIP)] );
                     } else { // ... if this is an NID
-                        valuesInRowCollection[i] = srcArrayDesc.getOriginalCoordinate(turnOff(j, FLIP), srcPos[turnOff(j, FLIP)], query);
+                        valuesInRedimArray[i] = srcArrayDesc.getOriginalCoordinate(turnOff(j, FLIP), srcPos[turnOff(j, FLIP)], query);
                     }
                 } else { // from an attribute
-                    valuesInRowCollection[i] = srcChunkIterators[j]->getItem();
+                    valuesInRedimArray[i] = srcChunkIterators[j]->getItem();
                 }
             }
 
-            // Set the last field of the data, and append to the RowCollection.
+            // Set the last two fields of the data, and append to the redimensioned array
             if (hasOverlap) {
                 OverlappingChunksIterator allChunks(destDims, destPos, chunkPos);
                 while (!allChunks.end()) {
                     Coordinates const& overlappingChunkPos = allChunks.getPosition();
                     position_t pos = arrayCoordinatesMapper.coord2pos(overlappingChunkPos, destPos);
-                    valuesInRowCollection[destAttrs.size()].setInt64(pos);
-                    size_t resultRowId = UNKNOWN_ROW_ID;
-                    rowCollection.appendItem(resultRowId, overlappingChunkPos, valuesInRowCollection);
+                    valuesInRedimArray[destAttrs.size()].setInt64(pos);
+                    position_t chunkId = mapChunkPosToId(overlappingChunkPos, arrayChunkIdMaps);
+                    valuesInRedimArray[destAttrs.size()+1].setInt64(chunkId);
+                    appendItemToRedimArray(valuesInRedimArray, 
+                                           query,
+                                           redimArrayIters,
+                                           redimChunkIters,
+                                           redimCount);
 
                     // Must increment after overlappingChunkPos is no longer needed, because the increment will modify overlappingChunkPos.
                     ++allChunks;
                 }
             } else {
                 position_t pos = arrayCoordinatesMapper.coord2pos(chunkPos, destPos);
-                valuesInRowCollection[destAttrs.size()].setInt64(pos);
-                size_t resultRowId = UNKNOWN_ROW_ID;
-                rowCollection.appendItem(resultRowId, chunkPos, valuesInRowCollection);
+                valuesInRedimArray[destAttrs.size()].setInt64(pos);
+                position_t chunkId = mapChunkPosToId(chunkPos, arrayChunkIdMaps);
+                valuesInRedimArray[destAttrs.size()+1].setInt64(chunkId);
+                appendItemToRedimArray(valuesInRedimArray,
+                                       query,
+                                       redimArrayIters,
+                                       redimChunkIters,
+                                       redimCount);
             }
 
             // Advance chunk iterators
-            ToNextItem:
+        ToNextItem:
 
             for (size_t i = 0; i < srcAttrs.size(); i++) {
                 if (srcChunkIterators[i]) {
@@ -342,10 +640,71 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
                 ++(*srcArrayIterators[i]);
             }
         }
+    } // while
+
+    // If there are leftover values, flush the output iters one last time
+    if (redimCount)
+    {
+        for (size_t i = 0; i < redimChunkIters.size(); ++i)
+        {
+            redimChunkIters[i]->flush();
+            redimChunkIters[i].reset();
+        }
+    }
+    for (size_t i = 0; i < redimArrayIters.size(); ++i)
+    {
+        redimArrayIters[i].reset();
     }
 
-    rowCollection.switchMode(RowCollectionModeRead);
-    timing.logTiming(logger, "[RedimStore] inputArray --> RowCollection");
+    timing.logTiming(logger, "[RedimStore] inputArray --> redimensioned");
+
+    // LOG4CXX_DEBUG(logger, "[RedimStore] redimensioned values: ");
+    // redimensioned->printArrayToLogger();
+
+    // Sort the redimensioned array based on the chunkid, followed by the position in the chunk
+    //
+    vector<Key> keys(2);
+    Key k;
+    k.columnNo = destAttrs.size() + 1;
+    k.ascent = true;
+    keys[0] = k;
+    k.columnNo = destAttrs.size();
+    k.ascent = true;
+    keys[1] = k;
+
+    SortArray sorter(redimensioned->getArrayDesc());
+    shared_ptr<TupleComparator> tcomp(new TupleComparator(keys, redimensioned->getArrayDesc()));
+    if (redimCount)
+    {
+        shared_ptr<MemArray> sortedRedimensioned = sorter.getSortedArray(redimensioned, query, tcomp);
+        redimensioned = sortedRedimensioned;
+    }
+
+    timing.logTiming(logger, "[RedimStore] redimensioned sorted");
+
+    // LOG4CXX_DEBUG(logger, "[RedimStore] redimensioned sorted values: ");
+    // redimensioned->printArrayToLogger();
+
+    // If hasSynthetic, each record with the same position get assigned a distinct value in the synthetic dimension, effectively
+    // assigning a distinct position to every record.  After updating the redimensioned array, it will need to be re-sorted.
+    //
+    if (hasSynthetic && redimCount)
+    {
+        if (updateSyntheticDimForRedimArray(query,
+                                            arrayCoordinatesMapper, 
+                                            arrayChunkIdMaps, 
+                                            dimSynthetic, 
+                                            redimensioned))
+        {
+            shared_ptr<MemArray> sortedRedimSynthetic = sorter.getSortedArray(redimensioned, query, tcomp);
+            redimensioned = sortedRedimSynthetic;
+        }
+
+        // LOG4CXX_DEBUG(logger, "[RedimStore] redimensioned after update synthetic: ");
+        // redimensioned->printArrayToLogger();
+    }
+
+    timing.logTiming(logger, "[RedimStore] synthetic dimension populated");
 
     // Create a MemArray call 'beforeRedistribution'.
     //
@@ -353,10 +712,8 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     //    (a) For an aggregate field, the type is the 'State' of the aggregate, rather than the destination field type.
     //
     // The data is computed as follows:
-    //    (a) For an aggregate field, the aggregate state, among all records with the same positin, is stored.
-    //    (b) If hasSynthetic, each record with the same position get assigned a distinct value in the synthetic dimension, effectively
-    //        assigning a distinct position to every record.
-    //    (c) If !hasAggregate and !hasSynthetic, for duplicates, only one record is kept.
+    //    (a) For an aggregate field, the aggregate state, among all records with the same position, is stored.
+    //    (b) If !hasAggregate and !hasSynthetic, for duplicates, only one record is kept.
     //
     // Also, the MemArray has the empty tag, regardless to what the input array has.
     //
@@ -378,93 +735,99 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     shared_ptr<MemArray> beforeRedistribution = make_shared<MemArray>(
               ArrayDesc(_schema.getName(), addEmptyTagAttribute(attrsBeforeRedistribution), _schema.getDimensions() ),query);
 
-    // Write data from the RowCollection to the MemArray
+    // Write data from the 'redimensioned' array to the 'beforeRedistribution' array
+    //
+
+    // Initialize iterators
+    //
     vector<shared_ptr<ArrayIterator> > arrayItersBeforeRedistribution(attrsBeforeRedistribution.size());
     vector<shared_ptr<ChunkIterator> > chunkItersBeforeRedistribution(attrsBeforeRedistribution.size());
-    for (size_t i=0; i<destAttrs.size(); ++i) {
+    for (size_t i=0; i<destAttrs.size(); ++i) 
+    {
         arrayItersBeforeRedistribution[i] = beforeRedistribution->getIterator(i);
     }
-
-    CompareValueVectorsByOneValue compareValueVectorsFunc(destAttrs.size(), TID_INT64); // compare two items based on position in chunk
-
-    RowCollection<Coordinates>::GroupToRowId const& groupToRowId = rowCollection.getGroupToRowId();
-    for (RowCollection<Coordinates>::GroupToRowId::const_iterator groupToRowIdIter = groupToRowId.begin();
-            groupToRowIdIter != groupToRowId.end(); ++groupToRowIdIter)
+    SCIDB_ASSERT(redimArrayIters.size() == destAttrs.size() + 2);
+    vector< shared_ptr<ConstArrayIterator> > redimArrayConstIters(redimArrayIters.size());
+    vector< shared_ptr<ConstChunkIterator> > redimChunkConstIters(redimChunkIters.size());
+    for (size_t i = 0; i < redimArrayConstIters.size(); ++i)
     {
-        Coordinates const& chunkPos = groupToRowIdIter->first;
-        size_t rowId = groupToRowIdIter->second;
+        redimArrayConstIters[i] = redimensioned->getConstIterator(i);
+    }
 
-        // Get the row.
-        vector<vector<Value> > items;
-        rowCollection.getWholeRow(rowId, items, false); // false - no separateNull
-        assert(items.size()>0);
-        Coordinates lows(chunkPos.size()), intervals(chunkPos.size());
-        arrayCoordinatesMapper.chunkPos2LowsAndIntervals(chunkPos, lows, intervals);
+    // Initialize current chunk id to a value that is never in the map
+    //
+    size_t chunkIdAttr = redimArrayConstIters.size() - 1;
+    size_t positionAttr = redimArrayConstIters.size() - 2;
+    size_t nDestAttrs = _schema.getDimensions().size();
+    size_t chunkId = arrayChunkIdMaps._chunkPosToIdMap.size();
+    Coordinates lows(nDestAttrs), intervals(nDestAttrs);
+    Coordinates outputCoord(nDestAttrs);
 
-        // Sort based on position in the chunk (again, all records in the same 'cell' were assigned the same value in the synthetic dim).
-        iqsort(&items[0], items.size(), compareValueVectorsFunc);
-        query->validate();
+    // Init state vector and prev position
+    StateVector stateVector(aggregates, 0);
+    position_t prevPosition = 0;
 
-        // If there is a synthetic dimension, and if there are duplicates, modify the values
-        // (so that the duplicates get distinct coordinates in the synthetic dimension).
-        bool needToResort = false;
-        if (hasSynthetic) {
-            Coordinate offset = 1; // To be added to the synthetic dimension of the current record.
-            position_t prevPosition = items[0][destAttrs.size()].getInt64(); // The position to compare with.
-            Coordinates coordinates(destDims.size());
-
-            for (size_t i=1; i<items.size(); ++i) {
-                position_t currPosition = items[i][destAttrs.size()].getInt64();
-                if (prevPosition == currPosition) {
-                    // make sure the number of duplicates is less than chunk interval (for the synthetic dim)
-                    if (offset >= destDims[dimSynthetic].getChunkInterval()) {
-                        throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_REDIMENSION_STORE_ERROR7);
-                    }
-
-                    // found a duplicate ==> recalculate the position, with an increased coordinate in the synthetic dim.
-                    arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, coordinates);
-                    coordinates[dimSynthetic] += offset;
-                    position_t newPos = arrayCoordinatesMapper.coord2posWithLowsAndIntervals(lows, intervals, coordinates);
-                    items[i][destAttrs.size()].setInt64(newPos);
-
-                    // Increment offset for the next duplicate, and mark needtoResort.
-                    ++offset;
-                    needToResort = true;
-                } else {
-                    prevPosition = currPosition;
-                    offset = 1;
-                }
-            }
+    // Scan through the items, aggregate (if apply), and write to the MemArray.
+    //
+    while (!redimArrayConstIters[0]->end())
+    {
+        // Set up chunk iters for the input chunk
+        for (size_t i = 0; i < redimChunkConstIters.size(); ++i)
+        {
+            redimChunkConstIters[i] = redimArrayConstIters[i]->getChunk().getConstIterator(i);
         }
 
-        // Resort, if some position has been changed.
-        if (needToResort) {
-            iqsort(&items[0], items.size(), compareValueVectorsFunc);
-            query->validate();
-        }
-
-        // Create new chunks and get the iterators.
-        // The first non-empty-tag attribute does NOT use NO_EMPTY_CHECK (so as to help take care of the empty tag); Others do.
-        //
-        int iterMode = ConstChunkIterator::SEQUENTIAL_WRITE;
-
-        for (size_t i=0; i<destAttrs.size(); ++i) {
-            Chunk& chunk = arrayItersBeforeRedistribution[i]->newChunk(chunkPos);
-            chunkItersBeforeRedistribution[i] = chunk.getIterator(query, iterMode);
-            iterMode |= ConstChunkIterator::NO_EMPTY_CHECK;
-        }
-
-        { // begin of scope -- needed to flush the chunks even in case of errors.
-            BOOST_SCOPE_EXIT((&chunkItersBeforeRedistribution)(&destAttrs)) {
-                // Flush the chunks.
-                for (size_t i=0; i<destAttrs.size(); ++i) {
-                    chunkItersBeforeRedistribution[i]->flush();
-                    chunkItersBeforeRedistribution[i].reset();
-                }
-            } BOOST_SCOPE_EXIT_END
-
-            // Scan through the items, aggregate (if apply), and write to the MemArray.
+        while (!redimChunkConstIters[0]->end())
+        {
+            // Have we found a new output chunk?
             //
+            size_t nextChunkId = redimChunkConstIters[chunkIdAttr]->getItem().getInt64();
+            if (chunkId != nextChunkId)
+            {
+                // Write the left-over stateVector
+                //
+                appendItemToBeforeRedistribution(arrayCoordinatesMapper,
+                                                 lows,
+                                                 intervals,
+                                                 prevPosition,
+                                                 chunkItersBeforeRedistribution,
+                                                 stateVector);
+
+                // Flush current output iters
+                //
+                for (size_t i = 0; i < destAttrs.size(); ++i)
+                {
+                    if (chunkItersBeforeRedistribution[i].get())
+                    {
+                        chunkItersBeforeRedistribution[i]->flush();
+                        chunkItersBeforeRedistribution[i].reset();
+                    }
+                }
+
+                // Init the coordinate mapper for the new chunk
+                //
+                chunkId = nextChunkId;
+                arrayCoordinatesMapper.chunkPos2LowsAndIntervals(mapIdToChunkPos(chunkId, arrayChunkIdMaps), 
+                                                                 lows, 
+                                                                 intervals);
+
+                // Create new chunks and get the iterators.
+                // The first non-empty-tag attribute does NOT use NO_EMPTY_CHECK (so as to help take care of the empty tag); Others do.
+                //
+                int iterMode = ConstChunkIterator::SEQUENTIAL_WRITE;
+                for (size_t i=0; i<destAttrs.size(); ++i) 
+                {
+                    Chunk& chunk = arrayItersBeforeRedistribution[i]->newChunk(mapIdToChunkPos(chunkId, arrayChunkIdMaps));
+                    chunkItersBeforeRedistribution[i] = chunk.getIterator(query, iterMode);
+                    iterMode |= ConstChunkIterator::NO_EMPTY_CHECK;
+                }
+
+                // Update prevPosition, reset state vector
+                //
+                prevPosition = 0;
+                stateVector.init();
+            }
+
             // When seeing the first item with a new position, the attribute values in the item are populated into the destItem as follows.
             //  - For a scalar field, the value is copied.
             //  - For an aggregate field, the value is initialized and accumulated.
@@ -473,60 +836,73 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
             //  - For a scalar field, the value is ignored (just select the first item).
             //  - For an aggregate field, the value is accumulated.
             //
-            StateVector stateVector(aggregates, 1);  // 1 = one element to ignore at the end of every items[i]; i.e. to ignore the 'position' field.
+            vector<Value> destItem(destAttrs.size());
+            for (size_t i = 0; i < destAttrs.size(); ++i)
+            {
+                destItem[i] = redimChunkConstIters[i]->getItem();
+            }
 
-            position_t prevPosition = 0; // The position to compare with.
-            if (items.size()>0) {
-                prevPosition = items[0][destAttrs.size()].getInt64();
+            position_t currPosition = redimChunkConstIters[positionAttr]->getItem().getInt64();
+            if (currPosition == prevPosition) 
+            {
+                stateVector.accumulate(destItem);
+            } 
+            else 
+            {
+                // Output the previous state vector.
+                appendItemToBeforeRedistribution(arrayCoordinatesMapper,
+                                                 lows,
+                                                 intervals,
+                                                 prevPosition,
+                                                 chunkItersBeforeRedistribution,
+                                                 stateVector);
+
+                // record the new prevPosition
+                prevPosition = currPosition;
+
+                // Init and accumulate with the current item.
                 stateVector.init();
-                stateVector.accumulate(items[0]);
-            }
-            Coordinates coordinates(destDims.size()); // a temporary variable into which a position is converted
-
-            for (size_t i=1; i<items.size(); ++i) {
-                position_t currPosition = items[i][destAttrs.size()].getInt64();
-
-                if (currPosition == prevPosition) {
-                    stateVector.accumulate(items[i]);
-                } else {
-                    // Output the previous state vector.
-                    arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, coordinates);
-                    vector<Value> const& destItem = stateVector.get();
-                    for (size_t a=0; a<destAttrs.size(); ++a) {
-                        bool rc = chunkItersBeforeRedistribution[a]->setPosition(coordinates);
-                        if (!rc) {
-                            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_INVALID_REDIMENSION_POSITION) << CoordsToStr(coordinates);
-                        }
-                        chunkItersBeforeRedistribution[a]->writeItem(destItem[a]);
-                    }
-
-                    // record the new prevPosition
-                    prevPosition = currPosition;
-
-                    // Init and accumulate with the current item.
-                    stateVector.init();
-                    stateVector.accumulate(items[i]);
-                }
+                stateVector.accumulate(destItem);
             }
 
-            // Write the last state vector.
-            if (items.size()>0) {
-                arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, coordinates);
-                vector<Value> const& destItem = stateVector.get();
-                for (size_t a=0; a<destAttrs.size(); ++a) {
-                    bool rc = chunkItersBeforeRedistribution[a]->setPosition(coordinates);
-                    if (!rc) {
-                        throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_INVALID_REDIMENSION_POSITION) << CoordsToStr(coordinates);
-                    }
-                    chunkItersBeforeRedistribution[a]->writeItem(destItem[a]);
-                }
+            // Advance chunk iterators
+            for (size_t i = 0; i < redimChunkConstIters.size(); ++i)
+            {
+                ++(*redimChunkConstIters[i]);
             }
-        } // end of scope
+        } // while chunk iterator
+
+        // Advance array iterators
+        for (size_t i = 0; i < redimArrayConstIters.size(); ++i)
+        {
+            ++(*redimArrayConstIters[i]);
+        }
+    } // while array iterator
+
+    // Flush the leftover statevector
+    appendItemToBeforeRedistribution(arrayCoordinatesMapper,
+                                     lows,
+                                     intervals,
+                                     prevPosition,
+                                     chunkItersBeforeRedistribution,
+                                     stateVector);
+    
+    // Flush the chunks one last time
+    for (size_t i=0; i<destAttrs.size(); ++i) 
+    {
+        if (chunkItersBeforeRedistribution[i].get())
+        {
+            chunkItersBeforeRedistribution[i]->flush();
+        }
+        chunkItersBeforeRedistribution[i].reset();
     }
+
     for (size_t i=0; i<destAttrs.size(); ++i) {
         arrayItersBeforeRedistribution[i].reset();
+        chunkItersBeforeRedistribution[i].reset();
     }
-    timing.logTiming(logger, "[RedimStore] RowCollection --> beforeRedistribution");
+
+    timing.logTiming(logger, "[RedimStore] redimensioned --> beforeRedistribution");
 
     if( !hasAggregate && !redistributionRequired)
     {

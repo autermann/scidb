@@ -16,8 +16,14 @@ SCIDB QUERY : <count(ABRREDIM)>
 {0} 0
 
 "killquery redimension_store (signal 2)"
+SCIDB QUERY : <../utils/killquery.sh -afl 2 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${PPID}_1.stdout || echo FAILURE>
+
 "killquery redimension_store (signal 15)"
+SCIDB QUERY : <../utils/killquery.sh -afl 15 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${PPID}_2.stdout || echo FAILURE>
+
 "killquery redimension_store (signal 9)"
+SCIDB QUERY : <../utils/killquery.sh -afl 9 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${PPID}_3.stdout || echo FAILURE>
+
 SCIDB QUERY : <count(ABRLOAD)>
 {i} count
 {0} 4000000
@@ -33,10 +39,10 @@ SCIDB QUERY : <count(ABRREDIM)>
 SCIDB QUERY : <versions(ABRREDIM)>
 {VersionNo} version_id,timestamp
 
-SCIDB QUERY : <project(list('arrays'),name,schema)>
-{No} name,schema
-{0} "ABRLOAD","ABRLOAD<a:double COMPRESSION 'dictionary'> [x=0:1999,10,0,y=0:1999,10,0]"
-{1} "ABRREDIM","ABRREDIM<x:int64> [a(double)=*,20,0]"
+SCIDB QUERY : <project(sort(filter(list('arrays'), regex(name,'ABR.*'))),name,schema)>
+{n} name,schema
+{0} 'ABRLOAD','ABRLOAD<a:double COMPRESSION \'dictionary\'> [x=0:1999,10,0,y=0:1999,10,0]'
+{1} 'ABRREDIM','ABRREDIM<x:int64> [a(double)=*,20,0]'
 
 SCIDB QUERY : <scan(ABRREDIM:a)>
 [An error expected at this place for the query "scan(ABRREDIM:a)". And it failed.]

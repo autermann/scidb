@@ -1,10 +1,6 @@
 --setup
 --start-query-logging
 
---aql drop array v4;
---aql drop array v4_dflt;
---aql drop array v4_null;
-
 --test
 --aql CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0]
 --aql LOAD v4 FROM '../tests/harness/testcases/data/doc/v4.scidb'

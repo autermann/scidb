@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" [
 <!ENTITY % myents SYSTEM "scidb_ug.ent">
-<!ENTITY scidb_version "13.3">
-<!ENTITY scidb_revision "6317">
+<!ENTITY scidb_version "13.9">
+<!ENTITY scidb_revision "6538">
 ]>
 <article>
   <info>
@@ -779,7 +779,7 @@ scidblist()</programlisting>
       <itemizedlist>
         <listitem>
           <para>List all of the existing arrays.<para><programlisting>AFL% list('arrays');  </programlisting><screen>name,id,schema,availability
-'test',79,'test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]',true
+'test',989,'test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]',true
 </screen></para></para>
         </listitem>
 
@@ -883,9 +883,9 @@ scidblist()</programlisting>
             that is useful for populating an array with randomly-generated
             values. Here, we create a 3<symbol>x</symbol>4 array, and fill it
             with random numbers between 10 and 99.<para><programlisting>AFL% store(build(&lt;randomVal:int64&gt;[i=0:2,3,0, j=0:3,4,0],random()%90+10),random_100);  </programlisting><screen>[
-[(63),(23),(58),(45)],
-[(53),(13),(49),(83)],
-[(94),(15),(14),(73)]
+[(45),(77),(47),(57)],
+[(20),(65),(42),(28)],
+[(65),(38),(82),(99)]
 ]</screen>Note
             that in this query, our attribute is of type int64 (an integer
             data type). Of course, your output will differ, as the random()

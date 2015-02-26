@@ -28,18 +28,18 @@
  */
 
 #include "log4cxx/logger.h"
-#include "boost/make_shared.hpp"
+#include <boost/make_shared.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <time.h>
 
 #include "ClientMessageHandleJob.h"
-#include "system/Exceptions.h"
-#include "query/QueryProcessor.h"
-#include "network/NetworkManager.h"
-#include "network/MessageUtils.h"
-#include "query/parser/Serialize.h"
-#include "array/Metadata.h"
-#include "query/executor/SciDBExecutor.h"
-
+#include <system/Exceptions.h>
+#include <query/QueryProcessor.h>
+#include <network/NetworkManager.h>
+#include <network/MessageUtils.h>
+#include <query/parser/Serialize.h>
+#include <array/Metadata.h>
+#include <query/executor/SciDBExecutor.h>
 
 using namespace std;
 using namespace boost;
@@ -53,8 +53,8 @@ ClientMessageHandleJob::ClientMessageHandleJob(boost::shared_ptr< Connection > c
         const boost::shared_ptr<MessageDesc>& messageDesc)
     : Job(boost::shared_ptr<Query>()), _connection(connection), _messageDesc(messageDesc)
 {
+    assert(connection); //XXX TODO: convert to exception
 }
-
 
 void ClientMessageHandleJob::run()
 {
@@ -62,30 +62,10 @@ void ClientMessageHandleJob::run()
    MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
    LOG4CXX_TRACE(logger, "Starting client message handling: type=" << messageType)
 
-   CurrentQueryScope queryScope(_messageDesc->getQueryID());
+   assert(_currHandler);
+   _currHandler();
 
-    switch (messageType)
-    {
-    case mtPrepareQuery:
-        prepareClientQuery();
-        break;
-    case mtExecuteQuery:
-        executeClientQuery();
-        break;
-    case mtFetch:
-        fetchChunk();
-        break;
-    case mtCompleteQuery:
-        completeQuery();
-        break;
-    case mtCancelQuery:
-        cancelQuery();
-        break;
-    default:
-        LOG4CXX_ERROR(logger, "Unknown message type " << messageType);
-        throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE) << messageType;
-    }
-    LOG4CXX_TRACE(logger, "Finishing client message handling: type=" << messageType)
+   LOG4CXX_TRACE(logger, "Finishing client message handling: type=" << messageType)
 }
 
 string ClientMessageHandleJob::getProgramOptions(std::string const& programOptions) const
@@ -100,84 +80,209 @@ string ClientMessageHandleJob::getProgramOptions(std::string const& programOptio
     return ip.str();
 }
 
+void
+ClientMessageHandleJob::handleLockTimeout(shared_ptr<Job>& job,
+                                          shared_ptr<WorkQueue>& toQueue,
+                                          shared_ptr<SerializationCtx>& sCtx,
+                                          shared_ptr<asio::deadline_timer>& timer,
+                                          const system::error_code& error)
+{
+    static const char *funcName="ClientMessageHandleJob::handleLockTimeout: ";
+    if (error == boost::asio::error::operation_aborted) {
+        LOG4CXX_ERROR(logger, funcName
+                      <<"Lock timer cancelled: "
+                      <<" queue=" << toQueue.get()
+                      <<", job="<<job.get()
+                      <<", queryID="<<job->getQuery()->getQueryID());
+        assert(false);
+    } else if (error) {
+        LOG4CXX_ERROR(logger, funcName
+                      <<"Lock timer encountered error: "<<error
+                      <<" queue=" << toQueue.get()
+                      <<", job="<<job.get()
+                      <<", queryID="<<job->getQuery()->getQueryID());
+        assert(false);
+    }
+    // we will try to schedule anyway
+    WorkQueue::scheduleReserved(job, toQueue, sCtx);
+}
+
+void ClientMessageHandleJob::reschedule()
+{
+    shared_ptr<WorkQueue> toQ(_wq.lock());
+    assert(toQ);
+    shared_ptr<SerializationCtx> sCtx(_wqSCtx.lock());
+    assert(sCtx);
+    shared_ptr<Job> thisJob(shared_from_this());
+
+    // try again on the same queue after a delay
+    toQ->reserve(toQ);
+    try {
+        uint64_t delayMicroSec = Query::getLockTimeoutNanoSec()/1000;
+        if (!_timer) {
+            _timer = shared_ptr<asio::deadline_timer>(new asio::deadline_timer(getIOService()));
+        }
+        int rc = _timer->expires_from_now(posix_time::microseconds(delayMicroSec));
+        if (rc != 0) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
+                   << "boost::asio::expires_from_now" << rc << rc << delayMicroSec);
+        }
+        typedef function<void(const system::error_code& error)> TimerCallback;
+        TimerCallback func = boost::bind(&handleLockTimeout,
+                                         thisJob,
+                                         toQ,
+                                         sCtx,
+                                         _timer,
+                                         asio::placeholders::error);
+        _timer->async_wait(func);
+    } catch (const scidb::Exception& e) {
+        toQ->unreserve();
+        throw;
+    }
+}
 
 void ClientMessageHandleJob::prepareClientQuery()
 {
-    const scidb::SciDB& scidb = getSciDBExecutor();
     scidb::QueryResult queryResult;
+    const scidb::SciDB& scidb = getSciDBExecutor();
     try
     {
+        queryResult.queryID = Query::generateID();
+        assert(queryResult.queryID > 0);
+        assert(_connection);
+        _connection->attachQuery(queryResult.queryID);
+
         // Getting needed parameters for execution
         const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
         bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
         string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
 
-        queryResult.queryID = Query::generateID();
         assert(queryResult.queryID > 0);
-        _connection->attachQuery(queryResult.queryID);
-
-        scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
-
-        // Creating message with result for sending to client
-        boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtQueryResult);
-        boost::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
-        resultMessage->setQueryID(queryResult.queryID);
-        queryResultRecord->set_explain_logical(queryResult.explainLogical);
-        queryResultRecord->set_selective(queryResult.selective);
-        queryResultRecord->set_exclusive_array_access(queryResult.requiresExclusiveArrayAccess);
-
-        vector<Warning> v = Query::getQueryByID(queryResult.queryID)->getWarnings();
-        for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
+        try
         {
-            ::scidb_msg::QueryResult_Warning* warn = queryResultRecord->add_warnings();
-
-            cout << "Propagate warning during prepare" << endl;
-            warn->set_code(it->getCode());
-            warn->set_file(it->getFile());
-            warn->set_function(it->getFunction());
-            warn->set_line(it->getLine());
-            warn->set_what_str(it->msg());
-            warn->set_strings_namespace(it->getStringsNamespace());
-            warn->set_stringified_code(it->getStringifiedCode());
+            scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
         }
-        Query::getQueryByID(queryResult.queryID)->clearWarnings();
-
-        for (vector<string>::const_iterator it = queryResult.plugins.begin();
-            it != queryResult.plugins.end(); ++it)
+        catch (const scidb::SystemCatalog::LockBusyException& e)
         {
-            queryResultRecord->add_plugins(*it);
+            _currHandler=boost::bind(&ClientMessageHandleJob::retryPrepareQuery, this, queryResult/*copy*/);
+            assert(_currHandler);
+            reschedule();
+            return;
         }
-
-        StatisticsScope sScope;
-        _connection->sendMessage(resultMessage);
-        LOG4CXX_DEBUG(logger, "The result preparation of query is sent to the client")
+        postPrepareQuery(queryResult);
     }
     catch (const Exception& e)
     {
         LOG4CXX_ERROR(logger, "prepareClientQuery failed to complete: " << e.what())
+        const scidb::SciDB& scidb = getSciDBExecutor();
         StatisticsScope sScope;
         handleExecuteOrPrepareError(e, queryResult, scidb);
     }
+}
+
+void ClientMessageHandleJob::retryPrepareQuery(scidb::QueryResult& queryResult)
+{
+    assert(queryResult.queryID > 0);
+    const scidb::SciDB& scidb = getSciDBExecutor();
+    try {
+        // Getting needed parameters for execution
+        const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
+        bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
+        string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
+        try
+        {
+            scidb.retryPrepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
+        }
+        catch (const scidb::SystemCatalog::LockBusyException& e)
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::retryPrepareQuery, this, queryResult/*copy*/);
+            assert(_currHandler);
+            assert(_timer);
+            reschedule();
+            return;
+        }
+        postPrepareQuery(queryResult);
+    }
+    catch (const Exception& e)
+    {
+        LOG4CXX_ERROR(logger, "prepareClientQuery failed to complete: " << e.what())
+        const scidb::SciDB& scidb = getSciDBExecutor();
+        StatisticsScope sScope;
+        handleExecuteOrPrepareError(e, queryResult, scidb);
+    }
+}
+
+void ClientMessageHandleJob::postPrepareQuery(scidb::QueryResult& queryResult)
+{
+    assert(queryResult.queryID > 0);
+    _timer.reset();
+
+    // Creating message with result for sending to client
+    shared_ptr<MessageDesc> resultMessage = make_shared<MessageDesc>(mtQueryResult);
+    shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
+    resultMessage->setQueryID(queryResult.queryID);
+    queryResultRecord->set_explain_logical(queryResult.explainLogical);
+    queryResultRecord->set_selective(queryResult.selective);
+    queryResultRecord->set_exclusive_array_access(queryResult.requiresExclusiveArrayAccess);
+
+    vector<Warning> v = Query::getQueryByID(queryResult.queryID)->getWarnings();
+    for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
+    {
+        ::scidb_msg::QueryResult_Warning* warn = queryResultRecord->add_warnings();
+
+        cout << "Propagate warning during prepare" << endl;
+        warn->set_code(it->getCode());
+        warn->set_file(it->getFile());
+        warn->set_function(it->getFunction());
+        warn->set_line(it->getLine());
+        warn->set_what_str(it->msg());
+        warn->set_strings_namespace(it->getStringsNamespace());
+        warn->set_stringified_code(it->getStringifiedCode());
+    }
+    Query::getQueryByID(queryResult.queryID)->clearWarnings();
+
+    for (vector<string>::const_iterator it = queryResult.plugins.begin();
+         it != queryResult.plugins.end(); ++it)
+    {
+        queryResultRecord->add_plugins(*it);
+    }
+
+    StatisticsScope sScope;
+    sendMessageToClient(resultMessage);
+    LOG4CXX_DEBUG(logger, "The result preparation of query is sent to the client")
 }
 
 void ClientMessageHandleJob::handleExecuteOrPrepareError(const Exception& err,
                                                          const scidb::QueryResult& queryResult,
                                                          const scidb::SciDB& scidb)
 {
-    _connection->sendMessage(makeErrorMessageFromException(err));
-    if (queryResult.queryID==0) {
-        return;
-    }
-    try {
-        scidb.cancelQuery(queryResult.queryID);
-    } catch (const scidb::SystemException& e) {
-        if (e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND
-            && e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND2) {
-            throw;
+    assert(_connection);
+    if (queryResult.queryID != 0) {
+        try {
+            scidb.cancelQuery(queryResult.queryID);
+            _connection->detachQuery(queryResult.queryID);
+        } catch (const scidb::SystemException& e) {
+            if (e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND
+                && e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND2) {
+                try { _connection->disconnect(); } catch (...) {}
+                throw;
+            }
         }
     }
+    shared_ptr<MessageDesc> msg(makeErrorMessageFromException(err));
+    sendMessageToClient(msg);
+}
+
+void ClientMessageHandleJob::sendMessageToClient(shared_ptr<MessageDesc>& msg)
+{
     assert(_connection);
-    _connection->detachQuery(queryResult.queryID);
+    assert(msg);
+    try {
+        _connection->sendMessage(msg);
+    } catch (const scidb::Exception& e) {
+        try { _connection->disconnect(); } catch (...) {}
+        throw;
+    }
 }
 
 void ClientMessageHandleJob::executeClientQuery()
@@ -186,104 +291,28 @@ void ClientMessageHandleJob::executeClientQuery()
     scidb::QueryResult queryResult;
     try
     {
-        // Getting needed parameters for execution
-        const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
-        bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
-        const string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
-
         queryResult.queryID = _messageDesc->getQueryID();
 
         if (queryResult.queryID <= 0) {
+            const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
+            bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
+            const string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
             queryResult.queryID = Query::generateID();
             assert(queryResult.queryID > 0);
             _connection->attachQuery(queryResult.queryID);
-            scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
-        }
-
-        scidb.executeQuery(queryString, afl, queryResult);
-
-        // Creating message with result for sending to client
-        boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtQueryResult);
-        boost::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
-        resultMessage->setQueryID(queryResult.queryID);
-        queryResultRecord->set_execution_time(queryResult.executionTime);
-        queryResultRecord->set_explain_logical(queryResult.explainLogical);
-        queryResultRecord->set_explain_physical(queryResult.explainPhysical);
-        queryResultRecord->set_selective(queryResult.selective); 
-        
-        boost::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
-        if (queryResult.selective)
-        {
-            const ArrayDesc& arrayDesc = queryResult.array->getArrayDesc();
-
-            queryResultRecord->set_array_name(arrayDesc.getName());
-
-            const Attributes& attributes = arrayDesc.getAttributes();
-            for (size_t i = 0; i < attributes.size(); i++)
+            try
             {
-                ::scidb_msg::QueryResult_AttributeDesc* attribute = queryResultRecord->add_attributes();
-
-                attribute->set_id(attributes[i].getId());
-                attribute->set_name(attributes[i].getName());
-                attribute->set_type(attributes[i].getType());
-                attribute->set_flags(attributes[i].getFlags());
-                attribute->set_default_compression_method(attributes[i].getDefaultCompressionMethod());
-                attribute->set_default_missing_reason(attributes[i].getDefaultValue().getMissingReason());
-                attribute->set_default_value(string((char*)attributes[i].getDefaultValue().data(), attributes[i].getDefaultValue().size()));
+                scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
             }
-
-            const Dimensions& dimensions = arrayDesc.getDimensions();
-            for (size_t i = 0; i < dimensions.size(); i++)
+            catch (const scidb::SystemCatalog::LockBusyException& e)
             {
-                ::scidb_msg::QueryResult_DimensionDesc* dimension = queryResultRecord->add_dimensions();
-
-                dimension->set_name(dimensions[i].getBaseName());
-                dimension->set_start_min(dimensions[i].getStartMin());
-                dimension->set_curr_start(dimensions[i].getCurrStart());
-                dimension->set_curr_end(dimensions[i].getCurrEnd());
-                dimension->set_end_max(dimensions[i].getEndMax());
-                dimension->set_chunk_interval(dimensions[i].getChunkInterval());
-                dimension->set_chunk_overlap(dimensions[i].getChunkOverlap());
-                dimension->set_type_id(dimensions[i].getType());
-                dimension->set_flags(dimensions[i].getFlags());
-                dimension->set_mapping_array_name("");
-                if (dimensions[i].getType() != TID_INT64 && !dimensions[i].getMappingArrayName().empty()) {
-                    boost::shared_ptr<Array> mappingArray = query->getArray(dimensions[i].getMappingArrayName());
-                    boost::shared_ptr<ConstArrayIterator> mappingArrayIterator = mappingArray->getConstIterator(0);
-                    if (!mappingArrayIterator->end()) {
-                        dimension->set_mapping_array_name(dimensions[i].getMappingArrayName());
-                        dimension->set_coordinates_mapping_size(mappingArray->getArrayDesc().getDimensions()[0].getLength());
-                    }
-                }
+                _currHandler=boost::bind(&ClientMessageHandleJob::retryExecuteQuery, this, queryResult/*copy*/);
+                assert(_currHandler);
+                reschedule();
+                return;
             }
         }
-
-        vector<Warning> v = query->getWarnings();
-        for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
-        {
-            ::scidb_msg::QueryResult_Warning* warn = queryResultRecord->add_warnings();
-
-            warn->set_code(it->getCode());
-            warn->set_file(it->getFile());
-            warn->set_function(it->getFunction());
-            warn->set_line(it->getLine());
-            warn->set_what_str(it->msg());
-            warn->set_strings_namespace(it->getStringsNamespace());
-            warn->set_stringified_code(it->getStringifiedCode());
-        }
-        query->clearWarnings();
-
-        for (vector<string>::const_iterator it = queryResult.plugins.begin();
-            it != queryResult.plugins.end(); ++it)
-        {
-            queryResultRecord->add_plugins(*it);
-        }
-
-        queryResult.array.reset();
-
-        StatisticsScope sScope;
-        _connection->sendMessage(resultMessage);
-        LOG4CXX_DEBUG(logger, "The result of query is sent to the client")
+        executeQueryInternal(queryResult);
     }
     catch (const Exception& e)
     {
@@ -291,6 +320,140 @@ void ClientMessageHandleJob::executeClientQuery()
        StatisticsScope sScope;
        handleExecuteOrPrepareError(e, queryResult, scidb);
     }
+}
+
+void ClientMessageHandleJob::retryExecuteQuery(scidb::QueryResult& queryResult)
+{
+    assert(queryResult.queryID>0);
+    const scidb::SciDB& scidb = getSciDBExecutor();
+    try
+    {
+        const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
+        bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
+        const string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
+        try
+        {
+            scidb.retryPrepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
+        }
+        catch (const scidb::SystemCatalog::LockBusyException& e)
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::retryExecuteQuery, this, queryResult/*copy*/);
+            assert(_currHandler);
+            assert(_timer);
+            reschedule();
+            return;
+        }
+        executeQueryInternal(queryResult);
+    }
+    catch (const Exception& e)
+    {
+       LOG4CXX_ERROR(logger, "executeClientQuery failed to complete: " << e.what())
+       StatisticsScope sScope;
+       handleExecuteOrPrepareError(e, queryResult, scidb);
+    }
+}
+
+void ClientMessageHandleJob::executeQueryInternal(scidb::QueryResult& queryResult)
+{
+    _timer.reset();
+
+    const scidb::SciDB& scidb = getSciDBExecutor();
+
+    assert(queryResult.queryID>0);
+
+    boost::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
+
+    query->validate();
+
+    // Getting needed parameters for execution
+    const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
+    assert(query->queryString == queryString);
+    bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
+    queryResult.queryID = query->getQueryID();
+
+    scidb.executeQuery(queryString, afl, queryResult);
+
+    // Creating message with result for sending to client
+    boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtQueryResult);
+    boost::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
+    resultMessage->setQueryID(queryResult.queryID);
+    queryResultRecord->set_execution_time(queryResult.executionTime);
+    queryResultRecord->set_explain_logical(queryResult.explainLogical);
+    queryResultRecord->set_explain_physical(queryResult.explainPhysical);
+    queryResultRecord->set_selective(queryResult.selective);
+
+    if (queryResult.selective)
+    {
+        const ArrayDesc& arrayDesc = queryResult.array->getArrayDesc();
+
+        queryResultRecord->set_array_name(arrayDesc.getName());
+
+        const Attributes& attributes = arrayDesc.getAttributes();
+        for (size_t i = 0; i < attributes.size(); i++)
+        {
+            ::scidb_msg::QueryResult_AttributeDesc* attribute = queryResultRecord->add_attributes();
+
+            attribute->set_id(attributes[i].getId());
+            attribute->set_name(attributes[i].getName());
+            attribute->set_type(attributes[i].getType());
+            attribute->set_flags(attributes[i].getFlags());
+            attribute->set_default_compression_method(attributes[i].getDefaultCompressionMethod());
+            attribute->set_default_missing_reason(attributes[i].getDefaultValue().getMissingReason());
+            attribute->set_default_value(string((char*)attributes[i].getDefaultValue().data(), attributes[i].getDefaultValue().size()));
+        }
+
+        const Dimensions& dimensions = arrayDesc.getDimensions();
+        for (size_t i = 0; i < dimensions.size(); i++)
+        {
+            ::scidb_msg::QueryResult_DimensionDesc* dimension = queryResultRecord->add_dimensions();
+
+            dimension->set_name(dimensions[i].getBaseName());
+            dimension->set_start_min(dimensions[i].getStartMin());
+            dimension->set_curr_start(dimensions[i].getCurrStart());
+            dimension->set_curr_end(dimensions[i].getCurrEnd());
+            dimension->set_end_max(dimensions[i].getEndMax());
+            dimension->set_chunk_interval(dimensions[i].getChunkInterval());
+            dimension->set_chunk_overlap(dimensions[i].getChunkOverlap());
+            dimension->set_type_id(dimensions[i].getType());
+            dimension->set_flags(dimensions[i].getFlags());
+            dimension->set_mapping_array_name("");
+            if (dimensions[i].getType() != TID_INT64 && !dimensions[i].getMappingArrayName().empty()) {
+                boost::shared_ptr<Array> mappingArray = query->getArray(dimensions[i].getMappingArrayName());
+                boost::shared_ptr<ConstArrayIterator> mappingArrayIterator = mappingArray->getConstIterator(0);
+                if (!mappingArrayIterator->end()) {
+                    dimension->set_mapping_array_name(dimensions[i].getMappingArrayName());
+                    dimension->set_coordinates_mapping_size(mappingArray->getArrayDesc().getDimensions()[0].getLength());
+                }
+            }
+        }
+    }
+
+    vector<Warning> v = query->getWarnings();
+    for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
+    {
+        ::scidb_msg::QueryResult_Warning* warn = queryResultRecord->add_warnings();
+
+        warn->set_code(it->getCode());
+        warn->set_file(it->getFile());
+        warn->set_function(it->getFunction());
+        warn->set_line(it->getLine());
+        warn->set_what_str(it->msg());
+        warn->set_strings_namespace(it->getStringsNamespace());
+        warn->set_stringified_code(it->getStringifiedCode());
+    }
+    query->clearWarnings();
+
+    for (vector<string>::const_iterator it = queryResult.plugins.begin();
+         it != queryResult.plugins.end(); ++it)
+    {
+        queryResultRecord->add_plugins(*it);
+    }
+
+    queryResult.array.reset();
+
+    StatisticsScope sScope;
+    sendMessageToClient(resultMessage);
+    LOG4CXX_DEBUG(logger, "The result of query is sent to the client")
 }
 
 void ClientMessageHandleJob::fetchChunk()
@@ -306,7 +469,7 @@ void ClientMessageHandleJob::fetchChunk()
         StatisticsScope sScope(&query->statistics);
         uint32_t attributeId = _messageDesc->getRecord<scidb_msg::Fetch>()->attribute_id();
         string arrayName = _messageDesc->getRecord<scidb_msg::Fetch>()->array_name();
-        LOG4CXX_TRACE(logger, "Fetching chunk of " << attributeId << " attribute in context of " << queryID << " query")
+        LOG4CXX_TRACE(logger, "Fetching chunk of " << attributeId << " attribute in context of " << queryID << " query");
 
         boost::shared_ptr<Array> fetchArray;
 
@@ -316,7 +479,11 @@ void ClientMessageHandleJob::fetchChunk()
         } else {
             fetchArray = query->getCurrentResultArray();
         }
-        assert(fetchArray); //XXX TODO: this needs to be an exception
+        if (!fetchArray) {
+            // the query must be deallocated, validate() should fail
+            query->validate();
+            assert(false);
+        }
         boost::shared_ptr< ConstArrayIterator> iter = fetchArray->getConstIterator(attributeId);
 
         boost::shared_ptr<MessageDesc> chunkMsg;
@@ -375,13 +542,14 @@ void ClientMessageHandleJob::fetchChunk()
         query->validate();
         _connection->sendMessage(chunkMsg);
 
-        LOG4CXX_TRACE(logger, "Chunk was sent to client")
+        LOG4CXX_TRACE(logger, "Chunk of " << attributeId << " attribute in context of " << queryID << " query sent to client");
     }
     catch (const Exception& e)
     {
         StatisticsScope sScope(query ? &query->statistics : NULL);
         LOG4CXX_ERROR(logger, "Client's fetchChunk failed to complete: " << e.what()) ;
-        _connection->sendMessage(makeErrorMessageFromException(e, queryID));
+        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        sendMessageToClient(msg);
     }
 }
 
@@ -395,18 +563,16 @@ void ClientMessageHandleJob::cancelQuery()
     try
     {
         scidb.cancelQuery(queryID);
-        if (_connection) { 
-            _connection->detachQuery(queryID);
-            _connection->sendMessage(makeOkMessage(queryID));
-        }
+        _connection->detachQuery(queryID);
+        boost::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
+        sendMessageToClient(msg);
         LOG4CXX_TRACE(logger, "The query " << queryID << " execution was canceled")
     }
     catch (const Exception& e)
     {
-        LOG4CXX_DEBUG(logger, e.what()) ;
-        if (_connection) { 
-            _connection->sendMessage(makeErrorMessageFromException(e, queryID));
-        }
+        LOG4CXX_ERROR(logger, e.what()) ;
+        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        sendMessageToClient(msg);
     }
 }
 
@@ -420,19 +586,121 @@ void ClientMessageHandleJob::completeQuery()
     try
     {
         scidb.completeQuery(queryID);
-        if (_connection) {
-            _connection->detachQuery(queryID);
-            _connection->sendMessage(makeOkMessage(queryID));
-        }
+        _connection->detachQuery(queryID);
+        boost::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
+        sendMessageToClient(msg);
         LOG4CXX_TRACE(logger, "The query " << queryID << " execution was completed")
     }
     catch (const Exception& e)
     {
-        LOG4CXX_DEBUG(logger, e.what()) ;
-        if (_connection) {
-            _connection->sendMessage(makeErrorMessageFromException(e, queryID));
-        }
+        LOG4CXX_ERROR(logger, e.what()) ;
+        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        sendMessageToClient(msg);
     }
+}
+
+void ClientMessageHandleJob::dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
+                                      boost::shared_ptr<WorkQueue>& workQueue)
+{
+    assert(workQueue);
+    assert(requestQueue);
+    assert(_messageDesc->getMessageType() < mtSystemMax);
+    MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
+    LOG4CXX_TRACE(logger, "Dispatching client message type=" << messageType);
+    const QueryID queryID = _messageDesc->getQueryID();
+    try {
+        switch (messageType)
+        {
+        case mtPrepareQuery:
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::prepareClientQuery, this);
+            // can potentially block
+            enqueue(requestQueue);
+        }
+        break;
+        case mtExecuteQuery:
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::executeClientQuery, this);
+            // can potentially block
+            enqueue(requestQueue);
+        }
+        break;
+        case mtFetch:
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::fetchChunk, this);
+            // can potentially block
+            enqueue(requestQueue);
+        }
+        break;
+        case mtCompleteQuery:
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::completeQuery, this);
+            enqueueOnErrorQueue(queryID);
+        }
+        break;
+        case mtCancelQuery:
+        {
+            _currHandler=boost::bind(&ClientMessageHandleJob::cancelQuery, this);
+            enqueueOnErrorQueue(queryID);
+            break;
+        }
+        break;
+        default:
+        {
+            LOG4CXX_ERROR(logger, "Unknown message type " << messageType);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE) << messageType;
+        }
+        }
+        LOG4CXX_TRACE(logger, "Client message type=" << messageType <<" dispatched");
+    }
+    catch (const Exception& e)
+    {
+        LOG4CXX_ERROR(logger, "Dropping message of type=" <<  _messageDesc->getMessageType()
+                      << ", for queryID=" << _messageDesc->getQueryID()
+                      << ", from CLIENT"
+                      << " because "<<e.what());
+        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        sendMessageToClient(msg);
+    }
+}
+
+// Note: No operations mutating this object are allowed to be called
+// after enqueue() returns.
+void ClientMessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
+
+{
+    LOG4CXX_TRACE(logger, "ClientMessageHandleJob::enqueue message of type="
+                  <<  _messageDesc->getMessageType()
+                  << ", for queryID=" << _messageDesc->getQueryID()
+                  << ", from CLIENT");
+
+    shared_ptr<Job> thisJob(shared_from_this());
+    WorkQueue::WorkItem work = boost::bind(&Job::executeOnQueue, thisJob, _1, _2);
+    assert(work);
+    try
+    {
+        q->enqueue(work);
+    }
+    catch (const WorkQueue::OverflowException& e)
+    {
+        LOG4CXX_ERROR(logger, "Overflow exception from the message queue ("
+                      << q.get() << "): " << e.what());
+        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, _messageDesc->getQueryID()));
+        sendMessageToClient(msg);
+    }
+}
+
+void ClientMessageHandleJob::enqueueOnErrorQueue(QueryID queryID)
+{
+    boost::shared_ptr<Query> query = Query::getQueryByID(queryID);
+    boost::shared_ptr<WorkQueue> q = query->getErrorQueue();
+    if (!q) {
+        // if errorQueue is gone, the query must be deallocated at this point
+        throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_NOT_FOUND) << queryID;
+    }
+    LOG4CXX_TRACE(logger, "Error queue size=" << q->size()
+                  << " for query ("<< queryID <<")");
+    enqueue(q);
 }
 
 } // namespace

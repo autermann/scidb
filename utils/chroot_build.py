@@ -52,12 +52,12 @@ class Col():
         Col.white = ''
 
 def info(str):
-    sys.stdout.write(Col.green + str + Col.reset + "\n")
-    sys.stdout.flush()
+    sys.stderr.write(Col.green + str + Col.reset + "\n")
+    sys.stderr.flush()
 
 def warn(str):
-    sys.stdout.write(Col.yellow + str + Col.reset)
-    sys.stdout.flush()
+    sys.stderr.write(Col.yellow + str + Col.reset)
+    sys.stderr.flush()
 
 def err(str):
     sys.stderr.write(Col.red + str + Col.reset)

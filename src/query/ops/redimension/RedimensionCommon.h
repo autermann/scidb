@@ -46,7 +46,6 @@
 #include "query/DimensionIndex.h"
 #include "util/iqsort.h"
 #include <log4cxx/logger.h>
-#include <array/RowCollection.h>
 #include <system/Utils.h>
 #include <boost/scope_exit.hpp>
 #include <util/BitManip.h>
@@ -147,6 +146,14 @@ public:
         assert(_valid);
         return _destItem;
     }
+
+    /**
+     * Return whether the state vector is valid
+     * @return true iff vector is in valid state
+     */
+    bool isValid() const {
+        return _valid;
+    }
 };
 
 /**
@@ -155,6 +162,9 @@ public:
 class RedimensionCommon : public PhysicalOperator
 {
 public:
+
+    static log4cxx::LoggerPtr logger;
+
     /**
      * Vanilla.
      * @param logicalName the name of operator
@@ -246,6 +256,50 @@ public:
                                        vector< shared_ptr<AttributeMap> > const& coordinateIndices,
                                        ElapsedMilliSeconds& timing,
                                        bool redistributionRequired = true);
+
+private:
+    /* Private interface to map between chunk positions and chunk ids (and back)
+     */
+    typedef map<Coordinates, size_t> ChunkToIdMap;
+    typedef map<size_t, Coordinates> IdToChunkMap;
+    typedef struct
+    {
+        ChunkToIdMap _chunkPosToIdMap;
+        IdToChunkMap _idToChunkPosMap;
+    } ChunkIdMaps;
+
+    size_t mapChunkPosToId(Coordinates const& chunkPos, ChunkIdMaps& maps);
+    Coordinates& mapIdToChunkPos(size_t id, ChunkIdMaps& maps);
+
+    /* Private interface to manage the 1-d 'redimensioned' array
+     */
+    shared_ptr<MemArray> initializeRedimensionedArray(shared_ptr<Query> const& query,
+                                                      Attributes const& srcAttrs,
+                                                      Attributes const& destAttrs,
+                                                      vector<size_t> const& attrMapping,
+                                                      vector<AggregatePtr> const& aggregates,
+                                                      vector< shared_ptr<ArrayIterator> >& redimArrayIters,
+                                                      vector< shared_ptr<ChunkIterator> >& redimChunkIters,
+                                                      size_t& redimCount);
+    void appendItemToRedimArray(vector<Value> const& item,
+                                shared_ptr<Query> const& query,
+                                vector< shared_ptr<ArrayIterator> >& redimArrayIters,
+                                vector< shared_ptr<ChunkIterator> >& redimChunkIters,
+                                size_t& redimCount);
+    bool updateSyntheticDimForRedimArray(shared_ptr<Query> const& query,
+                                         ArrayCoordinatesMapper const& coordMapper,
+                                         ChunkIdMaps& chunkIdMaps,
+                                         size_t dimSynthetic,
+                                         shared_ptr<MemArray>& redimensioned);
+
+    /* Helper function to append data to 'beforeRedistribution' array
+     */
+    void appendItemToBeforeRedistribution(ArrayCoordinatesMapper const& coordMapper,
+                                          Coordinates const& lows,
+                                          Coordinates const& intervals,
+                                          position_t prevPosition,
+                                          vector< shared_ptr<ChunkIterator> >& chunkItersBeforeRedist,
+                                          StateVector& stateVector);
 };
 
 } //namespace scidb

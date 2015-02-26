@@ -280,11 +280,25 @@ void ArrayDesc::initializeDimensions()
     Coordinate logicalChunkSize = 1;
     for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
         _dimensions[i]._array = this;
-        // check that logical size of chunk is less than 2^64: detect overflow during calculation of logical chunk size
-        if (_dimensions[i].getChunkInterval() != 0 && logicalChunkSize*_dimensions[i].getChunkInterval()/_dimensions[i].getChunkInterval() != logicalChunkSize) {
+        Coordinate chunkLength = _dimensions[i].getChunkInterval();
+        Coordinate t = chunkLength + _dimensions[i].getChunkOverlap();
+        if ( t < chunkLength ) //overflow check 
+        {
             throw SYSTEM_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE);
         }
-        logicalChunkSize *= _dimensions[i].getChunkInterval();
+        chunkLength = t;
+        t = chunkLength + _dimensions[i].getChunkOverlap();
+        if ( t < chunkLength) //ooverflow check again
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE);
+        }
+        
+        t = logicalChunkSize * chunkLength;
+        if (chunkLength != 0 && t / chunkLength != logicalChunkSize) //overflow check again
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE);
+        }
+        logicalChunkSize = t;
     }
 }
 
@@ -926,8 +940,8 @@ DimensionDesc::DimensionDesc() :
     validate();
 }
 
-DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordinate end, uint32_t chunkInterval,
-                             uint32_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
+DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordinate end, int64_t chunkInterval,
+                             int64_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
     ObjectNames(name),
 
     _startMin(start),
@@ -951,7 +965,7 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordina
 }
 
 DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names, Coordinate start, Coordinate end,
-                             uint32_t chunkInterval, uint32_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
+                             int64_t chunkInterval, int64_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
     ObjectNames(baseName, names),
 
     _startMin(start),
@@ -975,7 +989,7 @@ DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names
 }
 
 DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coordinate currStart, Coordinate currEnd,
-                             Coordinate endMax, uint32_t chunkInterval, uint32_t chunkOverlap, TypeId type, int flags,
+                             Coordinate endMax, int64_t chunkInterval, int64_t chunkOverlap, TypeId type, int flags,
                              std::string const& mappingArrayName, std::string const& comment,
                              Coordinate funcMapOffset, Coordinate funcMapScale) :
     ObjectNames(name),
@@ -998,7 +1012,7 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coord
 }
 
 DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names, Coordinate startMin,
-                             Coordinate currStart, Coordinate currEnd, Coordinate endMax, uint32_t chunkInterval, uint32_t chunkOverlap,
+                             Coordinate currStart, Coordinate currEnd, Coordinate endMax, int64_t chunkInterval, int64_t chunkOverlap,
                              TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment,
                              Coordinate funcMapOffset, Coordinate funcMapScale) :
     ObjectNames(baseName, names),
@@ -1133,12 +1147,12 @@ Coordinate DimensionDesc::getEndMax() const
     return _endMax;
 }
 
-uint32_t DimensionDesc::getChunkInterval() const
+int64_t DimensionDesc::getChunkInterval() const
 {
     return _chunkInterval;
 }
 
-uint32_t DimensionDesc::getChunkOverlap() const
+int64_t DimensionDesc::getChunkOverlap() const
 {
     return _chunkOverlap;
 }

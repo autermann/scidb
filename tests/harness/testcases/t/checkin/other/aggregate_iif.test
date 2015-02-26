@@ -1,0 +1,16 @@
+# This is the regression test for Ticket #3094.  In that ticket, the first
+# test statement gave the wrong answer even though the other two gave the
+# right answer.
+
+--setup
+--justrun "remove (A)"
+create array A<a:int32> [x=0:8,4,1]
+--aql select * into A from build(A, x)
+
+--test
+--aql select sum(iif(A1.a = A2.a, 1, 0)) from A as A1, A as A2
+aggregate(apply(join(A as A1, A as A2), b, iif(A1.a = A2.a, 1, 0)), sum(b))
+--aql select iif(A1.a = A2.a, 1, 0) from A as A1, A as A2
+
+--cleanup
+remove (A)

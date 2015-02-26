@@ -47,16 +47,23 @@
 
   <procedure>
     <step>
-      <para>Backup your data. The recommended way to do this is to use opaque
-      save. You need to repeat the procedure for each of your arrays. You
-      should also note the schema for each array.<orderedlist
-          numeration="loweralpha">
+      <para><emphasis role="bold">OPTIONAL.</emphasis> Backup your data. You
+      need to repeat the procedure for each of your arrays. You should also
+      note the schema for each array.<note>
+          <para>If you are upgrading from 13.6 to 13.9, <emphasis
+          role="bold">DO NOT USE THE OPAQUE METHOD TO BACKUP YOUR
+          DATA</emphasis>. The changes to the system catalog for 13.9 make it
+          impossible to load data files that were saved using the opaque
+          method in 13.6 or earlier. You can perform the upgrade in place
+          (that is, skip the backup step), or save your data using one of the
+          other, available formats.</para>
+        </note><orderedlist numeration="loweralpha">
           <listitem>
-            <para>Use opaque save to save your first array.<programlisting>AQL% <command>SAVE</command> <replaceable>array-name</replaceable> <command>INTO</command> '<replaceable>saved_array</replaceable>' <command>AS</command> 'OPAQUE'</programlisting>This
+            <para>Use some format (CSV in this example) to save your first
+            array.<programlisting>AQL% <command>SAVE</command> <replaceable>array-name</replaceable> <command>INTO</command> '<replaceable>saved_array</replaceable>' <command>AS</command> 'CSV'</programlisting>This
             saves the array data to <replaceable>saved_array</replaceable> to
             the coordinator instance, under your SciDB base path folder.
-            Repeat this for each of your arrays. For details, see <xref
-            linkend="opaqueSave"/>.</para>
+            Repeat this for each of your arrays.</para>
           </listitem>
 
           <listitem>
@@ -94,10 +101,11 @@
 
     <step>
       <para><emphasis role="bold">OPTIONAL.</emphasis> You can run multiple
-      versions of SciDB, if you would like. However, you can remove the
-      previous version of SciDB if you only need to run the latest version of
-      SciDB. If you installed to the default location, run the following
-      command to remove the old version:<programlisting>sudo rm -Rf /opt/scidb/<emphasis
+      versions of SciDB, if you would like: for details, see <xref
+      linkend="multipleSciDBs"/>. However, you can remove the previous version
+      of SciDB if you only need to run the latest version of SciDB. If you
+      installed to the default location, run the following command to remove
+      the old version:<programlisting>sudo rm -Rf /opt/scidb/<emphasis
             role="bold">scidbOldVersion</emphasis>/</programlisting>For
       example, if your current version is 12.10, the above command removes the
       <literal>/opt/scidb/12.10 </literal>folder and all of its sub
@@ -132,7 +140,15 @@
 
           <para>For example, if you are upgrading to version is
           &scidb_version;, you would copy your file to the
-          <literal>/opt/scidb/&scidb_version;/etc/</literal> folder.</para>
+          <literal>/opt/scidb/&scidb_version;/etc/</literal> folder.
+          Typically, the following settings are affected:<programlisting>install_root=/opt/scidb/13.9
+pluginsdir=/opt/scidb/13.9/lib/scidb/plugins
+logconf=/opt/scidb/13.9/share/scidb/log4cxx.properties</programlisting></para>
+
+          <para>Also, make sure to add the following setting to the
+          configuration file:</para>
+
+          <programlisting>enable-catalog-upgrade=true</programlisting>
         </listitem>
 
         <listitem>
@@ -144,10 +160,16 @@
     </step>
 
     <step>
-      <para>Initialize and restart your SciDB database. Initialization is
-      necessary to avoid errors that you would otherwise receive, based on
+      <para>Restart your SciDB database. Initialization is recommended to
+      avoid errors that you would otherwise receive, based on
       incompatibilities between your your "old" database and your "new" SciDB
-      version.</para>
+      version. Remember, though, that initializing the SciDB database destroys
+      all the data in that database.<note>
+          <para>If you get an error that says SciDB needs to upgrade the
+          system catalog, and that the action failed, make sure to set the
+          <code>enable-catalog-upgrade</code> parameter to <emphasis
+          role="bold">true</emphasis>, as detailed in step 7 above.</para>
+        </note></para>
     </step>
 
     <step>

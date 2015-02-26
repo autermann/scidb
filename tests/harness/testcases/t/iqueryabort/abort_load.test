@@ -5,15 +5,26 @@ create empty array ABRLOAD <v : int64> [I=0:2000,20,0, J=0:1000,20,0]
 
 --test 
 
---shell --command "../utils/killquery.sh -afl 2  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' " --store
---shell --command "../utils/killquery.sh -afl 15 2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' " --store
---shell --command "../utils/killquery.sh -afl 9  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' " --store
+--shell --command "../utils/killquery.sh -afl 2  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_1.stdout"
 
---echo "array should be empty (0 rows)..."
+--shell --command "../utils/killquery.sh -afl 15 2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_2.stdout"
+
+--shell --command "../utils/killquery.sh -afl 9  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_3.stdout"
+
+
+#--echo "array should be empty (0 rows)..."
 count(ABRLOAD)
 
 --stop-query-logging
 
 --cleanup
 remove(ABRLOAD)
-
+--shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"

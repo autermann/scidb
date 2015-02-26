@@ -69,7 +69,9 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.scalapack.phy
 //                    so we can pass fewer arguments
 
 
-void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPROW, slpp::int_t NPCOL, slpp::int_t MYPROW, slpp::int_t MYPCOL, const std::string& callerLabel)
+void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
+                    slpp::int_t NPROW, slpp::int_t NPCOL, slpp::int_t MYPROW, slpp::int_t MYPCOL,
+                    const std::string& callerLabel)
 {
     size_t nInstances = query->getInstancesCount();
     slpp::int_t instanceID = query->getInstanceID();
@@ -174,21 +176,19 @@ void ScaLAPACKPhysical::checkInputArray(boost::shared_ptr<Array>& Ain) const
 }
 
 
-void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc)
+void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
+                             slpp::int_t nPRow, slpp::int_t nPCol,
+                             slpp::int_t myPRow, slpp::int_t myPCol)
 {
     // use extractDataToOp() and the reformatToScalapack() operator
     // to reformat the data according to ScaLAPACK requirements.
     Coordinates coordFirst = getStart(array.get());
     Coordinates coordLast = getEndMax(array.get());
-    scidb::ReformatToScalapack pdelsetOp(dst, desc, coordFirst[0], coordFirst[1]);
+    scidb::ReformatToScalapack pdelsetOp(dst, desc, coordFirst[0], coordFirst[1], nPRow, nPCol, myPRow, myPCol);
 
     Timing reformatTimer;
-    LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK start");
-
-        extractDataToOp(array, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
-
-    LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK end");
-    if(doCerrTiming()) std::cerr << "extractArrayToScaLAPACK took " << reformatTimer.stop() << std::endl;
+    extractDataToOp(array, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
+    LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK took " << reformatTimer.stop());
 }
 
 bool ScaLAPACKPhysical::requiresRepart(ArrayDesc const& inputSchema) const
@@ -246,76 +246,122 @@ ArrayDesc ScaLAPACKPhysical::getRepartSchema(ArrayDesc const& inputSchema) const
     return ArrayDesc(inputSchema.getName(), inAttrs, resultDims);
 }
 
+shared_ptr<Array> ScaLAPACKPhysical::redistributeOutputArrayForTiming(shared_ptr<Array>& outputArray, shared_ptr<Query>& query, const std::string& callerLabel)
+{
+    // NOTE: for timing only.  Normally, the query planner inserts the redistribute
+    // between ScaLAPACK-based operators which have output type psScaLAPACK,
+    // and other operators, such as store, that require, e.g. type psRoundRobin (which isn't, it is hashed)
+    // but until the "consume()" operator is completed, and can request redistribution to RR,
+    // I need a way to force in the redistribution to measure its cost, when the terminal operator
+    // is filter(val > 1e200), which is my workaround for not having "consume"
 
+    // redistribute back to psRoundRobin
+    shared_ptr<Array>redistOutput= redistribute(outputArray, query, psRoundRobin);
+    return redistOutput;
+}
+
+///
+/// convert a set of inputArrays to psScaLAPACK distribution.  Doing them as a set allows certain extra sanity checks,
+/// but is not efficient use of memory, so this version is being phased out, or changed to only do the checks.
+///
 std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query, const std::string& callerLabel)
 {
     //
-    // + converts inputArrays to psScaLAPACK distribution
+    // + converts a set of inputArrays to psScaLAPACK distribution
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): via " << callerLabel << " begin.");
+
+    std::vector<shared_ptr<Array> > result;
+
+    // redistribute to psScaLAPACK
+    procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
+    PartitioningSchemaDataForScaLAPACK schemeData(getBlacsGridSize(inputArrays, query, callerLabel), firstChunkSize);
+
+    for(size_t ii=0; ii < inputArrays.size(); ii++) {
+        if (inputArrays[ii]->getArrayDesc().getPartitioningSchema() != psScaLAPACK) {
+            // when automatic repartitioning is introduced, have to decide which of the chunksizes will be the target.
+            // Until then, we assert they all are the same (already checked in each Logical operator)
+            assert(chunkRow(inputArrays[ii]) == firstChunkSize.row &&
+                   chunkCol(inputArrays[ii]) == firstChunkSize.col );
+
+            result.push_back(redistributeInputArray(inputArrays[ii], schemeData, query, callerLabel));
+        }
+    }
+
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): via " << callerLabel << " end.");
+    return result;
+}
+
+/// convert a single inputArray to psScaLAPACK distribution.  fewer sanity checks can be done in this case.
+/// So what is the motivation for this method?
+/// Alternating redistribute and extractToScaLAPACK allows the input array and redistributed array to be released before
+/// any more inputs are processed.  This reduces the memory overhead in gemm(), which uses up to 3 inputs(), considerably.
+/// and allows mem-array-threshold to be set higher for the same amount of total system memory.
+shared_ptr<Array> ScaLAPACKPhysical::redistributeInputArray(shared_ptr<Array>& inputArray, PartitioningSchemaDataForScaLAPACK schemeData,
+                                                            shared_ptr<Query>& query, const std::string& callerLabel)
+{
     //
-    // repartition and redistribution from SciDB chunks and arbitrary distribution
-    // to
-    // ScaLAPACK tiles (efficient cache-aware size) and psScaLAPACK, which is
-    //   true 2D block-cyclic.  Ideally, we will be able to repart() to from
-    //   arbitrary chunkSize to one that is efficient for ScaLAPACK
+    // + converts a single inputArrays to psScaLAPACK distribution
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray: via " << callerLabel << " begin.");
+
+    // repartition and redistribute from SciDB chunks and arbitrary distribution
+    // to ScaLAPACK-sized chunks on the SciDB instance that corresponds to the correct
+    // ScaLAPACK process in the ScaLAPACK process grid.
+    // Right now, this is just the redistribute, but at some point will include automatic
+    // repart() as well, as soon as repart() is fast enough use in practice.
+    // (right now, it is too expensive, and instead it is advisable to use a chunksize of
+    // of 1000 or 1024 (square), which gives acceptable performance on the SciDB side,
+    // at a 5-15% extra cost to the m^3 portion.
     //
-    std::vector<shared_ptr<Array> > redistInputs = inputArrays ; // copy by default
+
+    shared_ptr<Array> result = inputArray ; // in case no processing needed, the output is the input
+
     size_t nInstances = query->getInstancesCount();
-    bool requiresRedistribute = true ;  // TODO: when all tests functioning, enable this and re-test
-                                        //       (we don't want a different code path during bring-up)
+    bool requiresRedistribute = true ;  // TODO: when bringup is done, can set this false, but
+                                        //       its possible the 1-instance optimization below is already
+                                        //       contained inside redistribute, and can be removed from here.
+                                        // TODO: should test the above.
+
     if (nInstances>1 || requiresRedistribute) {
 #if 0
         // TODO: listed in ticket #1962, we do not yet handle chunksizes above some fixed limit by introducing a repart
-        if (chunking is not 64 x 64 square) {
-            // rechunk to 64 x 64 and redistribute, because
-            // then its very very close to being scalapack
-            // block cyclic layout... except that the resulting chunks are
-            // the transpose of the blocks, even though they are now on the
-            // right hosts
-            input=redistribute(repartArray(input), query, psScaLAPACK);
+        if (chunking is not square or not within limits or for some other reason needs repart. ) {
+            // repart in addition to redistributing
+            result=redistribute(repartArray(input), query, psScaLAPACK);
         } else
 #endif
-        // redistribute to psScaLAPACK
-        procRowCol_t firstChunkSize = { chunkRow(redistInputs[0]), chunkCol(redistInputs[0]) };
-        for(size_t ii=0; ii < inputArrays.size(); ii++) {
-            if (redistInputs[ii]->getArrayDesc().getPartitioningSchema() != psScaLAPACK) {
+        {
+            // redistribute to psScaLAPACK
+            if (inputArray->getArrayDesc().getPartitioningSchema() != psScaLAPACK) {
+                // redistribute is needed
                 Timing redistTime;
 
-                // when automatic repartitioning is introduced, have to decide which of the chunksizes will be the target.
-                // Until then, we assert they all are the same (already checked in each Logical operator)
-                assert(chunkRow(redistInputs[ii]) == firstChunkSize.row &&
-                       chunkCol(redistInputs[ii]) == firstChunkSize.col );
-
-                // get the parameters of the block-cyclic distribution required for this operator
-                PartitioningSchemaDataForScaLAPACK schemeData(getBlacsGridSize(inputArrays, query, callerLabel), firstChunkSize);
-
                 // do the redistribute
-                redistInputs[ii]=redistribute(inputArrays[ii], query, psScaLAPACK, "", ALL_INSTANCES_MASK,
+                result=redistribute(inputArray, query, psScaLAPACK, "", ALL_INSTANCES_MASK,
                                                boost::shared_ptr<DistributionMapper>(), /*shift*/0, &schemeData);
-                if(doCerrTiming()) std::cerr << "ScaLAPACKPhysical: redist["<<ii<<"] took " << redistTime.stop() << std::endl;
-                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays():"
+                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray: redistribute() took " << redistTime.stop() << " via " << callerLabel);
+                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray:"
                                        << " via " << callerLabel
-                                       << " redistributed input " << ii
-                                       << " chunksize (" << redistInputs[ii]->getArrayDesc().getDimensions()[0].getChunkInterval()
-                                       << ", "           << redistInputs[ii]->getArrayDesc().getDimensions()[1].getChunkInterval()
+                                       << " chunksize (" << inputArray->getArrayDesc().getDimensions()[0].getChunkInterval()
+                                       << ", "           << inputArray->getArrayDesc().getDimensions()[1].getChunkInterval()
                                        << ")");
             } else {
-                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays():"
+                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray: redistribute() took " << 0 << " (skipped) via " << callerLabel);
+                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray:"
                                        << " via " << callerLabel
-                                       << " keeping input " << ii
-                                       << " chunksize (" << inputArrays[ii]->getArrayDesc().getDimensions()[0].getChunkInterval()
-                                       << ", "           << inputArrays[ii]->getArrayDesc().getDimensions()[1].getChunkInterval()
+                                       << " chunksize (" << inputArray->getArrayDesc().getDimensions()[0].getChunkInterval()
+                                       << ", "           << inputArray->getArrayDesc().getDimensions()[1].getChunkInterval()
                                        << ")");
             }
         }
     } else {
-        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays():"
+        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray: redistribute() took " << 0 << " (skipped) via " << callerLabel);
+        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray:"
                                << " via " << callerLabel
-                               << " single instance, no redistribution.");
+                               << " single instance -> no redist needed.");
     }
 
-    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): via " << callerLabel << " end");
-    return redistInputs;
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray: via " << callerLabel << " end");
+    return result;
 }
 
 bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query, const std::string& callerLabel)
@@ -376,17 +422,17 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
 
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
                               << " via " << callerLabel
-                              << " calling set_fake_blacs_gridinfo_(ctx " << ICTXT
+                              << " calling scidb_set_blacs_gridinfo_(ctx " << ICTXT
                               << ", nProw " << blacsGridSize.row << ", nPcol "<< blacsGridSize.col
                               << ", myPRow " << myGridPos.row << ", myPCol " << myGridPos.col << ")");
-    set_fake_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
+    scidb_set_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
                               << " via " << callerLabel
-                              << " blacs_gridinfo(" << ICTXT << ") returns "
+                              << " scidb_blacs_gridinfo(" << ICTXT << ") returns "
                               << " gridsiz (" << NPROW  << ", " << NPCOL << ")"
                               << " gridPos (" << MYPROW << ", " << MYPCOL << ")");
 
@@ -438,7 +484,7 @@ procRowCol_t ScaLAPACKPhysical::getBlacsGridSize(std::vector< shared_ptr<Array> 
 }
 
 
-void ScaLAPACKPhysical::raiseIfBadResultInfo(sl_int_t INFO, const std::string& operatorName) const
+void ScaLAPACKPhysical::raiseIfBadResultInfo(slpp::int_t INFO, const std::string& operatorName) const
 {
     // a standard way to raise an error when a pTXXXXXMaster() routine returns
     // non-zero INFO from the corresponding    pTXXXXX_() call in the slave.

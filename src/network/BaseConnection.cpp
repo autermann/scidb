@@ -158,7 +158,7 @@ MessagePtr MessageDesc::createRecordByType(MessageID messageType)
     case mtNotify:
     case mtWait:
     case mtBarrier:
-    case mtMPISend:
+    case mtBufferSend:
     case mtAlive:
     case mtReplicaSyncRequest:
     case mtReplicaSyncResponse:
@@ -209,7 +209,7 @@ bool MessageDesc::validate()
     case mtNotify:
     case mtWait:
     case mtBarrier:
-    case mtMPISend:
+    case mtBufferSend:
     case mtAlive:
     case mtResourcesFileExistsRequest:
     case mtResourcesFileExistsResponse:

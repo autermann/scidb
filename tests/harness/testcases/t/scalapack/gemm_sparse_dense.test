@@ -1,4 +1,6 @@
 --setup
+load_library('dense_linear_algebra')
+
 --start-query-logging
 
 #CREATE ARRAY M5x5_dense<a: double >[I=0:4,1,0,J=0:4,1,0]
@@ -51,11 +53,20 @@ store ( build_sparse(M2x5_Sparse, 1.0*x+100.0*y, x=y), M2x5_Sparse)
 
 load_library('dense_linear_algebra')
 #1.gemm with Dense array and sparse array having Dimensions starting with 0
+# Supported
 gemm(M5x5_dense,M5x5_Sparse,M5x5)
+
 #2.gemm with dense and sparse matrix chunk size more  than 32
+# NOT SUPPORTED at this time
+# Disabled until Linear Algebra operators have auto-repartion. [part of #2200]
+# (#2200 blocked on #2302, "requiresRepart not fully functional")
 gemm(M5x5_dense_c2,M5x5_Sparse_c2,M5x5_c2)
 #3.gemm with Dense array and sparse array having Dimensions starting with non zero.
-gemm(M4x4_dense_nzd,M4x4_Sparse_nzd,M4x4_nzd)
+# NOT SUPPORTED at this time. [part of #2200]
+# bocked on various tickets about the meaning of "sparse", between, subarray, and
+# #2202 "Create rules of math operations ... Matrices"
+#gemm(M4x4_dense_nzd,M4x4_Sparse_nzd,M4x4_nzd)
+
 #4.gemm with rectangular Dense array and rectangular sparse array having Dimensions starting with non zero.Presntly nt working for #multiinstances
 gemm(M5x2_dense_new,M2x5_Sparse,M5x5)
 

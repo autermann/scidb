@@ -3,8 +3,8 @@
 %bcond_with insource
 %define scidb               scidb-VERSION_MAJOR.VERSION_MINOR
 %define libscidbclient      libscidbclient-VERSION_MAJOR.VERSION_MINOR
-%define scidb_boost         scidb-boost-VERSION_MAJOR.VERSION_MINOR
-%define scidb_boost_version 1.46.1-VERSION_PATCH
+%define scidb_boost         scidb-VERSION_MAJOR.VERSION_MINOR-libboost
+%define scidb_boost_version 1.54.0-VERSION_PATCH
 Name: %{scidb}
 Version: VERSION_PATCH
 Release: BUILD

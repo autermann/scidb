@@ -30,6 +30,7 @@
 
 #include "ReshapeArray.h"
 #include "system/Exceptions.h"
+#include "query/Operator.h"
 
 namespace scidb {
 
@@ -270,14 +271,11 @@ namespace scidb {
 
     inline void convertCoordinates(Coordinates const& srcPos, Dimensions const& srcDims, Coordinates& dstPos, Dimensions const& dstDims) 
     {
-        Coordinate offset = 0;
-        for (size_t i = 0, n = srcDims.size(); i < n; i++) { 
-            offset *= srcDims[i].getLength();
-            offset += srcPos[i] - srcDims[i].getStart();
-        }
-        for (int i = dstDims.size(); --i >= 0;) { 
-            dstPos[i] = dstDims[i].getStart() + (offset % dstDims[i].getLength());
-            offset /= dstDims[i].getLength();
+        dstPos = PhysicalBoundaries::reshapeCoordinates(srcPos, srcDims, dstDims);
+        if(dstPos[0] == MAX_COORDINATE)
+        {
+            //assert-like; should never happen
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal inconsistency reshaping coordinates";
         }
     }         
         

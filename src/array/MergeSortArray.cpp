@@ -25,7 +25,7 @@
  *
  *  Created on: Sep 23, 2010
  */
-#include "MergeSortArray.h"
+#include "array/MergeSortArray.h"
 #include "system/SystemCatalog.h"
 #include "network/NetworkManager.h"
 
@@ -94,10 +94,11 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
     MergeSortArray::MergeSortArray(const boost::shared_ptr<Query>& query,
                                    ArrayDesc const& array,
                                    std::vector< boost::shared_ptr<Array> > const& inputArrays,
-                                   vector<Key> const& keys, bool local)
+                                   boost::shared_ptr<TupleComparator> tcomp, 
+                                   bool local)
     : desc(array),
       currChunkIndex(0),
-      comparator(keys, array),
+      comparator(tcomp),
       chunkPos(1),
       chunkSize(array.getDimensions()[0].getChunkInterval()),
       isLocal(local),
@@ -144,7 +145,7 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
         int l = 0, r = permutation.size();
         while (l < r) {
             int m = (l + r) >> 1;
-            if (comparator.compare(streams[permutation[m]].tuple, tuple) > 0) {
+            if (comparator->compare(streams[permutation[m]].tuple, tuple) > 0) {
                 l = m + 1;
             } else {
                 r = m;

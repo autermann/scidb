@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
 <article>
   <info>
     <title>SciDB Quick Start</title>
@@ -40,7 +41,8 @@
       <listitem>
         <para>Download and install a full version of SciDB from the forum.
         SciDB and the User Guide can both be downloaded using the following
-        link: <ulink url="http://www.scidb.org/forum/viewforum.php?f=14">http://www.scidb.org/forum/viewforum.php?f=14</ulink>.</para>
+        link: <ulink
+        url="http://www.scidb.org/forum/viewforum.php?f=14">http://www.scidb.org/forum/viewforum.php?f=14</ulink>.</para>
       </listitem>
     </itemizedlist>
 
@@ -59,7 +61,8 @@
       <title>Use the SciDB VirtualBox Image</title>
 
       <para>We have created a VirtualBox image that contains SciDB 13.2.
-      Consult <ulink url="https://www.virtualbox.org/">https://www.virtualbox.org/</ulink>
+      Consult <ulink
+      url="https://www.virtualbox.org/">https://www.virtualbox.org/</ulink>
       for more information about VirtualBox.</para>
 
       <note>
@@ -73,7 +76,8 @@
           URL:</para>
 
           <para>
-            <ulink url="http://downloads.paradigm4.com/QuickStart/13.2/SciDB13.2-CentOS6.3-VirtualBox4.1.12.ova">http://downloads.paradigm4.com/QuickStart/13.2/SciDB13.2-CentOS6.3-VirtualBox4.1.12.ova</ulink>
+            <ulink
+            url="http://downloads.paradigm4.com/QuickStart/13.2/SciDB13.2-CentOS6.3-VirtualBox4.1.12.ova">http://downloads.paradigm4.com/QuickStart/13.2/SciDB13.2-CentOS6.3-VirtualBox4.1.12.ova</ulink>
           </para>
 
           <para>Download the .ova file to a partition with at least 8GB of
@@ -94,7 +98,9 @@
               <screen>Failed to open a session for the virtual machine
 SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 
-              <para>If you receive this error, click <emphasis role="bold">Settings</emphasis> and then <emphasis role="bold">OK</emphasis>. You should now be able to start the
+              <para>If you receive this error, click <emphasis
+              role="bold">Settings</emphasis> and then <emphasis
+              role="bold">OK</emphasis>. You should now be able to start the
               image.</para>
             </note></para>
         </step>
@@ -106,7 +112,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
         </step>
 
         <step>
-          <para>The supplied database is <emphasis role="bold">mydb</emphasis>. Start SciDB by typing the following
+          <para>The supplied database is <emphasis
+          role="bold">mydb</emphasis>. Start SciDB by typing the following
           command:<programlisting>scidb.py startall mydb</programlisting></para>
         </step>
       </procedure>
@@ -122,7 +129,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
       saved Virtual Machine with SciDB installed. You can use Amazon's EC2
       service to instantly launch this machine, log into it and use SciDB. It
       requires an Amazon Web Services account and Amazon will charge you a
-      small hourly fee for using their EC2 service. Consult <ulink url="http://aws.amazon.com">http://aws.amazon.com/</ulink> for more
+      small hourly fee for using their EC2 service. Consult <ulink
+      url="http://aws.amazon.com">http://aws.amazon.com/</ulink> for more
       information.</para>
 
       <para>To work with the SciDB 13.2 AMI, perform the following
@@ -135,11 +143,14 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
           <substeps>
             <step>
               <para>If you do not already have an Amazon AWS account, create
-              one at <ulink url="http://aws.amazon.com">http://aws.amazon.com/</ulink>.</para>
+              one at <ulink
+              url="http://aws.amazon.com">http://aws.amazon.com/</ulink>.</para>
             </step>
 
             <step>
-              <para>On the Amazon Web Services page, select <emphasis role="bold">My Account/Console</emphasis> &gt; <emphasis role="bold">AWS Management Console</emphasis>.</para>
+              <para>On the Amazon Web Services page, select <emphasis
+              role="bold">My Account/Console</emphasis> &gt; <emphasis
+              role="bold">AWS Management Console</emphasis>.</para>
             </step>
 
             <step>
@@ -160,7 +171,13 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
               <para>Select <emphasis role="bold">Community AMIs</emphasis> and
               enter <literal>ami-24f8604d</literal> (the name of the SciDB
               image) into the text field. This should return the details for
-              the ami-24f8604d image.</para>
+              the ami-24f8604d image.<note>
+                  <para>The set of community AMIs is region-specific. If you
+                  cannot find the SciDB image, change your region to <emphasis
+                  role="bold">US East (N. Virginia)</emphasis> and reenter the
+                  SciDB AMI name. Your region is displayed in the EC2 menu
+                  bar, next to your AWS account name.</para>
+                </note></para>
             </step>
 
             <step>
@@ -178,10 +195,13 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
                 <listitem>
                   <para><emphasis role="bold">Key Pairs: </emphasis>If
                   desired, you may create a Key Pair or use an existing one.
-                  This will allow logging into the instance as the <emphasis role="bold">ubuntu</emphasis> or <emphasis role="bold">root</emphasis> users using PKI rather than a
+                  This will allow logging into the instance as the <emphasis
+                  role="bold">ubuntu</emphasis> or <emphasis
+                  role="bold">root</emphasis> users using PKI rather than a
                   password. Alternatively, you can log into the instance as
                   the <emphasis role="bold">scidb</emphasis> user using the
-                  default password <emphasis role="bold">paradigm4</emphasis>.</para>
+                  default password <emphasis
+                  role="bold">paradigm4</emphasis>.</para>
                 </listitem>
               </itemizedlist>
             </step>
@@ -193,7 +213,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 
           <substeps>
             <step>
-              <para>On the final page of the wizard, click <emphasis role="bold">Launch</emphasis>. This launches your
+              <para>On the final page of the wizard, click <emphasis
+              role="bold">Launch</emphasis>. This launches your
               instance.</para>
             </step>
 
@@ -204,7 +225,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 
             <step>
               <para>Wait a few minutes for the image to come fully online.
-              When you see <literal>running</literal> in the <emphasis role="bold">State </emphasis>column, click the Instance.</para>
+              When you see <literal>running</literal> in the <emphasis
+              role="bold">State </emphasis>column, click the Instance.</para>
             </step>
 
             <step>
@@ -228,7 +250,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
         </step>
 
         <step>
-          <para>The supplied database is <emphasis role="bold">mydb</emphasis>. Start SciDB by typing the following
+          <para>The supplied database is <emphasis
+          role="bold">mydb</emphasis>. Start SciDB by typing the following
           command:<programlisting>scidb.py startall mydb</programlisting></para>
         </step>
       </procedure>
@@ -460,20 +483,29 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 
     <itemizedlist>
       <listitem>
-        <para>List all of the existing arrays.<para><programlisting>AFL% list('arrays');  </programlisting><screen>name,id,schema,availability
+        <para>List all of the existing arrays.<para>
+            <programlisting>AFL% list('arrays');  </programlisting>
+
+            <screen>name,id,schema,availability
 'test',671,'test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]',true
-</screen></para></para>
+</screen>
+          </para></para>
       </listitem>
 
       <listitem>
-        <para>Retrieve the schema for a particular array.<para><programlisting>AFL% show(test);  </programlisting><screen>[('test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]')]
-</screen></para></para>
+        <para>Retrieve the schema for a particular array.<para>
+            <programlisting>AFL% show(test);  </programlisting>
+
+            <screen>[('test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]')]
+</screen>
+          </para></para>
       </listitem>
 
       <listitem>
-        <para>Retrieve the contents for a particular array.<para><programlisting>AFL% scan(test);  </programlisting><screen>[[]]
-</screen>As
-        you can see, <literal>test </literal>is currently empty.</para></para>
+        <para>Retrieve the contents for a particular
+        array.<para><programlisting>AFL% scan(test);  </programlisting><screen>[[]]
+</screen>As you can see, <literal>test </literal>is currently
+        empty.</para></para>
       </listitem>
     </itemizedlist>
   </section>
@@ -533,9 +565,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 [(1),(1),(1),(1),(1)],
 [(1),(1),(1),(1),(1)],
 [(1),(1),(1),(1),(1)]
-]</screen>Note
-          that this query does not store the result anywhere—that is, SciDB
-          does not create a new array filled with 1's.</para></para>
+]</screen>Note that this query does not store the result anywhere—that is,
+          SciDB does not create a new array filled with 1's.</para></para>
         </listitem>
 
         <listitem>
@@ -546,9 +577,8 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 [(1),(1),(1),(1),(1)],
 [(1),(1),(1),(1),(1)],
 [(1),(1),(1),(1),(1)]
-]</screen>This
-          stores the output from the <command>build</command> operator into
-          the array, <literal>test</literal>.</para></para>
+]</screen>This stores the output from the <command>build</command> operator
+          into the array, <literal>test</literal>.</para></para>
         </listitem>
       </orderedlist>
     </section>
@@ -568,22 +598,21 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 [(99),(10),(40),(35)],
 [(78),(69),(68),(87)],
 [(17),(77),(13),(10)]
-]</screen>Note
-          that in this query, our attribute is of type int64 (an integer data
-          type). Of course, your output will differ, as the random() function
-          produces random output.</para></para>
+]</screen>Note that in this query, our attribute is of type int64 (an integer
+          data type). Of course, your output will differ, as the random()
+          function produces random output.</para></para>
         </step>
 
         <step>
           <para>This example uses the <command>iif</command> operator—inline
-          if—to populate an array with two different values.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0],iif(i=j,1,0)),test);  </programlisting><screen>[
+          if—to populate an array with two different
+          values.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0],iif(i=j,1,0)),test);  </programlisting><screen>[
 [(1),(0),(0),(0),(0)],
 [(0),(1),(0),(0),(0)],
 [(0),(0),(1),(0),(0)],
 [(0),(0),(0),(1),(0)],
 [(0),(0),(0),(0),(1)]
-]</screen>Note
-          that we have created a 5<symbol>x</symbol>5 identity array. The
+]</screen>Note that we have created a 5<symbol>x</symbol>5 identity array. The
           <command>iif</command> operator takes three arguments:<itemizedlist>
               <listitem>
                 <para>An expression to evaluate. In this case, the expression
@@ -611,10 +640,9 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
 [(1),(1),(0),(0),(0)],
 [(1),(1),(1),(0),(0)],
 [(1),(1),(1),(1),(0)]
-]</screen>In
-          this example, if i &gt; j, we add a 1 to the array, and if i &lt;=
-          j, SciDB evaluates the nested <command>iif</command> function, and
-          adds a 7 or 0 to the array, depending on whether the second
+]</screen>In this example, if i &gt; j, we add a 1 to the array, and if i
+          &lt;= j, SciDB evaluates the nested <command>iif</command> function,
+          and adds a 7 or 0 to the array, depending on whether the second
           expression is true.</para></para>
         </step>
       </procedure>
@@ -642,7 +670,9 @@ Convertible, 26.8</screen></para>
 
       <procedure>
         <step>
-          <para>Create a SciDB array to hold the data.<para><programlisting>AFL% create array A &lt;type:string, mpg:double&gt; [x=0:*,10,0];  </programlisting></para></para>
+          <para>Create a SciDB array to hold the data.<para>
+              <programlisting>AFL% create array A &lt;type:string, mpg:double&gt; [x=0:*,10,0];  </programlisting>
+            </para></para>
         </step>
 
         <step>
@@ -680,37 +710,58 @@ Convertible, 26.8</screen></para>
 
     <procedure>
       <step>
-        <para>We will use the array that we created earlier, <emphasis role="bold">test</emphasis>, and fill it with values.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0], i*5 +j+1),test);  </programlisting></para></para>
+        <para>We will use the array that we created earlier, <emphasis
+        role="bold">test</emphasis>, and fill it with values.<para>
+            <programlisting>AFL% store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0], i*5 +j+1),test);  </programlisting>
+          </para></para>
       </step>
 
       <step>
-        <para>Select a 3x3 sub array from the interior of the
-        array:<para><programlisting>AFL% subarray(test,1,1,3,3);  </programlisting><screen>[
+        <para>Select a 3x3 sub array from the interior of the array:<para>
+            <programlisting>AFL% subarray(test,1,1,3,3);  </programlisting>
+
+            <screen>[
 [(7),(8),(9)],
 [(12),(13),(14)],
 [(17),(18),(19)]
-]</screen></para></para>
+]</screen>
+          </para></para>
       </step>
 
       <step>
         <para>Slice the third column (j=2), and then the second row (i=1):
-        <para><programlisting>AFL% slice(test,j,2);  </programlisting><screen>[(3),(8),(13),(18),(23)]
-</screen><para><programlisting>AFL% slice(test,i,1);  </programlisting><screen>[(6),(7),(8),(9),(10)]
-</screen></para></para></para>
+        <para>
+            <programlisting>AFL% slice(test,j,2);  </programlisting>
+
+            <screen>[(3),(8),(13),(18),(23)]
+</screen>
+
+            <para>
+              <programlisting>AFL% slice(test,i,1);  </programlisting>
+
+              <screen>[(6),(7),(8),(9),(10)]
+</screen>
+            </para>
+          </para></para>
       </step>
 
       <step>
         <para>Use the <literal role="bold">thin </literal>operator to
-        uniformly sample data from the array. <para><programlisting>AFL% thin(test,0,2,0,2);  </programlisting><screen>[
+        uniformly sample data from the array. <para>
+            <programlisting>AFL% thin(test,0,2,0,2);  </programlisting>
+
+            <screen>[
 [(1),(3),(5)],
 [(11),(13),(15)],
 [(21),(23),(25)]
-]</screen><para><programlisting>AFL% thin(test,1,3,1,2);  </programlisting><screen>[
+]</screen>
+
+            <para><programlisting>AFL% thin(test,1,3,1,2);  </programlisting><screen>[
 [(7),(9)],
 [(22),(24)]
-]</screen>The
-        thin operator selects elements from given array dimensions at defined
-        intervals.</para></para></para>
+]</screen>The thin operator selects elements from given array dimensions at
+            defined intervals.</para>
+          </para></para>
       </step>
     </procedure>
   </section>
@@ -721,8 +772,9 @@ Convertible, 26.8</screen></para>
     <para>You can use combinations of operations on SciDB data. This allows
     you to view and analyze data in a nearly endless variety of ways.</para>
 
-    <para>For example, let's look at a query to list the SciDB
-    functions:<para><programlisting>AFL% list('functions');  </programlisting></para></para>
+    <para>For example, let's look at a query to list the SciDB functions:<para>
+        <programlisting>AFL% list('functions');  </programlisting>
+      </para></para>
 
     <para>If you run this query, it returns several hundred elements. Here are
     the first few items:<screen>{No} name,profile,deterministic,library
@@ -745,8 +797,10 @@ Convertible, 26.8</screen></para>
 
     <procedure>
       <step>
-        <para>Run the following query to create an array:<para><programlisting>AFL% store(sort(project(filter(list('functions'),
-   library='scidb'),name)),functionsArray);  </programlisting>Let's break down the actions in this query:<itemizedlist>
+        <para>Run the following query to create an
+        array:<para><programlisting>AFL% store(sort(project(filter(list('functions'),
+   library='scidb'),name)),functionsArray);  </programlisting>Let's break down
+        the actions in this query:<itemizedlist>
             <listitem>
               <para>Starting from the inside—which is where the SciDB engine
               starts—we have <literal>list('functions')</literal>, which lists
@@ -774,18 +828,25 @@ Convertible, 26.8</screen></para>
 
       <step>
         <para>Let's take a look at the schema of
-        <literal>functionsArray</literal>:<para><programlisting>AFL% show(functionsArray);  </programlisting><screen>[('functionsArray&lt;name:string&gt; [n=0:*,357,0]')]
-</screen></para></para>
+        <literal>functionsArray</literal>:<para>
+            <programlisting>AFL% show(functionsArray);  </programlisting>
+
+            <screen>[('functionsArray&lt;name:string&gt; [n=0:*,357,0]')]
+</screen>
+          </para></para>
       </step>
 
       <step>
         <para>We will use <literal>redimension_store </literal>to convert the
         attribute, <emphasis role="bold">name</emphasis>, to a dimension which
         removes duplicate values. First, we need to create a target array that
-        has a string dimension to match the string attribute, <emphasis role="bold">name</emphasis>. And since all arrays need at least one
+        has a string dimension to match the string attribute, <emphasis
+        role="bold">name</emphasis>. And since all arrays need at least one
         attribute, we the <command>count </command>function to create an
         attribute that counts the number of occurrences of each function
-        name.<para><programlisting>AFL% create array target &lt;count:uint64 null&gt; [name(string)=*,1000,0];  </programlisting></para></para>
+        name.<para>
+            <programlisting>AFL% create array target &lt;count:uint64 null&gt; [name(string)=*,1000,0];  </programlisting>
+          </para></para>
       </step>
 
       <step>
@@ -848,11 +909,10 @@ Convertible, 26.8</screen></para>
 {'tan'} 2
 {'togmt'} 1
 {'tznow'} 1
-</screen>As
-        you can see, the dimension actually contains the names of the SciDB
-        functions. The attribute, <emphasis role="bold">count</emphasis>,
-        contains the number of variations of the corresponding
-        function.</para></para>
+</screen>As you can see, the dimension actually contains the names of the
+        SciDB functions. The attribute, <emphasis
+        role="bold">count</emphasis>, contains the number of variations of the
+        corresponding function.</para></para>
       </step>
     </procedure>
   </section>

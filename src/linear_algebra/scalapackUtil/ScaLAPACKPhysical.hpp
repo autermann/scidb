@@ -35,6 +35,7 @@
 // de-facto standards
 
 // SciDB
+#include <log4cxx/logger.h>
 #include <query/Query.h>
 
 // MPI/ScaLAPACK
@@ -44,6 +45,7 @@
 #include "scalapackFromCpp.hpp"   // TODO JHM : rename slpp::int_t
 
 
+static log4cxx::LoggerPtr SCALAPACKPHYSICAL_HPP_logger(log4cxx::Logger::getLogger("scidb.scalapack.physical.op.hpp"));
 
 namespace scidb {
 
@@ -74,29 +76,37 @@ void valsSet(val_tt* dst, val_tt val, size_t numVal) {
 
 template<class float_tt>
 void setInputMatrixToAlgebraDefault(float_tt* dst, size_t numVal) {
+    Timing timer;
     valsSet(dst, float_tt(0), numVal); // empty cells imply zero
 
     enum dummy {DBG_DENSE_ALGEBRA_WITH_NAN_FILL=0};  // won't be correct if empty cells present
     if(DBG_DENSE_ALGEBRA_WITH_NAN_FILL) {
         valsSet(dst, ::nan(""), numVal); // any non-signalling nan will do
-        std::cerr << "@@@@@@@@@@@@@ WARNING: prefill matrix memory with NaN for debug" << std::endl ;
+        LOG4CXX_WARN(SCALAPACKPHYSICAL_HPP_logger, "@@@@@@@@@@@@@ WARNING: prefill matrix memory with NaN for debug");
     }
+    LOG4CXX_DEBUG(SCALAPACKPHYSICAL_HPP_logger, "setInputMatrixToAlgebraDefault took " << timer.stop());
 }
 
 template<class float_tt>
-void setOutputMatrixToAlgebraDefault(float_tt* dst, size_t numVal) {
+void setOutputMatrixToAlgebraDefault(float_tt* dst, size_t numVal, log4cxx::LoggerPtr logger) {
+    Timing timer;
     valsSet(dst, ::nan(""), numVal); // ScaLAPACK algorithm should provide all entries in matrix
+    LOG4CXX_DEBUG(SCALAPACKPHYSICAL_HPP_logger, "setOutputMatrixToAlgebraDefault took " << timer.stop());
 }
 
-void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPROW, slpp::int_t NPCOL,
-                                                                 slpp::int_t MYPROW, slpp::int_t MYPCOL, const std::string& callerLabel) ;
+void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
+                    slpp::int_t NPROW, slpp::int_t NPCOL,
+                    slpp::int_t MYPROW, slpp::int_t MYPCOL,
+                    const std::string& callerLabel) ;
 
 ///
 /// ScaLAPACK computation routines are only efficient for a certain
 /// range of sizes and are generally only implemented for
 /// square block sizes.  Check these constraints
 ///
-void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc);
+void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
+                             slpp::int_t nPRow, slpp::int_t nPCol,
+                             slpp::int_t myPRow, slpp::int_t myPCol);
 
 class ScaLAPACKPhysical : public MPIPhysical
 {
@@ -130,7 +140,67 @@ public:
     virtual ArrayDesc               getRepartSchema(ArrayDesc const& inputSchema) const;
 
     // extending API
+
+    /**
+     * for timing only.
+     * For proper operation, the query planner inserts the redistribute
+     * between ScaLAPACK-based operators (which have distribution psScaLAPACK) and others
+     * (e.g. store) which require psRoundRobin.  However, this requires using store() to
+     * as the terminal operator, which induces very long IO wait time into the execution of
+     * the benchmark.  Donghui is learning how to use the sg() operator to do this in such a
+     * benchmark situation, by writing the AFL    sg(op-under-test, ...) but so far does not understand
+     * all the options to sg().  Until that time, I'm just providing a function that can optionally
+     * be called within the scalapack operators under control of an environment variable, and this
+     * code can be dropped once we switch to sg(op-under-test, ...)
+     *
+     * @param outputArray   What would have been the output array, without this optional redistribute
+     * @param query         Current query
+     * @param callerLabel   a string that can be used when labeling logging messages, since the context in which
+     *                      this routine is working would be significant to the log line.
+     * @return              outputArray redistributed to psRoundRobin.
+     */
+    shared_ptr<Array> redistributeOutputArrayForTiming(shared_ptr<Array>& outputArray, shared_ptr<Query>& query, const std::string& callerLabel);
+
+    /**
+     * Make the provided inputArrays conform to the general requirements of ScaLAPACK operators, e.g.
+     * that they have acceptable chunk size and distribution.
+     *
+     * NOTE: the automatic repart() is not implemented yet, but we located inside this method.
+     * NOTE: at some point this may also include extractToScaLAPACK, so that it completely processes a single
+     *       input into ScaLAPACK memory, at which point a multi-input version will be acceptable again.
+     *
+     * @param inputArrays   The input arrays provided to the physical operator.
+     * @param query         current query
+     * @param callerLabel   a string that can be used when labeling logging messages, since the context in which
+     *                      this routine is working would be significant to the log line.
+     * @return              transformed or passed-through inputArrays, as appropriate
+     */
     std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query, const std::string& callerLabel);
+
+    /**
+     * Make the provided inputArray conform to the general requirements of ScaLAPACK operators, e.g.
+     * that they have acceptable chunk size and distribution.
+     * NOTE: the automatic repart() is not implemented yet, but may well go inside this method, which would then
+     *       be renamed to repartAndRedistInputArrays().
+     * NOTE: at some point this may be combined with extraction, so that it completely processes a single
+     *       input into ScaLAPACK memory, at which point a multi-input version will be acceptable again.
+     * NOTE: this single-array version is needed for use inside operators like gemm() which have multiple inputs to redistribute
+     *       and must extractToScaLAPACK and reset() the shared pointer to the input array afterwards, in order to conserve
+     *       memory vs converting multiple arrays together as in the method above.  Perhaps with a little more careful
+     *       rework, the reset() can be done safely inside the redistributeInputArrays() routine, but right now for backward
+     *       compatibility it does not.
+     *
+     * @param inputArray    The input array provided to the physical operator.
+     * @param schemData     Information about the ScaLAPACK process grid chosen for the operator as a whole.
+     *                      See redistributeInputArrays() for an example of constructing it.
+     * @param query         current query
+     * @param callerLabel   a string that can be used when labeling logging messages, since the context in which
+     *                      this routine is significant when reading the log line.
+     * @return              transformed or passed-through inputArray, as appropriate
+     */
+    shared_ptr<Array> redistributeInputArray(shared_ptr<Array>& inputArrays, PartitioningSchemaDataForScaLAPACK schemeData,
+                                             shared_ptr<Query>& query, const std::string& callerLabel);
+
     /**
      * Initialize the ScaLAPACK BLACS (Basic Linear Algebra Communications Systems).
      * @param redistInputs  The final inputs to the operator (already repartitioned and redistributed
@@ -154,7 +224,7 @@ public:
      * @param INFO          the ScaLAPACK INFO value as returned by MPISlaveProxy::waitForStatus()
      * @param operatorName  the ScaLAPACK operator name, e.g "pdgemm" or "pdgesvd" (do not include "Master" suffix)
      */
-    void                            raiseIfBadResultInfo(sl_int_t INFO, const std::string& operatorName) const ;
+    void                            raiseIfBadResultInfo(slpp::int_t INFO, const std::string& operatorName) const ;
 
 protected:
     /// routines that make dealing with matrix parameters

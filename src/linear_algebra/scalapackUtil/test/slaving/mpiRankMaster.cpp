@@ -72,12 +72,12 @@ void mpirankMaster(//general args
                 boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                 const string& ipcName, // can this be in the ctx too?
                 void * argsBuf,
-                const sl_int_t& NPROW, const sl_int_t& NPCOL,
-                const sl_int_t& MYPROW, const sl_int_t& MYPCOL, const sl_int_t& MYPNUM,
+                const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
+                const slpp::int_t& MYPROW, const slpp::int_t& MYPCOL, const slpp::int_t& MYPNUM,
                 // mpirank operator args
-                double *IN,  const sl_desc_t& DESC_IN,
-                double *OUT, const sl_desc_t& DESC_OUT,
-                sl_int_t &INFO)
+                double *IN,  const slpp::desc_t& DESC_IN,
+                double *OUT, const slpp::desc_t& DESC_OUT,
+                slpp::int_t &INFO)
 {
     enum dummy {DBG=0};
     if (DBG) {

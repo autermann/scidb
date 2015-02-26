@@ -280,7 +280,6 @@ PhysicalBoundaries PhysicalBoundaries::createEmpty(size_t numDimensions)
     return PhysicalBoundaries(resultStart, resultEnd);
 }
 
-
 bool PhysicalBoundaries::isEmpty() const
 {
     if (_startCoords.size() == 0)
@@ -298,43 +297,68 @@ bool PhysicalBoundaries::isEmpty() const
     return false;
 }
 
-uint64_t PhysicalBoundaries::getCellNumber(Coordinates const & in, Dimensions const& dims)
+uint64_t PhysicalBoundaries::getCellNumber (Coordinates const& coords, Dimensions const& dims)
 {
-    uint64_t cellNumber = 0;
-    if (in.size() != dims.size())
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_DIMENSIONS_DONT_MATCH_COORDINATES);
-
-    for (size_t i =0; i<dims.size(); i++)
+    if (dims.size() != coords.size())
     {
-        if (in[i] < dims[i].getStartMin() || in[i] > dims[i].getEndMax())
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_DIMENSIONS_DONT_MATCH_COORDINATES);
-
-        cellNumber *= dims[i].getLength();
-        cellNumber += (in[i] - dims[i].getStart());
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MISMATCHED_COORDINATES_IN_PHYSICAL_BOUNDARIES);
     }
-    return cellNumber;
+    uint64_t result = 0;
+    for ( size_t i = 0, n = dims.size(); i < n; i++)
+    {
+        if (dims[i].getLength()==0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MISMATCHED_COORDINATES_IN_PHYSICAL_BOUNDARIES);
+        }
+        uint64_t t = result * dims[i].getLength();
+        if (t / dims[i].getLength() != result) //overflow check multiplication
+        {
+            return INFINITE_LENGTH;
+        }
+        result = t;
+        t = result + coords[i] - dims[i].getStart();
+        if (t < result) //overflow check addition
+        {
+            return INFINITE_LENGTH;
+        }
+        result = t;
+    }
+    if (result >= INFINITE_LENGTH)
+    {
+        return INFINITE_LENGTH;
+    }
+    return result;
+}
+
+Coordinates PhysicalBoundaries::getCoordinates(uint64_t& cellNum, Dimensions const& dims, bool strictCheck)
+{
+    if(cellNum >= INFINITE_LENGTH)
+    {
+        return Coordinates(dims.size(), MAX_COORDINATE);
+    }
+    Coordinates result (dims.size(), 0);
+    for (int i = dims.size(); --i >= 0;)
+    {
+        result[i] = dims[i].getStart() + (cellNum % dims[i].getLength());
+        cellNum /= dims[i].getLength();
+    }
+    if (strictCheck && cellNum != 0)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MISMATCHED_COORDINATES_IN_PHYSICAL_BOUNDARIES);
+    }
+    return result;
 }
 
 Coordinates PhysicalBoundaries::reshapeCoordinates (Coordinates const& in,
                                                     Dimensions const& currentDims,
                                                     Dimensions const& newDims)
 {
-    uint64_t cellNumber = getCellNumber(in,currentDims);
-
-    Coordinates result;
-    for (size_t i =0; i<newDims.size(); i++)
+    uint64_t cellNum = getCellNumber(in, currentDims);
+    if ( cellNum >= INFINITE_LENGTH )
     {
-        uint64_t otherDimIncrements = 1;
-        for (size_t j = i+1; j<newDims.size(); j++)
-        {
-            otherDimIncrements *= newDims[j].getLength();
-        }
-
-        result.push_back(newDims[i].getStart() + cellNumber / otherDimIncrements);
-        cellNumber = cellNumber % otherDimIncrements;
+        return Coordinates(newDims.size(), MAX_COORDINATE);
     }
-
-    return result;
+    return getCoordinates(cellNum, newDims);
 }
 
 uint64_t PhysicalBoundaries::getNumCells (Coordinates const& start, Coordinates const& end)
@@ -343,7 +367,6 @@ uint64_t PhysicalBoundaries::getNumCells (Coordinates const& start, Coordinates 
     {
         return 0;
     }
-
     uint64_t result = 1;
     for ( size_t i = 0; i < end.size(); i++)
     {
@@ -353,54 +376,28 @@ uint64_t PhysicalBoundaries::getNumCells (Coordinates const& start, Coordinates 
         }
         else if(end[i] >= start[i])
         {
-            result *= (end[i] - start[i] + 1);
+            uint64_t t = result * (end[i] - start[i] + 1);
+            if ( t / (end[i] - start[i] + 1) != result) //overflow check multiplication
+            {
+                return INFINITE_LENGTH;
+            }
+            result = t;
         }
         else
         {
             result *= 0;
         }
     }
-
-    if (result > INFINITE_LENGTH)
+    if (result >= INFINITE_LENGTH)
     {
-        result = INFINITE_LENGTH;
+        return INFINITE_LENGTH;
     }
     return result;
 }
-
 
 uint64_t PhysicalBoundaries::getNumCells() const
 {
     return getNumCells(_startCoords, _endCoords);
-}
-
-uint64_t PhysicalBoundaries::getRawCellNumber(Coordinates const & in) const
-{
-    uint64_t cellNumber = 0;
-    for (size_t i =0; i<in.size(); i++)
-    {
-        cellNumber *= (_endCoords[i] - _startCoords[i] + 1);
-        cellNumber += (in[i] - _startCoords[i]);
-    }
-    return cellNumber;
-}
-
-Coordinates PhysicalBoundaries::coordsFromRawCellNumber (uint64_t cellNumber) const
-{
-    Coordinates result;
-    for (size_t i =0; i<_startCoords.size(); i++)
-    {
-        uint64_t otherDimIncrements = 1;
-        for (size_t j = i+1; j<_startCoords.size(); j++)
-        {
-            otherDimIncrements *= (_endCoords[j] - _startCoords[j] + 1);
-        }
-
-        result.push_back(_startCoords[i] + cellNumber / otherDimIncrements);
-        cellNumber = cellNumber % otherDimIncrements;
-    }
-
-    return result;
 }
 
 uint64_t PhysicalBoundaries::getCellsPerChunk (Dimensions const& dims)
@@ -408,6 +405,7 @@ uint64_t PhysicalBoundaries::getCellsPerChunk (Dimensions const& dims)
     uint64_t cellsPerChunk = 1;
     for (size_t i = 0; i<dims.size(); i++)
     {
+        //assume the dimensions that are passed in come from an array, therefore this is overflow-safe
         cellsPerChunk *= dims[i].getChunkInterval();
     }
     return cellsPerChunk;
@@ -416,6 +414,9 @@ uint64_t PhysicalBoundaries::getCellsPerChunk (Dimensions const& dims)
 uint64_t PhysicalBoundaries::getNumChunks(Dimensions const& dims) const
 {
     if (_startCoords.size() != dims.size())
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MISMATCHED_COORDINATES_IN_PHYSICAL_BOUNDARIES);
+    }
 
     if (isEmpty())
     {
@@ -429,19 +430,23 @@ uint64_t PhysicalBoundaries::getNumChunks(Dimensions const& dims) const
         {
             return INFINITE_LENGTH;
         }
-
         DimensionDesc const& dim = dims[i];
         if (_startCoords[i] < dim.getStart() || _endCoords[i] > dim.getEndMax())
+        {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MISMATCHED_COORDINATES_IN_PHYSICAL_BOUNDARIES);
+        }
         Coordinate arrayStart = dim.getStart();
-        uint32_t chunkInterval = dim.getChunkInterval();
+        int64_t chunkInterval = dim.getChunkInterval();
         Coordinate physStart = _startCoords[i]; //TODO:OPTAPI (- overlap) ?
         Coordinate physEnd = _endCoords[i];
-
         int64_t numChunks = chunkInterval == 0 ? 0 :
                             ((physEnd - arrayStart + chunkInterval) / chunkInterval) - ((physStart - arrayStart) / chunkInterval);
-
-        result *= numChunks;
+        uint64_t t = result * numChunks;
+        if ( numChunks && t / numChunks != result) //overflow check multiplication
+        {
+            return INFINITE_LENGTH;
+        }
+        result = t;
     }
     return result;
 }
@@ -1384,6 +1389,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
     ArrayID resultArrayId = 0;
     SystemCatalog* catalog = NULL;
     PhysicalBoundaries bounds = PhysicalBoundaries::createEmpty(nDims);
+    boost::shared_ptr<JobQueue> incomingQueue;
 
     if (resultArrayName.empty()) {
         outputArray = createTmpArray(desc, query);
@@ -1392,6 +1398,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
         outputArray = boost::shared_ptr<Array>(DBArray::newDBArray(resultArrayName, query));
         resultArrayId = outputArray->getHandle();
         query->getReplicationContext()->enableInboundQueue(resultArrayId, outputArray);
+        incomingQueue = PhysicalOperator::getGlobalQueueForOperators();
         catalog = SystemCatalog::getInstance();
         LOG4CXX_DEBUG(logger, "Array " << resultArrayName << " was opened")
     }
@@ -1407,7 +1414,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
     shared_ptr<RedimInfo> dummyRedimInfo;
     shared_ptr<SGContext> sgCtx = shared_ptr<SGContext>(
             new SGContext(chunkReceiver, dummyRedimInfo, outputArray, std::vector<AggregatePtr>() ));
-    query->setOperatorContext(sgCtx);
+    query->setOperatorContext(sgCtx, incomingQueue);
 
     /**
      *  Sending out our parts of the input array
@@ -1594,12 +1601,16 @@ PhysicalBoundaries findArrayBoundaries(shared_ptr<Array> srcArray,
 {
     ArrayDesc const& srcDesc = srcArray->getArrayDesc();
     ArrayID id = srcDesc.getId();
-
-    if (SystemCatalog::getInstance()->containsArray(srcDesc.getId()))
+    try
     {
         Coordinates lo = SystemCatalog::getInstance()->getLowBoundary(id);
         Coordinates hi = SystemCatalog::getInstance()->getHighBoundary(id);
         return PhysicalBoundaries(lo,hi);
+
+    } catch (SystemException const& x) {
+        if (x.getLongErrorCode() != SCIDB_LE_ARRAYID_DOESNT_EXIST) {
+            throw;
+        }
     }
 
     size_t nDims = srcDesc.getDimensions().size();

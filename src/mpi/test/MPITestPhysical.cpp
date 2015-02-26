@@ -42,6 +42,15 @@ namespace scidb
 using namespace std;
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.mpi.test"));
 
+boost::shared_ptr<MpiSlaveProxy> newMPISlaveProxyForTests(uint64_t launchId,
+                                                          const boost::shared_ptr<Query>& query,
+                                                          const std::string& installPath,
+                                                          uint32_t timeout, uint32_t delay)
+{
+    return boost::make_shared<MpiSlaveProxy>(launchId, query, installPath,
+                                             timeout, delay);
+}
+
 class PhysicalMpiTest: public MPIPhysical
 {
   public:
@@ -56,6 +65,17 @@ class PhysicalMpiTest: public MPIPhysical
     void preSingleExecute(shared_ptr<Query> query)
     {
         _mustLaunch = true;
+    }
+    void setQuery(const boost::shared_ptr<Query>& query)
+    {
+        // slow down the workers to make sure the slaves are started before
+        // the workers have set up the context
+        if (query->getCoordinatorInstanceID() !=
+            query->getInstanceID()) {
+            const int WORKER_QUERY_EXECUTION_DELAY_SEC = 10;
+            ::sleep(WORKER_QUERY_EXECUTION_DELAY_SEC);
+        }
+        MPIPhysical::setQuery(query);
     }
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
@@ -72,6 +92,9 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
         const string& installPath = MpiManager::getInstallPath(membership);
+
+        syncBarrier(0, query);
+        syncBarrier(1, query);
 
         testMultipleLaunches(installPath, membership, query);
         testEcho(installPath, membership,  query);
@@ -121,17 +144,16 @@ class PhysicalMpiTest: public MPIPhysical
             uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
             if (launchId-2 != oldLaunchId) {
                 throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                       << "XXXX Bug in manging last launch ID");
+                       << "XXXX Bug in managing last launch ID");
             }
 
             boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 
             if (i>0) {
                 try {
-                    _ctx->setSlave(launchId-3, slave);
+                    _ctx->setSlaveInternal(launchId-3, slave);
                     throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                           << "XXXX Bug in MPI context: MpiOperatorContext::setSave did not fail");
-
+                           << "XXXX Bug in MPI context: MpiOperatorContext::setSlave did not fail");
                 } catch(scidb::SystemException& e) {
                     if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
                         throw;
@@ -144,12 +166,12 @@ class PhysicalMpiTest: public MPIPhysical
                 }
             }
 
-            _ctx->setSlave(launchId, slave);
+            _ctx->setSlave(slave);
 
             try {
-                _ctx->setSlave(launchId-1, slave);
+                _ctx->setSlaveInternal(launchId-1, slave);
                 throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                           << "XXXX Bug in MPI context: MpiOperatorContext::setSave did not fail");
+                           << "XXXX Bug in MPI context: MpiOperatorContext::setSlave did not fail");
             } catch(scidb::SystemException& e) {
                 if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
                     throw;
@@ -185,7 +207,7 @@ class PhysicalMpiTest: public MPIPhysical
                            << "XXXX Bug in MPI launcher: MpiLauncher::isRunning returned true");
                 }
                 try {
-                    _ctx->setLauncher(launchId-1, launcher);
+                    _ctx->setLauncherInternal(launchId-1, launcher);
                     throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                            << "XXXX Bug in MPI context: MpiOperatorContext::setLauncher did not fail");
                 } catch(scidb::SystemException& e) {
@@ -199,7 +221,7 @@ class PhysicalMpiTest: public MPIPhysical
                     // expected
                 }
 
-                _ctx->setLauncher(launchId, launcher);
+                _ctx->setLauncher(launcher);
                 std::vector<std::string> args;
                 launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
             }
@@ -436,6 +458,7 @@ class PhysicalMpiTest: public MPIPhysical
                   boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX ECHO test");
+
 	uint64_t launchId    = _ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
@@ -444,12 +467,12 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
-	_ctx->setSlave(launchId, slave);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
 	    launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
 	}
@@ -571,6 +594,7 @@ class PhysicalMpiTest: public MPIPhysical
                         boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX SLOW_SLAVE test");
+
 	uint64_t launchId =_ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
@@ -580,13 +604,18 @@ class PhysicalMpiTest: public MPIPhysical
 
         syncBarrier(static_cast<int>(launchId), query);
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath, SLAVE_TIMEOUT_SEC));
-	_ctx->setSlave(launchId, slave);
+        const uint32_t LAUNCHER_CHECK_DELAY_SEC=1;
+        assert(SLAVE_TIMEOUT_SEC > LAUNCHER_CHECK_DELAY_SEC);
+
+	boost::shared_ptr<MpiSlaveProxy> slave = newMPISlaveProxyForTests(launchId, query, installPath,
+                                                                          SLAVE_TIMEOUT_SEC,
+                                                                          LAUNCHER_CHECK_DELAY_SEC);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             stringstream ss;
             ss << SLAVE_DELAY_SEC;
             std::vector<std::string> args;
@@ -604,12 +633,16 @@ class PhysicalMpiTest: public MPIPhysical
             if (e.getLongErrorCode() != SCIDB_LE_OPERATION_FAILED) {
                 throw;
             }
+            if (e.getErrorMessage().find("MPI slave process failed to communicate in time")
+                == std::string::npos) {
+                throw;
+            }
             // expected
         }
         LOG4CXX_DEBUG(logger, "XXXX SLOW_SLAVE: waiting for handshake again");
         bool ok=false;
         const uint32_t maxTries = scidb::getLivenessTimeout() / SLAVE_TIMEOUT_SEC ;
-        for (uint32_t i=0; i < maxTries; ++i) {
+        for (uint32_t i=0; i <= maxTries; ++i) {
             try {
                 slave->waitForHandshake(_ctx);
                 ok = true;
@@ -707,6 +740,7 @@ class PhysicalMpiTest: public MPIPhysical
                           boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX ABNORMAL_EXIT test");
+
 	uint64_t launchId =_ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
@@ -715,12 +749,12 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath, SLAVE_TIMEOUT_SEC));
-	_ctx->setSlave(launchId, slave);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
 	    launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
 	}
@@ -772,30 +806,45 @@ class PhysicalMpiTest: public MPIPhysical
 
         slave->sendCommand(cmd, _ctx);
 
+        bool eofConsumed=false;
         // slave should not respond
         try {
             slave->waitForStatus(_ctx);
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                    << "XXXX Bug in MPI slave: MpiSlaveProxy::waitForStatus did not fail");
         } catch (scidb::SystemException& e) {
+
             if ((e.getLongErrorCode() == SCIDB_LE_UNKNOWN_ERROR) &&
                 (e.getErrorMessage().find("disconnected prematurely") != std::string::npos) ){
                 // expected
+                // the EOF message should already be consumed by waitForStatus
+                eofConsumed=true;
             } else if (_mustLaunch &&
                        (e.getLongErrorCode() == SCIDB_LE_OPERATION_FAILED) &&
-                       (e.getErrorMessage().find("MPI launcher process") != std::string::npos) ){
+                       (e.getErrorMessage().find("MPI launcher process already terminated") != std::string::npos) ){
                 // expected
             } else {
+                LOG4CXX_ERROR(logger, "XXXX ABNORMAL_EXIT: BUG in waitForStatus !!!");
                 throw;
             }
         }
-        // the EOF message should already be consumed by waitForStatus
+
+        LOG4CXX_DEBUG(logger, "XXXX ABNORMAL_EXIT: waitForExit now");
         try {
             slave->waitForExit(_ctx);
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                   << "XXXX Bug in MPI slave: MpiSlaveProxy::waitForExit did not timeout");
+            if (eofConsumed) {
+                throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                       << "XXXX Bug in MPI slave: MpiSlaveProxy::waitForExit did not timeout");
+            }
         } catch (scidb::SystemException& e) {
+            if (!eofConsumed) {
+                throw;
+            }
             if (e.getLongErrorCode() != SCIDB_LE_OPERATION_FAILED) {
+                throw;
+            }
+            if (e.getErrorMessage().find("MPI slave process failed to communicate in time")
+                == std::string::npos) {
                 throw;
             }
             // expected
@@ -821,20 +870,21 @@ class PhysicalMpiTest: public MPIPhysical
                         boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_MSG from slave test");
+
 	uint64_t launchId =_ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                   << "XXXX Bug in manging last launch ID");
+                   << "XXXX Bug in managing last launch ID");
         }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
-	_ctx->setSlave(launchId, slave);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
 	}
@@ -884,8 +934,6 @@ class PhysicalMpiTest: public MPIPhysical
                 // expected
             }
         }
-        // clear all the bogus messages the slave has sent us
-        _ctx->complete(0);
     }
 
     void testBadMessageFlood(const std::string& installPath,
@@ -893,6 +941,7 @@ class PhysicalMpiTest: public MPIPhysical
                              boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_MSG_FLOOD from slave test");
+
 	uint64_t launchId =_ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
@@ -901,12 +950,12 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
-	_ctx->setSlave(launchId, slave);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
 	}
@@ -928,8 +977,28 @@ class PhysicalMpiTest: public MPIPhysical
         slave->sendCommand(cmd, _ctx);
 
         LOG4CXX_DEBUG(logger, "XXXX Checking slave status");
-        slave->waitForStatus(_ctx);
-
+        const size_t MSG_NUM = 10000;
+        size_t i=0;
+        const int WAIT_FOR_SLAVE_ERR_MSGS_SEC=2;
+        ::sleep(WAIT_FOR_SLAVE_ERR_MSGS_SEC); // let slave messages accumulate
+        for (; i <= MSG_NUM; ++i) {
+            try {
+                slave->waitForStatus(_ctx);
+                break;
+            } catch(scidb::SystemException& e) {
+                if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
+                    throw;
+                }
+                if (e.getErrorMessage().find("invalid status") == std::string::npos) {
+                    throw;
+                }
+                // expected
+            }
+        }
+        if (i > MSG_NUM) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in slave message delivery/order");
+        }
         cmd.clear();
         cmd.setCmd(string("EXIT"));
 
@@ -941,8 +1010,23 @@ class PhysicalMpiTest: public MPIPhysical
         if (_mustLaunch) {
             launcher->destroy();
         }
+
         // clear all the bogus messages the slave has sent us
-        _ctx->complete(0);
+        slave = boost::shared_ptr<MpiSlaveProxy>(new MpiSlaveProxy(launchId+1, query, installPath));
+        // Get the malformed handshake
+        try {
+            slave->waitForHandshake(_ctx);
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in detecting invalid handshake from slave: MpiSlave::waitForHandshake did not report invalid PID");
+        } catch(scidb::SystemException& e) {
+            if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
+                throw;
+            }
+            if (e.getErrorMessage().find("invalid PID") == std::string::npos) {
+                throw;
+            }
+            // expected
+        }
     }
 
     void testBadHandshake(const std::string& installPath,
@@ -950,6 +1034,7 @@ class PhysicalMpiTest: public MPIPhysical
                           boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_HANDSHAKE from slave test");
+
 	uint64_t launchId =_ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
@@ -958,12 +1043,12 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
-	_ctx->setSlave(launchId, slave);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
 	}
@@ -1010,8 +1095,6 @@ class PhysicalMpiTest: public MPIPhysical
         if (_mustLaunch) {
             launcher->destroy();
         }
-        // clear all the bogus messages the slave has sent us
-        _ctx->complete(0);
     }
 
     void testBadStatus(const std::string& installPath,
@@ -1019,20 +1102,21 @@ class PhysicalMpiTest: public MPIPhysical
                        boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_STATUS from slave test");
+
 	uint64_t launchId =_ctx->getNextLaunchId();
         uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
         if (launchId-1 != oldLaunchId) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                   << "XXXX Bug in manging last launch ID");
+                   << "XXXX Bug in managing last launch ID");
         }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
-	_ctx->setSlave(launchId, slave);
+	_ctx->setSlave(slave);
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
 	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
-	    _ctx->setLauncher(launchId, launcher);
+	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
 	}
@@ -1059,7 +1143,7 @@ class PhysicalMpiTest: public MPIPhysical
         slave->sendCommand(cmd, _ctx);
 
         // slave should be disconnected
-        try { 
+        try {
             slave->waitForExit(_ctx);
         } catch (scidb::SystemException& e) {
             if (!_mustLaunch) { 
@@ -1089,9 +1173,7 @@ class PhysicalMpiTest: public MPIPhysical
                 // expected
             }
         }
-        // clear all the bogus messages the slave has sent us
         LOG4CXX_DEBUG(logger, "XXXX BAD_STATUS: completing ...");
-        _ctx->complete(0);
     }
     private:
     bool _mustLaunch;

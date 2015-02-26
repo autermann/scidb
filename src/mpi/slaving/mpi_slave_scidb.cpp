@@ -550,7 +550,7 @@ int runScidbCommands(uint32_t port,
             // non-scidb version, until I factor them
             // HACK: set NPROW and NPCOL in bufs[1] and [2]
             // rest of problem will be made up inside pdgesvdSlave
-            
+
             void* bufs[MAX_BUFS];
             size_t sizes[MAX_BUFS];
             boost::scoped_ptr<scidb::SharedMemoryIpc> shMems[MAX_BUFS];
@@ -698,7 +698,7 @@ void handleBadMessageFlood(QueryID queryId,
 {
     const size_t MSG_NUM = 10000;
     cerr << "SLAVE: sending "<< MSG_NUM <<" wrong messages from BAD_MSG_FLOOD" << std::endl;
-    // SciDB is not waiting for messages with launch_id=0, so it should not queue up these messages
+    // SciDB is not waiting for messages with launch_id+1, so it should not queue up these messages
     assert(launchId>0);
     for (size_t i=0; i < MSG_NUM; ++i)
     {
@@ -708,14 +708,17 @@ void handleBadMessageFlood(QueryID queryId,
         boost::shared_ptr<scidb_msg::MpiSlaveHandshake> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
         wrongRecord->set_cluster_uuid("");
         wrongRecord->set_instance_id(0);
-        wrongRecord->set_launch_id(0);
+        if (i%2==0) {
+            wrongRecord->set_launch_id(launchId);
+        } else {
+            wrongRecord->set_launch_id(launchId+1);
+        }
         wrongRecord->set_rank(0);
         wrongRecord->set_pid(0);
         wrongRecord->set_ppid(0);
         scidbProxy.getConnection()->send(wrongMessage);
     }
  }
-
 
 void handleBadHandshake(QueryID queryId,
                         InstanceID instanceId,
@@ -755,7 +758,7 @@ void handleBadStatus(QueryID queryId,
                      uint64_t launchId,
                      MpiMasterProxy& scidbProxy)
 {
-    cerr << "SLAVE: sending malformed status from BAD_MSG" << std::endl;
+    cerr << "SLAVE: sending malformed status from BAD_STATUS" << std::endl;
     char buf[1]; buf[0]='\0';
     boost::shared_ptr<scidb::SharedBuffer> binary(new scidb::MemoryBuffer(buf, 1));
 
@@ -819,7 +822,7 @@ void handleAbnormalExit(const std::vector<std::string>& args)
 void handleSlowStart(const char *timeoutStr)
 {
     uint32_t timeout = str2uint32(timeoutStr);
-    cerr << "SLAVE: sleeping for " << timeout << " sec" << std::endl;
+    cerr << "SLAVE: sleeping for " << timeout << " sec before start" << std::endl;
     sleep(timeout);
 }
 

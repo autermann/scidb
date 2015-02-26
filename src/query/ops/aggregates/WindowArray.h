@@ -128,8 +128,6 @@ class WindowChunk : public ConstChunk
     WindowArray const& _array;  
     WindowArrayIterator const* _arrayIterator;  
     size_t _nDims;
-    Coordinates _firstPosIncludingOverlap;
-    Coordinates _lastPosIncludingOverlap;
     Coordinates _arrSize;
     Coordinates _firstPos;
     Coordinates _lastPos;
@@ -152,6 +150,7 @@ class WindowChunk : public ConstChunk
     //        must be used as the "center" of an output window computation)
     //        or not.
     bool _materialized;
+    boost::shared_ptr<CoordinatesMapper> _mapper;
 
     /**
      *   Returns true if the chunk's processing algorithm materializes input chunk.
@@ -190,9 +189,9 @@ private:
     AggregatePtr _aggregate;
     Value _defaultValue;
     int _iterationMode;
-    shared_ptr<ConstChunkIterator> _inputIterator;
-    shared_ptr<ConstArrayIterator> _emptyTagArrayIterator;
-    shared_ptr<ConstChunkIterator> _emptyTagIterator;
+    boost::shared_ptr<ConstChunkIterator> _inputIterator;
+    boost::shared_ptr<ConstArrayIterator> _emptyTagArrayIterator;
+    boost::shared_ptr<ConstChunkIterator> _emptyTagIterator;
     Value _nextValue;
     bool _noNullsCheck;
 };

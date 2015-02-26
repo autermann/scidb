@@ -91,15 +91,13 @@ public:
                     ArrayDesc versionArrayDesc;
                     if (SystemCatalog::getInstance()->getArrayDesc(versionName.str(), versionArrayDesc, false))
                     {
-                        SystemCatalog::getInstance()->deleteArrayCache(versionArrayDesc.getId());
-                        removeCoordinateIndices(versionArrayDesc, query);
+                         removeCoordinateIndices(versionArrayDesc, query);
                     }
                 }
             }
             // remove all versions at once
             StorageManager::getInstance().remove(arrayDesc.getUAId(), arrayDesc.getId());
             removeCoordinateIndices(arrayDesc, query);
-            SystemCatalog::getInstance()->deleteArrayCache(arrayDesc.getId());
         }
         return boost::shared_ptr<Array>();
     }
@@ -121,9 +119,9 @@ private:
                 if (SystemCatalog::getInstance()->getArrayDesc(indexName, indexDesc, false)
                     && SystemCatalog::getInstance()->countReferences(indexName) <= 1)
                 {
-                    StorageManager::getInstance().removeCoordinateMap(indexName);
-                    StorageManager::getInstance().remove(indexDesc.getUAId(), indexDesc.getId());
                     SystemCatalog::getInstance()->deleteArray(indexDesc.getId());
+                    StorageManager::getInstance().remove(indexDesc.getUAId(), indexDesc.getId());
+                    StorageManager::getInstance().removeCoordinateMap(indexName);
                 }
             }
         }

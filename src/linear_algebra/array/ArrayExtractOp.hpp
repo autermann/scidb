@@ -129,7 +129,8 @@ static char* copyStrideToOp2(char* src, scidb::Coordinates& first, scidb::Coordi
 /// can all use that implementation.  In theory, it should be possible to make that
 /// implementation no slower than this form due to inline template expansion.
 template<class ExtractOp_tt>
-void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, scidb::Coordinates const& first, scidb::Coordinates const& last, ExtractOp_tt& extractOp)
+void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID,
+                     scidb::Coordinates const& first, scidb::Coordinates const& last, ExtractOp_tt& extractOp)
 {
     const bool DBG=false ;
 
@@ -236,6 +237,7 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
             if (!aligned || hasOverlap || isEmptyable || isNullable || chunk.isRLE() || chunk.isSparse()) {
                 if(DBG) std::cerr << "extractDataToOp: chunk/tile iteration mode" << std::endl ;
 
+                extractOp.blockBegin();
                 for (boost::shared_ptr<scidb::ConstChunkIterator> ci =
                         chunk.getConstIterator(scidb::ChunkIterator::INTENDED_TILE_MODE|
                                                scidb::ChunkIterator::IGNORE_OVERLAPS|
@@ -405,6 +407,7 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
                         } // for(seg)
                     } // if(useReferenceVersion)
                 } //end for chunk iterator
+                extractOp.blockEnd();
             } else {
                 scidb::PinBuffer scope(chunk);
                 copyStrideToOp((char*)chunk.getData(), first, last, chunkPos, dims, sizeof(double), extractOp);

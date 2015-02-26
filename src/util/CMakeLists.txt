@@ -40,6 +40,7 @@ set (util_src
     BufferedFileInput.cpp
     shm/SharedMemoryIpc.cpp
     MultiConstIterators.cpp
+    WorkQueue.cpp
 )
 
 file(GLOB util_include "*.h")

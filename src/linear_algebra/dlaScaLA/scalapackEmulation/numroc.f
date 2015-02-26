@@ -1,4 +1,4 @@
-      INTEGER FUNCTION NUMROC( N, NB, IPROC, ISRCPROC, NPROCS )
+      INTEGER FUNCTION SCIDB_NUMROC( N, NB, IPROC, ISRCPROC, NPROCS )
 *
 *  -- ScaLAPACK tools routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -57,7 +57,7 @@
 *
 *     Figure the minimum number of rows/cols a process can have
 *
-      NUMROC = (NBLOCKS/NPROCS) * NB
+      SCIDB_NUMROC = (NBLOCKS/NPROCS) * NB
 *
 *     See if there are any extra blocks
 *
@@ -66,12 +66,12 @@
 *     If I have an extra block
 *
       IF( MYDIST.LT.EXTRABLKS ) THEN
-          NUMROC = NUMROC + NB
+          SCIDB_NUMROC = SCIDB_NUMROC + NB
 *
 *         If I have last block, it may be a partial block
 *
       ELSE IF( MYDIST.EQ.EXTRABLKS ) THEN
-          NUMROC = NUMROC + MOD( N, NB )
+          SCIDB_NUMROC = SCIDB_NUMROC + MOD( N, NB )
       END IF
 *
       RETURN

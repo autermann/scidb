@@ -267,19 +267,23 @@ PARAM_AGGREGATE_CALL)
         size_t windowSize = 1;
         for (size_t i = 0, size = nDims * 2, boundaryNo = 0; i < size; i+=2, ++boundaryNo)
         {
-            window[boundaryNo] = WindowBoundaries(
-                evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])
-                    ->getExpression(), query, TID_INT64).getInt64(),
-                evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i+1])
-                    ->getExpression(), query, TID_INT64).getInt64()
-                );
-            windowSize *= window[boundaryNo]._boundaries.second + window[boundaryNo]._boundaries.first + 1;
-            if (window[boundaryNo]._boundaries.first < 0)
+            int64_t boundaryLower = 
+                    evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(), query, TID_INT64).getInt64();
+
+            if (boundaryLower < 0)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_WINDOW_ERROR3,
                     _parameters[i]->getParsingContext());
-            if (window[boundaryNo]._boundaries.second < 0)
+;
+            int64_t boundaryUpper = 
+                    evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i+1])->getExpression(), query, TID_INT64).getInt64();
+
+            if (boundaryUpper < 0)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_WINDOW_ERROR3,
-                    _parameters[i + 1]->getParsingContext());
+                    _parameters[i]->getParsingContext());
+;
+            window[boundaryNo] = WindowBoundaries(boundaryLower,boundaryUpper);
+            windowSize *= window[boundaryNo]._boundaries.second + window[boundaryNo]._boundaries.first + 1;
+
         }
         if (windowSize <= 1)
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_WINDOW_ERROR4,

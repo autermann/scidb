@@ -26,6 +26,7 @@
 
 #include <array/Array.h>
 #include "../array/ArrayExtractOp.hpp"
+#include "reformat.hpp"
 #include "../scalapackUtil/scalapackFromCpp.hpp"
 
 using namespace scidb;
@@ -98,6 +99,49 @@ void redistScidbToScaLAPACK(double *A, const slpp::desc_t& DESCA, double *B, con
     }
 }
 #endif
+
+void infoG2L_zero_based(slpp::int_t globalRow, slpp::int_t globalCol, const slpp::desc_t& desc,
+                        slpp::int_t NPROW, slpp::int_t NPCOL, slpp::int_t MYPROW, slpp::int_t MYPCOL,
+                        slpp::int_t& localRowOut, slpp::int_t& localColOut)
+{
+    // Until we have a 100% clean re-implementation of INFOG2L in 0-based logic,
+    // we'll use this wrapper to call the Fortran one.  The inline makes it no
+    // worse than doing the adjustments manually, but sets up the division of labor
+    // so that we can replace INFOG2L() with an all C++ re-entrant version
+    // INFOG2L is f77 code and can legally be complied without a stack.
+
+    // TODO: there is a C++ version of INFOG2L but it was probably
+    //       enabled a little prematurely in r6467.
+    //       But now that INFOG2L conversion is done only once per block,
+    //       we don't have to worry so much about its efficiency.
+    //       If we decide its important to make optimizations based on
+    //       {R,C}SRC == 0 and/or that the arithmetic might be easier if
+    //       all done 0-based, then resurrect it from r6466 and make it right.
+
+    slpp::int_t IIA, JJA, IAROW, IACOL;  // scidb_infog2l_ outputs
+    scidb_infog2l_(globalRow+1, globalCol+1, desc, NPROW, NPCOL, MYPROW, MYPCOL, IIA, JJA, IAROW, IACOL); // call Fortran
+    localRowOut = IIA-1 ;
+    localColOut = JJA-1 ;
+}
+
+ReformatToScalapack::ReformatToScalapack(double* data, const slpp::desc_t& desc,
+                                         int64_t minrow, int64_t mincol,
+                                         slpp::int_t  NPROW, slpp::int_t  NPCOL,
+                                         slpp::int_t MYPROW, slpp::int_t MYPCOL)
+
+:
+    _data(data),
+    _desc(desc),
+    _desc_1d(scidbDistrib(desc)),
+    _minrow(minrow),
+    _mincol(mincol),
+    _NPROW(NPROW),
+    _NPCOL(NPCOL),
+    _MYPROW(MYPROW),
+    _MYPCOL(MYPCOL),
+    _blockState(ReformatToScalapack::BlockEnded) // allow only blockBegin() next
+{}
+
 
 
 

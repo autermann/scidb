@@ -29,7 +29,7 @@ NEW=~/.bashrc.new
 if ! grep SCIDB_VER ${ORIG} ; then
     cp -p ${ORIG} ${NEW}
     # Ubunutu aparently has a 'return' command
-    grep -v return ${ORIG} > ${NEW}
+    grep -v return ${ORIG} > ${NEW} || true
     echo "export SCIDB_VER=${SCIDB_VER}" >> ${NEW}
     echo "export PATH=/opt/scidb/\$SCIDB_VER/bin:/opt/scidb/\$SCIDB_VER/share/scidb:\$PATH" >> ${NEW}
     echo "export LD_LIBRARY_PATH=/opt/scidb/\$SCIDB_VER/lib:\$LD_LIBRARY_PATH" >> ${NEW}

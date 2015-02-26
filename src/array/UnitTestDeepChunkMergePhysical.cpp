@@ -165,7 +165,7 @@ public:
      * @throw SCIDB_SE_INTERNAL::SCIDB_LE_UNITTEST_FAILED
      */
     void testOnce_DeepChunkMerge(boost::shared_ptr<Query>& query, TypeId const& type,
-            Coordinate start, Coordinate end, uint32_t chunkInterval)
+            Coordinate start, Coordinate end, int64_t chunkInterval)
     {
         const int percentAttachBitmap = 90;
         const int percentEmpty = 20;
@@ -286,7 +286,7 @@ public:
         srand(time(NULL));
 
         for (Coordinate end=1; end<10; ++end) {
-            for (uint32_t interval=1; interval<15; ++interval) {
+            for (int64_t interval=1; interval<15; ++interval) {
                 testOnce_DeepChunkMerge(query, TID_INT64, 0, end, interval);
                 testOnce_DeepChunkMerge(query, TID_BOOL, 0, end, interval);
                 testOnce_DeepChunkMerge(query, TID_STRING, 0, end, interval);

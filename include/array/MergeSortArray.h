@@ -83,12 +83,13 @@ namespace scidb
         MergeSortArray(const boost::shared_ptr<Query>& query,
                        ArrayDesc const& desc,
                        std::vector< boost::shared_ptr<Array> > const& inputArrays,
-                       vector<Key> const& key, bool local = false);
+                       boost::shared_ptr<TupleComparator> tcomp, 
+                       bool local = false);
 
       private:
         ArrayDesc desc;
         size_t currChunkIndex;
-        TupleComparator comparator;
+        boost::shared_ptr<TupleComparator> comparator;
         Coordinates chunkPos;
         size_t chunkSize;
         bool isLocal;
@@ -113,7 +114,7 @@ namespace scidb
 
         int operator()(int i, int j) 
         { 
-            return -comparator.compare(streams[i].tuple, streams[j].tuple);
+            return -comparator->compare(streams[i].tuple, streams[j].tuple);
         }
     };
 

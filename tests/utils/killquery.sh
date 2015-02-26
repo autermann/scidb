@@ -24,9 +24,11 @@
 
 query="$4"
 signal="" 
-command="iquery"
+command="iquery -p ${IQUERY_PORT:=1239} -c ${IQUERY_HOST:=localhost}"
+
 # seconds after running query to wait before issuing kill
 tmpfile="/tmp/killquery.$$.tmp"
+stderrlog="/tmp/killquery.$$.stderr"
 delay=""
 pid=""
 
@@ -98,31 +100,45 @@ then
 	exit 1
 fi
 
+echo "Attempting  to kill (-$signal) iquery command after $delay seconds ..."
 
-echo "Attempting  to kill (-$signal) iquery command after $delay seconds..."
-#echo "    - running iquery command..."
- 
-#$command > /dev/null 2>&1 &
-$command &
+rm -f $stderrlog
+
+# if interrupted, this shell will kill the current process group
+trap 'kill 0' SIGINT SIGTERM SIGHUP SIGQUIT
+
+# run iquery in the background and close its stdout to make iquery error out
+echo "Running iquery command $command ..."
+$command  1>&- 2> $stderrlog &
 pid=$!
-# disown the command so that we don't see unneeded stderr output
-disown
 
-#echo "    - waiting for $delay seconds..."
-sleep $delay
+echo "PID: $pid"
 
-#echo "    - sending signal $signal to iquery..."
+echo "Waiting for $delay seconds..."
+sleep $delay 2>> $stderrlog
 
-kill -$signal $pid > /dev/null 2>&1
+echo "Sending signal $signal to iquery..."
+kill -$signal $pid 2>> $stderrlog
+rc=$?
+echo "Kill exit code=$rc"
 
-if [ $? -eq 0 ]
+echo "Waiting for exit code..."
+wait $pid 2>> $stderrlog
+rc=$?
+
+echo "Exit code=$rc"
+echo "Command stderr:"
+cat $stderrlog
+
+if [ $rc -eq 0 -o $rc -eq 127 ]
 then
-	echo "SUCCESS: kill returned code: $?"
+        echo "ERROR: iquery reported success or could not be found"
 	rm -f $tmpfile
-	exit 0
-else
-	echo "WARNING: kill returned code: $? ... iquery may have had an error or completed before the $delay second delay."
-	rm -f $tmpfile
+        rm -f $stderrlog
 	exit 1
+else
+	echo "SUCCESS"
+	rm -f $tmpfile
+        rm -f $stderrlog
+	exit 0
 fi
-

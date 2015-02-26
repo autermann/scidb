@@ -92,9 +92,9 @@ public:
         }
 
         double lhsCells = inputBoundaries[0].getNumCells() * inputBoundaries[0].getDensity();
-        double rhsCells = inputBoundaries[1].getNumCells() * inputBoundaries[0].getDensity();
+        double rhsCells = inputBoundaries[1].getNumCells() * inputBoundaries[1].getDensity();
         double resultCells = PhysicalBoundaries::getNumCells(resultStart, resultEnd);
-        double resultDensity = (lhsCells + rhsCells) / resultCells;
+        double resultDensity = std::min((lhsCells + rhsCells) / resultCells, 1.0);
 
         return PhysicalBoundaries(resultStart, resultEnd, resultDensity);
     }

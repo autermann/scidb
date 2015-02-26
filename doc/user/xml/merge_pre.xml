@@ -26,6 +26,16 @@
   <refsect1>
     <title>Summary</title>
 
+    <para>The following table shows the relationship between input and output
+    cells.</para>
+
+    <mediaobject>
+      <imageobject>
+        <imagedata align="left" contentwidth="400"
+                   fileref="../graphics/merge.png"/>
+      </imageobject>
+    </mediaobject>
+
     <para>The <replaceable>left_array</replaceable> and
     <replaceable>right_array </replaceable>must be compatible. For the merge
     operator, compatible means the following:</para>

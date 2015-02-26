@@ -93,57 +93,114 @@ class SciDBExecutor: public scidb::SciDB
         }
     }
 
-   void prepareQuery(const std::string& queryString, bool afl, const std::string& programOptions, QueryResult& queryResult, void* connection) const
+    void prepareQuery(const std::string& queryString,
+                      bool afl,
+                      const std::string& programOptions,
+                      QueryResult& queryResult,
+                      void* connection) const
     {
-        // Executing query string
-        assert(!Query::getQueryByID(queryResult.queryID, false, false)); //XXXXXXXX throw exception
+        // Parsing query string
+        if (Query::getQueryByID(queryResult.queryID, false, false)) {
+            assert(false);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "SciDBExecutor::prepareQuery";
+        }
+
+        size_t querySize = queryString.size();
+        int maxSize = Config::getInstance()->getOption<int>(CONFIG_QUERY_MAX_SIZE);
+        if (querySize > static_cast<size_t>(maxSize < 0 ? 0 : maxSize)) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_TOO_BIG) << querySize << maxSize;
+        }
 
         shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
-        shared_ptr<Query> query = queryProcessor->createQuery(queryString,
-                                                              queryResult.queryID);
+        boost::shared_ptr<Query> query = queryProcessor->createQuery(queryString, queryResult.queryID);
         assert(queryResult.queryID == query->getQueryID());
-        CurrentQueryScope queryScope(query->getQueryID());
         StatisticsScope sScope(&query->statistics);
         LOG4CXX_DEBUG(logger, "Parsing query(" << query->getQueryID() << "): " << queryString << "");
 
-        try { 
-            query->programOptions = programOptions;
+        try {
+            prepareQueryBeforeLocking(query, queryProcessor, afl, programOptions);
 
-            query->start();
+            query->acquireLocks(); //can throw "try-again", i.e. SystemCatalog::LockBusyException
 
-            Query::Finalizer f = bind(&Query::releaseLocks, _1);
-            query->pushFinalizer(f);
+            prepareQueryAfterLocking(query, queryProcessor, afl, queryResult);
 
-            // first pass to collect the array names in the query
-            queryProcessor->parseLogical(query, afl);
-            
-            queryProcessor->inferArrayAccess(query);
-            
-            query->acquireLocks();
-            query->arrayDescByNameCache.clear();
+        } catch (const scidb::SystemCatalog::LockBusyException& e) {
+            e.raise();
 
-            // second pass under the array locks
-            queryProcessor->parseLogical(query, afl);
-            LOG4CXX_TRACE(logger, "Query is parsed");
-
-            const ArrayDesc& desc = queryProcessor->inferTypes(query);
-            fillUsedPlugins(desc, queryResult.plugins);
-            LOG4CXX_TRACE(logger, "Types of query are inferred");
-            
-            std::ostringstream planString;
-            query->logicalPlan->toString(planString);
-            queryResult.explainLogical = planString.str();
-
-            queryResult.selective = !query->logicalPlan->getRoot()->isDdl();
-            queryResult.requiresExclusiveArrayAccess = query->doesExclusiveArrayAccess();
-
-            query->stop();
-            LOG4CXX_DEBUG(logger, "The query is prepared");
         } catch (const Exception& e) {
             query->done(e.copy());
             e.raise();
         }
+        LOG4CXX_DEBUG(logger, "Prepared query(" << query->getQueryID() << "): " << queryString << "");
     }
+
+    virtual void retryPrepareQuery(const std::string& queryString,
+                                 bool afl,
+                                 const std::string& programOptions,
+                                 QueryResult& queryResult) const
+    {
+        boost::shared_ptr<Query>  query = Query::getQueryByID(queryResult.queryID);
+
+        assert(queryResult.queryID == query->getQueryID());
+        StatisticsScope sScope(&query->statistics);
+        try {
+
+            query->retryAcquireLocks();  //can throw "try-again", i.e. SystemCatalog::LockBusyException
+
+            shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+
+            prepareQueryAfterLocking(query, queryProcessor, afl, queryResult);
+
+        } catch (const scidb::SystemCatalog::LockBusyException& e) {
+            e.raise();
+
+        } catch (const Exception& e) {
+            query->done(e.copy());
+            e.raise();
+        }
+        LOG4CXX_DEBUG(logger, "Prepared query(" << query->getQueryID() << "): " << queryString << "");
+   }
+
+    void prepareQueryBeforeLocking(boost::shared_ptr<Query>& query,
+                                   boost::shared_ptr<QueryProcessor>& queryProcessor,
+                                   bool afl,
+                                   const std::string& programOptions) const
+    {
+       query->validate();
+       query->programOptions = programOptions;
+       query->start();
+
+       // first pass to collect the array names in the query
+       queryProcessor->parseLogical(query, afl);
+
+       queryProcessor->inferArrayAccess(query);
+   }
+
+    void prepareQueryAfterLocking(boost::shared_ptr<Query>& query,
+                                  boost::shared_ptr<QueryProcessor>& queryProcessor,
+                                  bool afl,
+                                  QueryResult& queryResult) const
+    {
+        query->validate();
+
+        // second pass under the array locks
+        queryProcessor->parseLogical(query, afl);
+        LOG4CXX_TRACE(logger, "Query is parsed");
+
+        const ArrayDesc& desc = queryProcessor->inferTypes(query);
+        fillUsedPlugins(desc, queryResult.plugins);
+        LOG4CXX_TRACE(logger, "Types of query are inferred");
+
+        std::ostringstream planString;
+        query->logicalPlan->toString(planString);
+        queryResult.explainLogical = planString.str();
+
+        queryResult.selective = !query->logicalPlan->getRoot()->isDdl();
+        queryResult.requiresExclusiveArrayAccess = query->doesExclusiveArrayAccess();
+
+        query->stop();
+        LOG4CXX_DEBUG(logger, "The query is prepared");
+   }
 
     void executeQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
     {
@@ -155,7 +212,6 @@ class SciDBExecutor: public scidb::SciDB
         boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
 
         assert(query->getQueryID() == queryResult.queryID);
-        CurrentQueryScope queryScope(query->getQueryID());
         StatisticsScope sScope(&query->statistics);
 
         if (!query->logicalPlan->getRoot()) {
@@ -169,7 +225,7 @@ class SciDBExecutor: public scidb::SciDB
         bool isDdl = true;
         try {
             query->start();
-            
+
             while (queryProcessor->optimize(optimizer, query))
             {
                 LOG4CXX_DEBUG(logger, "Query is optimized");

@@ -31,7 +31,8 @@
  */
 
 #include "log4cxx/logger.h"
-#include "util/FileIO.h"
+#include <util/Platform.h>
+#include <util/FileIO.h>
 #include "array/MemArray.h"
 #include "system/Exceptions.h"
 #ifndef SCIDB_CLIENT
@@ -53,41 +54,6 @@ namespace scidb
 
     // Logger for operator. static to prevent visibility of variable outside of file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.memarray"));
-
-    CoordinatesMapper::CoordinatesMapper(ConstChunk const& chunk)
-    {
-        init(chunk.getFirstPosition(true), chunk.getLastPosition(true)); // true - withOverlap
-    }
-
-    CoordinatesMapper::CoordinatesMapper(Coordinates const& firstPosition, Coordinates const& lastPosition)
-    {
-        init(firstPosition, lastPosition);
-    }
-
-    CoordinatesMapper::CoordinatesMapper(Coordinates const& chunkPos, Dimensions const& dims)
-    {
-        init(computeFirstChunkPosition(chunkPos, dims), computeLastChunkPosition(chunkPos, dims));
-    }
-
-    void CoordinatesMapper::init(Coordinates const& firstPosition, Coordinates const& lastPosition)
-    {
-        assert(firstPosition.size() == lastPosition.size());
-        assert(firstPosition.size() > 0);
-
-        _origin = firstPosition;
-        _nDims = _origin.size();
-        _chunkIntervals.resize(_nDims);
-        _logicalChunkSize = 1;
-
-        for (size_t i = 0; i < _nDims; i++)
-        {
-            assert ( lastPosition[i] >= _origin[i] );
-            _chunkIntervals[i] = lastPosition[i]-_origin[i]+1;
-            _logicalChunkSize *= _chunkIntervals[i];
-        }
-
-        assert(_origin.size()>0);
-    }
 
     //
     // MemArray
@@ -363,12 +329,17 @@ namespace scidb
         }
         data.reset(newData);
         size = newSize;
-        currentStatistics->allocatedSize += newSize;
-        currentStatistics->allocatedChunks++;
+        if (currentStatistics) {
+            currentStatistics->allocatedSize += newSize;
+            currentStatistics->allocatedChunks++;
+        }
     }
 
     void MemChunk::free()
     {
+        if (isDebug() && data && size) {
+            memset(data.get(), 0, size);
+        }
         data.reset();
     }
 

@@ -98,12 +98,11 @@ _keys(keys), _arrayDesc(arrayDesc), _leFunctions(keys.size()), _eqFunctions(keys
 //
 // TupleArray
 //
-void TupleArray::sort(vector<Key> const& keys)
+void TupleArray::sort(shared_ptr<TupleComparator> tcomp)
 {
-	TupleComparator comparator(keys, getArrayDesc());
-	if (tuples.size() != 0) {
-		iqsort(&tuples[0], tuples.size(), comparator);
-	}
+    if (tuples.size() != 0) {
+        iqsort(&tuples[0], tuples.size(), *tcomp);
+    }
 }
 
 ArrayDesc const& TupleArray::getArrayDesc() const

@@ -54,6 +54,7 @@
 #include <system/Exceptions.h>
 #include <system/System.h>
 #include <network/MessageUtils.h>
+#include <network/MessageHandleJob.h>
 #include <smgr/io/ReplicationManager.h>
 
 using namespace std;
@@ -172,12 +173,13 @@ void Query::destroyFakeQuery(Query* q)
 
 Query::Query():
     _queryID(INVALID_QUERY_ID), _instanceID(INVALID_INSTANCE), _coordinatorID(INVALID_INSTANCE), _error(SYSTEM_EXCEPTION_SPTR(SCIDB_E_NO_ERROR, SCIDB_E_NO_ERROR)),
-    completionStatus(INIT), _commitState(UNKNOWN), _creationTime(time(NULL)), _useCounter(0), _doesExclusiveArrayAccess(false), _procGrid(NULL), isDDL(false)
+    _completionStatus(INIT), _commitState(UNKNOWN), _creationTime(time(NULL)), _useCounter(0), _doesExclusiveArrayAccess(false), _procGrid(NULL), isDDL(false)
 {
 }
 
 Query::~Query()
 {
+    LOG4CXX_TRACE(_logger, "Query::~Query() " << _queryID);
     if (statisticsMonitor) {
         statisticsMonitor->pushStatistics(*this);
     }
@@ -242,8 +244,10 @@ void Query::init(QueryID queryID, InstanceID coordID, InstanceID localInstanceID
       pushFinalizer(f);
       _errorQueue = NetworkManager::getInstance()->createWorkQueue();
       assert(_errorQueue);
-      _mpiReceiveQueue = NetworkManager::getInstance()->createWorkQueue();
-      assert(_mpiReceiveQueue);
+      _errorQueue->start();
+      _bufferReceiveQueue = NetworkManager::getInstance()->createWorkQueue();
+      assert(_bufferReceiveQueue);
+      _bufferReceiveQueue->start();
       _operatorQueue = NetworkManager::getInstance()->createWorkQueue();
       _operatorQueue->stop();
       assert(_operatorQueue);
@@ -267,6 +271,11 @@ bool Query::insert(QueryID queryID, shared_ptr<Query>& query)
    setCurrentQueryID(queryID);
 
    if (res.second) {
+      const uint32_t nRequests = std::max(Config::getInstance()->getOption<int>(CONFIG_MAX_REQUESTS),1);
+      if (_queries.size() > nRequests) {
+          _queries.erase(res.first);
+          throw (SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_RESOURCE_BUSY) << "too many queries");
+      }
       query = createDetached();
       assert(query);
       query->_queryID = queryID;
@@ -304,8 +313,9 @@ boost::shared_ptr<Query> Query::create(QueryID queryID)
        ScopedMutexLock mutexLock(queriesMutex);
 
        bool rc = insert(queryID, query);
-       if (!rc)
+       if (!rc) {
            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_DUPLICATE_QUERY_ID);
+       }
     }
     assert(query);
     assert(query->_queryID == queryID);
@@ -323,8 +333,8 @@ void Query::start()
 {
     ScopedMutexLock cs(errorMutex);
     checkNoError();
-    if (completionStatus == INIT) {
-        completionStatus = START;
+    if (_completionStatus == INIT) {
+        _completionStatus = START;
     }
 }
 
@@ -332,8 +342,8 @@ void Query::stop()
 {
     ScopedMutexLock cs(errorMutex);
     checkNoError();
-    if (completionStatus == START) {
-        completionStatus = INIT;
+    if (_completionStatus == START) {
+        _completionStatus = INIT;
     }
 }
 
@@ -358,10 +368,10 @@ void Query::done()
     ScopedMutexLock cs(errorMutex);
     if (SCIDB_E_NO_ERROR != _error->getLongErrorCode())
     {
-        completionStatus = ERROR;
+        _completionStatus = ERROR;
         _error->raise();
     }
-    completionStatus = OK;
+    _completionStatus = OK;
 }
 
 void Query::done(const shared_ptr<Exception> unwindException)
@@ -373,12 +383,12 @@ void Query::done(const shared_ptr<Exception> unwindException)
         {
             _error = unwindException;
         }
-        completionStatus = ERROR;
+        _completionStatus = ERROR;
         isAbort = (_commitState != UNKNOWN);
 
         LOG4CXX_DEBUG(_logger, "Query::done: queryID=" << _queryID
                       << ", _commitState=" << _commitState
-                      << ", erorCode=" << _error->getLongErrorCode());
+                      << ", errorCode=" << _error->getLongErrorCode());
     }
     if (isAbort) {
         handleAbort();
@@ -435,10 +445,10 @@ bool Query::checkFinalState()
 {
    ScopedMutexLock cs(errorMutex);
    return ( _finalizers.empty() &&
-            ((completionStatus == INIT &&
+            ((_completionStatus == INIT &&
               _error->getLongErrorCode() != SCIDB_E_NO_ERROR) ||
-             completionStatus == OK ||
-             completionStatus == ERROR) );
+             _completionStatus == OK ||
+             _completionStatus == ERROR) );
 }
 
 void Query::invokeFinalizers(deque<Finalizer>& finalizers)
@@ -462,6 +472,7 @@ void Query::invokeFinalizers(deque<Finalizer>& finalizers)
    }
 }
 
+
 void Query::sharedLock(string const& arrayName)
 {
     shared_ptr<RWLock> lock;
@@ -478,6 +489,7 @@ void Query::sharedLock(string const& arrayName)
     lock->lockRead(noopEc);
     LOG4CXX_DEBUG(_logger, "Granted shared lock of array " << arrayName << " for query " << _queryID);
 }
+
 
 void Query::exclusiveLock(string const& arrayName)
 {
@@ -533,7 +545,7 @@ void Query::handleAbort()
         if(_commitState == COMMITTED) {
             LOG4CXX_ERROR(_logger, "Query (" << queryId
                           << ") cannot be aborted after commit."
-                          << " completion status=" << completionStatus
+                          << " completion status=" << _completionStatus
                           << " commit status=" << _commitState
                           << " error=" << _error->getLongErrorCode());
             assert(false);
@@ -548,7 +560,7 @@ void Query::handleAbort()
             //XXX TODO: exceptions should be fixed to contain the right query ID
             //XXX assert(_error->getQueryId() == _queryID);
         }
-        if (completionStatus == START)
+        if (_completionStatus == START)
         {
             LOG4CXX_DEBUG(_logger, "Query (" << queryId << ") is still in progress");
             return;
@@ -577,10 +589,10 @@ void Query::handleCommit()
 
         LOG4CXX_DEBUG(_logger, "Query (" << _queryID << ") is being committed");
 
-        if (completionStatus != OK || _commitState == ABORTED) {
+        if (_completionStatus != OK || _commitState == ABORTED) {
             LOG4CXX_ERROR(_logger, "Query (" << _queryID
                           << ") cannot be committed after abort."
-                          << " completion status=" << completionStatus
+                          << " completion status=" << _completionStatus
                           << " commit status=" << _commitState
                           << " error=" << _error->getLongErrorCode());
             assert(false);
@@ -619,55 +631,69 @@ void Query::handleCancel()
 
 void Query::handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>& newLiveness)
 {
-   ScopedMutexLock cs(errorMutex);
+    QueryID thisQueryId(0);
+    InstanceID coordPhysId = COORDINATOR_INSTANCE;
+    {
+        ScopedMutexLock cs(errorMutex);
 
-   assert(newLiveness->getVersion() >= _coordinatorLiveness->getVersion());
+        assert(newLiveness->getVersion() >= _coordinatorLiveness->getVersion());
 
-   if (newLiveness->getVersion() == _coordinatorLiveness->getVersion()) {
-      assert(newLiveness->isEqual(*_coordinatorLiveness));
-      return;
-   }
+        if (newLiveness->getVersion() == _coordinatorLiveness->getVersion()) {
+            assert(newLiveness->isEqual(*_coordinatorLiveness));
+            return;
+        }
 
-   LOG4CXX_ERROR(_logger, "Query " << _queryID << " is aborted on changed liveness");
+        LOG4CXX_ERROR(_logger, "Query " << _queryID << " is aborted on changed liveness");
 
-   if (_error->getLongErrorCode() == SCIDB_E_NO_ERROR)
-   {
-       _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_QPROC, SCIDB_LE_NO_QUORUM);
-   }
+        if (_error->getLongErrorCode() == SCIDB_E_NO_ERROR)
+        {
+            _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_QPROC, SCIDB_LE_NO_QUORUM);
+        }
 
-   bool isAbort = false;
-   boost::shared_ptr<Exception> err = _error;
-   if (_coordinatorID != COORDINATOR_INSTANCE) {
+        bool isAbort = false;
+        if (_coordinatorID != COORDINATOR_INSTANCE) {
 
-       InstanceID coordId = getPhysicalCoordinatorID();
-       InstanceLiveness::InstancePtr newCoordState = newLiveness->find(coordId);
-       isAbort = newCoordState->isDead();
-       if (!isAbort) {
-           InstanceLiveness::InstancePtr oldCoordState = _coordinatorLiveness->find(coordId);
-           isAbort = (newCoordState != oldCoordState);
-       }
-   }
+            coordPhysId = getPhysicalCoordinatorID();
+            InstanceLiveness::InstancePtr newCoordState = newLiveness->find(coordPhysId);
+            isAbort = newCoordState->isDead();
+            if (!isAbort) {
+                InstanceLiveness::InstancePtr oldCoordState = _coordinatorLiveness->find(coordPhysId);
+                isAbort = (newCoordState != oldCoordState);
+            }
+        }
+        if (!isAbort) {
+            return;
+        }
+        // If the coordinator is dead, we abort the query.
+        // There is still a posibility that the coordinator actually has committed.
+        // For read queries it does not matter.
+        // For write queries UpdateErrorHandler::handleErrorOnWorker() will wait (while holding its own array lock)
+        // until the coordinator array lock is released and decide whether to really abort
+        // based on the state of the catalog (i.e. if the new version is recorded).
 
-   if (!_errorQueue) {
-       LOG4CXX_TRACE(_logger, "Liveness change will not be handled for a deallocated query (" << _queryID << ")");
-       return;
-   }
-   WorkQueue::WorkItem item = bind(&Query::handleError, shared_from_this(), err);
-   try {
-      _errorQueue->enqueue(item);
+        if (!_errorQueue) {
+            LOG4CXX_TRACE(_logger, "Liveness change will not be handled for a deallocated query (" << _queryID << ")");
+            return;
+        }
+        thisQueryId = _queryID;
+    }
+    try {
+        boost::shared_ptr<MessageDesc> msg = makeAbortMessage(thisQueryId);
 
-       if (isAbort) {
-           // if the coordinator is dead, we abort the query
-           LOG4CXX_TRACE(_logger, "Query " << _queryID << " is aborted due to a change in coordinator liveness");
-           item = bind(&Query::handleAbort, shared_from_this());
-           _errorQueue->enqueue(item);
-       }
-   } catch (const WorkQueue::OverflowException& ) {
-       LOG4CXX_ERROR(_logger, "Overflow exception from the error queue, queryID="<<_queryID);
-      // XXX TODO: deal with this exception maybe by retrying ...
-      assert(false);
-      throw;
-   }
+        // HACK (somewhat): set sourceid to coordinator, because only it can issue an abort
+        assert(coordPhysId != COORDINATOR_INSTANCE);
+        msg->setSourceInstanceID(coordPhysId);
+
+        shared_ptr<MessageHandleJob> job = make_shared<MessageHandleJob>(msg);
+        shared_ptr<WorkQueue> rq = NetworkManager::getInstance()->getRequestQueue();
+        shared_ptr<WorkQueue> wq = NetworkManager::getInstance()->getWorkQueue();
+        job->dispatch(rq, wq);
+
+    } catch (const scidb::Exception& e) {
+        LOG4CXX_ERROR(_logger, "Failed to abort queryID=" << thisQueryId
+                      << " on coordinator liveness change because: " << e.what());
+        throw;
+    }
 }
 
 InstanceID Query::getPhysicalCoordinatorID()
@@ -820,7 +846,7 @@ void Query::destroy()
     shared_ptr<Array> resultArray;
     shared_ptr<RemoteMergedArray> mergedArray;
     vector<shared_ptr<RemoteArray> > remoteArrays;
-    shared_ptr<WorkQueue> mpiQueue;
+    shared_ptr<WorkQueue> bufferQueue;
     shared_ptr<WorkQueue> errQueue;
     shared_ptr<WorkQueue> sgQueue;
     boost::shared_ptr<ReplicationContext> replicationCtx;
@@ -834,7 +860,7 @@ void Query::destroy()
         // This should be OK because we broadcast either
         // the error or abort before dropping the messages
 
-        _mpiReceiveQueue.swap(mpiQueue);
+        _bufferReceiveQueue.swap(bufferQueue);
         _errorQueue.swap(errQueue);
         _operatorQueue.swap(sgQueue);
         _replicationCtx.swap(replicationCtx);
@@ -849,6 +875,9 @@ void Query::destroy()
 
         _remoteArrays.swap(remoteArrays);
     }
+    bufferQueue->stop();
+    errQueue->stop();
+    sgQueue->stop();
     dumpMemoryUsage(getQueryID());
 }
 
@@ -899,12 +928,13 @@ Query::OperatorContext::~OperatorContext()
 {
 }
 
-void Query::setOperatorContext(shared_ptr<OperatorContext> const& opContext)
+void Query::setOperatorContext(shared_ptr<OperatorContext> const& opContext,
+                               shared_ptr<JobQueue> const& jobQueue)
 {
     assert(opContext);
     ScopedMutexLock lock(errorMutex);
     _operatorContext = opContext;
-    _operatorQueue->start();
+    _operatorQueue->start(jobQueue);
 }
 
 void Query::unsetOperatorContext()
@@ -1113,7 +1143,7 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
            do {  //XXX TODO: fix the wait, possibly with batching the checks
                coordLock = SystemCatalog::getInstance()->checkForCoordinatorLock(arrayName,
                                                                                  lock->getQueryId());
-               sleep((Query::_rng()%2)+1);
+               Query::waitForSystemCatalogLock();
            } while (coordLock);
        }
        ArrayID arrayId = lock->getArrayId();
@@ -1162,7 +1192,6 @@ void UpdateErrorHandler::doRollback(VersionID lastVersion,
        try {
            StorageManager::getInstance().rollback(undoArray);
            StorageManager::getInstance().remove(baseArrayId, newArrayId);
-           SystemCatalog::getInstance()->deleteArrayCache(newArrayId);
        } catch (const scidb::Exception& e) {
            LOG4CXX_ERROR(_logger, "UpdateErrorHandler::doRollback:"
                          << " lastVersion = "<< lastVersion
@@ -1223,9 +1252,34 @@ void Query::acquireLocks()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
-        locks = _requestedLocks; // TODO: swap instead of copy ?
+        Query::Finalizer f = bind(&Query::releaseLocks, _1);
+        pushFinalizer(f);
+        assert(_finalizers.size() > 1);
+        locks = _requestedLocks;
     }
-    LOG4CXX_DEBUG(_logger, "Acquiring "<< locks.size()
+    acquireLocksInternal(locks);
+}
+
+void Query::retryAcquireLocks()
+{
+    Query::QueryLocks locks;
+    {
+        ScopedMutexLock cs(errorMutex);
+        // try to assert that the lock release finalizer is in place
+        assert(_finalizers.size() > 1);
+        validate();
+        locks = _requestedLocks;
+    }
+    if (locks.size()<1) {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "Query::retryAcquireLocks";
+    }
+    acquireLocksInternal(locks);
+}
+
+void Query::acquireLocksInternal(Query::QueryLocks& locks)
+{
+    LOG4CXX_TRACE(_logger, "Acquiring "<< locks.size()
                   << " array locks for query " << _queryID);
 
     bool foundDeadInstances = (_coordinatorLiveness->getNumDead() > 0);
@@ -1235,20 +1289,40 @@ void Query::acquireLocks()
         {
             assert(lock);
             assert(lock->getQueryId() == _queryID);
-            LOG4CXX_DEBUG(_logger, "Acquiring lock: " << lock->toString());
+            LOG4CXX_TRACE(_logger, "Acquiring lock: " << lock->toString());
 
             if (foundDeadInstances && (lock->getLockMode() > SystemCatalog::LockDesc::RD)) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_NO_QUORUM);
             }
 
             bool rc = SystemCatalog::getInstance()->lockArray(lock, errorChecker);
-            if (!rc) assert(false);
+            if (!rc) {
+                assert(false);
+                throw std::runtime_error((string("Failed to acquire SystemCatalog lock")+lock->toString()).c_str());
+            }
         }
         validate();
+    } catch (const scidb::SystemCatalog::LockBusyException& e) {
+        throw;
     } catch (std::exception&) {
         releaseLocks(shared_from_this());
         throw;
     }
+    LOG4CXX_DEBUG(_logger, "Acquired "<< locks.size()
+                  << " array locks for query " << _queryID);
+}
+
+uint64_t Query::getLockTimeoutNanoSec()
+{
+    static const int WAIT_LOCK_TIMEOUT_MSEC = 2000;
+    const uint32_t msec = _rng()%WAIT_LOCK_TIMEOUT_MSEC;
+    const uint64_t nanosec = msec*1000000;
+    return nanosec;
+}
+
+void Query::waitForSystemCatalogLock()
+{
+    Thread::nanoSleep(getLockTimeoutNanoSec());
 }
 
 const ProcGrid* Query::getProcGrid() const
@@ -1440,57 +1514,40 @@ void ReplicationContext::replicationAck(InstanceID sourceId, ArrayID arrId)
     qInfo->getSemaphore().release();
 }
 
+/// cached pointer to the ReplicationManager singeton
 ReplicationManager*  ReplicationContext::_replicationMngr;
 
-boost::shared_ptr<WorkQueue> ReplicationContext::getReplicationQueue()
-{
-    assert(_replicationMngr);
-    return _replicationMngr->getInboundReplicationQueue();
-}
-
-void ReplicationContext::scheduleInbound(const shared_ptr<Job>& job)
-{
-    assert(job);
-    LOG4CXX_TRACE(Query::_logger, "ReplicationContext::scheduleInbound to replication queue="
-                  << getReplicationQueue().get());
-    WorkQueue::WorkItem item = boost::bind(&Job::execute, job);
-    try {
-        getReplicationQueue()->enqueue(item);
-
-    } catch (const WorkQueue::OverflowException& e) {
-
-        shared_ptr<Query> query(job->getQuery());
-        assert(query);
-        query->handleError(e.copy());
-        LOG4CXX_ERROR(Query::_logger, "Overflow exception from the replication message"
-                      <<" job="<<job.get()
-                      <<", queue=" << getReplicationQueue().get()
-                      <<", queryID="<<query->getQueryID()
-                      <<" : "<<e.what());
-        // XXX TODO: deal with this exception
-        assert(false);
-    }
-}
-
-void ReplicationContext::enqueueInbound(ArrayID arrId, const shared_ptr<Job>& job)
+void ReplicationContext::enqueueInbound(ArrayID arrId, shared_ptr<Job>& job)
 {
     assert(job);
     assert(arrId>0);
+    assert(job->getQuery());
     ScopedMutexLock cs(_mutex);
 
     boost::shared_ptr<WorkQueue> queryQ(getInboundQueue(arrId));
 
     if (Query::_logger->isTraceEnabled()) {
         shared_ptr<Query> query(job->getQuery());
-        assert(query);
         LOG4CXX_TRACE(Query::_logger, "ReplicationContext::enqueueInbound"
                       <<" job="<<job.get()
                       <<", queue="<<queryQ.get()
                       <<", arrId="<<arrId
                       << ", queryID="<<query->getQueryID());
     }
-    WorkQueue::WorkItem item = boost::bind(&ReplicationContext::scheduleInbound,job);
-    queryQ->enqueue(item);
+    assert(_replicationMngr);
+    try {
+        WorkQueue::WorkItem item = _replicationMngr->getInboundReplicationItem(job);
+        queryQ->enqueue(item);
+    } catch (const WorkQueue::OverflowException& e) {
+        LOG4CXX_ERROR(Query::_logger, "ReplicationContext::enqueueInbound"
+                      << ": Overflow exception from the message queue (" << queryQ.get()
+                      << "): "<<e.what());
+        shared_ptr<Query> query(job->getQuery());
+        assert(query);
+        assert(false);
+        query->handleError(e.copy());
+        throw;
+    }
 }
 
 } // namespace

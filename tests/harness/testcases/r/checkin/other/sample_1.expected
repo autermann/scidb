@@ -2,9 +2,11 @@ Query was executed successfully
 
 [Query was executed successfully, ignoring data output by this query.]
 
-[(1000000)]
+{i} count
+{0} 1000000
 
-[(1000000)]
+{i} count
+{0} 1000000
 
 verify results for unique seed value
 [Query was executed successfully, ignoring data output by this query.]
@@ -13,7 +15,8 @@ verify results for unique seed value
 
 [Query was executed successfully, ignoring data output by this query.]
 
-[(0)]
+{i} count
+{0} 0
 
 test if samples actually have different output
 [Query was executed successfully, ignoring data output by this query.]
@@ -24,15 +27,15 @@ test if samples actually have different output
 
 [Query was executed successfully, ignoring data output by this query.]
 
-[()]
+{i} count,count_2,count_3
 
 range should be 1000 +/- 999  (1-1999)
-[()]
+{i} count,count_2,count_3
 
-[()]
+{i} count,count_2,count_3
 
 size of join should be much smaller
-[()]
+{i} count,count_2,count_3
 
 Query was executed successfully
 

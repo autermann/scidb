@@ -62,7 +62,7 @@ namespace scidb
 
             //Load have schema as first argument as input, but it checks if this schema NOT anonymous,
             //so we just convert it into array reference
-            const string &schemaName = boost::shared_dynamic_cast<OperatorParamSchema>(loadParameters[0])->getSchema().getName();
+            const string &schemaName = boost::dynamic_pointer_cast<OperatorParamSchema>(loadParameters[0])->getSchema().getName();
             boost::shared_ptr<OperatorParam> paramArrayRef = boost::shared_ptr<OperatorParam>(
                                 new OperatorParamArrayReference(
                                     loadParameters[0]->getParsingContext(),
@@ -73,59 +73,59 @@ namespace scidb
             if ( query->getInstancesCount() == 1) {
                 boost::shared_ptr< LogicalOperator> storeOperator = olib->createLogicalOperator("store");
                 storeOperator->addParameter(paramArrayRef);
-                
+
                 std::vector< ArrayDesc> storeInputSchemas;
                 storeInputSchemas.push_back(inputOperator->getSchema());
-                
+
                 storeOperator->setSchema(storeOperator->inferSchema(storeInputSchemas, query));
 
                 boost::shared_ptr< LogicalQueryPlanNode> inputNode(
                     new  LogicalQueryPlanNode (node->getParsingContext(),
                                                      inputOperator));
-                
+
                 boost::shared_ptr< LogicalQueryPlanNode> storeNode(
                     new  LogicalQueryPlanNode (node->getParsingContext(),
                                                      storeOperator));
 
                 //load instance does not have any children. so the input instance will also have none.
                 assert(node->getChildren().size()==0);
-                
+
                 storeNode->addChild(inputNode);
                 return storeNode;
-            } else { 
-                LogicalOperator::Parameters sgParams(3);    
+            } else {
+                LogicalOperator::Parameters sgParams(3);
                 Value ival(TypeLibrary::getType(TID_INT32));
                 ival.setInt32(psRoundRobin);
                 sgParams[0] = boost::shared_ptr<OperatorParam>(
                     new OperatorParamLogicalExpression(node->getParsingContext(),
-                                                       boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)), 
+                                                       boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)),
                                                        TypeLibrary::getType(TID_INT32), true));
                 ival.setInt32(-1);
                 sgParams[1] = boost::shared_ptr<OperatorParam>(
-                    new OperatorParamLogicalExpression(node->getParsingContext(), 
-                                                       boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)), 
+                    new OperatorParamLogicalExpression(node->getParsingContext(),
+                                                       boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)),
                                                        TypeLibrary::getType(TID_INT32), true));
                 sgParams[2] = paramArrayRef;
-                
+
                 boost::shared_ptr< LogicalOperator> sgOperator = olib->createLogicalOperator("sg");
                 sgOperator->setParameters(sgParams);
 
                 std::vector< ArrayDesc> sgInputSchemas;
                 sgInputSchemas.push_back(inputOperator->getSchema());
-                
+
                 sgOperator->setSchema(sgOperator->inferSchema(sgInputSchemas,query));
 
                 boost::shared_ptr< LogicalQueryPlanNode> inputNode(
                     new  LogicalQueryPlanNode (node->getParsingContext(),
                                                      inputOperator));
-                
+
                 boost::shared_ptr< LogicalQueryPlanNode> sgNode(
                     new  LogicalQueryPlanNode (node->getParsingContext(),
                                                      sgOperator));
 
                 //load node does not have any children. so the input node will also have none.
                 assert(node->getChildren().size()==0);
-                
+
                 sgNode->addChild(inputNode);
 
                 return sgNode;
@@ -164,8 +164,8 @@ namespace scidb
                                                                                    attRef,
                                                                                    ""));
                aggOperator->addParameter(aggCall);
-           }  
-           if (oldStyleParams.size() != 0) { 
+           }
+           if (oldStyleParams.size() != 0) {
                ((LogicalOperator::Properties&)aggOperator->getProperties()).tile = false;
            }
 

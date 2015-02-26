@@ -1,5 +1,5 @@
-      SUBROUTINE DESCINIT( DESC, M, N, MB, NB, IRSRC, ICSRC, ICTXT,
-     $                     LLD, INFO )
+      SUBROUTINE SCIDB_DESCINIT( DESC, M, N, MB, NB, IRSRC, ICSRC,
+     $                           ICTXT, LLD, INFO )
 *
 *  -- ScaLAPACK tools routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -135,11 +135,11 @@
       INTEGER            MYCOL, MYROW, NPCOL, NPROW
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           BLACS_GRIDINFO, PXERBLA
+      EXTERNAL           SCIDB_BLACS_GRIDINFO, SCIDB_PXERBLA
 *     ..
 *     .. External Functions ..
-      INTEGER            NUMROC
-      EXTERNAL           NUMROC
+      INTEGER            SCIDB_NUMROC
+      EXTERNAL           SCIDB_NUMROC
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          MAX, MIN
@@ -148,7 +148,7 @@
 *
 *     Get grid parameters
 *
-      CALL BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
+      CALL SCIDB_BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
 *
       INFO = 0
       IF( M.LT.0 ) THEN
@@ -165,13 +165,13 @@
          INFO = -7
       ELSE IF( NPROW.EQ.-1 ) THEN
          INFO = -8
-      ELSE IF( LLD.LT.MAX( 1, NUMROC( M, MB, MYROW, IRSRC,
+      ELSE IF( LLD.LT.MAX( 1, SCIDB_NUMROC( M, MB, MYROW, IRSRC,
      $                                NPROW ) ) ) THEN
          INFO = -9
       END IF
 *
       IF( INFO.NE.0 )
-     $   CALL PXERBLA( ICTXT, 'DESCINIT', -INFO )
+     $   CALL SCIDB_PXERBLA( ICTXT, 'SCIDB_DESCINIT', -INFO )
 *
       DESC( DTYPE_ ) = BLOCK_CYCLIC_2D
       DESC( M_ )  = MAX( 0, M )
@@ -181,7 +181,8 @@
       DESC( RSRC_ ) = MAX( 0, MIN( IRSRC, NPROW-1 ) )
       DESC( CSRC_ ) = MAX( 0, MIN( ICSRC, NPCOL-1 ) )
       DESC( CTXT_ ) = ICTXT
-      DESC( LLD_ )  = MAX( LLD, MAX( 1, NUMROC( DESC( M_ ), DESC( MB_ ),
+      DESC( LLD_ )  = MAX( LLD, MAX( 1, SCIDB_NUMROC( DESC( M_ ),
+     $                              DESC( MB_ ),
      $                              MYROW, DESC( RSRC_ ), NPROW ) ) )
 *
       RETURN

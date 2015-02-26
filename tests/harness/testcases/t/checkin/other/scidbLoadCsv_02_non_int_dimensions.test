@@ -21,12 +21,10 @@
 
 
 --test
-#echo              "scidbLoadCsv.sh -a ID,AffyId,Response -D ID,AffyId -m '4,4' -c 4,4 string,string,double tmpA < scidbLoadCsv_test.csv"
---shell --command "../../utils/scidbLoadCsv.sh -p ${IQUERY_PORT:-1239} -a ID,AffyId,Response -D ID,AffyId -m '4,4' -c 4,4 string,string,double tmpA < scidbLoadCsv_test.csv"
+--shell --command "scidbLoadCsv.sh -p ${IQUERY_PORT:=1239} -a ID,AffyId,Response -D ID,AffyId -m '4,4' -c 4,4 string,string,double tmpA < scidbLoadCsv_test.csv"
 scan(tmpA)
 
-#echo              "scidbLoadCsv.sh -a ID,AffyId,Response -d 0,1       -m '4,4' -c 4,4 string,string,double tmpB < scidbLoadCsv_test.csv"
---shell --command "../../utils/scidbLoadCsv.sh -p ${IQUERY_PORT:-1239} -a ID,AffyId,Response -d 0,1       -m '4,4' -c 4,4 string,string,double tmpB < scidbLoadCsv_test.csv"
+--shell --command "scidbLoadCsv.sh -p ${IQUERY_PORT:=1239} -a ID,AffyId,Response -d 0,1       -m '4,4' -c 4,4 string,string,double tmpB < scidbLoadCsv_test.csv"
 scan(tmpB)
 
 

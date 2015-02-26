@@ -189,11 +189,17 @@ namespace scidb
     {
         currIterator = -1;
         currentChunk = NULL;
-        for (size_t i = 0, n = iterators.size(); i < n; i++) { 
-            if (iterators[i]->setPosition(pos)) {
+        for (size_t i = 0, n = iterators.size(); i < n; i++) 
+        { 
+            if (iterators[i]->setPosition(pos)) 
+            {
                 if (currIterator < 0) { 
                     currIterator = i;
                 }
+            }
+            else
+            {
+                iterators[i]->reset();
             }
         }
         return currIterator >= 0;
@@ -219,20 +225,21 @@ namespace scidb
 
     void MergeArrayIterator::operator ++()
     {
+        //fast-forward all iterators until their position is greater than currPos,
+        //then pick the iterator with the lowest position
         if (currIterator < 0)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+
+        Coordinates currPos = iterators[currIterator]->getPosition();
+        currIterator = -1;
         currentChunk = NULL;
-        Coordinates const& currPos = iterators[currIterator]->getPosition();
-        size_t n = iterators.size();
-        for (size_t i = currIterator+1; i < n; i++) { 
-            if (!iterators[i]->end() && iterators[i]->getPosition() == currPos) { 
+        for (size_t i = 0, n = iterators.size(); i < n; i++)
+        {
+            while(!iterators[i]->end() && coordinatesLessOrEqual(iterators[i]->getPosition(), currPos))
+            {
                 ++(*iterators[i]);
             }
-        }
-        ++(*iterators[currIterator]);
-        currIterator = -1;
-        for (size_t i = 0; i < n; i++) { 
-            if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
+            if(!iterators[i]->end() && (currIterator<0 || precede(iterators[i], iterators[currIterator])))
             {
                 currIterator = i;
             }

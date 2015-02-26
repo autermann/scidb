@@ -7,13 +7,28 @@ store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)
 
 --test
 
---shell --command "../utils/killquery.sh -aql 2  2 'update ABRTEST set v=3'" --store 
---shell --command "../utils/killquery.sh -aql 15 2 'update ABRTEST set v=3'" --store 
---shell --command "../utils/killquery.sh -aql 9  2 'update ABRTEST set v=3'" --store 
+--shell --command "../utils/killquery.sh -aql 2  2 'update ABRTEST set v=3' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_1.stdout"
+
+--shell --command "../utils/killquery.sh -aql 15 2 'update ABRTEST set v=3' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_2.stdout"
+
+--shell --command "../utils/killquery.sh -aql 9  2 'update ABRTEST set v=3' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_3.stdout"
+
 
 # clean abort for insert
---shell --command "../utils/killquery.sh -afl 2  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*5 + 13), v1), v1, v), ABRTEST)'" --store
---shell --command "../utils/killquery.sh -afl 9  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*v), v1), v1, v), ABRTEST)'" --store
+--shell --command "../utils/killquery.sh -afl 2  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*5 + 13), v1), v1, v), ABRTEST)' 1> /tmp/${PPID}_4.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_4.stdout"
+
+--shell --command "../utils/killquery.sh -afl 9  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*v), v1), v1, v), ABRTEST)' 1> /tmp/${PPID}_5.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_5.stdout"
+
 
 # should not have any changes (original pattern)
 subarray(ABRTEST, 0, 10)
@@ -28,3 +43,8 @@ count(versions(ABRTEST))
 --stop-query-logging
 
 remove(ABRTEST)
+--shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_4.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_5.stdout 2>/dev/null"

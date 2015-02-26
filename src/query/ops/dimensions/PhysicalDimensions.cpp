@@ -86,10 +86,10 @@ public:
             tuple[1].setInt64(dims[i].getStart());
             tuple[2] = Value(TypeLibrary::getType(TID_UINT64));
             tuple[2].setUint64(dims[i].getLength());
-            tuple[3] = Value(TypeLibrary::getType(TID_INT32));
-            tuple[3].setInt32(dims[i].getChunkInterval());
-            tuple[4] = Value(TypeLibrary::getType(TID_INT32));
-            tuple[4].setInt32(dims[i].getChunkOverlap());
+            tuple[3] = Value(TypeLibrary::getType(TID_UINT64));
+            tuple[3].setUint64(dims[i].getChunkInterval());
+            tuple[4] = Value(TypeLibrary::getType(TID_UINT64));
+            tuple[4].setUint64(dims[i].getChunkOverlap());
             tuple[5] = Value(TypeLibrary::getType(TID_INT64));
             tuple[5].setInt64(lowBoundary[i]);
             tuple[6] = Value(TypeLibrary::getType(TID_INT64));

@@ -72,6 +72,7 @@ namespace scidb
 #endif
     }
 
+
     /**
      * Terminate process with a given status code.
      * @status the code returned to the OS upon process exit

@@ -1,19 +1,12 @@
 SCIDB QUERY : <create empty array ABRLOAD <v : int64> [I=0:2000,20,0, J=0:1000,20,0]>
 Query was executed successfully
 
-SCIDB QUERY : <../utils/killquery.sh -afl 2  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' >
-Attempting  to kill (-2) iquery command after 2 seconds...
-SUCCESS: kill returned code: 0
+SCIDB QUERY : <../utils/killquery.sh -afl 2  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${PPID}_1.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 15 2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' >
-Attempting  to kill (-15) iquery command after 2 seconds...
-SUCCESS: kill returned code: 0
+SCIDB QUERY : <../utils/killquery.sh -afl 15 2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${PPID}_2.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' >
-Attempting  to kill (-9) iquery command after 2 seconds...
-SUCCESS: kill returned code: 0
+SCIDB QUERY : <../utils/killquery.sh -afl 9  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${PPID}_3.stdout || echo FAILURE>
 
-"array should be empty (0 rows)..."
 SCIDB QUERY : <count(ABRLOAD)>
 {i} count
 {0} 0

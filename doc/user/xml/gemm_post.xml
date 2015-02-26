@@ -17,6 +17,13 @@
   </refsynopsisdiv>
 
   <refsect1>
+    <title>Library</title>
+
+    <para>The <code>gemm</code> operator resides in the Dense Linear Algebra
+    library. Run the following query to load this library:<programlisting>AFL% load_library('dense_linear_algebra');</programlisting></para>
+  </refsect1>
+
+  <refsect1>
     <title>Summary</title>
 
     <para>The gemm operator multiplies matrices <emphasis><emphasis role="bold">A</emphasis></emphasis> and <emphasis><emphasis role="bold">B</emphasis></emphasis> then adds <emphasis><emphasis role="bold">C</emphasis></emphasis>. Matrices <emphasis><emphasis role="bold">A</emphasis></emphasis> and <emphasis><emphasis role="bold">B</emphasis></emphasis> must must be compatible for matrix
@@ -43,9 +50,6 @@
         <para>GEMM: <ulink url="http://en.wikipedia.org/wiki/General_Matrix_Multiply">http://en.wikipedia.org/wiki/General_Matrix_Multiply</ulink></para>
       </listitem>
     </itemizedlist>
-
-    <para>To use the <literal>gemm</literal> operator, you must first load the
-    <literal>dense_linear_algebra</literal> library.</para>
   </refsect1>
 
   <refsect1>

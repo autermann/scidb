@@ -9,9 +9,19 @@ store(join(build_sparse(ABR2, x+2 ,1),build_sparse(ABR2, x+1, 1)),ABR1)
 --test 
 --echo "issuing redim"
 #redimension_store(ABR1,ABR3)
---shell --command "../utils/killquery.sh -afl 2 1 'redimension_store(ABR1, ABR3)'" --store
---shell --command "../utils/killquery.sh -afl 15 1 'redimension_store(ABR1, ABR3)'" --store
---shell --command "../utils/killquery.sh -afl 9 1 'redimension_store(ABR1, ABR3)'" --store
+
+--shell --command "../utils/killquery.sh -afl 2 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_1.stdout"
+
+--shell --command "../utils/killquery.sh -afl 15 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_2.stdout"
+
+--shell --command "../utils/killquery.sh -afl 9 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_3.stdout"
+
 
 --echo "should be empty..."
 count(ABR3)
@@ -19,11 +29,13 @@ versions(ABR3)
 --error "scan(ABR3:a)"
 
 --echo "should be no mapping arrays..."
---sleep 12
-project(list('arrays'),name,schema)
+project(sort(filter(list('arrays'), regex(name,'ABR.*'))),name,schema)
 
 --cleanup
 --stop-query-logging
 remove(ABR1)
 remove(ABR2)
 remove(ABR3)
+--shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"

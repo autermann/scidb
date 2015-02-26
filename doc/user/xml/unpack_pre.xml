@@ -28,6 +28,18 @@
 
     <para>You can control the chunk size of the resulting array with the
     optional chunk_size parameter. The default chunk size is 1 million.</para>
+
+    <para><indexterm>
+        <primary>binary save</primary>
+      </indexterm><indexterm>
+        <primary>save</primary>
+
+        <secondary>binary</secondary>
+      </indexterm>One use case for unpack is for saving a multidimensional
+    array into a binary backup file. The way to do this is to first unpack the
+    array, and then use the <code>save</code> operator to perform a binary
+    save. You perform a binary save similarly to the way you perform a binary
+    load—see <xref linkend="loadBinary"/> for details.</para>
   </refsect1>
 
   <refsect1>
@@ -103,6 +115,46 @@
           <para>Unpack array A.<programlisting language="test">--afl unpack(A, x);</programlisting>
           Note that <code>unpack</code> has excluded the empty cells from the
           result array.</para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example shows how to use unpack to backup an array into a
+      binary file.</para>
+
+      <procedure>
+        <step>
+          <para>Assume we have the following array, <emphasis
+          role="bold">Names</emphasis>:<programlisting language="test">--afl create array A1 &lt;firstnames:string&gt; [i=0:2,3,0, j=0:1,2,0]; --show-output=no --show-query=no
+--afl create array A2 &lt;lastnames:string&gt; [i=0:2,3,0, j=0:1,2,0]; --show-output=no --show-query=no
+--afl store(build(A1,'[[("Bill"),("Anne")],[("Joe"),("Steve")],[("Burt"),("Ronald")]]',true),A1);
+      --show-output=no --show-query=no
+--afl store(build(A2,'[[("Clinton"),("Rice")],[("Pantoliano"),("Jobs")],[("Reynolds"),("Reagan")]]',true),A2);
+      --show-output=no --show-query=no
+--afl store(join(A1,A2),Names); --show-output=no --show-query=no
+--schema Names
+--afl scan(Names); --output-format=dense --chunkify=yes
+</programlisting></para>
+        </step>
+
+        <step>
+          <para>Unpack <emphasis role="bold">Names</emphasis> into a
+          1-dimensional array, <emphasis role="bold">namesFlat</emphasis>.
+          <programlisting language="test">--afl store(unpack(Names,x),namesFlat); --output-format=dcsv</programlisting></para>
+        </step>
+
+        <step>
+          <para>View the schema for <emphasis
+          role="bold">namesFlat</emphasis>, so that we can create the query
+          for the binary save.<programlisting language="test">--schema namesFlat</programlisting></para>
+        </step>
+
+        <step>
+          <para>So we have two int64 types, followed by two string types. Now
+          we perform the binary save.<programlisting>AFL% save(namesFlat,'/tmp/namesFlat.bin',0, '(int64,int64,string,string)');  </programlisting>This
+          writes the binary file, <emphasis
+          role="bold">namesFlat.bin</emphasis>, to the /tmp folder.</para>
         </step>
       </procedure>
     </informalexample>

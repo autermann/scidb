@@ -76,6 +76,8 @@ enum
     CONFIG_PREFETCHED_CHUNKS,
     CONFIG_VERSION,
     CONFIG_MERGE_SORT_BUFFER,
+    CONFIG_MERGE_SORT_NSTREAMS,
+    CONFIG_MERGE_PIPELINE_LIMIT,
     CONFIG_MEM_ARRAY_THRESHOLD,
     CONFIG_NETWORK_BUFFER,
     CONFIG_ASYNC_IO_BUFFER,
@@ -115,7 +117,10 @@ enum
     CONFIG_MPI_DIR,
     CONFIG_MPI_IF,
     CONFIG_MPI_TYPE,
-    CONFIG_CATALOG_RECONNECT_TRIES
+    CONFIG_CATALOG_RECONNECT_TRIES,
+    CONFIG_QUERY_MAX_SIZE,
+    CONFIG_MAX_REQUESTS,
+    CONFIG_ENABLE_CATALOG_UPGRADE
 };
 
 enum RepartAlgorithm
@@ -309,6 +314,16 @@ public:
     {
     	assert(_values[option]);
         return boost::any_cast<const T&>(_values[option]->getValue());
+    }
+
+    /**
+     * Retrieve the config-file-form name of a config option
+     * @param[in] option one of the config option enum values
+     * @return the command-line-style name of option
+     */
+    std::string const& getOptionName(int32_t option)
+    {
+        return _values[option]->getLongName();
     }
 
 	/**

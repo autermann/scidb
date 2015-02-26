@@ -527,13 +527,11 @@ namespace scidb
     : _array(arr),
       _arrayIterator(NULL),
       _nDims(arr._desc.getDimensions().size()),
-      _firstPosIncludingOverlap(_nDims),
-      _lastPosIncludingOverlap(_nDims),
-      _arrSize(_nDims),
       _firstPos(_nDims),
       _lastPos(_nDims),
       _attrID(attr),
-      _materialized(false)
+      _materialized(false),
+      _mapper()
     {
         if (arr._desc.getEmptyBitmapAttribute() == 0 || attr!=arr._desc.getEmptyBitmapAttribute()->getId())
         {
@@ -554,7 +552,8 @@ namespace scidb
         if (false == isMaterialized()) {
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OP_WINDOW_ERROR6);
         }
-        return _arrSize[_nDims-1];
+        SCIDB_ASSERT(_mapper);
+        return _mapper->getChunkInterval(_nDims-1);
     }
 
     /**
@@ -631,12 +630,9 @@ namespace scidb
      */
     inline uint64_t WindowChunk::coord2pos(Coordinates const& coord) const
     {
-        uint64_t pos = 0;
-        for (size_t i = 0; i < _nDims; i++) {
-            pos *= _arrSize[i];
-            SCIDB_ASSERT (( coord[i] >=  _firstPosIncludingOverlap[i] ));
-            pos += coord[i] - _firstPosIncludingOverlap[i];
-        }
+        SCIDB_ASSERT(_materialized);
+        position_t pos = _mapper->coord2pos(coord);
+        SCIDB_ASSERT(pos >= 0);
         return pos;
     }
 
@@ -645,11 +641,8 @@ namespace scidb
      */
     inline void WindowChunk::pos2coord(uint64_t pos, Coordinates& coord) const
     {
-        for (int i = _nDims; --i >= 0;) {
-            coord[i] = _firstPosIncludingOverlap[i] + (pos % _arrSize[i]);
-            pos /= _arrSize[i];
-        }
-        SCIDB_ASSERT((pos == 0));
+        SCIDB_ASSERT(_materialized);
+        _mapper->pos2coord(pos, coord);
     }
 
     /**
@@ -681,15 +674,12 @@ namespace scidb
             ConstChunk const& chunk = _arrayIterator->iterator->getChunk();
 
             //
-            // Get the number of logical elements in the chunk, including the
-            // cells in the overlapping region.
-            _firstPosIncludingOverlap = chunk.getFirstPosition(true);
-            _lastPosIncludingOverlap = chunk.getLastPosition(true);
-            for(size_t i =0; i<_nDims; i++)
-            {
-                _arrSize[i] = _lastPosIncludingOverlap[i]-_firstPosIncludingOverlap[i]+1;
-            }
+            // Initialize the coordinate mapper
+            _mapper = shared_ptr<CoordinatesMapper> (new CoordinatesMapper(chunk));
 
+            //
+            // Get the number of logical elements in the chunk, excluding the
+            // overlapping region
             Coordinates const& firstPos = chunk.getFirstPosition(false);
             Coordinates const& lastPos =  chunk.getLastPosition(false);
 
@@ -711,7 +701,7 @@ namespace scidb
             {
                 Coordinates const& currPos = chunkIter->getPosition();
                 Value const& currVal = chunkIter->getItem();
-                uint64_t pos = coord2pos(currPos);
+                uint64_t pos = _mapper->coord2pos(currPos);
 
                 bool insideOverlap=true;
                 for (size_t i=0; i<_nDims; i++)

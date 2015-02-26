@@ -38,6 +38,9 @@ set(ENV{revisionURL} $ENV{BUILD_REVISION})
 set(WITH_COVERAGE TRUE)
 file(REMOVE_RECURSE $ENV{BUILD_PATH}/Testing/)
 
+# the output of this script goes into Notes.xml, so echo the log directory link
+execute_process (COMMAND echo "Test logs are in: http://${CTEST_SITE}/$ENV{CDASH_PATH_RELATIVE}/log/")
+
 ctest_start(${TEST_MODEL})
 
 # configure
@@ -58,6 +61,7 @@ ctest_test()
 # copy result
 if(EXISTS "$ENV{CDASH_PATH_RESULT}")
   execute_process (COMMAND /bin/cp -R "${HARNESS_PATH}/testcases/r/" "$ENV{CDASH_PATH_RESULT}/")
+  execute_process (COMMAND /bin/cp -R "${HARNESS_PATH}/testcases/log/" "$ENV{CDASH_PATH_RESULT}/")
 
   # remove un-needed files
   execute_process(COMMAND /usr/bin/find . -depth \( -name *.expected -or -name *.svn \) -exec /bin/rm -rf {} \; 

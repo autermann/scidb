@@ -82,14 +82,13 @@ public:
                 InstanceID   instanceId,
                 InstanceRole instanceRole,
                 LockMode lockMode);
-
         LockDesc(const std::string& arrayName,
                 QueryID  queryId,
                 InstanceID   instanceId,
                 InstanceRole instanceRole,
                 LockMode lockMode,
                 uint64_t timestmap
-        );
+                );
 
         virtual ~LockDesc() {}
         const std::string& getArrayName() const { return _arrayName; }
@@ -102,10 +101,12 @@ public:
         InstanceRole  getInstanceRole() const { return _instanceRole; }
         LockMode  getLockMode() const { return _lockMode; }
         uint64_t  getTimestamp() const { return _timestamp; }
+        bool  isLocked() const { return _isLocked; }
         void setArrayId(ArrayID arrayId) { _arrayId = arrayId; }
         void setArrayVersionId(ArrayID versionId) { _arrayVersionId = versionId; }
         void setArrayVersion(VersionID version) { _arrayVersion = version; }
         void setLockMode(LockMode mode) { _lockMode = mode; }
+        void setLocked(bool isLocked) { _isLocked = isLocked; }
         std::string toString();
 
     private:
@@ -124,6 +125,30 @@ public:
         LockMode  _lockMode; // {1=read, write, remove, renameto, renamefrom}
         uint64_t  _timestamp;
         ArrayID  _immutableArrayId;
+        bool _isLocked;
+    };
+
+    /**
+     * This exception is thrown when an array is already locked (by a different query).
+     */
+    class LockBusyException: public SystemException
+    {
+    public:
+        LockBusyException(const char* file, const char* function, int32_t line)
+        : SystemException(file, function, line, "scidb",
+                          SCIDB_SE_EXECUTION, SCIDB_LE_RESOURCE_BUSY,
+                          "SCIDB_SE_EXECUTION", "SCIDB_LE_RESOURCE_BUSY", uint64_t(0))
+        {
+        }
+        ~LockBusyException() throw () {}
+        void raise() const { throw *this; }
+        virtual Exception::Pointer copy() const
+        {
+            Exception::Pointer ep(boost::make_shared<LockBusyException>(_file.c_str(),
+                                                                        _function.c_str(),
+                                                                        _line));
+            return ep;
+        }
     };
 
     /**
@@ -340,24 +365,6 @@ public:
      * @param[in] id array identifier
      */
     void deleteArray(const ArrayID id);
-
-    /**
-     * Delete cached array metadata
-     * @param id array identifier
-     */
-    void deleteArrayCache(const ArrayID id);
-
-    /**
-     * Invalidate cached array metadata
-     * @param id array identifier
-     */
-    void invalidateArrayCache(const ArrayID id);
-
-    /**
-     * Invalidate cached array metadata
-     * @param id array identifier
-     */
-    void invalidateArrayCache(std::string const& array_name);
 
     /**
      * Create new version of the array
@@ -579,8 +586,6 @@ private:
     static Mutex _pgLock;
 
     friend class Singleton<SystemCatalog>;
-
-    std::map<ArrayID, boost::shared_ptr<ArrayDesc> > _arrDescCache;
 
     int _reconnectTries;
 };

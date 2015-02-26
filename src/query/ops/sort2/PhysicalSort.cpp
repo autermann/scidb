@@ -29,7 +29,7 @@
 #include "query/Operator.h"
 #include "query/QueryProcessor.h"
 #include "array/Metadata.h"
-#include "MergeSortArray.h"
+#include "array/MergeSortArray.h"
 
 using namespace boost;
 
@@ -73,10 +73,13 @@ public:
 
     boost::shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
+        assert (query->getCoordinatorID() == COORDINATOR_INSTANCE);
+
         if (inputArrays.size() > 1) {
-            SortContext* ctx = (SortContext*)query->userDefinedContext;
-            boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new MergeSortArray(query, _schema, inputArrays, ctx->keys));
-            delete ctx;
+            std::auto_ptr<SortContext> ctx ((SortContext*)query->userDefinedContext);
+            boost::shared_ptr<TupleComparator> tcomp(new TupleComparator(ctx->keys, _schema));
+            boost::shared_ptr<Array> result(new MergeSortArray(query, _schema, inputArrays, tcomp));
+            ctx.reset();
             return result;
         }
         return inputArrays[0];

@@ -23,7 +23,7 @@
 #define SCALAPACK_EMULATION__HPP
 
 #include <sys/types.h>
-#include <linear_algebra/scalapackUtil/scalapackFromCpp.hpp>
+#include <linear_algebra/scalapackUtil/scalapackTypes.hpp>
 
 ///
 /// These methods are temporary scaffolding to allow SciDB to make calls that mimick
@@ -56,28 +56,49 @@ extern "C" {
     //    the right type, followed by delivering its address to FORTRAN, and all
     //    variables in FORTRAN are passed by such references.
 
-    // just to shorten some otherwise long lines below:
-    typedef slpp::int_t sl_int_t;
-    typedef slpp::desc_t sl_desc_t;
+    // Utilities (all copies of the FORTRAN ones, with their names prefixed with scidb_)
+    // these are modified by pruning their descent into the full ScaLAPACK call tree.
+    // just enough have been kept to make them work-alike in a local-array only
+    // and SciDB context.
+    //
 
-    // Utilities (all copies of the real FORTRAN ones)
-    void descinit_(sl_desc_t& desc,
-                   const sl_int_t& m, const sl_int_t& n,
-                   const sl_int_t& mb, const sl_int_t& nb,
-                   const sl_int_t& irSrc, const sl_int_t& icSrc, const sl_int_t& icTxt,
-                   const sl_int_t& lld, sl_int_t& info);
+    // a local-only operation (also true of its ScaLAPACK incarnation)
+    void scidb_descinit_(slpp::desc_t& desc,
+                   const slpp::int_t& m, const slpp::int_t& n,
+                   const slpp::int_t& mb, const slpp::int_t& nb,
+                   const slpp::int_t& irSrc, const slpp::int_t& icSrc, const slpp::int_t& icTxt,
+                   const slpp::int_t& lld, slpp::int_t& info);
    
-    void pdelset_(double* data, const sl_int_t& row, const sl_int_t& col,
-                  const sl_desc_t& desc, const double& val);
-    void pdelget_(const char& SCOPE, const char& TOP, double& ALPHA, const double* A,
-                  const sl_int_t& IA, const sl_int_t& JA, const sl_desc_t& DESCA);
+    // a local-only operation (even in its ScaLAPACK incarnation)
+    slpp::int_t scidb_numroc_(const slpp::int_t&, const slpp::int_t&, const slpp::int_t&, const slpp::int_t&, const slpp::int_t&);
 
-    sl_int_t numroc_(const sl_int_t&, const sl_int_t&, const sl_int_t&, const sl_int_t&, const sl_int_t&);
+    // scidb_ version is local only (vs ScaLPACK implementation which is global)
+    void scidb_pdelset_(double* data, const slpp::int_t& row, const slpp::int_t& col,
+                        const slpp::desc_t& desc, const double& val);
 
-    // This one does not exist in FORTRAN, caues the ones immediate above to return these values
-    void set_fake_blacs_gridinfo_(const bl_int_t& ictxt,
-                                  const bl_int_t& nprow, const bl_int_t& npcol,
-                                  const bl_int_t& myprow, const bl_int_t& mypcol);
+    // scidb_ version is local only (vs ScaLPACK implementation which is global)
+    void scidb_pdelget_(const char& SCOPE, const char& TOP, double& ALPHA, const double* A,
+                  const slpp::int_t& IA, const slpp::int_t& JA, const slpp::desc_t& DESCA);
+
+    // this call does not have a local memory / global memory distinction.  It just provides the mapping
+    // from global to local coordinates.  The Fortran call precedes the declaration, since there are so
+    // many arguments:
+    // SUBROUTINE INFOG2L(GRINDX, GCINDEX, DESCA, NPROW, NPCOL, MYROW, MYCOL, LRINDX, LCINDX, RSRC, CSRC )
+    void scidb_infog2l_(const slpp::int_t& GRINDX, const slpp::int_t& GCINDEX, const slpp::desc_t& DESCA,
+                        const slpp::int_t& NPROW, const slpp::int_t& NPCOL, const slpp::int_t& MYROW, const slpp::int_t& MYCOL,
+                        const slpp::int_t& LRINDX, const slpp::int_t& LCINDX, const slpp::int_t& RSRC, const slpp::int_t& CSRC);
+
+    // scidb_ version only returns exactly what was set by "scidb_set_blacs_gridinfo_" below
+    // it is actually implemented as an "extern C" function written in C++
+    void scidb_blacs_gridinfo_(const blacs::int_t&, const blacs::int_t&,
+                               const blacs::int_t&, blacs::int_t&, blacs::int_t&);
+    
+    // This one does not even exist in ScaLAPACK it is only used to modify the behavior of 
+    // the above, which works differently than in ScaLAPACK (where there is a stack of ictxts)
+    // it is actually implemented as an "extern C" function written in C++
+    void scidb_set_blacs_gridinfo_(const blacs::int_t& ictxt,
+                                   const blacs::int_t& nprow, const blacs::int_t& npcol,
+                                   const blacs::int_t& myprow, const blacs::int_t& mypcol);
 
 }
 

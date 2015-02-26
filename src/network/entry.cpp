@@ -201,7 +201,8 @@ void runSciDB()
 
    // Here we can play with thread number
    // TODO: For SG operations probably we should have separate thread pool
-   messagesThreadPool = make_shared<ThreadPool>(cfg->getOption<int>(CONFIG_MAX_JOBS), messagesJobQueue);
+   const uint32_t nJobs = std::max(cfg->getOption<int>(CONFIG_MAX_JOBS),2);
+   messagesThreadPool = make_shared<ThreadPool>(nJobs, messagesJobQueue);
 
    SystemCatalog* catalog = SystemCatalog::getInstance();
    const bool initializeCluster = Config::getInstance()->getOption<bool>(CONFIG_INITIALIZE);

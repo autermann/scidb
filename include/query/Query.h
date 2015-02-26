@@ -42,18 +42,19 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <log4cxx/logger.h>
 
-#include "array/Metadata.h"
-#include "util/Semaphore.h"
-#include "util/Event.h"
-#include "util/RWLock.h"
-#include "SciDBAPI.h"
-#include "util/Atomic.h"
-#include "query/Aggregate.h"
-#include "query/Statistics.h"
+#include <array/Metadata.h>
+#include <util/Thread.h>
+#include <util/Semaphore.h>
+#include <util/Event.h>
+#include <util/RWLock.h>
+#include <SciDBAPI.h>
+#include <util/Atomic.h>
+#include <query/Aggregate.h>
+#include <query/Statistics.h>
 #include <system/BlockCyclic.h>
-#include "system/Cluster.h"
-#include "system/Warnings.h"
-#include "system/SystemCatalog.h"
+#include <system/Cluster.h>
+#include <system/Warnings.h>
+#include <system/SystemCatalog.h>
 #include <util/WorkQueue.h>
 
 namespace boost
@@ -230,7 +231,7 @@ class Query : public boost::enable_shared_from_this<Query>
     {
        ScopedMutexLock cs(errorMutex);
        assert (_commitState==ABORTED);
-       bool result = (completionStatus == OK);
+       bool result = (_completionStatus == OK);
        return result;
     }
     bool checkFinalState();
@@ -248,20 +249,20 @@ class Query : public boost::enable_shared_from_this<Query>
         OK,   // query execute() completed with no errors
         ERROR // query execute() completed with errors
     } CompletionStatus;
-    CompletionStatus completionStatus;
+    CompletionStatus _completionStatus;
 
     /** Query commit state */
     typedef enum {
         UNKNOWN,
-        COMMITTED, // completionStatus!=ERROR
+        COMMITTED, // _completionStatus!=ERROR
         ABORTED
     } CommitState;
     CommitState _commitState;
 
     /**
-     * Queue for MPI-style messages
+     * Queue for MPI-style buffer messages
      */
-    boost::shared_ptr<scidb::WorkQueue> _mpiReceiveQueue;
+    boost::shared_ptr<scidb::WorkQueue> _bufferReceiveQueue;
 
     /**
      * FIFO queue for error messages
@@ -301,6 +302,11 @@ class Query : public boost::enable_shared_from_this<Query>
     static void freeQuery(QueryID queryID);
 
     /**
+     * Acquire a set of SystemCatalog locks
+     */
+    void acquireLocksInternal(Query::QueryLocks& locks);
+
+    /**
      * The result of query execution. It lives while the client connection is established.
      * In future we can develop more useful policy of result keeping with multiple
      * re-connections to query.
@@ -328,6 +334,7 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     int _useCounter;
 
+    // XXX TODO: consider removing this locks because PG locks should be sufficient
     std::map< std::string, boost::shared_ptr<RWLock> > locks;
     Mutex lockMutex;
 
@@ -335,7 +342,10 @@ class Query : public boost::enable_shared_from_this<Query>
     {
         if (SCIDB_E_NO_ERROR != _error->getLongErrorCode())
         {
-            assert(_error->getLongErrorCode() != SCIDB_LE_QUERY_ALREADY_COMMITED);
+            // note: error code can be SCIDB_LE_QUERY_ALREADY_COMMITED
+            //       because ParallelAccumulatorArray is started
+            //       regardless of whether the client pulls the data (even in case of mutating queries).
+            //       So, the client can request a commit before PAA is done.
             _error->raise();
         }
     }
@@ -349,6 +359,11 @@ class Query : public boost::enable_shared_from_this<Query>
     * cache for the ProGrid, which depends only on numInstances
     */
     mutable ProcGrid* _procGrid; // only access via getProcGrid()
+    
+    /**
+     * The mutex to serialize access to _queries map.
+     */
+    static Mutex queriesMutex;
 
  public:
 
@@ -362,9 +377,16 @@ class Query : public boost::enable_shared_from_this<Query>
     void exclusiveLock(std::string const& arrayName);
 
     /**
-     * The mutex to serialize access to _queries map.
+     * @return amount of time to wait before trying to acquire an array lock
      */
-    static Mutex queriesMutex;
+    static uint64_t getLockTimeoutNanoSec();
+
+    /**
+     * Put this thread to sleep for some time
+     * (before trying to acquire a SystemCatalog lock again)
+     */
+    static void waitForSystemCatalogLock();
+
     /**
      * Generate unique(?) query ID
      */
@@ -402,8 +424,6 @@ class Query : public boost::enable_shared_from_this<Query>
     bool isDDL;
 
     RWLock queryLock;
-
-    std::map<std::string, boost::shared_ptr<const ArrayDesc> > arrayDescByNameCache;
 
     /**
      * @brief _mappingArrays
@@ -494,6 +514,11 @@ class Query : public boost::enable_shared_from_this<Query>
         return _coordinatorID == COORDINATOR_INSTANCE ? _instanceID : _coordinatorID;
     }
 
+    bool isCoordinator()
+    {
+        return (_coordinatorID == COORDINATOR_INSTANCE);
+    }
+
     boost::shared_ptr<const InstanceLiveness> getCoordinatorLiveness()
     {
        return _coordinatorLiveness;
@@ -551,8 +576,6 @@ class Query : public boost::enable_shared_from_this<Query>
         _remoteArrays[instanceID] = array;
     }
 
-    std::vector<boost::shared_ptr<Array> > tempArrays;
-
     Statistics statistics;
 
     /**
@@ -582,15 +605,15 @@ class Query : public boost::enable_shared_from_this<Query>
     }
 
     /**
-     * Get the queue for delivering MPI-Send (mtMPISend) messages
+     * Get the queue for delivering buffer-send (mtMPISend) messages
      * @return empty pointer if the query is no longer active
      */
-    boost::shared_ptr<scidb::WorkQueue> getMpiReceiveQueue()
+    boost::shared_ptr<scidb::WorkQueue> getBufferReceiveQueue()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
-        assert(_mpiReceiveQueue);
-        return _mpiReceiveQueue;
+        assert(_bufferReceiveQueue);
+        return _bufferReceiveQueue;
     }
 
     boost::shared_ptr<scidb::WorkQueue> getErrorQueue()
@@ -721,53 +744,26 @@ class Query : public boost::enable_shared_from_this<Query>
      * @return result of running work
      */
     template<typename T, typename E>
-    static T runRestartableWork(boost::function<T()>& work, int tries = -1)
-    {
-        assert(work);
-        int counter = tries;
-        while (true)
-        {
-            //Run work
-            try
-            {
-                return work();
-            }
-            //Detect recoverable exception
-            catch (const E& e)
-            {
-                if (counter >= 0)
-                {
-                    counter--;
-
-                    if (counter < 0)
-                    {
-                        LOG4CXX_ERROR(_logger, "Query::runRestartableWork: Unable to restart work after " << tries << " tries");
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANNOT_RECOVER_RESTARTABLE_WORK);
-                    }
-                }
-
-                LOG4CXX_ERROR(_logger, "Query::runRestartableWork:"
-                              << " Exception: "<< e.what()
-                              << " will attempt to restart the operation");
-                sleep(_rng()%5);
-            }
-            //Detect unrecoverable exception
-            catch (...)
-            {
-                LOG4CXX_ERROR(_logger, "Query::runRestartableWork: Unable to recover and restart the operation");
-                throw;
-            }
-        }
-        assert(false);
-        return T();
-    }
+    static T runRestartableWork(boost::function<T()>& work, int tries = -1);
 
     /**
      * Acquire all locks requested via requestLock(),
-     * it blocks until all of the locks are acquired
+     * @throw scidb::SystemCatalog::LockBusyException if any of the locks are already taken (by other queries).
+     *        Any locks that have been successfully acquired remain in that state.
+     *        Any subsequent attempts to acquire the remaining locks should be done using retryAcquireLocks()
      * @throws exceptions while acquiring the locks and the same exceptions as validate()
      */
     void acquireLocks();
+
+    /**
+     * Acquire all locks requested via requestLock(). This method should be invoked only if
+     * a previous call to acquireLocks() has failed with scidb::LockBusyException
+     * @throw scidb::SystemCatalog::LockBusyException if any of the locks are already taken (by other queries).
+     *        Any locks that have been successfully acquired remain in that state.
+     *        Any subsequent attempts to acquire the remaining locks should be done using retryAcquireLocks()
+     * @throws exceptions while acquiring the locks and the same exceptions as validate()
+     */
+    void retryAcquireLocks();
 
     /**
      * @return  true if the query acquires exclusive locks
@@ -821,7 +817,8 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Set result SG context. Thread safe.
      */
-    void setOperatorContext(boost::shared_ptr<OperatorContext> const& opContext);
+    void setOperatorContext(boost::shared_ptr<OperatorContext> const& opContext,
+                            boost::shared_ptr<JobQueue> const& jobQueue = boost::shared_ptr<JobQueue>());
 
     /**
      * Remove result SG context.
@@ -858,7 +855,7 @@ class Query : public boost::enable_shared_from_this<Query>
     void done(const boost::shared_ptr<Exception> unwindException);
 
     /**
-     * This section describe member fields needed for implementing send/receive MPI functions.
+     * This section describe member fields needed for implementing send/receive functions.
      */
     Mutex _receiveMutex; //< Mutex for serialization access to _receiveXXX fields.
 
@@ -910,47 +907,18 @@ class Query : public boost::enable_shared_from_this<Query>
         return _error ? _error->getErrorMessage() : "";
     }
 
+    /**
+     * @return true if the query has been executed,
+     * but no processing is currently happening (i.e. the client is not fetching)
+     */
     bool idle() const {
-        return _useCounter == 0;
+        return ((_completionStatus == OK ||
+                 _completionStatus == ERROR) &&
+                // one ref is in Query::_queries another is shared_from_this()
+                // more refs indicate that some jobs/iterators are using the query
+                shared_from_this().use_count() < 3);
     }
-
-    void incUseCounter() {
-        _useCounter++;
-    }
-
-    void decUseCounter() {
-        _useCounter--;
-        assert(_useCounter >= 0);
-    }
-};
-
-class CurrentQueryScope
-{
-public:
-    CurrentQueryScope(QueryID queryID): _prevQueryID(Query::getCurrentQueryID())
-    {
-        Query::setCurrentQueryID(queryID);
-
-        ScopedMutexLock scope(Query::queriesMutex);
-        _query = Query::getQueryByID(queryID, false, false);
-        if (_query) {
-            _query->incUseCounter();
-        }
-    }
-
-    ~CurrentQueryScope()
-    {
-        Query::setCurrentQueryID(_prevQueryID);
-        if (_query) {
-            ScopedMutexLock scope(Query::queriesMutex);
-            _query->decUseCounter();
-        }
-    }
-
-private:
-    QueryID _prevQueryID;
-    boost::shared_ptr<Query> _query;
-};
+ };
 
 class UpdateErrorHandler : public Query::ErrorHandler
 {
@@ -1054,11 +1022,14 @@ class ReplicationContext
     public:
         explicit QueueInfo(const boost::shared_ptr<scidb::WorkQueue>& q)
         : _wq(q) { assert(q); }
-        virtual ~QueueInfo() {}
+        virtual ~QueueInfo()
+        {
+            if (_wq) { _wq->stop(); }
+        }
         boost::shared_ptr<scidb::WorkQueue> getQueue()     { return _wq; }
         boost::shared_ptr<scidb::Array>     getArray()     { return _array; }
         scidb::Semaphore&                   getSemaphore() { return _replicaSem; }
-        void setArray(const boost::shared_ptr<scidb::Array>& arr)   { _array=arr; }
+        void setArray(const boost::shared_ptr<scidb::Array>& arr) { _array=arr; }
     private:
         boost::shared_ptr<scidb::WorkQueue> _wq;
         boost::shared_ptr<scidb::Array>     _array;
@@ -1082,18 +1053,6 @@ class ReplicationContext
      * @return WorkQueue for enqueing replication jobs
      */
     boost::shared_ptr<scidb::WorkQueue> getInboundQueue(ArrayID arrId);
-
-    /**
-     * Schedule an inbound replication job
-     * @param job replication job
-     */
-    static void scheduleInbound(const boost::shared_ptr<Job>& job);
-
-    /**
-     * Get the replication queue shared across all queries
-     * @return WorkQueue for enqueing replication jobs
-     */
-    static boost::shared_ptr<WorkQueue> getReplicationQueue();
 
  private:
 
@@ -1124,7 +1083,7 @@ class ReplicationContext
      * @param arrId array ID to locate the appropriate queue
      * @param job replication job to enqueue
      */
-    void enqueueInbound(ArrayID arrId, const boost::shared_ptr<Job>& job);
+    void enqueueInbound(ArrayID arrId, boost::shared_ptr<Job>& job);
 
     /**
      * Wait until all replicas originated on THIS instance have been written to the REMOTE instances
@@ -1160,6 +1119,40 @@ class ReplicationContext
 #endif
 };
 
+template<typename T, typename E>
+T Query::runRestartableWork(boost::function<T()>& work, int tries)
+{
+    assert(work);
+    int counter = tries;
+    while (true)
+    {
+        //Run work
+        try {
+            return work();
+        }
+        //Detect recoverable exception
+        catch (const E& e)
+        {
+            if (counter >= 0)
+            {
+                counter--;
+
+                if (counter < 0)
+                {
+                    LOG4CXX_ERROR(_logger, "Query::runRestartableWork: Unable to restart work after " << tries << " tries");
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANNOT_RECOVER_RESTARTABLE_WORK);
+                }
+            }
+
+            LOG4CXX_ERROR(_logger, "Query::runRestartableWork:"
+                          << " Exception: "<< e.what()
+                          << " will attempt to restart the operation");
+            Thread::nanoSleep(getLockTimeoutNanoSec());
+        }
+    }
+    assert(false);
+    return T();
+}
 
 } // namespace
 

@@ -22,6 +22,7 @@
 set(metadata_files
     meta.sql
     1.sql
+    2.sql
 )
 
 set(genmeta_output

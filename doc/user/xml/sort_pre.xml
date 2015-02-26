@@ -38,6 +38,13 @@
 
     <para>You can control the chunk size of the resulting array with the
     optional <literal>chunk_size</literal> parameter.</para>
+
+    <para><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>sorting</secondary>
+      </indexterm>To sort by dimensions, you can use the <code>apply</code>
+    operator to return a dimension as an attribute, and then sort.</para>
   </refsect1>
 
   <refsect1>
@@ -74,7 +81,7 @@
         <step>
           <para>Show the source_array: <programlisting language="test">--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
 --shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winners2.csv &gt; $DOC_DATA/winners2.scidb
---aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2.scidb'; --show-query=no --show-output=no
+--aql load winnersFlat from '${DOC_DATA}/winners2.scidb'; --show-query=no --show-output=no
 --afl CREATE ARRAY champions&lt;person:string,country:string,time:double&gt; 
    [year=1996:2008,13,0,event(string)=3,3,0]; --show-query=no --show-output=no
 --afl redimension_store(winnersFlat,champions); --show-query=no --show-output=no</programlisting><programlisting
@@ -98,17 +105,31 @@
         </step>
       </procedure>
 
+      <para>To illustrate how to sort by a dimension, consider the following
+      example.</para>
+
+      <procedure>
+        <step>
+          <para>Create a small, two dimensional array. <programlisting
+          language="test">--afl store(build(&lt;val:double&gt;[i=0:2,3,0, j=0:2,3,0],i%3+j),A); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Use the apply operator to return the first dimension, and then
+          sort by it.<programlisting language="test">--afl sort(apply(A,dim,i),dim); --output-format=dcsv</programlisting></para>
+        </step>
+      </procedure>
+
       <para>To illustrate how the sort operator handles null values, this
       example first scans an array that includes a null value, then sorts the
       cells in ascending order, then sorts them in descending order.</para>
 
-      <programlisting language="test">--afl create array numbers &lt;number:int64 null&gt;[i=0:4,5,0] --show-query=no --show-output=no
---shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p N &lt; $DOC_DATA/mostNumbers.csv &gt; $DOC_DATA/mostNumbers.scidb
---aql load numbers from '../tests/harness/testcases/data/doc/mostNumbers.scidb'; --show-query=no --show-output=no</programlisting>
-
       <procedure>
         <step>
-          <para>Show the source_array: <programlisting language="test">--afl scan(numbers);</programlisting></para>
+          <para>Show the source_array: <programlisting language="test">--afl create array numbers &lt;number:int64 null&gt;[i=0:4,5,0] --show-query=no --show-output=no
+--shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p N &lt; $DOC_DATA/mostNumbers.csv &gt; $DOC_DATA/mostNumbers.scidb
+--aql load numbers from '${DOC_DATA}/mostNumbers.scidb'; --show-query=no --show-output=no
+--afl scan(numbers);</programlisting></para>
         </step>
 
         <step>

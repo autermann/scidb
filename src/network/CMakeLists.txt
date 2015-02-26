@@ -31,6 +31,8 @@ if (NOT WITHOUT_SERVER)
         MessageUtils.cpp
     )
 
+    configure_file(test/multi_query_test.py "${GENERAL_OUTPUT_DIRECTORY}/mu_driver.py" COPYONLY)
+
     file(GLOB network_include "*.h" "proto/*.proto")
 
     add_library(network_lib STATIC ${network_src} ${network_include})

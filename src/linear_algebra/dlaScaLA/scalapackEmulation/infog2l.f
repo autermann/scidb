@@ -1,5 +1,5 @@
-      SUBROUTINE INFOG2L( GRINDX, GCINDX, DESC, NPROW, NPCOL, MYROW,
-     $                    MYCOL, LRINDX, LCINDX, RSRC, CSRC )
+      SUBROUTINE SCIDB_INFOG2L( GRINDX, GCINDX, DESC, NPROW, NPCOL,
+     $                    MYROW, MYCOL, LRINDX, LCINDX, RSRC, CSRC )
 *
 *  -- ScaLAPACK tools routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,

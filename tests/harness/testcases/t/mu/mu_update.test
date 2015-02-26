@@ -1,0 +1,54 @@
+--setup
+
+ --igdata "store(build (<a:int64> [I=0:999,10,0], 0), MU_TEST_ARRAY)"
+ --igdata "store(build (<x:double>[i=0:1024-1,32,0, j=0:1024-1,32,0], 0.0),  MU_TEST_M1024x1024)"
+
+--shell --command "touch  /tmp/$PPID.mu_setup.sh"
+--shell --command "touch  /tmp/$PPID.mu_cleanup.sh"
+
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_ARRAY, a<>100))\''  > /tmp/$PPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_M1024x1024, x=100))\''  > /tmp/$PPID.mu_tests.sh"
+
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -naq $'\'store(project(apply(MU_TEST_ARRAY, b, a+1),b), MU_TEST_ARRAY)\''  >> /tmp/$PPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -naq $'\'store(project(apply(MU_TEST_M1024x1024, b, x+1),b), MU_TEST_M1024x1024)\''  >> /tmp/$PPID.mu_tests.sh"
+
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_ARRAY, a=100))\''  >> /tmp/$PPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_M1024x1024, x<>100))\''  >> /tmp/$PPID.mu_tests.sh"
+
+--shell --command "echo [multi_query_test]                    > /tmp/$PPID.mu.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$PPID.mu.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/$PPID.mu.cfg"
+
+--shell --command "echo setup=/tmp/$PPID.mu_setup.sh          >> /tmp/$PPID.mu.cfg"
+--shell --command "echo cleanup=/tmp/$PPID.mu_cleanup.sh      >> /tmp/$PPID.mu.cfg"
+--shell --command "echo tests=/tmp/$PPID.mu_tests.sh          >> /tmp/$PPID.mu.cfg"
+--shell --command "echo num-clients=100                       >> /tmp/$PPID.mu.cfg"
+--shell --command "echo num-iterations=1                      >> /tmp/$PPID.mu.cfg"
+
+--test
+
+# if interrupted, this shell command will kill the current process group (typically scidbtestharness+children).
+# this way the background iquery started here does not stay behind - best effort cleanup attempt.
+
+--shell --command "trap 'kill 0' SIGINT SIGTERM SIGHUP SIGQUIT ; python ../../bin/mu_driver.py /tmp/$PPID.mu.cfg 1> /tmp/$PPID.stdout 2> /tmp/$PPID.stderr"
+
+count(filter(MU_TEST_ARRAY, a<>100))
+count(filter(MU_TEST_ARRAY, a=100))
+
+count(filter(MU_TEST_M1024x1024,x<>100))
+count(filter(MU_TEST_M1024x1024,x=100))
+
+--cleanup
+
+--shell --command "cat /tmp/$PPID.stderr"
+--shell --command "cat /tmp/$PPID.stdout" --store
+
+remove(MU_TEST_ARRAY)
+remove(MU_TEST_M1024x1024)
+
+--shell --command "rm /tmp/$PPID.mu_setup.sh"
+--shell --command "rm /tmp/$PPID.mu_cleanup.sh"
+--shell --command "rm /tmp/$PPID.mu_tests.sh"
+--shell --command "rm /tmp/$PPID.mu.cfg"
+--shell --command "rm /tmp/$PPID.stdout"
+--shell --command "rm /tmp/$PPID.stderr" 

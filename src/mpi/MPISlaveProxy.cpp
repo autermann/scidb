@@ -26,6 +26,7 @@
 #include <util/Network.h>
 #include <util/NetworkMessage.h>
 #include <util/FileIO.h>
+#include <util/Platform.h>
 #include <query/Query.h>
 #include <log4cxx/logger.h>
 #include <../src/network/proto/scidb_msg.pb.h> //XXX TODO: move to public ?
@@ -43,20 +44,45 @@ namespace scidb
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.mpi"));
 
-static bool checkLauncher(double startTime, double timeout,
-                          uint64_t launchId, MpiOperatorContext* ctx)
+static bool checkLauncher(uint32_t testDelay,
+                          uint64_t launchId,
+                          MpiOperatorContext* ctx)
 {
     boost::shared_ptr<MpiLauncher> launcher(ctx->getLauncher(launchId));
+    if (isDebug()) {
+        if (launcher) {
+            // when running tests, slow down to give launcher a chance to exit
+            ::sleep(testDelay);
+        }
+    }
     if (launcher && !launcher->isRunning()) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
-                << "MPI launcher process";
+                << "MPI launcher process already terminated";
     }
+    return true;
+}
 
+static bool checkTimeout(double startTime,
+                         double timeout,
+                         uint64_t launchId,
+                         MpiOperatorContext* ctx)
+{
     if (mpi::hasExpired(startTime, timeout)) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
         << "MPI slave process failed to communicate in time";
     }
     return true;
+}
+
+static bool checkLauncherWithTimeout(uint32_t testDelay,
+                                     double startTime,
+                                     double timeout,
+                                     uint64_t launchId,
+                                     MpiOperatorContext* ctx)
+{
+    bool rc = checkLauncher(testDelay, launchId, ctx);
+    assert(rc);
+    return (checkTimeout(startTime, timeout, launchId, ctx) && rc);
 }
 
 void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
@@ -66,9 +92,15 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
                << "Connection to MPI slave already established");
     }
 
+    LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForHandshake: launchId="<<_launchId);
+
     MpiOperatorContext::LaunchErrorChecker errChecker =
-       boost::bind(&checkLauncher, mpi::getTimeInSecs(),
-                   static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT), _1, _2);
+    boost::bind(&checkLauncherWithTimeout,
+                _delayForTestingInSec,
+                mpi::getTimeInSecs(),
+                static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT),
+                _1, _2);
+
     boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
@@ -88,15 +120,27 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
             << "MPI slave handshake has no PID");
     }
-    if (!handshake->has_ppid()) {
+    const pid_t slavePid = handshake->pid();
+    if (slavePid == ::getpid() ||
+        slavePid == ::getppid() ||
+        slavePid < 2) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "MPI slave handshake has no PPID");
+            << "MPI slave handshake has invalid PID");
     }
 
-    _pids.push_back(handshake->pid());
-    _pids.push_back(handshake->ppid());
+    if (!handshake->has_ppid()) {
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+            << "MPI slave handshake has no PPID");
+    }
+    const pid_t slavePPid = handshake->ppid();
+    if (slavePPid == ::getpid() ||
+        slavePPid == ::getppid() ||
+        slavePPid < 2) {
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "MPI slave handshake has invalid PPID");
+    }
 
-    string clusterUuid = Cluster::getInstance()->getUuid();
+    const string clusterUuid = Cluster::getInstance()->getUuid();
 
     if (handshake->cluster_uuid() != clusterUuid) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
@@ -120,6 +164,9 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << "MPI slave handshake has invalid rank");
     }
+
+    _pids.push_back(slavePid);
+    _pids.push_back(slavePPid);
 
     ClientContext::DisconnectHandler dh =
         boost::bind(&MpiMessageHandler::handleMpiSlaveDisconnect, _launchId, _1);
@@ -177,10 +224,11 @@ int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx,
                << "No connection to MPI slave");
     }
 
-    const double noTimeoutValue = -1.0;
+    LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForStatus: launchId="<<_launchId);
+
     MpiOperatorContext::LaunchErrorChecker errChecker =
-       boost::bind(&checkLauncher, 0.0, noTimeoutValue, _1, _2);
-    
+       boost::bind(&checkLauncher, _delayForTestingInSec, _1, _2);
+
     boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
@@ -228,9 +276,14 @@ void MpiSlaveProxy::waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx)
                << "No connection to MPI slave");
     }
 
+    LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForExit: launchId="<<_launchId);
+
     MpiOperatorContext::LaunchErrorChecker errChecker =
-       boost::bind(&checkLauncher, mpi::getTimeInSecs(),
-                   static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT), _1, _2);
+    boost::bind(&checkTimeout,
+                mpi::getTimeInSecs(),
+                static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT),
+                _1, _2);
+
     boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
@@ -259,12 +312,14 @@ void MpiSlaveProxy::destroy(bool error)
         pid_t pid = *iter;
 
         //XXX TODO tigor: kill proceess group (-pid) ?
+        LOG4CXX_DEBUG(logger, "MpiSlaveProxy::destroy: killing slave pid = "<<pid);
         MpiErrorHandler::killProc(_installPath, clusterUuid, pid);
     }
 
-    // rm pid file
     std::string pidFile = mpi::getSlavePidFile(_installPath, _queryId, _launchId);
-    scidb::File::remove(pidFile.c_str(), false);
+    MpiErrorHandler::cleanupSlavePidFile(_installPath,
+                                         clusterUuid,
+                                         pidFile);
 
     // rm log file
     if (!logger->isTraceEnabled() && !_inError) {

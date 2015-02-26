@@ -211,7 +211,7 @@ static bool astHasAggregates(const AstNode *ast);
  * @warning Result and output arguments must be destructed
  */
 static AstNode* decomposeExpression(
-    const AstNode *ast,
+    AstNode *ast,
     AstNodes &preAggregationEvals,
     AstNodes &aggregateFunctions,
     unsigned int &internalNameCounter,
@@ -219,7 +219,8 @@ static AstNode* decomposeExpression(
     const ArrayDesc &inputSchema,
     const set<string> &groupedDimensions,
     bool window,
-    bool &joinOrigin);
+    bool &joinOrigin,
+    const shared_ptr<Query> &query);
 
 /**
  * @brief Transform expressions SELECT list clause into apply/project operators and aggregates calls
@@ -529,8 +530,6 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
         if (dimNode->getType() == dimension)
         {
             const AstNode *boundaries = dimNode->getChild(dimensionArgBoundaries);
-
-            const int64_t dim_o = passConstantExpression(dimNode->getChild(dimensionArgChunkOverlap), TID_INT64, query).getInt64();
             const int64_t dim_l = passConstantExpression(boundaries->getChild(dimensionBoundaryArgLowBoundary), TID_INT64, query).getInt64();
 
             if (dim_l <= MIN_COORDINATE || dim_l >= MAX_COORDINATE)
@@ -556,12 +555,12 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
 				}
             }
 
-            if (dim_o < 0 || dim_o > std::numeric_limits<uint32_t>::max())
+            const int64_t dim_o = passConstantExpression(dimNode->getChild(dimensionArgChunkOverlap), TID_INT64, query).getInt64();
+            if (dim_o < 0 )
             {
             	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_OVERLAP_SIZE,
             			dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext())
-            					<< std::numeric_limits<uint32_t>::max();
-
+            					<< std::numeric_limits<int64_t>::max();
             }
 
             int64_t dim_i = 0;
@@ -569,11 +568,11 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
             {
                 dim_i = passConstantExpression(dimNode->getChild(dimensionArgChunkInterval), TID_INT64, query).getInt64();
 
-                if (dim_i <= 0 || dim_i > std::numeric_limits<uint32_t>::max())
+                if (dim_i <= 0 )
                 {
                 	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_CHUNK_SIZE,
                 			dimNode->getChild(dimensionArgChunkInterval)->getParsingContext())
-                					<< std::numeric_limits<uint32_t>::max();
+                					<< std::numeric_limits<int64_t>::max();
                 }
             }
             else
@@ -3091,7 +3090,7 @@ static bool astHasAggregates(const AstNode *ast)
 }
 
 static AstNode* decomposeExpression(
-    const AstNode *ast,
+    AstNode *ast,
     AstNodes &preAggregationEvals,
     AstNodes &aggregateFunctions,
     unsigned int &internalNameCounter,
@@ -3099,7 +3098,8 @@ static AstNode* decomposeExpression(
     const ArrayDesc &inputSchema,
     const set<string> &groupedDimensions,
     bool window,
-    bool &joinOrigin)
+    bool &joinOrigin,
+    const shared_ptr<Query> &query)
 {
     LOG4CXX_TRACE(logger, "Decomposing expression");
     vector<ArrayDesc> inputSchemas(1, inputSchema);
@@ -3117,7 +3117,23 @@ static AstNode* decomposeExpression(
 
             const string& funcName = funcNode->getChild(functionArgName)->asNodeString()->getVal();
             const AstNode* funcArgs = funcNode->getChild(functionArgParameters);
+
             bool isAggregate = AggregateLibrary::getInstance()->hasAggregate(funcName);
+            bool isScalar = FunctionLibrary::getInstance()->findFunction(funcName, false);
+
+            if (isAggregate && isScalar)
+            {
+                shared_ptr<Expression> pExpr = make_shared<Expression>();
+                try
+                {
+                    ArrayDesc outputSchema;
+                    pExpr->compile(AstToLogicalExpression(ast), query, false, TID_VOID, inputSchemas, outputSchema);
+                    isAggregate = false;
+                }
+                catch (const Exception &e)
+                {
+                }
+            }
 
             // We found aggregate and must care of it
             if (isAggregate)
@@ -3259,7 +3275,7 @@ static AstNode* decomposeExpression(
                         LOG4CXX_TRACE(logger, "Passing function argument");
                         newFuncCallArgs->addChild(decomposeExpression(funcArg, preAggregationEvals,
                             aggregateFunctions, internalNameCounter, hasAggregates,
-                            inputSchema, groupedDimensions, window, joinOrigin));
+                            inputSchema, groupedDimensions, window, joinOrigin, query));
                     }
                 }
                 catch (...)
@@ -3498,7 +3514,8 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                             inputSchema,
                             groupedDimensions,
                             isWindowClause,
-                            joinOrigin);
+                            joinOrigin,
+                            query);
 
 
                         // Prepare name for SELECT item result. If AS was used by user, we just copy it

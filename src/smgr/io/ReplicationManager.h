@@ -139,16 +139,69 @@ class ReplicationManager;
         return bool(_lsnrId);
     }
 
-    boost::shared_ptr<scidb::WorkQueue> getInboundReplicationQueue()
+    /// Reserve space on the inbound replication queue and get a
+    /// work item which will schedule a replication job on the inbound replication queue
+    /// @param job replication job
+    /// @return WorkQueue::WorkItem for running on any queue
+    /// @throws WorkQueue::OverflowException
+    WorkQueue::WorkItem getInboundReplicationItem(boost::shared_ptr<Job>& job)
     {
         // no synchronization is needed because _inboundReplicationQ
         // is initialized at start() time and is never changed later
         assert(isStarted());
         assert(_inboundReplicationQ);
-        return  _inboundReplicationQ;
+        assert(job);
+        boost::shared_ptr<Reservation> res = boost::make_shared<Reservation>(_inboundReplicationQ, job);
+
+        WorkQueue::WorkItem item = boost::bind(&Reservation::enqueue, res, _1, _2);
+        return item;
     }
 
  private:
+
+    /// Class to manage space reservation and enqueing on the inbound replication queue
+    class Reservation
+    {
+    public:
+        /// Constructor reserves space on a queue
+        /// @param queue for reservation
+        /// @param job to schedule on the queue
+        Reservation(const boost::shared_ptr<WorkQueue>& queue,
+                    const boost::shared_ptr<Job>& job)
+        : _queue(queue), _job(job)
+        {
+            assert(queue);
+            assert(job);
+            queue->reserve();
+        }
+        /// Destructor unreserves space on the queue if the job was not enqueued
+        ~Reservation()
+        {
+            if ( boost::shared_ptr<WorkQueue> q = _queue.lock()) {
+                q->unreserve();
+            }
+        }
+        /// Eqnqueue the job onto the queue
+        /// @param fromQueue is the queue invoking this method
+        /// @param sCtx serialization context 
+        /// @see scidb::WorkQueue
+        void enqueue(boost::weak_ptr<scidb::WorkQueue>& fromQueue,
+                     boost::shared_ptr<SerializationCtx>& sCtx)
+        {
+            if ( boost::shared_ptr<WorkQueue> q = _queue.lock()) {
+                // sCtx is ignored because _inboundReplicationQ is single-threaded,
+                // and there is no need to hold up fromQueue,
+                // which just transfers its jobs to _inboundReplicationQ.
+                boost::shared_ptr<SerializationCtx> emptySCtx;
+                WorkQueue::scheduleReserved(_job, q, emptySCtx);
+            }
+            _queue.reset();
+        }
+    private:
+        boost::weak_ptr<WorkQueue> _queue;
+        boost::shared_ptr<Job> _job;
+    };
+
     void handleConnectionStatus(Notification<NetworkManager::ConnectionStatus>::MessageTypePtr connStatus);
     bool sendItem(RepItems& ri);
     void clear();

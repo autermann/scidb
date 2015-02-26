@@ -28,14 +28,25 @@
  * @brief The Job class
  */
 
-#include "util/Job.h"
-#include "query/Query.h"
-#include "log4cxx/logger.h"
+#include <log4cxx/logger.h>
+#include <util/WorkQueue.h>
+#include <query/Query.h>
+#include <util/Job.h>
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.common.thread"));
 
 namespace scidb
 {
+    void Job::executeOnQueue(boost::weak_ptr<WorkQueue>& wq,
+                             boost::shared_ptr<SerializationCtx>& sCtx)
+    {
+        _wq=wq;
+        _wqSCtx = sCtx;
+        run();
+        // the state of this object must not be modified after the call to run()
+        // or it has to be protected by a mutex
+    }
+
     void Job::execute()
     {
         if (_query) {
@@ -48,13 +59,22 @@ namespace scidb
             const char *err_msg = "Job::execute: unhandled exception";
             try {
                 run();
+
             } catch (Exception const& x) {
                 _error = x.copy();
-                LOG4CXX_ERROR(logger, err_msg << ": " << x.what()  << ", queryID="<<(_query ? _query->getQueryID() : 0));
+                LOG4CXX_ERROR(logger, err_msg
+                              << "\ntype: " << typeid(x).name()
+                              << "\njobType: " << typeid(*this).name()
+                              << "\nmesg: " << x.what()
+                              << "\nqueryID = "<<(_query ? _query->getQueryID() : 0));
             } catch (const std::exception& e) {
                 try {
                     _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-                    LOG4CXX_ERROR(logger, err_msg << ": " << e.what() << ", queryID="<<(_query ? _query->getQueryID() : 0));
+                    LOG4CXX_ERROR(logger, err_msg
+                                  << "\ntype: " << typeid(e).name()
+                                  << "\njobType: " << typeid(*this).name()
+                                  << "\nmesg: " << e.what()
+                                  << "\nqueryID = "<<(_query ? _query->getQueryID() : 0));
                 } catch (...) {}
                 throw;
             } catch (...) {
@@ -87,9 +107,8 @@ namespace scidb
         return true;
     }
 
-    void Job::rethrow() 
+    void Job::rethrow()
     {
         _error->raise();
     }
-
 } //namespace

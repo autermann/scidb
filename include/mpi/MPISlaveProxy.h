@@ -63,6 +63,33 @@ namespace scidb
             }
         };
 
+        friend boost::shared_ptr<MpiSlaveProxy> newMPISlaveProxyForTests(uint64_t launchId,
+                                                                         const boost::shared_ptr<Query>& q,
+                                                                         const std::string& installPath,
+                                                                         uint32_t timeout, uint32_t delay);
+        /**
+         * Constructor, used only for testing purposes
+         * @param launchId identifies the MPI job launch in which this slave participates
+         * @param q current query
+         * @param installPath installation directory of this SciDB instance (i.e. "data directory")
+         * @param timeout time after which the following operations throw an exception:
+         * waitForHandshake()
+         * waitForExit()
+         * @param delay in seconds, currently used to slowdown errorChecking in waitForExit()
+         */
+        MpiSlaveProxy(uint64_t launchId, const boost::shared_ptr<Query>& q,
+                      const std::string& installPath, uint32_t timeout, uint32_t delay)
+        : _launchId(launchId),
+          _queryId(q->getQueryID()),
+          _query(q),
+          _installPath(installPath),
+          _inError(false),
+          _MPI_SLAVE_RESPONSE_TIMEOUT(timeout),
+          _delayForTestingInSec(delay)
+        {
+            _pids.reserve(2);
+        }
+
     public:
         /**
          * Constructor
@@ -80,7 +107,8 @@ namespace scidb
           _query(q),
           _installPath(installPath),
           _inError(false),
-          _MPI_SLAVE_RESPONSE_TIMEOUT(timeout)
+          _MPI_SLAVE_RESPONSE_TIMEOUT(timeout),
+          _delayForTestingInSec(0)
         {
             _pids.reserve(2);
         }
@@ -98,7 +126,8 @@ namespace scidb
           _query(q),
           _installPath(installPath),
           _inError(false),
-          _MPI_SLAVE_RESPONSE_TIMEOUT(scidb::getLivenessTimeout())
+          _MPI_SLAVE_RESPONSE_TIMEOUT(scidb::getLivenessTimeout()),
+          _delayForTestingInSec(0)
         {
             _pids.reserve(2);
         }
@@ -181,6 +210,7 @@ namespace scidb
         std::string _installPath;
         bool _inError;
         const uint32_t _MPI_SLAVE_RESPONSE_TIMEOUT;
+        const uint32_t _delayForTestingInSec;
     };
 
 } //namespace

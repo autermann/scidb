@@ -1,6 +1,11 @@
 --setup
 create immutable array A <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
+create array foo <val:double> [x=1:1000,1,0]
+store(build_sparse(foo, x, x>350), foo)
+create array bar <val:double> [x=1:1000,1,0]
+store(build_sparse(bar, x+2, x<750), bar)
+
 
 --test
 scan(A)
@@ -12,6 +17,10 @@ merge(filter(A,a>1),filter(build(A,x+10),1=1))
 merge(filter(A,a>1),filter(build(A,x+10),0))
 merge(filter(A,a>1),filter(build(A,x+10),-1))
 
+count(between(merge(foo, bar), 200, 800))
+count(merge(between(foo, 200,800), between(bar,200,800)))
 
 --cleanup
 remove(A)
+remove(foo)
+remove(bar)

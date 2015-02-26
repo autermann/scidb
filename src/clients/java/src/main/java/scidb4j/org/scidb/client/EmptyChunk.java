@@ -155,9 +155,13 @@ public class EmptyChunk implements IChunk
     {
         int _curSeg = curSeg;
         long _curLogicalPosition = curLogicalPosition;
+        long nNonEmptyItemsTmp = nNonEmptyItems;
+        boolean endTmp = _end;
         boolean r = move();
         curSeg = _curSeg;
         curLogicalPosition = _curLogicalPosition;
+        nNonEmptyItems = nNonEmptyItemsTmp;
+        _end = endTmp;
         return r;
     }
 

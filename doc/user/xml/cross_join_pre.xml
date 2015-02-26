@@ -50,6 +50,39 @@
       order of arguments: always pass the larger array as the first
       argument.</para>
     </note>
+
+    <para>Note the following:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">cross_join </emphasis>performs an inner
+          join on selected dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para>Dimensions are not matched by order (as in <emphasis
+          role="bold">join</emphasis>) nor by name, but by pairings that you
+          explicitly provide.</para>
+        </listitem>
+
+        <listitem>
+          <para>Array operands can have unmatched dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para>Matching dimensions must have the same:<itemizedlist>
+              <listitem>
+                <para>Chunk size</para>
+              </listitem>
+
+              <listitem>
+                <para>Chunk overlap</para>
+              </listitem>
+
+              <listitem>
+                <para>Data type</para>
+              </listitem>
+            </itemizedlist></para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

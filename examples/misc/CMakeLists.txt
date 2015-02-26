@@ -26,6 +26,8 @@ set (misc_src
     ../../src/array/PhysicalTestCache.cpp
     ../../src/array/UnitTestDeepChunkMergeLogical.cpp
     ../../src/array/UnitTestDeepChunkMergePhysical.cpp
+    ../../src/array/UnitTestSortArrayLogical.cpp
+    ../../src/array/UnitTestSortArrayPhysical.cpp
 )
 
 file(GLOB misc_include "*.h")

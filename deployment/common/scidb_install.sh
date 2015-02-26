@@ -29,20 +29,22 @@ function centos6 ()
 
 function ubuntu1204 ()
 {
-    local packages
     function dependencies ()
     {
-	# On SciDB does not used scidb-boost, it is reason why "grep -v scidb" would works fine
 	(for package in $(ls *.deb); do
 	    dpkg --info $package | grep Depends | sed -e "s/Depends://g" | sed -e "s/,/\n/g" | awk '{print $1}' | grep -v scidb;
 	    dpkg --info $package | grep Depends | sed -e "s/Depends://g" | sed -e "s/,/\n/g" | awk '{print $1}' | grep scidb | grep mpich2;
+	    dpkg --info $package | grep Depends | sed -e "s/Depends://g" | sed -e "s/,/\n/g" | awk '{print $1}' | grep scidb | grep libboost;
 	done;) | sort -u
     }
     apt-get update
     apt-get install -y $(dependencies)
     dpkg -R -i .
-}
 
+# remark: possible to use a method more like that of the centos6() function above? i dislike the current approach because
+# it hard codes knowledge of specific 3rd party deps (mpich2 and libboost). Perhaps set up a Local Repository and then use
+# apt-get install as usual? Also, investigate use of dpkg-scanpackages, which may prove helpful. jab 8/2013. See #3506
+}
 
 OS=`./os_detect.sh`
 

@@ -34,7 +34,7 @@
 namespace scidb
 {
     
-sl_int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count)
+slpp::int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count)
 {
     enum dummy  {DBG=0};
     enum dummy2 {BUF_ARGS=0, BUF_IN, BUF_OUT, NUM_BUFS };
@@ -68,7 +68,7 @@ sl_int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count)
     // context
     sl_init_(ICTXT/*out*/, args.NPROW/*in*/, args.NPCOL/*in*/); 
 
-    sl_int_t NPROW=-1, NPCOL=-1, MYPROW=-1, MYPCOL=-1, MYPNUM=-1; // illegal vals
+    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1, MYPCOL=-1, MYPNUM=-1; // illegal vals
     getSlaveBLACSInfo(ICTXT/*in*/, NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM);
 
     if(NPROW  != args.NPROW  || NPCOL  != args.NPCOL ||
@@ -86,11 +86,11 @@ sl_int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count)
         ::exit(99); // something that does not look like a signal
     }
 
-    const sl_int_t& LLD_IN = args.IN.DESC.LLD ;
-    const sl_int_t one = 1 ;
-    const sl_int_t  LTD_IN = std::max(one, numroc_( args.IN.DESC.N, args.IN.DESC.NB, MYPCOL, /*CSRC_IN*/0, NPCOL )); 
-    const sl_int_t& MP = LLD_IN ;
-    const sl_int_t& NQ = LTD_IN ;
+    const slpp::int_t& LLD_IN = args.IN.DESC.LLD ;
+    const slpp::int_t one = 1 ;
+    const slpp::int_t  LTD_IN = std::max(one, numroc_( args.IN.DESC.N, args.IN.DESC.NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
+    const slpp::int_t& MP = LLD_IN ;
+    const slpp::int_t& NQ = LTD_IN ;
 
     // size check args
     if( sizes[BUF_ARGS] != sizeof(MPICopyArgs)) {
@@ -99,7 +99,7 @@ sl_int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count)
     }
 
     // size check IN
-    sl_int_t SIZE_IN = MP*NQ ;
+    slpp::int_t SIZE_IN = MP*NQ ;
     if( sizes[BUF_IN] != SIZE_IN * sizeof(double)) {
         std::cerr << "slave: error size mismatch:" << std::endl;
         std::cerr << "sizes[BUF_IN]" << sizes[BUF_IN] << std::endl;
@@ -109,7 +109,7 @@ sl_int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count)
     }
 
     // size check OUT
-    sl_int_t SIZE_OUT = SIZE_IN;
+    slpp::int_t SIZE_OUT = SIZE_IN;
     if( sizes[BUF_OUT] != SIZE_OUT *sizeof(double)) {
         std::cerr << "sizes[BUF_OUT]:"<<sizes[BUF_OUT];
         std::cerr << "MP * NQ = " << MP <<"*"<<NQ<<"="<< MP*NQ << std::endl;

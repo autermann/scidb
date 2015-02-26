@@ -48,7 +48,7 @@ public:
     shared_ptr<Array> execute(vector<shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
     {
         const scidb::SciDB& scidb = getSciDBExecutor();
-        const QueryID queryID = shared_dynamic_cast<OperatorParamPhysicalExpression>(_parameters[0])->getExpression()->evaluate().getInt64();
+        const QueryID queryID = dynamic_pointer_cast<OperatorParamPhysicalExpression>(_parameters[0])->getExpression()->evaluate().getInt64();
         scidb.cancelQuery(queryID);
 
         return boost::shared_ptr<Array>();

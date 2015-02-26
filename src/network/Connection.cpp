@@ -328,7 +328,7 @@ void Connection::handleSendMessage(const boost::system::error_code& error,
    for (std::list<shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
         i != msgs->end(); ++i) {
        const boost::shared_ptr<MessageDesc>& messageDesc = *i;
-       _networkManager.abortMessageQuery(messageDesc->getQueryID());
+       _networkManager.handleConnectionError(messageDesc->getQueryID());
    }
 
    if (_connectionState == CONNECTED) {
@@ -619,7 +619,7 @@ void Connection::disconnectInternal()
        assert(_instanceID == CLIENT_INSTANCE);
        QueryID queryID = i->first;
        const ClientContext::DisconnectHandler& dh = i->second;
-       _networkManager.cancelClientQuery(queryID, dh);
+       _networkManager.handleClientDisconnect(queryID, dh);
    }
 }
 
@@ -693,7 +693,6 @@ void Connection::getRemoteIp()
                     "Could not get the remote IP from connected socket to/from"
                     << getPeerId()
                     << ". Error:" << ec.value() << "('" << ec.message() << "')");
-      assert(false);
    }
 }
 
@@ -1021,7 +1020,7 @@ Connection::Channel::abortMessages()
     assert(networkManager);
     for (std::set<QueryID>::const_iterator iter = queries.begin();
          iter != queries.end(); ++iter) {
-        networkManager->abortMessageQuery(*iter);
+        networkManager->handleConnectionError(*iter);
     }
 }
 

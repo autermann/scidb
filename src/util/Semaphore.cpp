@@ -96,7 +96,7 @@ bool Semaphore::enter(ErrorChecker& errorChecker)
         }
         if (errno != ETIMEDOUT) {
             assert(false);
-            throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_THREAD_SEMAPHORE_ERROR) << errno;
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_THREAD_SEMAPHORE_ERROR) << errno;
         }
         if (errorChecker && !errorChecker()) {
            return false;

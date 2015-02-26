@@ -104,21 +104,23 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
 {
     LOG4CXX_DEBUG(logger, "NetworkManager::run()");
 
-    if (Config::getInstance()->getOption<int>(CONFIG_PORT) == 0) {
+    Config *cfg = Config::getInstance();
+    assert(cfg);
+
+    if (cfg->getOption<int>(CONFIG_PORT) == 0) {
         LOG4CXX_WARN(logger, "NetworkManager::run(): Starting to listen on an arbitrary port! (--port=0)");
     }
     boost::asio::ip::tcp::endpoint endPoint = _acceptor.local_endpoint();
-    const string address = Config::getInstance()->getOption<string>(CONFIG_ADDRESS);
+    const string address = cfg->getOption<string>(CONFIG_ADDRESS);
     const unsigned short port = endPoint.port();
 
-    const bool registerInstance = Config::getInstance()->getOption<bool>(CONFIG_REGISTER);
+    const bool registerInstance = cfg->getOption<bool>(CONFIG_REGISTER);
 
     SystemCatalog* catalog = SystemCatalog::getInstance();
-    const string& storageConfigPath =
-        Config::getInstance()->getOption<string>(CONFIG_STORAGE_URL);
+    const string& storageConfigPath = cfg->getOption<string>(CONFIG_STORAGE_URL);
 
     StorageManager::getInstance().open(storageConfigPath,
-                                       Config::getInstance()->getOption<int>(CONFIG_CACHE_SIZE)*MB);
+                                       cfg->getOption<int>(CONFIG_CACHE_SIZE)*MB);
     _selfInstanceID = StorageManager::getInstance().getInstanceId();
 
     if (registerInstance) {
@@ -134,21 +136,26 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
         StorageManager::getInstance().setInstanceId(_selfInstanceID);
         LOG4CXX_DEBUG(logger, "Registered instance # " << _selfInstanceID);
         return;
-    }
-    else {
+    } else {
         if (_selfInstanceID == INVALID_INSTANCE) {
             throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_NOT_REGISTERED);
         }
-        if (Config::getInstance()->getOption<int>(CONFIG_REDUNDANCY) >= (int)SystemCatalog::getInstance()->getNumberOfInstances())
+        if (cfg->getOption<int>(CONFIG_REDUNDANCY) >= (int)SystemCatalog::getInstance()->getNumberOfInstances())
             throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_INVALID_REDUNDANCY);
         catalog->markInstanceOnline(_selfInstanceID, address, port);
     }
     _jobQueue = jobQueue;
-    _workQueue = make_shared<WorkQueue>(jobQueue);
+
+    // make sure we have at least one thread in the client request queue
+    const uint32_t nJobs = std::max(cfg->getOption<int>(CONFIG_MAX_JOBS),2);
+    const uint32_t nRequests = std::max(cfg->getOption<int>(CONFIG_MAX_REQUESTS),1);
+
+    _requestQueue = make_shared<WorkQueue>(jobQueue, nJobs-1, nRequests);
+    _workQueue = make_shared<WorkQueue>(jobQueue, nJobs-1);
 
     LOG4CXX_INFO(logger, "Network manager is started on " << address << ":" << port << " instance #" << _selfInstanceID);
 
-    if (!Config::getInstance()->getOption<bool>(CONFIG_NO_WATCHDOG)) {
+    if (!cfg->getOption<bool>(CONFIG_NO_WATCHDOG)) {
        startInputWatcher();
     }
 
@@ -227,9 +234,15 @@ void NetworkManager::startAccept()
 
 void NetworkManager::handleAccept(shared_ptr<Connection> newConnection, const boost::system::error_code& error)
 {
-    if (error == boost::system::errc::operation_canceled)
+    if (error == boost::system::errc::operation_canceled) {
         return;
+    }
 
+    if (false) {
+        // XXX TODO: we need to provide bookkeeping to limit the number of client connection
+        LOG4CXX_DEBUG(logger, "Connection dropped: too many connections");
+        return;
+    }
     if (!error)
     {
         LOG4CXX_DEBUG(logger, "Waiting for the first message");
@@ -267,13 +280,13 @@ void NetworkManager::handleMessage(shared_ptr< Connection > connection, const sh
 
          if (messageDesc->getSourceInstanceID() == CLIENT_INSTANCE)
          {
-             shared_ptr<Job> job = shared_ptr<Job>(new ClientMessageHandleJob(connection, messageDesc));
-             _jobQueue->pushHighPriorityJob(job);
+             shared_ptr<ClientMessageHandleJob> job = make_shared<ClientMessageHandleJob>(connection, messageDesc);
+             job->dispatch(_requestQueue,_workQueue);
          }
          else
          {
-             shared_ptr<MessageHandleJob> job = shared_ptr<MessageHandleJob>(new MessageHandleJob(messageDesc));
-             job->dispatch(_jobQueue);
+             shared_ptr<MessageHandleJob> job = make_shared<MessageHandleJob>(messageDesc);
+             job->dispatch(_requestQueue,_workQueue);
          }
          handler = bind(&NetworkManager::publishMessage, _1);
       }
@@ -513,7 +526,7 @@ NetworkManager::_sendMessage(InstanceID targetInstanceID,
 {
     if (_shutdown) {
         handleShutdown();
-        abortMessageQuery(messageDesc->getQueryID());
+        handleConnectionError(messageDesc->getQueryID());
         return;
     }
     ScopedMutexLock mutexLock(_mutex);
@@ -624,7 +637,7 @@ NetworkManager::send(InstanceID targetInstanceID,
 
 void NetworkManager::send(InstanceID targetInstanceID, shared_ptr<SharedBuffer> data, shared_ptr< Query> query)
 {
-    shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtMPISend, data);
+    shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtBufferSend, data);
     msg->setQueryID(query->getQueryID());
     InstanceID target = query->mapLogicalToPhysical(targetInstanceID);
     sendMessage(target, msg);
@@ -781,69 +794,64 @@ void NetworkManager::reconnect(InstanceID instanceID)
    }
 }
 
-void NetworkManager::cancelClientQuery(const QueryID& queryId,
-                                      const ClientContext::DisconnectHandler& dh)
+void NetworkManager::handleClientDisconnect(const QueryID& queryId,
+                                            const ClientContext::DisconnectHandler& dh)
 {
    if (!queryId) {
       return;
    }
 
    LOG4CXX_WARN(logger, str(format("Client for query %lld disconnected") % queryId));
+   shared_ptr<Query> query = Query::getQueryByID(queryId, false, false);
 
-   try {
-      shared_ptr<Query> query = Query::getQueryByID(queryId, false);
+   if (!query) {
+       return;
+   }
+   if (!dh) {
+       assert(query->isCoordinator());
+       shared_ptr<scidb::WorkQueue> errorQ = query->getErrorQueue();
 
-      WorkQueue::WorkItem item;
-      if (!dh) {
-          item = boost::bind(&Query::handleCancel, query);
-      } else {
-          item = boost::bind(dh, query);
-      }
-      //XXX TODO: do this on the errorQueue
-      _workQueue->enqueue(item);
-   } catch (const WorkQueue::OverflowException& e) {
-      LOG4CXX_ERROR(logger, "Overflow exception from the work queue: "<<e.what());
-      // XXX TODO: deal with this exception maybe by re-trying ...
-      assert(false);
-      throw;
-   } catch (const scidb::SystemException& e) {
-      if (e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND
-          && e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND2) {
-          assert(false);
-          throw;
-      }
+       if (!errorQ) {
+           LOG4CXX_TRACE(logger, "Query " << query->getQueryID()
+                         << " no longer has the queue for error reporting,"
+                         " it must be no longer active");
+           return;
+       }
+       WorkQueue::WorkItem item = boost::bind(&Query::handleCancel, query);
+       boost::function<void()> work = boost::bind(&WorkQueue::enqueue, errorQ, item);
+       item.clear();
+       // XXX TODO: handleCancel() sends messages, and stalling the network thread can theoretically
+       // cause a deadlock when throttle control is enabled. So, when it is enabled,
+       // we can handle the throttle-control exceptions in handleCancel() to avoid the dealock
+       // (independently of this code).
+       Query::runRestartableWork<void, WorkQueue::OverflowException>(work);
+
+   } else {
+       WorkQueue::WorkItem item = boost::bind(dh, query);
+       try {
+           _workQueue->enqueue(item);
+       } catch (const WorkQueue::OverflowException& e) {
+           LOG4CXX_ERROR(logger, "Overflow exception from the work queue: "<<e.what());
+           assert(false);
+           query->handleError(e.copy());
+       }
    }
 }
 
-void NetworkManager::abortMessageQuery(const QueryID& queryID)
+void NetworkManager::handleConnectionError(const QueryID& queryID)
 {
    if (!queryID) {
       return;
    }
-   LOG4CXX_ERROR(logger, "Query " << queryID << " is aborted on connection error");
+   LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
+                         "Conection error in query " << queryID);
 
-   try {
-      shared_ptr<Query> query = Query::getQueryByID(queryID, false);
-      shared_ptr<scidb::WorkQueue> errorQ = query->getErrorQueue();
-      if (errorQ) {
-          WorkQueue::WorkItem item = bind(&Query::handleError, query,
-                                          SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
-          errorQ->enqueue(item);
-      } else {
-          LOG4CXX_TRACE(logger, "Query " << queryID << " no longer has the queue for error reporting,"
-                        " it must be no longer active");
-      }
-   } catch (const WorkQueue::OverflowException& e) {
-       LOG4CXX_WARN(logger, "Overflow exception from the error queue, queryID="<<queryID);
-       // XXX TODO: deal with this exception
-       assert(false);
-       // if the error queue is full, the query should be in error state eventually
-   } catch (const scidb::SystemException& e) {
-       if (e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND
-           && e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND2) {
-           throw;
-       }
+   shared_ptr<Query> query = Query::getQueryByID(queryID, false, false);
+
+   if (!query) {
+      return;
    }
+   query->handleError(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
 }
 
 void Send(void* ctx, int instance, void const* data, size_t size)

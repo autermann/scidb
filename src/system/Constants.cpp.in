@@ -21,35 +21,35 @@
 */
 
 /*
- * @file 
+ * @file
  *
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  *
  * @brief Defines source-wide constants out of line. The use of '-D  <symbol>,
- *        preprocessor macros, the declaration of compile time constants within
+ *        preprocessor macros, declarations of compile time constants within
  *        header files and the like, all tend to cause the make system to re-
  *        compile the entire system whenever any of these definitions change,
  *        so we pefer instead to define these constants out of line and refer
  *        to them through the functional interface defined in "Constant.h".
  */
 
-#include <stdint.h>
 #include <sstream>
-#include <string>
+#include <system/Constants.h>
 
-namespace scidb
-{
+/****************************************************************************/
+namespace scidb {
+/****************************************************************************/
+
 const char* SCIDB_VERSION()         {return "@CONFIGURE_SCIDB_VERSION@";}
 const char* SCIDB_VERSION_PUBLIC()  {return "@CONFIGURE_SCIDB_VERSION_MAJOR@.@CONFIGURE_SCIDB_VERSION_MINOR@.@CONFIGURE_SCIDB_VERSION_BUILD@";}
 const char* SCIDB_BUILD_TYPE()      {return "@CONFIGURE_SCIDB_BUILD_TYPE@";}
 const char* SCIDB_COPYRIGHT()       {return "Copyright (C) 2008-2013 SciDB, Inc.";}
+const char* SCIDB_INSTALL_PREFIX()  {return "@CMAKE_INSTALL_PREFIX@";}
 
 uint32_t    SCIDB_VERSION_MAJOR()   {return @CONFIGURE_SCIDB_VERSION_MAJOR@;}
 uint32_t    SCIDB_VERSION_MINOR()   {return @CONFIGURE_SCIDB_VERSION_MINOR@;}
 uint32_t    SCIDB_VERSION_PATCH()   {return @CONFIGURE_SCIDB_VERSION_PATCH@;}
 uint32_t    SCIDB_VERSION_BUILD()   {return @CONFIGURE_SCIDB_VERSION_BUILD@;}
-
-const char* SCIDB_INSTALL_PREFIX()  {return "@CMAKE_INSTALL_PREFIX@";}
 
 std::string DEFAULT_MPI_DIR()       {return "@CONFIGURE_DEFAULT_MPI_DIR@";}
 std::string DEFAULT_MPI_TYPE()      {return "@CONFIGURE_DEFAULT_MPI_TYPE@";}
@@ -65,15 +65,6 @@ std::string SCIDB_BUILD_INFO_STRING(const char* separator)
     return o.str();
 }
 
-
-// The Ubuntu openmpi package is installed into /usr
-
-extern const size_t MB = 1024*1024;
-extern const size_t GB = 1024*MB;
-
-extern const size_t DEFAULT_MEM_THRESHOLD          = 1024;
-extern const double DEFAULT_DENSE_CHUNK_THRESHOLD  = 1.0;
-extern const double DEFAULT_SPARSE_CHUNK_INIT_SIZE = 0.01;
-extern const int    DEFAULT_STRING_SIZE_ESTIMATION = 10;
-extern const int    METADATA_VERSION               = 1;
+/****************************************************************************/
 }
+/****************************************************************************/

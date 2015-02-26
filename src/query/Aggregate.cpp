@@ -27,6 +27,7 @@
  */
 
 #include "query/Aggregate.h"
+#include "query/FunctionLibrary.h"
 
 using boost::shared_ptr;
 using namespace std;
@@ -38,6 +39,33 @@ void AggregateLibrary::addAggregate(AggregatePtr const& aggregate)
 {
     if (!aggregate)
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_ADD_NULL_FACTORY);
+
+    //Try to find functions with 1 argument which can match new aggregate
+    std::vector<TypeId> inputTypes(1, aggregate->getAggregateType().typeId());
+    FunctionDescription functDescription;
+    std::vector<FunctionPointer> converters;
+    bool supportsVectorMode;
+    bool foundScalar = false;
+    foundScalar != FunctionLibrary::getInstance()->findFunction(
+            aggregate->getName(),
+            inputTypes,
+            functDescription,
+            converters,
+            supportsVectorMode,
+            true);
+
+    foundScalar |= FunctionLibrary::getInstance()->findFunction(
+            aggregate->getName(),
+            inputTypes,
+            functDescription,
+            converters,
+            supportsVectorMode,
+            false);
+
+    if (foundScalar)
+    {
+        throw USER_EXCEPTION(SCIDB_SE_UDO, SCIDB_LE_CANNOT_ADD_AGGREGATE) << aggregate->getName();
+    }
 
     const FactoriesMap::const_iterator i = _registeredFactories.find(aggregate->getName());
     if (i != _registeredFactories.end()) {

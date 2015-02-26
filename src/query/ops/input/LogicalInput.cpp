@@ -171,7 +171,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
         {
             throw USER_QUERY_EXCEPTION(
                 SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                _parameters[1]->getParsingContext()) << filesystem3::absolute(path);
+                _parameters[1]->getParsingContext()) << filesystem::absolute(path);
         }
     }
     else
@@ -181,7 +181,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
         {
             throw USER_QUERY_EXCEPTION(
                 SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                _parameters[1]->getParsingContext()) << filesystem3::absolute(path);
+                _parameters[1]->getParsingContext()) << filesystem::absolute(path);
         }
     }
 
@@ -227,7 +227,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
             // with coordinates in iquery may not work correctly.
             Coordinate from = srcDim.getStart();
             Coordinate till = srcDim.getEndMax();
-            uint32_t chunkInterval = uint32_t(till-from+1);
+            int64_t chunkInterval = int64_t(till-from+1);
             indexMapDim[0] = DimensionDesc("no", from, from, till, till, chunkInterval, 0);
             indexMapAttr[0] = AttributeDesc(0, "value", srcDim.getType(), 0, 0);
             ArrayDesc mappingArrayDesc(tmpMappingArrayName,

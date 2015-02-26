@@ -28,7 +28,7 @@
  * @brief The Thread class
  */
 #include <sstream>
-
+#include <time.h>
 #include <log4cxx/logger.h>
 
 #include <util/Thread.h>
@@ -167,5 +167,36 @@ void Thread::_threadFunction()
                   << ", pool = " << tp);
 }
 
+void Thread::nanoSleep(uint64_t nanoSec)
+{
+  struct timespec ts;
+  if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+      assert(false);
+      throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+  }
+  const uint64_t tenTo9 = 1000000000;
+  ts.tv_sec = ts.tv_sec + static_cast<time_t>(nanoSec / tenTo9);
+  const uint64_t tmp = ts.tv_nsec + (nanoSec % tenTo9);
+  if (tmp < tenTo9) {
+      ts.tv_nsec = static_cast<long>(tmp);
+  } else {
+      ts.tv_sec = ts.tv_sec + static_cast<time_t>(tmp / tenTo9);
+      ts.tv_nsec = static_cast<long>(tmp % tenTo9);
+  }
+  assert(ts.tv_sec>=0);
+  assert(ts.tv_nsec < static_cast<long>(tenTo9));
+
+  while (true) {
+      int rc = ::clock_nanosleep(CLOCK_REALTIME,
+                                 TIMER_ABSTIME,
+                                 &ts, NULL);
+      if (rc==0) { return; }
+
+      if (rc==EINTR) { continue; }
+
+      assert(false);
+      throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "clock_nanosleep";
+  }
+}
 
 } //namespace

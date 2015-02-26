@@ -503,7 +503,7 @@ public:
      */
     void fillInputArrayInfo(shared_ptr<Array>& inputArray, InputArrayInfo& inputArrayInfo)
     {
-        shared_ptr<ConstArrayIterator> inputArrayIter = inputArray->getIterator(0);
+        shared_ptr<ConstArrayIterator> inputArrayIter = inputArray->getConstIterator(0);
         while(!inputArrayIter->end())
         {
             ConstChunk const& inputChunk = inputArrayIter->getChunk();

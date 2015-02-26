@@ -15,11 +15,11 @@ store (build (<v : int64> [I=0:7,1,0], I), NODE_ID)
 ## ERROR4
 ##
 
-# coordinator
-subarray(apply (NODE_ID, foo, injectError (0, 4)),0,0)
---error "store(NODE_ID, NODE_ID_RENAMED)"
 # node1
 subarray(apply (NODE_ID, foo, injectError (1, 4)),0,1)
+--error "store(NODE_ID, NODE_ID_RENAMED)"
+# coordinator
+subarray(apply (NODE_ID, foo, injectError (0, 4)),0,0)
 --error "store(NODE_ID, NODE_ID_RENAMED)"
 
 --cleanup

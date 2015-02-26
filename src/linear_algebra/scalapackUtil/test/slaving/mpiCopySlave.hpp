@@ -65,11 +65,11 @@ namespace scidb {
 class MPICopyArgs {
 public:
     friend std::ostream& operator<<(std::ostream& os, const MPICopyArgs& a);
-    sl_int_t    NPROW;  // all ops will need these two to set up scalapack via blacs_init
-    sl_int_t    NPCOL;
-    sl_int_t    MYPROW; // all ops will need these to check the that the fake blacs_get_info
-    sl_int_t    MYPCOL; // and the real one returned identical values
-    sl_int_t    MYPNUM; // and the same for blacs_pnum()
+    slpp::int_t    NPROW;  // all ops will need these two to set up scalapack via blacs_init
+    slpp::int_t    NPCOL;
+    slpp::int_t    MYPROW; // all ops will need these to check the that the fake blacs_get_info
+    slpp::int_t    MYPCOL; // and the real one returned identical values
+    slpp::int_t    MYPNUM; // and the same for blacs_pnum()
 
     ScalapackArrayArgs IN;
     ScalapackArrayArgs OUT;
@@ -82,7 +82,7 @@ inline std::ostream& operator<<(std::ostream& os, const MPICopyArgs& a)
     return os;
 }
 
-sl_int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count);
+slpp::int_t mpiCopySlave(void* bufs[], size_t sizes[], unsigned count);
 
 } // namespace scidb
 

@@ -99,8 +99,15 @@ public:
         attributes[0] = AttributeDesc((AttributeID)0, "name",  TID_STRING, 0, 0);
         attributes[1] = AttributeDesc((AttributeID)1, "start",  TID_INT64, 0, 0);
         attributes[2] = AttributeDesc((AttributeID)2, "length",  TID_UINT64, 0, 0);
-        attributes[3] = AttributeDesc((AttributeID)3, "chunk_interval",  TID_INT32, 0, 0);
-        attributes[4] = AttributeDesc((AttributeID)4, "chunk_overlap",  TID_INT32, 0, 0);
+
+        //Internally, chunk sizes are signed, it is difficult to make them unsigned at the moment without disrupting
+        //the RLE math and the coordinate math. We often add the chunk size to a pair of coordinates (which are signed)
+        //and having unsigned / signed issues there might be difficult.
+        //However, this is a user-facing function and here we can return the chunk interval / overlap as unsigned,
+        //reinforcing to the user the notion that these fields cannot be negative. It seems like the right thing to do,
+        //even though their upper bound is max<int64_t> not max<uint64_t>.
+        attributes[3] = AttributeDesc((AttributeID)3, "chunk_interval",  TID_UINT64, 0, 0);
+        attributes[4] = AttributeDesc((AttributeID)4, "chunk_overlap",  TID_UINT64, 0, 0);
         attributes[5] = AttributeDesc((AttributeID)5, "low",  TID_INT64, 0, 0);
         attributes[6] = AttributeDesc((AttributeID)6, "high",  TID_INT64, 0, 0);
         attributes[7] = AttributeDesc((AttributeID)7, "type",  TID_STRING, 0, 0);

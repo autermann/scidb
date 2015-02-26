@@ -1,4 +1,4 @@
-      SUBROUTINE PDELGET( SCOPE, TOP, ALPHA, A, IA, JA, DESCA )
+      SUBROUTINE SCIDB_PDELGET( SCOPE, TOP, ALPHA, A, IA, JA, DESCA )
 *
 *  -- ScaLAPACK tools routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -125,25 +125,26 @@
      $                   MYROW, NPCOL, NPROW
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           BLACS_GRIDINFO, DGEBR2D, DGEBS2D, INFOG2L
+      EXTERNAL           SCIDB_BLACS_GRIDINFO, DGEBR2D, DGEBS2D,
+     $                   SCIDB_INFOG2L
 *     ..
 *     .. External Functions ..
-      LOGICAL            LSAME
-      EXTERNAL           LSAME
+      LOGICAL            SCIDB_LSAME
+      EXTERNAL           SCIDB_LSAME
 *     ..
 *     .. Executable Statements ..
 *
 *     Get grid parameters.
 *
       ICTXT = DESCA( CTXT_ )
-      CALL BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
+      CALL SCIDB_BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
 *
-      CALL INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL, IIA, JJA,
-     $              IAROW, IACOL )
+      CALL SCIDB_INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL,
+     $                    IIA, JJA, IAROW, IACOL )
 *
       ALPHA = ZERO
 *
-      IF( LSAME( SCOPE, 'R' ) ) THEN
+      IF( SCIDB_LSAME( SCOPE, 'R' ) ) THEN
          IF( MYROW.EQ.IAROW ) THEN
             IF( MYCOL.EQ.IACOL ) THEN
                IOFFA = IIA+(JJA-1)*DESCA( LLD_ )
@@ -154,7 +155,7 @@
      $                       IAROW, IACOL )
             END IF
          END IF
-      ELSE IF( LSAME( SCOPE, 'C' ) ) THEN
+      ELSE IF( SCIDB_LSAME( SCOPE, 'C' ) ) THEN
          IF( MYCOL.EQ.IACOL ) THEN
             IF( MYROW.EQ.IAROW ) THEN
                IOFFA = IIA+(JJA-1)*DESCA( LLD_ )
@@ -165,7 +166,7 @@
      $                       IAROW, IACOL )
             END IF
          END IF
-      ELSE IF( LSAME( SCOPE, 'A' ) ) THEN
+      ELSE IF( SCIDB_LSAME( SCOPE, 'A' ) ) THEN
          IF( ( MYROW.EQ.IAROW ).AND.( MYCOL.EQ.IACOL ) ) THEN
             IOFFA = IIA+(JJA-1)*DESCA( LLD_ )
             CALL DGEBS2D( ICTXT, SCOPE, TOP, 1, 1, A( IOFFA ), 1 )

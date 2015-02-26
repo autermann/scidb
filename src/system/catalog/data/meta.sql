@@ -349,8 +349,8 @@ create table "array_dimension"
   funcMapOffset bigint,
   funcMapScale bigint,
 --
-  chunk_interval int,
-  chunk_overlap int,
+  chunk_interval bigint,
+  chunk_overlap bigint,
   type varchar,
   flags int,
   mapping_array_name varchar,
@@ -396,7 +396,16 @@ returns uuid
 as '$libdir/uuid-ossp', 'uuid_generate_v1'
 volatile strict language C;
 
-insert into "cluster" values (uuid_generate_v1(), 1);
+
+-- The version number (2) corresponds to the var METADATA_VERSION from Constants.h
+-- If we start and find that cluster.metadata_version is less than METADATA_VERSION
+-- upgrade. The upgrade files are provided as sql scripts in 
+-- src/system/catalog/data/[NUMBER].sql. They are converted to string 
+-- constants in a C++ header file  (variable METADATA_UPGRADES_LIST[])
+-- and then linked in at build time. 
+-- @see SystemCatalog::connect(const string&, bool)
+-- Note: there is no downgrade path at the moment.
+insert into "cluster" values (uuid_generate_v1(), 2);
 
 create function get_cluster_uuid() returns uuid as $$
 declare t uuid;

@@ -1,4 +1,4 @@
-      SUBROUTINE PDELSET( A, IA, JA, DESCA, ALPHA )
+      SUBROUTINE SCIDB_PDELSET( A, IA, JA, DESCA, ALPHA )
 *
 *  -- ScaLAPACK tools routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -108,16 +108,17 @@
      $                   NPROW
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           BLACS_GRIDINFO, INFOG2L
+      EXTERNAL           SCIDB_BLACS_GRIDINFO, SCIDB_INFOG2L
 *     ..
 *     .. Executable Statements ..
 *
 *     Get grid parameters.
 *
-      CALL BLACS_GRIDINFO( DESCA( CTXT_ ), NPROW, NPCOL, MYROW, MYCOL )
+      CALL SCIDB_BLACS_GRIDINFO( DESCA( CTXT_ ), NPROW, NPCOL,
+     $                           MYROW, MYCOL )
 *
-      CALL INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL, IIA, JJA,
-     $              IAROW, IACOL )
+      CALL SCIDB_INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL,
+     $                    IIA, JJA, IAROW, IACOL )
 *
       IF( MYROW.EQ.IAROW .AND. MYCOL.EQ.IACOL )
      $   A( IIA+(JJA-1)*DESCA( LLD_ ) ) = ALPHA

@@ -208,7 +208,7 @@ SCIDB QUERY : <gemm(chunkTooSmall, Valid, Valid)>
 SCIDB QUERY : <remove(chunkTooSmall)>
 Query was executed successfully
 
-SCIDB QUERY : <create array chunkTooLarge  <a: double> [r=0:1,33,0, c=0:1,33,0]>
+SCIDB QUERY : <create array chunkTooLarge  <a: double> [r=0:1,1025,0, c=0:1,33,0]>
 Query was executed successfully
 
 SCIDB QUERY : <gemm(Valid, Valid, chunkTooLarge)>

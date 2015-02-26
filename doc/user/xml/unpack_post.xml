@@ -27,6 +27,18 @@
 
     <para>You can control the chunk size of the resulting array with the
     optional chunk_size parameter. The default chunk size is 1 million.</para>
+
+    <para><indexterm>
+        <primary>binary save</primary>
+      </indexterm><indexterm>
+        <primary>save</primary>
+
+        <secondary>binary</secondary>
+      </indexterm>One use case for unpack is for saving a multidimensional
+    array into a binary backup file. The way to do this is to first unpack the
+    array, and then use the <code>save</code> operator to perform a binary
+    save. You perform a binary save similarly to the way you perform a binary
+    load—see <xref linkend="loadBinary"/> for details.</para>
   </refsect1>
 
   <refsect1>
@@ -104,6 +116,58 @@
 </screen>
           Note that <code>unpack</code> has excluded the empty cells from the
           result array.</para></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example shows how to use unpack to backup an array into a
+      binary file.</para>
+
+      <procedure>
+        <step>
+          <para>Assume we have the following array, <emphasis role="bold">Names</emphasis>:<para><programlisting>AFL% show(Names)</programlisting><screen><command>Names</command>
+
+&lt; firstnames:string,
+lastnames:string &gt;
+
+[i=0:2,3,0,
+j=0:1,2,0]</screen><programlisting>AFL% scan(Names);  </programlisting><screen>[
+[('Bill','Clinton'),('Anne','Rice')],
+[('Joe','Pantoliano'),('Steve','Jobs')],
+[('Burt','Reynolds'),('Ronald','Reagan')]
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para>Unpack <emphasis role="bold">Names</emphasis> into a
+          1-dimensional array, <emphasis role="bold">namesFlat</emphasis>.
+          <para><programlisting>AFL% store(unpack(Names,x),namesFlat);  </programlisting><screen>{x} i,j,firstnames,lastnames
+{0} 0,0,'Bill','Clinton'
+{1} 0,1,'Anne','Rice'
+{2} 1,0,'Joe','Pantoliano'
+{3} 1,1,'Steve','Jobs'
+{4} 2,0,'Burt','Reynolds'
+{5} 2,1,'Ronald','Reagan'
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>View the schema for <emphasis role="bold">namesFlat</emphasis>, so that we can create the query
+          for the binary save.<para><programlisting>AFL% show(namesFlat)</programlisting><screen><command>namesFlat</command>
+
+&lt; i:int64,
+j:int64,
+firstnames:string,
+lastnames:string &gt;
+
+[x=0:*,6,0]</screen></para></para>
+        </step>
+
+        <step>
+          <para>So we have two int64 types, followed by two string types. Now
+          we perform the binary save.<programlisting>AFL% save(namesFlat,'/tmp/namesFlat.bin',0, '(int64,int64,string,string)');  </programlisting>This
+          writes the binary file, <emphasis role="bold">namesFlat.bin</emphasis>, to the /tmp folder.</para>
         </step>
       </procedure>
     </informalexample>

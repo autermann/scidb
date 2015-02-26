@@ -2,9 +2,15 @@
 --start-query-logging
 --test
 
---shell --command "../utils/killquery.sh -afl 2  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'" --store 
---shell --command "../utils/killquery.sh -afl 15 2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'" --store 
---shell --command "../utils/killquery.sh -afl 9  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'" --store 
+--shell --command "../utils/killquery.sh -afl 2  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_1.stdout"
+--shell --command "../utils/killquery.sh -afl 15 2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_2.stdout"
+--shell --command "../utils/killquery.sh -afl 9  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+# log the output
+--shell --command "cat /tmp/${PPID}_3.stdout"
 
 # our aborted query should not be listed.
 #project(list('queries'), name)
@@ -13,5 +19,7 @@
 --stop-query-logging
 
 # this should fail due to the above abort
-#--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ARRAY_DOESNT_EXIST "remove(ABRTEST)"
 --error --long=20 "remove(ABRTEST)"
+--shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"

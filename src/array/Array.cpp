@@ -32,6 +32,7 @@
 #include <string.h>
 #include <boost/assign.hpp>
 
+#include <util/Platform.h>
 #include "array/MemArray.h"
 #include "array/RLE.h"
 #include "system/Exceptions.h"
@@ -109,6 +110,9 @@ namespace scidb
 
     void CompressedBuffer::free()
     {
+        if (isDebug() && data && compressedSize) {
+            memset(data, 0, compressedSize);
+        }
        ::free(data);
        data = NULL;
     }
@@ -957,6 +961,68 @@ namespace scidb
         return boost::shared_ptr<ConstItemIterator>(new ConstItemIterator(*this, attrID, iterationMode));
     }
 
+    void Array::printArrayToLogger() const
+    {
+        // This function is only usable in debug builds, otherwise it is a no-op
+#ifndef NDEBUG
+        size_t nattrs = this->getArrayDesc().getAttributes(true).size();
+
+        vector< shared_ptr<ConstArrayIterator> > arrayIters(nattrs);
+        vector< shared_ptr<ConstChunkIterator> > chunkIters(nattrs);
+        vector<TypeId> attrTypes(nattrs);
+
+        LOG4CXX_DEBUG(logger, "[printArray] name (" << this->getName() << ")");
+
+        for (size_t i = 0; i < nattrs; i++)
+        {
+            arrayIters[i] = this->getConstIterator(i);
+            attrTypes[i] = this->getArrayDesc().getAttributes(true)[i].getType();
+        }
+
+        while (!arrayIters[0]->end())
+        {
+            for (size_t i = 0; i < nattrs; i++)
+            {
+                chunkIters[i] = arrayIters[i]->getChunk().getConstIterator();
+            }
+
+            while (!chunkIters[0]->end())
+            {
+                vector<Value> item(nattrs);
+                stringstream ssvalue;
+                stringstream sspos;
+
+                ssvalue << "( ";
+                for (size_t i = 0; i < nattrs; i++)
+                {
+                    item[i] = chunkIters[i]->getItem();
+                    ssvalue << ValueToString(attrTypes[i], item[i]) << " ";
+                }
+                ssvalue << ")";
+
+                sspos << "( ";
+                for (size_t i = 0; i < chunkIters[0]->getPosition().size(); i++)
+                {
+                    sspos << chunkIters[0]->getPosition()[i] << " ";
+                }
+                sspos << ")";
+
+                LOG4CXX_DEBUG(logger, "[PrintArray] pos " << sspos.str() << " val " << ssvalue.str());
+
+                for (size_t i = 0; i < nattrs; i++)
+                {
+                    ++(*chunkIters[i]);
+                }
+            }
+
+            for (size_t i = 0; i < nattrs; i++)
+            {
+                ++(*arrayIters[i]);
+            }
+        }
+#endif
+    }
+
     bool ConstArrayIterator::setPosition(Coordinates const& pos)
     {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "ConstArrayIterator::setPosition";
@@ -973,8 +1039,9 @@ namespace scidb
     Chunk& ArrayIterator::updateChunk()
     {
         ConstChunk const& constChunk = getChunk();
-        if (constChunk.isReadOnly())
+        if (constChunk.isReadOnly()) {
             throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_UPDATE_READ_ONLY_CHUNK);
+        }
         Chunk& chunk = (Chunk&)dynamic_cast<const Chunk&>(constChunk);
         chunk.pin();
         return chunk;

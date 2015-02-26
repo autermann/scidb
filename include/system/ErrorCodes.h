@@ -486,6 +486,15 @@ ERRCODE(SCIDB_LE_BAD_VECTOR_LENGTH,                 410); //Operator '%1%' requi
 ERRCODE(SCIDB_LE_OP_CAST_ERROR10,                   411); //Cannot cast attribute '%1%' type from '%2%' to '%3%'
 ERRCODE(SCIDB_LE_CANNOT_RECOVER_RESTARTABLE_WORK,   412); //Cannot recover restartable work
 ERRCODE(SCIDB_LE_CANNOT_MODIFY_ENVIRONMENT,         413); //Internal error, could not modify environ.
+ERRCODE(SCIDB_LE_MISMATCHED_OPAQUE_FORMAT_VERSION,  414); //This version of SciDB cannot read this opaque file (file version %1%, system version %2%)
+ERRCODE(SCIDB_LE_CANNOT_ADD_AGGREGATE,              415); //Can not add aggregate '%1%'. Scalar function with same signature already exists
+ERRCODE(SCIDB_LE_CANNOT_ADD_FUNCTION,               416); //Can not add function '%1%'. Aggregate with same signature already exists
+ERRCODE(SCIDB_LE_QUERY_TOO_BIG,                     417); //Query is too big. Query size: %1% bytes. Max allowed size: %2% bytes
+ERRCODE(SCIDB_LE_TOO_MANY_OPEN_FILES,               418); //Reached per-process fd limit
+ERRCODE(SCIDB_LE_OP_MULTIPLY_ERROR9,                419); //Non-supported attribute type in sparse multiply
+ERRCODE(SCIDB_LE_CUMULATE_NEEDS_AGGREGATES,         420); //Operator 'cumulate' requires one input array and at least one aggregate call
+ERRCODE(SCIDB_LE_CUMULATE_NO_OVERLAP,               421); //For now, cumulate does not handle dimensions with overlaps
+ERRCODE(SCIDB_LE_CUMULATE_DIM_AFTER_AGGREGATES,     422); //Operator 'cumulate' requires that the dimension parameter, if exists, should be the last one
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%
@@ -493,6 +502,7 @@ ERRCODE(SCIDB_LE_LIBPQ_NOT_THREADSAFE,              1002); //libpq is not built 
 ERRCODE(SCIDB_LE_CANT_CONNECT_PG,                   1003); //Can not connect to PostgreSQL catalog: '%1'
 ERRCODE(SCIDB_LE_UNREACHABLE_CODE,                  1004); //Fatal: Unreachable code is reached in '%1%'
 ERRCODE(SCIDB_LE_UNITTEST_FAILED,                   1005); //Unit test failed! Test = '%1%', failure = '%2%'
+ERRCODE(SCIDB_LE_NEED_UPGRADE_CONFIRMATION,         1006); //In order to proceed, the 'enable-catalog-upgrade' setting must be enabled
 
 // copied from P4
 ERRCODE(SCIDB_LE_DLA_ERROR13,               2001); //Request for unknown attribute

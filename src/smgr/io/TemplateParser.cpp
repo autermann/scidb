@@ -135,13 +135,14 @@ uint32_t OpaqueChunkHeader::calculateSignature(ArrayDesc const& desc)
     Attributes const& attrs = desc.getAttributes();
     size_t nDims = dims.size();
     size_t nAttrs = attrs.size();
-    uint32_t signature = uint32_t(nDims ^ nAttrs);
+    uint32_t signature = static_cast<uint32_t>(nDims ^ nAttrs);
     for (size_t i = 0; i < nDims; i++) {
-        signature ^= dims[i].getChunkInterval();
-        signature ^= dims[i].getChunkOverlap();
+        //OK to lose some information here
+        signature ^= static_cast<uint32_t>(dims[i].getChunkInterval());
+        signature ^= static_cast<uint32_t>(dims[i].getChunkOverlap());
     }
     for (size_t i = 0; i < nAttrs; i++) {
-        signature ^= (uint32_t)TypeLibrary::getType(attrs[i].getType()).bitSize();
+        signature ^= static_cast<uint32_t>(TypeLibrary::getType(attrs[i].getType()).bitSize());
     }
     return signature;
 }

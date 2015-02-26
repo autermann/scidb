@@ -76,8 +76,8 @@ class PhysicalRepart: public PhysicalOperator
 
         for (size_t i = 0, count = source.size(); i < count; ++i)
         {
-            uint32_t sourceInterval = source[i].getChunkInterval();
-            uint32_t resultInterval = result[i].getChunkInterval();
+            int64_t sourceInterval = source[i].getChunkInterval();
+            int64_t resultInterval = result[i].getChunkInterval();
             if (sourceInterval != resultInterval) {
                 return true;
             }
@@ -97,16 +97,16 @@ class PhysicalRepart: public PhysicalOperator
 
         for (size_t i = 0, count = source.size(); i < count; ++i)
         {
-            uint32_t sourceInterval = source[i].getChunkInterval();
-            uint32_t resultInterval = result[i].getChunkInterval();
+            int64_t sourceInterval = source[i].getChunkInterval();
+            int64_t resultInterval = result[i].getChunkInterval();
             if (sourceInterval < resultInterval) {
                 return false;
             }
             if (sourceInterval % resultInterval != 0) {
                 return false;
             }
-            uint32_t sourceOverlap =  source[i].getChunkOverlap();
-            uint32_t resultOverlap =  result[i].getChunkOverlap();
+            int64_t sourceOverlap =  source[i].getChunkOverlap();
+            int64_t resultOverlap =  result[i].getChunkOverlap();
             if (sourceOverlap < resultOverlap) {
                 return false;
             }

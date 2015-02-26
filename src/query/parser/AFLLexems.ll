@@ -104,7 +104,9 @@ Other .
 }
 
 {Identifier} {
+    CHECK_LEXEM_SIZE(yyleng + 1)
     const AFLKeyword *kw = FindAFLKeyword(yytext);
+
     if (kw)
     {
         //Allocate string for keyword only for non-reserved keywords. It will be freed in identifier_clause
@@ -140,6 +142,7 @@ Other .
 
 {QuotedIdentifier} {
     std::string str = std::string(yytext, 1, yyleng - 2);  
+    CHECK_LEXEM_SIZE(str.size() + 1)
     yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
     strcpy(yylval->stringVal, str.c_str());
     return token::IDENTIFIER;
@@ -178,6 +181,7 @@ L?'(\\.|[^'])*' {
     std::string str = std::string(yytext, 1, yyleng - 2);
     boost::replace_all(str, "\\'", "'");
 
+    CHECK_LEXEM_SIZE(str.size() + 1)
     yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
     strcpy(yylval->stringVal, str.c_str());
 

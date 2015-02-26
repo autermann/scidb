@@ -1,4 +1,4 @@
-      SUBROUTINE PXERBLA( ICTXT, SRNAME, INFO )
+      SUBROUTINE SCIDB_PXERBLA( ICTXT, SRNAME, INFO )
 *
 *  -- ScaLAPACK auxiliary routine (version 2.0) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -45,11 +45,11 @@
       INTEGER            MYCOL, MYROW, NPCOL, NPROW
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           BLACS_GRIDINFO
+      EXTERNAL           SCIDB_BLACS_GRIDINFO
 *     ..
 *     .. Executable Statements ..
 *
-      CALL BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
+      CALL SCIDB_BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
 *
       WRITE( *, FMT = 9999 ) MYROW, MYCOL, SRNAME, INFO
 *

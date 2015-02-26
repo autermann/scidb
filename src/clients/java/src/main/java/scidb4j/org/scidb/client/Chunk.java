@@ -177,11 +177,13 @@ public class Chunk implements IChunk
         int _curItemInSeg = curItemInSeg;
         int _curValueIndex = curValueIndex;
         int _curElementNumber = elementNumber;
+        boolean endTmp = _end;
         boolean r = move();
         curSeg = _curSeg;
         curItemInSeg = _curItemInSeg;
         curValueIndex = _curValueIndex;
         elementNumber = _curElementNumber;
+        _end = endTmp;
         return r;
     }
 

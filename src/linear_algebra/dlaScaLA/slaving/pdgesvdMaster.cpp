@@ -75,15 +75,15 @@ void pdgesvdMaster(Query* query,  // or do I need only the ctx?
                    boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                    const string& ipcName, // can this be in the ctx too?
                    void*  argsBuf,
-                   const sl_int_t& NPROW, const sl_int_t& NPCOL,
-                   const sl_int_t& MYPROW, const sl_int_t& MYPCOL, const sl_int_t& MYPNUM,
+                   const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
+                   const slpp::int_t& MYPROW, const slpp::int_t& MYPCOL, const slpp::int_t& MYPNUM,
                    const char &jobU, const char &jobVT,
-                   const sl_int_t& M, const sl_int_t &N, 
-                   double* A, const sl_int_t& IA, const sl_int_t& JA, const sl_desc_t& DESC_A,
+                   const slpp::int_t& M, const slpp::int_t &N,
+                   double* A, const slpp::int_t& IA, const slpp::int_t& JA, const slpp::desc_t& DESC_A,
                    double* S, 
-                   double* U,  const sl_int_t& IU,  const sl_int_t& JU,  const sl_desc_t& DESC_U,
-                   double* VT, const sl_int_t& IVT, const sl_int_t& JVT, const sl_desc_t& DESC_VT,
-                   sl_int_t& INFO)
+                   double* U,  const slpp::int_t& IU,  const slpp::int_t& JU,  const slpp::desc_t& DESC_U,
+                   double* VT, const slpp::int_t& IVT, const slpp::int_t& JVT, const slpp::desc_t& DESC_VT,
+                   slpp::int_t& INFO)
 {
     enum dummy { DBG=0 };
     static const char ARG_NUM_SHM_BUFFERS[] = "5";  // ARGS + A, S, U, and VT
@@ -116,7 +116,7 @@ void pdgesvdMaster(Query* query,  // or do I need only the ctx?
     LOG4CXX_DEBUG(logger, "pdgesvdMaster(): slave->waitForStatus(ctx) returned " << status);
 
     // assign the result
-    INFO = boost::numeric_cast<sl_int_t, int64_t>(status);
+    INFO = boost::numeric_cast<slpp::int_t, int64_t>(status);
 
     // slaving cleanups
     cmd.clear();

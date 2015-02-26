@@ -96,7 +96,6 @@ public:
                 << oldArrayName;
             }
         }
-        SystemCatalog::getInstance()->invalidateArrayCache(oldArrayName);
         getInjectedErrorListener().check();
         return boost::shared_ptr<Array>();
     }

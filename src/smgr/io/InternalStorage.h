@@ -34,9 +34,9 @@
 #include <dirent.h>
 
 #include <vector>
-#include <queue>
 #include <map>
-#include <set>
+#include <boost/unordered_map.hpp>
+#include <boost/enable_shared_from_this.hpp>
 #include "array/MemArray.h"
 #include "Storage.h"
 #include "array/DBArray.h"
@@ -47,7 +47,6 @@
 #include <query/Query.h>
 #include <util/InjectedError.h>
 #include "ReplicationManager.h"
-#include <boost/unordered_map.hpp>
 #include <system/Constants.h>
 
 namespace scidb
@@ -292,7 +291,7 @@ namespace scidb
      * Technically speaking it does not need to inherit from scidb::Chunk, but it is currently.
      * Most scidb::Chunk interfaces are not directly supported by PersistentChunk.
      */
-    class PersistentChunk : public Chunk
+    class PersistentChunk : public Chunk, public boost::enable_shared_from_this<PersistentChunk>
     {
         friend class CachedStorage;
         friend class ListChunkMapArrayBuilder;
@@ -723,6 +722,17 @@ namespace scidb
             friend class DBArrayChunk;
 
         private:
+            ArrayDesc const& getArrayDesc() const { return _array->getArrayDesc(); }
+            AttributeDesc const& getAttributeDesc() const { return _attrDesc; }
+            Array const& getArray() const { return *_array; }
+
+            // This is the current map from the chunks returned to the user of DBArrayIterator
+            // to the StorageManager PersistentChunks
+            typedef boost::unordered_map<boost::shared_ptr<PersistentChunk>, boost::shared_ptr<DBArrayChunk> > DBArrayMap;
+            DBArrayMap _dbChunks;
+            DBArrayChunk* getDBArrayChunk(boost::shared_ptr<PersistentChunk>& dbChunk);
+
+        private:
             Chunk* _currChunk;
             CachedStorage* _storage;
 
@@ -733,17 +743,6 @@ namespace scidb
             boost::weak_ptr<Query> _query;
             bool const _writeMode;
             boost::shared_ptr<const Array> _array;
-
-        private:
-            ArrayDesc const& getArrayDesc() const { return _array->getArrayDesc(); }
-            AttributeDesc const& getAttributeDesc() const { return _attrDesc; }
-            Array const& getArray() const { return *_array; }
-
-            // This is the current map from the chunks returned to the user of DBArrayIterator
-            // to the StorageManager PersistentChunks
-            typedef boost::unordered_map<PersistentChunk*, boost::shared_ptr<DBArrayChunk> > DBArrayMap;
-            DBArrayMap _dbChunks;
-            DBArrayChunk* getDBArrayChunk(PersistentChunk* dbChunk);
 
         public:
             DBArrayIterator(CachedStorage* storage,
@@ -775,7 +774,7 @@ namespace scidb
             char          _filler[HEADER_SIZE];
         };
 
-        map< string, CoordinateMap> _coordinateMap;
+        map< string, boost::shared_ptr<CoordinateMap> > _coordinateMap;
 
         vector<Compressor*> _compressors;
 
@@ -825,20 +824,20 @@ namespace scidb
         ReplicationManager* _replicationManager;
 
         //Methods:
-        CoordinateMap& getCoordinateMap(string const& indexName, DimensionDesc const& dim,
-                                        const boost::shared_ptr<Query>& query);
+        boost::shared_ptr<CoordinateMap> getCoordinateMap(string const& indexName, DimensionDesc const& dim,
+                                                          const boost::shared_ptr<Query>& query);
 
-        PersistentChunk* _cloneChunk(ArrayDesc const& dstDesc, StorageAddress const& addr,
-                                     PersistentChunk const& srcChunk, boost::shared_ptr<Query>& query);
-        PersistentChunk* _cloneLocalChunk(ArrayDesc const& dstDesc,
-                                          StorageAddress const& addr,
-                                          PersistentChunk const& srcChunk,
-                                          ChunkDescriptor& cloneDesc,
-                                          boost::shared_ptr<Query>& query);
-        PersistentChunk* _cloneLocalChunk(ArrayDesc const& dstDesc,
-                                          StorageAddress const& addr,
-                                          PersistentChunk const& srcChunk,
-                                          boost::shared_ptr<Query>& query);
+        boost::shared_ptr<PersistentChunk> _cloneChunk(ArrayDesc const& dstDesc, StorageAddress const& addr,
+                                                       PersistentChunk const& srcChunk, boost::shared_ptr<Query>& query);
+        boost::shared_ptr<PersistentChunk> _cloneLocalChunk(ArrayDesc const& dstDesc,
+                                                            StorageAddress const& addr,
+                                                            PersistentChunk const& srcChunk,
+                                                            ChunkDescriptor& cloneDesc,
+                                                            boost::shared_ptr<Query>& query);
+        boost::shared_ptr<PersistentChunk> _cloneLocalChunk(ArrayDesc const& dstDesc,
+                                                            StorageAddress const& addr,
+                                                            PersistentChunk const& srcChunk,
+                                                            boost::shared_ptr<Query>& query);
         /**
          * Perform metadata/lock recovery and storage rollback as part of the intialization.
          * It may block waiting for the remote coordinator recovery to occur.
@@ -874,8 +873,8 @@ namespace scidb
          * @param addr the address of the chunk in the array
          * @return pointer to the unloaded chunk object. Null if no such chunk is present.
          */
-        PersistentChunk* lookupChunk(ArrayDesc const& desc, StorageAddress const& addr);
-        void freeChunk(PersistentChunk& chunk);
+        boost::shared_ptr<PersistentChunk> lookupChunk(ArrayDesc const& desc, StorageAddress const& addr);
+        void internalFreeChunk(PersistentChunk& chunk);
         void addChunkToCache(PersistentChunk& chunk);
         uint64_t getCurrentTimestamp() const
         {
@@ -1046,10 +1045,10 @@ namespace scidb
         /**
          * @see Storage::createChunk
          */
-        PersistentChunk* createChunk(ArrayDesc const& desc,
-                                     StorageAddress const& addr,
-                                     int compressionMethod,
-                                     const boost::shared_ptr<Query>& query);
+        boost::shared_ptr<PersistentChunk> createChunk(ArrayDesc const& desc,
+                                                       StorageAddress const& addr,
+                                                       int compressionMethod,
+                                                       const boost::shared_ptr<Query>& query);
 
         /**
          * @see Storage::deleteChunk
@@ -1122,9 +1121,9 @@ namespace scidb
         /**
          * @see Storage::readChunk
          */
-        PersistentChunk* readChunk(ArrayDesc const& desc,
-                                   StorageAddress const& addr,
-                                   const boost::shared_ptr<Query>& query);
+        boost::shared_ptr<PersistentChunk> readChunk(ArrayDesc const& desc,
+                                                     StorageAddress const& addr,
+                                                     const boost::shared_ptr<Query>& query);
 
         /**
          * @see Storage::setInstanceId
@@ -1180,6 +1179,11 @@ namespace scidb
          * @see Storage::removeDeadChunks
          */
         void removeDeadChunks(ArrayDesc const& arrayDesc, set<Coordinates, CoordinatesLess> const& liveChunks, boost::shared_ptr<Query>& query);
+
+        /**
+         * @see Storage::removeDeadChunks
+         */
+        void freeChunk(PersistentChunk* chunk);
 
         static CachedStorage instance;
     };

@@ -275,7 +275,7 @@ ERRMSG(SCIDB_LE_OP_INPUT_ERROR6,                    "Too much nesting");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR7,                    "Out of bounds");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR8,                    "Input parser expected literal");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR9,                    "No values for empty cells should be defined: only () is accepted");
-ERRMSG(SCIDB_LE_OP_INPUT_ERROR10,                   "Invalid format for input file");
+ERRMSG(SCIDB_LE_OP_INPUT_ERROR10,                   "This version of scidb does not support this input file");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR11,                   "Chunk is out of window boundary");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR12,                   "Unterminated character constant");
 ERRMSG(SCIDB_LE_OP_INPUT_ERROR13,                   "Unterminated string literal");
@@ -390,7 +390,7 @@ ERRMSG(SCIDB_LE_INVALID_REDIMENSION_POSITION,       "Cannot redimension coordina
 ERRMSG(SCIDB_LE_SYSCALL_ERROR,                      "Invocation of %1% failed with return code=%2%, error=%3%, arg(s)=%4%");
 ERRMSG(SCIDB_LE_NON_FQ_PATH_ERROR,                  "Path %1% is not fully qualified");
 ERRMSG(SCIDB_LE_UNKNOWN_CTX,                        "Unknown/unexpected context type '%1%'");
-ERRMSG(SCIDB_LE_CANT_LOCK_FILE,                     "Failed to get exclusive access to the file %1%");
+ERRMSG(SCIDB_LE_CANT_LOCK_FILE,                     "Failed to get exclusive access to the file %1%, error = %2%");
 ERRMSG(SCIDB_LE_TEMPLATE_PARSE_ERROR,               "Failed to parse template at position %1%");
 ERRMSG(SCIDB_LE_TEMPLATE_FIXED_SIZE_TYPE,           "Length should not be explicitly specified for fixed size type %1%");
 ERRMSG(SCIDB_LE_FILE_WRITE_ERROR,                   "Failed to write file: %1%");
@@ -433,6 +433,15 @@ ERRMSG(SCIDB_LE_BAD_VECTOR_LENGTH,                  "Operator '%1%' requires a v
 ERRMSG(SCIDB_LE_OP_CAST_ERROR10,                    "Cannot cast attribute '%1%' type from '%2%' to '%3%'");
 ERRMSG(SCIDB_LE_CANNOT_RECOVER_RESTARTABLE_WORK,    "Cannot recover restartable work");
 ERRMSG(SCIDB_LE_CANNOT_MODIFY_ENVIRONMENT,          "Internal error, could not modify environ.");
+ERRMSG(SCIDB_LE_MISMATCHED_OPAQUE_FORMAT_VERSION,   "This version of SciDB cannot read this opaque file (file version %1%, system version %2%)");
+ERRMSG(SCIDB_LE_CANNOT_ADD_AGGREGATE,               "Can not add aggregate '%1%'. Scalar function with same signature already exists");
+ERRMSG(SCIDB_LE_CANNOT_ADD_FUNCTION,                "Can not add function '%1%'. Aggregate with same signature already exists");
+ERRMSG(SCIDB_LE_QUERY_TOO_BIG,                      "Query is too big. Query size: %1% bytes. Max allowed size: %2% bytes");
+ERRMSG(SCIDB_LE_TOO_MANY_OPEN_FILES,                "Reached per-process fd limit");
+ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR9,                 "Non-supported attribute type in sparse multiply");
+ERRMSG(SCIDB_LE_CUMULATE_NEEDS_AGGREGATES,          "Operator 'cumulate' requires one input array and at least one aggregate call");
+ERRMSG(SCIDB_LE_CUMULATE_NO_OVERLAP,                "For now, cumulate does not handle dimensions with overlaps");
+ERRMSG(SCIDB_LE_CUMULATE_DIM_AFTER_AGGREGATES,      "Operator 'cumulate' requires that the dimension parameter, if exists, should be the last one");
 //Next ERRMSG
 
 ERRMSG(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,          "Execution of query '%1%' failed with error %2%");
@@ -440,6 +449,7 @@ ERRMSG(SCIDB_LE_LIBPQ_NOT_THREADSAFE,               "libpq is not threadsafe. Re
 ERRMSG(SCIDB_LE_CANT_CONNECT_PG,                    "Cannot connect to PostgreSQL catalog: '%1%'");
 ERRMSG(SCIDB_LE_UNREACHABLE_CODE,                   "Fatal: Unreachable code is reached in '%1%'");
 ERRMSG(SCIDB_LE_UNITTEST_FAILED,                    "Unit test failed! Test = '%1%', failure = '%2%'");
+ERRMSG(SCIDB_LE_NEED_UPGRADE_CONFIRMATION,          "In order to proceed, the 'enable-catalog-upgrade' setting must be enabled");
 
 // Copied from P4
 ERRMSG(SCIDB_LE_DLA_ERROR13,                        "Request for unknown attribute");

@@ -126,13 +126,14 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR42); // too large
         }
 
-        // TODO: make two variables slpp::SCLAPACK_EFFICIENT_BLOCK_SIZE_MINIMUM and _MAXIMUM instead of single number
+
         // TODO: the following does not work correctly.  postWarning() itself uses SCIDB_WARNING
-        //       need an example to follow
-        if (false) {  // broken code inside postWarning(SCIDB_WARNING()) faults. Not sure what the argument is supposed to be
+        //       does not work correctly from a plugin, so seeking an example of how to do
+        //       postWarning() from a plugin.
+        if (false) {
+            // broken code inside postWarning(SCIDB_WARNING()) faults and needs a different argument.
             for(size_t d = ROW; d <= COL; d++) {
-                if(dims[d].getChunkInterval() < slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE ||
-                   dims[d].getChunkInterval() < slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE) {
+                if(dims[d].getChunkInterval() != slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE) {
                     query->postWarning(SCIDB_WARNING(DLA_WARNING4) << slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE
                                                                    << slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE);
                 }
@@ -155,7 +156,7 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
     // check: the chunkSizes from the user must be identical (until auto-repart is working)
     const bool AUTO_REPART_WORKING = false ;  // #2032
     if( ! AUTO_REPART_WORKING ) {
-        uint32_t commonChunkSize = schemas[0].getDimensions()[ROW].getChunkInterval();
+        int64_t commonChunkSize = schemas[0].getDimensions()[ROW].getChunkInterval();
         // TODO: remove these checks if #2023 is fixed and requiresRepart() is functioning correctly
         for(size_t iArray=0; iArray < NUM_MATRICES; iArray++) {
             const Dimensions& dims = schemas[iArray].getDimensions();
@@ -175,30 +176,19 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
     //
     //    (1) The required restriction to make ScaLAPACK work is that they are equal
     //    in both dimensions (square chunks) and equal for all matrices.
-    //    (2) Next, we need a chunk of A,B, and C to fit into L1 cache at the same time.
-    //    this is required to make any BLAS run well, while the next chunk is being
-    //    statged into L2.  Different BLASes want the chunk size to be all in L1 or partly
-    //    in L1 and L2.  We don't know this right now, but we do know that all
-    //    modern procesors have tiny, unshared, L2 caches.  Assuming the multiply is really
-    //    large, we disregard the O(M^2) communication time because the multiply will be
-    //    O(M^3).  So knowing an Intel Sandybridge has L1 data cache size 32KiB we find that
-    //    for doubles, the answer is to use less than sqrt(32*1024/3/8) which is 36.9  So 32
-    //    square is the conservative number.  If we allow it to run in L2 (256KiB) then
-    //    sqrt(256*1024/3/8) = 104.5.  This suggest that if L2/L1 cache movement is hidden
-    //    then 64x64 is tolerable only if the L2/L1 movement is schedule well, as it was in
-    //    the GOTO blas.  Right now, 32x32 is a much better starting point.
-    //    (3) So what do we do if the chunksize is not optimal?  How do we compute the answer
-    //    but give the warning (good approach if matrix size is small or medium).
+    //    (2) Legal values are in a range, expressed by SCALAPACK_{MIN,MAX}_BLOCK_SIZE
+    //    (3) So what do we do if the chunksize is not optimal?  Can we go ahead and compute
+    //    the answer if the matrix is below a size where it will really matter?
+    //    Can we fix query->postWarning to warn in that case?
     //    (4) If the user gives inputs that match, and don't need a repart, we can proceed.
-    //    But if any of them need a repart, we can only do all of them to the optimal size.
+    //    (5) Else we will have to add reparts for the user [not implemented]
+    //    Should we repart some of them to another size?  Or should we repart all of them
+    //    to the optimial aize?  Unforunately, we don't have the information we would need
+    //    to make an intelligent choice ...
     //    Due to the api of LogicalOperator::requiresRepart() we can't tell which situation
-    //    it is ... all matching so don't insert, or it isn't the optimal size, so insert.
-    //    We'll write this part to allow it if the inputs all match, even if not optimal,
-    //    AND have the optimizer insert reparts.  That will "train" the user to what we
-    //    think the minimal requirements will be here, and blow up below where we run into
-    //    problems with the optimizer that need to be fixed soon.
+    //    it is, because it still only functions on the first input only.
     //
-    // TODO: after #2032 is fixed, have James reduce/remove the above comment to the current truth
+    // TODO: after #2032 is fixed, have James fix note(4) above.
     //
 }
 

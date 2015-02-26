@@ -32,6 +32,8 @@ set (array_src
     ParallelAccumulatorArray.cpp
     RLE.cpp
     DeepChunkMerger.cpp
+    MergeSortArray.cpp
+    SortArray.cpp
 )
 
 file(GLOB array_include "*.h")

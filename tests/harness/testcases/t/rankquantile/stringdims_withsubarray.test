@@ -39,11 +39,11 @@ store(subarray(quantile(md_expo, 9, response, AffyId), '202188_at', 0, '243427_s
 
 --cleanup
 
-remove(md_expo_quant)
-remove(md_expo_quant_ID)
-remove(md_expo_quant2_ID)
-remove(md_expo_quant_AffyId)
-remove(md_expo)
 remove(expo)
+remove(md_expo)
+remove(md_expo_quant_AffyId)
+remove(md_expo_quant2_ID)
+remove(md_expo_quant_ID)
+remove(md_expo_quant)
 
 --stop-query-logging

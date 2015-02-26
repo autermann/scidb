@@ -134,14 +134,41 @@ namespace scidb
         static ExchangeTemplate parse(ArrayDesc const& desc, string const& format, bool isImport);
     };
 
-    const uint32_t OPAQUE_CHUNK_MAGIC = 0xAECAC;
+    /**
+     * If you are changing the format of the first two fields of the OpaqueChunkHeader struct (very rare), then you MUST change this number.
+     * Illegal values are values that are very likely to occur in a corrupted file by accident, like:
+     * 0x00000000
+     * 0xFFFFFFFF
+     *
+     * Or values that have been used in the past:
+     * 0x0AECAC
+     * 0x5AC00E
+     *
+     * You must pick a value that is not equal to any of the values above - AND add it to the list.
+     * Picking a new magic has the effect of opaque data file not being transferrable between scidb versions with different magic values.
+     */
+    const uint32_t OPAQUE_CHUNK_MAGIC = 0x5AC00E;
+
+    /**
+     * If you are changing the format of the OpaqueChunkHeader struct (other than the first 2 fields) - you must increment this number.
+     *
+     * Revision history:
+     *
+     * SCIDB_OPAQUE_FORMAT_VERSION = 1:
+     *    Author: Egor P.
+     *    Date: 8/4/2013
+     *    Ticket: 3417
+     *    Note: Initial version (existing implementation).
+     */
+    const uint32_t SCIDB_OPAQUE_FORMAT_VERSION = 1;
 
     struct OpaqueChunkHeader
     {
         uint32_t magic;
+        uint32_t version;
         uint32_t size;
         uint32_t signature;
-        uint8_t  attrId;
+        uint64_t attrId;
         int8_t   compressionMethod;
         uint8_t  flags;
         uint8_t  nDims;

@@ -129,7 +129,7 @@ namespace scidb
    boost::asio::io_service& getIOService();
 
    /**
-    * @return a queue suitable for running arbitrary tasks
+    * @return a queue suitable for running tasks that are guaranteed to make progress
     * @note No new threads are created as a result of adding work to the queue
     */
    boost::shared_ptr<WorkQueue> getWorkQueue();

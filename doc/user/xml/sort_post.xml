@@ -36,6 +36,13 @@
 
     <para>You can control the chunk size of the resulting array with the
     optional <literal>chunk_size</literal> parameter.</para>
+
+    <para><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>sorting</secondary>
+      </indexterm>To sort by dimensions, you can use the <code>apply</code>
+    operator to return a dimension as an attribute, and then sort.</para>
   </refsect1>
 
   <refsect1>
@@ -127,11 +134,39 @@
         </step>
       </procedure>
 
+      <para>To illustrate how to sort by a dimension, consider the following
+      example.</para>
+
+      <procedure>
+        <step>
+          <para>Create a small, two dimensional array. <para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:2,3,0, j=0:2,3,0],i%3+j),A);  </programlisting><screen>[
+[(0),(1),(2)],
+[(1),(2),(3)],
+[(2),(3),(4)]
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para>Use the apply operator to return the first dimension, and then
+          sort by it.<para><programlisting>AFL% sort(apply(A,dim,i),dim);  </programlisting><screen>{n} val,dim
+{0} 0,0
+{1} 1,0
+{2} 2,0
+{3} 1,1
+{4} 2,1
+{5} 3,1
+{6} 2,2
+{7} 3,2
+{8} 4,2
+</screen></para></para>
+        </step>
+      </procedure>
+
       <para>To illustrate how the sort operator handles null values, this
       example first scans an array that includes a null value, then sorts the
       cells in ascending order, then sorts them in descending order.</para>
 
-      <para><procedure>
+      <procedure>
         <step>
           <para>Show the source_array: <para><programlisting>AFL% scan(numbers);</programlisting><screen>{i} number
 {0} 0
@@ -162,6 +197,6 @@
 </screen></para></para>
         </step>
       </procedure>
-    </para></informalexample>
+    </informalexample>
   </refsect1>
 </refentry>
