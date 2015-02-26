@@ -1,0 +1,23 @@
+--setup
+--start-query-logging
+
+--aql drop array intensityFlatShadow
+--aql drop array intensityFlat
+--aql drop array intensityFlatBadCells
+--shell --command " csv2scidb -s 1 -p SNN < ../tests/harness/testcases/doc_data/int4error.csv > ../tests/harness/testcases/doc_data/int4error.scidb " --store
+
+--test
+--aql CREATE ARRAY intensityFlat < exposure:string,elapsedTime:int64,measuredIntensity:int64 null > [i=0:6,1000000,0]
+--aql LOAD intensityFlat FROM '../tests/harness/testcases/doc_data/int4error.scidb' AS 'text' ERRORS 99 SHADOW ARRAY intensityFlatShadow
+--aql SELECT * FROM show(intensityFlatShadow)
+--aql SELECT * FROM intensityFlatShadow
+--aql SELECT * FROM intensityFlat
+--aql SELECT intensityFlat.exposure AS exposureDATUM, intensityFlatShadow.exposure AS exposureMSG, intensityFlat.elapsedTime AS elapsedTimeDATUM, intensityFlatShadow.elapsedTime AS elapsedTimeMSG, intensityFlat.measuredIntensity AS measuredIntensityDATUM, intensityFlatShadow.measuredIntensity AS measuredIntensityMSG, row_offset INTO intensityFlatBadCells FROM intensityFlat, intensityFlatShadow
+--aql SELECT * FROM intensityFlatBadCells
+
+--cleanup
+drop array intensityFlat
+drop array intensityFlatShadow
+drop array intensityFlatBadCells
+
+--stop-query-logging

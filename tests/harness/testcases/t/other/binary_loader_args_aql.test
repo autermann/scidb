@@ -1,0 +1,61 @@
+--setup 
+--start-query-logging
+create array SP <a: int32, b: string, c: double, d: int64, e: bool, f: float, g: string_10>[i=1:1000,100,0]
+
+create array A2 <a: int32, b: int32, c: string, d: string, e: string, f: string, g: int64>[i=1:1000,100,0]
+create array A2a <a: int32, b: int32, c: string, d: string, e: string, f: string, g: int64>[i=1:1000,100,0]
+
+--test
+
+--aql load SP from current instance '../tests/harness/testcases/data/sp.txt'
+--aql load A2 from current instance '../tests/harness/testcases/data/A2.txt'
+
+--aql select * from SP
+--aql select * from count(versions(SP))
+--aql select * from show(SP)
+--aql select * from dimensions(SP)
+
+--error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql "load A2 from current instance '../tests/harness/testcases/data/A2_err.txt'"
+
+--error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql "load A2 from current instance '../tests/harness/testcases/data/A2_err.txt' as 'text' errors 2"
+
+--aql load A2 from current instance '../tests/harness/testcases/data/A2_err.txt' as 'text' errors 3
+--aql load A2 from current instance '../tests/harness/testcases/data/A2_err.txt' as 'text' errors 9999 shadow array A2_shadow
+--aql load A2a from current instance '../tests/harness/testcases/data/A2_err.txt' as 'text' errors 9999
+
+--aql save SP into current instance 'sp_int32.bin' as '(int32,string,double,int64,bool,float,string_10)'
+--error --code=scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER --aql "save SP into current instance'junk.bin' as '(int32,string,double,int64,datetime,float,datetime)'"
+--aql load SP from current instance 'sp_int32.bin' as '(int32,string,double,int64,bool,float,string_10)' errors 100 shadow array SP_err
+--aql load SP from current instance 'sp_int32.bin' as '(int32,string,double,int64,bool,float,string_10)' errors 1 shadow array SP_err
+
+--aql select * from SP
+--aql select * from count(versions(SP))
+--aql select * from show(SP)
+--aql select * from dimensions(SP)
+
+--aql save SP into current instance 'sp_int32_int64.bin' as '(int64,string,double,int64,bool,float,string_10)'
+--aql load SP from current instance 'sp_int32_int64.bin' as '(int64,string,double,int64,bool,float,string_10)'
+
+--aql select * from SP
+--aql select * from count(versions(SP))
+--aql select * from show(SP)
+--aql select * from dimensions(SP)
+
+--aql save SP into 'sp_aql.bin' as 'opaque'
+--aql load SP from 'sp_aql.bin' as 'opaque'
+
+--aql select * from SP
+--aql select * from count(versions(SP))
+--aql select * from show(SP)
+--aql select * from dimensions(SP)
+
+--error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql "load SP from current instance '../tests/harness/testcases/data/sp_err.txt'"
+
+--cleanup
+remove(SP)
+remove(A2)
+remove(A2a)
+remove(SP_err)
+remove(A2_shadow)
+
+--stop-query-logging

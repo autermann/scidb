@@ -1,0 +1,587 @@
+../../bin/doSvd.sh: =====================================
+../../bin/doSvd.sh: ../../bin/doSvd.sh 1,10,20 begin
+Query was executed successfully
+../../bin/doSvd.sh: **********************************************************************
+../../bin/doSvd.sh: ****** verbose, remultiplied svd('U'), svd('VT'), svd('values') 
+../../bin/doSvd.sh: ****** from 1 to 10 (if any)
+../../bin/doSvd.sh: verbose svd test @ 1 x 1 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 1 x 1 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 1 x 1 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 1 x 1 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 2 x 2 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 2 x 2 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 2 x 2 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 2 x 2 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+1,0,3
+1,1,4
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 3 x 3 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 3 x 3 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 3 x 3 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 3 x 3 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+1,0,4
+1,1,5
+1,2,6
+2,0,7
+2,1,8
+2,2,9
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 4 x 4 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 4 x 4 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 4 x 4 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 4 x 4 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+1,0,5
+1,1,6
+1,2,7
+1,3,8
+2,0,9
+2,1,10
+2,2,11
+2,3,12
+3,0,13
+3,1,14
+3,2,15
+3,3,16
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 5 x 5 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 5 x 5 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 5 x 5 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 5 x 5 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+0,4,5
+1,0,6
+1,1,7
+1,2,8
+1,3,9
+1,4,10
+2,0,11
+2,1,12
+2,2,13
+2,3,14
+2,4,15
+3,0,16
+3,1,17
+3,2,18
+3,3,19
+3,4,20
+4,0,21
+4,1,22
+4,2,23
+4,3,24
+4,4,25
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 6 x 6 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 6 x 6 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 6 x 6 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 6 x 6 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+0,4,5
+0,5,6
+1,0,7
+1,1,8
+1,2,9
+1,3,10
+1,4,11
+1,5,12
+2,0,13
+2,1,14
+2,2,15
+2,3,16
+2,4,17
+2,5,18
+3,0,19
+3,1,20
+3,2,21
+3,3,22
+3,4,23
+3,5,24
+4,0,25
+4,1,26
+4,2,27
+4,3,28
+4,4,29
+4,5,30
+5,0,31
+5,1,32
+5,2,33
+5,3,34
+5,4,35
+5,5,36
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 7 x 7 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 7 x 7 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 7 x 7 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 7 x 7 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+0,4,5
+0,5,6
+0,6,7
+1,0,8
+1,1,9
+1,2,10
+1,3,11
+1,4,12
+1,5,13
+1,6,14
+2,0,15
+2,1,16
+2,2,17
+2,3,18
+2,4,19
+2,5,20
+2,6,21
+3,0,22
+3,1,23
+3,2,24
+3,3,25
+3,4,26
+3,5,27
+3,6,28
+4,0,29
+4,1,30
+4,2,31
+4,3,32
+4,4,33
+4,5,34
+4,6,35
+5,0,36
+5,1,37
+5,2,38
+5,3,39
+5,4,40
+5,5,41
+5,6,42
+6,0,43
+6,1,44
+6,2,45
+6,3,46
+6,4,47
+6,5,48
+6,6,49
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 8 x 8 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 8 x 8 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 8 x 8 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 8 x 8 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+0,4,5
+0,5,6
+0,6,7
+0,7,8
+1,0,9
+1,1,10
+1,2,11
+1,3,12
+1,4,13
+1,5,14
+1,6,15
+1,7,16
+2,0,17
+2,1,18
+2,2,19
+2,3,20
+2,4,21
+2,5,22
+2,6,23
+2,7,24
+3,0,25
+3,1,26
+3,2,27
+3,3,28
+3,4,29
+3,5,30
+3,6,31
+3,7,32
+4,0,33
+4,1,34
+4,2,35
+4,3,36
+4,4,37
+4,5,38
+4,6,39
+4,7,40
+5,0,41
+5,1,42
+5,2,43
+5,3,44
+5,4,45
+5,5,46
+5,6,47
+5,7,48
+6,0,49
+6,1,50
+6,2,51
+6,3,52
+6,4,53
+6,5,54
+6,6,55
+6,7,56
+7,0,57
+7,1,58
+7,2,59
+7,3,60
+7,4,61
+7,5,62
+7,6,63
+7,7,64
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 9 x 9 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 9 x 9 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 9 x 9 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 9 x 9 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+0,4,5
+0,5,6
+0,6,7
+0,7,8
+0,8,9
+1,0,10
+1,1,11
+1,2,12
+1,3,13
+1,4,14
+1,5,15
+1,6,16
+1,7,17
+1,8,18
+2,0,19
+2,1,20
+2,2,21
+2,3,22
+2,4,23
+2,5,24
+2,6,25
+2,7,26
+2,8,27
+3,0,28
+3,1,29
+3,2,30
+3,3,31
+3,4,32
+3,5,33
+3,6,34
+3,7,35
+3,8,36
+4,0,37
+4,1,38
+4,2,39
+4,3,40
+4,4,41
+4,5,42
+4,6,43
+4,7,44
+4,8,45
+5,0,46
+5,1,47
+5,2,48
+5,3,49
+5,4,50
+5,5,51
+5,6,52
+5,7,53
+5,8,54
+6,0,55
+6,1,56
+6,2,57
+6,3,58
+6,4,59
+6,5,60
+6,6,61
+6,7,62
+6,8,63
+7,0,64
+7,1,65
+7,2,66
+7,3,67
+7,4,68
+7,5,69
+7,6,70
+7,7,71
+7,8,72
+8,0,73
+8,1,74
+8,2,75
+8,3,76
+8,4,77
+8,5,78
+8,6,79
+8,7,80
+8,8,81
+r,c,multiply
+
+../../bin/doSvd.sh: verbose svd test @ 10 x 10 csize 32 x 32
+Query was executed successfully
+../../bin/doSvd.sh: verbose U test @ 10 x 10 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose VT test @ 10 x 10 csize 32 x 32
+Query was executed successfully
+
+../../bin/doSvd.sh: verbose S test @ 10 x 10 csize 32 x 32
+Query was executed successfully
+
+0,0,1
+0,1,2
+0,2,3
+0,3,4
+0,4,5
+0,5,6
+0,6,7
+0,7,8
+0,8,9
+0,9,10
+1,0,11
+1,1,12
+1,2,13
+1,3,14
+1,4,15
+1,5,16
+1,6,17
+1,7,18
+1,8,19
+1,9,20
+2,0,21
+2,1,22
+2,2,23
+2,3,24
+2,4,25
+2,5,26
+2,6,27
+2,7,28
+2,8,29
+2,9,30
+3,0,31
+3,1,32
+3,2,33
+3,3,34
+3,4,35
+3,5,36
+3,6,37
+3,7,38
+3,8,39
+3,9,40
+4,0,41
+4,1,42
+4,2,43
+4,3,44
+4,4,45
+4,5,46
+4,6,47
+4,7,48
+4,8,49
+4,9,50
+5,0,51
+5,1,52
+5,2,53
+5,3,54
+5,4,55
+5,5,56
+5,6,57
+5,7,58
+5,8,59
+5,9,60
+6,0,61
+6,1,62
+6,2,63
+6,3,64
+6,4,65
+6,5,66
+6,6,67
+6,7,68
+6,8,69
+6,9,70
+7,0,71
+7,1,72
+7,2,73
+7,3,74
+7,4,75
+7,5,76
+7,6,77
+7,7,78
+7,8,79
+7,9,80
+8,0,81
+8,1,82
+8,2,83
+8,3,84
+8,4,85
+8,5,86
+8,6,87
+8,7,88
+8,8,89
+8,9,90
+9,0,91
+9,1,92
+9,2,93
+9,3,94
+9,4,95
+9,5,96
+9,6,97
+9,7,98
+9,8,99
+9,9,100
+r,c,multiply
+
+../../bin/doSvd.sh: *****************************************************************************
+../../bin/doSvd.sh: ****** quick test, svd('U') only
+../../bin/doSvd.sh: ****** from 11 to 20 (if any)
+../../bin/doSvd.sh: U-only test @ 11 x 11 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*11), 'U'))
+i,count
+0,121
+
+../../bin/doSvd.sh: U-only test @ 12 x 12 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*12), 'U'))
+i,count
+0,144
+
+../../bin/doSvd.sh: U-only test @ 13 x 13 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*13), 'U'))
+i,count
+0,169
+
+../../bin/doSvd.sh: U-only test @ 14 x 14 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*14), 'U'))
+i,count
+0,196
+
+../../bin/doSvd.sh: U-only test @ 15 x 15 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*15), 'U'))
+i,count
+0,225
+
+../../bin/doSvd.sh: U-only test @ 16 x 16 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*16), 'U'))
+i,count
+0,256
+
+../../bin/doSvd.sh: U-only test @ 17 x 17 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*17), 'U'))
+i,count
+0,289
+
+../../bin/doSvd.sh: U-only test @ 18 x 18 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*18), 'U'))
+i,count
+0,324
+
+../../bin/doSvd.sh: U-only test @ 19 x 19 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*19), 'U'))
+i,count
+0,361
+
+../../bin/doSvd.sh: U-only test @ 20 x 20 csize 32 x 32
+Query was executed successfully
+count(gesvd(build(TEST_DOSVD_IN, 1+c+r*20), 'U'))
+i,count
+0,400
+
+../../bin/doSvd.sh: ../../bin/doSvd.sh 1,10,20 end
+
+

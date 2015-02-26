@@ -65,6 +65,45 @@ Other .
 	yylloc->step();
 %}
 
+(?i:auto) {
+    return token::AUTO;
+}
+(?i:opaque) {
+    return token::OPAQUE;
+}
+
+(?i:csv) {
+    return token::CSV;
+}
+
+(?i:csv\+) {
+    return token::CSV_PLUS;
+}
+
+(?i:lcsv\+) {
+    return token::LCSV_PLUS;
+}
+
+(?i:dense) {
+    return token::DENSE;
+}
+
+(?i:sparse) {
+    return token::SPARSE;
+}
+
+(?i:lsparse) {
+    return token::LSPARSE;
+}
+
+(?i:text) {
+    return token::TEXT;
+}
+
+(?i:dcsv) {
+    return token::DCSV;
+}
+
 {OneLineComment} {
 }
 

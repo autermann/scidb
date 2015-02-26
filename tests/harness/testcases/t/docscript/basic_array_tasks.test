@@ -1,0 +1,54 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+--aql CREATE ARRAY A <val_a:double>[i=0:9,10,0]  
+--aql CREATE ARRAY B <val_b:double>[j=0:9,10,0]  
+load(A, '../examples/A.scidb')  
+load(B, '../examples/B.scidb')  
+--set-format auto
+--stop-igdata
+--aql SELECT * FROM A  
+--aql SELECT * FROM B  
+--aql SELECT * FROM show(A)  
+--aql SELECT * FROM show(B)  
+--aql SELECT j from B  
+--aql SELECT val_b from B  
+--aql SELECT j FROM B WHERE j > 3 and j < 7  
+--aql SELECT sqrt(val_b) FROM B WHERE j>3 and j<7  
+--aql SELECT * INTO C FROM A, B  
+--set-format dcsv
+show(C)
+--set-format auto
+--aql SELECT * INTO D FROM C,B  
+--aql SELECT * FROM show(D)  
+--aql SELECT C.val_b + D.val_b FROM C,D  
+--aql SELECT a1.val_a,a2.val_a+2 FROM A as a1,A as a2  
+--set-format dcsv
+--aql CREATE ARRAY m3x3<a:double> [i=1:3,3,0,j=1:3,3,0]  
+--start-igdata
+load(m3x3, '../examples/m3x3.txt')  
+--aql CREATE ARRAY vector3<b:double> [k=1:3,3,0]  
+load(vector3, '../examples/vector3.scidb')  
+--stop-igdata
+show(vector3)
+--set-format dense
+scan(vector3)  
+--set-format auto
+--aql SELECT * FROM m3x3 JOIN vector3 ON m3x3.j = vector3.k  
+--aql  SELECT data.i*10 FROM A AS data WHERE A.i < 5  
+--aql  SELECT pow(c,2) FROM (SELECT A.val_a + B.val_b AS c FROM A,B) WHERE i > 5  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(A)
+remove(B)
+remove(C)
+remove(D)
+remove(m3x3)
+remove(vector3)

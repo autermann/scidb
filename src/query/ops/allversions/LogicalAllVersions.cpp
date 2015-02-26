@@ -39,6 +39,50 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: allversions().
+ *
+ * @par Synopsis:
+ *   allversions( srcArray )
+ *
+ * @par Summary:
+ *   Creates a single array containing all versions of an existing array.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   VersionNo: type=int64, start=1, end=last version no, chunk interval=1
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - allversions(A) <quantity: uint64, sales:double> [VersionNo, year, item]  =
+ *     <br> VersionNo, year, item, quantity, sales
+ *     <br>     1,     2011,  2,      7,     31.64
+ *     <br>     1,     2011,  3,      6,     19.98
+ *     <br>     1,     2012,  1,      5,     41.65
+ *     <br>     1,     2012,  2,      9,     40.68
+ *     <br>     1,     2012,  3,      8,     26.64
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalAllVersions: public LogicalOperator
 {
 public:

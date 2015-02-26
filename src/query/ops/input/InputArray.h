@@ -46,6 +46,8 @@
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "array/MemArray.h"
+#include "smgr/io/TemplateParser.h"
+#include "util/BufferedFileInput.h"
 
 #include "log4cxx/logger.h"
 #include "log4cxx/basicconfigurator.h"
@@ -55,7 +57,7 @@ namespace scidb
 {
     using namespace std;
 
-        // declared static to prevent visibility of variable outside of this file
+    // declared static to prevent visibility of variable outside of this file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc.ops.inputarray"));
 
     class InputArray;
@@ -76,67 +78,100 @@ namespace scidb
         TKN_EOF
     };
 
+    typedef enum
+    {
+        AS_EMPTY,
+        AS_TEXT_FILE,
+        AS_BINARY_FILE,
+        AS_STRING        
+    } InputType;
+
     class Scanner
     {
         FILE* f;
-        string value;
-                string filePath;
+        string filePath;
         int missingReason;
         int lineNo;
         int columnNo;
+        int64_t pos;
+        char *buf;
+        boost::shared_ptr<BufferedFileInput> doubleBuffer;
+
+        // A temporary string which is used to hold the current token.
+        // Normally, bytes are copied to stringBuf.
+        // When stringBuf is filled up, or when getValue() is called, content in stringBuf is appended to the end of tmpValue.
+        // This optimization is used to avoid expensive calls to string::operation+=() for individual bytes.
+        string tmpValue;
+
+        // Max size of the temporary stringBuf.
+        static const size_t MAX_TEMP_BUF_SIZE = 100;
+
+        // When constructing the string content, individual bytes are appended to the end of char[100].
+        char stringBuf[MAX_TEMP_BUF_SIZE];
+
+        // how many chars are in use in stringBuf
+        size_t nStringBuf;
+        
+        void openStringStream(string const& input);
+
 
       public:
-        bool isNull() const
+        inline bool isNull() const
         {
             return missingReason >= 0;
         }
 
-        int getMissingReason() const
+        inline int getMissingReason() const
         {
             return missingReason;
         }
 
-        string const& getValue()
+        inline string const& getValue()
         {
-            return value;
+            tmpValue.append(stringBuf, nStringBuf);
+            nStringBuf = 0;
+            return tmpValue;
         }
 
-        int getLine() const
+        inline int64_t getPosition() const
+        {
+            return pos;
+        }
+ 
+        inline void setPosition(int64_t p) { 
+            pos = p;
+        }
+
+        inline int getLine() const
         {
             return lineNo;
         }
 
-        int getColumn() const
+        inline int getColumn() const
         {
             return columnNo;
         }
 
-        Scanner(string const& file)
-        {
-            LOG4CXX_DEBUG(logger, "Attempting to open file '" << file << "' for input");
-                        filePath = file;
-            missingReason = -1;
-            lineNo = 1;
-            columnNo = 0;
-            f = fopen(file.c_str(), "r");
-            if (NULL == f ) {
-                LOG4CXX_DEBUG(logger,"Attempt to open input file '" << file << "' and failed with errno = " << errno);
-                if (!f)
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_OPEN_FILE) << file;
-            }
-        }
+        bool open(string const& input, InputType inputType, boost::shared_ptr<Query> query);
+
+        Scanner() : f(NULL), missingReason(0), lineNo(0), columnNo(0), pos(0), buf(NULL), nStringBuf(0)
+        { }
 
         ~Scanner()
         {
-            fclose(f);
+            doubleBuffer.reset();
+            if (f != NULL) { 
+                fclose(f);
+            }
+            if (buf)
+                delete[] buf;
         }
 
-        long getFilePos() { return f ? ftell(f) : -1; }
+        const string& getFilePath() const { return filePath; }
 
-                string& getFilePath() { return filePath; }
-
-        int getChar() {
-            int ch = getc(f);
+        inline int getChar() {
+            int ch = doubleBuffer->myGetc();
+            pos += 1;
             if (ch == '\n') {
                 lineNo += 1;
                 columnNo = 0;
@@ -148,35 +183,110 @@ namespace scidb
 
         void ungetChar(int ch) {
             if (ch != EOF) {
+                pos -= 1;
                 if (ch == '\n') {
                     lineNo -= 1;
                 } else {
                     columnNo -= 1;
                 }
-                ungetc(ch, f);
+                doubleBuffer->myUngetc(ch);
+            }
+        }
+        
+        FILE* getFile() const
+        {
+            return f;
+        }
+
+        /*
+         * Append a char to the end of stringBuf.
+         */
+        inline void Append(int ch) {
+            if (nStringBuf < MAX_TEMP_BUF_SIZE) {
+                stringBuf[nStringBuf++] = static_cast<char>(ch);
+            } else {
+                tmpValue.append(stringBuf, nStringBuf);
+                nStringBuf = 1;
+                stringBuf[0] = static_cast<char>(ch);
             }
         }
 
+        /*
+         * The get() function is reengineered so as to process the most frequent characters first.
+         * The frequency information below is based on a real customer input file.
+         *
+         *  ,: 131805589
+         *   : 87870466
+         *  1: 67195493
+         *  2: 65545353
+         *  4: 63800051
+         *  0: 59916857
+         *  3: 53139522
+         *  8: 51823424
+         *  7: 51776908
+         *  6: 51722637
+         *  9: 51678571
+         *  5: 51165942
+         * \n: 43935255
+         *  ): 43935211
+         *  (: 43935211
+         *  }: 44
+         *  {: 44
+         *  ]: 44
+         *  [: 44
+         *  ;: 44
+         */
 
-        Token get()
+        /*
+         * Below is the new version.
+         */
+        inline Token get()
         {
             int ch;
 
             while ((ch = getChar()) != EOF && isspace(ch)); // ignore whitespaces
 
-            if (ch == EOF) {
-                return TKN_EOF;
+            if (ch>='0' && ch<='9') {
+CommonCase:
+                nStringBuf = 0;
+                tmpValue.clear();
+
+                while (true) {
+                    if (ch>='0' && ch<='9') {
+                        Append(ch);
+                        ch = getChar();
+                        continue;
+                    }
+                    else if (ch==',' || isspace(ch) || ch=='(' || ch==')' || ch == ']' || ch == '}' || ch == '{' || ch == '[' || ch == '*' || ch==EOF) {
+                        break;
+                    }
+                    Append(ch);
+                    ch = getChar();
+                }
+                if (nStringBuf==0 && tmpValue.size()==0)
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR14);
+                ungetChar(ch);
+                if (nStringBuf==4 && tmpValue.size()==0 && stringBuf[0]=='n' && stringBuf[1]=='u' && stringBuf[2]=='l' && stringBuf[3]=='l') {
+                    missingReason = 0;
+                }
+                else {
+                    missingReason = -1;
+                }
+                return TKN_LITERAL;
             }
 
             switch (ch) {
-              case '\'':
+            case ',':
+              return TKN_COMMA;
+            case '(':
+              return TKN_TUPLE_BEGIN;
+            case ')':
+              return TKN_TUPLE_END;
+            case '\'':
                 ch = getChar();
                 if (ch == '\\') {
                     ch = getChar();
                     switch (ch) {
-                      case '0':
-                        ch = 0;
-                        break;
                       case 'n':
                         ch = '\n';
                         break;
@@ -189,19 +299,25 @@ namespace scidb
                       case 't':
                         ch = '\t';
                         break;
+                      case '0':
+                        ch = 0;
+                        break;
                     }
 
                 }
                 if (ch == EOF)
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR12);
-                value = (char)ch;
+                nStringBuf = 1;
+                stringBuf[0] = (char)ch;
+                tmpValue.clear();
                 ch = getChar();
                 if (ch != '\'')
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR12);
                 missingReason = -1;
                 return TKN_LITERAL;
               case '"':
-                value.clear();
+                nStringBuf = 0;
+                tmpValue.clear();
                 while (true) {
                     ch = getChar();
                     if (ch == '\\') {
@@ -213,7 +329,7 @@ namespace scidb
                         missingReason = -1;
                         return TKN_LITERAL;
                     }
-                    value += (char)ch;
+                    Append(ch);
                 }
                 break;
               case '{':
@@ -222,37 +338,26 @@ namespace scidb
                 return TKN_COORD_END;
               case '*':
                 return TKN_MULTIPLY;
-              case '(':
-                return TKN_TUPLE_BEGIN;
-              case ')':
-                return TKN_TUPLE_END;
               case '[':
                 return TKN_ARRAY_BEGIN;
               case ']':
                 return TKN_ARRAY_END;
-              case ',':
-                return TKN_COMMA;
               case ';':
                 return TKN_SEMICOLON;
               case '?':
-                value.clear();
-                missingReason = 0;
-                while ((ch = getChar()) >= '0' && ch <= '9') {
-                    missingReason = missingReason*10 + ch - '0';
-                }
-                ungetChar(ch);
-                return TKN_LITERAL;
+                  nStringBuf = 0;
+                  tmpValue.clear();
+                  missingReason = 0;
+                  while ((ch = getChar()) >= '0' && ch <= '9') {
+                      missingReason = missingReason*10 + ch - '0';
+                  }
+                  ungetChar(ch);
+                  return TKN_LITERAL;
+              case EOF:
+                return TKN_EOF;
+
               default:
-                value.clear();
-                while (ch != EOF && !isspace(ch) && ch != ')' && ch != ']'  && ch != '}' && ch != '(' && ch != '{' && ch != '[' && ch != ',' && ch != '*') {
-                    value += (char)ch;
-                    ch = getChar();
-                }
-                if (!value.size())
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR14);
-                ungetChar(ch);
-                missingReason = value == "null" ? 0 : -1;
-                return TKN_LITERAL;
+                  goto CommonCase;
             }
         }
     };
@@ -278,17 +383,41 @@ namespace scidb
 
     class InputArray : public Array
     {
-       friend class InputArrayIterator;
+        friend class InputArrayIterator;
       public:
-        bool supportsRandomAccess() const;
+
+        /**
+         * Get the least restrictive access mode that the array supports.
+         * @return SINGLE_PASS
+         */
+        virtual Access getSupportedAccess() const
+        {
+            return SINGLE_PASS;
+        }
+
+
         virtual ArrayDesc const& getArrayDesc() const;
         virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const;
-        InputArray(ArrayDesc const& desc, string const& filePath, boost::shared_ptr<Query>& query);
+
+        InputArray(ArrayDesc const& desc, string const& input, string const& format, boost::shared_ptr<Query>& query, InputType inputType, int64_t maxCnvErrors = 0, string const& shadowArrayName = string(), bool parallelLoad = false);
+        ~InputArray();
 
         bool moveNext(size_t chunkIndex);
         ConstChunk const& getChunk(AttributeID attr, size_t chunkIndex);
 
+        void sg();
+        void redistributeShadowArray(boost::shared_ptr<Query> const& query);
+        void scheduleSG(boost::shared_ptr<Query> const& query);
+        void completeShadowArrayRow();
+        void handleError(Exception const& x, boost::shared_ptr<ChunkIterator> iterator, AttributeID i, int64_t pos);
+        
+        void resetShadowChunkIterators();
+    
       private:
+        bool loadOpaqueChunk(boost::shared_ptr<Query>& query, size_t chunkIndex);
+        bool loadBinaryChunk(boost::shared_ptr<Query>& query, size_t chunkIndex);
+        bool loadTextChunk(boost::shared_ptr<Query>& query, size_t chunkIndex);
+
         struct LookAheadChunks {
             MemChunk chunks[LOOK_AHEAD];
         };
@@ -302,20 +431,36 @@ namespace scidb
         vector<LookAheadChunks> lookahead;
         vector< TypeId> types;
         vector< Value> attrVal;
+        vector< Value> binVal;
         vector< FunctionPointer> converters;
         Value coordVal;
         Value strVal;
         AttributeID emptyTagAttrID;
-
+        bool binaryLoad;
+        ExchangeTemplate templ;
+        uint64_t nLoadedCells;
+        uint64_t nLoadedChunks;
+        size_t nErrors;
+        size_t maxErrors;
+        uint32_t signature;
+        boost::shared_ptr<Array> shadowArray;
         enum State
         {
             Init,
             EndOfStream,
             EndOfChunk,
-            InsideArray
+            InsideArray,
+            EmptyArray
         };
         State state;
         MemChunk tmpChunk;
+        vector< shared_ptr<ArrayIterator> > shadowArrayIterators;
+        vector< shared_ptr<ChunkIterator> > shadowChunkIterators;
+        size_t nAttrs;
+        int lastBadAttr;
+        InstanceID myInstanceID;
+        size_t nInstances;
+        bool parallelLoad;
         boost::weak_ptr<Query> _query;
     };
 

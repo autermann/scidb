@@ -126,8 +126,6 @@ class MultiplyArray : public Array
     
     bool isSelfChunk(Coordinates const& pos) const;
 
-    bool supportsRandomAccess() const;
-
     ArrayDesc desc;
     Dimensions const& dims;
     boost::shared_ptr<Array> leftArray;

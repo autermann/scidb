@@ -33,7 +33,7 @@ set (group_stars_src
 
 add_library(groupstars SHARED ${group_stars_src})
 set_target_properties(groupstars PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
-
+extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "libgroupstars${CMAKE_SHARED_LIBRARY_SUFFIX}" groupstars)
 if (APPLE)
   set_target_properties(groupstars PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif (APPLE)

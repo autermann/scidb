@@ -100,7 +100,17 @@ public:
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
-    virtual bool supportsRandomAccess() const;
+
+    /**
+     * Get the least restrictive access mode that the array supports.
+     * Need to override this because we are a subclass of DelegateArray but we we don't set the member
+     * DelegateArray::inputArray which would cause DelegateArray::getSupportedAccess() to segfault.
+     * @return RANDOM
+     */
+    virtual Access getSupportedAccess() const
+    {
+        return RANDOM;
+    }
 
     string getVersionName(VersionID version) const;
 

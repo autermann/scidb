@@ -37,6 +37,57 @@ using namespace boost;
 namespace scidb
 {
 
+/**
+ * @brief The operator: analyze().
+ *
+ * @par Synopsis:
+ *   analyze( srcArray {, attr}* )
+ *
+ * @par Summary:
+ *   Returns an array describing the following characteristics of the specified attributes (or all the attributes, if no attribute is specified):
+ *   - attribute_name
+ *   - min
+ *   - max
+ *   - distinct_count: approximate count of distinct values.
+ *   - non_null_count: the number of cells with non-null values.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 0 or more attributes.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attribute_name: string
+ *   <br>   min: string
+ *   <br>   max: string
+ *   <br>   distinct_count: uint64
+ *   <br>   non_null_count: uint64
+ *   <br> >
+ *   <br> [
+ *   <br>   attribute_number: type=int64, start=0, end=#displayed attributes less 1, chunk interval=1000
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - analyze(A) <attribute_name:string, min:string, max:string, distinct_count:uint64, non_null_count:uint64> [attribute_number]  =
+ *     <br> attribute_number, attribute_name, min, max, distinct_count, non_null_count
+ *     <br>      0,              "quantity"   "5"  "9"       5,            5
+ *     <br>      1,               "sales"  "19.98" "41.65"   5,            5
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - If multiple attributes are specified, the ordering of the attributes in the result array is determined by the ordering of the attributes in srcAttrs.
+ *   - The value of attribute_number may be different from the number of an attribute in srcAttrs.
+ *
+ */
 class LogicalAnalyze : public LogicalOperator
 {
 public:

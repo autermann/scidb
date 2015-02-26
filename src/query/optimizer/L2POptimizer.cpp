@@ -57,7 +57,7 @@ public:
 
 private:
     boost::shared_ptr<PhysicalQueryPlanNode> traverse(const boost::shared_ptr<Query>& query,
-                                                      boost::shared_ptr<LogicalQueryPlanNode> instance);
+                                                      boost::shared_ptr<LogicalQueryPlanNode> node);
 };
 
 boost::shared_ptr<PhysicalPlan> L2POptimizer::optimize(const boost::shared_ptr<Query>& query,
@@ -77,10 +77,10 @@ boost::shared_ptr<PhysicalPlan> L2POptimizer::optimize(const boost::shared_ptr<Q
 }
 
 boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::shared_ptr<Query>& query,
-                                                                boost::shared_ptr<LogicalQueryPlanNode> instance)
+                                                                boost::shared_ptr<LogicalQueryPlanNode> node)
 {
-   instance = logicalRewriteIfNeeded(query, instance);
-    boost::shared_ptr<LogicalOperator> logicalOp = instance->getLogicalOperator();
+    node = logicalRewriteIfNeeded(query, node);
+    boost::shared_ptr<LogicalOperator> logicalOp = node->getLogicalOperator();
 
     vector<string> physicalOperatorsNames;
     OperatorLibrary::getInstance()->getPhysicalNames(logicalOp->getLogicalName(), physicalOperatorsNames);
@@ -90,7 +90,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
     vector< ArrayDesc> inputSchemas;
 
     // Adding children schemas
-    const vector<boost::shared_ptr<LogicalQueryPlanNode> >& childs = instance->getChildren();
+    const vector<boost::shared_ptr<LogicalQueryPlanNode> >& childs = node->getChildren();
     for (size_t ch = 0; ch < childs.size(); ch++)
     {
         inputSchemas.push_back(childs[ch]->getLogicalOperator()->getSchema());
@@ -143,11 +143,11 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
             createPhysicalOperator(logicalOp->getLogicalName(), physicalName, phParams, logicalOp->getSchema());
     physicalOp->setQuery(query);
 
-    boost::shared_ptr<PhysicalQueryPlanNode> result(new PhysicalQueryPlanNode(physicalOp, false, instance->isDdl(), instance->supportsTileMode()));
+    boost::shared_ptr<PhysicalQueryPlanNode> result(new PhysicalQueryPlanNode(physicalOp, false, node->isDdl(), node->supportsTileMode()));
 
-    BOOST_FOREACH(boost::shared_ptr<LogicalQueryPlanNode> instance_child, instance->getChildren())
+    BOOST_FOREACH(boost::shared_ptr<LogicalQueryPlanNode> node_child, node->getChildren())
     {
-       boost::shared_ptr <PhysicalQueryPlanNode> pChild = traverse(query, instance_child);
+       boost::shared_ptr <PhysicalQueryPlanNode> pChild = traverse(query, node_child);
         pChild->setParent(result);
         result->addChild(pChild);
     }
@@ -162,12 +162,11 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
                 logicalOp->getGlobalOperatorName().second, PhysicalOperator::Parameters(), logicalOp->getSchema());
         globalOp->setQuery(query);
 
-        boost::shared_ptr<PhysicalQueryPlanNode> globalInstance(new PhysicalQueryPlanNode(globalOp, true, false, false));
+        boost::shared_ptr<PhysicalQueryPlanNode> globalNode(new PhysicalQueryPlanNode(globalOp, true, false, false));
 
         if ( query->getInstancesCount() > 1) {
             // Insert SG to scatter aggregated result
             ArrayDesc sgSchema =  logicalOp->getSchema();
-            sgSchema.setId(0);
             sgSchema.setName("");
             //  TODO[apoliakov]: sgSchema.setPartitioningSchema(psRoundRobin); ??
 
@@ -186,23 +185,23 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
                 OperatorLibrary::getInstance()->createPhysicalOperator("sg", "impl_sg", sgParams, sgSchema);
             sgOp->setQuery(query);
 
-            boost::shared_ptr<PhysicalQueryPlanNode> sgInstance(new PhysicalQueryPlanNode(sgOp, false, false, false));
+            boost::shared_ptr<PhysicalQueryPlanNode> sgNode(new PhysicalQueryPlanNode(sgOp, false, false, false));
 
-            globalInstance->setParent(sgInstance);
-            sgInstance->addChild(globalInstance);
+            globalNode->setParent(sgNode);
+            sgNode->addChild(globalNode);
 
-            result->setParent(globalInstance);
-            globalInstance->addChild(result);
+            result->setParent(globalNode);
+            globalNode->addChild(result);
 
-            result = sgInstance;
+            result = sgNode;
         } else {
-            result->setParent(globalInstance);
-            globalInstance->addChild(result);
+            result->setParent(globalNode);
+            globalNode->addChild(result);
 
-            result = globalInstance;
+            result = globalNode;
         }
     }
-    else if ( !result->isDistributionPreserving() || !result->isChunkPreserving() )
+    else if (result->changesDistribution() || !result->outputFullChunks())
     {
         // Dumbest thing we can do: if we're not ABSOLUTELY SURE the operator is distribution-preserving, insert an SG,
         // and redistribute data exactly as in the output schema of the operator
@@ -224,13 +223,13 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
                                                                                                                 sgSchema);
         sgOperator->setQuery(query);
 
-        boost::shared_ptr<PhysicalQueryPlanNode> sgInstance(new PhysicalQueryPlanNode(sgOperator,
+        boost::shared_ptr<PhysicalQueryPlanNode> sgNode(new PhysicalQueryPlanNode(sgOperator,
                                                                                   false,
                                                                                   false,
                                                                                   false));
-        sgInstance->addChild(result);
-        result->setParent(sgInstance);
-        result = sgInstance;
+        sgNode->addChild(result);
+        result->setParent(sgNode);
+        result = sgNode;
     }
 
     return result;

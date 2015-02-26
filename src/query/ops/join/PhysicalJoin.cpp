@@ -144,16 +144,26 @@ public:
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
-        Dimensions const& rightDimensions = inputArrays[1]->getArrayDesc().getDimensions();
+
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM ||
+            inputArrays[1]->getSupportedAccess() != Array::RANDOM)
+        {
+            //We use setPosition to align data, so input arrays must support it
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
+        boost::shared_ptr<Array> left = inputArrays[0];
+        boost::shared_ptr<Array> right = inputArrays[1];
+        Dimensions const& rightDimensions = right->getArrayDesc().getDimensions();
         size_t nRightDims = rightDimensions.size();
         for (size_t i = 0; i < nRightDims; i++) {
             if (rightDimensions[i].getType() != TID_INT64) {
-               return boost::shared_ptr<Array>(new MapJoinArray(_schema, inputArrays[0], redistribute(inputArrays[1], query, psReplication), query));
+                return boost::shared_ptr<Array>(new MapJoinArray(_schema, left, redistribute(right, query, psReplication), query));
             }
         }
         return boost::shared_ptr<Array>(_schema.getEmptyBitmapAttribute() == NULL
-                                        ? (Array*)new JoinArray(_schema, inputArrays[0], inputArrays[1])
-                                        : (Array*)new JoinEmptyableArray(_schema, inputArrays[0], inputArrays[1]));
+                                        ? (Array*)new JoinArray(_schema, left, right)
+                                        : (Array*)new JoinEmptyableArray(_schema, left, right));
     }
 };
 

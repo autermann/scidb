@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!-- This document was created with Syntext Serna Free. --><!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
 <chapter>
-  <title>SciDB Data Type Reference</title>
+  <title>SciDB Data Types and Casting</title>
   <para>SciDB supports the following data types. You can access this list by using <code>list(&apos;types&apos;)</code> at the AFL command line.</para>
   <informaltable frame="all">
     <tgroup cols="3">
@@ -34,7 +34,7 @@
         <row>
           <entry>datetimetz </entry>
           <entry>1970-01-01 00:00:00 -00:00</entry>
-          <entry>Timezone </entry>
+          <entry>Date and time with timezone offset. </entry>
         </row>
         <row>
           <entry>double </entry>
@@ -68,8 +68,8 @@
         </row>
         <row>
           <entry>string </entry>
-          <entry>""</entry>
-          <entry>Character string </entry>
+          <entry>&quot;&quot;</entry>
+          <entry>Variable length character string </entry>
         </row>
         <row>
           <entry>uint8 </entry>
@@ -94,4 +94,76 @@
       </tbody>
     </tgroup>
   </informaltable>
+
+  <para>
+  Attribute values in SciDB can be cast or converted from one data type to
+  another. SciDB permits type conversions between numerical data types
+  (for example, from int8 to int32 or int8 to double). SciDB also
+  supports the conversion of numeric data types to non-numeric data
+  types, such as string.
+  </para>
+
+  <para>Attribute type conversion can be requested explicitly using
+  the following syntax.
+
+For example, if you have an integer data type and would like to use an
+operator only defined to accept double data type attributes, you can
+use the following conversion step to derive an attribute of the
+correct type.
+
+<programlisting>
+CREATE ARRAY A &lt;a1: int32&gt;[i=0:0,1,0];
+store(build(A,2),A);
+</programlisting>
+
+<programlisting>
+apply(A, a2, double(a1));
+apply(A, a2, string(a1));
+</programlisting>
+
+This generates a new attribute a2 with double data type from a1. 
+
+A numeric data type can also be converted to string, which returns a UTF-8 encoded string. 
+</para>
+
+<para>
+SciDB includes special functions for the conversion between temporal data types. 
+</para>
+
+<para>The following examples demonstrate how to use conversion
+functions between the datetime data type and the datetime with
+timezone, datetimetz data type.  The date time with time zone data
+type, datetimetz, uses a timezone offset relative to GMT. You can cast
+datetime to datetimetz by appending an offset using the following
+example:
+
+<programlisting>create array T&lt;td: datetime&gt;[i=0:0,1,0];
+store(build(T, now()), T);
+apply(T, dst, append_offset(td, 3600));
+</programlisting>
+
+</para>
+
+<para>
+To append an offset and apply it to the time, use the
+apply_offset() function, which adds a timezone offset to the
+datetime. The offset must be expressed in seconds. 
+
+<programlisting>
+create array T1 &lt;t:datetime&gt;[i=0:1,1,0];
+store(apply(T1,dst,apply_offset(t,3600)),T1);
+</programlisting>
+
+To return the datetime portion of a datetimetz value, use the strip_offset function:
+<programlisting>
+apply(T1,dst,strip_offset(dst));
+</programlisting>
+
+To apply the offset to the datetime and return a GMT datetime, use the togmt
+function: 
+<programlisting>
+apply(timedate_and_timezone,dst,togmt(myzone));
+</programlisting>
+</para>
+
 </chapter>

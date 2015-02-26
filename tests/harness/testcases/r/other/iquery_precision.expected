@@ -1,0 +1,25 @@
+SCIDB QUERY : <create array foo <x:double> [i=1:10,10,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(foo, 1.0/i), foo)>
+{i} x
+{1} 1
+{2} 0.5
+{3} 0.333333
+{4} 0.25
+{5} 0.2
+{6} 0.166667
+{7} 0.142857
+{8} 0.125
+{9} 0.111111
+{10} 0.1
+
+SCIDB QUERY : <iquery -aq 'scan(foo)'>
+[(1),(0.5),(0.333333),(0.25),(0.2),(0.166667),(0.142857),(0.125),(0.111111),(0.1)]
+
+SCIDB QUERY : <iquery -w 10 -aq 'scan(foo)'>
+[(1),(0.5),(0.3333333333),(0.25),(0.2),(0.1666666667),(0.1428571429),(0.125),(0.1111111111),(0.1)]
+
+SCIDB QUERY : <remove(foo)>
+Query was executed successfully
+

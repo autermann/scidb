@@ -34,6 +34,8 @@
  * limits of the input array, the behavior of the operator is undefined.
  *
  * The top-level array object simply serves as a factory for the iterators.
+ * @author Konstantin Knizhnik <knizhnik@garret.ru>
+ * @author poliocough@gmail.com
  */
 
 #ifndef SUB_ARRAY_H_
@@ -61,14 +63,6 @@ class SubArrayChunk : public DelegateChunk
 {
     friend class SubArrayChunkIterator;
     friend class SubArrayDirectChunkIterator;
-  public:
-    Coordinates const& getFirstPosition(bool withOverlap) const;
-    Coordinates const& getLastPosition(bool withOverlap) const;
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
-
-    void setPosition(Coordinates const& pos);
-
-    SubArrayChunk(SubArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID);
 
   private:
     SubArray const& array;
@@ -77,10 +71,31 @@ class SubArrayChunk : public DelegateChunk
     Coordinates lastPos;
     Coordinates lastPosWithOverlap;
     bool        fullyBelongs;
+
+  public:
+    Coordinates const& getFirstPosition(bool withOverlap) const;
+    Coordinates const& getLastPosition(bool withOverlap) const;
+    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+
+    void setPosition(Coordinates const& pos);
+
+    SubArrayChunk(SubArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID);
 };
     
 class SubArrayChunkIterator : public ConstChunkIterator
 {
+  private:
+    SubArray const& array;
+    SubArrayChunk const& chunk;
+    ConstChunk const* inputChunk;
+    boost::shared_ptr<ConstArrayIterator> inputArrayIterator;
+    boost::shared_ptr<ConstChunkIterator> inputIterator;
+
+    Coordinates outPos;
+    Coordinates inPos;
+    bool hasCurrent;
+    int mode;
+
   public:
     int getMode();
     Value& getItem();
@@ -93,29 +108,19 @@ class SubArrayChunkIterator : public ConstChunkIterator
     ConstChunk const& getChunk();
 
     SubArrayChunkIterator(SubArrayChunk const& chunk, int iterationMode);
-
-  private:
-    SubArray const& array;
-    SubArrayChunk const& chunk;
-    ConstChunk const* inputChunk;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
-    Coordinates outPos; 
-    Coordinates inPos; 
-    bool hasCurrent;
-    int mode;
 };
 
 class SubArrayDirectChunkIterator : public DelegateChunkIterator
 {
+  private:
+    SubArray const& array;
+    Coordinates currPos;
+
   public:
     Coordinates const& getPosition();
     bool setPosition(Coordinates const& pos);
 
     SubArrayDirectChunkIterator(SubArrayChunk const& chunk, int iterationMode);
-
-  private:
-    SubArray const& array;
-    Coordinates currPos; 
 };
 
 /***
@@ -126,13 +131,31 @@ class SubArrayDirectChunkIterator : public DelegateChunkIterator
 class SubArrayIterator : public DelegateArrayIterator
 {
     friend class SubArrayChunkIterator;
+
+protected:
+    bool setInputPosition(size_t i);
+    void fillSparseChunk(size_t i);
+
+    SubArray const& array;
+    Coordinates outPos;
+    Coordinates inPos;
+    bool hasCurrent;
+
+    Coordinates outChunkPos;
+    boost::shared_ptr<ChunkIterator> outIterator;
+    MemChunk sparseChunk;
+    boost::shared_ptr<ConstArrayIterator> emptyIterator;
+
   public:
 	/***
 	 * Constructor for the subarray iterator
 	 * Here we initialize the current position vector to all zeros, and obtain an iterator for the appropriate
 	 * attribute in the input array.
 	 */
-	SubArrayIterator(SubArray const& subarray, AttributeID attrID);
+	SubArrayIterator(SubArray const& subarray, AttributeID attrID, bool doReset = true);
+
+	virtual ~SubArrayIterator()
+	{}
 
 	/***
 	 * The end call checks whether we're operating with the last chunk of the subarray
@@ -163,22 +186,24 @@ class SubArrayIterator : public DelegateArrayIterator
 	virtual void reset();
 
     virtual ConstChunk const& getChunk();
+};
 
-  private:
-    bool setInputPosition(size_t i);
-    void fillSparseChunk(size_t i);
-    void checkState();
+class MappedSubArrayIterator : public SubArrayIterator
+{
+protected:
+    set<Coordinates,CoordinatesLess>::const_iterator _mIter;
 
-    SubArray const& array;	
-	Coordinates outPos; 
-	Coordinates inPos; 
-    bool hasCurrent;
-    bool positioned;
+public:
+    MappedSubArrayIterator(SubArray const& subarray, AttributeID attrID);
 
-    Coordinates outChunkPos;
-    boost::shared_ptr<ChunkIterator> outIterator;
-    MemChunk sparseChunk;
-    boost::shared_ptr<ConstArrayIterator> emptyIterator;
+    virtual ~MappedSubArrayIterator()
+    {}
+
+    virtual bool setPosition(Coordinates const& pos);
+
+    virtual void operator ++();
+
+    virtual void reset();
 };
 
 class SubArray : public DelegateArray
@@ -187,6 +212,44 @@ class SubArray : public DelegateArray
     friend class SubArrayChunkIterator;
     friend class SubArrayDirectChunkIterator;
     friend class SubArrayIterator;
+    friend class MappedSubArrayIterator;
+
+  private:
+    Coordinates subarrayLowPos;
+    Coordinates subarrayHighPos;
+    Dimensions const& dims;
+    Dimensions const& inputDims;
+    bool aligned;
+
+    bool _useChunkSet;
+    set<Coordinates, CoordinatesLess> _chunkSet;
+
+    void buildChunkSet();
+    void addChunksToSet(Coordinates outChunkCoords, size_t dim = 0);
+
+    /**
+     * SubArray has two ArrayIterator types:
+     * 1. SubArrayIterator probes the space of all possible chunks
+     * 2. MappedSubArrayIterator first builds a map of all chunks that are present.
+     *
+     * Building the map is preferred when the input array is very sparse and the subarray box can contain millions of possible chunks.
+     * In 99% of the cases, walking along one attribute and collecting the chunk coordinates is very cheap.
+     *
+     * Between has a very similar two-iterator system. See comment in BetweenArray.h for why 6,000 is a good number.
+     * We should merge these constants somehow but making them one config does not seem right.
+     * [poliocough, 4/18/12]
+     *
+     * TODO: we should merge these maps together into a unified API:
+     * Array
+     * {
+     *   bool hasChunkCount();
+     *   size_t getChunkCount();
+     *   bool hasChunkMap();
+     *   map<...> getChunkMap();
+     * }
+     * This could prove useful inside ops like subarray, between, slice. AND it could provide for faster implementation of ops like join.
+     */
+    static const size_t SUBARRAY_MAP_ITERATOR_THRESHOLD = 6000;
 
   public:
 	SubArray(ArrayDesc& d, Coordinates lowPos, Coordinates highPos, boost::shared_ptr<Array> input);
@@ -196,12 +259,7 @@ class SubArray : public DelegateArray
  
     void out2in(Coordinates const& out, Coordinates& in) const;
     void in2out(Coordinates const& in, Coordinates& out) const;
-  private:
-	Coordinates subarrayLowPos;
-	Coordinates subarrayHighPos;
-    Dimensions const& dims;
-    Dimensions const& inputDims;
-    bool aligned;
+
 };
 
 

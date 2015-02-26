@@ -32,7 +32,6 @@ set (array_src
     FileArray.cpp
     DBArray.cpp
     ParallelAccumulatorArray.cpp
-    RLEArray.cpp
     RLE.cpp
 )
 

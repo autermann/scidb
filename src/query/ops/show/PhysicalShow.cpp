@@ -42,15 +42,20 @@ namespace scidb
 class PhysicalShow: public PhysicalOperator
 {
 public:
-        PhysicalShow(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalShow(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+        _result = boost::shared_ptr<MemArray>(new MemArray(_schema));
     }
 
-    shared_ptr<Array> execute(vector<shared_ptr<Array> >& inputArrays,
-            shared_ptr<Query> query)
+    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution>& inputDistributions,
+                                                 const std::vector< ArrayDesc>& inputSchemas) const
     {
-        assert(inputArrays.size() == 0);
+        return ArrayDistribution(psLocalInstance);
+    }
+
+    void preSingleExecute(boost::shared_ptr<Query> query)
+    {
         assert(_parameters.size() == 1);
 
         stringstream ss;
@@ -59,8 +64,7 @@ public:
         // we want to "show" only the persistent contents (i.e. the catalog contents)
         printSchema(ss, ((const shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema());
 
-        boost::shared_ptr<MemArray> arr = boost::shared_ptr<MemArray>(new MemArray(_schema));
-        boost::shared_ptr<ArrayIterator> arrIt = arr->getIterator(0);
+        boost::shared_ptr<ArrayIterator> arrIt = _result->getIterator(0);
         Coordinates coords;
         coords.push_back(0);
         Chunk& chunk = arrIt->newChunk(coords);
@@ -69,8 +73,18 @@ public:
         v.setString(ss.str().c_str());
         chunkIt->writeItem(v);
         chunkIt->flush();
-        return arr;
     }
+
+    boost::shared_ptr<Array> execute(
+        std::vector<boost::shared_ptr<Array> >& inputArrays,
+        boost::shared_ptr<Query> query)
+    {
+        assert(inputArrays.size() == 0);
+        return _result;
+    }
+
+private:
+    boost::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalShow, "show", "impl_show")

@@ -1,0 +1,19 @@
+
+--test
+--start-query-logging
+
+--shell  --command="cat ../examples/m4x4.scidb " --store
+--set-format dcsv
+--start-igdata
+CREATE empty ARRAY m4x4 <val:double>[i=0:3,4,0,j=0:3,4,0]  
+--aql LOAD m4x4 FROM '../examples/m4x4.scidb'  
+--set-format dense
+--stop-igdata
+--aql SELECT * FROM variable_window(m4x4,i,1,1,sum(val))  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(m4x4)

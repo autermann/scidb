@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>gemm</refname>
+
+    <refpurpose>Produces a result array from three operand arrays A, B, and C.
+    The result array is ( A x B ) + C.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>AFL%  gemm(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>,<replaceable>summand_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The gemm operator performs matrix multiplication on two input
+    matrices, adds the matrix product to a third matrix, and returns the
+    resulting matrix sum.</para>
+
+    <para>The operand arrays must be compatible for the operation. All three
+    arrays must have a single numeric attribute. The left and right arrays
+    must have the same size of 'inner' dimension and same chunk size along
+    that dimension. The summand array must have the same dimension sizes as
+    the result of (left_array x right_array).</para>
+
+    <para>To use the gemm operator, you must first load the
+    dense_linear_algebra library.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Limitations</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>For each dimension of each operand array, the chunk size must be
+        32.</para>
+      </listitem>
+
+      <listitem>
+        <para>All of the operand matrixes must be square.</para>
+      </listitem>
+
+      <listitem>
+        <para>For each dimension of each operand array, the dimension starting
+        index must be zero.</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+</refentry>

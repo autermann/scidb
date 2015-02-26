@@ -43,7 +43,7 @@ namespace scidb
 /**
  * Macroses for easy defining keywords and collating them to tokens
  */
-#define AQLKW(name, tok) {name,  AQLParser::token::tok},
+#define AQLKW(name, tok, reserved) {name,  AQLParser::token::tok, reserved},
 
 /**
  * Structure for defining keywords.
@@ -51,7 +51,8 @@ namespace scidb
 struct AQLKeyword
 {
 	const char* name;
-	 AQLParser::token::yytokentype tok;
+	AQLParser::token::yytokentype tok;
+	bool reserved;
 };
 
 /**

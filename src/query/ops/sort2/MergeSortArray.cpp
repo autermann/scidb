@@ -166,10 +166,10 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
         while (permutation.size() != 0) {
             if (!chunkIterators[0]) {
                 for (size_t i = 0; i < nAttrs; i++) {
-                    Address addr(desc.getId(), i, chunkPos);
+                    Address addr(i, chunkPos);
                     MemChunk& chunk = attributes[i].chunks[chunkIndex % CHUNK_HISTORY_SIZE];
                     chunk.initialize(this, &desc, addr, desc.getAttributes()[i].getDefaultCompressionMethod());
-                    chunkIterators[i] = chunk.getIterator(query, ChunkIterator::NO_EMPTY_CHECK);
+                    chunkIterators[i] = chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE|ChunkIterator::NO_EMPTY_CHECK);
                 }
                 chunkPos[0] += chunkSize;
                 currChunkIndex += 1;
@@ -216,11 +216,6 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
             chunkIterators[i]->flush();
         }
         return true;
-    }
-
-    bool MergeSortArray::supportsRandomAccess() const
-    {
-        return false;
     }
 
     ConstChunk const& MergeSortArray::getChunk(AttributeID attr, size_t chunkIndex)

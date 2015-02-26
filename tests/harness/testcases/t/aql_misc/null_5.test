@@ -18,86 +18,86 @@ create  empty array mn_dt 	  <a:datetime null>[x=0:3,2,0]
 
 --test
 --echo datatype = bool
---sleep 2
+
 --aql load m_bool from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_bool from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_bool from '../tests/harness/testcases/data/empty_b.txt'
---sleep 2
+
 --aql load mn_bool from '../tests/harness/testcases/data/empty_b.txt'
 
 
 --echo datatype = string
---sleep 2
+
 --aql load m_string from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_string from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_string from '../tests/harness/testcases/data/empty_s.txt'
---sleep 2
+
 --aql load mn_string from '../tests/harness/testcases/data/empty_s.txt'
---sleep 2
+
 --aql load m_string from '../tests/harness/testcases/data/empty_n.txt'
---sleep 2
+
 --aql load mn_string from '../tests/harness/testcases/data/empty_n.txt'
 
 
 --echo datatype = int32
---sleep 2
+
 --aql load m_i32 from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_i32 from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_i32 from '../tests/harness/testcases/data/empty_n.txt'
---sleep 2
+
 --aql load mn_i32 from '../tests/harness/testcases/data/empty_n.txt'
 
 
 
 --echo datatype = int8
---sleep 2
+
 --aql load m_i8 from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_i8 from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_i8 from '../tests/harness/testcases/data/empty_n.txt'
---sleep 2
+
 --aql load mn_i8 from '../tests/harness/testcases/data/empty_n.txt'
 
 
 
 --echo datatype = int16
---sleep 2
+
 --aql load m_i16 from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_i16 from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_i16 from '../tests/harness/testcases/data/empty_n.txt'
---sleep 2
+
 --aql load mn_i16 from '../tests/harness/testcases/data/empty_n.txt'
 
 
 
 --echo datatype = char
---sleep 2
+
 --aql load m_char from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_char from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_char from '../tests/harness/testcases/data/empty_s.txt'
---sleep 2
+
 --aql load mn_char from '../tests/harness/testcases/data/empty_s.txt'
 
 
 --echo datatype = datetime
---sleep 2
+
 --aql load m_dt from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load mn_dt from '../tests/harness/testcases/data/null_5.txt'
---sleep 2
+
 --aql load m_dt from '../tests/harness/testcases/data/empty_d.txt'
---sleep 2
+
 --aql load mn_dt from '../tests/harness/testcases/data/empty_d.txt'
 
 

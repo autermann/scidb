@@ -72,7 +72,7 @@ void configHook(int32_t configOption)
                 case CONFIG_HELP:
                         cout << "Available options:" << endl
                                 << Config::getInstance()->getDescription() << endl;
-                        exit(0);
+                        ::exit(0);
                         break;
         }
 }
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
         cfg->setOption(CONFIG_PORT,0);
 
         SystemCatalog* catalog = SystemCatalog::getInstance();
-        catalog->connect(cfg->getOption<string>(CONFIG_CATALOG_CONNECTION_STRING));
+        catalog->connect(cfg->getOption<string>(CONFIG_CATALOG_CONNECTION_STRING), false);
 
         CppUnit::TextUi::TestRunner runner;
         CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();

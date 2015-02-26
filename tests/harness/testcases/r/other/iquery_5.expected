@@ -8,67 +8,91 @@ SCIDB QUERY : <create empty array A3 <c:string, a:int32> [b(string)=6,2,0,x=0:2,
 Query was executed successfully
 
 SCIDB QUERY : <load(A,'../tests/harness/testcases/data/iquery_5.txt')>
-[[(10,"b_04","c_04")],[(11,"b_14","c_14")],[(12,"b_24","c_24")]];[[(10,"b_05","c_05")],[(11,"b_15","c_15")],[(12,"b_25","c_25")]]
+{x,y} a,b,c
+{0,4} 10,"b_04","c_04"
+{1,4} 11,"b_14","c_14"
+{2,4} 12,"b_24","c_24"
+{0,5} 10,"b_05","c_05"
+{1,5} 11,"b_15","c_15"
+{2,5} 12,"b_25","c_25"
 
 SCIDB QUERY : <redimension_store(A,A2)>
-[(10,"b_04"),(10,"b_05"),(11,"b_14"),(11,"b_15"),(12,"b_24"),(12,"b_25")]
+{c} a,b
+{"c_04"} 10,"b_04"
+{"c_05"} 10,"b_05"
+{"c_14"} 11,"b_14"
+{"c_15"} 11,"b_15"
+{"c_24"} 12,"b_24"
+{"c_25"} 12,"b_25"
 
 SCIDB QUERY : <redimension_store(A,A3)>
-[[("c_04",10),(),()],[("c_05",10),(),()],[(),("c_14",11),()],[(),("c_15",11),()],[(),(),("c_24",12)],[(),(),("c_25",12)]]
+{b,x} c,a
+{"b_04",0} "c_04",10
+{"b_05",0} "c_05",10
+{"b_14",1} "c_14",11
+{"b_15",1} "c_15",11
+{"b_24",2} "c_24",12
+{"b_25",2} "c_25",12
 
 SCIDB QUERY : <echo ('iquery   -o lcsv+ -aq \'scan ( A )\'')>
-[("iquery   -o lcsv+ -aq 'scan ( A )'")]
+{i} text
+{0} "iquery   -o lcsv+ -aq 'scan ( A )'"
 
 SCIDB QUERY : < iquery   -o lcsv+ -aq 'scan ( A )' >
-x,y,a,b,c,EmptyTag
-0,4,10,"b_04","c_04",true
-1,4,11,"b_14","c_14",true
-2,4,12,"b_24","c_24",true
-0,5,10,"b_05","c_05",true
-1,5,11,"b_15","c_15",true
-2,5,12,"b_25","c_25",true
+x,y,a,b,c
+0,4,10,"b_04","c_04"
+1,4,11,"b_14","c_14"
+2,4,12,"b_24","c_24"
+0,5,10,"b_05","c_05"
+1,5,11,"b_15","c_15"
+2,5,12,"b_25","c_25"
 
 SCIDB QUERY : <echo ('iquery   -o lsparse -aq \'scan ( A )\'')>
-[("iquery   -o lsparse -aq 'scan ( A )'")]
+{i} text
+{0} "iquery   -o lsparse -aq 'scan ( A )'"
 
 SCIDB QUERY : < iquery   -o lsparse -aq 'scan ( A )' >
-{0,4}[[{0,4}(10,"b_04","c_04",true)],[{1,4}(11,"b_14","c_14",true)],[{2,4}(12,"b_24","c_24",true)]];{0,5}[[{0,5}(10,"b_05","c_05",true)],[{1,5}(11,"b_15","c_15",true)],[{2,5}(12,"b_25","c_25",true)]]
+{0,4}[[{0,4}(10,"b_04","c_04")],[{1,4}(11,"b_14","c_14")],[{2,4}(12,"b_24","c_24")]];{0,5}[[{0,5}(10,"b_05","c_05")],[{1,5}(11,"b_15","c_15")],[{2,5}(12,"b_25","c_25")]]
 
 SCIDB QUERY : <echo ('iquery   -o lcsv+ -aq \'scan ( A2 )\'')>
-[("iquery   -o lcsv+ -aq 'scan ( A2 )'")]
+{i} text
+{0} "iquery   -o lcsv+ -aq 'scan ( A2 )'"
 
 SCIDB QUERY : < iquery   -o lcsv+ -aq 'scan ( A2 )' >
-c,a,b,EmptyTag
-"c_04",10,"b_04",true
-"c_05",10,"b_05",true
-"c_14",11,"b_14",true
-"c_15",11,"b_15",true
-"c_24",12,"b_24",true
-"c_25",12,"b_25",true
+c,a,b
+"c_04",10,"b_04"
+"c_05",10,"b_05"
+"c_14",11,"b_14"
+"c_15",11,"b_15"
+"c_24",12,"b_24"
+"c_25",12,"b_25"
 
 SCIDB QUERY : <echo ('iquery   -o lsparse -aq \'scan ( A2 )\'')>
-[("iquery   -o lsparse -aq 'scan ( A2 )'")]
+{i} text
+{0} "iquery   -o lsparse -aq 'scan ( A2 )'"
 
 SCIDB QUERY : < iquery   -o lsparse -aq 'scan ( A2 )' >
-{"c_04"}[{"c_04"}(10,"b_04",true),{"c_05"}(10,"b_05",true),{"c_14"}{"c_14"}(11,"b_14",true),{"c_15"}(11,"b_15",true),{"c_24"}{"c_24"}(12,"b_24",true),{"c_25"}(12,"b_25",true)]
+{"c_04"}[{"c_04"}(10,"b_04"),{"c_05"}(10,"b_05"),{"c_14"}{"c_14"}(11,"b_14"),{"c_15"}(11,"b_15"),{"c_24"}{"c_24"}(12,"b_24"),{"c_25"}(12,"b_25")]
 
 SCIDB QUERY : <echo ('iquery   -o lcsv+ -aq \'scan ( A3 )\'')>
-[("iquery   -o lcsv+ -aq 'scan ( A3 )'")]
+{i} text
+{0} "iquery   -o lcsv+ -aq 'scan ( A3 )'"
 
 SCIDB QUERY : < iquery   -o lcsv+ -aq 'scan ( A3 )' >
-b,x,c,a,EmptyTag
-"b_04",0,"c_04",10,true
-"b_05",0,"c_05",10,true
-"b_14",1,"c_14",11,true
-"b_15",1,"c_15",11,true
-"b_24",2,"c_24",12,true
-"b_25",2,"c_25",12,true
+b,x,c,a
+"b_04",0,"c_04",10
+"b_05",0,"c_05",10
+"b_14",1,"c_14",11
+"b_15",1,"c_15",11
+"b_24",2,"c_24",12
+"b_25",2,"c_25",12
 
 SCIDB QUERY : <echo ('iquery   -o lsparse -aq \'scan ( A3 )\'')>
-[("iquery   -o lsparse -aq 'scan ( A3 )'")]
+{i} text
+{0} "iquery   -o lsparse -aq 'scan ( A3 )'"
 
 SCIDB QUERY : < iquery   -o lsparse -aq 'scan ( A3 )' >
-{"b_04",0}[[{"b_04",0}("c_04",10,true)],[{"b_05",0}("c_05",10,true),{"b_14",1}{"b_14",1}("c_14",11,true)],[{"b_15",1}("c_15",11,true),{"b_24",2}{"b_24",2}("c_24",12,true)],[{"b_25",2}("c_25",12,true)]]
+{"b_04",0}[[{"b_04",0}("c_04",10)],[{"b_05",0}("c_05",10),{"b_14",1}{"b_14",1}("c_14",11)],[{"b_15",1}("c_15",11),{"b_24",2}{"b_24",2}("c_24",12)],[{"b_25",2}("c_25",12)]]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

@@ -28,10 +28,39 @@
 
 #include "query/Operator.h"
 
-
 namespace scidb
 {
 
+/**
+ * @brief The operator: normalize().
+ *
+ * @par Synopsis:
+ *   normalize( srcArray )
+ *
+ * @par Summary:
+ *   Produces a result array by dividing each element of a 1-attribute vector by the square root of the sum of squares of the elements.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims. There should be exactly one attribute (of double type) and exactly one dimension.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalNormalize : public  LogicalOperator
 {
   public:

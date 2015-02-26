@@ -36,6 +36,38 @@ using namespace std;
 
 namespace scidb {
 
+/**
+ * @brief The operator: setopt().
+ *
+ * @par Synopsis:
+ *   setopt( option [, newValue] )
+ *
+ * @par Summary:
+ *   Gets/Sets a config option at runtime.
+ *
+ * @par Input:
+ *   - option: the config option.
+ *   - newValue: an optional new value for the config option. If provided, the option is set. Either way, the option value(s) is returned.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   old: string
+ *   <br>   new: string, if newValue is provided
+ *   <br> >
+ *   <br> [
+ *   <br>   No: start=0, end=#instances-1, chunk interval=1
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalSetopt: public LogicalOperator
 {
 public:

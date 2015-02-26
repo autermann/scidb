@@ -1,6 +1,6 @@
 --setup
 --start-query-logging
-
+--set-format csv+
 CREATE  ARRAY A_load <STR : string, DBL : double, I32 : int32, I64 : int64, FLT : float, STR2 : string>[ Line=0:*,8,0 ]
 load ( A_load, '../tests/harness/testcases/data/redim_comp1.txt')
 scan ( A_load )
@@ -14,7 +14,7 @@ CREATE  ARRAY B_repart2 < STR : string, I32 : int32, FLT : float, Line : int64> 
 redimension_store (A_load, B)
 redimension_store (A_load, B_repart1)
 
---error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_STORE_ERROR1 "store ( repart (B_repart1, B_repart2), B_repart2)"
+store ( repart (B_repart1, B_repart2), B_repart2)
 
 CREATE  ARRAY B_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:*,8,0 ]
 
@@ -73,9 +73,7 @@ redimension_store (apply(F, recno, int32(Line)), F_flipped)
 count ( filter ( join ( cast(F_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR))
 # F END
 
-
-
-
+--reset-format
 
 --cleanup
 

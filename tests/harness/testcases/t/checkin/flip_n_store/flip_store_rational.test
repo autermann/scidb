@@ -8,6 +8,10 @@ create immutable empty array C <a:rational>[b(rational)=3,3,0]
 project(apply(store(join(build(T,rational(x+1,x+2)),build(T,rational(x+10,x+11))),A),c,str(a)+' - '+str(b)),c)
 
 --test
+
+#workaround for p4 bug 564
+--set-format csv+
+
 project(apply(redimension_store(A,B),c,str(b)),c)
 project(apply(redimension_store(B,C),c,str(a)),c)
 project(apply(unpack(B,row),c,str(a)+' - '+str(b)),c)
@@ -54,6 +58,8 @@ project(apply(sum(C1),c,str(a_sum)),c)
 project(apply(sort(C1,a),c,str(a)),c)
 project(apply(sort(C1,a desc),c,str(a)),c)
 rename(C1,C)
+
+--reset-format
 
 --cleanup
 remove(A)

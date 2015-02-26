@@ -28,13 +28,15 @@
 # <source_path> is a path of the directory containing scidb code
 # <build_path> is a path to be used for out-of-source builds
 
-if test $# -ne 5
+if test $# -lt 5
 then
-echo "Usage : SciDBSubmitBuild.sh Nightly|Experimental|Continuous <source_path> <build_path> <build_type>"
+echo "Usage : SciDBSubmitBuild.sh Nightly|Experimental|Continuous <source_path> <build_path> <build_type> <branch_name>"
 echo "        <source_path> : is a path of the directory containing scidb code"
 echo "        <build_path>  : is a path to be used for out-of-source builds"
 echo "        <build_type>  : is the type of build (CC vs. Release vs. RelWithDebInfo vs. Debug vs. Profile)"
-echo "        <build_tag>   : is the tag of build (branch e.g., rel_11_12)"
+echo "        <branch_name> : is the tag of branch (trunk, rel_11_12)"
+echo "        [noinit]	    : if 'noinit' in included, the database will be preserved after completion." 
+echo "        [valgrind]    : if 'valgrind' is included, SciDB is run under valgrind."
 echo ""
 exit 1
 fi
@@ -42,11 +44,14 @@ fi
 TESTMODEL=$1
 if test "$TESTMODEL" != Nightly && test "$TESTMODEL" != Experimental && test "$TESTMODEL" != Continuous
 then
-echo "Usage : SciDBSubmitBuild.sh Nightly|Experimental|Continuous <source_path> <build_path> <build_type>"
+echo "Usage : SciDBSubmitBuild.sh Nightly|Experimental|Continuous <source_path> <build_path> <build_type> <branch_name>"
 echo "        <source_path> : is a path of the directory containing scidb code"
 echo "        Check if (Nightly|Experimental|Continuous) is spelled correctly."
 echo "        <build_path>  : is a path to be used for out-of-source builds"
 echo "        <build_type>  : is the type of build (CC, Release, RelWithDebInfo, Debug, Profile)"
+echo "        <branch_name> : is the tag of branch (trunk, rel_11_12)"
+echo "        [noinit]      : if 'noinit' in included, the database will be preserved after completion."
+echo "        [valgrind]    : if 'valgrind' is included, SciDB is run under valgrind."
 echo ""
 exit 1
 fi
@@ -56,6 +61,24 @@ export BUILD_PATH="$3"
 export BUILD_TYPE="$4"
 # This is a temporary fix to print the branch on the dashboard.
 export BUILD_BRANCH="$5"
+export SCIDB_INIT=0
+
+if [ "$6" == "noinit" ]
+then
+    export SCIDB_INIT="0"
+else
+    export SCIDB_INIT="1"
+fi
+
+if [ "$6" == "valgrind" or "$7" == "valgrind" ]
+then
+    export USE_VALGRIND=1
+else
+    export USE_VALGRIND=0
+fi
+
+# Only defined for ubuntu1104-vm configurations. (2, 3, or 4 instances)
+export NUM_INSTANCES="$7"
 
 CTESTScriptLOCATION="$SOURCE_PATH/cdash"
 
@@ -77,6 +100,7 @@ then
 echo "File $SOURCE_PATH/CTestConfig.cmake does not exist"
 exit 1
 fi
+echo "Setting vars"
 export TESTMODEL=$TESTMODEL
 export EXECUTABLE_CMAKE_PATH=/usr/local/bin/cmake
 export EXECUTABLE_CTEST_PATH=/usr/local/bin/ctest
@@ -92,7 +116,8 @@ svn up $CTESTScriptLOCATION/SciDB_DashboardSubmission.cmake > /dev/null
 # If you are accessing this machine using some other external IP address then please set value for this variable to that external IP.
 #export cdashclientip=`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname`
 #export cdashclientip=webmail.emolabs.com:99
-export cdashclientip=10.0.20.200
+domain='.local.paradigm4.com'
+export cdashclientip=`hostname`$domain
 
 if test -z $cdashclientip
 then
@@ -129,13 +154,13 @@ echo "ERROR : No write permissions for directory $BUILD_PATH"
 exit 1
 fi
 
-echo "Info : Copying files to $BUILD_PATH"
-echo "$SOURCE_PATH $BUILD_PATH"
-cp -r $SOURCE_PATH/* $BUILD_PATH/
 echo "Info : Updating svn in $SOURCE_PATH"
 cd $SOURCE_PATH
 svn up > /dev/null
 
+echo "Info : Copying files to $BUILD_PATH"
+echo "$SOURCE_PATH $BUILD_PATH"
+cp -r $SOURCE_PATH/* $BUILD_PATH/
 
 mkdir -p $BUILD_PATH/
 cd $BUILD_PATH
@@ -143,7 +168,7 @@ cmake $SOURCE_PATH > /dev/null 2>&1
 
 TIMESTAMP=$(date +%H-%M-%S_%d.%m.%Y)
 
-LOGFILE="/tmp/scidb_${TESTMODEL}Build.log_${TIMESTAMP}"
+LOGFILE="/tmp/scidb_${TESTMODEL}_${BUILD_BRANCH}_build.log_${TIMESTAMP}"
 export CDASH__LOGFILE=$LOGFILE
 
 echo "Performing update, compile, test, coverage report submission for this build. Please wait ..."
@@ -155,12 +180,14 @@ mkdir -p "$LOCALHOST_ROOT_DIRECTORY/$CDASH_TESTCASES_FOLDER"
 export scidbtestresultsURL=$CDASH_TESTCASES_FOLDER/r/
 export scidbtestcasesURL=$CDASH_TESTCASES_FOLDER/t/
 
-export BUILD_REVISION=`cat $BUILD_PATH/version.txt`
+export BUILD_REVISION=$(cat $BUILD_PATH/version.txt)
+echo "Build rev $BUILD_REVISION"
 export BUILD_TAG="${BUILD_REVISION}-${BUILD_TYPE}-${BUILD_BRANCH}"
 echo "Build tag is ${BUILD_TAG}"
 $EXECUTABLE_CTEST_PATH -S "cdash/SciDB_DashboardSubmission.cmake" -VV > "$LOGFILE" 2>&1
 cd $origdir
 
+export USE_VALGRIND=0
 echo "Done."
 echo ""
 exit 0

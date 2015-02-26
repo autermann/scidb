@@ -1,0 +1,17 @@
+SCIDB QUERY : <create array wordOfConversation <wordID:int64> [languageID=1:1000,100,0, conversationID=1:5000000,1000,0, timeOffsetInSeconds=1:10000,1000,100]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(wordOfConversation)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT approxdc(wordID) FROM wordOfConversation>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT approxdc(wordID) FROM wordOfConversation GROUP BY languageID>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT approxdc(wordID) FROM wordOfConversation GROUP BY conversationID>
+[Query was executed successfully, ignoring data output by this query.]
+
+Query was executed successfully
+

@@ -39,6 +39,43 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: dimensions().
+ *
+ * @par Synopsis:
+ *   dimensions( srcArray )
+ *
+ * @par Summary:
+ *   List the dimensions of the source array.
+ *
+ * @par Input:
+ *   - srcArray: a source array.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   name: string
+ *   <br>   start: int64,
+ *   <br>   length: uint64
+ *   <br>   chunk_interval: int32
+ *   <br>   chunk_overlap: int32
+ *   <br>   low: int64
+ *   <br>   high: int64
+ *   <br>   type: string
+ *   <br> >
+ *   <br> [
+ *   <br>   No: start=0, end=#dimensions less 1, chunk interval=#dimensions.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalDimensions: public LogicalOperator
 {
 public:
@@ -46,7 +83,6 @@ public:
         LogicalOperator(logicalName, alias)
     {
     	ADD_PARAM_IN_ARRAY_NAME()
-        _properties.ddl = true;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)

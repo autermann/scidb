@@ -1,0 +1,312 @@
+SCIDB QUERY : <cat ../examples/expo_example.txt >
+d,p,val
+"device-0","probe-0",0.01
+"device-1","probe-0",2.04
+"device-2","probe-0",6.09
+"device-3","probe-0",12.16
+"device-4","probe-0",20.25
+"device-0","probe-1",30.36
+"device-1","probe-1",42.49
+"device-2","probe-1",56.64
+"device-3","probe-1",72.81
+"device-4","probe-1",91
+"device-0","probe-2",111.21
+"device-1","probe-2",133.44
+"device-2","probe-2",157.69
+"device-3","probe-2",183.96
+"device-4","probe-2",212.25
+"device-0","probe-3",242.56
+"device-1","probe-3",274.89
+"device-2","probe-3",309.24
+"device-3","probe-3",345.61
+"device-4","probe-3",384
+"device-0","probe-4",424.41
+"device-1","probe-4",466.84
+"device-2","probe-4",511.29
+"device-3","probe-4",557.76
+"device-4","probe-4",606.25
+
+SCIDB QUERY : <CREATE ARRAY device_probe <d:string, p:string, val:double> [i=1:25,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load(device_probe, '../examples/expo_example.scidb')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array two_dim<val:double>[d(string)=5,5,0, p(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(device_probe, two_dim)>
+[[(0.01),(30.36),(111.21),(242.56),(424.41)],[(2.04),(42.49),(133.44),(274.89),(466.84)],[(6.09),(56.64),(157.69),(309.24),(511.29)],[(12.16),(72.81),(183.96),(345.61),(557.76)],[(20.25),(91),(212.25),(384),(606.25)]]
+
+SCIDB QUERY : <SELECT val FROM two_dim WHERE d='device-2' and p='probe-3'>
+[[(),(),(),(),()],[(),(),(),(),()],[(),(),(),(309.24),()],[(),(),(),(),()],[(),(),(),(),()]]
+
+SCIDB QUERY : <CREATE ARRAY Ds <av:double NULL>[d(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(device_probe, Ds, avg(val) as av)>
+{d} av
+{"device-0"} 161.71
+{"device-1"} 183.94
+{"device-2"} 208.19
+{"device-3"} 234.46
+{"device-4"} 262.75
+
+SCIDB QUERY : <CREATE ARRAY Dp <av:double NULL>[p(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(device_probe, Dp, avg(val) as av)>
+{p} av
+{"probe-0"} 8.11
+{"probe-1"} 58.66
+{"probe-2"} 159.71
+{"probe-3"} 311.26
+{"probe-4"} 513.31
+
+SCIDB QUERY : <CREATE ARRAY redim_missing< val1:string,val2:string NULL,val3:double >[i=0:9,10,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(redim_missing)>
+{i} schema
+{0} "redim_missing<val1:string,val2:string NULL,val3:double> [i=0:9,10,0]"
+
+SCIDB QUERY : <load(redim_missing, '../examples/redim_missing.scidb')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <scan(redim_missing)>
+{i} val1,val2,val3
+{0} "0","0",1
+{1} "0","1",0.540302
+{2} "0","2",-0.416147
+{3} "0","3",-0.989992
+{4} "0","4",-0.653644
+{5} "1",null,0.7
+{6} "1","1",0.841471
+{7} "1","2",0.909297
+{8} "1","3",0.14112
+{9} "1","4",-0.756802
+
+SCIDB QUERY : <CREATE ARRAY redim_target <val3:double> [val1(string)=2,2,0,val2(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(redim_missing,redim_target)>
+[[(1),(0.540302),(-0.416147),(-0.989992),(-0.653644)],[(),(0.841471),(0.909297),(0.14112),(-0.756802)]]
+
+SCIDB QUERY : <CREATE ARRAY m4x4 <val:double>[i=0:3,4,0,j=0:3,4,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build(m4x4,i*4+j),m4x4)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <scan(m4x4)>
+[[(0),(1),(2),(3)],[(4),(5),(6),(7)],[(8),(9),(10),(11)],[(12),(13),(14),(15)]]
+
+SCIDB QUERY : <show(m4x4)>
+{i} schema
+{0} "m4x4<val:double> [i=0:3,4,0,j=0:3,4,0]"
+
+SCIDB QUERY : <CREATE ARRAY m3x3 < val:double >[i=0:2,3,0,j=0:2,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load(m3x3, '../examples/m3x3.txt')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * INTO m1 FROM unpack(m3x3,k)>
+[(0,0,0),(0,1,1),(0,2,2),(1,0,3),(1,1,4),(1,2,5),(2,0,6),(2,1,7),(2,2,8)]
+
+SCIDB QUERY : <show(m1)>
+{i} schema
+{0} "m1<i:int64,j:int64,val:double> [k=0:*,9,0]"
+
+SCIDB QUERY : <show(m3x3)>
+{i} schema
+{0} "m3x3<val:double> [i=0:2,3,0,j=0:2,3,0]"
+
+SCIDB QUERY : <SELECT * FROM m3x3>
+[[(0),(1),(2)],[(3),(4),(5)],[(6),(7),(8)]]
+
+SCIDB QUERY : <SELECT * FROM reverse(m3x3)>
+[[(8),(7),(6)],[(5),(4),(3)],[(2),(1),(0)]]
+
+SCIDB QUERY : <show(m4x4)>
+{i} schema
+{0} "m4x4<val:double> [i=0:3,4,0,j=0:3,4,0]"
+
+SCIDB QUERY : <scan(m4x4)>
+[[(0),(1),(2),(3)],[(4),(5),(6),(7)],[(8),(9),(10),(11)],[(12),(13),(14),(15)]]
+
+SCIDB QUERY : <SELECT * FROM subarray(m4x4, 2, 2, 3, 4)>
+[[(10),(11)],[(14),(15)]]
+
+SCIDB QUERY : <CREATE ARRAY m3x3x3 < val: double >[i=0:2,3,0,j=0:2,3,0,k=0:2,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(m3x3x3)>
+{i} schema
+{0} "m3x3x3<val:double> [i=0:2,3,0,j=0:2,3,0,k=0:2,3,0]"
+
+SCIDB QUERY : <store(build(m3x3x3, i+j+k), m3x3x3)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <scan(m3x3x3)>
+[[[(0),(1),(2)],[(1),(2),(3)],[(2),(3),(4)]],[[(1),(2),(3)],[(2),(3),(4)],[(3),(4),(5)]],[[(2),(3),(4)],[(3),(4),(5)],[(4),(5),(6)]]]
+
+SCIDB QUERY : <slice(m3x3x3,k,1)>
+[[(1),(2),(3)],[(2),(3),(4)],[(3),(4),(5)]]
+
+SCIDB QUERY : <show(m4x4)>
+{i} schema
+{0} "m4x4<val:double> [i=0:3,4,0,j=0:3,4,0]"
+
+SCIDB QUERY : <scan(m4x4)>
+[[(0),(1),(2),(3)],[(4),(5),(6),(7)],[(8),(9),(10),(11)],[(12),(13),(14),(15)]]
+
+SCIDB QUERY : <thin(m4x4, 0, 2, 0, 2)>
+[[(0),(2)],[(8),(10)]]
+
+SCIDB QUERY : <SELECT * INTO m3x3_new FROM attribute_rename(m3x3,val,val2)>
+[[(0),(1),(2)],[(3),(4),(5)],[(6),(7),(8)]]
+
+SCIDB QUERY : <show(m3x3_new)>
+{i} schema
+{0} "m3x3_new<val2:double> [i=0:2,3,0,j=0:2,3,0]"
+
+SCIDB QUERY : <SELECT * INTO m3x3_new_attr FROM apply(m3x3,val2,val+10,val3,pow(val,2))>
+[[(0,10,0),(1,11,1),(2,12,4)],[(3,13,9),(4,14,16),(5,15,25)],[(6,16,36),(7,17,49),(8,18,64)]]
+
+SCIDB QUERY : <show(m3x3_new_attr)>
+{i} schema
+{0} "m3x3_new_attr<val:double,val2:double,val3:double> [i=0:2,3,0,j=0:2,3,0]"
+
+SCIDB QUERY : <SELECT val2, val3 FROM m3x3_new_attr>
+[[(10,0),(11,1),(12,4)],[(13,9),(14,16),(15,25)],[(16,36),(17,49),(18,64)]]
+
+SCIDB QUERY : <CREATE ARRAY Dsp_raw<d: string, t: string, val: double >[i=1:25,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY Dsp<val: double>[d(string)=5,5,0,t(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load(Dsp_raw, '../examples/expo_example.scidb')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(Dsp_raw, Dsp)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <scan(Dsp)>
+{d,t} val
+{"device-0","probe-0"} 0.01
+{"device-0","probe-1"} 30.36
+{"device-0","probe-2"} 111.21
+{"device-0","probe-3"} 242.56
+{"device-0","probe-4"} 424.41
+{"device-1","probe-0"} 2.04
+{"device-1","probe-1"} 42.49
+{"device-1","probe-2"} 133.44
+{"device-1","probe-3"} 274.89
+{"device-1","probe-4"} 466.84
+{"device-2","probe-0"} 6.09
+{"device-2","probe-1"} 56.64
+{"device-2","probe-2"} 157.69
+{"device-2","probe-3"} 309.24
+{"device-2","probe-4"} 511.29
+{"device-3","probe-0"} 12.16
+{"device-3","probe-1"} 72.81
+{"device-3","probe-2"} 183.96
+{"device-3","probe-3"} 345.61
+{"device-3","probe-4"} 557.76
+{"device-4","probe-0"} 20.25
+{"device-4","probe-1"} 91
+{"device-4","probe-2"} 212.25
+{"device-4","probe-3"} 384
+{"device-4","probe-4"} 606.25
+
+SCIDB QUERY : <show(Dsp)>
+{i} schema
+{0} "Dsp<val:double> [d(string)=5,5,0,t(string)=5,5,0]"
+
+SCIDB QUERY : <SELECT * INTO Dsp_slice_0 FROM slice(Dsp, d, 'device-0')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * INTO Dsp_slice_1 FROM slice(Dsp, d, 'device-1')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * INTO Dsp_slice_2 FROM slice(Dsp, d, 'device-2')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(Dsp_slice_2)>
+{i} schema
+{0} "Dsp_slice_2<val:double> [t(string)=5,5,0]"
+
+SCIDB QUERY : <SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2)>
+{t} val
+{0} 0.01
+{1} 30.36
+{2} 111.21
+{3} 242.56
+{4} 424.41
+{5} 6.09
+{6} 56.64
+{7} 157.69
+{8} 309.24
+{9} 511.29
+
+SCIDB QUERY : <show(Dsp_1d)>
+{i} schema
+{0} "Dsp_1d<val:double> [t=0:9,5,0]"
+
+SCIDB QUERY : <SELECT * into Dsp_new FROM concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d))>
+{d,t} val
+{0,"probe-0"} 0.01
+{0,"probe-1"} 30.36
+{0,"probe-2"} 111.21
+{0,"probe-3"} 242.56
+{0,"probe-4"} 424.41
+{1,"probe-0"} 6.09
+{1,"probe-1"} 56.64
+{1,"probe-2"} 157.69
+{1,"probe-3"} 309.24
+{1,"probe-4"} 511.29
+
+SCIDB QUERY : <show(Dsp_new)>
+{i} schema
+{0} "Dsp_new<val:double> [d=0:1,1,0,t(string)=5,5,0]"
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

@@ -44,6 +44,11 @@ enum
     POINT_E_CANT_CONVERT_TO_POINT = SCIDB_USER_ERROR_CODE_START
 };
 
+void construct_point(const scidb::Value** args, scidb::Value* res, void*)
+{
+    *(Point*)res->data() = Point();
+}
+
 void str2Point(const scidb::Value** args, scidb::Value* res, void*)
 {
     Point* p = (Point*)res->data();

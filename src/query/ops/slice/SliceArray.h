@@ -272,6 +272,15 @@ class SliceArray : public Array
     void mapPos(Coordinates& outPos, Coordinates const& inPos) const;
 
   public:
+
+    /**
+     * This is part of a pattern that has two different possible array iterators, and picks an iterator based
+     * on the logical size of the array. The same pattern is used in Between and Subarray.
+     * See comment in BetweenArray.h for why 6,000 is a good number.
+     * We should merge these constants somehow but making them one config does not seem right.
+     */
+    static const size_t SLICE_INFINITE_ITERATOR_THRESHOLD = 6000;
+
 	SliceArray(ArrayDesc& d, Coordinates const& slice, uint64_t mask, boost::shared_ptr<Array> input);
 
 	virtual string const& getName() const;
@@ -283,7 +292,7 @@ class SliceArray : public Array
 	ArrayDesc desc;
 	Coordinates slice;
     uint64_t mask;
-    bool     infinite;
+    bool     useInfiniteIterator;
     bool     simple;
 	boost::shared_ptr<Array> inputArray;
     Dimensions const& inputDims;

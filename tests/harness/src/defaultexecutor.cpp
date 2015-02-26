@@ -72,10 +72,15 @@
 # define TESTCASE_COMMAND_RECONNECT         "--reconnect" /* for reconnecting to scidb */
 # define TESTCASE_COMMAND_STARTQUERYLOGGING "--start-query-logging"
 # define TESTCASE_COMMAND_STOPQUERYLOGGING  "--stop-query-logging"
+# define TESTCASE_COMMAND_STARTIGNOREWARNINGS "--start-ignore-warnings"
+# define TESTCASE_COMMAND_STOPIGNOREWARNINGS "--stop-ignore-warnings"
 # define TESTCASE_COMMAND_STARTIGDATA       "--start-igdata"
 # define TESTCASE_COMMAND_STOPIGDATA        "--stop-igdata"
 # define TESTCASE_COMMAND_STARTTIMER        "--start-timer"
 # define TESTCASE_COMMAND_STOPTIMER         "--stop-timer"
+# define TESTCASE_COMMAND_SETFORMAT	    "--set-format"
+# define TESTCASE_COMMAND_ENDFORMAT	    "--reset-format"
+# define TESTCASE_COMMAND_SETPRECISION      "--set-precision"
 # define TESTCASE_COMMAND_ERROR             "--error"
 # define TESTCASE_COMMAND_JUSTRUN           "--justrun"
 # define TESTCASE_COMMAND_IGDATA            "--igdata"  /* ignore data */
@@ -170,8 +175,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		 **/
 		if (queryResult.selective && _ignoredata_flag == false)
 		{
-            scidb::DBLoader dbSaver;
-			dbSaver.save (*queryResult.array, queryoutput_file);
+            scidb::DBLoader::save (*queryResult.array, queryoutput_file, boost::shared_ptr<scidb::Query>(), _outputFormat);
 		}
 		else if (queryResult.selective && _ignoredata_flag == true)
 		{
@@ -234,7 +238,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			outFileStream.close ();
 		}
 
-        if (queryResult.hasWarnings())
+        if (_ignoreWarnings == false && queryResult.hasWarnings())
         {
             _resultfileStream << "Warning(s) detected during query execution: " << endl;
             while (queryResult.hasWarnings())
@@ -298,33 +302,33 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		if (errorInfo)
 		{
 			_resultfileStream << "[An error expected at this place for the query \"" << queryString << "\".";
-			_resultfileStream << " And it failed with";
-			_resultfileStream << " error code = " << e.getStringifiedErrorId();
-			if (errorInfo->_expected_errorcode2 != "")
-				_resultfileStream << " error code2 = " << e.getErrorId();
-			if (errorInfo->_expected_errns != "")
-				_resultfileStream << " error namespace = " << e.getErrorsNamespace();
-			if (errorInfo->_expected_errshort != int32_t(~0))
-				_resultfileStream << " short code = " << e.getShortErrorCode();
-			if (errorInfo->_expected_errlong != int32_t(~0))
-				_resultfileStream << " long code = " << e.getLongErrorCode();
-			_resultfileStream << ".";
+			_resultfileStream << " And it failed";
 
 			if (errorInfo->_expected_errorcode != "" || errorInfo->_expected_errorcode2 != "" || errorInfo->_expected_errns != "" || errorInfo->_expected_errshort != int32_t(~0) || errorInfo->_expected_errlong != int32_t(~0))
-				_resultfileStream << " Expected";
+			{
+				_resultfileStream << " with error code = " << e.getStringifiedErrorId();
+				if (errorInfo->_expected_errorcode2 != "")
+					_resultfileStream << " error code2 = " << e.getErrorId();
+				if (errorInfo->_expected_errns != "")
+					_resultfileStream << " error namespace = " << e.getErrorsNamespace();
+				if (errorInfo->_expected_errshort != int32_t(~0))
+					_resultfileStream << " short code = " << e.getShortErrorCode();
+				if (errorInfo->_expected_errlong != int32_t(~0))
+					_resultfileStream << " long code = " << e.getLongErrorCode();
+				_resultfileStream << ". Expected";
 
-            stringstream expectedTmp;
-			if (errorInfo->_expected_errorcode != "")
-			    expectedTmp << " error code = " << errorInfo->_expected_errorcode;
-            if (errorInfo->_expected_errorcode2 != "")
-                expectedTmp << " error code2 = " << errorInfo->_expected_errorcode2;
-            if (errorInfo->_expected_errns != "")
-                expectedTmp << " error namespace = " << errorInfo->_expected_errns;
-            if (errorInfo->_expected_errshort != int32_t(~0))
-                expectedTmp << " short code = " <<  errorInfo->_expected_errshort;
-            if (errorInfo->_expected_errlong != int32_t(~0))
-                expectedTmp << " long code = " <<  errorInfo->_expected_errlong;
-            _resultfileStream << expectedTmp.str() << ".]" << endl << endl;
+				stringstream expectedTmp;
+				if (errorInfo->_expected_errorcode != "")
+			    		expectedTmp << " error code = " << errorInfo->_expected_errorcode;
+            			if (errorInfo->_expected_errorcode2 != "")
+                			expectedTmp << " error code2 = " << errorInfo->_expected_errorcode2;
+            			if (errorInfo->_expected_errns != "")
+                			expectedTmp << " error namespace = " << errorInfo->_expected_errns;
+            			if (errorInfo->_expected_errshort != int32_t(~0))
+                			expectedTmp << " short code = " <<  errorInfo->_expected_errshort;
+            			if (errorInfo->_expected_errlong != int32_t(~0))
+                			expectedTmp << " long code = " <<  errorInfo->_expected_errlong;
+            			_resultfileStream << expectedTmp.str() << ".]" << endl << endl;
 
 			/* compare actual and expected error codes */
 			if (
@@ -334,7 +338,8 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			    || (errorInfo->_expected_errshort != int32_t(~0) && errorInfo->_expected_errshort != e.getShortErrorCode())
 			    || (errorInfo->_expected_errlong != int32_t(~0) && errorInfo->_expected_errlong != e.getLongErrorCode())
 			    )
-			{
+			  {
+				_errorCodesDiffer = true;
 				LOG4CXX_INFO (_logger, "Actual Error code (" << e.getErrorId() << " aka "
 				    << e.getStringifiedErrorId() << ") does not match with the Expected Error code ("
 				    << expectedTmp.str() << "). Hence this is a test case failure...");
@@ -343,8 +348,11 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
                                 }
 //				throw ExecutorError (FILE_LINE_FUNCTION, "SciDB query execution failed");
 				return SUCCESS;
-// We should now return SUCCESS because we dont want the test to throw EXECUTOR_ERROR if query returns an exception. Instead it will show FILES_DIFFER automatically when it compares the actual and expected output files.
+// We should now return SUCCESS because we dont want the test to throw EXECUTOR_ERROR and jump to cleanup section if the actual error code does not match with the expected error code.
+			  }
 			}
+			else
+				_resultfileStream << ".]" << endl << endl;
 
 			LOG4CXX_INFO (_logger, "This was an expected Exception. Hence continuing...");
 			if(queryResult.queryID && _dbconnection) {
@@ -444,9 +452,83 @@ int DefaultExecutor :: startTimer (const string &args)
 	return SUCCESS;
 }
 
+int DefaultExecutor :: endOutputFormat (void)
+{
+	_outputFormat = "dcsv";
+	LOG4CXX_INFO (_logger, "Reset Query Output Format to 'dcsv'");
+	return SUCCESS;
+}
+
+int DefaultExecutor :: setOutputFormat(const string &args)
+{
+	LOG4CXX_INFO (_logger, "Setting Query Output Format to " << args);
+	std::string validFormats [] = {"auto", "csv", "dense", "csv+", "lcsv+", "text", "sparse", "lsparse", "store", "text", "opaque", "dcsv"};
+
+	for (int i=0; i<12; i++)
+	{
+		if (strcasecmp(validFormats[i].c_str(),args.c_str()) == 0)
+		{
+			_outputFormat = args;
+			return SUCCESS;
+		}
+	}
+	LOG4CXX_INFO (_logger, "Invalid Format: " << args << ". Switching back to dcsv format.");
+	_outputFormat = "dcsv";
+	return SUCCESS;
+}
+
+int DefaultExecutor :: setPrecision(const string &args)
+{
+	LOG4CXX_INFO (_logger, "Setting Precision to " << args);
+	try
+	{
+		if(_precisionSet == false)
+			_precisionDefaultValue = scidb::DBLoader::defaultPrecision;
+		int temp = boost::lexical_cast<int>(args);
+		scidb::DBLoader::defaultPrecision = temp;
+		_precisionSet = true;
+	}
+	catch(...)
+	{
+		LOG4CXX_INFO (_logger, "Invalid Precision Value: " << args << ". Re-setting back to default.");
+		_precisionSet = false;
+		scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+	}
+	return SUCCESS;
+}
+
 int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 {
 	LOG4CXX_INFO (_logger, "Executing the shell command : " << sco->_command);
+	if (strcasecmp(sco->_cwd.c_str(),"") != 0)
+	{
+		if (sco->_cwd.find("$BASE_PATH") != string::npos)
+		{
+			string new_command;
+			new_command = "iquery -p ";
+			new_command.append(boost::lexical_cast<string>(_ie.scidbPort));
+			new_command.append(" -aq \"project(list('instances'),instance_path)\"");
+			stringstream bstream;
+			int rbytes, exit_code=FAILURE;
+		        char buf[BUFSIZ];
+		        FILE *pipe = 0;
+		        while ((rbytes = ReadOutputOf (new_command, &pipe, buf, sizeof (buf), &exit_code)) > 0)
+		        {
+		                buf[rbytes] = 0;
+	                        bstream << buf;
+			}
+			string server_base_path;
+			server_base_path = bstream.str();
+			boost::trim(server_base_path);
+			server_base_path = server_base_path.substr(3,server_base_path.find("\")")-8);
+			LOG4CXX_INFO (_logger, "Server-base-path detected: '" << server_base_path << "'.");
+			boost::replace_first(sco->_cwd,"$BASE_PATH",server_base_path);
+		}
+
+		LOG4CXX_INFO (_logger, "Working directory specified: '"
+<< sco->_cwd << "'.");
+		boost::replace_all(sco->_cwd,"\"","");
+	}
 
 	boost::filesystem::ofstream _outputfileStream;
 	if (sco->_outputFile.length ())
@@ -475,41 +557,50 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 			_resultfileStream << "SCIDB QUERY : <" <<sco->_command << ">" << "\n";
 	}
 
-	bool no_output = true;
+	if (strcasecmp(sco->_cwd.c_str(),"") != 0)
+	{
+		sco->_cwd = getAbsolutePath(sco->_cwd.c_str());
+		if (boost::filesystem::is_directory(sco->_cwd))
+		{
+                        sco->_command = "cd " + sco->_cwd + " && " + sco->_command;
+                        LOG4CXX_INFO (_logger, "Changing working directory to : '" << sco->_cwd << "'.");
+                }
+                else
+                        LOG4CXX_INFO (_logger, "Invalid working directory specified : '" << sco->_cwd << "'. Reverting to current working directory.");
+	}
+
 	int rbytes, exit_code=FAILURE;
 	char buf[BUFSIZ];
 	FILE *pipe = 0;
 	while ((rbytes = ReadOutputOf (sco->_command, &pipe, buf, sizeof (buf), &exit_code)) > 0)
 	{
-		no_output = false;
 		buf[rbytes] = 0;
 
 		/* store in the file specified in the --out option */
 		if (sco->_outputFile.length ())
-			_outputfileStream << buf << "\n";
+			_outputfileStream << buf;
 
 		/* store in the .out file along with the results of different SciDB queries */
 		if (sco->_store == true)
-			_resultfileStream << buf << "\n";
+			_resultfileStream << buf;
 
 		/* if none of --out, --store is given then log the output to .log file */
 		if (sco->_outputFile.length() == 0 && sco->_store == false)
 			LOG4CXX_INFO (_logger, buf);
 	}
 
-	if (no_output) // add newline incase of no output
+    /* store in the file specified in the --out option */
+    if (sco->_outputFile.length ())
+        _outputfileStream << "\n";
+    
+    /* store in the .out file along with the results of different SciDB queries */
+    if (sco->_store == true)
+        _resultfileStream << "\n";
+
+	if (sco->_outputFile.length ())
 	{
-		 /* store in the file specified in the --out option */
-                if (sco->_outputFile.length ())
-                        _outputfileStream << "\n";
-
-                /* store in the .out file along with the results of different SciDB queries */
-                if (sco->_store == true)
-                        _resultfileStream << "\n";
-	}
-
-	_outputfileStream.close ();
-
+        _outputfileStream.close ();
+    }
 	if (exit_code >= 0)
 	{
 		LOG4CXX_INFO (_logger, "Shell command exited with Exit code = " << exit_code << ".");
@@ -567,6 +658,15 @@ int DefaultExecutor :: execCommand (const string &cmd, const string &args, void 
 		LOG4CXX_INFO (_logger, "Stoping query logging...");
 		_queryLogging = false;
 
+        } else if (cmd == TESTCASE_COMMAND_STARTIGNOREWARNINGS)
+        {
+                LOG4CXX_INFO (_logger, "Starting to ignore warnings...");
+                _ignoreWarnings = true;
+        } else if (cmd == TESTCASE_COMMAND_STOPIGNOREWARNINGS)
+        {
+                LOG4CXX_INFO (_logger, "Stopping to ignore warnings...");
+                _ignoreWarnings = false;
+
 	} else if (cmd == TESTCASE_COMMAND_STARTIGDATA)
 	{
 		LOG4CXX_INFO (_logger, "Starting Ignoring the data output by query ...");
@@ -578,6 +678,15 @@ int DefaultExecutor :: execCommand (const string &cmd, const string &args, void 
 	} else if (cmd == TESTCASE_COMMAND_STARTTIMER)
 	{
 		startTimer (args);
+	} else if (cmd == TESTCASE_COMMAND_SETFORMAT)
+	{
+		setOutputFormat (args);
+	} else if (cmd == TESTCASE_COMMAND_ENDFORMAT)
+	{
+		endOutputFormat ();
+	} else if (cmd == TESTCASE_COMMAND_SETPRECISION)
+	{
+		setPrecision (args);
 	} else if (cmd == TESTCASE_COMMAND_STOPTIMER)
 	{
 		stopTimer (args);
@@ -757,6 +866,20 @@ int DefaultExecutor :: execCommandsection (const Command &section)
 		if (execCommand (section.cmd, section.args) == FAILURE)
 			return FAILURE;
 
+        /* section --start-ignore-warnings */
+        } else if (section.cmd == TESTCASE_COMMAND_STARTIGNOREWARNINGS)
+        {
+                assert (section.subCommands.size () == 0);
+                if (execCommand (section.cmd, section.args) == FAILURE)
+                        return FAILURE;
+
+        /* section --stop-ignore-warnings */
+        } else if (section.cmd == TESTCASE_COMMAND_STOPIGNOREWARNINGS)
+        {
+                assert (section.subCommands.size () == 0);
+                if (execCommand (section.cmd, section.args) == FAILURE)
+                        return FAILURE;
+
 	/* section --start-timer */
 	} else if (section.cmd == TESTCASE_COMMAND_STARTTIMER)
 	{
@@ -766,6 +889,27 @@ int DefaultExecutor :: execCommandsection (const Command &section)
 
 	/* section --stop-timer */
 	} else if (section.cmd == TESTCASE_COMMAND_STOPTIMER)
+	{
+		assert (section.subCommands.size () == 0);
+		if (execCommand (section.cmd, section.args) == FAILURE)
+			return FAILURE;
+
+	/* section --set-format */
+	} else if (section.cmd == TESTCASE_COMMAND_SETFORMAT)
+	{
+		assert (section.subCommands.size () == 0);
+		if (execCommand (section.cmd, section.args) == FAILURE)
+			return FAILURE;
+
+	/* section --reset-format */
+	} else if (section.cmd == TESTCASE_COMMAND_ENDFORMAT)
+	{
+		assert (section.subCommands.size () == 0);
+		if (execCommand (section.cmd, section.args) == FAILURE)
+			return FAILURE;
+
+	/* section --set-precision */
+	} else if (section.cmd == TESTCASE_COMMAND_SETPRECISION)
 	{
 		assert (section.subCommands.size () == 0);
 		if (execCommand (section.cmd, section.args) == FAILURE)
@@ -1093,6 +1237,7 @@ int DefaultExecutor :: parseShellCommandOptions (string line, struct ShellComman
 		desc.add_options() ("command", po::value<string>(), "shell command to be executed.");
 		desc.add_options() ("out", po::value<string>(), "File name to redirect the output of the shell command.");
 		desc.add_options() ("store",                    "Flag to indicate if the output of the shell command should be stored inside the .expected/.out file along with the output of SciDB queries.");
+		desc.add_options() ("cwd", po::value<string>(), "Working directory for the shell command.");
 		po::variables_map vm;
 		po::store (po::parse_command_line (argc, argv, desc), vm);
 		po::notify (vm);
@@ -1104,6 +1249,9 @@ int DefaultExecutor :: parseShellCommandOptions (string line, struct ShellComman
 
 			if (vm.count ("store"))
 				sco->_store = true;
+
+			if (vm.count ("cwd"))
+				sco->_cwd = vm["cwd"].as<string>();
 		}
 
 		for (int i=0; i<argc; i++)
@@ -1900,6 +2048,50 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					_queryLogging = false;
 				}
 
+                        /* command --start-ignore-warnings */
+                        } else if (boost::iequals (tokens[0],TESTCASE_COMMAND_STARTIGNOREWARNINGS))
+                        {
+                                if (!in_setup && !in_test && !in_cleanup)
+                                {
+                                        /* this means --start-ignore-warnings is out of any section i.e. at the beginning of the file before --setup */
+                                        _errStream << "Command " << TESTCASE_COMMAND_STARTIGNOREWARNINGS << " must appear inside some section (i.e. --setup, --test, --cleanup)";
+                                        throw_PARSEERROR (_errStream.str())
+                                }
+                                else
+                                {
+                                        /* this means --start-ignore-warnings is appearing under some section */
+                                        Command subtmp;
+                                        subtmp.cmd = TESTCASE_COMMAND_STARTIGNOREWARNINGS;
+                                        subtmp.args = "";
+                                        tmp.subCommands.push_back (subtmp);
+                                        _ignoreWarnings = true;
+                                }
+
+                        /* command --stop-ignore-warnings */
+                        } else if (boost::iequals (tokens[0],TESTCASE_COMMAND_STOPIGNOREWARNINGS))
+                        {
+                                if (_ignoreWarnings == false)
+                                {
+                                        _errStream << "Command " << TESTCASE_COMMAND_STOPIGNOREWARNINGS << " does not match with the corresponding " << TESTCASE_COMMAND_STARTIGNOREWARNINGS;
+                                        throw_PARSEERROR (_errStream.str())
+                                }
+
+                                if (!in_setup && !in_test && !in_cleanup)
+                                {
+                                        /* this means --stop-ignore-warnings is out of any section i.e. at the beginning of the file before --setup */
+                                        _errStream << "Command " << TESTCASE_COMMAND_STOPIGNOREWARNINGS << " must appear inside some section (i.e. --setup, --test, --cleanup)";
+                                        throw_PARSEERROR (_errStream.str())
+                                }
+                                else
+                                {
+                                        /* this means --stop-ignore-warnings is appearing under some section */
+                                        Command subtmp;
+                                        subtmp.cmd = TESTCASE_COMMAND_STOPIGNOREWARNINGS;
+                                        subtmp.args = "";
+                                        tmp.subCommands.push_back (subtmp);
+                                        _ignoreWarnings = false;
+                                }
+
 			/* command --start-igdata */
 			} else if (boost::iequals (tokens[0],TESTCASE_COMMAND_STARTIGDATA))
 			{
@@ -1984,6 +2176,31 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					_timerEnabled = true;
 				}
 
+			/* command --set-format */
+			} else if (boost::iequals (tokens[0],TESTCASE_COMMAND_SETFORMAT))
+			{
+				if (!in_setup && !in_test && !in_cleanup)
+				{
+					/* this means --set-format is out of any section i.e. at the beginning of the file before --setup */
+					_errStream << "Command " << TESTCASE_COMMAND_SETFORMAT << " must appear inside some section (i.e. --setup, --test, --cleanup)";
+					throw_PARSEERROR (_errStream.str())
+				}
+				else
+				{
+					/* this means --set-format is appearing under some section */
+					if (tokens.size() == 1)
+					{
+						_errStream << "Command " << TESTCASE_COMMAND_SETFORMAT << " must be followed by a Query Output Format";
+						throw_PARSEERROR (_errStream.str())
+					}
+					string format_tag = tokens[1];
+
+					Command subtmp;
+					subtmp.cmd = TESTCASE_COMMAND_SETFORMAT;
+					subtmp.args = format_tag; /* only considering first token as a tag and ignoring rest of the tokens */
+					tmp.subCommands.push_back (subtmp);
+				}
+
 			/* command --stop-timer */
 			} else if (boost::iequals (tokens[0],TESTCASE_COMMAND_STOPTIMER))
 			{
@@ -2007,6 +2224,48 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					subtmp.args = _timerTags[_timerTags.size() - 1];
 					tmp.subCommands.push_back (subtmp);
 					_timerEnabled = false;
+				}
+
+			/* command --reset-format */
+			} else if (boost::iequals (tokens[0],TESTCASE_COMMAND_ENDFORMAT))
+			{
+				if (!in_setup && !in_test && !in_cleanup)
+				{
+					/* this means --reset-format is out of any section i.e. at the beginning of the file before --setup */
+					_errStream << "Command " << TESTCASE_COMMAND_ENDFORMAT << " must appear inside some section (i.e. --setup, --test, --cleanup)";
+					throw_PARSEERROR (_errStream.str())
+				}
+				else
+				{
+					/* this means --reset-format is appearing under some section */
+					Command subtmp;
+					subtmp.cmd = TESTCASE_COMMAND_ENDFORMAT;
+					tmp.subCommands.push_back (subtmp);
+				}
+
+			/* command --set-precision */
+			} else if (boost::iequals (tokens[0],TESTCASE_COMMAND_SETPRECISION))
+			{
+				if (!in_setup && !in_test && !in_cleanup)
+				{
+					/* this means --set-precision is out of any section i.e. at the beginning of the file before --setup */
+					_errStream << "Command " << TESTCASE_COMMAND_SETPRECISION << " must appear inside some section (i.e. --setup, --test, --cleanup)";
+					throw_PARSEERROR (_errStream.str())
+				}
+				else
+				{
+					/* this means --set-precision is appearing under some section */
+					if (tokens.size() == 1)
+					{
+						_errStream << "Command " << TESTCASE_COMMAND_SETPRECISION << " must be followed by a Precision Value";
+						throw_PARSEERROR (_errStream.str())
+					}
+					string precision_tag = tokens[1];
+
+					Command subtmp;
+					subtmp.cmd = TESTCASE_COMMAND_SETPRECISION;
+					subtmp.args = precision_tag; /* only considering first token as a tag and ignoring rest of the tokens */
+					tmp.subCommands.push_back (subtmp);
 				}
 
 			/* command --error */
@@ -2225,6 +2484,7 @@ void DefaultExecutor :: printExecutorEnvironment (void)
 	LOG4CXX_INFO (_logger, "_ie.rootDir : "          << _ie.rootDir);
 	LOG4CXX_INFO (_logger, "_ie.sleepTime : "        << _ie.sleepTime);
 	LOG4CXX_INFO (_logger, "_ie.log_queries : "      << _ie.log_queries);
+	LOG4CXX_INFO (_logger, "_ie.save_failures : "    << _ie.save_failures);
 	LOG4CXX_INFO (_logger, "_ie.logDir : "           << _ie.logDir);
 	LOG4CXX_INFO (_logger, "_ie.debugLevel : "       << _ie.debugLevel);
 
@@ -2346,6 +2606,7 @@ void DefaultExecutor :: copyToLocal (const InfoForExecutor &ie)
 	_ie.rootDir            = ie.rootDir;
 	_ie.sleepTime          = ie.sleepTime;
 	_ie.log_queries        = ie.log_queries;
+	_ie.save_failures      = ie.save_failures;
 	_ie.logDir             = ie.logDir;
 	_ie.logDestination     = ie.logDestination;
 	_ie.debugLevel         = ie.debugLevel;
@@ -2392,10 +2653,30 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 	if (executeTestCase () == FAILURE)
 	{
 		LOG4CXX_INFO (_logger, "EXECUTOR returning FAILURE to the caller.");
+		if (_precisionSet == true)
+		{
+			scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+			_precisionSet = false;
+		}
 		return FAILURE;
+	}
+	if (_errorCodesDiffer == true)
+	{
+		LOG4CXX_INFO (_logger, "EXECUTOR returning FAILURE to the caller.");
+		if (_precisionSet == true)
+		{
+			scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+			_precisionSet = false;
+		}
+		return ERROR_CODES_DIFFER;
 	}
 
 	LOG4CXX_INFO (_logger, "EXECUTOR returning SUCCESS to the caller.");
+	if (_precisionSet == true)
+	{
+		scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+		_precisionSet = false;
+	}
 	return SUCCESS;
 }
 

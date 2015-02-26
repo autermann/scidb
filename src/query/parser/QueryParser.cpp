@@ -60,6 +60,8 @@ QueryParser::QueryParser(bool trace) :
 boost::shared_ptr<AstNode> QueryParser::parse(const std::string& input, bool aql)
 {
     _parsingContext = boost::shared_ptr<ParsingContext>(new ParsingContext(input));
+    _errorContext.reset();
+    _errorString = "";
 
     if (aql)
     {
@@ -86,18 +88,14 @@ boost::shared_ptr<AstNode> QueryParser::parse(const std::string& input, bool aql
 
 void QueryParser::error(const class location& loc, const std::string& msg)
 {
+    // Don't rewrite context and message if already was set before. E.g. in parser we can found
+    // unexpected token LEXER_ERROR which indicate emergency aborting of scanning, but we will not
+    // show parser's error "Unexpected token" and use lexer's error instead.
+    if (_errorContext)
+        return;
     _errorContext = boost::shared_ptr<ParsingContext>(
             new ParsingContext(_parsingContext->getQueryString(), loc.begin.line, loc.begin.column, loc.end.line, loc.end.column));
     _errorString = msg;
-}
-
-void QueryParser::error2(const class location& loc, const std::string& msg)
-{
-    throw USER_QUERY_EXCEPTION(
-        SCIDB_SE_PARSER,
-        SCIDB_LE_QUERY_PARSING_ERROR,
-        boost::make_shared<ParsingContext>(_parsingContext->getQueryString(), loc.begin.line, loc.begin.column,
-            loc.end.line, loc.end.column)) << msg;
 }
 
 } // namespace scidb

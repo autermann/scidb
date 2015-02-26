@@ -31,7 +31,7 @@
  * @author James McQueston <jmcqueston@paradigm4.com>
  */
 
-#include "na.h"
+#include "util/na.h"
 #include <math.h>
 #include <stdio.h>
 #include <sys/types.h>

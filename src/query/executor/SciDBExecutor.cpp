@@ -93,7 +93,7 @@ class SciDBExecutor: public scidb::SciDB
         }
     }
 
-   void prepareQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
+   void prepareQuery(const std::string& queryString, bool afl, const std::string& programOptions, QueryResult& queryResult, void* connection) const
     {
         // Executing query string
         assert(!Query::getQueryByID(queryResult.queryID, false, false)); //XXXXXXXX throw exception
@@ -107,6 +107,8 @@ class SciDBExecutor: public scidb::SciDB
         LOG4CXX_DEBUG(logger, "Parsing query(" << query->getQueryID() << "): " << queryString << "");
 
         try { 
+            query->programOptions = programOptions;
+
             query->start();
 
             Query::Finalizer f = bind(&Query::releaseLocks, _1);
@@ -155,7 +157,6 @@ class SciDBExecutor: public scidb::SciDB
         assert(query->getQueryID() == queryResult.queryID);
         CurrentQueryScope queryScope(query->getQueryID());
         StatisticsScope sScope(&query->statistics);
-        LOG4CXX_DEBUG(logger, "Executing query(" << query->getQueryID() << "): " << queryString << "")
 
         if (!query->logicalPlan->getRoot()) {
             throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_WAS_EXECUTED);
@@ -187,7 +188,7 @@ class SciDBExecutor: public scidb::SciDB
                 queryProcessor->preSingleExecute(query);
                 NetworkManager* networkManager = NetworkManager::getInstance();
                 size_t instancesCount = query->getInstancesCount();
-                if (!isDdl)
+
                 {
                     std::ostringstream planString;
                     query->getCurrentPhysicalPlan()->toString(planString);
@@ -233,23 +234,20 @@ class SciDBExecutor: public scidb::SciDB
                 }
                 LOG4CXX_DEBUG(logger, "Query is executed locally");
 
-                if (!isDdl)
-                {
-                    // Wait for results from every instance except itself
-                    Semaphore::ErrorChecker ec = bind(&Query::validate, query);
-                    query->results.enter(instancesCount-1, ec);
-                    LOG4CXX_DEBUG(logger, "The responses are received");
-                    /**
-                     * Check error state
-                     */
-                    query->validate();
-                }
+                // Wait for results from every instance except itself
+                Semaphore::ErrorChecker ec = bind(&Query::validate, query);
+                query->results.enter(instancesCount-1, ec);
+                LOG4CXX_DEBUG(logger, "The responses are received");
+                /**
+                 * Check error state
+                 */
+                query->validate();
 
                 queryProcessor->postSingleExecute(query);
             }
             query->done();
         } catch (const Exception& e) {
-            if (!isDdl && e.getShortErrorCode() != SCIDB_SE_THREAD)
+            if (e.getShortErrorCode() != SCIDB_SE_THREAD)
             {
                 LOG4CXX_DEBUG(logger, "Broadcast ABORT message to all instances for query " << query->getQueryID());
                 shared_ptr<MessageDesc> abortMessage = makeAbortMessage(query->getQueryID());

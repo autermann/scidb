@@ -36,14 +36,49 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: repart().
+ *
+ * @par Synopsis:
+ *   repart( srcArray, schema )
+ *
+ * @par Summary:
+ *   Produces a result array similar to the source array, but with different chunk sizes, different chunk overlaps, or both.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *   - schema: the desired schema.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   dimensions from the desired schema
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalRepart: public LogicalOperator
 {
 public:
     LogicalRepart(const string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-    	ADD_PARAM_INPUT()
-    	ADD_PARAM_SCHEMA()
+         _properties.tile = (false ==
+                 Config::getInstance()->
+                 getOption<bool>(CONFIG_REPART_DISABLE_TILE_MODE));
+
+        ADD_PARAM_INPUT()
+        ADD_PARAM_SCHEMA()
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)

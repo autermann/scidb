@@ -36,6 +36,40 @@ using namespace std;
 
 namespace scidb {
 
+/**
+ * @brief The operator: diskinfo().
+ *
+ * @par Synopsis:
+ *   diskinfo()
+ *
+ * @par Summary:
+ *   Checks disk usage.
+ *
+ * @par Input:
+ *   n/a
+ *
+ * @par Output array:
+ *        <
+ *   <br>   used: uint64
+ *   <br>   available: uint64
+ *   <br>   clusterSize: uint64
+ *   <br>   nFreeClusters: uint64
+ *   <br>   nSegments: uint64
+ *   <br> >
+ *   <br> [
+ *   <br>   Instance: start=0, end=#instances less 1, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - For internal usage.
+ *
+ */
 class LogicalDiskInfo: public LogicalOperator
 {
 public:

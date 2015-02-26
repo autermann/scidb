@@ -1,0 +1,297 @@
+SCIDB QUERY : <create array ddFlat <patientID:int64,elapsedTime:int64,pulse:int64,ppm:int64> [csvRow=0:1000,1000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load ddFlat from '../examples/doseData.scidb'>
+{csvRow} patientID,elapsedTime,pulse,ppm
+{0} 1,0,72,10
+{1} 1,10,75,434
+{2} 1,20,77,676
+{3} 1,25,76,721
+{4} 1,30,77,744
+{5} 1,60,82,654
+{6} 1,120,68,377
+{7} 1,300,70,89
+{8} 2,0,86,20
+{9} 2,10,86,544
+{10} 2,20,87,689
+{11} 2,25,90,804
+{12} 2,30,85,922
+{13} 2,60,81,1067
+{14} 2,120,79,866
+{15} 2,300,79,645
+{16} 3,0,68,17
+{17} 3,10,68,333
+{18} 3,20,65,444
+{19} 3,25,70,606
+{20} 3,30,70,673
+{21} 3,60,77,624
+{22} 3,120,78,508
+{23} 3,300,78,212
+
+SCIDB QUERY : <create array doseData <pulse:int64,ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(ddFlat,doseData)>
+{patientID,elapsedTime} pulse,ppm
+{1,0} 72,10
+{1,10} 75,434
+{1,20} 77,676
+{1,25} 76,721
+{1,30} 77,744
+{1,60} 82,654
+{1,120} 68,377
+{1,300} 70,89
+{2,0} 86,20
+{2,10} 86,544
+{2,20} 87,689
+{2,25} 90,804
+{2,30} 85,922
+{2,60} 81,1067
+{2,120} 79,866
+{2,300} 79,645
+{3,0} 68,17
+{3,10} 68,333
+{3,20} 65,444
+{3,25} 70,606
+{3,30} 70,673
+{3,60} 77,624
+{3,120} 78,508
+{3,300} 78,212
+
+SCIDB QUERY : <create array ppmFunction <ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0,pulse=0:300,301,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(doseData,ppmFunction)>
+{patientID,elapsedTime,pulse} ppm
+{1,0,72} 10
+{1,10,75} 434
+{1,20,77} 676
+{1,25,76} 721
+{1,30,77} 744
+{1,60,82} 654
+{1,120,68} 377
+{1,300,70} 89
+{2,0,86} 20
+{2,10,86} 544
+{2,20,87} 689
+{2,25,90} 804
+{2,30,85} 922
+{2,60,81} 1067
+{2,120,79} 866
+{2,300,79} 645
+{3,0,68} 17
+{3,10,68} 333
+{3,20,65} 444
+{3,25,70} 606
+{3,30,70} 673
+{3,60,77} 624
+{3,120,78} 508
+{3,300,78} 212
+
+SCIDB QUERY : <create array pulseFunction <pulse:int64> [patientID=1:100,100,0, elapsedTime=0:999,1000,0, ppm=0:10000,10001,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(doseData,pulseFunction)>
+{patientID,elapsedTime,ppm} pulse
+{1,0,10} 72
+{1,10,434} 75
+{1,20,676} 77
+{1,25,721} 76
+{1,30,744} 77
+{1,60,654} 82
+{1,120,377} 68
+{1,300,89} 70
+{2,0,20} 86
+{2,10,544} 86
+{2,20,689} 87
+{2,25,804} 90
+{2,30,922} 85
+{2,60,1067} 81
+{2,120,866} 79
+{2,300,645} 79
+{3,0,17} 68
+{3,10,333} 68
+{3,20,444} 65
+{3,25,606} 70
+{3,30,673} 70
+{3,60,624} 77
+{3,120,508} 78
+{3,300,212} 78
+
+SCIDB QUERY : <create array nwFlat <event:string,year:int64,person:string,country:string,time:double> [csvRow=0:11,12,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load nwFlat from '../examples/nationWinners.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array nationWinners <person:string,country:string,time:double> [event(string)=3,3,0,year=1996:2008,13,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(nwFlat,nationWinners)>
+{event,year} person,country,time
+{"dash",1996} "Bailey","Canada",9.84
+{"dash",2000} "Greene","USA",9.87
+{"dash",2004} "Gatlin","USA",9.85
+{"dash",2008} "Bolt","Jamaica",9.69
+{"marathon",1996} "Thugwane","RSA",7956
+{"marathon",2000} "Abera","Ethiopia",7811
+{"marathon",2004} "Baldini","Italy",7855
+{"marathon",2008} "Wanjiru","Kenya",7596
+{"steeplechase",1996} "Keter","Kenya",487.12
+{"steeplechase",2000} "Kosgei","Kenya",503.17
+{"steeplechase",2004} "Kemboi","Kenya",485.81
+{"steeplechase",2008} "Kipruto","Kenya",490.34
+
+SCIDB QUERY : <create array victoryCountPerCountryYear <victoryCount:uint64 null> [year=1996:2008,13,0,country(string)=300,300,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store (nationWinners, victoryCountPerCountryYear, count(*) as victoryCount)>
+{year,country} victoryCount
+{1996,"Canada"} 1
+{1996,"Kenya"} 1
+{1996,"RSA"} 1
+{2000,"Ethiopia"} 1
+{2000,"Kenya"} 1
+{2000,"USA"} 1
+{2004,"Italy"} 1
+{2004,"Kenya"} 1
+{2004,"USA"} 1
+{2008,"Jamaica"} 1
+{2008,"Kenya"} 2
+
+SCIDB QUERY : <create array vPer_CY_Synthetic <person:string,event:string,time:double> [country(string)=300,300,0,year=1996:2008,13,0,synD=1:6,6,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(nationWinners,vPer_CY_Synthetic)>
+{country,year,synD} person,event,time
+{"Canada",1996,1} "Bailey","dash",9.84
+{"Ethiopia",2000,1} "Abera","marathon",7811
+{"Italy",2004,1} "Baldini","marathon",7855
+{"Jamaica",2008,1} "Bolt","dash",9.69
+{"Kenya",1996,1} "Keter","steeplechase",487.12
+{"Kenya",2000,1} "Kosgei","steeplechase",503.17
+{"Kenya",2004,1} "Kemboi","steeplechase",485.81
+{"Kenya",2008,1} "Wanjiru","marathon",7596
+{"Kenya",2008,2} "Kipruto","steeplechase",490.34
+{"RSA",1996,1} "Thugwane","marathon",7956
+{"USA",2000,1} "Greene","dash",9.87
+{"USA",2004,1} "Gatlin","dash",9.85
+
+SCIDB QUERY : <create array arbitraryWinner <person:string,event:string,time:double> [country(string)=300,300,0,year=1996:2008,13,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(nationWinners,arbitraryWinner)>
+{country,year} person,event,time
+{"Canada",1996} "Bailey","dash",9.84
+{"Ethiopia",2000} "Abera","marathon",7811
+{"Italy",2004} "Baldini","marathon",7855
+{"Jamaica",2008} "Bolt","dash",9.69
+{"Kenya",1996} "Keter","steeplechase",487.12
+{"Kenya",2000} "Kosgei","steeplechase",503.17
+{"Kenya",2004} "Kemboi","steeplechase",485.81
+{"Kenya",2008} "Wanjiru","marathon",7596
+{"RSA",1996} "Thugwane","marathon",7956
+{"USA",2000} "Greene","dash",9.87
+{"USA",2004} "Gatlin","dash",9.85
+
+SCIDB QUERY : <scan(nationWinners)>
+{event,year} person,country,time
+{"dash",1996} "Bailey","Canada",9.84
+{"dash",2000} "Greene","USA",9.87
+{"dash",2004} "Gatlin","USA",9.85
+{"dash",2008} "Bolt","Jamaica",9.69
+{"marathon",1996} "Thugwane","RSA",7956
+{"marathon",2000} "Abera","Ethiopia",7811
+{"marathon",2004} "Baldini","Italy",7855
+{"marathon",2008} "Wanjiru","Kenya",7596
+{"steeplechase",1996} "Keter","Kenya",487.12
+{"steeplechase",2000} "Kosgei","Kenya",503.17
+{"steeplechase",2004} "Kemboi","Kenya",485.81
+{"steeplechase",2008} "Kipruto","Kenya",490.34
+
+SCIDB QUERY : <create array victoryCountPerCountry <victoryCount:uint64 null> [country(string)=300,300,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store (nationWinners, victoryCountPerCountry, count(*) as victoryCount)>
+{country} victoryCount
+{"Canada"} 1
+{"Ethiopia"} 1
+{"Italy"} 1
+{"Jamaica"} 1
+{"Kenya"} 5
+{"RSA"} 1
+{"USA"} 2
+
+SCIDB QUERY : <create array vPer_C_Synthetic <person:string,event:string,time:double> [country(string)=300,300,0,synD=1:6,6,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(nationWinners,vPer_C_Synthetic)>
+{country,synD} person,event,time
+{"Canada",1} "Bailey","dash",9.84
+{"Ethiopia",1} "Abera","marathon",7811
+{"Italy",1} "Baldini","marathon",7855
+{"Jamaica",1} "Bolt","dash",9.69
+{"Kenya",1} "Wanjiru","marathon",7596
+{"Kenya",2} "Keter","steeplechase",487.12
+{"Kenya",3} "Kosgei","steeplechase",503.17
+{"Kenya",4} "Kemboi","steeplechase",485.81
+{"Kenya",5} "Kipruto","steeplechase",490.34
+{"RSA",1} "Thugwane","marathon",7956
+{"USA",1} "Greene","dash",9.87
+{"USA",2} "Gatlin","dash",9.85
+
+SCIDB QUERY : <create array namesFlat < givenName:string, surname:string, a:int64, b:int64 null, c:int64, d:int64> [ csvRow=0:6,6,0 ]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load namesFlat from '../examples/namesData.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array names <a:int64, b:int64 null, c:int64, d:int64> [givenName(string)=5,5,0,surname(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(namesFlat,names)>
+{givenName,surname} a,b,c,d
+{"Adam","Richards"} 77,5555,-5111,800
+{"Adam","Welch"} 44,8888,-8111,300
+{"Adam","Zwick"} 22,9999,-9111,100
+{"Bill","Welch"} 55,7777,-7111,400
+{"Bill","Zwick"} 33,null,-2111,233
+{"Cathy","Welch"} 66,6666,-6111,550
+
+SCIDB QUERY : <create array namesRedimensioned <b:int64 null, c:int64, avgD:double null> [surname(string)=5,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store (names, namesRedimensioned, avg(d) as avgD)>
+{surname} b,c,avgD
+{"Richards"} 5555,-5111,800
+{"Welch"} 8888,-8111,416.667
+{"Zwick"} 9999,-9111,166.5
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

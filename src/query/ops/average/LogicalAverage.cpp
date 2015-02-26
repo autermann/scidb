@@ -38,10 +38,52 @@ using namespace std;
 namespace scidb
 {
 
-class Average : public  LogicalOperator
+/**
+ * @brief The operator: avg().
+ *
+ * @par Synopsis:
+ *   avg( srcArray, [attr {, groupbyDim}*] )
+ *
+ * @par Summary:
+ *   Computes the average value of an attribute. If no attribute is given, the first attribute is used. If a list of groupbyDims are given, compute one
+ *   average value per distinct group.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attr_avg: the source attribute name, followed by "_avg"
+ *   <br> >
+ *   <br> [
+ *   <br>   groupbyDims (if provided); or
+ *   <br>   'i' (if no groupbyDim is given): start=end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - avg(A, sales, year) <sales_avg:double> [year] =
+ *     <br> year, sales_avg
+ *     <br> 2011,  25.81
+ *     <br> 2012,  36.3233
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - same as aggregate(srcArray, avg(attr), groupbyDims)
+ *
+ */
+class LogicalAverage : public  LogicalOperator
 {
 public:
-	Average(const std::string& logicalName, const std::string& alias):
+	LogicalAverage(const std::string& logicalName, const std::string& alias):
 		LogicalOperator(logicalName, alias)
 	{
 		ADD_PARAM_INPUT()
@@ -110,7 +152,7 @@ public:
 	}
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Average, "avg")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalAverage, "avg")
 
 } //namespace scidb
 

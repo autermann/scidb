@@ -22,6 +22,7 @@
 
 set (io_src
     DBLoader.cpp
+    TemplateParser.cpp
     Storage.cpp
     ReplicationManager.cpp
 )

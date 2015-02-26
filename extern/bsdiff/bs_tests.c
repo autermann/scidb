@@ -33,15 +33,12 @@ int TestPatch(unsigned char *first, off_t firstLen, unsigned char *second, off_t
 	int returnVal = 0;
 	unsigned int i;
 
-	//bufToFile(first, firstLen, "TestBuf_first.bin");
-	//bufToFile(second, secondLen, "TestBuf_second.bin");
-
 	if (verbose != 0) printf("Creating the patch\n");
 	if ((returnVal = bsdiff_nocompress(first, firstLen, second, secondLen, resultsBuf, resultsBufSize, &resultsLen)) != 0) {
 		if (verbose != 0) printf("Could not diff arrays!  Error was %d\n", returnVal);
 		goto err;
 	}
-	//bufToFile(resultsBuf, resultsLen, "TestBuf_patch.bin");
+
 	printf("Applying the patch\n");
 	if ((returnVal = bspatch_nocompress(first, firstLen, resultsBuf, resultsLen, &results, &resultsLen)) != 0) {
 		if (verbose != 0) printf("Could not apply patch for arrays!  Error was %d\n", returnVal);
@@ -52,7 +49,7 @@ int TestPatch(unsigned char *first, off_t firstLen, unsigned char *second, off_t
 			if (verbose != 0) printf("Final buffer (%ld) not the same length as input buffer (%ld)!\n", resultsLen, firstLen);
 			goto err;
 		}
-		//bufToFile(results, resultsLen, "TestBuf_results.bin");
+
 		if ((returnVal = memcmp(second, results, secondLen)) != 0) {
 			if (verbose != 0) printf("Reconstructed array not equal to original!  memcmp returned %d\n", returnVal);
 			for (i = 0; i < secondLen; i++) {

@@ -1,0 +1,21 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+create array wordOfConversation <wordID:int64> [languageID=1:1000,100,0, conversationID=1:5000000,1000,0, timeOffsetInSeconds=1:10000,1000,100] 
+--stop-igdata
+show(wordOfConversation)
+--start-igdata
+--aql SELECT approxdc(wordID) FROM wordOfConversation  
+--aql SELECT approxdc(wordID) FROM wordOfConversation GROUP BY languageID  
+--aql SELECT approxdc(wordID) FROM wordOfConversation GROUP BY conversationID  
+--stop-igdata
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(wordOfConversation)

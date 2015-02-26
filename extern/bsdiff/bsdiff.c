@@ -212,7 +212,7 @@ int bsdiff_nocompress(u_char* srcBuf, off_t srcLen, u_char* trgBuf, off_t trgLen
 	off_t s,Sf,lenf,Sb,lenb;
 	u_char *db = NULL, *eb = NULL;
 	off_t overlap,Ss,lens;
-	off_t outPos;
+	off_t outPos = 32;
 	off_t i;
 	u_char buf[8];
 	int ret = 0;
@@ -245,7 +245,6 @@ int bsdiff_nocompress(u_char* srcBuf, off_t srcLen, u_char* trgBuf, off_t trgLen
 	offtout(0, outBuf + 8);
 	offtout(0, outBuf + 16);
 	offtout(trgLen, outBuf + 24);
-	outPos = 32;
 
 	scan=0;len=0;
 	lastscan=0;lastpos=0;lastoffset=0;

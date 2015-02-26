@@ -58,7 +58,7 @@
     "MEM_ARRAY_THREASHOLD": 1024,
 
 // Directory for SciDB temporary files
-    "TMP_DIR": "/tmp",
+    "TMP_PATH": "/tmp",
 
 // Number of execution threads
     "EXEC_THREADS": 16,

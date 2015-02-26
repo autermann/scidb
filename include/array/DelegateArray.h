@@ -108,18 +108,19 @@ class DelegateChunkIterator : public ConstChunkIterator
 {
   public:
     int getMode();
-    Value& getItem();
+    virtual Value& getItem();
     bool isEmpty();
     bool end();
-    void operator ++();
+    virtual void operator ++();
     Coordinates const& getPosition();
-    bool setPosition(Coordinates const& pos);
-    void reset();
+    virtual bool setPosition(Coordinates const& pos);
+    virtual void reset();
     ConstChunk const& getChunk();
     bool supportsVectorMode() const;
     void setVectorMode(bool enabled);
 
     DelegateChunkIterator(DelegateChunk const* chunk, int iterationMode);
+    virtual ~DelegateChunkIterator() {}
 
   protected:
     DelegateChunk const* chunk;
@@ -156,7 +157,15 @@ class DelegateArray : public Array
 	virtual ~DelegateArray()
 	{}
 
-    virtual bool supportsRandomAccess() const;
+    /**
+     * Get the least restrictive access mode that the array supports.
+     * @return the least restrictive access mode supported by the input array.
+     */
+    virtual Access getSupportedAccess() const
+    {
+        return inputArray->getSupportedAccess();
+    }
+
 	virtual string const& getName() const;
 	virtual ArrayID getHandle() const;
 	virtual const ArrayDesc& getArrayDesc() const;
@@ -191,7 +200,7 @@ public:
 };
 
 /**
- * Array with dummy empty-tag attribute - used to perfrom operations with 
+ * Array with dummy empty-tag attribute - used to perform operations with 
  * emptyable and non-emptyable arrays
  */
 class NonEmptyableArray : public DelegateArray
@@ -232,6 +241,7 @@ class NonEmptyableArray : public DelegateArray
  */
 class SplitArray : public DelegateArray 
 {
+  protected:
     class ArrayIterator : public DelegateArrayIterator
     {
       public:
@@ -244,28 +254,40 @@ class SplitArray : public DelegateArray
 
         ArrayIterator(SplitArray const& array, AttributeID attrID);
 
-      private:
+      protected:
         MemChunk chunk;
         Address addr;
         Dimensions const& dims;
         SplitArray const& array;
-        size_t attrBitSize;
         bool hasCurrent;
         bool chunkInitialized;
+      private:
+        size_t attrBitSize;
     };
 
   public:
-    SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& source, Coordinates const& from, Coordinates const& till);
+    SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& src, Coordinates const& from, Coordinates const& till);
     virtual ~SplitArray();
 
-    virtual bool supportsRandomAccess() const;
+    /**
+     * Get the least restrictive access mode that the array supports.
+     * @return Array::RANDOM
+     */
+    virtual Access getSupportedAccess() const
+    {
+        return Array::RANDOM;
+    }
+
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
+    const Coordinates& from() const { return _from; }
+    const Coordinates& till() const { return _till; }
+    const Coordinates& size() const { return _size; }
   private:
-    Coordinates from;
-    Coordinates till;
-    Coordinates size;
-    boost::shared_array<char> source;
-    bool        empty;
+    Coordinates _from;
+    Coordinates _till;
+    Coordinates _size;
+    boost::shared_array<char> _src;
+    bool        _empty;
 };
 
 /**
@@ -279,11 +301,11 @@ class MaterializedArray : public DelegateArray
         RLEFormat,
         DenseFormat
     };
-    MaterializeFormat format;
-    std::vector< std::map<Coordinates, boost::shared_ptr<MemChunk>, CoordinatesLess > > chunkCache;
-    std::map<Coordinates, boost::shared_ptr<ConstRLEEmptyBitmap>, CoordinatesLess > bitmapCache;
-    Mutex mutex;
-    size_t cacheSize;
+    MaterializeFormat _format;
+    std::vector< std::map<Coordinates, boost::shared_ptr<MemChunk>, CoordinatesLess > > _chunkCache;
+    std::map<Coordinates, boost::shared_ptr<ConstRLEEmptyBitmap>, CoordinatesLess > _bitmapCache;
+    Mutex _mutex;
+    size_t _cacheSize;
 
     static void materialize(MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format);
     
@@ -291,11 +313,15 @@ class MaterializedArray : public DelegateArray
 
     class ArrayIterator : public DelegateArrayIterator
     {
-        MaterializedArray& array;
-        boost::shared_ptr<MemChunk> materializedChunk;
+        MaterializedArray& _array;
+        ConstChunk const* _chunkToReturn;
+        boost::shared_ptr<MemChunk> _materializedChunk;
 
       public:
         virtual ConstChunk const& getChunk();
+        virtual void operator ++();
+        virtual bool setPosition(Coordinates const& pos);
+        virtual void reset();
 
         ArrayIterator(MaterializedArray& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat);
     };

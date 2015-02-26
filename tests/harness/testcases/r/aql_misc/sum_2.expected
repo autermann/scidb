@@ -1,12 +1,14 @@
 Query was executed successfully
 
-[(1),(2),(3)]
+{x} a
+{0} 1
+{1} 2
+{2} 3
 
-[(1),(2),(3)]
-
-[(1),(2),(3)]
-
-[(1),(2),(3)]
+{x} sum
+{0} 1
+{1} 2
+{2} 3
 
 Query was executed successfully
 

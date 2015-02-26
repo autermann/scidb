@@ -182,7 +182,10 @@ void OperatorLibrary::getLogicalNames(vector<string> &logicalOperatorsNames)
 {
     for(LogicalOperatorFactories::iterator it = _logicalOperatorFactories.begin(); it != _logicalOperatorFactories.end(); ++it)
     {
-        logicalOperatorsNames.push_back(it->first);
+        shared_ptr<LogicalOperator> logicalOperator = it->second->createLogicalOperator("");
+        if (!logicalOperator->getProperties().secondPhase) {
+            logicalOperatorsNames.push_back(it->first);
+        }
     }
 }
 

@@ -67,7 +67,9 @@ private:
 
   public:
     void checkForDeadlock() { 
+#ifndef __APPLE__
         assert(_mutex.__data.__count == 1);
+#endif
     }
     
     Mutex()

@@ -1,0 +1,56 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+--aql CREATE ARRAY A <x: double, err: double> [i=0:99,10,0, j=0:99,10,0]  
+--aql CREATE ARRAY B <val:double>[sample(string)=6,6,0]  
+--aql DROP ARRAY A  
+--aql CREATE ARRAY products <name:string,price:float default float(100.0),sold:datetime> [i=0:*,10,0]  
+--aql  CREATE ARRAY product_null <name:string NULL,price:float NULL,sold:datetime NULL> [i=0:*,10,0]  
+--aql CREATE ARRAY product_dflt <name:string, price:float default float(100.0), sold:datetime> [i=0:*,10,0]  
+--shell  --command="cat ../examples/m4x4_missing.txt  " --store
+CREATE ARRAY m4x4_missing <val1:double,val2:int32>[x=0:3,4,0,y=0:3,4,0]  
+--set-format auto
+--stop-igdata
+load(m4x4_missing, '../examples/m4x4_missing.txt')  
+--set-format dcsv
+--start-igdata
+remove(m4x4_missing)  
+CREATE ARRAY m4x4_missing <val1:double,val2:int32 default 5468>[x=0:3,4,0,y=0:3,4,0]  
+--set-format auto
+--stop-igdata
+load(m4x4_missing, '../examples/m4x4_missing.txt')  
+--set-format dcsv
+--start-igdata
+--aql CREATE ARRAY open <val:double>[I=0:9,10,0,J=0:*,10,0]  
+--aql CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]  
+--aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0] 
+--aql LOAD winnersFlat FROM '../examples/olympic_data.scidb'  
+redimension_store(winnersFlat,winners)  
+--stop-igdata
+show(winners)
+--aql SELECT * FROM winners:event  
+--aql SELECT * FROM winners  
+--start-igdata
+rename(winners, OlympicWinners)  
+--stop-igdata
+show(OlympicWinners)
+--aql SELECT * INTO winnerGrid FROM cast(OlympicWinners, < LastName: string, elapsedTime: double> [x=1996:2008,1000,0,y=0:*,1000,0] )  
+show(winnerGrid)
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(B)
+remove(products)
+remove(product_null)
+remove(product_dflt)
+remove(m4x4_missing)
+remove(open)
+remove(winnersFlat)
+remove(OlympicWinners)
+remove(winnerGrid)

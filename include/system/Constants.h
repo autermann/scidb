@@ -59,6 +59,14 @@ extern const size_t DEFAULT_MEM_THRESHOLD;
 extern const double DEFAULT_DENSE_CHUNK_THRESHOLD;
 extern const double DEFAULT_SPARSE_CHUNK_INIT_SIZE;
 extern const int DEFAULT_STRING_SIZE_ESTIMATION;
+
+extern const int METADATA_VERSION;
+
+/**
+ * The maximum number of dimensions that SciDB supports.
+ * This constant is needed at compile time; so it cannot be set in Constants.cpp.in.
+ */
+const size_t MAX_NUM_DIMS_SUPPORTED = 100;
 }
 
 #endif /* CONSTANTS_H_ */

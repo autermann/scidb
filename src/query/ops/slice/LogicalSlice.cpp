@@ -33,6 +33,39 @@
 
 namespace scidb {
 
+/**
+ * @brief The operator: slice().
+ *
+ * @par Synopsis:
+ *   slice( srcArray {, dim, dimValue}* )
+ *
+ * @par Summary:
+ *   Produces a 'slice' of the source array, by holding zero or more dimension values constant.
+ *   The result array does not include the dimensions that are used for slicing.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *   - dim: one of the dimensions to be used for slicing.
+ *   - dimValue: the constant value in the dimension to slice.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims less the list of slicing dims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalSlice: public LogicalOperator
 {
 public:

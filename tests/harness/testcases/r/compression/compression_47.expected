@@ -32,79 +32,217 @@ SCIDB QUERY : <create empty array Nc <x:int64 compression 'rle' > [a(string)=6,3
 Query was executed successfully
 
 SCIDB QUERY : <select * into Ts_rle from build(Ts,string(x))>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into Ts_d from Ts_rle>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into Ts_ns from Ts_rle>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into Ts_be from Ts_rle>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into Ts_z from Ts_rle>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into Ts_bz from Ts_rle>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into Ts_nf from Ts_rle>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into N from Ts>
-[]
+{a} x
 
 SCIDB QUERY : <select * into N from Ts_rle>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into N from Ts_d>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into N from Ts_ns>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into N from Ts_be>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into N from Ts_z>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into N from Ts_bz>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into N from Ts_nf>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts>
-[]
+{a} x
 
 SCIDB QUERY : <select * into Nc from Ts_rle>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts_d>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts_ns>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts_be>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts_z>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts_bz>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into Nc from Ts_nf>
-[(-1),(-2),(0),(1),(2),(3)]
+{a} x
+{"-1"} -1
+{"-2"} -2
+{"0"} 0
+{"1"} 1
+{"2"} 2
+{"3"} 3
 
 SCIDB QUERY : <select * into eTs from Nc>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <select * into eTs from N>
-[("-2"),("-1"),("0"),("1"),("2"),("3")]
+{x} a
+{-2} "-2"
+{-1} "-1"
+{0} "0"
+{1} "1"
+{2} "2"
+{3} "3"
 
 SCIDB QUERY : <remove(Ts)>
 Query was executed successfully

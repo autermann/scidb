@@ -38,6 +38,7 @@
 #include "network/MessageUtils.h"
 #include "util/RWLock.h"
 #include "query/Query.h"
+#include "query/Operator.h"
 #include "smgr/io/Storage.h"
 #include "system/Resources.h"
 #include <util/Thread.h>
@@ -57,10 +58,10 @@ MessageHandleJob::MessageHandleJob(const boost::shared_ptr<MessageDesc>& message
     LOG4CXX_TRACE(logger, "Creating a new job for message of type=" << _messageDesc->getMessageType()
                   << " from instance=" << _messageDesc->getSourceInstanceID()
                   << " for queryID=" << _messageDesc->getQueryID());
-   
+
     const QueryID queryID = _messageDesc->getQueryID();
     if (queryID != 0) {
-        _query = Query::getQueryByID(queryID, _messageDesc->getMessageType() == mtPreparePhysicalPlan);                              
+        _query = Query::getQueryByID(queryID, _messageDesc->getMessageType() == mtPreparePhysicalPlan);
     } else {
         LOG4CXX_TRACE(logger, "Creating fake query: type=" << _messageDesc->getMessageType()
                       << ", for message from instance=" << _messageDesc->getSourceInstanceID());
@@ -209,9 +210,9 @@ void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
     {
         sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
         _query->chunkReqs[sourceId].increment();
-        boost::shared_ptr<WorkQueue> q = _query->getSGQueue();
+        boost::shared_ptr<WorkQueue> q = _query->getOperatorQueue();
         if (logger->isTraceEnabled() && q) {
-            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: SG queue size="<<q->size()
+            LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: Operator queue size="<<q->size()
                           << " for query ("<<queryID<<")");
         }
         enqueue(q);
@@ -221,7 +222,7 @@ void MessageHandleJob::dispatch(boost::shared_ptr<JobQueue>& jobQueue)
     case mtMPISend:
     {
         boost::shared_ptr<WorkQueue> q = _query->getMpiReceiveQueue();
-        if (logger->isTraceEnabled() && q) { 
+        if (logger->isTraceEnabled() && q) {
             LOG4CXX_TRACE(logger, "MessageHandleJob::dispatch: MPISend queue size="<<q->size()
                           << " for query ("<<queryID<<")");
         }
@@ -292,7 +293,7 @@ void MessageHandleJob::run()
     assert(_messageDesc);
     assert(_messageDesc->getMessageType() < mtSystemMax);
     boost::function<void()> func = boost::bind(&destroyFakeQuery, _query.get());
-    Destructor fqd(func);
+    Destructor<boost::function<void()> > fqd(func);
 
     const MessageType messageType = static_cast<MessageType>(_messageDesc->getMessageType());
     LOG4CXX_TRACE(logger, "Starting message handling: type=" << messageType
@@ -330,10 +331,10 @@ void MessageHandleJob::run()
                      << ", messageType = " << messageType
                      << ", sourceInstance = " << _messageDesc->getSourceInstanceID()
                      << ", queryID="<<_messageDesc->getQueryID());
-       
-       if (messageType != mtError && messageType != mtAbort && _query->getPhysicalCoordinatorID() != COORDINATOR_INSTANCE) 
+
+       if (messageType != mtError && messageType != mtAbort && _query->getPhysicalCoordinatorID() != COORDINATOR_INSTANCE)
        {
-           boost::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, _messageDesc->getQueryID()); 
+           boost::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, _messageDesc->getQueryID());
            NetworkManager::getInstance()->sendMessage(_query->getPhysicalCoordinatorID(), errorMessage);
        }
        if (_query) {
@@ -344,8 +345,8 @@ void MessageHandleJob::run()
               LOG4CXX_DEBUG(logger, "Handle error for query " << _messageDesc->getQueryID());
               _query->handleError(e.copy());
           }
-       } else { 
-           LOG4CXX_DEBUG(logger, "Query " << _messageDesc->getQueryID() << " is already destructed");           
+       } else {
+           LOG4CXX_DEBUG(logger, "Query " << _messageDesc->getQueryID() << " is already destructed");
        }
        if (e.getShortErrorCode() == SCIDB_SE_THREAD)
        {
@@ -402,7 +403,7 @@ void MessageHandleJob::handleExecutePhysicalPlan()
 {
    try {
       LOG4CXX_DEBUG(logger, "Running physical plan: queryID=" << _messageDesc->getQueryID())
-      
+
       currentStatistics->receivedSize += _messageDesc->getMessageSize();
       currentStatistics->receivedMessages++;
       boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
@@ -443,77 +444,6 @@ void MessageHandleJob::handleQueryResult()
     _query->results.release();
 }
 
-void MessageHandleJob::handleAggregateChunk()
-{
-    boost::shared_ptr<scidb_msg::Chunk> chunkRecord = _messageDesc->getRecord<scidb_msg::Chunk>();
-    assert(!chunkRecord->eof());
-    assert(_query);
-
-    RWLock::ErrorChecker noopEc;
-    ScopedRWLockRead shared(_query->queryLock, noopEc);
-
-    try
-    {
-        LOG4CXX_TRACE(logger, "Next chunk message was received")
-
-        const int compMethod = chunkRecord->compression_method();
-        const size_t decompressedSize = chunkRecord->decompressed_size();
-        const AttributeID attributeID = chunkRecord->attribute_id();
-        const size_t count = chunkRecord->count();
-
-        boost::shared_ptr<Array> outputArray = _query->getSGContext()->_resultSG;
-        AggregatePtr aggregate = _query->getSGContext()->_aggregateList[attributeID];
-
-        ScopedMutexLock cs(_query->resultCS);
-        boost::shared_ptr<ArrayIterator> outputIter = outputArray->getIterator(attributeID);
-
-        Coordinates coordinates;
-        for (int i = 0; i < chunkRecord->coordinates_size(); i++)
-        {
-            coordinates.push_back(chunkRecord->coordinates(i));
-        }
-
-        boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(_messageDesc->getBinary());
-        compressedBuffer->setCompressionMethod(compMethod);
-        compressedBuffer->setDecompressedSize(decompressedSize);
-        Chunk* outChunk;
-        if (outputIter->setPosition(coordinates))
-        {
-            outChunk = &outputIter->updateChunk();
-            bool isSparse = outChunk->isSparse() || chunkRecord->sparse();
-
-            MemChunk tmpChunk;
-            Address chunkAddr;
-            ArrayDesc const& desc = outputArray->getArrayDesc();
-            chunkAddr.coords = coordinates;
-            chunkAddr.arrId = desc.getId();
-            chunkAddr.attId = attributeID;
-            tmpChunk.initialize(outputArray.get(), &desc, chunkAddr, compMethod);
-            tmpChunk.setSparse(isSparse);
-            tmpChunk.setRLE(chunkRecord->rle());
-            tmpChunk.decompress(*compressedBuffer);
-
-            outChunk->aggregateMerge(tmpChunk, aggregate, _query);
-        }
-        else
-        {
-            outChunk = &outputIter->newChunk(coordinates, compMethod);
-            outChunk->setSparse(chunkRecord->sparse());
-            outChunk->setRLE(chunkRecord->rle());
-            outChunk->decompress(*compressedBuffer); // TODO: it's better avoid decompression. It can be written compressed
-            outChunk->setCount(count);
-            outChunk->write(_query);
-        }
-        sgSync();
-        LOG4CXX_TRACE(logger, "Chunk was stored")
-    }
-    catch(const Exception& e)
-    {
-        sgSync();
-        throw;
-    }
-}
-
 void MessageHandleJob::sgSync()
 {
     sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
@@ -525,134 +455,212 @@ void MessageHandleJob::sgSync()
     }
 }
 
-void MessageHandleJob::handleChunk()
+/**
+ * Given a chunk received over the network, initialize a MemChunk.
+ * @param[inout] pTmpChunk the pre-existing MemChunk, to be filled using data in compressedBuffer
+ * @param[out] pinTmpChunk the PinBuffer to protect pTmpChunk
+ * @param[in]  array       the array
+ * @param[in]  coordinates the chunk position
+ * @param[in]  attributeID
+ * @param[in]  compMethod  the compression method
+ * @param[in]  sparse
+ * @param[in]  rle
+ * @param[inout] compressedBuffer  the buffer received over the network; the function may free compressedBuffer->data.
+ *
+ * @note MemChunk::decompress(CompressedBuffer const& compressedBuffer) may result at compressedBuffer->data be freed and set to NULL.
+ */
+void initMemChunkFromNetwork(shared_ptr<MemChunk>& pTmpChunk, shared_ptr<PinBuffer>& pinTmpChunk, shared_ptr<Array> const& array, Coordinates const& coordinates, AttributeID attributeID,
+        int compMethod, bool sparse, bool rle, shared_ptr<CompressedBuffer>& compressedBuffer)
+{
+    assert(pTmpChunk);
+    assert(compressedBuffer && compressedBuffer->getData());
+
+    pinTmpChunk = make_shared<PinBuffer>(*pTmpChunk);
+    Address chunkAddr;
+    chunkAddr.coords = coordinates;
+    chunkAddr.attId = attributeID;
+    pTmpChunk->initialize(array.get(), &array->getArrayDesc(), chunkAddr, compMethod);
+    pTmpChunk->setSparse(sparse);
+    pTmpChunk->setRLE(rle);
+    pTmpChunk->decompress(*compressedBuffer);
+}
+
+void MessageHandleJob::_handleChunkOrAggregateChunk(bool isAggregateChunk)
 {
     boost::shared_ptr<scidb_msg::Chunk> chunkRecord = _messageDesc->getRecord<scidb_msg::Chunk>();
     assert(!chunkRecord->eof());
     assert(_query);
     RWLock::ErrorChecker noopEc;
     ScopedRWLockRead shared(_query->queryLock, noopEc);
+
     try
     {
-        // TODO: Apply it to statistics of current SG
-        currentStatistics->receivedSize += _messageDesc->getMessageSize();
-        currentStatistics->receivedMessages++;
+        if (! isAggregateChunk) {
+            // TODO: Apply it to statistics of current SG
+            currentStatistics->receivedSize += _messageDesc->getMessageSize();
+            currentStatistics->receivedMessages++;
+        }
+
         LOG4CXX_TRACE(logger, "Next chunk message was received")
         const int compMethod = chunkRecord->compression_method();
         const size_t decompressedSize = chunkRecord->decompressed_size();
         const AttributeID attributeID = chunkRecord->attribute_id();
         const size_t count = chunkRecord->count();
 
-        boost::shared_ptr<Array> outputArray = _query->getSGContext()->_resultSG;
+        boost::shared_ptr<SGContext> sgCtx = dynamic_pointer_cast<SGContext>(_query->getOperatorContext());
+        if (sgCtx == NULL) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_CTX)
+                   << typeid(*_query->getOperatorContext()).name());
+        }
+
+        boost::shared_ptr<Array> outputArray = sgCtx->_resultSG;
         ScopedMutexLock cs(_query->resultCS);
         boost::shared_ptr<ArrayIterator> outputIter = outputArray->getIterator(attributeID);
+
+        const bool shouldCacheEmptyBitmap = sgCtx->_shouldCacheEmptyBitmap;
+        const ArrayDesc& desc = outputArray->getArrayDesc();
+        const size_t sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
+        const bool isEmptyable = (desc.getEmptyBitmapAttribute() != NULL);
+        const bool isEmptyIndicator = isEmptyable && (attributeID+1==desc.getAttributes().size());
+        const bool rle = chunkRecord->rle();
+
+        if (isAggregateChunk) {
+            assert(! isEmptyIndicator);
+        }
 
         Coordinates coordinates;
         for (int i = 0; i < chunkRecord->coordinates_size(); i++) {
             coordinates.push_back(chunkRecord->coordinates(i));
         }
 
-        boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(_messageDesc->getBinary());
-        compressedBuffer->setCompressionMethod(compMethod);
-        compressedBuffer->setDecompressedSize(decompressedSize);
-        Chunk* outChunk;
-        if (outputIter->setPosition(coordinates)) { // merge with existed chunk
-            outChunk = &outputIter->updateChunk();
-            if (outChunk->getDiskChunk() != NULL)
-                throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_UPDATE_CHUNK);
-            outChunk->setCount(0); // unknown
-            AttributeDesc const& attr = outChunk->getAttributeDesc();
-            bool isSparse = outChunk->isSparse() || chunkRecord->sparse();
-            bool isRLE = outChunk->isRLE() || chunkRecord->rle();
-            bool isVarying = TypeLibrary::getType(attr.getType()).variableSize();
-            char* dst = (char*)outChunk->getData();
-            Value const& defaultValue = attr.getDefaultValue();
-            if ((dst == NULL || (!isSparse && !isRLE && !isVarying && defaultValue.isZero() && !attr.isNullable())) && compMethod == 0) { // chunk is not compressed
-                char const* src = (char const*)compressedBuffer->getData();
-                if (dst == NULL) {
-                    outChunk->allocate(decompressedSize);
-                    outChunk->setSparse(chunkRecord->sparse());
-                    outChunk->setRLE(chunkRecord->rle());
-                    outChunk->setCount(count);
-                    memcpy(outChunk->getData(), src, decompressedSize);
-                } else {
-                    if (decompressedSize != outChunk->getSize())
-                        throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_MERGE_CHUNKS_WITH_VARYING_SIZE);
-                    for (size_t j = 0; j < decompressedSize; j++) {
-                        dst[j] |= src[j];
-                    }
-                } 
-                outChunk->write(_query);
-            } else {
-                MemChunk tmpChunk;
-                Address chunkAddr;
-                ArrayDesc const& desc = outputArray->getArrayDesc();
-                chunkAddr.coords = coordinates;
-                chunkAddr.arrId = desc.getId();
-                chunkAddr.attId = attributeID;
-                tmpChunk.initialize(outputArray.get(), &desc, chunkAddr, compMethod);
-                tmpChunk.setSparse(isSparse);
-                tmpChunk.setRLE(chunkRecord->rle());
-                tmpChunk.decompress(*compressedBuffer);
-
-                char* dst = (char*)outChunk->getData();
-                if (dst != NULL && (isSparse || isRLE || isVarying || !defaultValue.isZero() || attr.isNullable())) {
-                    boost::shared_ptr<ChunkIterator> dstIterator = outChunk->getIterator(_query, (outChunk->isSparse() ? ChunkIterator::SPARSE_CHUNK : 0)
-                                                                                        | ChunkIterator::APPEND_CHUNK | ChunkIterator::NO_EMPTY_CHECK);
-                    boost::shared_ptr<ConstChunkIterator> srcIterator = tmpChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS
-                                                                                                  |ChunkIterator::NO_EMPTY_CHECK
-                                                                                                  |ChunkIterator::IGNORE_DEFAULT_VALUES);
-                    if (desc.getEmptyBitmapAttribute() != NULL) {
-                        while (!srcIterator->end()) {
-                            if (!dstIterator->setPosition(srcIterator->getPosition()))
-                                throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-                            Value const& value = srcIterator->getItem();
-                            dstIterator->writeItem(value);
-                            ++(*srcIterator);
-                        }
-                    } else {
-                        while (!srcIterator->end()) {
-                            Value const& value = srcIterator->getItem();
-                            if (value != defaultValue) {
-                                if (!dstIterator->setPosition(srcIterator->getPosition()))
-                                    throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-                                dstIterator->writeItem(value);
-                            }
-                            ++(*srcIterator);
-                        }
-                    } 
-                    dstIterator->flush();
-                } else {
-                    char const* src = (char const*)tmpChunk.getData();
-                    if (dst == NULL) {
-                        outChunk->allocate(decompressedSize);
-                        outChunk->setSparse(isSparse);
-                        outChunk->setRLE(chunkRecord->rle());
-                        outChunk->setCount(count);
-                        memcpy(outChunk->getData(), src, decompressedSize);
-                    } else {
-                        if (decompressedSize != outChunk->getSize())
-                            throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_MERGE_CHUNKS_WITH_VARYING_SIZE);
-                        for (size_t j = 0; j < decompressedSize; j++) {
-                            dst[j] |= src[j];
-                        }
-                    }
-                    outChunk->write(_query);
-                }
-            }
-        } else { // new chunk
-            outChunk = &outputIter->newChunk(coordinates, compMethod);
-            outChunk->setSparse(chunkRecord->sparse());
-            outChunk->setRLE(chunkRecord->rle());
-            outChunk->decompress(*compressedBuffer); // TODO: it's better avoid decompression. It can be written compressed
-            outChunk->setCount(count);
-            outChunk->write(_query);
+        if (!isAggregateChunk && sgCtx->_targetVersioned)
+        {
+            sgCtx->_newChunks.insert(coordinates);
         }
-        checkChunkMagic(*outChunk);
 
-        checkChunkMagic(*outChunk);
+        boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(_messageDesc->getBinary());
+        if (compressedBuffer) {
+            assert(compressedBuffer->getData());
+            PinBuffer pin(*compressedBuffer); // this line protects compressedBuffer->data from being freed, allowing MemChunk::decompressed(*compressedBuffer) to be called multiple times.
+
+            compressedBuffer->setCompressionMethod(compMethod);
+            compressedBuffer->setDecompressedSize(decompressedSize);
+            Chunk* outChunk;
+
+            // temporary MemArray objects
+            shared_ptr<MemChunk> pTmpChunk = make_shared<MemChunk>();  // make it a shared pointer, because the bitmap chunk needs to be preserved across threads.
+            MemChunk closure;
+
+            // the PinBuffer objects protect tmpChunk and closure, respectively.
+            shared_ptr<PinBuffer> pinTmpChunk, pinClosure;
+
+            if (outputIter->setPosition(coordinates)) { // existing chunk
+                outChunk = &outputIter->updateChunk();
+
+                if (! isAggregateChunk) {
+                    if (outChunk->getDiskChunk() != NULL) {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_UPDATE_CHUNK);
+                    }
+                    outChunk->setCount(0); // unknown
+                }
+
+                // if (a) either dest is NULL or merge by bitwise-or is possible; and (b) src is not compressed
+                char* dst = static_cast<char*>(outChunk->getData());
+                if ( (dst == NULL || (outChunk->isPossibleToMergeByBitwiseOr() && !chunkRecord->sparse() && !chunkRecord->rle()))
+                     &&
+                     compMethod == 0 )
+                {
+                    char const* src = (char const*)compressedBuffer->getData();
+
+                    // Special care is needed if shouldCacheEmptyBitmap.
+                    // - If this is the empty bitmap, store it in the SGContext.
+                    // - Otherwise, add the empty bitmap from the SGContext to the chunk's data.
+                    if (shouldCacheEmptyBitmap) {
+                        initMemChunkFromNetwork(pTmpChunk, pinTmpChunk, outputArray, coordinates, attributeID,
+                                compMethod, chunkRecord->sparse() || outChunk->isSparse(), rle, compressedBuffer);
+
+                        if (isEmptyIndicator) {
+                            sgCtx->setCachedEmptyBitmapChunk(sourceId, pTmpChunk, coordinates);
+                        } else {
+                            shared_ptr<ConstRLEEmptyBitmap> cachedBitmap = sgCtx->getCachedEmptyBitmap(sourceId, coordinates);
+                            assert(cachedBitmap);
+                            pinClosure = make_shared<PinBuffer>(closure);
+                            closure.initialize(*pTmpChunk);
+                            pTmpChunk->makeClosure(closure, cachedBitmap);
+                            src = static_cast<char const*>(closure.getData());
+                        }
+                    }
+
+                    if (dst == NULL) {
+                        outChunk->allocateAndCopy(src, decompressedSize, chunkRecord->sparse(), chunkRecord->rle(), count, _query);
+                    } else {
+                        outChunk->mergeByBitwiseOr(src, decompressedSize, _query);
+                    }
+                } else {
+                    initMemChunkFromNetwork(pTmpChunk, pinTmpChunk, outputArray, coordinates, attributeID,
+                            compMethod, chunkRecord->sparse() || outChunk->isSparse(), rle, compressedBuffer);
+
+                    ConstChunk const* srcChunk = &(*pTmpChunk);
+
+                    // Special care is needed if shouldCacheEmptyBitmap.
+                    // - If this is the empty bitmap, store it in the SGContext.
+                    // - Otherwise, add the empty bitmap from the SGContext to the chunk's data.
+                    if (shouldCacheEmptyBitmap) {
+                        if (isEmptyIndicator) {
+                            sgCtx->setCachedEmptyBitmapChunk(sourceId, pTmpChunk, coordinates);
+                        } else {
+                            shared_ptr<ConstRLEEmptyBitmap> cachedBitmap = sgCtx->getCachedEmptyBitmap(sourceId, coordinates);
+                            assert(cachedBitmap);
+                            pinClosure = make_shared<PinBuffer>(closure);
+                            closure.initialize(*pTmpChunk);
+                            pTmpChunk->makeClosure(closure, cachedBitmap);
+                            srcChunk = &closure;
+                        }
+                    }
+
+                    if (isAggregateChunk) {
+                        AggregatePtr aggregate = sgCtx->_aggregateList[attributeID];
+                        if (!isEmptyable && rle) {
+                            assert(!shouldCacheEmptyBitmap);
+                            assert(srcChunk==&(*pTmpChunk));
+                            outChunk->nonEmptyableAggregateMerge(*srcChunk, aggregate, _query);
+                        } else {
+                            outChunk->aggregateMerge(*srcChunk, aggregate, _query);
+                        }
+                    } else {
+                        outChunk->merge(*srcChunk, _query);
+                    }
+                }
+            } else { // new chunk
+                outChunk = &outputIter->newChunk(coordinates, compMethod);
+                outChunk->setSparse(chunkRecord->sparse());
+                outChunk->setRLE(rle);
+                shared_ptr<CompressedBuffer> myCompressedBuffer = compressedBuffer;
+
+                // Special care is needed if shouldCacheEmptyBitmap.
+                // - If this is the empty bitmap, store it in the SGContext.
+                // - Otherwise, add the empty bitmap from the SGContext to the chunk's data.
+                if (shouldCacheEmptyBitmap) {
+                    initMemChunkFromNetwork(pTmpChunk, pinTmpChunk, outputArray, coordinates, attributeID,
+                            compMethod, chunkRecord->sparse() || outChunk->isSparse(), rle, compressedBuffer);
+                    if (isEmptyIndicator) {
+                        sgCtx->setCachedEmptyBitmapChunk(sourceId, pTmpChunk, coordinates);
+                    } else {
+                        shared_ptr<ConstRLEEmptyBitmap> cachedBitmap = sgCtx->getCachedEmptyBitmap(sourceId, coordinates);
+                        assert(cachedBitmap);
+                        myCompressedBuffer = make_shared<CompressedBuffer>();
+                        pTmpChunk->compress(*myCompressedBuffer, cachedBitmap);
+                    }
+                }
+                outChunk->decompress(*myCompressedBuffer);
+                outChunk->setCount(count);
+                outChunk->write(_query);
+            } // end if (outputIter->setPosition(coordinates))
+
+            assert(checkChunkMagic(*outChunk));
+        } // end if (compressedBuffer)
+
         sgSync();
-
         LOG4CXX_TRACE(logger, "Chunk was stored")
     }
     catch(const Exception& e)
@@ -660,7 +668,6 @@ void MessageHandleJob::handleChunk()
         sgSync();
         throw;
     }
-
 }
 
 void MessageHandleJob::handleReplicaSyncRequest()
@@ -694,11 +701,20 @@ void MessageHandleJob::handleChunkReplica()
     for (int i = 0; i < chunkRecord->coordinates_size(); i++) {
         coordinates.push_back(chunkRecord->coordinates(i));
     }
-    if (decompressedSize == 0) { // clone of replica
-        StorageManager::getInstance().cloneChunk(coordinates, attributeID, chunkRecord->cloned_array_id(), chunkRecord->array_id());
-    } else { 
-        DBArray outputArray(chunkRecord->array_id(), _query);
-        boost::shared_ptr<ArrayIterator> outputIter = outputArray.getIterator(attributeID);
+
+    shared_ptr<ArrayDesc> desc = SystemCatalog::getInstance()->getArrayDesc(chunkRecord->array_id());
+    if(chunkRecord->tombstone())
+    { // tombstone record
+        StorageManager::getInstance().removeLocalChunkVersion(*desc, coordinates);
+    }
+    else if (decompressedSize == 0)
+    { // clone of replica
+        shared_ptr<ArrayDesc> sourceDesc = SystemCatalog::getInstance()->getArrayDesc(chunkRecord->source_array_id());
+        StorageManager::getInstance().cloneChunk(coordinates, *desc, attributeID, *sourceDesc, chunkRecord->source_attribute_id());
+    }
+    else 
+    { // regular chunk
+        boost::shared_ptr<ArrayIterator> outputIter = StorageManager::getInstance().getArrayIterator(*desc, attributeID, _query);
         boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(_messageDesc->getBinary());
         compressedBuffer->setCompressionMethod(compMethod);
         compressedBuffer->setDecompressedSize(decompressedSize);
@@ -750,7 +766,6 @@ void MessageHandleJob::handleRemoteChunk()
     }
 }
 
-
 void MessageHandleJob::handleFetchChunk()
 {
     boost::shared_ptr<scidb_msg::Fetch> fetchRecord = _messageDesc->getRecord<scidb_msg::Fetch>();
@@ -776,7 +791,7 @@ void MessageHandleJob::handleFetchChunk()
             const ConstChunk* chunk = &iter->getChunk();
             boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
             boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-            if (chunk->isRLE() && resultArray->getArrayDesc().getEmptyBitmapAttribute() != NULL && !chunk->getAttributeDesc().isEmptyIndicator()) { 
+            if (chunk->isRLE() && resultArray->getArrayDesc().getEmptyBitmapAttribute() != NULL && !chunk->getAttributeDesc().isEmptyIndicator()) {
                 emptyBitmap = chunk->getEmptyBitmap();
             }
             chunk->compress(*buffer, emptyBitmap);
@@ -851,14 +866,13 @@ void MessageHandleJob::handleFetchChunk()
     LOG4CXX_TRACE(logger, "Remote chunk was sent to client")
 }
 
-
 void MessageHandleJob::handleSyncRequest()
 {
     currentStatistics->receivedSize += _messageDesc->getMessageSize();
     currentStatistics->receivedMessages++;
 
     sourceId = _query->mapPhysicalToLogical(_messageDesc->getSourceInstanceID());
-    
+
     if (_query->chunkReqs[sourceId].test()) {
         boost::shared_ptr<MessageDesc> syncMsg = boost::make_shared<MessageDesc>(mtSyncResponse);
         syncMsg->setQueryID(_messageDesc->getQueryID());

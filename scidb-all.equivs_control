@@ -1,0 +1,9 @@
+Section: misc
+Priority: optional
+Homepage: http://scidb.org
+Standards-Version: 3.6.2
+
+Package: scidb-all
+Version: 12.7
+Depends: scidb, libscidbclient, libscidbclient-python, scidb-plugins, scidb-utils, scidb-dev-tools
+Description: SciDB meta package

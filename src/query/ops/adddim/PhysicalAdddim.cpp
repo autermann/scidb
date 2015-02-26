@@ -37,24 +37,27 @@ using namespace boost;
 
 namespace scidb {
 
-class PhysicalAdddim: public  PhysicalOperator
+class PhysicalAdddim : public  PhysicalOperator
 {
 public:
-	PhysicalAdddim(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalAdddim(std::string const& logicalName,
+                   std::string const& physicalName,
+                   Parameters const& parameters,
+                   ArrayDesc const& schema):
 	    PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
 	}
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector<ArrayDesc> const& inputSchemas) const
     {
         PhysicalBoundaries input = inputBoundaries[0];
         Coordinates start, end;
         start.push_back(0);
         end.push_back(0);
 
-        for (size_t i = 0; i<input.getStartCoords().size(); i++)
-        {
+        for (size_t i = 0; i<input.getStartCoords().size(); i++) {
             start.push_back(input.getStartCoords()[i]);
             end.push_back(input.getEndCoords()[i]);
         }
@@ -65,7 +68,9 @@ public:
 	 * Adddim is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    boost::shared_ptr<Array> execute(
+            vector< boost::shared_ptr<Array> >& inputArrays,
+            boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
 		return boost::shared_ptr<Array>(new AdddimArray(_schema, inputArrays[0]));

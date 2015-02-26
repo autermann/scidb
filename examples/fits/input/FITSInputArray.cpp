@@ -47,7 +47,7 @@ FITSInputArray::FITSInputArray(ArrayDesc const& array, string const& filePath, u
       desc(array),
       dims(array.getDimensions()),
       nDims(dims.size()),
-      nAttrs(array.getAttributes().size()),
+      nAttrs(array.getAttributes(true).size()),
       values(nAttrs),
       chunks(nAttrs),
       chunkIterators(nAttrs),
@@ -87,11 +87,6 @@ boost::shared_ptr<ConstArrayIterator> FITSInputArray::getConstIterator(Attribute
     return boost::shared_ptr<ConstArrayIterator>(new FITSInputArrayIterator(*(FITSInputArray*) this, attr));
 }
 
-bool FITSInputArray::supportsRandomAccess() const
-{
-    return false;
-}
-
 ConstChunk* FITSInputArray::getChunkByIndex(size_t index, AttributeID attr)
 {
     if (chunkIndex > 0) {
@@ -121,7 +116,6 @@ ConstChunk* FITSInputArray::getChunkByIndex(size_t index, AttributeID attr)
         initChunkPos();
         readChunk();
     }
-
     // If within window, return chunk
     if (index < kWindowSize || (index > (chunkIndex - kWindowSize) && index <= chunkIndex)) {
          return &chunks[attr].chunks[index % kWindowSize];
@@ -171,7 +165,7 @@ bool FITSInputArray::validDimensions()
     vector<int> const& axisSizes = parser.getAxisSizes();
 
     for (size_t i = 0; i < nDims; i++) {
-        if (axisSizes[i] != dims[i].getLength()) {
+        if (static_cast<uint64_t>(axisSizes[i]) != dims[i].getLength()) {
             return false;
         }
     }
@@ -291,7 +285,7 @@ void FITSInputArray::readChunk()
 void FITSInputArray::initMemChunks(boost::shared_ptr<Query>& query)
 {
     for (size_t i = 0; i < nAttrs; i++) {
-        Address addr(desc.getId(), i, chunkPos);
+        Address addr(i, chunkPos);
 
         MemChunk& chunk = chunks[i].chunks[chunkIndex % kWindowSize];
         chunk.initialize(this, &desc, addr, desc.getAttributes()[i].getDefaultCompressionMethod());

@@ -138,7 +138,7 @@ class InjectedErrorLibrary
     }
  private:
     typedef std::map<long int, boost::shared_ptr<const InjectedError> > IdToErrorMap;
-#ifdef DEBUG
+#ifndef NDEBUG
     IdToErrorMap _registeredErrors;
     Mutex _mutex;
 #endif
@@ -164,7 +164,7 @@ class InjectedErrorListener
      */
     void start()
     {
-#ifdef DEBUG
+#ifndef NDEBUG
         ScopedMutexLock lock(_mutex);
         if (_lsnrID) {
             return;
@@ -179,7 +179,7 @@ class InjectedErrorListener
      */
     void check()
     {
-#ifdef DEBUG
+#ifndef NDEBUG
         ScopedMutexLock lock(_mutex);
         if (!_msg) {
             return;
@@ -194,7 +194,7 @@ class InjectedErrorListener
      */
     void stop()
     {
-#ifdef DEBUG
+#ifndef NDEBUG
         ScopedMutexLock lock(_mutex);
         Notification<ErrorType>::removePublishListener(_lsnrID);
 #endif
@@ -202,12 +202,12 @@ class InjectedErrorListener
  private:
     void handle(typename Notification<ErrorType>::MessageTypePtr msg)
     {
-#ifdef DEBUG
+#ifndef NDEBUG
         ScopedMutexLock lock(_mutex);
         _msg = msg;
 #endif
     }
-#ifdef DEBUG
+#ifndef NDEBUG
     typename Notification<ErrorType>::ListenerID _lsnrID;
     typename Notification<ErrorType>::MessageTypePtr _msg;
     Mutex _mutex;

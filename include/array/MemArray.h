@@ -34,63 +34,52 @@
 #include <map>
 #include <assert.h>
 #include <boost/shared_ptr.hpp>
+#include <boost/shared_array.hpp>
 #include <query/Query.h>
+#include <util/Lru.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb
 {
-
     /**
-     * Fully qualified address of array element
+     * An Address is used to specify the location of a chunk inside an array.
      */
     struct Address
     {
-        /**
-         * Array identifier
-         */
-        ArrayID arrId;
-        /**
+        /*
          * Attribute identifier
          */
         AttributeID attId;
         /**
-         * Element coordinates
+         * Chunk coordinates
          */
         Coordinates coords;
 
         /**
-         * Constructur
-         * @param arrId array identifier
+         * Default constructor
+         */
+        Address()
+        {}
+
+        /**
+         * Constructor
          * @param attId attribute identifier
          * @param coords element coordinates
          */
-        Address(ArrayID arrId, AttributeID attId, Coordinates const& coords)
-        {
-            this->arrId = arrId;
-            this->attId = attId;
-            this->coords = coords;
-        }
-
-        /**
-         * Default constructor
-         */
-        Address() {}
+        Address(AttributeID attId, Coordinates const& coords) :
+            attId(attId), coords(coords)
+        {}
 
         /**
          * Copy constructor
+         * @param addr the object to copy from
          */
         Address(const Address& addr)
         {
-            this->arrId = addr.arrId;
             this->attId = addr.attId;
             this->coords = addr.coords;
-        }
-
-        bool operator < (const Address& other) const
-        {
-            return less(other);
         }
 
         /**
@@ -98,19 +87,20 @@ namespace scidb
          * @param other another aorgument of comparison
          * @return true if "this" preceeds "other" in partial order
          */
-        bool less(const Address& other) const
+        bool operator <(const Address& other) const
         {
-            if (arrId != other.arrId) {
-                return arrId < other.arrId;
-            }
-            if (attId != other.attId) {
+            if (attId != other.attId)
+            {
                 return attId < other.attId;
             }
-            if (coords.size() != other.coords.size()) {
+            if (coords.size() != other.coords.size())
+            {
                 return coords.size() < other.coords.size();
             }
-            for (size_t i = 0, n = coords.size(); i < n; i++) {
-                if (coords[i] != other.coords[i]) {
+            for (size_t i = 0, n = coords.size(); i < n; i++)
+            {
+                if (coords[i] != other.coords[i])
+                {
                     return coords[i] < other.coords[i];
                 }
             }
@@ -122,17 +112,17 @@ namespace scidb
          * @param other another aorgument of comparison
          * @return true if "this" equals to "other"
          */
-        bool operator == (const Address& other) const
+        bool operator ==(const Address& other) const
         {
-            if (arrId != other.arrId) {
-                return false;
-            }
-            if (attId != other.attId) {
+            if (attId != other.attId)
+            {
                 return false;
             }
             assert(coords.size() == other.coords.size());
-            for (size_t i = 0, n = coords.size(); i < n; i++) {
-                if (coords[i] != other.coords[i]) {
+            for (size_t i = 0, n = coords.size(); i < n; i++)
+            {
+                if (coords[i] != other.coords[i])
+                {
                     return false;
                 }
             }
@@ -144,29 +134,23 @@ namespace scidb
          * @param other another aorgument of comparison
          * @return true if "this" not equals to "other"
          */
-        bool operator != (const Address& other) const
+        bool operator !=(const Address& other) const
         {
             return !(*this == other);
         }
 
+        /**
+         * Compute a hash of coordiantes
+         * @return a 64-bit hash of the chunk coordinates.
+         */
         uint64_t hash() const
         {
             uint64_t h = 0;
-            for (int i = coords.size(); --i >= 0;) {
+            for (int i = coords.size(); --i >= 0;)
+            {
                 h ^= coords[i];
             }
             return h;
-        }
-    };
-
-    /**
-     * Address comparator to be used in std::map
-     */
-    struct AddressLess
-    {
-        bool operator()(const Address& c1, const Address& c2)
-        {
-            return c1.less(c2);
         }
     };
 
@@ -176,28 +160,51 @@ namespace scidb
     class CoordinatesMapper
     {
       protected:
-        size_t      nDims;
-        position_t  logicalChunkSize;
-        Coordinates origin;
-        Coordinates chunkIntervals;
+        size_t      _nDims;
+        position_t  _logicalChunkSize;
+        Coordinates _origin;
+        Coordinates _chunkIntervals;
+
+        // Internal init function that is shared by the constructors.
+        void init(Coordinates const& firstPosition, Coordinates const& lastPosition);
 
       public:
-        CoordinatesMapper(ConstChunk const& chunk); 
+        /**
+         * Constructor.
+         * @param  chunk  A chunk from which the first position and last position will be used.
+         */
+        CoordinatesMapper(ConstChunk const& chunk);
+
+        /**
+         * Constructor.
+         * @param  firstPosition  The first position of the chunk.
+         * @param  lastPosition   The last position of the chunk.
+         */
+        CoordinatesMapper(Coordinates const& firstPosition, Coordinates const& lastPosition);
+
+        /**
+         * Constructor
+         * @param  chunkPos  The chunk position without overlap.
+         * @param  dims      The dimensions.
+         */
+        CoordinatesMapper(Coordinates const& chunkPos, Dimensions const& dims);
 
         void pos2coord(position_t pos, Coordinates& coord) const 
         {
-            if (nDims == 1) { 
-                coord[0] = origin[0] + pos;
-                assert(pos < chunkIntervals[0]);
-            } else if (nDims == 2) { 
-                coord[1] = origin[1] + (pos % chunkIntervals[1]);
-                pos /= chunkIntervals[1];
-                coord[0] = origin[0] + pos;
-                assert(pos < chunkIntervals[0]);
+            assert(_origin.size()>0);
+
+            if (_nDims == 1) {
+                coord[0] = _origin[0] + pos;
+                assert(pos < _chunkIntervals[0]);
+            } else if (_nDims == 2) {
+                coord[1] = _origin[1] + (pos % _chunkIntervals[1]);
+                pos /= _chunkIntervals[1];
+                coord[0] = _origin[0] + pos;
+                assert(pos < _chunkIntervals[0]);
             } else { 
-                for (int i = (int)nDims; --i >= 0;) {
-                    coord[i] = origin[i] + (pos % chunkIntervals[i]);
-                    pos /= chunkIntervals[i];
+                for (int i = (int)_nDims; --i >= 0;) {
+                    coord[i] = _origin[i] + (pos % _chunkIntervals[i]);
+                    pos /= _chunkIntervals[i];
                 }
                 assert(pos == 0);
             }
@@ -205,21 +212,155 @@ namespace scidb
 
         position_t coord2pos(Coordinates const& coord) const
         {
-            if (nDims == 1) { 
-                return coord[0] - origin[0];
-            } else if (nDims == 2) { 
-                return (coord[0] - origin[0])*chunkIntervals[1] + (coord[1] - origin[1]);
+            if (_nDims == 1) {
+                return coord[0] - _origin[0];
+            } else if (_nDims == 2) {
+                return (coord[0] - _origin[0])*_chunkIntervals[1] + (coord[1] - _origin[1]);
             } else { 
                 position_t pos = 0;
-                for (size_t i = 0, n = nDims; i < n; i++) {
-                    pos *= chunkIntervals[i];
-                    pos += coord[i] - origin[i];
+                for (size_t i = 0, n = _nDims; i < n; i++) {
+                    pos *= _chunkIntervals[i];
+                    pos += coord[i] - _origin[i];
                 }
                 return pos;
             }
         }
+        
+        /**
+         * Retrieve the number of dimensions used by the mapper.
+         * @return the number of dimensions
+         */
+        size_t getNumDims() const
+        {
+            return _nDims;
+        }
     };
        
+    /**
+     * Map coordinates to offset within chunk and vice versa, while the chunk is given at run time.
+     * The difference from CoordinatesMapper is that this object can be created once and reused for all chunks in the array.
+     */
+    class ArrayCoordinatesMapper
+    {
+      protected:
+        Dimensions  _dims;
+
+      public:
+        /**
+         * Constructor.
+         * @param  dims   the dimensions
+         */
+        ArrayCoordinatesMapper(Dimensions const& dims)
+        : _dims(dims)
+        {
+            assert(dims.size()>0);
+        }
+
+
+        /**
+         * Convert chunkPos to lows and intervals.
+         * Without overlap, lows[i] = chunkPos[i]; but with overlap, lows[i] may be smaller (but can't be smaller than dims[i].getStart().
+         * Similar with highs[i] (may be larger than the last logical coord, but can't be larger than dims[i].getEndMax().
+         * The interval is just highs[i]-lows[i]+1.
+         * @param chunkPos   the chunk position
+         * @param lows       [out] the low point
+         * @param intervals  [out] the intervals of each dim
+         */
+        inline void chunkPos2LowsAndIntervals(Coordinates const& chunkPos, Coordinates& lows, Coordinates& intervals) const
+        {
+            assert(chunkPos.size()==_dims.size());
+            assert(lows.size()==_dims.size());
+            assert(intervals.size()==_dims.size());
+
+            for (size_t i=0; i<_dims.size(); ++i) {
+                lows[i] = chunkPos[i] - _dims[i].getChunkOverlap();
+                if (lows[i] < _dims[i].getStart()) {
+                    lows[i] = _dims[i].getStart();
+                }
+                Coordinate high = chunkPos[i] + _dims[i].getChunkInterval()+_dims[i].getChunkOverlap() - 1;
+                if (high > _dims[i].getEndMax()) {
+                    high = _dims[i].getEndMax();
+                }
+                intervals[i] = high - lows[i] + 1;
+
+                assert(intervals[i]>0);
+            }
+        }
+
+        /**
+         * Given a position in a chunk, and the chunkPos, compute the coordinate.
+         * @param chunkPos   the chunk position
+         * @param pos        position in a chunk, as returned by coord2pos
+         * @param coord      [out] the coordinate
+         */
+        void pos2coord(Coordinates const& chunkPos, position_t pos, Coordinates& coord) const
+        {
+            Coordinates lows(chunkPos.size());
+            Coordinates intervals(chunkPos.size());
+            chunkPos2LowsAndIntervals(chunkPos, lows, intervals);
+            pos2coordWithLowsAndIntervals(lows, intervals, pos, coord);
+        }
+
+        /**
+         * Upon repeated call to pos2coord with the same chunkPos, the performance can be improved by
+         * converting chunkPos to lows and intervals, then call pos2coord with lows and intervals.
+         * @param lows       the low point of the chunk
+         * @param intervals  the intervals of the chunk
+         * @param pos        position in a chunk, as returned by coord2pos
+         * @param coord      [out] the coordinate
+         */
+        void pos2coordWithLowsAndIntervals(Coordinates const& lows, Coordinates const& intervals, position_t pos, Coordinates& coord) const
+        {
+            assert(lows.size() == _dims.size());
+            assert(intervals.size() == _dims.size());
+            assert(coord.size() == _dims.size());
+
+            size_t i = _dims.size();
+            while (i>0) {
+                --i;
+                coord[i] = lows[i] + (pos % intervals[i]);
+                pos /= intervals[i];
+            }
+            assert(pos == 0);
+        }
+
+        /**
+         * Given a coord in a chunk, and the chunkPos, compute the position in the chunk.
+         * @param chunkPos the chunk position
+         * @param coord    the coord in the chunk
+         * @return the position
+         */
+        position_t coord2pos(Coordinates const& chunkPos, Coordinates const& coord) const
+        {
+            Coordinates lows(_dims.size());
+            Coordinates intervals(_dims.size());
+            chunkPos2LowsAndIntervals(chunkPos, lows, intervals);
+            return coord2posWithLowsAndIntervals(lows, intervals, coord);
+        }
+
+        /**
+         * Upon repeated call to coord2ps with the same chunkPos, the performance can be improved by
+         * converting chunkPos to lows and intervals, then call coord2pos with lows and intervals.
+         * @param lows       the low point of the chunk
+         * @param intervals  the intervals of the chunk
+         * @param coord      the coord in the chunk
+         * @return the position
+         */
+        position_t coord2posWithLowsAndIntervals(Coordinates const& lows, Coordinates const& intervals, Coordinates const& coord) const
+        {
+            assert(lows.size() == _dims.size());
+            assert(intervals.size() == _dims.size());
+            assert(coord.size() == _dims.size());
+
+            position_t pos = 0;
+            for (size_t i = 0; i < _dims.size(); ++i) {
+                pos *= intervals[i];
+                pos += coord[i] - lows[i];
+            }
+            return pos;
+        }
+    };
+
     class MemArray;
     class MemArrayIterator;
 
@@ -231,9 +372,10 @@ namespace scidb
         friend class MemArray;
         friend class MemArrayIterator;
         friend class MemChunkIterator;
+        friend class SharedMemCache;
       protected:
         Address addr; // address of first chunk element
-        void*   data; // uncompressed data (may be NULL if swapped out)
+        boost::shared_array<char>   data; // uncompressed data (may be NULL if swapped out)
         size_t  size;
         size_t  nElems;
         int     compressionMethod;
@@ -303,6 +445,10 @@ namespace scidb
         void decompress(const CompressedBuffer& buf);
     };
 
+    class LruMemChunk;
+    typedef LRUSecondary<LruMemChunk*> MemChunkLru;
+    typedef LRUSecondary<LruMemChunk*>::ListIterator MemChunkLruIterator;
+
     /**
      * Chunk of temporary array which body can be located either in memory either on disk
      */
@@ -310,9 +456,11 @@ namespace scidb
     {
         friend class MemArray;
         friend class MemArrayIterator;
+        friend class SharedMemCache;
 
-        LruMemChunk* next;
-        LruMemChunk* prev;
+    private:
+        MemChunkLruIterator _whereInLru;
+
         int64_t      swapFileOffset;
         size_t       accessCount;
         size_t       swapFileSize;
@@ -323,25 +471,16 @@ namespace scidb
 
         bool isTemporary() const;
 
-        bool isEmpty() {
-            return next == this;
-        }
+        bool isEmpty() const;
 
-        void prune() {
-            next = prev = this;
-        }
+        /**
+         * Take a note that this LruMemChunk has been removed from the Lru.
+         */
+        void prune();
 
-        void unlink() {
-            next->prev = prev;
-            prev->next = next;
-            prune();
-        }
+        void removeFromLru();
 
-        void link(LruMemChunk* elem) {
-            elem->prev = this;
-            elem->next = next;
-            next = next->prev = elem;
-        }
+        void pushToLru();
 
         virtual void write(boost::shared_ptr<Query>& query);
 
@@ -350,6 +489,58 @@ namespace scidb
     };
     
 
+    /**
+     * Structure to share mem chunks.
+     */
+    class SharedMemCache
+    {
+    private:
+        // The LRU of LruMemChunk objects.
+        MemChunkLru _theLru;
+
+        uint64_t _usedMemSize;
+        uint64_t _usedMemThreshold;
+        Mutex _mutex;
+        size_t _swapNum;
+        size_t _loadsNum;
+
+        static SharedMemCache _sharedMemCache;
+
+    public:
+        SharedMemCache();
+        void pinChunk(LruMemChunk& chunk);
+        void unpinChunk(LruMemChunk& chunk);
+        void swapOut();
+        void deleteChunk(LruMemChunk& chunk);
+        void cleanupArray(MemArray &array);
+        static SharedMemCache& getInstance() {
+            return _sharedMemCache;
+        }
+
+        /**
+         * Get the LRU.
+         * @return a reference to the LRU object.
+         */
+        static MemChunkLru& getLru() {
+            return _sharedMemCache._theLru;
+        }
+
+        uint64_t getUsedMemSize() const {
+            return _sharedMemCache._usedMemSize;
+        }
+
+        size_t getSwapNum() const {
+            return _swapNum;
+        }
+
+        size_t getLoadsNum() const {
+            return _loadsNum;
+        }
+
+        void setMemThreshold(uint64_t memThreshold) {
+            _usedMemThreshold = memThreshold;
+        }
+    };
 
     /**
      * Temporary (in-memory) array implementation
@@ -360,6 +551,7 @@ namespace scidb
         friend class LruMemChunk;
         friend class MemChunkIterator;
         friend class MemArrayIterator;
+        friend class SharedMemCache;
       public:
         //
         // Sparse chunk iterator
@@ -376,8 +568,29 @@ namespace scidb
 
         MemArray(ArrayDesc const& arr);
         MemArray(const MemArray& other);
-        MemArray(boost::shared_ptr<Array> input);
+
+        /**
+         * Construct by first creating an empty MemArray with the shape of input,
+         * then append all data from input to this.
+         * @param input the input array used for the array descriptor and the data
+         * @param vertical the method to use when copying data. True by default,
+         * meaning copy each attribute separately - first all chunks of attribute 1,
+         * then all chunks of attribute 2 and so on... False means copy all attributes
+         * at the same time - first all attributes for the first chunk, then all
+         * attributes for the second chunk. The value false must be used when input
+         * array does not support the independent scanning of attributes
+         * (i.e. MergeSortArray).
+         */
+        MemArray(boost::shared_ptr<Array> input, bool vertical = true);
         ~MemArray();
+
+        /**
+         * @see Array::isMaterialized()
+         */
+        virtual bool isMaterialized() const
+        {
+            return true;
+        }
 
       private:
         void initLRU();
@@ -386,13 +599,10 @@ namespace scidb
         void unpinChunk(LruMemChunk& chunk);
 
         ArrayDesc desc;
-        map<Address, LruMemChunk, AddressLess> chunks;
-        LruMemChunk lru;
-        uint64_t usedMemSize;
-        uint64_t usedMemThreshold;
-        uint64_t usedFileSize;
-        int swapFile;
-        Mutex lruMutex;
+        uint64_t _usedFileSize;
+        int _swapFile;
+        map<Address, LruMemChunk> _chunks;
+        Mutex _mutex;
     };
 
     /**
@@ -400,8 +610,8 @@ namespace scidb
      */
     class MemArrayIterator : public ArrayIterator
     {
-        map<Address, LruMemChunk, AddressLess>::iterator curr;
-        map<Address, LruMemChunk, AddressLess>::iterator last;
+        map<Address, LruMemChunk>::iterator curr;
+        map<Address, LruMemChunk>::iterator last;
         MemArray& array;
         Address addr;
         Chunk* currChunk;
@@ -503,23 +713,6 @@ namespace scidb
         bool   hasCurrent;
     private:
         boost::weak_ptr<Query> _query;
-    };
-
-    /**
-     * Coordinates comparator to be used in std::map
-     */
-    struct CoordinatesLess
-    {
-        bool operator()(const Coordinates& c1, const Coordinates& c2) const
-        {
-            assert(c1.size() == c2.size());
-            for (size_t i = 0, n = c1.size(); i < n; i++) {
-                if (c1[i] != c2[i]) {
-                    return c1[i] < c2[i];
-                }
-            }
-            return false;
-        }
     };
 
    /**
@@ -645,7 +838,6 @@ namespace scidb
         bool   hasCurrent;
         bool   hasOverlap;
         bool   isEmptyable;
-        bool   isPlain;
         int    mode;
         boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
         ConstRLEEmptyBitmap::iterator emptyBitmapIterator;
@@ -718,6 +910,7 @@ namespace scidb
         boost::shared_ptr<Query> getQuery();
         
         RLEChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode, boost::shared_ptr<Query> const& q);
+        virtual ~RLEChunkIterator();
 
       private:
         position_t getPos() { 

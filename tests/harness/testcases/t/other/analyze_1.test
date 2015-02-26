@@ -18,9 +18,11 @@ store(build(a5,'a'+string(x)+string(y)),a5)
 create array a6 <val1:float> [x=0:3,2,0,y=0:3,2,0]
 store(build(a6,x+y+1.5),a6)
 
-load_library ( 'librational.so' )
+
+load_library ('rational')
 create array a7 <val1:rational> [x=0:3,2,0,y=0:3,2,0]
 load(a7,'../tests/harness/testcases/data/analyze2.txt')
+
 
 --test
 analyze(a1)

@@ -1,39 +1,60 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
 <refentry>
   <refnamediv>
     <refname>project</refname>
-    <refpurpose>Select array attributes</refpurpose>
-  </refnamediv>
-  <refsynopsisdiv>
-    <synopsis><command>SELECT</command> * <command>INTO</command> <replaceable>target_array</replaceable> 
-   <command>FROM</command> project(<replaceable>source_array</replaceable>, <replaceable>attribute1</replaceable>, <replaceable>attribute2</replaceable>,...);
 
-store(project(<replaceable>source_array</replaceable>,<replaceable>attribute1</replaceable>,<replaceable>attribute2</replaceable>,...),<replaceable>target_array</replaceable>);</synopsis>
+    <refpurpose>Produces a result array with the same dimensions as -- but a
+    subset of the attributes of -- a source array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>project(<replaceable>source_array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>attribute</replaceable></optional>...);</synopsis>
   </refsynopsisdiv>
+
   <refsect1>
     <title>Summary</title>
-    <para>Project the input array on the specified attributes, in the specified order. Attributes that are not specified are
-excluded from the output.
-</para>
+
+    <para>The project operator produces a result array that includes some
+    attributes of a source array but excludes others. You indicate which
+    attributes to include by supplying their names with the attribute
+    parameter(s). In the result array, the attributes will appear in the order
+    you name them as parameters.</para>
+
+    <para>You can use the project operator in the FROM clause of an AQL SELECT
+    statement, as a stand-alone operator in a AFL statement, or as an operand
+    within other SciDB operators.</para>
   </refsect1>
+
   <refsect1>
     <title>Example</title>
+
     <informalexample>
-      <para>This example takes an array with 3 attributes and returns an array with 2 attributes.</para>
+      <para>This example takes a 2-D array with 3 attributes, excludes one of
+      the attributes, and reorders the remaining two.</para>
+
       <procedure>
         <step>
-          <para>Create an array source_array:<programlisting>store(build(&lt;val1:double&gt;[i=0:4,5,0],1),source_array);</programlisting>This query outputs:<screen>[(1),(1),(1),(1),(1)]</screen></para>
+          <para>Show the source_array:<programlisting>scan(champions)</programlisting>This
+          query outputs:<screen>year,event,person,country,time
+1996,"dash","Bailey","Canada",9.84
+1996,"marathon","Thugwane","RSA",7956
+2000,"dash","Greene","USA",9.87
+2000,"marathon","Abera","Ethiopia",7811
+2000,"steeplechase","Kosgei","Kenya",503.17</screen></para>
         </step>
+
         <step>
-          <para>Create an attribute val2 and store val1 and val2 in the array:<programlisting>store(apply(source_array,val2,i+1),two_attr);</programlisting><screen>[(1,1),(1,2),(1,3),(1,4),(1,5)]</screen></para>
-        </step>
-        <step>
-          <para>Create an attribute called val3 and store val1, val2, and val3 in an array three_attr:<programlisting>store(apply(two_attr,val3,sin(val2/1.0)),three_attr);</programlisting><screen>[(1,1,0.841471),(1,2,0.909297),(1,3,0.14112),
-   (1,4,-0.756802),(1,5,-0.958924)]</screen></para>
-        </step>
-        <step>
-          <para>Project attribute val3 and val2:<programlisting>project(three_attr,val3,val2);</programlisting>This query outputs:<screen>[(0.841471,1),(0.909297,2),(0.14112,3),(-0.756802,4),(-0.958924,5)]</screen></para>
+          <para>Use the project operator to exclude the person attribute, and
+          to reorder the remaining attributes:<programlisting>project(champions,time,country)</programlisting>This
+          query outputs:<screen>year,event,time,country
+1996,"dash",9.84,"Canada"
+1996,"marathon",7956,"RSA"
+2000,"dash",9.87,"USA"
+2000,"marathon",7811,"Ethiopia"
+2000,"steeplechase",503.17,"Kenya"</screen></para>
         </step>
       </procedure>
     </informalexample>

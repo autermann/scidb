@@ -33,6 +33,37 @@
 namespace scidb
 {
 
+/**
+ * @brief The operator: create_array().
+ *
+ * @par Synopsis:
+ *   create_array( arrayName, arraySchema )
+ *
+ * @par Summary:
+ *   Creates an array with a given name and schema.
+ *
+ * @par Input:
+ *   - arrayName: the array name
+ *   - arraySchema: the array schema of attrs and dims
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attrs
+ *   <br> >
+ *   <br> [
+ *   <br>   dims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalCreateArray: public LogicalOperator
 {
 public:
@@ -44,7 +75,7 @@ public:
         ADD_PARAM_SCHEMA()
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 2);
@@ -52,7 +83,6 @@ public:
         assert(_parameters[1]->getParamType() == PARAM_SCHEMA);
 
         const string &name = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName();
-        ArrayDesc schema = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema();
 
         if (SystemCatalog::getInstance()->containsArray(name))
         {
@@ -60,8 +90,7 @@ public:
                 _parameters[0]->getParsingContext()) << name;
         }
 
-        schema.setName(name);
-        return schema;
+        return ArrayDesc();
     }
 
     void inferArrayAccess(boost::shared_ptr<Query>& query)
@@ -73,7 +102,7 @@ public:
         const string& arrayName = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName();
         assert(!arrayName.empty());
         assert(arrayName.find('@') == std::string::npos);
-	boost::shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(arrayName,
+        boost::shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(arrayName,
                                                                                     query->getQueryID(),
                                                                                     Cluster::getInstance()->getLocalInstanceId(),
                                                                                     SystemCatalog::LockDesc::COORD,

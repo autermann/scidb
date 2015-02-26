@@ -2,11 +2,229 @@ Query was executed successfully
 
 Query was executed successfully
 
-[("george",null,"washington",8,false,false),("john",null,"adams",4,false,false),("thomas",null,"jefferson",8,false,false),("james",null,"madison",8,false,false),("james",null,"monroe",8,false,false),("john","quincy","adams",4,false,false),("andrew",null,"jackson",8,false,false),("martin",null,"van buren",4,false,false),("william","henry","harrison",0,true,false),("john",null,"tyler",4,false,false),("james","knox","polk",4,false,false),("zachary",null,"taylor",1,false,false),("millard",null,"fillmore",3,false,false),("franklin",null,"pierce",4,false,false),("james",null,"buchanan",4,false,false),("abraham",null,"lincoln",4,true,true),("andrew",null,"johnson",4,false,false),("ulysses","simpson","grant",8,false,false),("rutherford","birchard","hayes",4,false,false),("james","abram","garfield",0,true,true),("chester","alan","arthrur",4,false,false),("grover",null,"cleveland",4,false,false),("benjamin",null,"harrison",4,false,false),("grover",null,"cleveland",4,false,false),("william",null,"mckinley",4,true,true),("theodore",null,"roosevelt",8,false,false),("william","howard","taft",4,false,false),("woodrow",null,"wilson",8,false,false),("warren","gamaliel","harding",2,true,false),("calvin",null,"coolidge",6,false,false),("herbert","clark","hoover",4,false,false),("franklin","delano","roosevelt",12,true,false),("harry","s","truman",8,false,false),("dwight","david","eisenhower",8,false,false),("john","fitzgerald","kennedy",2,true,true),("lyndon","baines","johnson",6,false,false),("richard","milhous","nixon",5,false,false),("gerald","rudolph","ford",3,false,false),("james","earl","carter",4,false,false),("ronald","wilson","reagan",8,false,false),("george","herbert walker","bush",4,false,false),("william","jefferson","clinton",8,false,false),("george","walker","bush",8,false,false),("barack","hussein","obama",null,null,false)]
+{president_number} first_name,middle_name,last_name,years_in_office,died_in_office,assassinated
+{1} "george",null,"washington",8,false,false
+{2} "john",null,"adams",4,false,false
+{3} "thomas",null,"jefferson",8,false,false
+{4} "james",null,"madison",8,false,false
+{5} "james",null,"monroe",8,false,false
+{6} "john","quincy","adams",4,false,false
+{7} "andrew",null,"jackson",8,false,false
+{8} "martin",null,"van buren",4,false,false
+{9} "william","henry","harrison",0,true,false
+{10} "john",null,"tyler",4,false,false
+{11} "james","knox","polk",4,false,false
+{12} "zachary",null,"taylor",1,false,false
+{13} "millard",null,"fillmore",3,false,false
+{14} "franklin",null,"pierce",4,false,false
+{15} "james",null,"buchanan",4,false,false
+{16} "abraham",null,"lincoln",4,true,true
+{17} "andrew",null,"johnson",4,false,false
+{18} "ulysses","simpson","grant",8,false,false
+{19} "rutherford","birchard","hayes",4,false,false
+{20} "james","abram","garfield",0,true,true
+{21} "chester","alan","arthrur",4,false,false
+{22} "grover",null,"cleveland",4,false,false
+{23} "benjamin",null,"harrison",4,false,false
+{24} "grover",null,"cleveland",4,false,false
+{25} "william",null,"mckinley",4,true,true
+{26} "theodore",null,"roosevelt",8,false,false
+{27} "william","howard","taft",4,false,false
+{28} "woodrow",null,"wilson",8,false,false
+{29} "warren","gamaliel","harding",2,true,false
+{30} "calvin",null,"coolidge",6,false,false
+{31} "herbert","clark","hoover",4,false,false
+{32} "franklin","delano","roosevelt",12,true,false
+{33} "harry","s","truman",8,false,false
+{34} "dwight","david","eisenhower",8,false,false
+{35} "john","fitzgerald","kennedy",2,true,true
+{36} "lyndon","baines","johnson",6,false,false
+{37} "richard","milhous","nixon",5,false,false
+{38} "gerald","rudolph","ford",3,false,false
+{39} "james","earl","carter",4,false,false
+{40} "ronald","wilson","reagan",8,false,false
+{41} "george","herbert walker","bush",4,false,false
+{42} "william","jefferson","clinton",8,false,false
+{43} "george","walker","bush",8,false,false
+{44} "barack","hussein","obama",null,null,false
 
-[("george","no_middle_name","washington",8,false,false),("john","no_middle_name","adams",4,false,false),("thomas","no_middle_name","jefferson",8,false,false),("james","no_middle_name","madison",8,false,false),("james","no_middle_name","monroe",8,false,false),("john","quincy","adams",4,false,false),("andrew","no_middle_name","jackson",8,false,false),("martin","no_middle_name","van buren",4,false,false),("william","henry","harrison",0,true,false),("john","no_middle_name","tyler",4,false,false),("james","knox","polk",4,false,false),("zachary","no_middle_name","taylor",1,false,false),("millard","no_middle_name","fillmore",3,false,false),("franklin","no_middle_name","pierce",4,false,false),("james","no_middle_name","buchanan",4,false,false),("abraham","no_middle_name","lincoln",4,true,true),("andrew","no_middle_name","johnson",4,false,false),("ulysses","simpson","grant",8,false,false),("rutherford","birchard","hayes",4,false,false),("james","abram","garfield",0,true,true),("chester","alan","arthrur",4,false,false),("grover","no_middle_name","cleveland",4,false,false),("benjamin","no_middle_name","harrison",4,false,false),("grover","no_middle_name","cleveland",4,false,false),("william","no_middle_name","mckinley",4,true,true),("theodore","no_middle_name","roosevelt",8,false,false),("william","howard","taft",4,false,false),("woodrow","no_middle_name","wilson",8,false,false),("warren","gamaliel","harding",2,true,false),("calvin","no_middle_name","coolidge",6,false,false),("herbert","clark","hoover",4,false,false),("franklin","delano","roosevelt",12,true,false),("harry","s","truman",8,false,false),("dwight","david","eisenhower",8,false,false),("john","fitzgerald","kennedy",2,true,true),("lyndon","baines","johnson",6,false,false),("richard","milhous","nixon",5,false,false),("gerald","rudolph","ford",3,false,false),("james","earl","carter",4,false,false),("ronald","wilson","reagan",8,false,false),("george","herbert walker","bush",4,false,false),("william","jefferson","clinton",8,false,false),("george","walker","bush",8,false,false),("barack","hussein","obama",255,null,false)]
+{president_number} first_name,middle_name,last_name,years_in_office,died_in_office,assassinated
+{1} "george","no_middle_name","washington",8,false,false
+{2} "john","no_middle_name","adams",4,false,false
+{3} "thomas","no_middle_name","jefferson",8,false,false
+{4} "james","no_middle_name","madison",8,false,false
+{5} "james","no_middle_name","monroe",8,false,false
+{6} "john","quincy","adams",4,false,false
+{7} "andrew","no_middle_name","jackson",8,false,false
+{8} "martin","no_middle_name","van buren",4,false,false
+{9} "william","henry","harrison",0,true,false
+{10} "john","no_middle_name","tyler",4,false,false
+{11} "james","knox","polk",4,false,false
+{12} "zachary","no_middle_name","taylor",1,false,false
+{13} "millard","no_middle_name","fillmore",3,false,false
+{14} "franklin","no_middle_name","pierce",4,false,false
+{15} "james","no_middle_name","buchanan",4,false,false
+{16} "abraham","no_middle_name","lincoln",4,true,true
+{17} "andrew","no_middle_name","johnson",4,false,false
+{18} "ulysses","simpson","grant",8,false,false
+{19} "rutherford","birchard","hayes",4,false,false
+{20} "james","abram","garfield",0,true,true
+{21} "chester","alan","arthrur",4,false,false
+{22} "grover","no_middle_name","cleveland",4,false,false
+{23} "benjamin","no_middle_name","harrison",4,false,false
+{24} "grover","no_middle_name","cleveland",4,false,false
+{25} "william","no_middle_name","mckinley",4,true,true
+{26} "theodore","no_middle_name","roosevelt",8,false,false
+{27} "william","howard","taft",4,false,false
+{28} "woodrow","no_middle_name","wilson",8,false,false
+{29} "warren","gamaliel","harding",2,true,false
+{30} "calvin","no_middle_name","coolidge",6,false,false
+{31} "herbert","clark","hoover",4,false,false
+{32} "franklin","delano","roosevelt",12,true,false
+{33} "harry","s","truman",8,false,false
+{34} "dwight","david","eisenhower",8,false,false
+{35} "john","fitzgerald","kennedy",2,true,true
+{36} "lyndon","baines","johnson",6,false,false
+{37} "richard","milhous","nixon",5,false,false
+{38} "gerald","rudolph","ford",3,false,false
+{39} "james","earl","carter",4,false,false
+{40} "ronald","wilson","reagan",8,false,false
+{41} "george","herbert walker","bush",4,false,false
+{42} "william","jefferson","clinton",8,false,false
+{43} "george","walker","bush",8,false,false
+{44} "barack","hussein","obama",255,null,false
 
-[(1,4,true),(2,12,false),(1,0,false),(1,4,false),(1,6,false),(1,4,false),(1,8,false),(2,16,false),(3,20,false),(1,3,false),(2,8,false),(1,8,false),(1,4,false),(6,28,true),(4,14,true),(1,6,false),(1,4,false),(1,3,false),(1,5,false),(1,8,false),(1,4,false),(1,8,false),(1,8,false),(1,8,false),(1,2,false),(4,16,true),(1,8,false),(1,1,false),(),()]
+{first_name} count,total_years_in_office,any_assassinated
+{"abraham"} 1,4,true
+{"andrew"} 2,12,false
+{"barack"} 1,0,false
+{"benjamin"} 1,4,false
+{"calvin"} 1,6,false
+{"chester"} 1,4,false
+{"dwight"} 1,8,false
+{"franklin"} 2,16,false
+{"george"} 3,20,false
+{"gerald"} 1,3,false
+{"grover"} 2,8,false
+{"harry"} 1,8,false
+{"herbert"} 1,4,false
+{"james"} 6,28,true
+{"john"} 4,14,true
+{"lyndon"} 1,6,false
+{"martin"} 1,4,false
+{"millard"} 1,3,false
+{"richard"} 1,5,false
+{"ronald"} 1,8,false
+{"rutherford"} 1,4,false
+{"theodore"} 1,8,false
+{"thomas"} 1,8,false
+{"ulysses"} 1,8,false
+{"warren"} 1,2,false
+{"william"} 4,16,true
+{"woodrow"} 1,8,false
+{"zachary"} 1,1,false
+
+Query was executed successfully
+
+{president_number} first_name,middle_name,last_name,years_in_office,died_in_office,assassinated
+{1} "george",null,"washington",8,false,false
+{2} "john",null,"adams",4,false,false
+{3} "thomas",null,"jefferson",8,false,false
+{4} "james",null,"madison",8,false,false
+{5} "james",null,"monroe",8,false,false
+{6} "john","quincy","adams",4,false,false
+{7} "andrew",null,"jackson",8,false,false
+{8} "martin",null,"van buren",4,false,false
+{9} "william","henry","harrison",0,true,false
+{10} "john",null,"tyler",4,false,false
+{11} "james","knox","polk",4,false,false
+{12} "zachary",null,"taylor",1,false,false
+{13} "millard",null,"fillmore",3,false,false
+{14} "franklin",null,"pierce",4,false,false
+{15} "james",null,"buchanan",4,false,false
+{16} "abraham",null,"lincoln",4,true,true
+{17} "andrew",null,"johnson",4,false,false
+{18} "ulysses","simpson","grant",8,false,false
+{19} "rutherford","birchard","hayes",4,false,false
+{20} "james","abram","garfield",0,true,true
+{21} "chester","alan","arthrur",4,false,false
+{22} "grover",null,"cleveland",4,false,false
+{23} "benjamin",null,"harrison",4,false,false
+{24} "grover",null,"cleveland",4,false,false
+{25} "william",null,"mckinley",4,true,true
+{26} "theodore",null,"roosevelt",8,false,false
+{27} "william","howard","taft",4,false,false
+{28} "woodrow",null,"wilson",8,false,false
+{29} "warren","gamaliel","harding",2,true,false
+{30} "calvin",null,"coolidge",6,false,false
+{31} "herbert","clark","hoover",4,false,false
+{32} "franklin","delano","roosevelt",12,true,false
+{33} "harry","s","truman",8,false,false
+{34} "dwight","david","eisenhower",8,false,false
+{35} "john","fitzgerald","kennedy",2,true,true
+{36} "lyndon","baines","johnson",6,false,false
+{37} "richard","milhous","nixon",5,false,false
+{38} "gerald","rudolph","ford",3,false,false
+{39} "james","earl","carter",4,false,false
+{40} "ronald","wilson","reagan",8,false,false
+{41} "george","herbert walker","bush",4,false,false
+{42} "william","jefferson","clinton",8,false,false
+{43} "george","walker","bush",8,false,false
+{44} "barack","hussein","obama",null,null,false
+
+{president_number} first_name,middle_name,last_name,years_in_office,died_in_office,assassinated
+{1} "george",null,"washington",8,false,false
+{2} "john",null,"adams",4,false,false
+{3} "thomas",null,"jefferson",8,false,false
+{4} "james",null,"madison",8,false,false
+{5} "james",null,"monroe",8,false,false
+{6} "john","quincy","adams",4,false,false
+{7} "andrew",null,"jackson",8,false,false
+{8} "martin",null,"van buren",4,false,false
+{9} "william","henry","harrison",0,true,false
+{10} "john",null,"tyler",4,false,false
+{11} "james","knox","polk",4,false,false
+{12} "zachary",null,"taylor",1,false,false
+{13} "millard",null,"fillmore",3,false,false
+{14} "franklin",null,"pierce",4,false,false
+{15} "james",null,"buchanan",4,false,false
+{16} "abraham",null,"lincoln",4,true,true
+{17} "andrew",null,"johnson",4,false,false
+{18} "ulysses","simpson","grant",8,false,false
+{19} "rutherford","birchard","hayes",4,false,false
+{20} "james","abram","garfield",0,true,true
+{21} "chester","alan","arthrur",4,false,false
+{22} "grover",null,"cleveland",4,false,false
+{23} "benjamin",null,"harrison",4,false,false
+{24} "grover",null,"cleveland",4,false,false
+{25} "william",null,"mckinley",4,true,true
+{26} "theodore",null,"roosevelt",8,false,false
+{27} "william","howard","taft",4,false,false
+{28} "woodrow",null,"wilson",8,false,false
+{29} "warren","gamaliel","harding",2,true,false
+{30} "calvin",null,"coolidge",6,false,false
+{31} "herbert","clark","hoover",4,false,false
+{32} "franklin","delano","roosevelt",12,true,false
+{33} "harry","s","truman",8,false,false
+{34} "dwight","david","eisenhower",8,false,false
+{35} "john","fitzgerald","kennedy",2,true,true
+{36} "lyndon","baines","johnson",6,false,false
+{37} "richard","milhous","nixon",5,false,false
+{38} "gerald","rudolph","ford",3,false,false
+{39} "james","earl","carter",4,false,false
+{40} "ronald","wilson","reagan",8,false,false
+{41} "george","herbert walker","bush",4,false,false
+{42} "william","jefferson","clinton",8,false,false
+{43} "george","walker","bush",8,false,false
+{44} "barack","hussein","obama",null,null,false
+
+{president_number} first_name,middle_name,last_name,years_in_office,died_in_office,assassinated,first_name,middle_name,last_name,years_in_office,died_in_office,assassinated
+{41} "george","herbert walker","bush",4,false,false,"george","herbert walker","bush",4,false,false
+
+{first_name} count,total_years_in_office,any_assassinated
+{"george"} 3,20,false
+
+Query was executed successfully
 
 Query was executed successfully
 

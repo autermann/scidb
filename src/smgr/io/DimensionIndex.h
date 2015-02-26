@@ -45,10 +45,11 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+// Compare attribute values using "<" function for attribute type
 class AttributeComparator
 {
   public:
-    bool operator()(const Value& v1, const Value& v2) const
+    inline bool operator()(const Value& v1, const Value& v2) const
     {
         const Value* operands[2];
         Value result;
@@ -81,6 +82,9 @@ class AttributeComparator
     FunctionPointer less;
 };
 
+// Set of attribute values. 
+// Tempalte is used to support both classical set and multiset
+// Double value is handled in special way because it is expected to be the most frequently used type for user defined coordinates
 template<typename DoubleSet, typename ValueSet>
 class __Attribute_XSet : AttributeComparator
 {
@@ -96,6 +100,7 @@ class __Attribute_XSet : AttributeComparator
         return (typeID == TID_DOUBLE) ? doubleSet.size() : valueSet.size();
     }
 
+    // Add single value
     void add(Value const& item) 
     {
         if (typeID == TID_DOUBLE)
@@ -119,6 +124,7 @@ class __Attribute_XSet : AttributeComparator
         }
     }
 
+    // Add data from buffer
     void add(void const* data, size_t size) 
     {
         if (typeID == TID_DOUBLE) {
@@ -172,6 +178,7 @@ class __Attribute_XSet : AttributeComparator
         }
     }
 
+    // Add data from shared buffer
     void add(shared_ptr<SharedBuffer> buf, InstanceID instance = 0) 
     {
         if (buf) { 
@@ -179,10 +186,14 @@ class __Attribute_XSet : AttributeComparator
         }
     }
 
+    //
+    // Perform sort of data and return pointer to the buffer with sorted data.
+    // Format of the buffer depends on whether it is used at first stage (partial sort) or at second stage (merge of partially sorted data)
     shared_ptr<SharedBuffer> sort(bool partial)
     {
         if (!partial)
         {
+            // for final sort we store number of value (coordiantes) and offsets to bodies for varying size type
             if (type.variableSize())
             {
                 totalSize += valueSet.size()*sizeof(int);
@@ -200,7 +211,7 @@ class __Attribute_XSet : AttributeComparator
             dst = (char*)dp;
         } else {
             size_t attrSize = type.byteSize();
-            if (attrSize == 0) { 
+            if (attrSize == 0) { // varying size type
                 int* offsPtr = (int*)dst;
                 char* base = NULL;
                 if (!partial) { 
@@ -210,8 +221,9 @@ class __Attribute_XSet : AttributeComparator
                 for (ValueIterator i = valueSet.begin(); i != valueSet.end(); ++i) {
                     attrSize = i->size();
                     if (!partial) { 
-                        *offsPtr++ = (int)(dst - base);
+                        *offsPtr++ = (int)(dst - base); // offset to body
                     }
+                    // Simple encoding for length of varying size types: use one byte for values with size < 255 and 5 bytes for others
                     if (attrSize-1 >= 0xFF) {
                         *dst++ = '\0';
                         *dst++ = char(attrSize >> 24);
@@ -222,7 +234,7 @@ class __Attribute_XSet : AttributeComparator
                     memcpy(dst, i->data(), attrSize);
                     dst += attrSize;
                 }
-            } else { 
+            } else { // fixed size type
                 for (ValueIterator i = valueSet.begin(); i != valueSet.end(); ++i) {
                     memcpy(dst, i->data(), attrSize);
                     dst += attrSize;
@@ -231,7 +243,7 @@ class __Attribute_XSet : AttributeComparator
         }
         if (!partial)
         {
-            *(size_t*)dst = size();
+            *(size_t*)dst = size(); // number of written values
             dst += sizeof(size_t);
         }
         assert(dst == (char*)buf->getData() + buf->getSize());
@@ -272,6 +284,7 @@ struct ValueKey
     ValueKey() {}
 };
 
+// Comparator of Values
 class ValueKeyComparator : public AttributeComparator
 {
   public:
@@ -287,6 +300,11 @@ class ValueKeyComparator : public AttributeComparator
     ValueKeyComparator(TypeId tid) : AttributeComparator(tid) {}
 };
 
+
+// Bag of values of non-unique attributes. The main difference with AttributeMultiSet (__Attribute_XSet< multiset<double>, multiset<Value, AttributeComparator> >)
+// is that we have to store extra information about instance at which this value is located.
+// It is needed to correctly merge of bags from different instances.
+// Methods are the same as in __Attribute_XSet
 class AttributeBag : ValueKeyComparator
 {
   public:
@@ -447,6 +465,10 @@ class AttributeBag : ValueKeyComparator
 typedef __Attribute_XSet< set<double>, set<Value, AttributeComparator> > AttributeSet;
 typedef __Attribute_XSet< multiset<double>, multiset<Value, AttributeComparator> > AttributeMultiSet;
 
+// Class used to map original coodinate value (user defined coordinate) into ordinal (integer) coordinate and visa versa.
+// Current implementation use sorted array and binary search.
+// Template is used to support both unique and non-unique attributes.
+// Double value is handled in special way because it is expected to be the most frequently used type for user defined coordinates
 template<typename DoubleMap, typename ValueMap>
 class __Attribute_XMap : AttributeComparator
 {
@@ -504,7 +526,7 @@ class __Attribute_XMap : AttributeComparator
     : AttributeComparator(tid), valueMap(*this), _start(start), _toOrdinal(NULL), _fromOrdinal(NULL)
     {        
         Coordinate coord = start;
-        duplicates.resize(nCoords);
+        duplicates.resize(nCoords); // collect number of duplicates at each instance
         if (typeID == TID_DOUBLE) {
             double* dp = (double*)data;
             uint16_t* np = (uint16_t*)(dp + nCoords);
@@ -528,6 +550,7 @@ class __Attribute_XMap : AttributeComparator
                 uint8_t* base = src + nCoords*sizeof(int);
                 for (size_t i = 0, j = 0; i < nCoords; i++) {
                     src = base + offsPtr[i];
+                    // Simple encoding for length of varying size types: use one byte for values with size < 255 and 5 bytes for other
                     if (*src == 0) { 
                         attrSize = (src[1] << 24) | (src[2] << 16) | (src[3] << 8) | src[4];
                         src += 5;
@@ -585,7 +608,7 @@ class __Attribute_XMap : AttributeComparator
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_FOR_COORDINATE);
             return MIN_COORDINATE-1;
         }
-        if (_toOrdinal != NULL) { 
+        if (_toOrdinal != NULL) { // functional mapping
             const Value* params[3];
             Value result;
             params[0] = &value;

@@ -107,7 +107,7 @@ class ClientArray: public StreamArray
 {
 public:
     ClientArray( BaseConnection* connection, const ArrayDesc& arrayDesc, QueryID queryID, QueryResult& queryResult):
-    StreamArray(arrayDesc), _connection(connection), _queryID(queryID), _queryResult(queryResult) 
+    StreamArray(arrayDesc), _connection(connection), _queryID(queryID), _queryResult(queryResult)
     {
     }
     
@@ -147,6 +147,41 @@ private:
     QueryResult& _queryResult;
 };
 
+std::string getModuleFileName()
+{
+    // read the full name, e.g. '/tmp/dir/myfile'
+    const size_t maxLength = PATH_MAX+NAME_MAX;
+    char exepath[maxLength+1] = {0};
+    ssize_t len = readlink("/proc/self/exe", exepath, maxLength);
+    if (len==-1 || len==0) return exepath;
+    exepath[len]=0;
+    return exepath;
+}
+
+std::string getCommandLineOptions()
+{
+    stringstream cmdline;
+    FILE *f = fopen("/proc/self/cmdline", "rb");
+    char *arg = NULL;
+    size_t size = 0;
+    bool first = true;
+    while(getdelim(&arg, &size, 0, f) != -1) {
+        if (!first) {
+            cmdline << arg << " ";
+        } else {
+            first = false;
+        }
+    }
+    free(arg);
+    fclose(f);
+    return cmdline.str();
+}
+
+void fillProgramOptions(std::string& programOptions)
+{
+    programOptions = getModuleFileName() + " " + getCommandLineOptions();
+}
+
 /**
  * Remote implementation of the SciDBAPI interface
  */
@@ -172,16 +207,20 @@ public:
         }
     }
 
-    void prepareQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
+    void prepareQuery(const std::string& queryString, bool afl, const std::string&, QueryResult& queryResult, void* connection) const
     {
         StatisticsScope sScope;
         boost::shared_ptr<MessageDesc> queryMessage = boost::make_shared<MessageDesc>(mtPrepareQuery);
         queryMessage->getRecord<scidb_msg::Query>()->set_query(queryString);
         queryMessage->getRecord<scidb_msg::Query>()->set_afl(afl);
 
+        std::string programOptions;
+        fillProgramOptions(programOptions);
+        queryMessage->getRecord<scidb_msg::Query>()->set_program_options(programOptions);
+
         LOG4CXX_TRACE(logger, "Send " << (afl ? "AFL" : "AQL") << " for preparation " << queryString);
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage(queryMessage);
+        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(queryMessage);
 
         if (resultMessage->getMessageType() != mtQueryResult) {
             assert(resultMessage->getMessageType() == mtError);
@@ -209,14 +248,17 @@ public:
                         );
         }
 
-        queryResult.plugins.resize(queryResultRecord->plugins_size());
-        for (int i = 0; i < queryResultRecord->plugins_size(); i++)
+        if (queryResultRecord->selective())
         {
-            queryResult.plugins[i] = queryResultRecord->plugins(i);
-            PluginManager::getInstance()->loadLibrary(queryResult.plugins[i], false);
+            queryResult.plugins.resize(queryResultRecord->plugins_size());
+            for (int i = 0; i < queryResultRecord->plugins_size(); i++)
+            {
+                queryResult.plugins[i] = queryResultRecord->plugins(i);
+                PluginManager::getInstance()->loadLibrary(queryResult.plugins[i], false);
+            }
         }
 
-        // Processing result message
+         // Processing result message
         queryResult.queryID = resultMessage->getQueryID();
         if (queryResultRecord->has_exclusive_array_access()) {
             queryResult.requiresExclusiveArrayAccess = queryResultRecord->exclusive_array_access();
@@ -231,6 +273,9 @@ public:
         boost::shared_ptr<MessageDesc> queryMessage = boost::make_shared<MessageDesc>(mtExecuteQuery);
         queryMessage->getRecord<scidb_msg::Query>()->set_query(queryString);
         queryMessage->getRecord<scidb_msg::Query>()->set_afl(afl);
+        std::string programOptions;
+        fillProgramOptions(programOptions);
+        queryMessage->getRecord<scidb_msg::Query>()->set_program_options(programOptions);
         queryMessage->setQueryID(queryResult.queryID);
 
         if (!queryResult.queryID) {
@@ -240,7 +285,7 @@ public:
             LOG4CXX_TRACE(logger, "Send prepared query " << queryResult.queryID << " for execution");
         }
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage(queryMessage);
+        boost::shared_ptr<MessageDesc> resultMessage = static_cast<BaseConnection*>(connection)->sendAndReadMessage<MessageDesc>(queryMessage);
 
         if (resultMessage->getMessageType() != mtQueryResult) {
             assert(resultMessage->getMessageType() == mtError);
@@ -300,24 +345,40 @@ public:
                         queryResultRecord->dimensions(i).type_id(),
                         queryResultRecord->dimensions(i).flags(),
                         queryResultRecord->dimensions(i).mapping_array_name());
+
                 dimensions.push_back(dim);
+
                 size_t dimMapSize = queryResultRecord->dimensions(i).coordinates_mapping_size();
-                if (dim.getType() != TID_INT64 && !dim.getMappingArrayName().empty() && dimMapSize != 0) { 
-                    Attributes mapAttrs(1);
-                    mapAttrs[0] = AttributeDesc(0, "value", dim.getType(), 0, 0);
-                    Dimensions mapDims(1);
-                    mapDims[0] = DimensionDesc("no", dim.getStart(), dim.getStart(), dim.getStart() + dimMapSize-1, dim.getStart() + dimMapSize-1, dimMapSize, 0);                    
-                    ArrayDesc mapArrayDesc(dim.getBaseName(), mapAttrs, mapDims);
-                    boost::shared_ptr<Array> mapArray = boost::shared_ptr<Array>(new MemArray(mapArrayDesc));
-                    boost::shared_ptr<ArrayIterator> mapArrayIterator = mapArray->getIterator(0);
-                    Coordinates mapPos(1, dim.getStart());
-                    Chunk& newChunk = mapArrayIterator->newChunk(mapPos, 0);
-                    newChunk.setRLE(false);
-                    newChunk.allocate(queryResultRecord->dimensions(i).coordinates_mapping().size());
-                    memcpy(newChunk.getData(), queryResultRecord->dimensions(i).coordinates_mapping().data(), queryResultRecord->dimensions(i).coordinates_mapping().size());
-                    boost::shared_ptr<Query> dummyQuery;
-                    newChunk.write(dummyQuery);
-                    queryResult.mappingArrays[i] = mapArray;
+                if (dim.getType() != TID_INT64 && !dim.getMappingArrayName().empty())
+                {
+                    //we need to download the mapping array for this dimension. But first check to see if we already have it
+                    //Sometimes, several dimensions will have the same mapping array.
+                    string mappingArrayName = dim.getMappingArrayName();
+                    bool mappingAlreadyCollected = false;
+                    for (int j=0; j<i; j++)
+                    {
+                        if(dimensions[j].getType() != TID_INT64 && dimensions[j].getMappingArrayName() == mappingArrayName)
+                        {
+                            queryResult.mappingArrays[i]= queryResult.mappingArrays[j];
+                            mappingAlreadyCollected = true;
+                            break;
+                        }
+                    }
+
+                    if ( !mappingAlreadyCollected )
+                    {
+                        Attributes mapAttrs(1);
+                        mapAttrs[0] = AttributeDesc(0, "value", dim.getType(), 0, 0);
+                        Dimensions mapDims(1);
+                        mapDims[0] = DimensionDesc("no", dim.getStart(), dim.getStart(), dim.getStart() + dimMapSize-1, dim.getStart() + dimMapSize-1, dimMapSize, 0);
+                        ArrayDesc mapArrayDesc(mappingArrayName, mapAttrs, mapDims);
+
+                        boost::shared_ptr<Array> clientArray = boost::shared_ptr<Array>(
+                                    new ClientArray(static_cast<BaseConnection*>(connection),
+                                                    mapArrayDesc, queryResult.queryID, queryResult));
+                        boost::shared_ptr<Array> mapArray = boost::shared_ptr<Array>(new MemArray(clientArray, true));
+                        queryResult.mappingArrays[i] = mapArray;
+                    }
                 }
             }
 
@@ -357,7 +418,7 @@ public:
 
         LOG4CXX_TRACE(logger, "Canceling query for execution " << queryID);
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage(cancelQueryMessage);
+        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(cancelQueryMessage);
 
         //  assert(resultMessage->getMessageType() == mtError);
         if (resultMessage->getMessageType() == mtError) {
@@ -377,7 +438,7 @@ public:
 
         LOG4CXX_TRACE(logger, "Completing query for execution " << queryID);
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage(completeQueryMessage);
+        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(completeQueryMessage);
 
         if (resultMessage->getMessageType() == mtError) {
             boost::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
@@ -400,9 +461,11 @@ ConstChunk const* ClientArray::nextChunk(AttributeID attId, MemChunk& chunk)
     LOG4CXX_TRACE(logger, "Fetching next chunk of " << attId << " attribute");
     boost::shared_ptr<MessageDesc> fetchDesc = boost::make_shared<MessageDesc>(mtFetch);
     fetchDesc->setQueryID(_queryID);
-    fetchDesc->getRecord<scidb_msg::Fetch>()->set_attribute_id(attId);
+    shared_ptr<scidb_msg::Fetch> fetchDescRecord = fetchDesc->getRecord<scidb_msg::Fetch>();
+    fetchDescRecord->set_attribute_id(attId);
+    fetchDescRecord->set_array_name(getArrayDesc().getName());
 
-    boost::shared_ptr<MessageDesc> chunkDesc = _connection->sendAndReadMessage(fetchDesc);
+    boost::shared_ptr<MessageDesc> chunkDesc = _connection->sendAndReadMessage<MessageDesc>(fetchDesc);
 
     if (chunkDesc->getMessageType() != mtChunk) {
         assert(chunkDesc->getMessageType() == mtError);
@@ -420,7 +483,6 @@ ConstChunk const* ClientArray::nextChunk(AttributeID attId, MemChunk& chunk)
 
         Address firstElem;
         firstElem.attId = attId;
-        firstElem.arrId = getArrayDesc().getId();
         for (int i = 0; i < chunkMsg->coordinates_size(); i++) {
             firstElem.coords.push_back(chunkMsg->coordinates(i));
         }

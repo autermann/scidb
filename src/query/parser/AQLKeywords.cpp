@@ -40,7 +40,7 @@ namespace scidb
 const AQLKeyword AQLKeywords[] =
 {
     #include "query/parser/AQLKeywordsList.h"
-    {NULL,  AQLParser::token::EOQ} // just array end marker for loop
+    {NULL,  AQLParser::token::EOQ, false} // just array end marker for loop
 };
 
 

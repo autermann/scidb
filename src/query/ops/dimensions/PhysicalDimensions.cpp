@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalDimensions.cpp
  *
  * @author knizhnik@garret.ru
  *
@@ -43,27 +43,30 @@ namespace scidb
 class PhysicalDimensions: public PhysicalOperator
 {
 public:
-    PhysicalDimensions(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalDimensions(std::string const& logicalName,
+                       std::string const& physicalName,
+                       Parameters const& parameters,
+                       ArrayDesc const& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, vector<boost::shared_ptr<Tuple> >()));
     }
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const& inputDistributions,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
         return ArrayDistribution(psLocalInstance);
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    void preSingleExecute(boost::shared_ptr<Query> query)
     {
-        assert(inputArrays.size() == 0);
         assert(_parameters.size() == 1);
-
         string arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         SystemCatalog& catalog = * SystemCatalog::getInstance();
@@ -74,7 +77,8 @@ public:
         Dimensions const& dims = arrayDesc.getDimensions();
         
         vector< boost::shared_ptr<Tuple> > tuples(dims.size());
-        for (size_t i = 0; i < dims.size(); i++) { 
+        for (size_t i = 0, size = dims.size(); i < size; i++)
+        {
             Tuple& tuple = *new Tuple(8);
             tuples[i] = boost::shared_ptr<Tuple>(&tuple);
             tuple[0].setData(dims[i].getBaseName().c_str(), dims[i].getBaseName().length() + 1);
@@ -91,10 +95,19 @@ public:
             tuple[6] = Value(TypeLibrary::getType(TID_INT64));
             tuple[6].setInt64(highBoundary[i]);
             tuple[7].setData(dims[i].getType().c_str(), dims[i].getType().length() + 1);
+        }
 
-        } 
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
     }
+
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    {
+        assert(inputArrays.size() == 0);
+        return _result;
+    }
+
+private:
+    boost::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalDimensions, "dimensions", "physicalDimensions")

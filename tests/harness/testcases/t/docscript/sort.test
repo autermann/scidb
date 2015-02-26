@@ -1,0 +1,36 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
+--shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winners2.csv > ../examples/winners2.scidb "
+--aql load winnersFlat from '../examples/winners2.scidb'  
+CREATE ARRAY champions<person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]  
+redimension_store(winnersFlat,champions)  
+--stop-igdata
+--aql select * from champions  
+--aql select * from sort(champions,country)  
+--start-igdata
+store(project(winnersFlat,country, year, event),winnersAbridged)  
+--stop-igdata
+--aql select * from sort(winnersAbridged,country, year desc, 100)  
+--start-igdata
+create array numbers <number:int64 null>[i=0:4,5,0] 
+--shell  --command="csv2scidb -s 1 -p N < ../examples/mostNumbers.csv > ../examples/mostNumbers.scidb "
+--aql load numbers from '../examples/mostNumbers.scidb'  
+--stop-igdata
+--aql select * from numbers  
+--aql select * from sort(numbers, number asc)  
+--aql select * from sort(numbers, number desc)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(winnersFlat)
+remove(champions)
+remove(winnersAbridged)
+remove(numbers)

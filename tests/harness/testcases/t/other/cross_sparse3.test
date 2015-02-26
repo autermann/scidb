@@ -1,0 +1,67 @@
+--setup
+--start-query-logging
+#Ticket number : 1635 for cross operator
+#Tests for cross operator between dense and sparse array type.
+#Tests for Null attribute , cross between bounded and unbounded with different array schema
+#Test for cross operator with other operator nested like subarray,filter,xgrid,unpack.
+
+create array teeth <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
+load(teeth, '../tests/harness/testcases/data/teeth_na.txt')
+create  array A <a:float>[x=-2:2,3,0]
+store(build(A,x+1/2.3),A)
+create array d1 <a1: double NULL> [x=0:4,3,0, y=-2:1,2,1]
+store(build_sparse(d1, 1.0*x+100.0*y, x<>y),d1)
+
+
+
+--test
+cross(teeth,A)
+cross(A,teeth)
+count(cross(A,teeth))
+count(cross(teeth,A))
+store(cross(teeth,A),BBB)
+show(BBB)
+cross(A,d1)
+avg(cross(A,d1))
+avg(cross(d1,A))
+count(cross(A,d1))
+cross(d1,concat(A,A))
+subarray(d1,0,-2,1,0)
+cross(subarray(A,-2,-1),subarray(d1,0,-2,1,0))
+cross(filter(A, a>0),d1)
+cross(cross(filter(A, a>0),d1),cross(A,A))
+count(cross(cross(filter(A, a>0),d1),cross(A,A)))
+cross(A,xgrid(teeth,2,2))
+count(cross(A,xgrid(teeth,2,2)))
+count(cross(A,teeth))
+cross(d1,teeth)
+cross(teeth,d1)
+count(cross(teeth,d1))
+count(cross(d1,teeth))
+store(cross(teeth,d1),CCC)
+show(CCC)
+unpack(teeth,j)
+store(unpack(teeth,j),ZZZ)
+show(ZZZ)
+cross(unpack(teeth,j),A)
+cross(ZZZ,A)
+sum(cross(ZZZ,A))
+stdev(cross(ZZZ,A))
+var(cross(ZZZ,A))
+max(cross(ZZZ,A))
+min(cross(ZZZ,A))
+
+
+
+--cleanup
+remove(teeth)
+remove(A)
+remove(d1)
+remove(BBB)
+remove(CCC)
+remove(ZZZ)
+
+
+
+
+--stop-query-logging

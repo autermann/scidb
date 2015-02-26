@@ -3,7 +3,7 @@
 import os
 import sys
 import time
-sys.path.append('@CMAKE_INSTALL_PREFIX@' + '/lib')
+sys.path.append(os.path.join('@CMAKE_INSTALL_PREFIX@', 'lib'))
 import libscidbpython as swig
 
 
@@ -67,13 +67,14 @@ class Connection(object):
         if not self._handle:
             raise ValueError("no open connection")
         db = swig.getSciDB()
-        return db.cancelQuery(queryID, connection=self._handle)
+        return db.cancelQuery(queryID, self._handle)
 
     def completeQuery(self, queryID):
         if not self._handle:
             raise ValueError("no open connection")
         db = swig.getSciDB()
-        return db.completeQuery(queryID, connection=self._handle)
+        return db.completeQuery(queryID, self._handle)
+
 
 
 def connect(hostname = None, port = 1239):

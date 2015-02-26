@@ -1,0 +1,19 @@
+--setup 
+
+--start-query-logging
+create array H<i:int64>[a(string)=1000000,1000000,0]
+--start-igdata 
+store(build(<a:string>[i=0:999999,1000000,0],format(i+0.0,'Gregor awoke one morning to find himself transformed into a gigantic insect. %f')),G)
+--stop-igdata
+
+
+--test
+--start-igdata
+redimension_store(G,H)
+--stop-igdata
+
+--stop-query-logging 
+
+--cleanup
+remove(H)
+remove(G)

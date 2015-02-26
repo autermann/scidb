@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>store</refname>
+    <refpurpose>Store query output in a SciDB array</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis>store(<replaceable>operator</replaceable>(<replaceable>operator_args</replaceable>),<replaceable>named_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>store  is a write operator, that is, one of the AFL operations that can update an array.
+Each execution of store causes a new version of the array to be created. When an array is removed, so are
+all its versions. The argument <replaceable>named_array</replaceable> must be an array that was previously created and stored in the SciDB namespace.
+</para>
+    <para>store() can be used to save the resultant output array into an existing/new array. It can also be used to
+duplicate an array (by using the name of the source array in the first parameter and target_array in the second
+parameter).
+</para>
+    <note>
+      <para>
+The AFL store operator provides the same functionality as the AQL <code><command>SELECT</command></code> * <code><command>INTO</command></code> ... <code><command>FROM</command></code> ... statement.</para>
+    </note>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>Build and store a 2-dimensional, 1-attribute matrix of zeros:
+<para><programlisting>AFL% store(build(&lt;val: double&gt;[i=0:2,3,0,j=0:2,3,0],0),zeros_array);  </programlisting>
+
+You can change the name of the array zeros_array to ones_array and the cell values to 1 with a store statement:
+<para><programlisting>AFL% store(build(zeros_array,1),ones_array);  </programlisting></para></para></para>
+    </informalexample>
+    <informalexample>
+      <para>Build and store a 2-dimensional, 1-attribute matrix of random numbers between 1 and 10:
+<para><programlisting>AFL% CREATE ARRAY random_array &lt;val:double null&gt;[i=0:3,4,0,j=0:3,4,0];  </programlisting><programlisting>AFL% store(build(random_array,random()%10),random_array);  </programlisting><screen>[
+[(4),(8),(7),(0)],
+[(0),(2),(6),(8)],
+[(9),(3),(6),(0)],
+[(1),(1),(1),(4)]
+]</screen>
+
+You can update the array with a different set of random numbers by re-running the store statement:
+
+<para><programlisting>AFL% store(build(random_array,random()%10),random_array);  </programlisting><screen>[
+[(3),(4),(4),(3)],
+[(5),(6),(5),(2)],
+[(5),(7),(8),(9)],
+[(4),(9),(3),(0)]
+]</screen></para></para></para>
+    </informalexample>
+  </refsect1>
+</refentry>

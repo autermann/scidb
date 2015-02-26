@@ -12,6 +12,8 @@
 #include "query/parser/ParsingContext.h"
 #include "query/parser/QueryParser.h"
 
+#include "util/StackAlloc.h"
+
 typedef scidb::AQLParser::token token;
 typedef scidb::AQLParser::token_type token_type;
 #define yyterminate() return token::EOQ
@@ -37,6 +39,8 @@ typedef scidb::AQLParser::token_type token_type;
 #define YY_USER_INIT \
     yylloc->begin.column = yylloc->begin.line = 1; \
     yylloc->end.column = yylloc->end.line = 1;
+
+scidb::StackAlloc<char> stringsAllocator;
 %}
 
 Space [ \t\r\f]
@@ -76,6 +80,10 @@ Other .
     return token::NEQ;
 }
 
+"!=" {
+    return token::NEQ;
+}
+
 ">=" {
     return token::GTEQ;
 }
@@ -102,15 +110,28 @@ Other .
     const AQLKeyword *kw = FindAQLKeyword(yytext);
     if (kw)
     {
-        yylval->keyword = new std::string(yytext, yyleng);
+        //Allocate string for keyword only for non-reserved keywords. It will be freed in identifier_clause
+        //in case of successful parsing (or in bison destructor in case unsuccessfull parsing).
+        if (!kw->reserved)
+        {
+            yylval->keyword = stringsAllocator.allocate(yyleng + 1);
+            strcpy(yylval->keyword, yytext);
+        }
+        else
+        {
+            yylval->keyword = NULL;
+        }
         return kw->tok;
     }
-    yylval->stringVal = new std::string(yytext, yyleng);
+    yylval->stringVal = stringsAllocator.allocate(yyleng + 1);
+    strcpy(yylval->stringVal, yytext);
     return token::IDENTIFIER;
 }
 
 {QuotedIdentifier} {
-    yylval->stringVal = new std::string(yytext, 1, yyleng - 2);  
+    std::string str = std::string(yytext, 1, yyleng - 2);  
+    yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
+    strcpy(yylval->stringVal, str.c_str());
     return token::IDENTIFIER;
 }
 
@@ -121,7 +142,8 @@ Other .
     }
     catch(boost::bad_lexical_cast &e)
     {
-        _glue.error2(*yylloc, boost::str(boost::format("Can not interpret '%s' as int64 value. Value too big.") % yytext));
+        _glue.error(*yylloc, boost::str(boost::format("Can not interpret '%s' as int64 value. Value too big.") % yytext));
+        return token::LEXER_ERROR;
     }
     return token::INTEGER;
 }
@@ -133,7 +155,8 @@ Other .
     }
     catch(boost::bad_lexical_cast &e)
     {
-        _glue.error2(*yylloc, boost::str(boost::format("Can not interpret '%s' as real value. Value too big.") % yytext));
+        _glue.error(*yylloc, boost::str(boost::format("Can not interpret '%s' as real value. Value too big.") % yytext));
+        return token::LEXER_ERROR;
     }
 
     return token::REAL;
@@ -146,7 +169,8 @@ Other .
     }
     catch(boost::bad_lexical_cast &e)
     {
-        _glue.error2(*yylloc, boost::str(boost::format("Can not interpret '%s' as decimal value. Value too big.") % yytext));
+        _glue.error(*yylloc, boost::str(boost::format("Can not interpret '%s' as decimal value. Value too big.") % yytext));
+        return token::LEXER_ERROR;
     }
 
     return token::REAL;
@@ -154,9 +178,12 @@ Other .
 
 L?\'(\\.|[^\\\'])*\'    {
     //FIXME: Ugly unescaping.
-    std::string *str = new std::string(yytext, 1, yyleng - 2);
-    boost::replace_all(*str, "\\'", "'");
-    yylval->stringVal = str;  
+    std::string str = std::string(yytext, 1, yyleng - 2);
+    boost::replace_all(str, "\\'", "'");
+
+    yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
+    strcpy(yylval->stringVal, str.c_str());
+
     return token::STRING_LITERAL;
 }
 

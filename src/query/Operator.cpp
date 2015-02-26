@@ -28,23 +28,27 @@
  * @brief Implementation of basic operator methods.
  */
 
-#include "boost/make_shared.hpp"
-#include "boost/function.hpp"
-#include "boost/bind.hpp"
+#include <boost/make_shared.hpp>
+#include <boost/function.hpp>
+#include <boost/bind.hpp>
 #include <log4cxx/logger.h>
 
-#include "query/Operator.h"
-#include "query/OperatorLibrary.h"
-#include "network/NetworkManager.h"
-#include "network/BaseConnection.h"
-#include "network/MessageUtils.h"
-#include "system/SystemCatalog.h"
-#include "array/DBArray.h"
-#include "array/FileArray.h"
-#include "query/QueryProcessor.h"
-#include "system/Config.h"
-#include "system/SciDBConfigOptions.h"
-#include "smgr/io/Storage.h"
+#include <query/Operator.h>
+#include <query/OperatorLibrary.h>
+#include <network/NetworkManager.h>
+#include <network/BaseConnection.h>
+#include <network/MessageUtils.h>
+#include <system/SystemCatalog.h>
+#include <array/DBArray.h>
+#include <array/FileArray.h>
+#include <query/QueryProcessor.h>
+#include <system/BlockCyclic.h>
+#include <system/Config.h>
+#include <system/SciDBConfigOptions.h>
+#include <smgr/io/Storage.h>
+#include <boost/functional/hash.hpp>
+#include <util/Hashing.h>
+#include <util/Timing.h>
 
 using namespace std;
 using namespace boost;
@@ -584,6 +588,13 @@ std::ostream& operator<<(std::ostream& stream, const ArrayDistribution& dist)
                                 break;
         case psUndefined:       stream<<"undefined";
                                 break;
+        case psGroupby:         stream<<"groupby";
+                                break;
+        case psScaLAPACK:       stream<<"ScaLAPACK";
+                                break;
+    default:
+            assert(0);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "operator<<(std::ostream& stream, const ArrayDistribution& dist)";
     }
 
     if (dist._partitioningSchema == psLocalInstance)
@@ -629,13 +640,37 @@ void barrier(int barrierId, NetworkManager* networkManager, boost::shared_ptr<Qu
     LOG4CXX_DEBUG(logger, "All barrier messages received - continuing")
 }
 
+/**
+ * Compute hash over the groupby dimensions.
+ * @param   allDims   Coordinates containing all the dims.
+ * @param   isGroupby   For every dimension, whether it is a groupby dimension.
+ *
+ * @note The result can be larger than #instances!!! The caller should mod it.
+ *
+ */
+InstanceID hashForGroupby(const Coordinates& allDims, const vector<bool>& isGroupby ) {
+    assert(allDims.size()==isGroupby.size());
+    Coordinates groups;
+    for (size_t i=0; i<allDims.size(); ++i) {
+        if (isGroupby[i]) {
+            groups.push_back(allDims[i]);
+        }
+    }
+    return VectorHash<Coordinate>()(groups);
+}
+
+/**
+ * Compute the instanceID for a group.
+ * For psGroupby, if the logic is modified, also change PhysicalQuantile.cpp::GroupbyQuantileArrayIterator::getInstanceForChunk.
+ */
 InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
                        Coordinates chunkPosition,
                        ArrayDesc const& desc,
                        PartitioningSchema ps,
                        boost::shared_ptr<DistributionMapper> distMapper,
                        size_t shift,
-                       InstanceID defaultInstanceId)
+                       InstanceID defaultInstanceId,
+                       PartitioningSchemaData* psData)
 {
     const uint64_t instanceCount = query->getInstancesCount();
     InstanceID result = defaultInstanceId;
@@ -648,15 +683,17 @@ InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
     if (distMapper.get() != NULL)
     {
         chunkPosition = distMapper->translate(chunkPosition);
-        shape = distMapper->getShapeVector();
-
-        dim0Length = shape[0];
-        dim1Length = shape.numDimensions() > 1 ? shape[1] : 0;
     }
 
     switch (ps)
     {
-        case psRoundRobin:
+        case psRoundRobin:  // WARNING: hashed, NOT bock-cyclic!
+                            // as getChunkNumber() returns hashed patterns
+
+            if(false) { // needed for debugging ScaLAPACK until the end of Cheshire
+                std::cerr << "getInstanceForChunk to hashed, chunkPos= " << chunkPosition << std::endl;
+                std::cerr << "conversion to RoundRobin, chunkPos=" << chunkPosition << std::endl;
+            }
             result = desc.getChunkNumber(chunkPosition) % instanceCount;
             break;
         case psByRow:
@@ -672,17 +709,46 @@ InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
                 }
                 else
                 {
-                        result = 0;
+                        result = 0;  // TODO Tigor ; you wanted a comment because you wanted to look at this line
                 }
                 break;
         }
 
+        case psScaLAPACK:
+        {
+            if (dims.size() <= 2) {      // not defined for > 2
+                result = iidForScaLAPACK(chunkPosition, dims, *(query.get()));
+                if(false) { // needed for debugging ScaLAPACK until the end of Cheshire
+                    std::cerr << "getInstanceForChunk to ScaLAPACK, chunkPos= " << chunkPosition << std::endl;
+                    std::cerr << " -> " <<result<< " shift:" <<shift<< " IC:" <<instanceCount<< std::endl ;
+                }
+            } else {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
+            }
+
+        } break;
+
         case psUndefined:
-            throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
 
         case psReplication:
         case psLocalInstance:
             break;
+
+        case psGroupby:
+        {
+            PartitioningSchemaDataGroupby* pIsGroupbyDim = dynamic_cast<PartitioningSchemaDataGroupby*>(psData);
+            if (pIsGroupbyDim!=NULL) {
+                result = hashForGroupby(chunkPosition, pIsGroupbyDim->_arrIsGroupbyDim);
+            } else {
+                assert(false);
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "getInstanceForChunk - psGroupby";
+            }
+            break;
+        }
+
+        default:
+            assert(false);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "getInstanceForChunk";
     }
 
     return (result + shift) % instanceCount;
@@ -702,128 +768,272 @@ static std::vector<AggregatePtr> copyAggList(std::vector<AggregatePtr> const& in
     return result;
 }
 
+/**
+ * Scan through the inputIters that are not ended, and set whether each inputIters[i] is atMinPos.
+ * @param[in]    inputIters  a vector of array iterators
+ * @param[inout] ended       a vector telling whether each input iterator has ended
+ * @param[out]   atMinPos    a vector telling whether each input iterator (that is not ended) is at the min position
+ * @param[out]   minPos      the min position
+ * @return  whether there exists a valid min position, i.e. whether at least one ended[i] is false
+ *
+ * @note The input vectors (except minPos) must be pre-allocated. This applies to the output vector atMinPos as well.
+ */
+bool checkIfAtMin(vector<shared_ptr<ConstArrayIterator> >const& inputIters, vector<bool>& ended, vector<bool>& atMinPos, Coordinates& minPos)
+{
+    assert(inputIters.size() == ended.size());
+    assert(ended.size() == atMinPos.size());
+
+    minPos.clear();
+    AttributeID nAttrs = inputIters.size();
+
+    for (AttributeID attrId = nAttrs; attrId-- > 0; ) {
+        if (ended[attrId]) {
+            continue;
+        }
+        if (inputIters[attrId]->end()) {
+            ended[attrId] = true;
+            continue;
+        }
+
+        Coordinates const& pos = inputIters[attrId]->getPosition();
+        if (minPos.size()==0) {
+            minPos = pos;
+            atMinPos[attrId] = true;
+        } else {
+            int64_t c = coordinatesCompare(pos, minPos);
+            if (c==0) {
+                atMinPos[attrId] = true;
+            } else if (c<0) { // all the previous ones are NOT at min position!
+                minPos = pos;
+                for (AttributeID i=attrId+1; i<nAttrs; ++i) {
+                    atMinPos[i] = false;
+                }
+                atMinPos[attrId] = true;
+            } else { // this one is NOT at min position!
+                atMinPos[attrId] = false;
+            }
+        }
+    }
+
+    return minPos.size()>0;
+}
+
+/**
+ * Works ONLY with RLE.
+ */
 boost::shared_ptr<MemArray> redistributeAggregate(boost::shared_ptr<MemArray> inputArray,
                                                   boost::shared_ptr<Query> query,
-                                                  vector <AggregatePtr> const& aggs)
+                                                  vector <AggregatePtr> const& aggs,
+                                                  shared_ptr<RedimInfo> redimInfo)
 {
     LOG4CXX_DEBUG(logger, "SG_AGGREGATE started");
 
     uint64_t totalBytesSent = 0;
+    uint64_t totalBytesSynced = 0;
 
     NetworkManager* networkManager = NetworkManager::getInstance();
     const uint64_t instanceCount = query->getInstancesCount();
+
+    //At this point, we always assume that there will be many-to-one communication (i.e. everyone sends chunk {1,1}
+    //to instance 0 at the same time). So cap the network buffer.
+    //TODO: what we can do here is build a map of all local chunks, send all maps to coordinator, then coordinator
+    //can determine in fact the worst-case divisor for this equation. We can do this because our input should always
+    //be materialized here.
+    size_t networkBufferLimit = Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER)*MB / instanceCount;
 
     if (instanceCount == 1)
     {
         return inputArray;
     }
 
-    ArrayDesc desc = inputArray->getArrayDesc();
-
+    ArrayDesc const& desc = inputArray->getArrayDesc();
     size_t nAttrs = desc.getAttributes().size();
-    if (desc.getEmptyBitmapAttribute() != NULL && (desc.getEmptyBitmapAttribute()->getId() != nAttrs-1 || aggs[nAttrs-1] != NULL))
+    bool isEmptyable = (desc.getEmptyBitmapAttribute() != NULL);
+    if (isEmptyable && (desc.getEmptyBitmapAttribute()->getId() != nAttrs-1 || aggs[nAttrs-1] != NULL)) {
         throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_REDISTRIBUTE_AGGREGATE_ERROR1);
+    }
+
+    // In redistributeAggregate as long as the array is emptyable, we always cache the empty bitmap, i.e. we do NOT send the empty bitmap along with the real attribute chunks.
+    // We need a separate variable, in case we want to change the logic in the future.
+    bool shouldCacheEmptyBitmap = isEmptyable;
 
     boost::shared_ptr<MemArray> outputArray(new MemArray(desc));
-    bool isEmptyable = desc.getEmptyBitmapAttribute() != NULL;
 
     barrier(0, networkManager, query, instanceCount);
     // set SG context after the barrier
-    query->setSGContext(shared_ptr<SGContext>(new SGContext(outputArray, copyAggList(aggs) )));
+    query->setOperatorContext(make_shared<SGContext>(shouldCacheEmptyBitmap, instanceCount, outputArray, copyAggList(aggs), redimInfo ));
 
-    size_t msgCounter = 0;
-    size_t syncInterval = 10;
-    uint64_t arraySize = desc.getUsedSpace();
-    if (arraySize != INFINITE_LENGTH && arraySize != 0)
-    {
-        size_t bufSize = Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER)*MB;
-        size_t chunkSize = arraySize / desc.getNumberOfChunks();
-        if (chunkSize != 0)
-        {
-            syncInterval = (bufSize + chunkSize - 1) / chunkSize;
-        }
-    }
+    // timing
+    LOG4CXX_DEBUG(logger, "[redistributeAggregate] Begin, reporting a timing every 10 chunks.");
+    size_t chunkID = 0;
+    ElapsedMilliSeconds timing;
+    uint64_t elapsed = 0;
+    size_t reportATimingAfterHowManyChunks = 10; // report a timing after how many chunks?
+
     //Regular redistribute() assumes that if there is a chunk for attribute 0, there must also be a chunk at same position
     //for all other attributes. Not the case with aggregate state arrays! Aggregates that ignore nulls may produce a lot less
     //chunks than aggregates that count nulls.
-    for (AttributeID attrId = nAttrs; attrId-- != 0;)
-    {
-        shared_ptr<ConstArrayIterator> inputIter = inputArray->getConstIterator(attrId);
-        shared_ptr<ArrayIterator> outputIter = outputArray->getIterator(attrId);
-        while (!inputIter->end())
-        {
-            Coordinates chunkPosition = inputIter->getPosition();
-            InstanceID instanceID =  getInstanceForChunk(query, chunkPosition, desc, psRoundRobin, shared_ptr<DistributionMapper>(), 0, 0);
-            const ConstChunk& chunk = inputIter->getChunk();
-            AttributeDesc const& attributeDesc = chunk.getAttributeDesc();
-            const Coordinates& coordinates = chunk.getFirstPosition(false);
-            MessageType mt = aggs[attrId].get() ? mtAggregateChunk : mtChunk;
+    //
+    // We maintain a vector of shared_ptr<ConstArrayIterator>.
+    // We maintain a state vector, describing the state of each ConstArrayIterator.
+    // The possible states are: ALREADY_END, AT_MIN_POS, LARGER_THAN_MIN_POS
+    // In each iteration, we process the chunks of the ConstArrayIterators that are AT_MIN_POS, and we increment them.
+    //
+    vector<shared_ptr<ConstArrayIterator> > inputIters(nAttrs);
+    vector<shared_ptr<ArrayIterator> > outputIters(nAttrs); // assigned later, under the mutex protection
+    vector<bool> ended(nAttrs);
+    vector<bool> atMinPos(nAttrs);
+    Coordinates chunkPosition;
 
-            boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-            if (chunk.isRLE() && isEmptyable && !attributeDesc.isEmptyIndicator()) { 
-                emptyBitmap = chunk.getEmptyBitmap();
+    for (AttributeID attrId = nAttrs; attrId-- > 0; ) {
+        inputIters[attrId] = inputArray->getConstIterator(attrId);
+        ended[attrId] = false;
+    }
+
+    // Each iteration of the while loop advances the inputIters that are at minPos
+    while (true) {
+        bool hasMoreData = checkIfAtMin(inputIters, ended, atMinPos, chunkPosition);
+        if (!hasMoreData) {
+            break;
+        }
+
+        // assert that the empty tag chunk exists
+        if (isEmptyable) {
+            if (ended[nAttrs-1] || !atMinPos[nAttrs-1]) {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "redistributeAggregate";
             }
-            
-            if ( instanceID != query->getInstanceID() )
-            {
-                boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
-                chunk.compress(*buffer, emptyBitmap);
+        }
 
-                boost::shared_ptr<MessageDesc> chunkMsg = boost::make_shared<MessageDesc>(mt, buffer);
-                boost::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
-                chunkRecord->set_eof(false);
-                chunkRecord->set_sparse(chunk.isSparse());
-                chunkRecord->set_rle(chunk.isRLE());
-                chunkRecord->set_compression_method(buffer->getCompressionMethod());
-                chunkRecord->set_attribute_id(attrId);
-                chunkRecord->set_decompressed_size(buffer->getDecompressedSize());
-                chunkRecord->set_count(chunk.isCountKnown() ? chunk.count() : 0);
-                chunkMsg->setQueryID(query->getQueryID());
-                for (size_t i = 0; i < coordinates.size(); i++)
-                {
-                    chunkRecord->add_coordinates(coordinates[i]);
+        // sharedEmptyBitmap is the empty bitmap at a given chunkPos, to be shared by all the attributes.
+        shared_ptr<ConstRLEEmptyBitmap> sharedEmptyBitmap;
+
+        for (AttributeID attrId = nAttrs; attrId-- != 0;) {
+            if (ended[attrId] || !atMinPos[attrId]) {
+                continue;
+            }
+
+            InstanceID instanceID =  getInstanceForChunk(query, chunkPosition, desc, psRoundRobin, shared_ptr<DistributionMapper>(), 0, 0);
+            const ConstChunk& chunk = inputIters[attrId]->getChunk();
+            if (!chunk.isRLE()) {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "redistributeAggregate; must be RLE";
+            }
+
+            bool isEmptyIndicator = (isEmptyable && attrId+1 == nAttrs);
+
+            if (chunk.getSize() > 0)
+            {
+                if (isEmptyable) {
+                    if (attrId+1 == nAttrs) {
+                        assert(!sharedEmptyBitmap);
+                        sharedEmptyBitmap = chunk.getEmptyBitmap();
+                        assert(sharedEmptyBitmap);
+                    } else {
+                        assert(sharedEmptyBitmap);
+                    }
                 }
 
-                networkManager->send(instanceID, chunkMsg);
-                LOG4CXX_TRACE(logger, "Sending chunk with att=" << attrId << " to instance=" << instanceID);
-                totalBytesSent += buffer->getDecompressedSize();
-                if (++msgCounter >= syncInterval) {
-                    sync(networkManager, query, instanceCount);
-                    msgCounter = 0;
-                }                
-            }
-            else
-            {
-                ScopedMutexLock cs(query->resultCS);
-                if (outputIter->setPosition(coordinates))
+                const Coordinates& coordinates = chunk.getFirstPosition(false);
+                MessageType mt = aggs[attrId].get() ? mtAggregateChunk : mtChunk;
+
+                if ( instanceID != query->getInstanceID() )
                 {
-                    Chunk& dstChunk = outputIter->updateChunk();
-                    if (aggs[attrId].get())
-                    {
-                        dstChunk.aggregateMerge(chunk, aggs[attrId], query);
+                    boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
+                    shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+                    if (isEmptyable && !shouldCacheEmptyBitmap && !isEmptyIndicator) {
+                        emptyBitmap = sharedEmptyBitmap;
+                        assert(emptyBitmap);
                     }
-                    else
+                    chunk.compress(*buffer, emptyBitmap);
+                    assert(buffer && buffer->getData());
+
+                    boost::shared_ptr<MessageDesc> chunkMsg = boost::make_shared<MessageDesc>(mt, buffer);
+                    boost::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
+                    chunkRecord->set_eof(false);
+                    chunkRecord->set_sparse(chunk.isSparse());
+                    chunkRecord->set_rle(chunk.isRLE());
+                    chunkRecord->set_compression_method(buffer->getCompressionMethod());
+                    chunkRecord->set_attribute_id(attrId);
+                    chunkRecord->set_decompressed_size(buffer->getDecompressedSize());
+                    chunkRecord->set_count(chunk.isCountKnown() ? chunk.count() : 0);
+                    chunkMsg->setQueryID(query->getQueryID());
+                    for (size_t i = 0; i < coordinates.size(); i++)
                     {
-                        dstChunk.merge(chunk, query);
+                        chunkRecord->add_coordinates(coordinates[i]);
+                    }
+
+                    networkManager->send(instanceID, chunkMsg);
+                    LOG4CXX_TRACE(logger, "Sending chunk with att=" << attrId << " to instance=" << instanceID);
+                    totalBytesSent += buffer->getDecompressedSize();
+                    if (totalBytesSent > totalBytesSynced + networkBufferLimit) {
+                        sync(networkManager, query, instanceCount);
+                        totalBytesSynced = totalBytesSent;
                     }
                 }
                 else
                 {
-                    outputIter->copyChunk(chunk, emptyBitmap);                        
+                    ScopedMutexLock cs(query->resultCS);
+                    if (!outputIters[attrId]) {
+                        outputIters[attrId] = outputArray->getIterator(attrId);
+                    }
+                    if (outputIters[attrId]->setPosition(coordinates))
+                    {
+                        Chunk& dstChunk = outputIters[attrId]->updateChunk();
+                        if (aggs[attrId].get())
+                        {
+                            if( desc.getEmptyBitmapAttribute() == NULL && dstChunk.isRLE() && chunk.isRLE())
+                            {
+                                dstChunk.nonEmptyableAggregateMerge(chunk, aggs[attrId], query);
+                            }
+                            else
+                            {
+                                dstChunk.aggregateMerge(chunk, aggs[attrId], query);
+                            }
+                        }
+                        else
+                        {
+                            dstChunk.merge(chunk, query);
+                        }
+                    }
+                    else
+                    {
+                        shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+                        if (isEmptyable && !isEmptyIndicator) {
+                            emptyBitmap = sharedEmptyBitmap;
+                        }
+                        outputIters[attrId]->copyChunk(chunk, emptyBitmap);
+                    }
+                    LOG4CXX_TRACE(logger, "Storing chunk with att=" << attrId << " locally")
                 }
-                LOG4CXX_TRACE(logger, "Storing chunk with att=" << attrId << " locally")
+
+                // timing
+                ++ chunkID;
+                if (chunkID%reportATimingAfterHowManyChunks ==0) {
+                    elapsed = timing.elapsed();
+                    LOG4CXX_DEBUG(logger, "[redistributeAggregate] reading " << chunkID << " chunks took " << elapsed << " ms, or " << ElapsedMilliSeconds::toString(elapsed));
+                    if (chunkID==100) {
+                        reportATimingAfterHowManyChunks  = 100;
+                        LOG4CXX_DEBUG(logger, "[redistributeAggregate] Now reporting a number after 100 chunks.");
+                    } else if (chunkID==1000) {
+                        reportATimingAfterHowManyChunks = 1000;
+                        LOG4CXX_DEBUG(logger, "[redistributeAggregate] Now reporting a number after 1000 chunks.");
+                    }
+                }
             }
-            ++(*inputIter);
-         }
-     }
 
-     sync(networkManager, query, instanceCount);
-     barrier(1, networkManager, query, instanceCount);
+            ++(*inputIters[attrId]);
+        } // end for
+    } // end while
 
-     query->unsetSGContext();
+    elapsed = timing.elapsed();
+    LOG4CXX_DEBUG(logger, "[redistributeAggregate] reading " << chunkID << " chunks took " << elapsed << " ms, or " << ElapsedMilliSeconds::toString(elapsed));
 
-     LOG4CXX_DEBUG(logger, "Finishing SG_AGGREGATE work; sent " << totalBytesSent << " bytes.")
-     return outputArray;
+    sync(networkManager, query, instanceCount);
+    barrier(1, networkManager, query, instanceCount);
+
+    query->unsetOperatorContext();
+
+    LOG4CXX_DEBUG(logger, "Finishing SG_AGGREGATE work; sent " << totalBytesSent << " bytes.")
+    return outputArray;
 }
 
 
@@ -883,6 +1093,10 @@ AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>cons
 
         throw;
     }
+
+    assert(false);
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "resolveAggregate";
+    return AggregatePtr();
 }
 
 void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall, ArrayDesc const& inputDesc, ArrayDesc& outputDesc)
@@ -898,18 +1112,20 @@ void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const
                                            0));
 }
 
-
 boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
                                       boost::shared_ptr<Query> query,
                                       PartitioningSchema ps,
                                       const string& resultArrayName,
                                       InstanceID instanceID,
                                       boost::shared_ptr<DistributionMapper> distMapper,
-                                      size_t shift)
+                                      size_t shift,
+                                      PartitioningSchemaData* psData)
 {
     LOG4CXX_DEBUG(logger, "SG started with partitioning schema = " << ps << ", instanceID = " << instanceID)
 
     uint64_t totalBytesSent = 0;
+    uint64_t totalBytesSynced = 0;
+    size_t networkBufferLimit = Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER)*MB;
 
     /**
      * Creating result array with the same descriptor as the input one
@@ -917,7 +1133,16 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
     NetworkManager* networkManager = NetworkManager::getInstance();
     const uint64_t instanceCount = query->getInstancesCount();
 
-    if (instanceCount == 1 || (ps == psLocalInstance && (int64_t) instanceID == -1)) {
+    assert(instanceID == COORDINATOR_INSTANCE_MASK || instanceID == ALL_INSTANCES_MASK || (size_t)instanceID < query->getInstancesCount());
+
+    if (ps == psLocalInstance || ps == psReplication) {
+        networkBufferLimit /= instanceCount;
+    }
+
+    if (instanceID == COORDINATOR_INSTANCE_MASK) { 
+        instanceID = query->getCoordinatorInstanceID();
+    }
+    if (instanceCount == 1 || (ps == psLocalInstance && instanceID == ALL_INSTANCES_MASK)) {
         return inputArray;
     }
 
@@ -926,157 +1151,139 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
     size_t nDims = srcDims.size();
 
     size_t nAttrs = desc.getAttributes().size();
-    AttributeDesc const* emptyAttr = desc.getEmptyBitmapAttribute();
-    if (emptyAttr != NULL && emptyAttr->getId() != nAttrs-1)
+    bool isEmptyable = (desc.getEmptyBitmapAttribute() != NULL);
+    if (isEmptyable && desc.getEmptyBitmapAttribute()->getId() != nAttrs-1) {
         throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_REDISTRIBUTE_ERROR1);
+    }
+
+    // In redistribute, we never cache empty bitmap, for now
+    bool shouldCacheEmptyBitmap = false;
     
     boost::shared_ptr<Array> outputArray;
     ArrayID resultArrayId = 0;
     SystemCatalog* catalog = NULL;
-    Coordinates lowBoundary(nDims);
-    Coordinates highBoundary(nDims);
+    PhysicalBoundaries bounds = PhysicalBoundaries::createEmpty(nDims);
 
     if (resultArrayName.empty()) {
         outputArray = createTmpArray(desc);
         LOG4CXX_DEBUG(logger, "Temporary array was opened")
     } else {
-        for (size_t i = 0; i < nDims; i++) {
-            lowBoundary[i] = srcDims[i].getCurrStart();
-            highBoundary[i] = srcDims[i].getCurrEnd();
-        }
         outputArray = boost::shared_ptr<Array>(new DBArray(resultArrayName, query));
         resultArrayId = outputArray->getHandle();
         catalog = SystemCatalog::getInstance();
         LOG4CXX_DEBUG(logger, "Array " << resultArrayName << " was opened")
     }
-    Dimensions const& dims = outputArray->getArrayDesc().getDimensions();
+
+    ArrayDesc const& dstDesc = outputArray->getArrayDesc();
+    Dimensions const& dims = dstDesc.getDimensions();
 
     barrier(0, networkManager, query, instanceCount);
     /**
      * Assigning result of this operation for current query and signal to concurrent handlers that they
      * can continue to work (after the barrier)
      */
-    query->setSGContext(shared_ptr<SGContext>(new SGContext(outputArray)));
-
-    size_t msgCounter = 0;
+    shared_ptr<SGContext> sgCtx = make_shared<SGContext>(shouldCacheEmptyBitmap, instanceCount, outputArray);
+    query->setOperatorContext(sgCtx);
 
     /**
      *  Sending out our parts of the input array
      */
     vector<boost::shared_ptr<ConstArrayIterator> > inputIters;
-    vector<boost::shared_ptr<ArrayIterator> > outputIters;
 
     for (AttributeID attrId = 0; attrId < nAttrs; attrId++)
     {
         inputIters.push_back(inputArray->getConstIterator(attrId));
-        outputIters.push_back(outputArray->getIterator(attrId));
     }
 
-    size_t syncInterval = 10;
-    uint64_t arraySize = desc.getUsedSpace();
-    if (arraySize != INFINITE_LENGTH && arraySize != 0) {
-        size_t bufSize = Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER)*MB;
-        size_t chunkSize = arraySize / desc.getNumberOfChunks();
-        if (chunkSize != 0) {
-            syncInterval = (bufSize + chunkSize - 1) / chunkSize;
-        }
-    }
+    // we want to set outputIters lazily, after getting mutex.
+    // Here we just allocate placeholders.
+    vector<boost::shared_ptr<ArrayIterator> > outputIters(nAttrs);
+
     while (!inputIters[0]->end())
     {
         Coordinates chunkPosition = inputIters[0]->getPosition();
-        instanceID = getInstanceForChunk(query, chunkPosition,desc,ps,distMapper,shift,instanceID);
+        instanceID = getInstanceForChunk(query, chunkPosition,desc,ps,distMapper,shift,instanceID, psData);
 
-        boost::shared_ptr<ConstRLEEmptyBitmap> sharedEmptyBitmap;
+        // sharedEmptyBitmap is the empty bitmap at a given chunkPos, to be shared by all the attributes.
+        shared_ptr<ConstRLEEmptyBitmap> sharedEmptyBitmap;
 
         for (AttributeID attrId = nAttrs; attrId-- != 0;)
         {
             // Sending current chunk to instanceID instance or saving locally
             const ConstChunk& chunk = inputIters[attrId]->getChunk();
-            AttributeDesc const& attributeDesc = chunk.getAttributeDesc();
-            assert(attributeDesc.getId() == attrId);
-
-            const Coordinates& coordinates = chunk.getFirstPosition(false);
-
-            boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-            if (chunk.isRLE() && emptyAttr != NULL) { 
-                if (!sharedEmptyBitmap) {                         
-                    sharedEmptyBitmap = chunk.getEmptyBitmap();
-                }
-                if (!attributeDesc.isEmptyIndicator()) {                         
-                    emptyBitmap = sharedEmptyBitmap;
-                }
-            }
-            if ((InstanceID)instanceID != query->getInstanceID() || ps == psReplication)
+            if (chunk.getSize() > 0)
             {
-                boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
-                chunk.compress(*buffer, emptyBitmap);
-                boost::shared_ptr<MessageDesc> chunkMsg = boost::make_shared<MessageDesc>(mtChunk, buffer);
-                boost::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
-                chunkRecord->set_eof(false);
-                chunkRecord->set_sparse(chunk.isSparse());
-                chunkRecord->set_rle(chunk.isRLE());
-                chunkRecord->set_compression_method(buffer->getCompressionMethod());
-                chunkRecord->set_attribute_id(attrId);
-                chunkRecord->set_decompressed_size(buffer->getDecompressedSize());
-                chunkRecord->set_count(chunk.isCountKnown() ? chunk.count() : 0);
-                chunkMsg->setQueryID(query->getQueryID());
-                for (size_t i = 0; i < coordinates.size(); i++) {
-                    chunkRecord->add_coordinates(coordinates[i]);
+                if (resultArrayId != 0 && attrId == nAttrs - 1) {
+                    bounds.updateFromChunk(&chunk, dstDesc.getEmptyBitmapAttribute() == NULL);
                 }
 
-                if (ps != psReplication) {
-                    networkManager->send(instanceID, chunkMsg);
-                    LOG4CXX_TRACE(logger, "Sending chunk with att=" << attrId << " to instance=" << instanceID)
-                    msgCounter++;
-                }
-                else {
-                    networkManager->sendOutMessage(chunkMsg);
-                    LOG4CXX_TRACE(logger, "Sending out chunk with att=" << attrId << " to every instance")
-                    msgCounter += instanceCount - 1;
-                }
-                if (msgCounter >= syncInterval) {
-                    sync(networkManager, query, instanceCount);
-                    msgCounter = 0;
-                }
-                totalBytesSent += buffer->getDecompressedSize();
-            }
-            if ((InstanceID)instanceID == query->getInstanceID() || ps == psReplication)
-            {
-                ScopedMutexLock cs(query->resultCS);
-                if (outputIters[attrId]->setPosition(coordinates)) {
-                    Chunk& dstChunk = outputIters[attrId]->updateChunk();
-                    if (dstChunk.isReadOnly())
-                        throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_CANT_MERGE_READONLY_CHUNK);
-                    dstChunk.merge(chunk, query);
-                } else {
-                    outputIters[attrId]->copyChunk(chunk, emptyBitmap);
-                }
-            }
-            if (resultArrayId != 0) {           
-                Coordinates const& first = chunk.getFirstPosition(false);
-                Coordinates const& last = chunk.getLastPosition(false);
-                bool newHighBoundary = false;
-                for (size_t i = 0; i < nDims; i++) {
-                    if (first[i] < lowBoundary[i]) {
-                        lowBoundary[i] = first[i];
+                AttributeDesc const& attributeDesc = chunk.getAttributeDesc();
+                assert(attributeDesc.getId() == attrId);
+
+                const Coordinates& coordinates = chunk.getFirstPosition(false);
+
+                boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+                if (chunk.isRLE() && isEmptyable) {
+                    if (!sharedEmptyBitmap) {
+                        sharedEmptyBitmap = chunk.getEmptyBitmap();
                     }
-                    if (last[i] > highBoundary[i]) {
-                        if (dims[i].getLength() == INFINITE_LENGTH) { 
-                            newHighBoundary = true;
-                        } else { 
-                            highBoundary[i] = last[i];
+                    if (!attributeDesc.isEmptyIndicator()) {
+                        emptyBitmap = sharedEmptyBitmap;
+                    }
+                }
+                if ((InstanceID)instanceID != query->getInstanceID() || ps == psReplication)
+                {
+                    boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
+                    chunk.compress(*buffer, emptyBitmap);
+                    boost::shared_ptr<MessageDesc> chunkMsg = boost::make_shared<MessageDesc>(mtChunk, buffer);
+                    boost::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
+                    chunkRecord->set_eof(false);
+                    chunkRecord->set_sparse(chunk.isSparse());
+                    chunkRecord->set_rle(chunk.isRLE());
+                    chunkRecord->set_compression_method(buffer->getCompressionMethod());
+                    chunkRecord->set_attribute_id(attrId);
+                    chunkRecord->set_decompressed_size(buffer->getDecompressedSize());
+                    chunkRecord->set_count(chunk.isCountKnown() ? chunk.count() : 0);
+                    chunkMsg->setQueryID(query->getQueryID());
+                    for (size_t i = 0; i < coordinates.size(); i++) {
+                        chunkRecord->add_coordinates(coordinates[i]);
+                    }
+
+                    if (ps != psReplication) {
+                        networkManager->send(instanceID, chunkMsg);
+                        LOG4CXX_TRACE(logger, "Sending chunk with att=" << attrId << " to instance=" << instanceID)
+                    }
+                    else {
+                        networkManager->sendOutMessage(chunkMsg);
+                        LOG4CXX_TRACE(logger, "Sending out chunk with att=" << attrId << " to every instance")
+                    }
+                    totalBytesSent += buffer->getDecompressedSize();
+                    if (totalBytesSent > totalBytesSynced + networkBufferLimit) {
+                        sync(networkManager, query, instanceCount);
+                        totalBytesSynced = totalBytesSent;
+                    }
+                }
+                if ((InstanceID)instanceID == query->getInstanceID() || ps == psReplication)
+                {
+                    ScopedMutexLock cs(query->resultCS);
+                    if(sgCtx->_targetVersioned)
+                    {
+                        sgCtx->_newChunks.insert(coordinates);
+                    }
+                    assert(attrId < nAttrs);
+                    if (!outputIters[attrId]) {
+                        outputIters[attrId] = outputArray->getIterator(attrId);
+                    }
+                    if (outputIters[attrId]->setPosition(coordinates)) {
+                        Chunk& dstChunk = outputIters[attrId]->updateChunk();
+                        if (dstChunk.isReadOnly()) {
+                            throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_CANT_MERGE_READONLY_CHUNK);
                         }
+                        dstChunk.merge(chunk, query);
+                    } else {
+                        outputIters[attrId]->copyChunk(chunk, emptyBitmap);
                     }
                 }
-                if (newHighBoundary) { 
-                    Coordinates high = chunk.getHighBoundary(false);
-                    for (size_t j = 0; j < nDims; j++) {
-                        if (high[j] > highBoundary[j]) {
-                            highBoundary[j] = high[j];
-                        }
-                    }
-                }
-                LOG4CXX_TRACE(logger, "Storing chunk with att=" << attrId << " locally")
             }
             ++(*inputIters[attrId]);
         }
@@ -1084,22 +1291,25 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
 
     sync(networkManager, query, instanceCount);
     barrier(1, networkManager, query, instanceCount);
+    LOG4CXX_DEBUG(logger, "SG termination barrier reached.");
 
     /**
-     * Reset rSG Context to NULL
+     * Reset SG Context to NULL
      */
-    query->unsetSGContext();
+    query->unsetOperatorContext();
+
+    if (sgCtx->onSGCompletionCallback) { 
+        LOG4CXX_DEBUG(logger, "Invoke SG callback.");
+        sgCtx->onSGCompletionCallback(sgCtx->callbackArg);
+    }
 
     if (resultArrayId != 0) {
-        for (size_t i = 0; i < nDims; i++) {
-            if (lowBoundary[i] < dims[i].getStartMin()) {  
-                lowBoundary[i] = dims[i].getStartMin();
-            }
-            if (highBoundary[i] > dims[i].getEndMax()) {  
-                highBoundary[i] = dims[i].getEndMax();
-            }
+        catalog->updateArrayBoundaries(dstDesc, bounds);
+        if (sgCtx->_targetVersioned)
+        {   //storing sg and array is mutable - insert tombstones:
+            StorageManager::getInstance().removeDeadChunks(outputArray->getArrayDesc(), sgCtx->_newChunks, query);
         }
-        catalog->updateArrayBoundaries(resultArrayId, lowBoundary, highBoundary);
+
         StorageManager::getInstance().flush();
         query->replicationBarrier();
 
@@ -1110,7 +1320,21 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
             if (dims[i].getType() != TID_INT64 && srcMappingArrayName != dstMappingArrayName) { 
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(srcMappingArrayName);
                 if (tmpMappingArray) { 
+                    // Source array contains temporary NIDs, when we store this array in database, we also need to persist NIDs
                     DBArray dbMappingArray(dstMappingArrayName, query);
+                    ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
+                    ArrayDesc const& dbMappingArrayDesc = dbMappingArray.getArrayDesc();
+                    if (query->getCoordinatorID() == COORDINATOR_INSTANCE 
+                        && tmpMappingArrayDesc.getDimensions()[0].getChunkInterval() != dbMappingArrayDesc.getDimensions()[0].getChunkInterval()) { 
+                        LOG4CXX_DEBUG(logger, "Update chunk interval for NID array " << dbMappingArrayDesc.getName() << "(" << dbMappingArrayDesc.getId() << ") from " << dbMappingArrayDesc.getDimensions()[0].getChunkInterval() << " to " << tmpMappingArrayDesc.getDimensions()[0].getChunkInterval());
+                        SystemCatalog::getInstance()->updateArray(ArrayDesc(dbMappingArrayDesc.getId(),
+                                                                            dbMappingArrayDesc.getUAId(),
+                                                                            dbMappingArrayDesc.getVersionId(),
+                                                                            dbMappingArrayDesc.getName(),
+                                                                            dbMappingArrayDesc.getAttributes(),
+                                                                            tmpMappingArrayDesc.getDimensions(),
+                                                                            dbMappingArrayDesc.getFlags()));
+                    }
                     shared_ptr<ArrayIterator> srcArrayIterator = tmpMappingArray->getIterator(0);
                     shared_ptr<ArrayIterator> dstArrayIterator = dbMappingArray.getIterator(0);
                     Chunk& dstChunk = dstArrayIterator->newChunk(srcArrayIterator->getPosition(), 0);
@@ -1124,8 +1348,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
             }
         }
     }
-    LOG4CXX_DEBUG(logger, "Finishing SCATTER/GATHER work; sent " << totalBytesSent << " bytes.")
-
+    LOG4CXX_DEBUG(logger, "Finishing SCATTER/GATHER work; sent " << totalBytesSent << " bytes.");
     return outputArray;
 }
 
@@ -1197,6 +1420,99 @@ PhysicalBoundaries findArrayBoundaries(shared_ptr<Array> srcArray,
     return localBoundaries;
 }
 
+void PhysicalBoundaries::updateFromChunk(ConstChunk const* chunk, bool chunkShapeOnly)
+{
+    size_t nDims = _startCoords.size();
+    if (chunk == NULL)
+    {   return; }
+
+    //chunk iteration is expensive - only perform if needed
+    Coordinates const& chunkFirstPos = chunk->getFirstPosition(false), chunkLastPos = chunk->getLastPosition(false);
+    bool updateLowBound = false, updateHiBound = false;
+    for (size_t i = 0; i < nDims; i++)
+    {
+       if (chunkFirstPos[i] < _startCoords[i])
+       {
+           if ( chunkShapeOnly )
+           {    _startCoords[i] = chunkFirstPos[i]; }
+           else
+           {   updateLowBound = true; }
+       }
+
+       if (chunkLastPos[i] > _endCoords[i])
+       {
+           if ( chunkShapeOnly)
+           {    _endCoords[i] = chunkLastPos[i]; }
+           else
+           {    updateHiBound = true; }
+       }
+    }
+
+    //The chunk is inside the box and cannot expand the bounds. Early exit.
+    if (!updateLowBound && !updateHiBound)
+    {   return; }
+
+    //TODO: there is a further optimization opportunity here. The given chunk *should* always be a bitmap
+    //chunk. Once we verify that, we can iterate over bitmap segments and compute coordinates. Committing
+    //this due to timing constraints - should revisit and optimize this when possible.
+    boost::shared_ptr<ConstChunkIterator> citer = chunk->materialize()->getConstIterator();
+    while (!citer->end() && (updateLowBound || updateHiBound))
+    {
+        Coordinates const& pos = citer->getPosition();
+        bool updated = false;
+        for (size_t j = 0; j < nDims; j++)
+        {
+            if (updateHiBound && pos[j] > _endCoords[j])
+            {
+                _endCoords[j] = pos[j];
+                updated = true;
+            }
+            if (updateLowBound && pos[j] < _startCoords[j])
+            {
+                _startCoords[j] = pos[j];
+                updated = true;
+            }
+        }
+        if(updated) //it's likely that no further update can come from this chunk
+        {
+            if(updateHiBound)
+            {
+                size_t k=0;
+                while (k<nDims && _endCoords[k]>=chunkLastPos[k])
+                { k++; }
+                if (k==nDims) //no more useful data for hi bound could come from this chunk!
+                {   updateHiBound=false; }
+            }
+            if(updateLowBound)
+            {
+                size_t k=0;
+                while (k<nDims && _startCoords[k]<=chunkFirstPos[k])
+                { k++; }
+                if (k==nDims) //no more useful data for lo bound could come from this chunk!
+                {   updateLowBound=false; }
+            }
+        }
+        ++(*citer);
+    }
+}
+
+PhysicalBoundaries PhysicalBoundaries::trimToDims(Dimensions const& dims) const
+{
+    SCIDB_ASSERT(_startCoords.size() == dims.size());
+    size_t nDims = dims.size();
+
+    Coordinates resStart(nDims);
+    Coordinates resEnd(nDims);
+
+    for(size_t i=0; i<nDims; i++)
+    {
+        resStart[i] = std::max<Coordinate> (dims[i].getStartMin(), _startCoords[i]);
+        resEnd[i] = std::min<Coordinate> (dims[i].getEndMax(), _endCoords[i]);
+    }
+
+    return PhysicalBoundaries(resStart, resEnd, _density);
+}
+
 
 class BroadcastedBuffer
 {
@@ -1263,13 +1579,13 @@ boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
             indexMapDim[0] = DimensionDesc("no", start, start, start + dimSize - 1, start + dimSize - 1, dimSize, 0);
             indexMapAttr[0] = AttributeDesc(0, "value", attrSet.getType(), 0, 0);
             ArrayDesc indexMapDesc(indexArrayName, indexMapAttr, indexMapDim, ArrayDesc::LOCAL);
-            ArrayID mappingArrayID = SystemCatalog::getInstance()->addArray(indexMapDesc, psReplication);
-            assert(mappingArrayID > 0);
+            SystemCatalog::getInstance()->addArray(indexMapDesc, psReplication);
+            assert(indexMapDesc.getId()>0);
         }
     }
 
     size_t *nCoordsPtr = (size_t*)((char*)buf->getData() + buf->getSize() - sizeof(size_t));
-    size_t nCoords = *nCoordsPtr;\
+    size_t nCoords = *nCoordsPtr;
 
     //
     // Store array with coordinates index locally at each instance
@@ -1326,9 +1642,10 @@ boost::shared_ptr<MapType> __buildSortedXIndex( shared_ptr<Array> srcArray,
                 while (!chunkIterator->end())
                 {
                     Value const& value = chunkIterator->getItem();
-                    if (value.isNull())
-                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_REDIMENSION_NULL);
-                    attrSet.add(value);
+                    if (!value.isNull())
+                    {
+                        attrSet.add(value);
+                    }
                     ++(*chunkIterator);
                 }
             }
@@ -1441,5 +1758,21 @@ void LogicalOperator::inferArrayAccess(boost::shared_ptr<Query>& query)
 }
 
 InjectedErrorListener<OperatorInjectedError> PhysicalOperator::_injectedErrorListener;
+
+boost::shared_ptr<ThreadPool> PhysicalOperator::_globalThreadPoolForOperators;
+boost::shared_ptr<JobQueue> PhysicalOperator::_globalQueueForOperators;
+Mutex PhysicalOperator::_mutexGlobalQueueForOperators;
+
+boost::shared_ptr<JobQueue> PhysicalOperator::getGlobalQueueForOperators()
+{
+    ScopedMutexLock cs(_mutexGlobalQueueForOperators);
+    if (!_globalThreadPoolForOperators) {
+        _globalQueueForOperators = boost::shared_ptr<JobQueue>(new JobQueue());
+        _globalThreadPoolForOperators = boost::shared_ptr<ThreadPool>(
+                new ThreadPool(Config::getInstance()->getOption<int>(CONFIG_EXEC_THREADS), _globalQueueForOperators));
+        _globalThreadPoolForOperators->start();
+    }
+    return _globalQueueForOperators;
+}
 
 } //namespace

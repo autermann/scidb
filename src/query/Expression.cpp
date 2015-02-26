@@ -85,7 +85,10 @@ ExpressionContext::ExpressionContext(Expression& expression):
     for (size_t i = 0; i < _state.size(); i++) {
         const size_t size = expression._functions[i].stateSize;
         if (size > 0)
+        {
             _state[i] = shared_array<char>(new char[size]);
+            memset(_state[i].get(), 0, size);
+        }
     }
 }
 
@@ -320,7 +323,7 @@ Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
 
     const Dimensions& dims = arrayDesc.getDimensions();
     for (size_t i = 0; i < dims.size(); i++) {
-        if (dims[i].hasNameOrAlias(referenceName, arrayName))
+        if (dims[i].hasNameAndAlias(referenceName, arrayName))
         {
             bind.kind = BindInfo::BI_COORDINATE;
             bind.resolvedId = i;
@@ -700,7 +703,7 @@ const Value& Expression::evaluate(ExpressionContext& e)
                 continue;
             switch ((size_t)f->function) {
             default:
-                f->function((const Value**)&e._args[f->argIndex], e._args[f->resultIndex], e._state[i].get());
+                f->function((const Value**)&e._args[f->argIndex], e._args[f->resultIndex], e._state[i-1].get());
             }
         }
     } catch (const Exception& ex) {

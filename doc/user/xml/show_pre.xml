@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>show</refname>
+
+    <refpurpose>Produces a result array whose contents describe the schema of
+    an array you supply.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>show(<replaceable>named_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The show operator returns an array's schema. The argument
+    <replaceable>named_array</replaceable> must be an array that was
+    previously created and stored in SciDB.</para>
+
+    <para>You can use the show operator in the FROM clause of an AQL SELECT
+    statement, as a stand-alone operator in a AFL statement, or as an operand
+    within other SciDB operators.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example shows the schema for an array, creates and stores an
+      abridged version of that array, then shows the schema of the abridged
+      version.</para>
+
+      <procedure>
+        <step>
+          <para>Show the schema for the original array
+
+<programlisting language='test'>
+--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
+--shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winners2.csv &gt; ../examples/winners2.scidb
+--aql load winnersFlat from '../examples/winners2.scidb'; --show-query=no --show-output=no
+--afl CREATE ARRAY champions&lt;person:string,country:string,time:double&gt; 
+   [year=1996:2008,13,0,event(string)=3,3,0]; --show-query=no --show-output=no
+--afl redimension_store(winnersFlat,champions); --show-query=no --show-output=no
+</programlisting>
+<programlisting language='test'>
+--aql select * from show(champions); --show-query=yes --show-output=yes
+</programlisting>
+</para>
+        </step>
+
+        <step>
+          <para>Use the project and store operators to create an abridged
+          array that excludes the country and time attributes:
+<programlisting language='test'>
+--aql select * into championsAbridged from project(champions,person); --show-query=yes --show-output=yes
+</programlisting>
+</para>
+        </step>
+
+        <step>
+          <para>Show the schema for the abridged array:
+<programlisting language='test'>
+--aql select * from show(championsAbridged); --show-output=yes --show-query=yes
+</programlisting>
+</para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

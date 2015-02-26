@@ -27,36 +27,47 @@
  *      Author: Knizhnik
  */
 
-#include "query/Operator.h"
-#include "array/Metadata.h"
+#include <query/Operator.h>
 
 namespace scidb {
 
 using namespace std;
 
-/***
- * Helper function to add empty tag attribute to the array
- * Constructs a new array descriptor with empty tag attribute
- ***/
-inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
-{
-    Attributes const& inputAttributes = desc.getAttributes();
-	Attributes newAttributes;
-    for (size_t i = 0, n = inputAttributes.size(); i < n; i++) { 
-        newAttributes.push_back(inputAttributes[i]);
-    }
-    if (desc.getEmptyBitmapAttribute() == NULL) { 
-        newAttributes.push_back(AttributeDesc((AttributeID)newAttributes.size(),
-                                             DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
-    }
-	return ArrayDesc(desc.getName(), newAttributes, desc.getDimensions());
-}
-
-
-class Filter: public  LogicalOperator
+/**
+ * @brief The operator: filter().
+ *
+ * @par Synopsis:
+ *   filter( srcArray, expression )
+ *
+ * @par Summary:
+ *   Produces a result array by filtering out (mark as empty) the cells in the source array for which the expression evaluates to False.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - expression: an expression which takes a cell in the source array as input and evaluates to either True or False.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
+class LogicalFilter: public  LogicalOperator
 {
 public:
-	Filter(const std::string& logicalName, const std::string& alias):
+	LogicalFilter(const std::string& logicalName, const std::string& alias):
 	        LogicalOperator(logicalName, alias)
     {
         _properties.tile = true;
@@ -78,7 +89,7 @@ public:
 	}
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Filter, "filter")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalFilter, "filter")
 
 
 }  // namespace scidb

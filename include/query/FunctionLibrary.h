@@ -79,6 +79,7 @@ private:
     };
 
     PluginObjects _functionLibraries;
+    bool _registeringBuiltInObjects;
 
     Converter const* findDirectConverter(TypeId const& srcType, TypeId const& destType, bool tile);
 
@@ -185,7 +186,7 @@ public:
                                   bool tile = false)
     {
         bool supportsVectorMode = false;
-        return findConverter(srcType, destType, tile, supportsVectorMode);
+        return findConverter(srcType, destType, supportsVectorMode, tile);
     }
 
     bool findConverter(const Type& srcType,

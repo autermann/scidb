@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>build_sparse</refname>
+
+    <refpurpose>Produces a sparse result array and assigns values to its
+    non-empty cells.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>AQL% <command>SELECT</command> * <command>FROM</command> build_sparse(<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>,
+                                <replaceable>expression</replaceable>,<replaceable>boolean_expression</replaceable>);</synopsis>
+
+    <synopsis>AFL% build_sparse(<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>,
+                  <replaceable>expression</replaceable>,<replaceable>boolean_expression</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The build_sparse operator takes as input a template_array or schema
+    definition, an expression that defines a scalar value, and an expression
+    that defines a Boolean value. The argument
+    <replaceable>template_array</replaceable> must be an array that was
+    previously created and stored in SciDB. The output of build_sparse is a
+    result array with the same schema as the template array or schema
+    definition, the value specified by <replaceable>expression</replaceable>
+    wherever <replaceable>boolean_expression</replaceable> evaluates to true,
+    and empty cells wherever <replaceable>boolean_expression</replaceable>
+    evaluates to false.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>Build a sparse identity matrix -- one where only the diagonal
+      elements are present:
+<programlisting language='test'>
+--afl build_sparse(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],1,i=j);
+</programlisting></para>
+    </informalexample>
+  </refsect1>
+
+  <refsect1>
+    <title>Limitations</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>The build_sparse operator can only take arrays with one
+        attribute.</para>
+      </listitem>
+
+      <listitem>
+        <para>The build_sparse operator can only take arrays with bounded
+        dimensions.</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+</refentry>

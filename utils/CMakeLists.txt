@@ -38,6 +38,7 @@ configure_file(sample_config.ini.in "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/
 configure_file(config.ini.planet "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/config.ini.planet")
 configure_file(config.ini.ec2 "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/config.ini.ec2")
 configure_file(scidb_cores "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/scidb_cores")
+configure_file(loadcsv.py.in "${GENERAL_OUTPUT_DIRECTORY}/loadcsv.py")
 
 add_executable(benchGen benchGen.cc) 
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "benchGen" benchGen)
@@ -53,6 +54,8 @@ extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "scidbconf" scidbconf)
 target_link_libraries(scidbconf system_lib)
 set_target_properties(scidbconf PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
 
-
 configure_file(scidbLoadCsv.sh "${GENERAL_OUTPUT_DIRECTORY}/scidbLoadCsv.sh" COPYONLY)
 
+add_executable(splitcsv splitcsv.c)
+extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "splitcsv" splitcsv)
+set_target_properties(splitcsv PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})

@@ -1,0 +1,155 @@
+SCIDB QUERY : <create array SP <a: int32, b: string, c: double, d: int64, e: bool, f: float, g: string_10>[i=1:1000,100,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array SP_project <a: int32, b: string, c: double, f: float, g: string_10>[i=1:1000,75,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array A2 <a: int32, b: int32, c: string, d: string, e: string, f: string, g: int64>[i=1:1000,100,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array A2a <a: int32, b: int32, c: string, d: string, e: string, f: string, g: int64>[i=1:1000,100,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load(SP, '../tests/harness/testcases/data/sp.txt')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{1000} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <load(A2, '../tests/harness/testcases/data/A2.txt')>
+{i} a,b,c,d,e,f,g
+{1} 1,4,"one","four","sixteen","thirty two",128
+{888} 2,5,"five","ten","fifteen","thirty",3
+{889} 2,5,"five","ten","fifteen","thirty",256
+{998} 2,5,"five","ten","fifteen","thirty",55
+{1000} 2,5,"five","ten","password1","password2",4
+
+SCIDB QUERY : <load(A2, '../tests/harness/testcases/data/A2_err.txt')>
+[An error expected at this place for the query "load(A2, '../tests/harness/testcases/data/A2_err.txt')". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+
+SCIDB QUERY : <load(A2, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 2)>
+[An error expected at this place for the query "load(A2, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 2)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+
+SCIDB QUERY : <load(A2, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 3)>
+{i} a,b,c,d,e,f,g
+{1} 1,4,"one","four","sixteen","thirty two",128
+{888} 2,5,"five","ten","fifteen","thirty",0
+{889} 2,5,"five","ten","fifteen","thirty",256
+{998} 2,5,"five","ten","fifteen","thirty",0
+{1000} 2,5,"five","ten","","",0
+
+SCIDB QUERY : <load(A2, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 9999, A2_shadow)>
+{i} a,b,c,d,e,f,g
+{1} 1,4,"one","four","sixteen","thirty two",128
+{888} 2,5,"five","ten","fifteen","thirty",0
+{889} 2,5,"five","ten","fifteen","thirty",256
+{998} 2,5,"five","ten","fifteen","thirty",0
+{1000} 2,5,"five","ten","","",0
+
+SCIDB QUERY : <load(A2a, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 9999)>
+{i} a,b,c,d,e,f,g
+{1} 1,4,"one","four","sixteen","thirty two",128
+{888} 2,5,"five","ten","fifteen","thirty",0
+{889} 2,5,"five","ten","fifteen","thirty",256
+{998} 2,5,"five","ten","fifteen","thirty",0
+{1000} 2,5,"five","ten","","",0
+
+SCIDB QUERY : <load(A2a, '../tests/harness/testcases/data/A2_err.txt')>
+[An error expected at this place for the query "load(A2a, '../tests/harness/testcases/data/A2_err.txt')". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+
+SCIDB QUERY : <load(A2a, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 2)>
+[An error expected at this place for the query "load(A2a, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 2)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+
+SCIDB QUERY : <load(A2a, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 4, A2a_err)>
+{i} a,b,c,d,e,f,g
+{1} 1,4,"one","four","sixteen","thirty two",128
+{888} 2,5,"five","ten","fifteen","thirty",0
+{889} 2,5,"five","ten","fifteen","thirty",256
+{998} 2,5,"five","ten","fifteen","thirty",0
+{1000} 2,5,"five","ten","","",0
+
+SCIDB QUERY : <scan(A2a_err)>
+{i} a,b,c,d,e,f,g,row_offset
+{888} null,null,null,null,null,null,"Failed to parse string",119
+{998} null,null,null,null,null,null,"Failed to parse string",240
+{1000} null,null,null,null,null,null,"Failed to parse string",279
+
+SCIDB QUERY : <count(A2a_err)>
+{i} count
+{0} 3
+
+SCIDB QUERY : <save(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,float,string_10)')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{1000} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <save(SP, 'junk.bin', -2, '(int32,string,double,int64,datetime,float,datetime)')>
+[An error expected at this place for the query "save(SP, 'junk.bin', -2, '(int32,string,double,int64,datetime,float,datetime)')". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER.]
+
+SCIDB QUERY : <load(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,float,string_10)', 100, SP_err)>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <load(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,float,string_10)', 1, SP_err)>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <save(SP, 'sp_int32_int64.bin', -2, '(int64,string,double,int64,bool,float,string_10)')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <load(SP, 'sp_int32_int64.bin', -2, '(int64,string,double,int64,bool,float,string_10)')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <load(SP, '../tests/harness/testcases/data/sp_err.txt', -2)>
+[An error expected at this place for the query "load(SP, '../tests/harness/testcases/data/sp_err.txt', -2)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+
+SCIDB QUERY : <load(SP, '../tests/harness/testcases/data/sp_err.txt', -2, 'text', 1, SP_err)>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{1000} 1000,"last",4.5567,44,false,44.332,""
+
+SCIDB QUERY : <save(SP@2, 'sp_dbl_flt.bin', -2, '(int64,string,string,int64,bool,float,string_10)')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <load(SP, 'sp_dbl_flt.bin', -2, '(int64,string,string,int64,bool,float,string_10)')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <save(SP, 'sp_all.bin', -2, '(int64,string,double,,,float,string_10)')>
+{i} a,b,c,d,e,f,g
+{1} 1,"first",4.44557,45,true,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44,false,44.332,"LAST_10"
+
+SCIDB QUERY : <load(SP_project, 'sp_all.bin', -2, '(int64,string,double,float,string_10)')>
+{i} a,b,c,f,g
+{1} 1,"first",4.44557,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44.332,"LAST_10"
+
+SCIDB QUERY : <load(SP_project, 'sp_dbl_flt.bin', -2, '(int64,string,string,skip(8),skip(1),float,string_10)')>
+{i} a,b,c,f,g
+{1} 1,"first",4.44557,44.556,"FIRST_1"
+{2} 1000,"last",4.5567,44.332,"LAST_10"
+
+SCIDB QUERY : <remove(SP)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(SP_project)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(A2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(A2a)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(A2a_err)>
+Query was executed successfully
+

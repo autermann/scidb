@@ -39,6 +39,7 @@
 #include "query/TypeSystem.h"
 #include "util/PluginManager.h"
 #include "util/na.h"
+#include "query/FunctionLibrary.h"
 #include "query/LogicalExpression.h"
 
 using namespace std;
@@ -206,7 +207,7 @@ std::vector<TypeId> TypeLibrary::_typeIds()
  * NOTE: This will only work efficiently for the built in types. If you try 
  *       use this for a UDT it needs to do a lookup to try and find a UDF.
  */
-string ValueToString(const TypeId type, const Value& value, bool verbose)
+string ValueToString(const TypeId type, const Value& value, int precision)
 {
     std::stringstream ss;
 
@@ -225,11 +226,9 @@ string ValueToString(const TypeId type, const Value& value, bool verbose)
         if (isNAonly(val)) {
             ss << "NA";
         } else {
-            if (isnan(val) || isinf(val) || val==0)
+            if (isnan(val) || val==0)
                 val = abs(val);
-            if (verbose) { 
-                ss.precision(DBL_DIG);
-            }
+            ss.precision(precision);
             ss << val;
         }
 	} else if ( TID_INT64 == type ) {
@@ -524,6 +523,30 @@ bool isBuiltinType(const TypeId type)
         || TID_VOID == type
         || TID_DATETIMETZ == type;
 }
+
+void setDefaultValue(Value &value, const TypeId typeId)
+{
+    int fixed_str;
+    if (isBuiltinType(typeId) || typeId == TID_BINARY || sscanf(typeId.c_str(), "string_%d", &fixed_str) == 1)
+    {
+        value.setZero();
+    }
+    else
+    {
+        FunctionDescription functionDesc;
+        vector<FunctionPointer> converters;
+        if (FunctionLibrary::getInstance()->findFunction(typeId, vector<TypeId>(), functionDesc, converters, false))
+        {
+            functionDesc.getFuncPtr()(0, &value, 0);
+        }
+        else
+        {
+            stringstream ss;
+            ss << typeId << "()";
+            throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_FUNCTION_NOT_FOUND) << ss.str();
+        }
+    }
+}
  
 TypeId propagateType(const TypeId type)
 {
@@ -571,20 +594,20 @@ void StringToValue(const TypeId type, const string& str, Value& value)
             value.setFloat(atof(str.c_str()));
         }
 	} else if ( TID_INT8 == type ) { 
-        int8_t val;
-        if (sscanf(str.c_str(), "%hhd%n", &val, &n) != 1 || n != (int)str.size())
+        int16_t val;
+        if (sscanf(str.c_str(), "%hd%n", &val, &n) != 1 || n != (int)str.size() || val>127 || val<-127)
             throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_FAILED_PARSE_STRING);
-        value.setInt8(val);
+        value.setInt8(static_cast<int8_t>(val));
     } else if (TID_INT16 == type) { 
         int16_t val;
         if (sscanf(str.c_str(), "%hd%n", &val, &n) != 1 || n != (int)str.size())
             throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_FAILED_PARSE_STRING);
         value.setInt16(val);
     } else if ( TID_UINT8 == type ) { 
-        uint8_t val;
-        if (sscanf(str.c_str(), "%hhu%n", &val, &n) != 1 || n != (int)str.size())
+        uint16_t val;
+        if (sscanf(str.c_str(), "%hu%n", &val, &n) != 1 || n != (int)str.size() || val>255)
             throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_FAILED_PARSE_STRING);
-        value.setUint8(val);
+        value.setUint8(static_cast<uint8_t>(val));
     } else if ( TID_UINT16 == type ) { 
         uint16_t val;
         if (sscanf(str.c_str(), "%hu%n", &val, &n) != 1 || n != (int)str.size())

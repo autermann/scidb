@@ -48,7 +48,8 @@ def main():
     for x,y,z in pos:
 	query="store(reshape(slice(very_small_obs,Z,%d),<oid:int64 NULL,center:bool NULL,polygon:int32 NULL,sumPixel:int64 NULL,avgDist:double NULL,point:bool NULL>[J=%d:%d,%d,0,I=%d:%d,%d,0]),very_small_obs_%d)" %(z,x,x+size-1,size,y,y+size-1,size,z)    
 	print query
-    	db.executeQuery(query,"afl");
+    	result=db.executeQuery(query,"afl")
+        db.completeQuery(result.queryID)
     db.disconnect()     #Disconnect from the SciDB server. 
 
     print "Done!"

@@ -20,79 +20,125 @@ SCIDB QUERY : <create empty array G <b:int64> [y=0:*,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <select * into A from build(<a:int64> [x=0:2,3,0],x+10)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into B from A>
-[(10),(11),(12)]
+{x} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into C from A>
-[(10),(11),(12)]
+{x} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into D from A>
-[(10),(11),(12)]
+{y} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into E from A>
-[(10),(11),(12)]
+{x} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into E from A where x=1>
-[(),(11),()]
+{x} b
+{1} 11
 
 SCIDB QUERY : <select * into E from A where x<>1>
-[(10),(),(12)]
+{x} b
+{0} 10
+{2} 12
 
 SCIDB QUERY : <select * into E from A where a=30>
-[(),(),()]
+{x} b
 
 SCIDB QUERY : <select * into E from A where a<30>
-[(10),(11),(12)]
+{x} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into E from A where x=0 and a<12>
-[(10),(),()]
+{x} b
+{0} 10
 
 SCIDB QUERY : <select * into E from A where a=10 or x=2>
-[(10),(),(12)]
+{x} b
+{0} 10
+{2} 12
 
 SCIDB QUERY : <select * into F from A>
-[(10),(11),(12)]
+{x} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into F from A where x=1>
-[(),(11),()]
+{x} b
+{1} 11
 
 SCIDB QUERY : <select * into F from A where x<>1>
-[(10),(),(12)]
+{x} b
+{0} 10
+{2} 12
 
 SCIDB QUERY : <select * into F from A where a=30>
-[(),(),()]
+{x} b
 
 SCIDB QUERY : <select * into F from A where a<30>
-[(10),(11),(12)]
+{x} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into F from A where a>10 and x>1>
-[(),(),(12)]
+{x} b
+{2} 12
 
 SCIDB QUERY : <select * into F from A where a>11 or x=5>
-[(),(),(12)]
+{x} b
+{2} 12
 
 SCIDB QUERY : <select * into G from A>
-[(10),(11),(12)]
+{y} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into G from A where x=1>
-[(),(11),()]
+{y} b
+{1} 11
 
 SCIDB QUERY : <select * into G from A where x<>1>
-[(10),(),(12)]
+{y} b
+{0} 10
+{2} 12
 
 SCIDB QUERY : <select * into G from A where a=30>
-[(),(),()]
+{y} b
 
 SCIDB QUERY : <select * into G from A where a<30>
-[(10),(11),(12)]
+{y} b
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into G from A where a<30 and x=1>
-[(),(11),()]
+{y} b
+{1} 11
 
 SCIDB QUERY : <select * into G from A where a<10 or x=0>
-[(10),(),()]
+{y} b
+{0} 10
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

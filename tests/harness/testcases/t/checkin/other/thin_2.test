@@ -5,7 +5,7 @@ store(build(A,x+10.5),A)
 
 --test
 thin(A,-2,1)
-window(thin(A,-2,1),2,sum(a))
+window(thin(A,-2,1),0,1,sum(a))
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_THIN_ERROR3 "thin(A,0,2)"
 thin(A,0,3)
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_THIN_ERROR3 "thin(A,1,2)"

@@ -7,9 +7,9 @@ store(build(C,p-q),C)
 
 --test
 --aql update A set a = a + 20
---sleep 2
+
 --aql update C set c = c + 50
---sleep 2
+
 --aql select * from A join B on A.x = B.x
 --aql select * from A join B on B.y = A.y
 --aql select * from A join C on A.x = C.p

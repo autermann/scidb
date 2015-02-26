@@ -22,17 +22,18 @@
 
 ERRMSG(SCIDB_E_NO_ERROR,                           "No errors");
 
+ERRMSG(SCIDB_SE_QPROC,                              "Query processor error");
 ERRMSG(SCIDB_SE_STORAGE,                            "Storage error");
 ERRMSG(SCIDB_SE_SYSCAT,                             "System catalog error");
 ERRMSG(SCIDB_SE_ERRORS_MGR,                         "Errors manager error");
 ERRMSG(SCIDB_SE_UDO,                                "Error in user defined object");
-ERRMSG(SCIDB_SE_QPROC,                              "Query processor error");
 ERRMSG(SCIDB_SE_TYPE,                               "Type error");
 ERRMSG(SCIDB_SE_TYPESYSTEM,                         "Type system error");
 ERRMSG(SCIDB_SE_INTERNAL,                           "Internal SciDB error");
 ERRMSG(SCIDB_SE_PLUGIN_MGR,                         "Plugin manager error");
 ERRMSG(SCIDB_SE_OPERATOR,                           "Operator error");
 ERRMSG(SCIDB_SE_IO,                                 "I/O error");
+ERRMSG(SCIDB_SE_METADATA,                           "Metadata error");
 ERRMSG(SCIDB_SE_NO_MEMORY,                          "Not enough memory");
 ERRMSG(SCIDB_SE_EXECUTION,                          "Error during query execution");
 ERRMSG(SCIDB_SE_CONFIG,                             "Error in config");
@@ -48,5 +49,6 @@ ERRMSG(SCIDB_SE_IMPORT_ERROR,                       "Import error");
 ERRMSG(SCIDB_SE_MERGE,                              "Merge error");
 ERRMSG(SCIDB_SE_REDISTRIBUTE,                       "Error during redistribute");
 ERRMSG(SCIDB_SE_TYPE_CONVERSION,                    "Type conversion error");
+ERRMSG(SCIDB_SE_REPLICATION,                        "Replication error");
 //Next ERRMSG
 

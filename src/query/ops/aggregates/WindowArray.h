@@ -50,6 +50,25 @@ class WindowArray;
 class WindowArrayIterator;
 class MaterializedWindowChunkIterator;
 
+struct WindowBoundaries
+{
+    WindowBoundaries()
+    {
+        _boundaries.first = _boundaries.second = 0;
+    }
+
+    WindowBoundaries(Coordinate preceding, Coordinate following)
+    {
+        assert(preceding >= 0);
+        assert(following >= 0);
+
+        _boundaries.first = preceding;
+        _boundaries.second = following;
+    }
+
+    std::pair<Coordinate, Coordinate> _boundaries;
+};
+
 class WindowChunk : public ConstChunk
 {
     friend class MaterializedWindowChunkIterator;
@@ -192,14 +211,14 @@ class WindowArray : public Array
 
     WindowArray(ArrayDesc const& desc,
                 boost::shared_ptr<Array> const& inputArray,
-                vector<size_t> const& window,
+                vector<WindowBoundaries> const& window,
                 vector<AttributeID> const& inputAttrIDs,
                 vector <AggregatePtr> const& aggregates);
 
   private:
     ArrayDesc _desc;
     ArrayDesc _inputDesc;
-    vector<size_t> _window;
+    vector<WindowBoundaries> _window;
     Dimensions _dimensions;
     boost::shared_ptr<Array> _inputArray;
     vector<AttributeID> _inputAttrIDs;

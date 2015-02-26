@@ -38,32 +38,44 @@ using namespace boost;
 class PhysicalNormalize: public  PhysicalOperator
 {
   public:
-	PhysicalNormalize(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalNormalize(
+            std::string const& logicalName,
+            std::string const& physicalName,
+            Parameters const& parameters,
+            ArrayDesc const& schema):
 	    PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
 	}
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector< ArrayDesc> const&) const
     {
         return ArrayDistribution(psLocalInstance);
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
         return inputBoundaries[0];
     }
 
 
-	boost::shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays,
-                                      boost::shared_ptr<Query> query)
+    boost::shared_ptr<Array> execute(
+            std::vector< boost::shared_ptr<Array> >& inputArrays,
+            boost::shared_ptr<Query> query)
 	{
+        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
         boost::shared_ptr<Array> inputArray = inputArrays[0];
         if (query->getInstancesCount() > 1) { 
             uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getInstanceID() : query->getCoordinatorID();

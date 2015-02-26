@@ -32,6 +32,7 @@
 
 #include "system/Resources.h"
 #include "network/NetworkManager.h"
+#include "network/proto/scidb_msg.pb.h"
 #include "query/Query.h"
 #include "util/Semaphore.h"
 #include "util/Mutex.h"

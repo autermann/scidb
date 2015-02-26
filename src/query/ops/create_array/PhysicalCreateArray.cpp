@@ -45,19 +45,25 @@ public:
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                    const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return PhysicalBoundaries::createEmpty(_schema.getDimensions().size());
+        return PhysicalBoundaries::createEmpty(
+            ((boost::shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema().getDimensions().size());
+    }
+
+    void preSingleExecute(boost::shared_ptr<Query> query)
+    {
+        assert(_parameters.size() == 2);
+        const string &name = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName();
+        ArrayDesc schema = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema();
+        schema.setName(name);
+        SystemCatalog::getInstance()->addArray(schema, psRoundRobin);
     }
 
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
             boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
-        assert(_parameters.size() == 2);
-
-        SystemCatalog::getInstance()->addArray(getSchema(), psRoundRobin);
-
         // It's DDL command and should not return a value
-        return boost::shared_ptr< Array>();
+        return boost::shared_ptr<Array>();
     }
 };
 

@@ -33,10 +33,41 @@
 
 using namespace std;
 
-namespace scidb {
+namespace scidb
+{
 
-    
-
+/**
+ * @brief The operator: sample().
+ *
+ * @par Synopsis:
+ *   sample( srcArray, probability [, seed] )
+ *
+ * @par Summary:
+ *   Produces a result array containing randomly sampled chunks from srcArray.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *   - probability: a double value from 0 to 1, as the probability that a chunk is selected.
+ *   - seed: an int64 value as the seed to the random number generator.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalSample: public LogicalOperator
 {
 public:

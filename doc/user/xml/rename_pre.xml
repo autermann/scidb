@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>rename</refname>
+
+    <refpurpose>Change array name</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>rename(<replaceable>named_array</replaceable>,<replaceable>new_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The AFL rename operator works like the AQL statement SELECT * INTO
+    except that the old array name can be reused immediately with the rename
+    operator. The rename operator is akin to using the Unix mv command,
+    whereas SELECT * INTO is akin to the Unix cp command. The argument
+    <replaceable>named_array</replaceable> must be an array that was
+    previously created and stored in the SciDB namespace.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>Create an array named source and rename source to
+      target.<programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:9,10,0],1),source); --show-output=no
+--afl list('arrays');
+--afl rename(source,target); --show-output=no
+--afl list('arrays');</programlisting></para>
+    </informalexample>
+  </refsect1>
+</refentry>

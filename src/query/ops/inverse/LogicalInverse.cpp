@@ -31,10 +31,33 @@
 namespace scidb
 {
 
-class Inverse : public  LogicalOperator
+/**
+ * @brief The operator: inverse().
+ *
+ * @par Synopsis:
+ *   inverse( srcArray )
+ *
+ * @par Summary:
+ *   Produces the matrix inverse of a square matrix.
+ *
+ * @par Input:
+ *   - srcArray: a 2D square matrix.
+ *
+ * @par Output array:
+ *   n/a
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ */
+class LogicalInverse : public  LogicalOperator
 {
 public:
-	Inverse(const std::string& logicalName, const std::string& alias):
+	LogicalInverse(const std::string& logicalName, const std::string& alias):
 	    LogicalOperator(logicalName, alias)
 	{
 		ADD_PARAM_INPUT()
@@ -73,6 +96,6 @@ public:
 
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Inverse, "inverse")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalInverse, "inverse")
 
 } //namespace scidb

@@ -55,3 +55,7 @@ aql, create array A_uint8 <a:uint8> [x=0:0,1,0]
 afl, store( build(A_uint8,80), A_uint8)
 afl, remove(A_uint8)
 
+aql, create array simplearray < foo:int32, bar:char, baz:string > [ a=0:99, 10,0,  b=0:9, 10,0]
+aql, load simplearray from '/tmp/simplearray.data'
+aql, select * from simplearray
+afl, remove(simplearray)

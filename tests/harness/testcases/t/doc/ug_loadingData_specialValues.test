@@ -1,0 +1,24 @@
+--setup
+--start-query-logging
+
+--aql drop array v4;
+--aql drop array v4_dflt;
+--aql drop array v4_null;
+
+--test
+--aql CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0]
+--aql LOAD v4 FROM '../tests/harness/testcases/doc_data/v4.scidb'
+
+--aql CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0]
+--aql LOAD v4_dflt FROM '../tests/harness/testcases/doc_data/v4.scidb'
+
+--aql CREATE ARRAY v4_null <val1:int8,val2:int8 NULL> [i=0:3,4,0]
+--aql LOAD v4_null FROM '../tests/harness/testcases/doc_data/v4_null.scidb'
+
+--cleanup
+--aql drop array v4
+--aql drop array v4_dflt
+--aql drop array v4_null
+
+--stop-query-logging
+

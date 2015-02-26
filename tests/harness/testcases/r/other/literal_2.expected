@@ -1,0 +1,123 @@
+SCIDB QUERY : <build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', true)>
+{x} a
+{0} NA
+{1} NA
+{2} NA
+
+SCIDB QUERY : <build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1)>
+{x} a
+{10} nan
+{11} inf
+{12} inf
+
+SCIDB QUERY : <build(<a:double> [x=10:13,4,0], '[(NaN),(-inf),(inf),(2.5)]', 1)>
+{x} a
+{10} nan
+{11} -inf
+{12} inf
+{13} 2.5
+
+SCIDB QUERY : <build(<a:double, b:float> [x=110:112,1,0], '[(NaN,inf),(-inf,inf),(inf,NaN)]', 1)>
+{x} a,b
+{110} nan,inf
+{111} -inf,inf
+{112} inf,nan
+
+SCIDB QUERY : <build(<a:double, b:float, c:string> [x=110:112,1,0], '[(NaN,inf,Bio),(-inf,inf,Phy),(inf,NaN,Math)]', 1)>
+{x} a,b,c
+{110} nan,inf,"Bio"
+{111} -inf,inf,"Phy"
+{112} inf,nan,"Math"
+
+SCIDB QUERY : <min(build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', 1))>
+{i} a_min
+{0} null
+
+SCIDB QUERY : <max(build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', 1))>
+{i} a_max
+{0} null
+
+SCIDB QUERY : <avg(build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', 1))>
+{i} a_avg
+{0} null
+
+SCIDB QUERY : <select * from array(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),(234.56)]')>
+{x} a
+{0} NA
+{1} NA
+{2} NA
+{3} 234.56
+
+SCIDB QUERY : <select * from array(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]')>
+{x} a
+{0} NA
+{1} NA
+{2} NA
+
+SCIDB QUERY : <select * from array(<a:double, b:float, c:string> [x=110:112,1,0], '[(NaN,inf,Bio),(-inf,inf,Phy),(inf,NaN,Math)]')>
+{x} a,b,c
+{110} nan,inf,"Bio"
+{111} -inf,inf,"Phy"
+{112} inf,nan,"Math"
+
+SCIDB QUERY : <select max(a),min(a),avg(a) from array(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),(234.56)]')>
+{i} max,min_1,avg_2
+{0} 234.56,234.56,234.56
+
+SCIDB QUERY : <select max(a),max(b),min(a),min(b) from array(<a:double, b:float, c:string> [x=110:112,2,0], '[(NaN,inf,Bio),(-inf,inf,Phy),(inf,NaN,Math)]')>
+{i} max,max_1,min_2,min_3
+{0} inf,inf,-inf,inf
+
+SCIDB QUERY : <save(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1), '../tests/harness/testcases/data/literal.txt')>
+{x} a
+{10} nan
+{11} inf
+{12} inf
+
+SCIDB QUERY : <save(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1), '../tests/harness/testcases/data/literal.txt')>
+{x} a
+{10} nan
+{11} inf
+{12} inf
+
+SCIDB QUERY : <store(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1),Test1)>
+{x} a
+{10} nan
+{11} inf
+{12} inf
+
+SCIDB QUERY : <sort(Test1)>
+{n} a
+{0} nan
+{1} inf
+{2} inf
+
+SCIDB QUERY : <sort(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1))>
+{n} a
+{0} nan
+{1} inf
+{2} inf
+
+SCIDB QUERY : <sort(build(<a:double> [x=10:12,3,0], '[(4),(3.5),(7.9)]', 1))>
+{n} a
+{0} 3.5
+{1} 4
+{2} 7.9
+
+SCIDB QUERY : <build(<a:datetime, days: string default 'Thursday'> [x=0:2,3,0], '[("2012-07-13 18:41:14",Sunday),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)>
+{x} a,days
+{0} "2012-07-13 18:41:14","Sunday"
+{1} "2011-12-13 18:41:14","Thursday"
+{2} "2012-12-13 18:41:14","Thursday"
+
+SCIDB QUERY : <build(<a:datetime , days: string default 'Thursday'> [x=0:2,3,0], '[(),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)>
+{x} a,days
+{1} "2011-12-13 18:41:14","Thursday"
+{2} "2012-12-13 18:41:14","Thursday"
+
+SCIDB QUERY : <build(NOT EMPTY<a:datetime default now() , days: string default 'Thursday'> [x=0:2,3,0], '[(),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <remove(Test1)>
+Query was executed successfully
+

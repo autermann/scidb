@@ -40,6 +40,56 @@ namespace scidb {
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: aggregate().
+ *
+ * @par Synopsis:
+ *   aggregate( srcArray {, AGGREGATE_CALL}+ {, groupbyDim}* )
+ *   <br> AGGREGATE_CALL := AGGREGATE_FUNC(inputAttr) [as resultName]
+ *   <br> AGGREGATE_FUNC := approxdc | avg | count | max | min | sum | stdev | var | some_use_defined_aggregate_function
+ *
+ * @par Summary:
+ *   Calculates aggregates over groups of values in an array, given the aggregate types and attributes to aggregate on. <br>
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 1 or more aggregate calls.
+ *     Each aggregate call has an AGGREGATE_FUNC, an inputAttr and a resultName.
+ *     The default resultName is inputAttr followed by '_' and then AGGREGATE_FUNC.
+ *     For instance, the default resultName for sum(sales) is 'sales_sum'.
+ *     The count aggregate may take * as the input attribute, meaning to count all the items in the group including null items.
+ *     The default resultName for count(*) is 'count'.
+ *   - 0 or more dimensions that together determines the grouping criteria.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   The aggregate calls' resultNames.
+ *   <br> >
+ *   <br> [
+ *   <br>   The list of groupbyDims, if exists; or
+ *   <br>   i, if no groupbyDim is provided.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - aggregate(A, count(*), max(quantity), sum(sales), year) <count: uint64, quantity_max: uint64, sales_sum: double> [year] =
+ *     <br> year, count, quantity_max, sales_sum
+ *     <br> 2011,   2,      7,           51.62
+ *     <br> 2012,   3,      9,          108.97
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - All the aggregate functions ignore null values, except count(*).
+ *
+ */
 class LogicalAggregate: public  LogicalOperator
 {
 public:
@@ -86,9 +136,9 @@ public:
         string const& dimName = reference->getObjectName();
         string const& dimAlias = reference->getArrayName();
 
-        for (size_t j = 0; j < inputDims.size(); j++)
+        for (size_t j = 0, n = inputDims.size(); j < n; j++)
         {
-            if (inputDims[j].hasNameOrAlias(dimName, dimAlias))
+            if (inputDims[j].hasNameAndAlias(dimName, dimAlias))
             {
                 //no overlap
                 outDims.push_back(DimensionDesc( inputDims[j].getBaseName(),
@@ -112,38 +162,46 @@ public:
 
     ArrayDesc inferSchema(vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {
-		assert(schemas.size() == 1);
-		ArrayDesc const& input = schemas[0];
+        assert(schemas.size() == 1);
+        ArrayDesc const& input = schemas[0];
 
-		Dimensions const& inputDims = input.getDimensions();
+        Dimensions const& inputDims = input.getDimensions();
 
-		Attributes outAttrs;
-		Dimensions outDims;
+        Attributes outAttrs;
+        Dimensions outDims;
 
-		for (size_t i =0; i<_parameters.size(); i++)
-		{
-		    if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)
-		    {
-		        addDimension(inputDims, outDims, _parameters[i]);
-		    }
-		}
+        for (size_t i =0, n = _parameters.size(); i<n; i++)
+        {
+            if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)
+            {
+                addDimension(inputDims, outDims, _parameters[i]);
+            }
+        }
 
-		if (outDims.size() == 0)
+        bool grand = true;
+        if (outDims.size() == 0)
         {
             outDims.push_back(DimensionDesc("i", 0, 0, 0, 0, 1, 0));
         } 
         else 
         {
             _properties.tile = false;
+            grand = false;
         }
 
 		ArrayDesc outSchema(input.getName(), Attributes(), outDims);
-		for (size_t i =0; i<_parameters.size(); i++)
+		for (size_t i =0, n = _parameters.size(); i<n; i++)
 		{
 		    if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
 		    {
 		        addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], input, outSchema);
 		    }
+		}
+
+		if(!grand)
+		{
+	        AttributeDesc et ((AttributeID) outSchema.getAttributes().size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+	        outSchema.addAttribute(et);
 		}
 		return outSchema;
 	}

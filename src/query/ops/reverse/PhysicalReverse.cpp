@@ -46,27 +46,26 @@ public:
 	{
 	}
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
         //TODO: OPTAPI TESTME, MAPPER?
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const & inputDistributions,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
-        if (isDistributionPreserving(inputSchemas))
-        {
+        if (changesDistribution(inputSchemas)) {
+            return ArrayDistribution(psUndefined);
+        } else {
             return inputDistributions[0];
         }
-        else
-        {
-            return ArrayDistribution(psUndefined);
-        }
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
         if (inputBoundaries[0].isEmpty())
         {
@@ -97,6 +96,11 @@ public:
     {
 		assert(inputArrays.size() == 1);
 		assert(_parameters.size() == 0);
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
 		return boost::shared_ptr<Array>(new ReverseArray(_schema, inputArrays[0]));
 	 }
 };

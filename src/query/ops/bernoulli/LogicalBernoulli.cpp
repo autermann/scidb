@@ -34,22 +34,50 @@
 using namespace std;
 
 namespace scidb {
-
-inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
-{
-    Attributes const& inputAttributes = desc.getAttributes();
-	Attributes newAttributes;
-    for (size_t i = 0, n = inputAttributes.size(); i < n; i++) { 
-        newAttributes.push_back(inputAttributes[i]);
-    }
-    if (desc.getEmptyBitmapAttribute() == NULL) { 
-        newAttributes.push_back(AttributeDesc((AttributeID)newAttributes.size(),
-                                             DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
-    }
-	return ArrayDesc(desc.getName(), newAttributes, desc.getDimensions());
-}
     
-
+/**
+ * @brief The operator: bernoulli().
+ *
+ * @par Synopsis:
+ *   bernoulli( srcArray, probability [, seed] )
+ *
+ * @par Summary:
+ *   Evaluates whether to include a cell in the result array by generating a random number and checks if it is less than probability.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - probability: the probability threshold, in [0..1]
+ *   - an optional seed for the random number generator.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - bernoulli(A, 0.5, 100) <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  3,      8,     26.64
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalBernoulli: public LogicalOperator
 {
 public:

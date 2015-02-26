@@ -194,11 +194,6 @@ DelegateChunkIterator* AllVersionsArray::createChunkIterator(DelegateChunk const
     return new AllVersionsChunkIterator(chunk, iterationMode, ((AllVersionsChunk const*)chunk)->currVersion);
 }
 
-bool AllVersionsArray::supportsRandomAccess() const
-{
-    return true;
-}
-
 AllVersionsArray::AllVersionsArray(ArrayDesc const& arrayDesc, vector<VersionDesc> const& versionIds,  boost::shared_ptr<Query>& query)
 : DelegateArray(arrayDesc, shared_ptr<Array>(), true),
   versions(versionIds),

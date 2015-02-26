@@ -1,0 +1,35 @@
+SCIDB QUERY : <create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load winnersFlat from '../examples/winnersFew.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array champions <person:string,country:string,time:double null> [year=1996:2008,13,0, event(string)=3,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(winnersFlat,champions)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <scan(champions)>
+{year,event} person,country,time
+{1996,"dash"} "Bailey","Canada",9.84
+{1996,"marathon"} "Thugwane","RSA",7956
+{2000,"dash"} "Greene","USA",9.87
+{2000,"marathon"} "Abera","Ethiopia",7811
+{2000,"steeplechase"} "Kosgei","Kenya",503.17
+{2008,"marathon"} "Wanjiru","Kenya",7596
+
+SCIDB QUERY : <select * from attributes(champions)>
+{No} name,type_id,nullable
+{0} "person","string",false
+{1} "country","string",false
+{2} "time","double",true
+
+SCIDB QUERY : <select * from attributes(champions) where nullable = true>
+{No} name,type_id,nullable
+{2} "time","double",true
+
+Query was executed successfully
+
+Query was executed successfully
+

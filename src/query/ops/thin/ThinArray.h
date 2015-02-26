@@ -82,6 +82,7 @@ class ThinChunk : public DelegateChunk
     ThinArray const& array;
     MemChunk chunk;
     bool sparse;
+    ConstChunk const* srcChunk;
 
   public:
     virtual bool isSparse() const;

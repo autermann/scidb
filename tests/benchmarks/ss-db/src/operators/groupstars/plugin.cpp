@@ -40,7 +40,7 @@ EXPORTED_FUNCTION void GetPluginVersion(uint32_t& major, uint32_t& minor, uint32
 {
     // Provide correct values here. SciDB check it and does not allow to load too new plugins.
     major = 12;
-    minor = 02;
+    minor = 07;
     patch = 0;
     build = 0;
 }

@@ -21,7 +21,7 @@
 */
 
 /**
- * @file Network.h
+ * @file NetworkMessage.h
  * @brief Common network related types.
  */
 
@@ -36,5 +36,20 @@ namespace scidb
    typedef ::google::protobuf::Message Message;
    typedef boost::shared_ptr<Message> MessagePtr;
    typedef uint16_t MessageID;
+
+   /// Reserved message ID not used for any message
+   const MessageID SYSTEM_NONE_MSG_ID = 0;
+   /// Message IDs for internal SciDB messages are strictly less than this value
+   const MessageID SYSTEM_MAX_MSG_ID = 29;
+
+   /**
+    * Messageg types used by SciDB plugins
+    */
+   enum UserDefinedMessageType
+   {
+   mtMpiSlaveHandshake=SYSTEM_MAX_MSG_ID,
+   mtMpiSlaveResult,
+   mtMpiSlaveCommand
+   };
 }
 #endif /* NETWORK_MESSAGE_H_ */

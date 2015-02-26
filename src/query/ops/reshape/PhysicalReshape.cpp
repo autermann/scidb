@@ -46,21 +46,22 @@ public:
 	{
 	}
 
-	virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-	{
-		return false;
-	}
+    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
+    {
+        return true;
+    }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector<ArrayDesc> const&) const
     {
         return ArrayDistribution(psUndefined);
     }
 
-	virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-	{
-		return isDistributionPreserving(inputSchemas);
-	}
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
+    {
+        return false;
+    }
 
     inline bool isSameShape(ArrayDesc const& a1, ArrayDesc const& a2) 
     {
@@ -111,12 +112,21 @@ public:
 		assert(inputArrays.size() == 1);
         shared_ptr< Array> array = inputArrays[0];
         ArrayDesc const& desc = array->getArrayDesc();
-        return 
-            isSameShape(_schema, desc)
-            ? shared_ptr<Array>(new DelegateArray(_schema, array, true))
-            : isShift(_schema, desc)
-                ? shared_ptr<Array>(new ShiftArray(_schema, array))
-                : shared_ptr<Array>(new ReshapeArray(_schema, array));
+
+        if (isSameShape(_schema, desc))
+        {
+            return shared_ptr<Array>(new DelegateArray(_schema, array, true));
+        }
+        if (isShift(_schema, desc))
+        {
+            return shared_ptr<Array>(new ShiftArray(_schema, array));
+        }
+
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+        return shared_ptr<Array>(new ReshapeArray(_schema, array));
 	 }
 };
     

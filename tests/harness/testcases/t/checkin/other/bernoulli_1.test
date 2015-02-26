@@ -4,7 +4,7 @@ create immutable array xyz <a:double> [x=0:1999,100,0, y=0:1999,100,0]
 
 --test
 filter(avg(filter(bernoulli(xyz, 0.1, 2011), a <> 0)), a_avg<0.4 or a_avg>0.7)
-filter(count(filter(bernoulli(xyz, 0.1, 2011), a>0.1)), count<60 or count>80)
+filter(count(filter(bernoulli(xyz, 0.1, 2011), a>0.1)), count<50)
 
 --cleanup
 remove(xyz)

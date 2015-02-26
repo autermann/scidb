@@ -82,7 +82,7 @@ public:
         CPPUNIT_ASSERT(final.isZero());
 
         sum->initializeState(state);
-        input.setZero();
+        setDefaultValue(input, sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         sum->accumulate(state, input);
         CPPUNIT_ASSERT(state.isZero());
@@ -99,7 +99,7 @@ public:
         CPPUNIT_ASSERT(final.isZero());
 
         sum->initializeState(state);
-        input.setZero();
+        setDefaultValue(input, sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         input.setInt32(5);
         sum->accumulate(state, input);
@@ -107,7 +107,7 @@ public:
         sum->accumulate(state, input);
 
         state2 = Value(sum->getStateType());
-        state2.setZero();
+        setDefaultValue(state2, sum->getStateType().typeId());
         sum->merge(state2, state);
         sum->merge(state, state2);
 
@@ -137,14 +137,14 @@ public:
         CPPUNIT_ASSERT(final.isZero());
 
         sum->initializeState(state);
-        input.setZero();
+        setDefaultValue(input, sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         sum->accumulate(state, input);
         sum->finalResult(final, state);
         CPPUNIT_ASSERT(final.isZero());
 
         sum->initializeState(state);
-        input.setZero();
+        setDefaultValue(input, sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         input.setFloat(5.1);
         sum->accumulate(state, input);
@@ -152,7 +152,7 @@ public:
         sum->accumulate(state, input);
 
         Value state2(sum->getStateType());
-        state2.setZero();
+        setDefaultValue(state2, sum->getStateType().typeId());
         sum->merge(state2, state);
         sum->merge(state, state2);
 

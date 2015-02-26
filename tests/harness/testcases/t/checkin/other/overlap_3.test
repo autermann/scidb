@@ -6,7 +6,7 @@ create empty array A <a:string> [x=-2:3,2,1,y=0:2,2,2]
 store(build_sparse(A,string(x)+'_'+string(y),x<>2 and y<>2),A)
 
 --test
-save(A,'a_test.txt','store')
+save(A,'a_test.txt',-1,'store')
 load(A,'a_test.txt',-1)
 scan(A)
 

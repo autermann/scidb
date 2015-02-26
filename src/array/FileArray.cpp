@@ -121,7 +121,6 @@ namespace scidb
     FileArrayIterator::FileArrayIterator(FileArray& arr, AttributeID attId) : array(arr)
     {
         addr.attId = attId;
-        addr.arrId = 0;
         reset();
     }
 

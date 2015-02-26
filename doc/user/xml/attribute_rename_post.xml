@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>attribute_rename</refname>
+
+    <refpurpose>Produces a result array with the same dimensions, attributes,
+    and cell values as a source array, but with one or more of the attributes
+    renamed.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>attribute_rename(<replaceable>array</replaceable>,<replaceable>old_attribute1</replaceable>,<replaceable>new_attribute1</replaceable>
+<optional>, <replaceable>old_attribute2</replaceable>,<replaceable>new_attribute2</replaceable></optional>...);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The attribute_rename operator produces a result array that is nearly
+    identical to a source array, except that one or more attributes are
+    renamed.</para>
+
+    <para>You can use the attribute_rename operator in the FROM clause of an
+    AQL SELECT statement, as a stand-alone operator in a AFL statement, or as
+    an operand within other SciDB operators..</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example takes a 2-D array with three attributes and produces
+      an identical array, except the third attribute is renamed.</para>
+
+      <procedure>
+        <step>
+          <para>Show the source_array:<para><programlisting>AFL% scan(champions)</programlisting><screen>{year,event} person,country,time
+{1996,"dash"} "Bailey","Canada",9.84
+{1996,"marathon"} "Thugwane","RSA",7956
+{2000,"dash"} "Greene","USA",9.87
+{2000,"marathon"} "Abera","Ethiopia",7811
+{2000,"steeplechase"} "Kosgei","Kenya",503.17
+{2008,"marathon"} "Wanjiru","Kenya",7596
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Use the project operator to exclude the person attribute, and
+          to reorder the remaining attributes:<para><programlisting>AFL% attribute_rename(champions,time,time_in_seconds)</programlisting><screen>{year,event} person,country,time_in_seconds
+{1996,"dash"} "Bailey","Canada",9.84
+{1996,"marathon"} "Thugwane","RSA",7956
+{2000,"dash"} "Greene","USA",9.87
+{2000,"marathon"} "Abera","Ethiopia",7811
+{2000,"steeplechase"} "Kosgei","Kenya",503.17
+{2008,"marathon"} "Wanjiru","Kenya",7596
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

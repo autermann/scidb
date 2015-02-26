@@ -73,6 +73,7 @@
 %token <int64Val>    INTEGER "integer"
 %token <realVal>    REAL "real"
 %token <stringVal>    STRING_LITERAL "string"
+%token LEXER_ERROR;
 
 %{
 #include "query/parser/QueryParser.h"
@@ -277,14 +278,18 @@ array_dimension:
     {
         if ($5 <= 0 || $5 > std::numeric_limits<uint32_t>::max())
         {
+            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
             delete $1;
-            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $3;
+            YYABORT;
         }
 
         if ($7 < 0 || $7 > std::numeric_limits<uint32_t>::max())
         {
+            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
             delete $1;
-            glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $3;
+            YYABORT;
         }
     
         $$ = new AstNode(dimension, CONTEXT(@1),
@@ -315,14 +320,22 @@ array_dimension:
     {
         if ($9 <= 0 || $9 > std::numeric_limits<uint32_t>::max())
         {
+            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
             delete $1;
-            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $3;
+            delete $4;
+            delete $7;
+            YYABORT;
         }
 
         if ($11 < 0 || $11 > std::numeric_limits<uint32_t>::max())
         {
+            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
             delete $1;
-            glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $3;
+            delete $4;
+            delete $7;
+            YYABORT;
         }
 
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
@@ -364,7 +377,10 @@ dimension_boundary:
     negative_index INTEGER
     {
         if ($2 <= MIN_COORDINATE || $2 >= MAX_COORDINATE)
-            glue.error2(@2, "Dimension boundaries must be between -4611686018427387903 and 4611686018427387903");
+        {
+            glue.error(@2, "Dimension boundaries must be between -4611686018427387903 and 4611686018427387903");
+            YYABORT;
+        }
         $$ = new AstNodeInt64(dimensionBoundary, CONTEXT(@1), $1 ? -$2 : $2);
     }
     | '*'

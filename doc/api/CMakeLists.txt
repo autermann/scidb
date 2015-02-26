@@ -28,7 +28,7 @@ if(DOXYGEN_FOUND)
     set(CONFIGURE_DOXYGEN_GENERATE_HTML "YES")
     set(CONFIGURE_DOXYGEN_GENERATE_LATEX "NO")
     set(CONFIGURE_DOXYGEN_QUIET "NO")
-    set(CONFIGURE_DOXYGEN_EXCLUDE_PATTERNS ".svn CMakeFiles *_unit_tests.h location.hh Scanner.cpp Scanner.fixed.cpp Parser.cpp Parser.hpp position.hh stack.hh scidb_msg.pb.h scidb_msg.pb.cc")
+    set(CONFIGURE_DOXYGEN_EXCLUDE_PATTERNS ".svn CMakeFiles *_unit_tests.h location.hh Scanner.cpp Scanner.fixed.cpp Parser.cpp Parser.hpp position.hh stack.hh scidb_msg.pb.h scidb_msg.pb.cc CatalogMetadata.h")
 
     if (SCIDB_DOC_TYPE STREQUAL "API")
         set(CONFIGURE_DOXYGEN_INPUT "${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/doc/pages")

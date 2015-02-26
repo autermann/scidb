@@ -85,6 +85,9 @@ public:
 
     virtual bool supportAsterisk() const { return false; }
 
+    /**
+     * This is supposed to be removed.
+     */
     virtual bool ignoreZeroes() const
     {
         return false;
@@ -101,13 +104,48 @@ public:
     }
 
     virtual void initializeState(Value& state) = 0;
+
+    /**
+     * Accumulate an input value to a state.
+     */
     virtual void accumulate(Value& state, Value const& input) = 0;
 
+    /**
+     * Accumulate all input values to a state.
+     */
     virtual void accumulate(Value& state, std::vector<Value> const& input)
     {
         for (size_t i = 0; i< input.size(); i++)
         {
             accumulate(state, input[i]);
+        }
+    }
+
+    /**
+     * Whether a value qualifies to be accumulated.
+     * @note The method does NOT check ignoreZeroes(), because that is supposed to be dead code and should be removed.
+     */
+    virtual bool qualifyAccumulate(Value const& input) {
+        return !(ignoreNulls() && input.isNull());
+    }
+
+    /**
+     * Call accumulate on a single value, if qualify.
+     */
+    virtual void tryAccumulate(Value& state, Value const& input) {
+        if (qualifyAccumulate(input)) {
+            accumulate(state, input);
+        }
+    }
+
+    /**
+     * Call accumulate on multiple values, if qualify.
+     */
+    virtual void tryAccumulate(Value& state, std::vector<Value> const& input)
+    {
+        for (size_t i = 0; i< input.size(); i++)
+        {
+            tryAccumulate(state, input[i]);
         }
     }
 
@@ -136,6 +174,24 @@ public:
     virtual void finalResult(Value& result, Value const& state) = 0;
 };
 
+template<typename T> inline
+bool skipValue(T value)
+{
+    return false;
+}
+
+template<> inline
+bool skipValue<double>(double value)
+{
+    return isnan(value);
+}
+
+template<> inline
+bool skipValue<float>(float value)
+{
+    return isnan(value);
+}
+
 template<template <typename TS, typename TSR> class A, typename T, typename TR, bool asterisk = false>
 class BaseAggregate: public Aggregate
 {
@@ -160,7 +216,7 @@ public:
 
     Type getStateType() const
     {
-        Type stateType(TID_BINARY, sizeof(typename A<T, TR>::State));
+        Type stateType(TID_BINARY, sizeof(typename A<T, TR>::State) << 3);
         return stateType;
     }
 
@@ -178,7 +234,10 @@ public:
 
     void accumulate(Value& state, Value const& input)
     {
-        A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), *reinterpret_cast<T*>(input.data()));
+        T value = *reinterpret_cast<T*>(input.data());
+        if (!skipValue(value)) {
+            A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), value);
+        }
     }
 
     virtual void accumulatePayload(Value& state, ConstRLEPayload const* tile)
@@ -190,11 +249,17 @@ public:
             if (v.null)
                 continue;
             if (v.same) {
-                A<T, TR>::multAggregate(s, getPayloadValue<T>(tile, v.valueIndex), v.length());
+                T value = getPayloadValue<T>(tile, v.valueIndex);
+                if (!skipValue(value)) {
+                    A<T, TR>::multAggregate(s, value, v.length());
+                }
             } else {
                 const size_t end = v.valueIndex + v.length();
                 for (size_t j = v.valueIndex; j < end; j++) {
-                    A<T, TR>::aggregate(s, getPayloadValue<T>(tile, j));
+                    T value = getPayloadValue<T>(tile, j);
+                    if (!skipValue(value)) {
+                        A<T, TR>::aggregate(s, value);
+                    }
                 }
             }
         }
@@ -251,17 +316,26 @@ public:
 
     void initializeState(Value& state)
     {
-        state.setVector(sizeof(typename A<T, TR>::State));
-        state.setNull();
+        //Here we use missing code 1 for special meaning. It means there have been values
+        //accumulated but no valid state yet. This is used by aggregates min() and max() so
+        //that min(null, null) returns null. We can't use missing code 0 because that's
+        //reserved by the system for groups that do not exist.
+        state.setNull(1);
     }
 
     void accumulate(Value& state, Value const& input)
     {
+        //ignoreNulls is true so null input is not allowed
         if (state.isNull())
         {
-            A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()),
-                           *reinterpret_cast<T*>(input.data()));
-            state.setNull(-1);
+            T value = *reinterpret_cast<T*>(input.data());
+            if (!skipValue(value)) {
+                state.setVector(sizeof(typename A<T, TR>::State));
+                A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()), value);
+                state.setNull(-1);
+            } else {
+                return;
+            }
         }
         A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), *reinterpret_cast<T*>(input.data()));
     }
@@ -271,12 +345,25 @@ public:
         if (!tile->payloadSize()) {
             return;
         }
-        typename A<T, TR>::State& s = *static_cast< typename A<T, TR>::State* >(state.data());
+
         if (state.isNull())
         {
-            A<T, TR>::init(s, getPayloadValue<T>(tile, 0));
-            state.setNull(-1);
+            for (size_t i = 0; i < tile->payloadCount(); i++) {
+                T value = getPayloadValue<T>(tile, i);
+                if (!skipValue(value)) {
+                    state.setVector(sizeof(typename A<T, TR>::State));
+                    typename A<T, TR>::State& si = *static_cast< typename A<T, TR>::State* >(state.data());
+                    A<T, TR>::init(si, value);
+                    state.setNull(-1);
+                    break;
+                }
+            }
         }
+        if (state.isNull()) {
+            return;
+        }
+
+        typename A<T, TR>::State& s = *static_cast< typename A<T, TR>::State* >(state.data());
         for (size_t i = 0; i < tile->nSegments(); i++)
         {
             const RLEPayload::Segment& v = tile->getSegment(i);
@@ -295,6 +382,13 @@ public:
 
     void merge(Value& dstState, Value const& srcState)
     {
+        if(srcState.isNull()) {
+            return;
+        }
+        if(dstState.isNull()) {
+            dstState = srcState;
+            return;
+        }
         A<T, TR>::merge(*static_cast< typename A<T, TR>::State* >(dstState.data()), *static_cast< typename A<T, TR>::State* >(srcState.data()));
     }
 
@@ -337,7 +431,7 @@ class AggregateLibrary: public Singleton<AggregateLibrary>
 private:
     // Map of aggregate factories.
     // '*' for aggregate type means universal aggregate operator which operates by expressions (slow universal implementation).
-    typedef std::map < std::string, std::map<TypeId, AggregatePtr> > FactoriesMap;
+    typedef std::map < std::string, std::map<TypeId, AggregatePtr>, __lesscasecmp > FactoriesMap;
     FactoriesMap _registeredFactories;
 
 public:

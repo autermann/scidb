@@ -37,6 +37,39 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: substitute().
+ *
+ * @par Synopsis:
+ *   substitute( srcArray, substituteArray {, attr}* )
+ *
+ * @par Summary:
+ *   Produces a result array the same as srcArray, but with null values (of selected attributes) substituted using the values in substituteArray.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims, that may contain null values.
+ *   - substituteArray: the array from which the values may be used to substitute the null values in srcArray.
+ *     It must have a single dimension which starts at 0, and a single attribute.
+ *   - An optional list of attributes to substitute. The default is to substitute all nullable attributes.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalSubstitute: public LogicalOperator
 {
   public:

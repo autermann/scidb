@@ -55,9 +55,9 @@ LogicalQueryPlanNode::LogicalQueryPlanNode(
 LogicalQueryPlanNode::LogicalQueryPlanNode(
 	const boost::shared_ptr<ParsingContext>& parsingContext,
 	const boost::shared_ptr<LogicalOperator>& logicalOperator,
-	const std::vector<boost::shared_ptr<LogicalQueryPlanNode> > &childInstances):
+	const std::vector<boost::shared_ptr<LogicalQueryPlanNode> > &childNodes):
 	_logicalOperator(logicalOperator),
-	_childInstances(childInstances),
+	_childNodes(childNodes),
 	_parsingContext(parsingContext)
 {
 }
@@ -66,9 +66,9 @@ const ArrayDesc& LogicalQueryPlanNode::inferTypes(boost::shared_ptr< Query> quer
 {
     std::vector<ArrayDesc> inputSchemas;
     ArrayDesc outputSchema;
-	for (size_t i=0, end=_childInstances.size(); i<end; i++)
+	for (size_t i=0, end=_childNodes.size(); i<end; i++)
 	{
-        inputSchemas.push_back(_childInstances[i]->inferTypes(query));
+        inputSchemas.push_back(_childNodes[i]->inferTypes(query));
 	}
     outputSchema = _logicalOperator->inferSchema(inputSchemas, query);
     //FIXME: May be cover inferSchema method with another one and assign alias there?
@@ -82,9 +82,9 @@ const ArrayDesc& LogicalQueryPlanNode::inferTypes(boost::shared_ptr< Query> quer
 void LogicalQueryPlanNode::inferArrayAccess(boost::shared_ptr<Query>& query)
 {
     //XXX TODO: consider non-recursive implementation
-    for (size_t i=0, end=_childInstances.size(); i<end; i++)
+    for (size_t i=0, end=_childNodes.size(); i<end; i++)
     {
-        _childInstances[i]->inferArrayAccess(query);
+        _childNodes[i]->inferArrayAccess(query);
     }
     assert(_logicalOperator);
     _logicalOperator->inferArrayAccess(query);
@@ -99,17 +99,17 @@ PhysicalQueryPlanNode::PhysicalQueryPlanNode(const boost::shared_ptr<PhysicalOpe
 }
 
 PhysicalQueryPlanNode::PhysicalQueryPlanNode(const boost::shared_ptr<PhysicalOperator>& physicalOperator,
-		const std::vector<boost::shared_ptr<PhysicalQueryPlanNode> > &childInstances,
+		const std::vector<boost::shared_ptr<PhysicalQueryPlanNode> > &childNodes,
                                              bool agg, bool ddl, bool tile):
 	_physicalOperator(physicalOperator),
-	_childInstances(childInstances),
+	_childNodes(childNodes),
 	_parent(), _agg(agg), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
 {
 }
 
 bool PhysicalQueryPlanNode::isStoringSg() const
 {
-    if ( isSgInstance() )
+    if ( isSgNode() )
     {
         PhysicalOperator::Parameters params = _physicalOperator->getParameters();
         if (params.size() == 3)

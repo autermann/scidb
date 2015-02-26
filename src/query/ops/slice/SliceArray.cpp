@@ -462,17 +462,18 @@ namespace scidb
       inputArray(input),
       inputDims(input->getArrayDesc().getDimensions())
 	{
-        infinite = false;
+        useInfiniteIterator = false;
         simple = true;
+        ArrayDesc const& inputDesc = input->getArrayDesc();
+        double numChunksInSlice = 1; //number of logical chunks the resulting "slice" will contain.
         for (size_t i = 0, n = inputDims.size(); i < n; i++, aMask >>= 1) {
-            if (!(aMask & 1)) { 
-                if (inputDims[i].getLength() == INFINITE_LENGTH) { 
-                    infinite = true;
-                }
+            if (!(aMask & 1)){
+                numChunksInSlice *= inputDesc.getNumChunksAlongDimension(i);
             } else if (inputDims[i].getChunkInterval() != 1) { 
                 simple = false;
             }
         }
+        useInfiniteIterator = (numChunksInSlice > SLICE_INFINITE_ITERATOR_THRESHOLD);
     }
     
     string const& SliceArray::getName() const
@@ -492,7 +493,7 @@ namespace scidb
 
     boost::shared_ptr<ConstArrayIterator> SliceArray::getConstIterator(AttributeID id) const
 	{
-		return boost::shared_ptr<ConstArrayIterator>(infinite 
+		return boost::shared_ptr<ConstArrayIterator>(useInfiniteIterator 
                                               ? (ConstArrayIterator*)new InfiniteSliceArrayIterator(*this, id) 
                                               : (ConstArrayIterator*)new SliceArrayIterator(*this, id));
 	}   

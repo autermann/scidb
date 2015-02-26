@@ -1,0 +1,21 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
+--shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winnersFew.csv > ../examples/winnersFew.scidb "
+--aql load winnersFlat from '../examples/winnersFew.scidb' 
+--stop-igdata
+show(winnersFlat)
+--aql select * from winnersFlat 
+--aql select * from analyze(winnersFlat) 
+--aql select * from analyze(winnersFlat,year,time) 
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(winnersFlat)

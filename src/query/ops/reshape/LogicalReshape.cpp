@@ -33,67 +33,96 @@
 
 namespace scidb
 {
-    using namespace std;
+using namespace std;
 
-
-    class LogicalReshape: public LogicalOperator
+/**
+ * @brief The operator: reshape().
+ *
+ * @par Synopsis:
+ *   reshape( srcArray, schema )
+ *
+ * @par Summary:
+ *   Produces a result array containing the same cells as, but a different shape from, the source array.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *   - schema: the desired schema, with the same attributes as srcAttrs, but with different size and/or number of dimensions.
+ *     The restriction is that the product of the dimension sizes is equal to the number of cells in srcArray.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   dimensions from the provided schema
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
+class LogicalReshape: public LogicalOperator
+{
+public:
+    LogicalReshape(const string& logicalName, const std::string& alias) :
+            LogicalOperator(logicalName, alias)
     {
-      public:
-        LogicalReshape(const string& logicalName, const std::string& alias)
-        : LogicalOperator(logicalName, alias)
-        {
-        	ADD_PARAM_INPUT()
-        	ADD_PARAM_SCHEMA()
+        ADD_PARAM_INPUT()
+        ADD_PARAM_SCHEMA()
+    }
+
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    {
+        assert(schemas.size() == 1);
+        assert(_parameters.size() == 1);
+
+        ArrayDesc dstArrayDesc =
+                ((boost::shared_ptr<OperatorParamSchema>&) _parameters[0])->getSchema();
+
+        ArrayDesc const& srcArrayDesc = schemas[0];
+        Attributes const& srcAttributes = srcArrayDesc.getAttributes();
+        Dimensions const& srcDimensions = srcArrayDesc.getDimensions();
+        Dimensions const& dstDimensions = dstArrayDesc.getDimensions();
+
+        if (dstArrayDesc.getName().size() == 0) {
+            dstArrayDesc.setName(srcArrayDesc.getName() + "_reshape");
         }
 
-        ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
-        {
-            assert(schemas.size() == 1);
-            assert(_parameters.size() == 1);
-
-            ArrayDesc dstArrayDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
-
-            ArrayDesc const& srcArrayDesc = schemas[0];
-            Attributes const& srcAttributes = srcArrayDesc.getAttributes();
-            Dimensions const& srcDimensions = srcArrayDesc.getDimensions();
-            Dimensions const& dstDimensions = dstArrayDesc.getDimensions();
-
-            if (dstArrayDesc.getName().size() == 0)
-            {
-                dstArrayDesc.setName(srcArrayDesc.getName()+"_reshape");
+        Coordinate srcArraySize = 1;
+        for (size_t i = 0, n = srcDimensions.size(); i < n; i++) {
+            if (srcDimensions[i].getType() != TID_INT64
+                    || srcDimensions[i].getLength() == 0
+                    || srcDimensions[i].getLength() == INFINITE_LENGTH) {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR1);
             }
-
-            Coordinate srcArraySize = 1;
-            for (size_t i = 0, n = srcDimensions.size(); i < n; i++)
-            {
-                if (srcDimensions[i].getType() != TID_INT64 || srcDimensions[i].getLength() == 0
-                    || srcDimensions[i].getLength() == INFINITE_LENGTH)
-                {
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR1);
-                }
-                srcArraySize *= srcDimensions[i].getLength();
-                if (srcDimensions[i].getChunkOverlap() != 0)
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);
-            }
-            Coordinate dstArraySize = 1;
-            for (size_t i = 0, n = dstDimensions.size(); i < n; i++)
-            {
-                if (dstDimensions[i].getType() != TID_INT64 || dstDimensions[i].getLength() == 0
-                    || dstDimensions[i].getLength() == INFINITE_LENGTH)
-                {
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR1);
-                }
-                dstArraySize *= dstDimensions[i].getLength();
-                if (dstDimensions[i].getChunkOverlap() != 0)
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);
-            }
-            if (srcArraySize != dstArraySize)
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR3);
-
-            return ArrayDesc(dstArrayDesc.getName(), srcAttributes, dstDimensions);
+            srcArraySize *= srcDimensions[i].getLength();
+            if (srcDimensions[i].getChunkOverlap() != 0)
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);
         }
-    };
+        Coordinate dstArraySize = 1;
+        for (size_t i = 0, n = dstDimensions.size(); i < n; i++) {
+            if (dstDimensions[i].getType() != TID_INT64
+                    || dstDimensions[i].getLength() == 0
+                    || dstDimensions[i].getLength() == INFINITE_LENGTH) {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR1);
+            }
+            dstArraySize *= dstDimensions[i].getLength();
+            if (dstDimensions[i].getChunkOverlap() != 0)
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);
+        }
+        if (srcArraySize != dstArraySize)
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR3);
 
-    DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalReshape, "reshape")
+        return ArrayDesc(dstArrayDesc.getName(), srcAttributes, dstDimensions);
+    }
+};
+
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalReshape, "reshape")
 
 } //namespace

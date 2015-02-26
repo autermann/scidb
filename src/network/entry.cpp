@@ -44,7 +44,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
+#include <fstream>
 
 #include "network/NetworkManager.h"
 #include "system/SciDBConfigOptions.h"
@@ -58,6 +63,7 @@
 #include "smgr/io/Storage.h"
 #include <util/InjectedError.h>
 #include <smgr/io/ReplicationManager.h>
+#include <system/Utils.h>
 
 // to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.entry"));
@@ -95,8 +101,27 @@ void runSciDB()
       log4cxx::PropertyConfigurator::configure(log4cxxProperties.c_str());
    }
 
+   //Initialize random number generator
+   //We will try to read seed from /dev/urandom and if we can't for some reason we will take time and pid as seed
+   ifstream file ("/dev/urandom", ios::in|ios::binary);
+   unsigned int seed;
+   if (file.is_open())
+   {
+       const size_t size = sizeof(unsigned int);
+       char buf[size];
+       file.read(buf, size);
+       file.close();
+       seed = *reinterpret_cast<unsigned int*>(buf);
+   }
+   else
+   {
+       seed = time(0) ^ (getpid() << 8);
+       LOG4CXX_WARN(logger, "Can not open /dev/urandom. srandom will be initialized with fallback seed based on time and pid.");
+   }
+   srandom(seed);
+
    LOG4CXX_INFO(logger, "Start SciDB instance (pid="<<getpid()<<"). " << SCIDB_BUILD_INFO_STRING(". "));
-   LOG4CXX_INFO(logger, "Configuration:\n" << cfg->toString());   
+   LOG4CXX_INFO(logger, "Configuration:\n" << cfg->toString());
 
    if (cfg->getOption<int>(CONFIG_MAX_MEMORY_LIMIT) > 0)
    {
@@ -129,6 +154,36 @@ void runSciDB()
        }
    }
 
+   std::string tmpDir = Config::getInstance()->getOption<std::string>(CONFIG_TMP_PATH);
+   // If the tmp directory does not exist, create it.
+   // Note that multiple levels of directories may need to be created.
+   if (tmpDir.length() == 0 || tmpDir[tmpDir.length()-1] != '/') {
+       tmpDir += '/';
+   }
+   if (access(tmpDir.c_str(),0) != 0) {
+       size_t end = 0;
+       do {
+           while (end < tmpDir.length() && tmpDir[end] != '/') {
+               ++ end;
+           }
+           if (end < tmpDir.length()) {
+               ++ end;
+               string subdir = tmpDir.substr(0, end);
+               if (access(subdir.c_str(),0) != 0) {
+                   if (mkdir(subdir.c_str(), 0755) != 0) {
+                       LOG4CXX_DEBUG(logger, "Could not create temp directory "<<subdir<<" errno "<<errno);
+                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_OPEN_FILE) << subdir.c_str() << errno;
+                   }
+                   LOG4CXX_DEBUG(logger, "Created temp directory "<<subdir);
+               }
+           }
+       } while (end<tmpDir.length());
+   }
+
+#ifndef __APPLE__
+   const int memThreshold = Config::getInstance()->getOption<int>(CONFIG_MEM_ARRAY_THRESHOLD);
+   SharedMemCache::getInstance().setMemThreshold(memThreshold * MB);
+
    int largeMemLimit = cfg->getOption<int>(CONFIG_LARGE_MEMALLOC_LIMIT);
    if (largeMemLimit>0 && (0==mallopt(M_MMAP_MAX, largeMemLimit))) {
 
@@ -140,7 +195,7 @@ void runSciDB()
 
        LOG4CXX_WARN(logger, "Failed to set small-memalloc-size");
    }
-   
+#endif
    boost::shared_ptr<JobQueue> messagesJobQueue = boost::make_shared<JobQueue>();
 
    // Here we can play with thread number
@@ -148,19 +203,22 @@ void runSciDB()
    messagesThreadPool = make_shared<ThreadPool>(cfg->getOption<int>(CONFIG_MAX_JOBS), messagesJobQueue);
 
    SystemCatalog* catalog = SystemCatalog::getInstance();
+   const bool initializeCluster = Config::getInstance()->getOption<bool>(CONFIG_INITIALIZE);
    try
    {
-       catalog->connect(Config::getInstance()->getOption<string>(CONFIG_CATALOG_CONNECTION_STRING));
+       //Disable metadata upgrade in initialize mode
+       catalog->connect(
+           Config::getInstance()->getOption<string>(CONFIG_CATALOG_CONNECTION_STRING),
+           !initializeCluster);
    }
    catch (const std::exception &e)
    {
        LOG4CXX_ERROR(logger, "System catalog connection failed: " << e.what());
-       _exit(1);
+       scidb::exit(1);
    }
    int errorCode = 0;
    try
    {
-       const bool initializeCluster = Config::getInstance()->getOption<bool>(CONFIG_INITIALIZE);
        if (!catalog->isInitialized() || initializeCluster)
        {
            catalog->initializeCluster();
@@ -177,6 +235,7 @@ void runSciDB()
 
        // Pull in the injected error library symbols
        InjectedErrorLibrary::getLibrary()->getError(0);
+       PhysicalOperator::getInjectedErrorListener();
 
        ReplicationManager::getInstance()->start();
 
@@ -204,7 +263,7 @@ void runSciDB()
    }
    LOG4CXX_INFO(logger, "SciDB instance. " << SCIDB_BUILD_INFO_STRING(". ") << " is exiting.");
    log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getOff());
-   _exit(errorCode);
+   scidb::exit(errorCode);
 }
 
 void printPrefix(const char * msg="")
@@ -219,7 +278,7 @@ void printPrefix(const char * msg="")
            << date->tm_mday<<" "
            << date->tm_hour<<":"
            << date->tm_min<<":"
-           << date->tm_sec   
+           << date->tm_sec
            << " ";
    }
    cerr << "(ppid=" << getpid() << "): " << msg;
@@ -230,7 +289,7 @@ void handleFatalError(const int err, const char * msg)
    cerr << ": "
         << err << ": "
         << strerror(err) << endl;
-   exit(1);
+   scidb::exit(1);
 }
 
 int controlPipe[2];
@@ -246,35 +305,47 @@ void setupControlPipe()
 
 void checkPort()
 {
-    try {
-       boost::asio::io_service ioService;
-       boost::asio::ip::tcp::acceptor 
+    uint16_t n = 10;
+    while (true) {
+        try {
+            boost::asio::io_service ioService;
+            boost::asio::ip::tcp::acceptor
             testAcceptor(ioService,
                          boost::asio::ip::tcp::endpoint(
-                              boost::asio::ip::tcp::v4(),
-                              Config::getInstance()->getOption<int>(CONFIG_PORT)));
-       testAcceptor.close();
-       ioService.stop();
-    } catch (const boost::system::system_error& e) {
-       printPrefix();
-       cerr << e.what()
-            << ". Exiting."
-            << endl;
-       exit(1);
+                             boost::asio::ip::tcp::v4(),
+                             Config::getInstance()->getOption<int>(CONFIG_PORT)));
+            testAcceptor.close();
+            ioService.stop();
+            return;
+        } catch (const boost::system::system_error& e) {
+            if ((n--) <= 0) {
+                printPrefix();
+                cerr << e.what() << ". Exiting." << endl;
+                scidb::exit(1);
+            }
+        }
+        sleep(1);
     }
 }
 
 void terminationHandler(int signum)
 {
    unsigned char byte = 1;
-   write(controlPipe[1], &byte, sizeof(byte));
+   ssize_t ret = write(controlPipe[1], &byte, sizeof(byte));
+   if (ret!=1){}
    printPrefix("Terminated.\n");
-   exit(0);
+   // A signal handler should only call async signal-safe routines
+   // _exit() is one, but exit() is not
+   _exit(0);
+}
+
+void initControlPipe()
+{
+   controlPipe[0] = controlPipe[1] = -1;
 }
 
 void setupTerminationHandler()
 {
-   controlPipe[0] = controlPipe[1] = -1;
    struct sigaction action;
    action.sa_handler = terminationHandler;
    sigemptyset(&action.sa_mask);
@@ -381,7 +452,6 @@ int main(int argc, char* argv[])
     LoggerControl logCtx;
 
     // need to adjust sigaction SIGCHLD ?
-   srandom(static_cast<unsigned int>(std::time(0)));
    try
    {
        initConfig(argc, argv);
@@ -390,7 +460,7 @@ int main(int argc, char* argv[])
    {
       printPrefix();
       cerr << "Failed to initialize server configuration: " << e.what() << endl;
-      exit(1);
+      scidb::exit(1);
    }
    Config *cfg = Config::getInstance();
 
@@ -399,15 +469,30 @@ int main(int argc, char* argv[])
       if (daemon(1, 0) == -1) {
          handleFatalError(errno,"daemon() failed");
       }
+      // STDIN is /dev/null in a daemon process,
+      // we need to fake it out in case we run without the watchdog
+      initControlPipe();
+      close(STDIN_FILENO);
+      setupControlPipe();
+      if (controlPipe[0]==STDIN_FILENO) {
+          close(controlPipe[1]);
+          controlPipe[1]=-1;
+      } else {
+          assert(controlPipe[1]==STDIN_FILENO);
+          close(controlPipe[0]);
+          controlPipe[0]=-1;
+      }
+   } else {
+       initControlPipe();
    }
 
    if(cfg->getOption<bool>(CONFIG_REGISTER) ||
       cfg->getOption<bool>(CONFIG_NO_WATCHDOG)) {
       runSciDB();
       assert(0);
-      exit(1);
+      scidb::exit(1);
    }
    runWithWatchdog();
    assert(0);
-   exit(1);
+   scidb::exit(1);
 }

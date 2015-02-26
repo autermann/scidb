@@ -29,34 +29,44 @@ SCIDB QUERY : <create empty array T2 <b:int32 default 4 compression 'bitmap enco
 Query was executed successfully
 
 SCIDB QUERY : <show(Ts)>
-[("Ts<a:string> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts<a:string> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Tsn)>
-[("Tsn<a:string> [x=-2:3,2,1]")]
+{i} schema
+{0} "Tsn<a:string> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_rle)>
-[("Ts_rle<a:string DEFAULT \"test\" COMPRESSION 'rle'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_rle<a:string DEFAULT \"test\" COMPRESSION 'rle'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_d)>
-[("Ts_d<a:int32 COMPRESSION 'dictionary'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_d<a:int32 COMPRESSION 'dictionary'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_ns)>
-[("Ts_ns<a:int64 COMPRESSION 'null suppression'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_ns<a:int64 COMPRESSION 'null suppression'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_be)>
-[("Ts_be<a:bool COMPRESSION 'bitmap encoding'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_be<a:bool COMPRESSION 'bitmap encoding'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_z)>
-[("Ts_z<a:float COMPRESSION 'zlib'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_z<a:float COMPRESSION 'zlib'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_bz)>
-[("Ts_bz<a:double COMPRESSION 'bzlib'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_bz<a:double COMPRESSION 'bzlib'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(Ts_nf)>
-[("Ts_nf<a:string COMPRESSION 'null filter'> [x=-2:3,2,1]")]
+{i} schema
+{0} "Ts_nf<a:string COMPRESSION 'null filter'> [x=-2:3,2,1]"
 
 SCIDB QUERY : <show(T2)>
-[("T2<b:int32 DEFAULT 4 COMPRESSION 'bitmap encoding',a:string DEFAULT \"test\"> [x=-2:3,2,1]")]
+{i} schema
+{0} "T2<b:int32 DEFAULT 4 COMPRESSION 'bitmap encoding',a:string DEFAULT \"test\"> [x=-2:3,2,1]"
 
 SCIDB QUERY : <remove(Ts)>
 Query was executed successfully

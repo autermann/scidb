@@ -8,9 +8,9 @@ store(build(B,'b'+string(y+1)),B)
 --test
 --aql select * into C from A,B
 --aql update A set a = a + 20
---sleep 2
+
 --aql update B set b = b + '_'
---sleep 2
+
 --aql select * into D from A,B
 --aql select * from C join D on C.x = D.x
 

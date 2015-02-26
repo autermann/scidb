@@ -1,0 +1,41 @@
+SCIDB QUERY : <create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load winnersFlat from '../examples/winners2.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY champions<person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(winnersFlat,champions)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <select * from show(champions)>
+{i} schema
+{0} "champions<person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]"
+
+SCIDB QUERY : <select * into championsAbridged from project(champions,person)>
+{year,event} person
+{1996,"dash"} "Bailey"
+{1996,"marathon"} "Thugwane"
+{1996,"steeplechase"} "Keter"
+{2000,"dash"} "Greene"
+{2000,"marathon"} "Abera"
+{2000,"steeplechase"} "Kosgei"
+{2004,"dash"} "Gatlin"
+{2004,"marathon"} "Baldini"
+{2004,"steeplechase"} "Kemboi"
+{2008,"dash"} "Bolt"
+{2008,"marathon"} "Wanjiru"
+{2008,"steeplechase"} "Kipruto"
+
+SCIDB QUERY : <select * from show(championsAbridged)>
+{i} schema
+{0} "championsAbridged<person:string> [year=1996:2008,13,0,event(string)=3,3,0]"
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

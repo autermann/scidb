@@ -26,6 +26,7 @@
  * @brief SubArray implementation
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
+ * @author poliocough@gmail.com
  */
 
 #include "SubArray.h"
@@ -176,7 +177,6 @@ namespace scidb
             array.out2in(outPos, inPos);
             if (!inputIterator || !inputChunk->contains(inPos, withOverlaps)) {
                 inputIterator.reset();
-                boost::shared_ptr<ConstArrayIterator> inputArrayIterator = chunk.getArrayIterator().getInputIterator();
                 if (inputArrayIterator->setPosition(inPos)) { 
                     inputChunk = &inputArrayIterator->getChunk();
                     inputIterator = inputChunk->getConstIterator(mode);
@@ -198,11 +198,13 @@ namespace scidb
 
     bool SubArrayChunkIterator::setPosition(Coordinates const& pos)
     {
+        if (!chunk.contains(pos, (mode & IGNORE_OVERLAPS) == 0)) { 
+            return hasCurrent = false;
+        }
         outPos = pos;
         array.out2in(outPos, inPos);
         if (!inputIterator || !inputChunk->contains(inPos, (mode & IGNORE_OVERLAPS) == 0)) {
             inputIterator.reset();
-            boost::shared_ptr<ConstArrayIterator> inputArrayIterator = chunk.getArrayIterator().getInputIterator();
             if (inputArrayIterator->setPosition(inPos)) { 
                 inputChunk = &inputArrayIterator->getChunk();
                 inputIterator = inputChunk->getConstIterator(mode);
@@ -229,12 +231,13 @@ namespace scidb
     : array(aChunk.array),
       chunk(aChunk),
       inputChunk(&aChunk.getInputChunk()),
-      inputIterator(inputChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       outPos(array.dims.size()),
       inPos(outPos.size()),
       hasCurrent(false),
       mode(iterationMode & ~INTENDED_TILE_MODE)
     {
+        AttributeID attId = aChunk.getAttributeDesc().getId();
+        inputArrayIterator = array.getInputArray()->getConstIterator(attId);
         reset();
     }
 
@@ -264,27 +267,22 @@ namespace scidb
     //
     // SubArray iterator methods
     //
-    SubArrayIterator::SubArrayIterator(SubArray const& subarray, AttributeID attrID) 
+    SubArrayIterator::SubArrayIterator(SubArray const& subarray, AttributeID attrID, bool doReset)
     : DelegateArrayIterator(subarray, attrID, subarray.inputArray->getConstIterator(attrID)),
       array(subarray), 
       outPos(subarray.subarrayLowPos.size()),
       inPos(outPos.size()),
       hasCurrent(false),
-      positioned(false),
       outChunkPos(outPos.size())
     {
-	}
-
-    inline void SubArrayIterator::checkState() 
-    { 
-        if (!positioned) { 
+        if(doReset)
+        {
             reset();
         }
     }
 
 	bool SubArrayIterator::end()
 	{
-        checkState();
         return !hasCurrent;
     }
 
@@ -318,13 +316,12 @@ namespace scidb
          
     ConstChunk const& SubArrayIterator::getChunk() 
     { 
-        checkState();
         if (!chunkInitialized) { 
             chunkInitialized = true;
             ConstChunk const& inChunk = inputIterator->getChunk();
             if (inChunk.isSparse()) {
                 ArrayDesc const& desc = array.getArrayDesc();
-                Address addr(desc.getId(), attr, outPos);
+                Address addr(attr, outPos);
                 sparseChunk.initialize(&array, &desc, addr, 0);
                 sparseChunk.setSparse(true);
                 if (sparseChunk.isRLE() && !emptyIterator) { 
@@ -369,7 +366,6 @@ namespace scidb
 
 	void SubArrayIterator::operator ++()
     {
-        checkState();
         const Dimensions& dims = array.dims;
         size_t nDims = dims.size();
         chunkInitialized = false;
@@ -392,7 +388,6 @@ namespace scidb
 
 	Coordinates const& SubArrayIterator::getPosition()
 	{ 
-        checkState();
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         return outPos;
@@ -400,8 +395,11 @@ namespace scidb
 
 	bool SubArrayIterator::setPosition(Coordinates const& pos)
 	{
-        positioned = true;
-        outPos = pos;
+	    if( !array.getArrayDesc().contains(pos) )
+	    {
+	        return hasCurrent = false;
+	    }
+	    outPos = pos;
         array.getArrayDesc().getChunkPositionFor(outPos);
         array.out2in(outPos, inPos); 
         return hasCurrent = setInputPosition(0);
@@ -409,7 +407,6 @@ namespace scidb
 
 	void SubArrayIterator::reset()
 	{
-        positioned = true;
         const Dimensions& dims = array.dims;
         size_t nDims = dims.size();
  		for (size_t i = 0; i < nDims; i++) {
@@ -420,7 +417,78 @@ namespace scidb
         ++(*this);
 	}
     
-    //
+    MappedSubArrayIterator::MappedSubArrayIterator(SubArray const& subarray, AttributeID attrID):
+         SubArrayIterator(subarray, attrID, false)
+    {
+        //need to call this class's reset, not parent's.
+        reset();
+    }
+
+    bool MappedSubArrayIterator::setPosition(Coordinates const& pos)
+    {
+        if( !array.getArrayDesc().contains(pos) )
+       {
+           return hasCurrent = false;
+       }
+
+        outPos = pos;
+        array.getArrayDesc().getChunkPositionFor(outPos);
+        _mIter = array._chunkSet.find(outPos);
+        if(_mIter==array._chunkSet.end())
+        {
+            return hasCurrent = false;
+        }
+        outPos = *_mIter;
+        array.out2in(outPos, inPos);
+        return hasCurrent = setInputPosition(0);
+    }
+
+    void MappedSubArrayIterator::operator ++()
+    {
+        do
+        {
+            _mIter++;
+            if(_mIter!=array._chunkSet.end())
+            {
+                outPos = *_mIter;
+                array.out2in(outPos, inPos);
+                if(setInputPosition(0))
+                {
+                    hasCurrent = true;
+                    return;
+                }
+            }
+            else
+            {
+                hasCurrent = false;
+                return;
+            }
+        } while( true );
+    }
+
+    void MappedSubArrayIterator::reset()
+    {
+        _mIter = array._chunkSet.begin();
+        if(_mIter==array._chunkSet.end())
+        {
+            hasCurrent = false;
+        }
+        else
+        {
+            outPos = *_mIter;
+            array.out2in(outPos, inPos);
+            if (setInputPosition(0))
+            {
+                hasCurrent = true;
+            }
+            else
+            {
+                ++(*this);
+            }
+        }
+    }
+
+	//
     // SubArray methods
     //
     SubArray::SubArray(ArrayDesc& array, Coordinates lowPos, Coordinates highPos, boost::shared_ptr<Array> input)
@@ -428,7 +496,8 @@ namespace scidb
       subarrayLowPos(lowPos), 
       subarrayHighPos(highPos),
       dims(desc.getDimensions()),
-      inputDims(input->getArrayDesc().getDimensions())
+      inputDims(input->getArrayDesc().getDimensions()),
+      _useChunkSet(false)
 	{
         aligned = true;
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
@@ -437,13 +506,74 @@ namespace scidb
                 break;
             }
         }
-    }
-    
-    DelegateArrayIterator* SubArray::createArrayIterator(AttributeID attrID) const
-    {
-        return new SubArrayIterator(*this, attrID);
+
+        double numChunksInBox = 1;
+        ArrayDesc const& inputDesc = input->getArrayDesc();
+        for (size_t i=0, n = inputDesc.getDimensions().size(); i<n; i++)
+        {
+            numChunksInBox *= inputDesc.getNumChunksAlongDimension(i, subarrayLowPos[i], subarrayHighPos[i]);
+        }
+
+        if (numChunksInBox > SUBARRAY_MAP_ITERATOR_THRESHOLD)
+        {
+            _useChunkSet = true;
+            buildChunkSet();
+        }
     }
 
+    void SubArray::addChunksToSet(Coordinates outChunkCoords, size_t dim)
+    {
+        //if we are not aligned, then each input chunk can contribute to up to 2^nDims output chunks
+        //therefore, the recursion
+        for(size_t i= (dim == 0 ? 0 : dim -1), n = outChunkCoords.size(); i<n; i++)
+        {
+            if (outChunkCoords[i]<dims[i].getStartMin() || outChunkCoords[i]>dims[i].getEndMax())
+            {
+                return;
+            }
+        }
+        if(aligned || dim == outChunkCoords.size())
+        {
+            _chunkSet.insert(outChunkCoords);
+        }
+        else
+        {
+            addChunksToSet(outChunkCoords, dim+1);
+            outChunkCoords[dim]+=dims[dim].getChunkInterval();
+            addChunksToSet(outChunkCoords, dim+1);
+        }
+    }
+
+    void SubArray::buildChunkSet()
+    {
+        AttributeID inputAttribute = 0;
+        if(inputArray->getArrayDesc().getEmptyBitmapAttribute())
+        {
+            inputAttribute = inputArray->getArrayDesc().getEmptyBitmapAttribute()->getId();
+        }
+        size_t nDims = inputArray->getArrayDesc().getDimensions().size();
+        shared_ptr<ConstArrayIterator> inputIter = inputArray->getConstIterator(inputAttribute);
+        Coordinates outChunkCoords(nDims);
+        while(!inputIter->end())
+        {
+            in2out(inputIter->getPosition(), outChunkCoords);
+            desc.getChunkPositionFor(outChunkCoords);
+            addChunksToSet(outChunkCoords);
+            ++(*inputIter);
+        }
+    }
+
+    DelegateArrayIterator* SubArray::createArrayIterator(AttributeID attrID) const
+    {
+        if(_useChunkSet)
+        {
+            return new MappedSubArrayIterator(*this, attrID);
+        }
+        else
+        {
+            return new SubArrayIterator(*this, attrID);
+        }
+    }
 
     DelegateChunk* SubArray::createChunk(DelegateArrayIterator const* iterator, AttributeID attrID) const
     {

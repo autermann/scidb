@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>Transcendental functions</refname>
+
+    <refpurpose>Perform mathematical functions in a query
+    expression</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> <replaceable>expression1</replaceable> <command>FROM</command> <replaceable>array</replaceable> <command>WHERE</command> <replaceable>expression2</replaceable>;</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>These functions perform nonalgebraic functions including
+    trigonometry and logarithmic functions.</para>
+
+    <informaltable frame="all">
+      <?dbfo keep-together="auto" ?>
+
+      <tgroup cols="4">
+        <colspec colname="c1" colwidth="10*"/>
+
+        <colspec colname="c2" colwidth="20*"/>
+
+        <colspec colname="c3" colwidth="20*"/>
+
+        <colspec colname="cgen1" colwidth="30*"/>
+
+        <thead>
+          <row>
+            <entry>Function Name</entry>
+
+            <entry>Description</entry>
+
+            <entry>Syntax</entry>
+
+            <entry>Datatypes</entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry>acos</entry>
+
+            <entry>Inverse (arc) cosine in radians</entry>
+
+            <entry>acos(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>asin</entry>
+
+            <entry>Inverse (arc) sine in radians</entry>
+
+            <entry>asin(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>atan</entry>
+
+            <entry>Inverse (arc) tangent in radians</entry>
+
+            <entry>atan(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>cos</entry>
+
+            <entry>Cosine (input in radians)</entry>
+
+            <entry>cos(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>exp</entry>
+
+            <entry>Exponential</entry>
+
+            <entry>exp(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>log</entry>
+
+            <entry>Base-<emphasis role="italic">e</emphasis> logarithm</entry>
+
+            <entry>log(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>log10</entry>
+
+            <entry>Base-10 logarithm</entry>
+
+            <entry>log10(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>sin</entry>
+
+            <entry>Sine (input in radians)</entry>
+
+            <entry>sin(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+
+          <row>
+            <entry>tan</entry>
+
+            <entry>Tangent (input in radians)</entry>
+
+            <entry>tan(scalar)</entry>
+
+            <entry>double,float</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </informaltable>
+  </refsect1>
+</refentry>

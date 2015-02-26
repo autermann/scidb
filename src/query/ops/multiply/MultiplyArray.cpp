@@ -28,7 +28,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <log4cxx/logger.h>
-
+#include <boost/scope_exit.hpp>
 #include "array/DelegateArray.h"
 #include "query/ops/multiply/MultiplyArray.h"
 #include "network/NetworkManager.h"
@@ -123,7 +123,7 @@ namespace scidb
         if (chunk.isInitialized() && currPos == chunk.getFirstPosition(false)) {
            return chunk;
         }
-        Address addr(array.desc.getId(), 0, currPos);
+        Address addr(0, currPos);
         chunk.initialize(&array, &array.desc, addr, 0);
         chunk.setRLE(false);
 
@@ -148,9 +148,7 @@ namespace scidb
             colPos[ROW] = array.kStartRight + ck;
             if (rowIter->setPosition(rowPos) && colIter->setPosition(colPos)) {
                 if (!outIter) {
-                   outIter = chunk.getIterator(query,
-                                               ChunkIterator::IGNORE_OVERLAPS|((rowIter->getChunk().isSparse()
-                                                                                || colIter->getChunk().isSparse()) ? ChunkIterator::SPARSE_CHUNK : 0));
+                   outIter = chunk.getIterator(query, ChunkIterator::IGNORE_OVERLAPS);
                 }
                 array.multiplyChunks(rowIter, colIter, outIter, ci, cj, ck);
             }
@@ -186,109 +184,118 @@ namespace scidb
     {
         boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new MemArray(desc));
         boost::shared_ptr<ArrayIterator> outArrayIter = result->getIterator(0);
-        map<Coordinates, boost::shared_ptr<ChunkIterator>, CoordinatesLess> chunkIterators;
-        Coordinates pos(2);
-        size_t iterNo = 0;
-        InstanceID neighborInstance = (instanceId + 1) % nInstances;
-        timeval begin, end;
-        time_t delta;
-        boost::shared_ptr<Query> query(_query.lock());
-
-        if (iLength < jLength) { // shift left matrix
-            while (true) {
-                uint64_t numMultipliedChunks = 0;
-                gettimeofday(&begin, NULL);
-                if (iterNo != 0) {
-                    delta = (begin.tv_sec - end.tv_sec)*1000000 + (begin.tv_usec - end.tv_usec);
-                    LOG4CXX_DEBUG(logger, "Shift left matrix: " << delta << " microseconds");
-                }
-
-                boost::shared_ptr<ConstArrayIterator> leftIterator = leftArray->getConstIterator(attr);
-                boost::shared_ptr<ConstArrayIterator> rightIterator = rightArray->getConstIterator(attr);
-                //printf("Shift left matrix iteration %d:\n", (int)iterNo);
-                while (!rightIterator->end()) {
-                    Coordinates const& rightPos = rightIterator->getPosition();
-                    Coordinate cj = rightPos[COL];
-                    Coordinate ck = rightPos[ROW];
-                    for (uint64_t i = 0; i < iLength; i += iChunkLen)
-                    {
-                        Coordinate ci = iStart + i;
-                        pos[ROW] = ci;
-                        pos[COL] = ck;
-                        if (leftIterator->setPosition(pos)) {
-                            pos[COL] = cj;
-                            boost::shared_ptr<ChunkIterator>& outIter = chunkIterators[pos];
-                            if (!outIter) {
-                                Chunk& outChunk = outArrayIter->newChunk(pos);
-                                outChunk.setRLE(false);
-                                outIter = outChunk.getIterator(query, ChunkIterator::IGNORE_OVERLAPS);
-                            }
-                            //printf("[%lld,%lld] * [%lld,%lld]\n", ci, ck, ck, cj);
-                            multiplyChunks(leftIterator, rightIterator, outIter, ci, cj, ck);
-                            numMultipliedChunks ++;
-                        }
-                    }
-                    ++(*rightIterator);
-                }
-                gettimeofday(&end, NULL);
-                delta = (end.tv_sec - begin.tv_sec)*1000000 + (end.tv_usec - begin.tv_usec);
-                LOG4CXX_DEBUG(logger, "Iteration " << (iterNo+1) << ": " << delta << " microseconds; multiplied "<<numMultipliedChunks<<" chunk pairs");
-                if (++iterNo == nInstances) {
-                    break;
-                }
-                leftArray = redistribute(leftArray, query, psLocalInstance, "", neighborInstance);
-            }
-        } else { // Shift right matrix
-            while (true) {
-                uint64_t numMultipliedChunks = 0;
-                gettimeofday(&begin, NULL);
-                if (iterNo != 0) {
-                    delta = (begin.tv_sec - end.tv_sec)*1000000 + (begin.tv_usec - end.tv_usec);
-                    LOG4CXX_DEBUG(logger, "Shift right matrix: " << delta << " microseconds");
-                }
-                boost::shared_ptr<ConstArrayIterator> leftIterator = leftArray->getConstIterator(attr);
-                boost::shared_ptr<ConstArrayIterator> rightIterator = rightArray->getConstIterator(attr);
-                //printf("Shift right matrix iteration %d:\n", (int)iterNo);
-                while (!leftIterator->end()) {
-                    Coordinates const& leftPos = leftIterator->getPosition();
-                    Coordinate ci = leftPos[ROW];
-                    Coordinate ck = leftPos[COL];
-                    for (uint64_t j = 0; j < jLength; j += jChunkLen)
-                    {
-                        Coordinate cj = jStart + j;
-                        pos[ROW] = ck;
-                        pos[COL] = cj;
-                        if (rightIterator->setPosition(pos)) {
-                            pos[ROW] = ci;
-                            boost::shared_ptr<ChunkIterator>& outIter = chunkIterators[pos];
-                            if (!outIter) {
-                                Chunk& outChunk = outArrayIter->newChunk(pos);
-                                outChunk.setRLE(false);
-                                outIter = outChunk.getIterator(query, ChunkIterator::IGNORE_OVERLAPS);
-                            }
-                            //printf("[%lld,%lld] * [%lld,%lld]\n", ci, ck, ck, cj);
-                            multiplyChunks(leftIterator, rightIterator, outIter, ci, cj, ck);
-                            numMultipliedChunks ++;
-                        }
-                    }
-                    ++(*leftIterator);
-                }
-                gettimeofday(&end, NULL);
-                delta = (end.tv_sec - begin.tv_sec)*1000000 + (end.tv_usec - begin.tv_usec);
-                LOG4CXX_DEBUG(logger, "Iteration " << (iterNo+1) << ": " << delta << " microseconds; multiplied "<<numMultipliedChunks<<" chunk pairs");
-                if (++iterNo == nInstances) {
-                    break;
-                }
-                rightArray = redistribute(rightArray, query, psLocalInstance, "", neighborInstance);
-            }
-        }
-        leftArray.reset();
-        rightArray.reset();
-        for (map<Coordinates, boost::shared_ptr<ChunkIterator>, CoordinatesLess>::iterator ci = chunkIterators.begin();
-             ci != chunkIterators.end();
-             ++ci)
         {
-            ci->second->flush();
+            map<Coordinates, boost::shared_ptr<ChunkIterator>, CoordinatesLess> chunkIterators;
+            Coordinates pos(2);
+            size_t iterNo = 0;
+            InstanceID neighborInstance = (instanceId + 1) % nInstances;
+            timeval begin, end;
+            time_t delta;
+            boost::shared_ptr<Query> query(_query.lock());
+
+            BOOST_SCOPE_EXIT((&chunkIterators)) 
+            {
+                // This is finally block: always executed in case of normal or abnormal method termination
+                // Flush iterators to unpin chunks
+                for (map<Coordinates, boost::shared_ptr<ChunkIterator>, CoordinatesLess>::iterator ci = chunkIterators.begin();
+                     ci != chunkIterators.end();
+                     ++ci)
+                {
+                    ci->second->flush();
+                }
+            }
+            BOOST_SCOPE_EXIT_END
+
+            if (iLength < jLength) { // shift left matrix
+                while (true) {
+                    uint64_t numMultipliedChunks = 0;
+                    gettimeofday(&begin, NULL);
+                    if (iterNo != 0) {
+                        delta = (begin.tv_sec - end.tv_sec)*1000000 + (begin.tv_usec - end.tv_usec);
+                        LOG4CXX_DEBUG(logger, "Shift left matrix: " << delta << " microseconds");
+                    }
+
+                    boost::shared_ptr<ConstArrayIterator> leftIterator = leftArray->getConstIterator(attr);
+                    boost::shared_ptr<ConstArrayIterator> rightIterator = rightArray->getConstIterator(attr);
+                    //printf("Shift left matrix iteration %d:\n", (int)iterNo);
+                    while (!rightIterator->end()) {
+                        Coordinates const& rightPos = rightIterator->getPosition();
+                        Coordinate cj = rightPos[COL];
+                        Coordinate ck = rightPos[ROW];
+                        for (uint64_t i = 0; i < iLength; i += iChunkLen)
+                        {
+                            Coordinate ci = iStart + i;
+                            pos[ROW] = ci;
+                            pos[COL] = ck;
+                            if (leftIterator->setPosition(pos)) {
+                                pos[COL] = cj;
+                                boost::shared_ptr<ChunkIterator>& outIter = chunkIterators[pos];
+                                if (!outIter) {
+                                    Chunk& outChunk = outArrayIter->newChunk(pos);
+                                    outChunk.setRLE(false);
+                                    outIter = outChunk.getIterator(query, ChunkIterator::IGNORE_OVERLAPS);
+                                }
+                                //printf("[%lld,%lld] * [%lld,%lld]\n", ci, ck, ck, cj);
+                                multiplyChunks(leftIterator, rightIterator, outIter, ci, cj, ck);
+                                numMultipliedChunks ++;
+                            }
+                        }
+                        ++(*rightIterator);
+                    }
+                    gettimeofday(&end, NULL);
+                    delta = (end.tv_sec - begin.tv_sec)*1000000 + (end.tv_usec - begin.tv_usec);
+                    LOG4CXX_DEBUG(logger, "Iteration " << (iterNo+1) << ": " << delta << " microseconds; multiplied "<<numMultipliedChunks<<" chunk pairs");
+                    if (++iterNo == nInstances) {
+                        break;
+                    }
+                    leftArray = redistribute(leftArray, query, psLocalInstance, "", neighborInstance);
+                }
+            } else { // Shift right matrix
+                while (true) {
+                    uint64_t numMultipliedChunks = 0;
+                    gettimeofday(&begin, NULL);
+                    if (iterNo != 0) {
+                        delta = (begin.tv_sec - end.tv_sec)*1000000 + (begin.tv_usec - end.tv_usec);
+                        LOG4CXX_DEBUG(logger, "Shift right matrix: " << delta << " microseconds");
+                    }
+                    boost::shared_ptr<ConstArrayIterator> leftIterator = leftArray->getConstIterator(attr);
+                    boost::shared_ptr<ConstArrayIterator> rightIterator = rightArray->getConstIterator(attr);
+                    //printf("Shift right matrix iteration %d:\n", (int)iterNo);
+                    while (!leftIterator->end()) {
+                        Coordinates const& leftPos = leftIterator->getPosition();
+                        Coordinate ci = leftPos[ROW];
+                        Coordinate ck = leftPos[COL];
+                        for (uint64_t j = 0; j < jLength; j += jChunkLen)
+                        {
+                            Coordinate cj = jStart + j;
+                            pos[ROW] = ck;
+                            pos[COL] = cj;
+                            if (rightIterator->setPosition(pos)) {
+                                pos[ROW] = ci;
+                                boost::shared_ptr<ChunkIterator>& outIter = chunkIterators[pos];
+                                if (!outIter) {
+                                    Chunk& outChunk = outArrayIter->newChunk(pos);
+                                    outChunk.setRLE(false);
+                                    outIter = outChunk.getIterator(query, ChunkIterator::IGNORE_OVERLAPS);
+                                }
+                                //printf("[%lld,%lld] * [%lld,%lld]\n", ci, ck, ck, cj);
+                                multiplyChunks(leftIterator, rightIterator, outIter, ci, cj, ck);
+                                numMultipliedChunks ++;
+                            }
+                        }
+                        ++(*leftIterator);
+                    }
+                    gettimeofday(&end, NULL);
+                    delta = (end.tv_sec - begin.tv_sec)*1000000 + (end.tv_usec - begin.tv_usec);
+                    LOG4CXX_DEBUG(logger, "Iteration " << (iterNo+1) << ": " << delta << " microseconds; multiplied "<<numMultipliedChunks<<" chunk pairs");
+                    if (++iterNo == nInstances) {
+                        break;
+                    }
+                    rightArray = redistribute(rightArray, query, psLocalInstance, "", neighborInstance);
+                }
+            }
+            leftArray.reset();
+            rightArray.reset();
         }
         return result;
     }
@@ -369,7 +376,7 @@ namespace scidb
                         outCoords[ROW] = i;
                         outCoords[COL] = j;
                         bool rc = outIter->setPosition(outCoords);
-                        assert(rc);
+                        if (!rc) assert(false);
                         if (!outIter->isEmpty()) { 
                             Value& v = outIter->getItem();
                             partialProd += ValueToDouble(attrType, v);
@@ -515,7 +522,7 @@ namespace scidb
                     // Write the value to the output chunk
                     if (!empty) {
                         const bool rc = outIter->setPosition(outCoords);
-                        assert(rc);
+                        if (!rc) assert(false);
                         if (!outIter->isEmpty()) {
                             *operands[3] = outIter->getItem();
                             add((const Value**)&operands[2], operands[4], NULL);
@@ -828,7 +835,7 @@ namespace scidb
         if (chunk.isInitialized() && currPos == chunk.getFirstPosition(false)) {
             return chunk;
         }
-        Address addr(array.desc.getId(), 0, currPos);
+        Address addr(0, currPos);
         chunk.initialize(&array, &array.desc, addr, 0);
 
         boost::shared_ptr<Query> query(_query.lock());
@@ -870,7 +877,7 @@ namespace scidb
                     outCoords[ROW] = i;
                     outCoords[COL] = j;
                     bool rc = outIter->setPosition(outCoords);
-                    assert(rc);
+                    if (!rc) assert(false);
                     DoubleToValue(attrType, partialProd, value);
                     outIter->writeItem(value);
                 }
@@ -921,11 +928,6 @@ namespace scidb
                 ++(*arrayIterator);
             }
         }
-    }
-
-    bool MultiplyArray::supportsRandomAccess() const
-    {
-        return false;
     }
 
     bool MultiplyArray::isSelfChunk(Coordinates const& pos) const

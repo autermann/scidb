@@ -362,7 +362,6 @@ ERRCODE(SCIDB_LE_OP_RESHAPE_ERROR3,                 284); //Incompatible array d
 ERRCODE(SCIDB_LE_OP_REVERSE_ERROR1,                 285); //Only fixed size array can be reversed
 ERRCODE(SCIDB_LE_OP_SLICE_ERROR1,                   286); //Input array has too few dimensions for slice
 ERRCODE(SCIDB_LE_OP_SLICE_ERROR2,                   287); //Slice coordinate is out of bounds
-ERRCODE(SCIDB_LE_OP_SORT_ERROR1,                    288); //Can sort only one dimensional arrays
 ERRCODE(SCIDB_LE_OP_SORT_ERROR2,                    289); //Column index is out of range
 ERRCODE(SCIDB_LE_OP_SORT_ERROR3,                    290); //Can not jump on more than one chunk forward
 ERRCODE(SCIDB_LE_OP_SORT_ERROR4,                    291); //Chunk out of window
@@ -432,19 +431,59 @@ ERRCODE(SCIDB_LE_OP_CROSSJOIN_ERROR2,               355); //Joined dimensions sh
 ERRCODE(SCIDB_LE_OP_NORMALIZE_ERROR3,               356); //Attribute must be of double type
 ERRCODE(SCIDB_LE_EXPLICIT_EMPTY_FLAG_NOT_ALLOWED,   357); //Explicit empty flag attribute not allowed. Use EMPTY keyword.
 ERRCODE(SCIDB_LE_OP_CAST_ERROR9,                    358); //Dimension type doesn't match
-ERRCODE(SCIDB_LE_INCONSISTENT_ARRAY_DESC_CACHE,     359); //Array descriptor cache is inconsistent
+ERRCODE(SCIDB_LE_INCONSISTENT_ARRAY_DESC,           359); //Array descriptor is inconsistent
 ERRCODE(SCIDB_LE_FUNC_MAP_TRANSFORMATION_NOT_POSSIBLE, 360); //Not able to perform requested functional mapping transformation
 ERRCODE(SCIDB_LE_OP_REDIMENSION_STORE_ERROR7,       361); //Too much duplicates for REDIMENSION_STORE with new dimension: increase chunk size
 ERRCODE(SCIDB_LE_QUERY_ALREADY_COMMITED,            362); //Operation not possible because the query (%1%) already commited
 ERRCODE(SCIDB_LE_CAN_NOT_CHANGE_MAPPING,            363); //Can not change coordinates mapping for non-versioned array %1%
 ERRCODE(SCIDB_LE_NETWORK_QUEUE_FULL,                364); //Network queue is full
 ERRCODE(SCIDB_LE_INVALID_MESSAGE_FORMAT,            365); //Invalid message format for type %1%
-
+ERRCODE(SCIDB_LE_INVALID_ARRAY_LITERAL,             366); //Build required constant string when array literal flag is true
+ERRCODE(SCIDB_LE_INVALID_REDIMENSION_POSITION,      367); //Cannot redimension coordinates %1%; the position is not valid in the destination array
+ERRCODE(SCIDB_LE_SYSCALL_ERROR,                     368); //Invocation of %1% failed with return code=%2%, error=%3%, arg(s)=%4%
+ERRCODE(SCIDB_LE_NON_FQ_PATH_ERROR,                 369); //Path %1% is not fully qualified
+ERRCODE(SCIDB_LE_UNKNOWN_CTX,                       370); //Unknown/unexpected context type '%1%'
+ERRCODE(SCIDB_LE_CANT_LOCK_FILE,                    371); //Failed to get exclusive access to the file %1%
+ERRCODE(SCIDB_LE_TEMPLATE_PARSE_ERROR,              372); //Failed to parser templace at position %1%
+ERRCODE(SCIDB_LE_TEMPLATE_FIXED_SIZE_TYPE,          373); //Length should not be explcitly specified for fixed size type %1%
+ERRCODE(SCIDB_LE_FILE_WRITE_ERROR,                  374); //Failed to write file: %1%
+ERRCODE(SCIDB_LE_FILE_READ_ERROR,                   375); //Failed to read file: %1%
+ERRCODE(SCIDB_LE_UNSUPPORTED_FORMAT,                376); //Unsupported format: %1%
+ERRCODE(SCIDB_LE_MULTIPLE_DIMENSION_SPECIFICATION,  377); //Same dimension specified many times
+ERRCODE(SCIDB_LE_NOT_ENOUGH_DIMENSIONS_IN_SPECIFICATION,378); //Not all dimensions were specified
+ERRCODE(SCIDB_LE_PARTITION_NAME_NOT_UNIQUE,         379); //Partition name should be unique
+ERRCODE(SCIDB_LE_PARTITION_NAME_NOT_SPECIFIED,      380); //Partition name not specified
+ERRCODE(SCIDB_LE_UNKNOWN_PARTITION_NAME,            381); //Unknown partition name
+ERRCODE(SCIDB_LE_OP_WINDOW_ERROR3,                  382); //PRECEDING and FOLLOWING must be zero or positive values
+ERRCODE(SCIDB_LE_WRONG_OVER_USAGE,                  383); //OVER keyword can be applied only to aggregates
+ERRCODE(SCIDB_W_MISSING_REASON_OUT_OF_BOUNDS,       384); //Missing reason can not be imported in binary file
+ERRCODE(SCIDB_LE_DDL_CANT_BE_NESTED,                385); //DDL operator can not be nested
+ERRCODE(SCIDB_LE_NO_OPERATOR_RESULT,                386); //Nested operator not returned any result to parent
+ERRCODE(SCIDB_LE_CATALOG_NEWER_THAN_SCIDB,          387); //Can not connect SciDB with metadata version %1% to catalog with metadata version %2%
+ERRCODE(SCIDB_LE_CATALOG_METADATA_UPGRADE_ERROR,    388); //Catalog metadata upgrade failed with error: %1%
+ERRCODE(SCIDB_LE_DDL_SHOULDNT_HAVE_INPUTS,          389); //DDL operator should not have inputs
+ERRCODE(SCIDB_LE_UNSUPPORTED_INPUT_ARRAY,           390); //Operator %1 does not support the given virtual input array. Consider splitting the query and using store() to create a temporary result
+ERRCODE(SCIDB_LE_OP_WINDOW_ERROR4,                  391); //Window size should be greater than 1
+ERRCODE(SCIDB_LE_OP_INPUT_ERROR15,                  392); //Expected boolean constant for empty indicator
+ERRCODE(SCIDB_LE_OP_INPUT_ERROR16,                  393); //Number of failures exceeds threshold
+ERRCODE(SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE,       394); //Chunk size must be positive
+ERRCODE(SCIDB_LE_OPERATION_FAILED_WITH_ERRNO,       395); //Operation %1% failed with errno %2%
+ERRCODE(SCIDB_LE_OP_RLE_EXPECTED,                   396); //Chunk expected to be in RLE format
+ERRCODE(SCIDB_LE_OP_NONEMPTY_EXPECTED,              397); //Non-emptyable array expected
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%
 ERRCODE(SCIDB_LE_LIBPQ_NOT_THREADSAFE,              1002); //libpq is not built as threadsafe, rebuild it with --enable-thread-safety
 ERRCODE(SCIDB_LE_CANT_CONNECT_PG,                   1003); //Can not connect to PostgreSQL catalog: '%1'
+ERRCODE(SCIDB_LE_UNREACHABLE_CODE,                  1004); //Fatal: Unreachable code is reached in '%1%'
+
+// copied from P4
+ERRCODE(SCIDB_LE_DLA_ERROR13,               2001); //Request for unknown attribute
+ERRCODE(SCIDB_LE_DLA_ERROR14,               2002); //Specified attribute not found in array
+ERRCODE(SCIDB_LE_DLA_ERROR15,               2003); //Ranked attribute cannot be an empty indicator
+ERRCODE(SCIDB_LE_DLA_ERROR16,               2004); //Specified dimension not found in array
+ERRCODE(SCIDB_LE_DLA_ERROR17,               2005); //The number of samples passed to quantile must be at least 1
+
 } //namespace scidb
 
 #endif /* ERRORCODES_H_ */

@@ -1,1 +1,0 @@
-log4cxx >= 0.10.0, protobuf >= 2.2.0, zlib >= 1.2.3, bzip2-libs >= 1.0.5

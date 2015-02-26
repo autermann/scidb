@@ -83,172 +83,312 @@ SCIDB QUERY : <create empty array edTs_nf <a:int64 null default 2 compression 'n
 Query was executed successfully
 
 SCIDB QUERY : <load Ts_rle from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_d from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_ns from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_be from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_z from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_bz from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_nf from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_rle from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_d from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_ns from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_be from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_z from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_bz from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load dTs_nf from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_rle from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_d from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_ns from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_be from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_z from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_bz from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load eTs_nf from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_rle from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_d from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_ns from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_be from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_z from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_bz from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load edTs_nf from '../tests/harness/testcases/data/null_19.txt'>
-[[(),(),()],[(),(),(?2)],[(?1),(),()],[(),(),()],[(),(),()],[(),(),()]]
+{x,y} a
+{-1,2} ?2
+{0,0} ?1
 
 SCIDB QUERY : <load Ts_rle from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load Ts_d from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load Ts_ns from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load Ts_be from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load Ts_z from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load Ts_bz from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load Ts_nf from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_rle from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_d from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_ns from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_be from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_z from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_bz from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load dTs_nf from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_rle from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_d from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_ns from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_be from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_z from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_bz from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load eTs_nf from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_rle from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_d from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_ns from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_be from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_z from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_bz from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <load edTs_nf from '../tests/harness/testcases/data/null_20.txt'>
-[[(),(),()],[(),(),()],[(),(),(?3)],[(),(),()],[(?1),(),()],[(),(),(?2)]]
+{x,y} a
+{0,2} ?3
+{2,0} ?1
+{3,2} ?2
 
 SCIDB QUERY : <remove(Ts_rle)>
 Query was executed successfully

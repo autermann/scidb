@@ -64,19 +64,13 @@ public:
      */
     boost::shared_ptr<AstNode> parse(const std::string& input, bool aql = true);
 
-    // For using by hand inside lexer and parsers. Preparing context and raising exception.
-    void error2(const class location& l, const std::string& m);
-
-
     void setComment(std::string const& comment) { 
         _docComment = comment;
     }
 
-private:
-    // For internal parser using (called when parser found syntax error)
-    // Just preparing contexts and let bison do all other work
     void error(const class location& l, const std::string& m);
 
+private:
     bool _trace;
     class AQLScanner* _aqlScanner;
     class AFLScanner* _aflScanner;

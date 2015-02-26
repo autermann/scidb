@@ -284,7 +284,7 @@ namespace scidb
                 cc.setInputChunk(inputIterator->getChunk());
             } else { 
                 ArrayDesc const& desc = array.getArrayDesc();
-                Address addr(desc.getId(), attr, outPos);
+                Address addr(attr, outPos);
                 cc.shapeChunk.initialize(&array, &desc, addr, desc.getAttributes()[attr].getDefaultCompressionMethod());
                 cc.setProxy();
             }
@@ -470,11 +470,6 @@ namespace scidb
             ? (DelegateChunkIterator*)new ConcatDirectChunkIterator(chunk, iterationMode)
             : (DelegateChunkIterator*)new ConcatChunkIterator(chunk, iterationMode);
         
-    }
-
-    bool ConcatArray::supportsRandomAccess() const
-    {
-        return simpleAppend;
     }
 
     ConcatArray::ConcatArray(ArrayDesc const& array, boost::shared_ptr<Array> const& left, boost::shared_ptr<Array> const& right)

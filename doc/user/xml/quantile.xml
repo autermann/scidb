@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>quantile</refname>
+    <refpurpose>Quantile of an array or subarray</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+ <synopsis><command>SELECT</command> * <command>FROM</command> quantile(<replaceable>array</replaceable><optional>,<replaceable>attribute1</replaceable>,<replaceable>attribute2,...</replaceable></optional>
+     <optional>,<replaceable>dimension1</replaceable>,<replaceable>dimension2</replaceable>,...</optional>);</synopsis>
+    </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>A q-quantile is a point taken at a
+specified interval on a sorted data set that divides the data set into q subsets. The 2-quantile is the median,
+that is, the numerical value separating the lower half and upper half of the data set. 
+</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example calculates the 2-quantile (median) for a 2-dimensional array.</para>
+      <procedure>
+        <step>
+          <para>Create a 1-dimensional array called quantile_array:<programlisting><command>CREATE ARRAY</command> quantile_array &lt;val:double&gt;[i=0:10,11,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Put numerical random values between 0 and 11 into quantile_array: <programlisting><command>SELECT</command> * <command>FROM </command>
+store(build(quantile_array,random()%12/1.0),quantile_array);</programlisting><screen>[(2),(8),(2),(1),(6),(11),(0),(0),(7),(5),(7)]</screen></para>
+        </step>
+        <step>
+          <para>Find the median of quantile_array:<programlisting><command>SELECT</command> * <command>FROM</command> quantile(quantile_array,2);</programlisting><screen>[(0,0),(0.5,5),(1,11)]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

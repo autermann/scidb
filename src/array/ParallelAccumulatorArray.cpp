@@ -28,15 +28,19 @@
 
 #include <stdio.h>
 #include <vector>
+#include <log4cxx/logger.h>
 #include "array/ParallelAccumulatorArray.h"
 #include "system/Exceptions.h"
 #include "system/Config.h"
 #include "system/SciDBConfigOptions.h"
+#include "query/Operator.h"
 
 namespace scidb
 {
     using namespace boost;
     using namespace std;
+
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc.processor"));
 
     //
     // ParallelAccumulatorArray
@@ -44,8 +48,9 @@ namespace scidb
     ConstChunk const* ParallelAccumulatorArray::ChunkPrefetchJob::getResult()
     {
         wait(true, false);
-        if (!resultChunk)
+        if (!resultChunk) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+        }
         return resultChunk;
     }
 
@@ -76,7 +81,7 @@ namespace scidb
                 if (inputChunk.isMaterialized()) {
                     resultChunk = &inputChunk;
                 } else {
-                    Address addr(acc.desc.getId(), attrId, inputChunk.getFirstPosition(false));
+                    Address addr(attrId, inputChunk.getFirstPosition(false));
                     accChunk.initialize(&acc, &acc.desc, addr, inputChunk.getCompressionMethod());
                     accChunk.setBitmapChunk((Chunk*)&inputChunk);
                     boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|ChunkIterator::IGNORE_EMPTY_CELLS);
@@ -107,21 +112,6 @@ namespace scidb
         }
     }
 
-    boost::shared_ptr<ThreadPool> ParallelAccumulatorArray::threadPool;
-    boost::shared_ptr<JobQueue> ParallelAccumulatorArray::queue;
-    Mutex ParallelAccumulatorArray::initCriticalSection;
-
-
-    boost::shared_ptr<JobQueue> ParallelAccumulatorArray::getQueue()
-    {
-        ScopedMutexLock cs(initCriticalSection);
-        if (!threadPool) {
-            queue = boost::shared_ptr<JobQueue>(new JobQueue());
-            threadPool = boost::shared_ptr<ThreadPool>(new ThreadPool(Config::getInstance()->getOption<int>(CONFIG_EXEC_THREADS), queue));
-            threadPool->start();
-        }
-        return queue;
-    }
 
 ParallelAccumulatorArray::ParallelAccumulatorArray(boost::shared_ptr<Array> array)
     : StreamArray(array->getArrayDesc(), false),
@@ -129,18 +119,27 @@ ParallelAccumulatorArray::ParallelAccumulatorArray(boost::shared_ptr<Array> arra
       iterators(array->getArrayDesc().getAttributes().size()),
       activeJobs(iterators.size()),
       completedJobs(iterators.size())
-    { }
+    {
+        if (iterators.size() <= 0) {
+            LOG4CXX_FATAL(logger, "Array descriptor arrId = " << array->getArrayDesc().getId()
+                          << " name = " << array->getArrayDesc().getId()
+                          << " has no attributes ");
+            assert(0);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INCONSISTENT_ARRAY_DESC);
+        }
+    }
 
 void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
  {
-    getQueue();
-    int nAttrs = (int)iterators.size();
-    for (int i = 0; i < nAttrs; i++) {
+    PhysicalOperator::getGlobalQueueForOperators();
+    size_t nAttrs = iterators.size();
+    assert(nAttrs>0);
+    for (size_t i = 0; i < nAttrs; i++) {
        iterators[i] = pipe->getConstIterator(i);
     }
     int nPrefetchedChunks = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
     do {
-       for (int i = 0; i < nAttrs; i++) {
+       for (size_t i = 0; i < nAttrs; i++) {
           doNewJob(boost::shared_ptr<ChunkPrefetchJob>(new ChunkPrefetchJob(shared_from_this(), i, query)));
        }
     } while ((nPrefetchedChunks -= nAttrs) > 0);
@@ -161,7 +160,7 @@ void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
         AttributeID attrId = job->getAttributeID();
         if (!iterators[attrId]->end()) {
             job->setPosition(iterators[attrId]->getPosition());
-            queue->pushJob(job);
+            PhysicalOperator::getGlobalQueueForOperators()->pushJob(job);
             activeJobs[attrId].push_back(job);
             ++(*iterators[attrId]);
         }
@@ -174,7 +173,7 @@ void ParallelAccumulatorArray::start(const boost::shared_ptr<Query>& query)
             doNewJob(completedJobs[attId]);
             completedJobs[attId].reset();
         }
-        if (activeJobs[attId].size() == 0) {
+        if (activeJobs[attId].empty()) {
             return NULL;
         }
         completedJobs[attId] = activeJobs[attId].front();

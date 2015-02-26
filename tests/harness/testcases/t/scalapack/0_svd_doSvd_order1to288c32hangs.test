@@ -1,0 +1,29 @@
+--setup
+
+--test
+
+load_library('dense_linear_algebra')
+
+# doSvd.sh <order-min> [order-max-verbose [order-max [order-step-type [order-step]]]] (last is "+" or "x" for mult)
+
+# one good one, just to see that everything else works
+#
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 1 -1 1 + 1 "
+
+# 129-223 always hang on server
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 129 -1 159 + 1 "
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 160 -1 191 + 1 "
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 192 -1 223 + 1 "
+# 224 too
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 224 -1 224 + 1 "
+
+# 224 hangs on the server,too,now
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 224 -1 224 + 1 "
+
+# 64-95 7 or more of these will hang on each run
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 64 -1 95 + 1 "
+
+
+
+--cleanup
+

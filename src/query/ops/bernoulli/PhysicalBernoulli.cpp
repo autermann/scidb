@@ -241,6 +241,12 @@ public:
 	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
+
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
         int seed = (_parameters.size() == 2)
             ? (int)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64()
             : (int)time(NULL);

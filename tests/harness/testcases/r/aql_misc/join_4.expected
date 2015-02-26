@@ -2,11 +2,17 @@ Query was executed successfully
 
 Query was executed successfully
 
-[(1),(1),(1)]
+{x} a
+{0} 1
+{1} 1
+{2} 1
 
-[(2),(2),(2)]
+{y} b
+{0} 2
+{1} 2
+{2} 2
 
-[(),(),()]
+{x} a,b
 
 Query was executed successfully
 

@@ -1,0 +1,45 @@
+--setup
+--start-query-logging
+# Ticket number: 1646 
+# Tests covers 1D arrays with special values like NA, NaN, Null, INF.
+# Build literals nested in other ops like save & aggregates
+# Tests cover AFL & AQL syntax
+
+--test
+build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', true)
+build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1)
+build(<a:double> [x=10:13,4,0], '[(NaN),(-inf),(inf),(2.5)]', 1)
+build(<a:double, b:float> [x=110:112,1,0], '[(NaN,inf),(-inf,inf),(inf,NaN)]', 1)
+build(<a:double, b:float, c:string> [x=110:112,1,0], '[(NaN,inf,Bio),(-inf,inf,Phy),(inf,NaN,Math)]', 1)
+
+min(build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', 1))
+max(build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', 1))
+avg(build(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]', 1))
+
+--aql select * from array(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),(234.56)]')
+--aql select * from array(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),()]')
+--aql select * from array(<a:double, b:float, c:string> [x=110:112,1,0], '[(NaN,inf,Bio),(-inf,inf,Phy),(inf,NaN,Math)]')
+--aql select max(a),min(a),avg(a) from array(<a:double> [x=0:3,4,0], '[(NA),(NA),(NA),(234.56)]')
+--aql select max(a),max(b),min(a),min(b) from array(<a:double, b:float, c:string> [x=110:112,2,0], '[(NaN,inf,Bio),(-inf,inf,Phy),(inf,NaN,Math)]')
+
+save(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1), '../tests/harness/testcases/data/literal.txt')
+save(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1), '../tests/harness/testcases/data/literal.txt')
+
+store(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1),Test1)
+sort(Test1)
+
+sort(build(<a:double> [x=10:12,3,0], '[(NaN),(inf),(inf)]', 1))
+sort(build(<a:double> [x=10:12,3,0], '[(4),(3.5),(7.9)]', 1))
+
+build(<a:datetime, days: string default 'Thursday'> [x=0:2,3,0], '[("2012-07-13 18:41:14",Sunday),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)
+build(<a:datetime , days: string default 'Thursday'> [x=0:2,3,0], '[(),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)
+
+--start-igdata
+build(NOT EMPTY<a:datetime default now() , days: string default 'Thursday'> [x=0:2,3,0], '[(),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)
+--stop-igdata
+
+
+--cleanup
+remove(Test1)
+
+--stop-query-logging

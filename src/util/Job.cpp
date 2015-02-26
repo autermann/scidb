@@ -38,26 +38,30 @@ namespace scidb
 {
     void Job::execute()
     {
-       if (_query) {
-          Query::setCurrentQueryID(_query->getQueryID());
-       } else {
-          Query::setCurrentQueryID(0);
-       }
+        if (_query) {
+            Query::setCurrentQueryID(_query->getQueryID());
+        } else {
+            Query::setCurrentQueryID(0);
+        }
 
-       if (!_removed) {
-            try  {
+        if (!_removed) {
+            const char *err_msg = "Job::execute: unhandled exception in job";
+            try {
                 run();
-            } catch (Exception const& x) { 
+            } catch (Exception const& x) {
                 _error = x.copy();
-                LOG4CXX_ERROR(logger, "Job::execute: unhandled exception in job: " << x.what());
+                LOG4CXX_ERROR(logger, err_msg << ": " << x.what());
+            } catch (const std::exception& e) {
+                _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << e.what();
+                LOG4CXX_ERROR(logger, err_msg << ": " << e.what());
             } catch (...) {
-                _query.reset();
-                throw;
+                _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << err_msg;
+                LOG4CXX_ERROR(logger, err_msg);
             }
         }
-       _query.reset();
-       _done.release();
-       Query::setCurrentQueryID(0);
+        _query.reset();
+        _done.release();
+        Query::setCurrentQueryID(0);
     }
 
     // Waits until job is done

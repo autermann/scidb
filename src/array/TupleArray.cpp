@@ -26,6 +26,7 @@
  * @brief Temporary (in-memory) array implementation
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
+ * @author Donghui
  */
 
 #include "util/iqsort.h"
@@ -37,399 +38,463 @@
 
 namespace scidb
 {
-    using namespace boost;
-    using namespace std;
+using namespace boost;
+using namespace std;
 
-    //
-    // Tuple comparator
-    // 
-    int TupleComparator::compare(Tuple const& t1, Tuple const& t2) 
-    {
-        for (size_t i = 0, n = _keys.size(); i < n; i++) {
-            const int j = _keys[i].columnNo;
-            //vector<Value> args(2, TypeLibrary::getType(_arrayDesc.getAttributes()[j].getType()));
-            const Value* args[2];
-            if (t1[j].isNull() || t2[j].isNull()) { 
-                int diff = t1[j].isNull() ? t2[j].isNull() ? 0 : -1 : 1;
-                return _keys[i].ascent ? diff : -diff;
-            }
-            args[0] = &t1[j];
-            args[1] = &t2[j];
-            //Value res(TypeLibrary::getType(TID_BOOL));
-            Value res;
-            
-            _eqFunctions[i](&args[0], &res, NULL);
-            if (!res.getBool()) {
-                _leFunctions[i](&args[0], &res, NULL);
-                return (res.getBool()) ? (_keys[i].ascent ? -1 : 1) : (_keys[i].ascent ? 1 : -1);
-            }
-        }
-        return 0;
-    }
+//
+// Tuple comparator
+//
+int TupleComparator::compare(Tuple const& t1, Tuple const& t2)
+{
+	for (size_t i = 0, n = _keys.size(); i < n; i++) {
+		const int j = _keys[i].columnNo;
+		const Value* args[2];
+		NullNaNanRegular what1 = getNullNaNanRegular(t1[j], _types[i]);
+		NullNaNanRegular what2 = getNullNaNanRegular(t2[j], _types[i]);
+		if (what1!=what2) {
+			int result = what1-what2;
+			if (! _keys[i].ascent) {
+				result = - result;
+			}
+			return result;
+		}
+		if (what1!=REGULAR_VALUE) {
+			return 0;
+		}
+		args[0] = &t1[j];
+		args[1] = &t2[j];
+		Value res;
 
-    TupleComparator::TupleComparator(vector<Key> const& keys, const ArrayDesc& arrayDesc):
-    _keys(keys), _arrayDesc(arrayDesc), _leFunctions(keys.size()), _eqFunctions(keys.size())
-    {
-        for (size_t i = 0; i < _keys.size(); i++) {
-            vector<TypeId> argTypes(2, _arrayDesc.getAttributes()[_keys[i].columnNo].getType());
-             FunctionDescription functionDesc;
-            vector<FunctionPointer> converters;
-            bool supportsVectorMode;
-            if (!FunctionLibrary::getInstance()->findFunction("<", argTypes, functionDesc, converters, supportsVectorMode, false))
-                throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATOR_NOT_FOUND) << "<" << argTypes[0];
-            _leFunctions[i] = functionDesc.getFuncPtr();
-            if (!FunctionLibrary::getInstance()->findFunction("=", argTypes, functionDesc, converters, supportsVectorMode, false))
-                throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATOR_NOT_FOUND) << "=" << argTypes[0];
-            _eqFunctions[i] = functionDesc.getFuncPtr();
-        }
-    }
+		_eqFunctions[i](&args[0], &res, NULL);
+		if (!res.getBool()) {
+			_leFunctions[i](&args[0], &res, NULL);
+			return (res.getBool()) ? (_keys[i].ascent ? -1 : 1) : (_keys[i].ascent ? 1 : -1);
+		}
+	}
+	return 0;
+}
 
-    //
-    // TupleArray 
-    //     
-    void TupleArray::sort(vector<Key> const& keys)
-    { 
-        TupleComparator comparator(keys, getArrayDesc());
-        if (tuples.size() != 0) { 
-            iqsort(&tuples[0], tuples.size(), comparator);
-        }
-    }
-      
-    ArrayDesc const& TupleArray::getArrayDesc() const
-    {
-        return desc;
-    }
+TupleComparator::TupleComparator(vector<Key> const& keys, const ArrayDesc& arrayDesc):
+_keys(keys), _arrayDesc(arrayDesc), _leFunctions(keys.size()), _eqFunctions(keys.size()), _types(keys.size())
+{
+	for (size_t i = 0; i < _keys.size(); i++) {
+		vector<TypeId> argTypes(2, _arrayDesc.getAttributes()[_keys[i].columnNo].getType());
+		 FunctionDescription functionDesc;
+		vector<FunctionPointer> converters;
+		bool supportsVectorMode;
+		if (!FunctionLibrary::getInstance()->findFunction("<", argTypes, functionDesc, converters, supportsVectorMode, false))
+			throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATOR_NOT_FOUND) << "<" << argTypes[0];
+		_leFunctions[i] = functionDesc.getFuncPtr();
+		if (!FunctionLibrary::getInstance()->findFunction("=", argTypes, functionDesc, converters, supportsVectorMode, false))
+			throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATOR_NOT_FOUND) << "=" << argTypes[0];
+		_eqFunctions[i] = functionDesc.getFuncPtr();
 
-    boost::shared_ptr<ConstArrayIterator> TupleArray::getConstIterator(AttributeID attId) const
-    {
-        return boost::shared_ptr<ConstArrayIterator>(new TupleArrayIterator(*this, attId));
-    }
+		const int j = _keys[i].columnNo;
+		TypeId strType = _arrayDesc.getAttributes()[j].getType();
+		_types[i] = getDoubleFloatOther(strType);
+	}
+}
 
-    TupleArray::TupleArray(ArrayDesc const& schema, vector< boost::shared_ptr<Tuple> > const& data, Coordinate offset)
-    : desc(schema), 
-      start(schema.getDimensions()[0].getStart() + offset), 
-      end(start + offset + schema.getDimensions()[0].getLength() - 1), 
-      tuples(data), chunkSize(schema.getDimensions()[0].getChunkInterval())
-    {
-        desc.cutOverlap();
-        if (Coordinate(start + tuples.size()) <= end) { 
-            end = start + tuples.size() - 1;
-        }
-    }
+//
+// TupleArray
+//
+void TupleArray::sort(vector<Key> const& keys)
+{
+	TupleComparator comparator(keys, getArrayDesc());
+	if (tuples.size() != 0) {
+		iqsort(&tuples[0], tuples.size(), comparator);
+	}
+}
 
-    void TupleArray::truncate()
-    {
-        Dimensions newDims(1);
-        DimensionDesc const& oldDim = desc.getDimensions()[0];
-        newDims[0] = DimensionDesc(oldDim.getBaseName(),
-                                   oldDim.getNamesAndAliases(),
-                                   oldDim.getStart(), 
-                                   oldDim.getStart(), 
-                                   oldDim.getStart() + tuples.size() - 1, 
-                                   oldDim.getStart() + tuples.size() - 1, 
-                                   oldDim.getChunkInterval(), 
-                                   0);
-        desc = ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
-    }
+ArrayDesc const& TupleArray::getArrayDesc() const
+{
+	return desc;
+}
 
-    void TupleArray::append(boost::shared_ptr<Array> inputArray)
-    {
-        size_t nAttrs = desc.getAttributes().size();
-        vector< boost::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
-        for (size_t i = 0; i < nAttrs; i++) { 
-            arrayIterators[i] = inputArray->getConstIterator(i);
-        }
-        append(arrayIterators, (size_t)-1);
-    }
+boost::shared_ptr<ConstArrayIterator> TupleArray::getConstIterator(AttributeID attId) const
+{
+	return boost::shared_ptr<ConstArrayIterator>(new TupleArrayIterator(*this, attId));
+}
 
-    void TupleArray::append(vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t nChunks)
-    {
-        size_t nAttrs = desc.getAttributes().size();
-        vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrs);
-        while (nChunks-- != 0 && !arrayIterators[0]->end()) { 
-            for (size_t i = 0; i < nAttrs; i++) { 
-                chunkIterators[i] = arrayIterators[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS|ConstChunkIterator::IGNORE_OVERLAPS);
-            }
-            while (!chunkIterators[0]->end()) { 
-                if (!chunkIterators[0]->isEmpty()) {
-                    Tuple& tuple = *new Tuple(nAttrs);
-                    tuples.push_back(boost::shared_ptr<Tuple>(&tuple));
-                    for (size_t i = 0; i < nAttrs; i++) {                         
-                        tuple[i] = chunkIterators[i]->getItem();
-                        ++(*chunkIterators[i]);
-                    }                
-                } else { 
-                    for (size_t i = 0; i < nAttrs; i++) {                    
-                        ++(*chunkIterators[i]);
-                    }                                    
-                }
-            }
-            for (size_t i = 0; i < nAttrs; i++) { 
-                ++(*arrayIterators[i]);
-            }                                
-        }
-    }
+TupleArray::TupleArray(ArrayDesc const& schema, vector< boost::shared_ptr<Tuple> > const& data, Coordinate offset)
+: desc(schema),
+  start(schema.getDimensions()[0].getStart() + offset),
+  end(start + offset + schema.getDimensions()[0].getLength() - 1),
+  tuples(data), chunkSize(schema.getDimensions()[0].getChunkInterval())
+{
+	desc.cutOverlap();
+	if (Coordinate(start + tuples.size()) <= end) {
+		end = start + tuples.size() - 1;
+	}
+}
 
-    void TupleArray::append(vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t shift, size_t step)
-    {
-        size_t nAttrs = desc.getAttributes().size();
-        vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrs);
-        
-        for (size_t j = shift; j != 0 && !arrayIterators[0]->end(); --j) {
-            for (size_t i = 0; i < nAttrs; i++) { 
-                ++(*arrayIterators[i]);
-            }                                
-        }
-        while (!arrayIterators[0]->end()) { 
-            for (size_t i = 0; i < nAttrs; i++) { 
-                chunkIterators[i] = arrayIterators[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS|ConstChunkIterator::IGNORE_OVERLAPS);
-            }
-            while (!chunkIterators[0]->end()) { 
-                if (!chunkIterators[0]->isEmpty()) {
-                    Tuple& tuple = *new Tuple(nAttrs);
-                    tuples.push_back(boost::shared_ptr<Tuple>(&tuple));
-                    for (size_t i = 0; i < nAttrs; i++) {                         
-                        tuple[i] = chunkIterators[i]->getItem();
-                        ++(*chunkIterators[i]);
-                    }                
-                } else { 
-                    for (size_t i = 0; i < nAttrs; i++) {                    
-                        ++(*chunkIterators[i]);
-                    }                                    
-                }
-            }
-            for (size_t j = step; j != 0 && !arrayIterators[0]->end(); --j) {
-                for (size_t i = 0; i < nAttrs; i++) { 
-                    ++(*arrayIterators[i]);
-                }                                
-            }
-        }
-    }
+void TupleArray::truncate()
+{
+	Dimensions newDims(1);
+	DimensionDesc const& oldDim = desc.getDimensions()[0];
+	newDims[0] = DimensionDesc(oldDim.getBaseName(),
+							   oldDim.getNamesAndAliases(),
+							   oldDim.getStart(),
+							   oldDim.getStart(),
+							   oldDim.getStart() + tuples.size() - 1,
+							   oldDim.getStart() + tuples.size() - 1,
+							   oldDim.getChunkInterval(),
+							   0);
+	desc = ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
+	start = newDims[0].getStart();
+	end = newDims[0].getEndMax();
+}
 
-    //
-    // TupleArrayIterator
-    //
-    ConstChunk const& TupleArrayIterator::getChunk()
-    {
-        if (!hasCurrent)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        chunk.lastPos = chunk.firstPos = currPos;
-        if ((chunk.lastPos[0] += array.chunkSize - 1) > array.end) { 
-            chunk.lastPos[0] = array.end;
-        }
-        return chunk;
-    }
+size_t TupleArray::getTupleFootprint(Attributes const& attrs)
+{
+	size_t res =0, n = attrs.size();
+	for(size_t i=0; i<n; i++)
+	{
+		size_t attSize = attrs[i].getSize();
+		if(attSize == 0)
+		{   //variable size
+			attSize = Config::getInstance()->getOption<int>(CONFIG_STRING_SIZE_ESTIMATION);
+		}
+		res += Value::getFootprint(attSize);
+	}
+	return res + sizeof(Tuple) + sizeof(shared_ptr<Tuple>);
+}
 
-    bool TupleArrayIterator::end() 
-    {
-        return !hasCurrent;
-    }
+/**
+ * This version of append does not yet support inputArray having one less attribute (the empty tag).
+ */
+void TupleArray::append(boost::shared_ptr<Array> inputArray)
+{
+	size_t nAttrs = desc.getAttributes().size();
+	vector< boost::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
+	for (size_t i = 0; i < nAttrs; i++) {
+		arrayIterators[i] = inputArray->getConstIterator(i);
+	}
+	append(arrayIterators, (size_t)-1);
+}
 
-    void TupleArrayIterator::operator ++()
-    {
-        if (!hasCurrent)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        currPos[0] += array.chunkSize;            
-        hasCurrent = currPos[0] <= array.end;
-    }
+/*
+ * arrayIterators may have one less attribute (the empty tag) than the output schema does.
+ */
+void TupleArray::append(vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t nChunks)
+{
+	size_t nAttrsOut = desc.getAttributes().size();
+	size_t nAttrsIn = arrayIterators.size();
+	assert(nAttrsIn==nAttrsOut || nAttrsIn+1==nAttrsOut);
 
-    Coordinates const& TupleArrayIterator::getPosition() 
-    {
-        if (!hasCurrent)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        return currPos;
-    }
+	// Whether empty tag needs to be generated manually.
+	bool manualEmptyTag = nAttrsIn + 1 == nAttrsOut;
 
-    bool TupleArrayIterator::setPosition(Coordinates const& pos)
-    {
-        if (pos[0] >= array.start && pos[0] <= array.end) { 
-            currPos[0] = pos[0] - ((pos[0] - array.start) % array.chunkSize);
-            hasCurrent = true;
-        } else { 
-            hasCurrent = false;
-        }
-        return hasCurrent;
-    }
+	// In TupleArray, all empty tag field is true.
+	Value trueValue(TypeLibrary::getType(TID_BOOL));
+	trueValue.setBool(true);
 
-    void TupleArrayIterator::reset()
-    {
-        currPos[0] = array.start;
-        hasCurrent = currPos[0] <= array.end;
-    }
+	vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrsIn);
+	while (nChunks-- != 0 && !arrayIterators[0]->end()) {
+		for (size_t i = 0; i < nAttrsIn; i++) {
+			chunkIterators[i] = arrayIterators[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS|ConstChunkIterator::IGNORE_OVERLAPS);
+		}
+		while (!chunkIterators[0]->end()) {
+			if (!chunkIterators[0]->isEmpty()) {
+				Tuple& tuple = *new Tuple(nAttrsOut);
+				tuples.push_back(boost::shared_ptr<Tuple>(&tuple));
+				for (size_t i = 0; i < nAttrsOut; i++) {
+					if (i+1<nAttrsOut || !manualEmptyTag) {
+						tuple[i] = chunkIterators[i]->getItem();
+						++(*chunkIterators[i]);
+					} else {
+						tuple[i] = trueValue;
+					}
+				}
+			} else {
+				for (size_t i = 0; i < nAttrsIn; i++) {
+					++(*chunkIterators[i]);
+				}
+			}
+		}
+		for (size_t i = 0; i < nAttrsIn; i++) {
+			++(*arrayIterators[i]);
+		}
+	}
+}
 
-    TupleArrayIterator::TupleArrayIterator(TupleArray const& arr, AttributeID att)
-    : array(arr), attrID(att), chunk(arr, att), currPos(1)
-    {
-        reset();
-    }
+/*
+ * arrayIterators may have one less attribute (the empty tag) than the output schema does.
+ */
+void TupleArray::append(vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t shift, size_t step)
+{
+	size_t nAttrsOut = desc.getAttributes().size();
+	size_t nAttrsIn = arrayIterators.size();
+	assert(nAttrsIn==nAttrsOut || nAttrsIn+1==nAttrsOut);
 
-     TupleArray::TupleArray(ArrayDesc const& schema, boost::shared_ptr<Array> inputArray)
-    : desc(schema), 
-      start(schema.getDimensions()[0].getStart()), 
-      end(schema.getDimensions()[0].getEndMax()), 
-      chunkSize(schema.getDimensions()[0].getChunkInterval())
-    {
-        if (schema.getDimensions().size() != 1)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
-        append(inputArray);
-        if (start == MIN_COORDINATE || end == MAX_COORDINATE) { 
-            start = 0;
-            end = tuples.size()-1;
-        } else if (Coordinate(start + tuples.size()) <= end) { 
-            end = start + tuples.size() - 1;
-        }
-    }
+	// Whether empty tag needs to be generated manually.
+	bool manualEmptyTag = nAttrsIn + 1 == nAttrsOut;
 
-    TupleArray::TupleArray(ArrayDesc const& schema, vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t nChunks)
-    : desc(schema), 
-      start(schema.getDimensions()[0].getStart()), 
-      end(schema.getDimensions()[0].getEndMax()), 
-      chunkSize(schema.getDimensions()[0].getChunkInterval())
-    {
-        if (schema.getDimensions().size() != 1)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
-        append(arrayIterators, nChunks);
-        if (start == MIN_COORDINATE || end == MAX_COORDINATE) { 
-            start = 0;
-            end = tuples.size()-1;
-        } else if (Coordinate(start + tuples.size()) <= end) { 
-            end = start + tuples.size() - 1;
-        }
-    }
+	// In TupleArray, all empty tag field is true.
+	Value trueValue(TypeLibrary::getType(TID_BOOL));
+	trueValue.setBool(true);
 
-    TupleArray::TupleArray(ArrayDesc const& schema, vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t shift, size_t step)
-    : desc(schema), 
-      start(schema.getDimensions()[0].getStart()), 
-      end(schema.getDimensions()[0].getEndMax()), 
-      chunkSize(schema.getDimensions()[0].getChunkInterval())
-    {
-        if (schema.getDimensions().size() != 1)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
-        append(arrayIterators, shift, step);
-        if (start == MIN_COORDINATE || end == MAX_COORDINATE) { 
-            start = 0;
-            end = tuples.size()-1;
-        } else if (Coordinate(start + tuples.size()) <= end) { 
-            end = start + tuples.size() - 1;
-        }
-    }
+	vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrsIn);
 
-    //
-    // Tuple chunk
-    //
+	for (size_t j = shift; j != 0 && !arrayIterators[0]->end(); --j) {
+		for (size_t i = 0; i < nAttrsIn; i++) {
+			++(*arrayIterators[i]);
+		}
+	}
+	while (!arrayIterators[0]->end()) {
+		for (size_t i = 0; i < nAttrsIn; i++) {
+			chunkIterators[i] = arrayIterators[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS|ConstChunkIterator::IGNORE_OVERLAPS);
+		}
+		while (!chunkIterators[0]->end()) {
+			if (!chunkIterators[0]->isEmpty()) {
+				Tuple& tuple = *new Tuple(nAttrsOut);
+				tuples.push_back(boost::shared_ptr<Tuple>(&tuple));
+				for (size_t i = 0; i < nAttrsOut; i++) {
+					if (i+1<nAttrsOut || !manualEmptyTag) {
+						tuple[i] = chunkIterators[i]->getItem();
+						++(*chunkIterators[i]);
+					} else {
+						tuple[i] = trueValue;
+					}
+				}
+			} else {
+				for (size_t i = 0; i < nAttrsIn; i++) {
+					++(*chunkIterators[i]);
+				}
+			}
+		}
+		for (size_t j = step; j != 0 && !arrayIterators[0]->end(); --j) {
+			for (size_t i = 0; i < nAttrsIn; i++) {
+				++(*arrayIterators[i]);
+			}
+		}
+	}
+}
 
-    const ArrayDesc& TupleChunk::getArrayDesc() const
-    {
-        return array.desc;
-    }
+//
+// TupleArrayIterator
+//
+ConstChunk const& TupleArrayIterator::getChunk()
+{
+	if (!hasCurrent)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	chunk.lastPos = chunk.firstPos = currPos;
+	if ((chunk.lastPos[0] += array.chunkSize - 1) > array.end) {
+		chunk.lastPos[0] = array.end;
+	}
+	return chunk;
+}
 
-    const AttributeDesc& TupleChunk::getAttributeDesc() const
-    {
-        return array.desc.getAttributes()[attrID];
-    }
+bool TupleArrayIterator::end()
+{
+	return !hasCurrent;
+}
 
-    int TupleChunk::getCompressionMethod() const
-    {
-        return getAttributeDesc().getDefaultCompressionMethod();
-    }
+void TupleArrayIterator::operator ++()
+{
+	if (!hasCurrent)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	currPos[0] += array.chunkSize;
+	hasCurrent = currPos[0] <= array.end;
+}
 
-    Coordinates const& TupleChunk::getFirstPosition(bool withOverlap) const
-    {
-        return firstPos;
-    }
+Coordinates const& TupleArrayIterator::getPosition()
+{
+	if (!hasCurrent)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	return currPos;
+}
 
-    Coordinates const& TupleChunk::getLastPosition(bool withOverlap) const
-    {
-        return lastPos;
-    }
+bool TupleArrayIterator::setPosition(Coordinates const& pos)
+{
+	if (pos[0] >= array.start && pos[0] <= array.end) {
+		currPos[0] = pos[0] - ((pos[0] - array.start) % array.chunkSize);
+		hasCurrent = true;
+	} else {
+		hasCurrent = false;
+	}
+	return hasCurrent;
+}
 
-    boost::shared_ptr<ConstChunkIterator> TupleChunk::getConstIterator(int iterationMode) const
-    {
-        return boost::shared_ptr<ConstChunkIterator>(new TupleChunkIterator(*this, iterationMode));
-    }
+void TupleArrayIterator::reset()
+{
+	currPos[0] = array.start;
+	hasCurrent = currPos[0] <= array.end;
+}
 
-    TupleChunk::TupleChunk(TupleArray const& arr, AttributeID att)
-    : array(arr), attrID(att), firstPos(1), lastPos(1)
-    {
-    }
+TupleArrayIterator::TupleArrayIterator(TupleArray const& arr, AttributeID att)
+: array(arr), attrID(att), chunk(arr, att), currPos(1)
+{
+	reset();
+}
 
-    //
-    // TupleChunkIterator
-    //
-    int TupleChunkIterator::getMode()
-    {
-        return mode;
-    }
+ TupleArray::TupleArray(ArrayDesc const& schema, boost::shared_ptr<Array> inputArray)
+: desc(schema),
+  start(schema.getDimensions()[0].getStart()),
+  end(schema.getDimensions()[0].getEndMax()),
+  chunkSize(schema.getDimensions()[0].getChunkInterval())
+{
+	if (schema.getDimensions().size() != 1)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
+	append(inputArray);
+	if (start == MIN_COORDINATE || end == MAX_COORDINATE) {
+		start = 0;
+		end = tuples.size()-1;
+	} else if (Coordinate(start + tuples.size()) <= end) {
+		end = start + tuples.size() - 1;
+	}
+}
 
-     Value& TupleChunkIterator::getItem()
-    {
-        if (i > last)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        return (*array.tuples[i])[attrID];
-    }
+TupleArray::TupleArray(ArrayDesc const& schema, vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t nChunks)
+: desc(schema),
+  start(schema.getDimensions()[0].getStart()),
+  end(schema.getDimensions()[0].getEndMax()),
+  chunkSize(schema.getDimensions()[0].getChunkInterval())
+{
+	if (schema.getDimensions().size() != 1)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
+	append(arrayIterators, nChunks);
+	if (start == MIN_COORDINATE || end == MAX_COORDINATE) {
+		start = 0;
+		end = tuples.size()-1;
+	} else if (Coordinate(start + tuples.size()) <= end) {
+		end = start + tuples.size() - 1;
+	}
+}
 
-    bool TupleChunkIterator::isEmpty()
-    {
-        if (i > last)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        return !array.tuples[i];
-    }
+TupleArray::TupleArray(ArrayDesc const& schema, vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t shift, size_t step)
+: desc(schema),
+  start(schema.getDimensions()[0].getStart()),
+  end(schema.getDimensions()[0].getEndMax()),
+  chunkSize(schema.getDimensions()[0].getChunkInterval())
+{
+	if (schema.getDimensions().size() != 1)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
+	append(arrayIterators, shift, step);
+	if (start == MIN_COORDINATE || end == MAX_COORDINATE) {
+		start = 0;
+		end = tuples.size()-1;
+	} else if (Coordinate(start + tuples.size()) <= end) {
+		end = start + tuples.size() - 1;
+	}
+}
 
-    bool TupleChunkIterator::end()
-    {
-        return i > last;
-    }
-     
-    inline bool TupleChunkIterator::isVisible() const
-    {
-        return !((mode & IGNORE_EMPTY_CELLS) && !array.tuples[i])
-            && !((mode & IGNORE_NULL_VALUES) && array.tuples[i] && (*array.tuples[i])[attrID].isNull());
-    }
-    
-    void TupleChunkIterator::operator ++()
-    {
-        if (i > last)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        while (++i <= last && !isVisible());
-    }
-    
-    Coordinates const& TupleChunkIterator::getPosition()
-    {
-        if (i > last)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
-        currPos[0] = i + array.start;
-        return currPos;
-    }
+//
+// Tuple chunk
+//
 
-    bool TupleChunkIterator::setPosition(Coordinates const& pos)
-    {
-        if (pos[0] < chunk.firstPos[0] || pos[0] > chunk.lastPos[0]) { 
-            return false;
-        }
-        i = size_t(pos[0] - array.start);
-        return isVisible();
-    }
-    
-    void TupleChunkIterator::reset()
-    {
-        for (i = chunk.firstPos[0] - array.start; i <= last && !isVisible(); i++);
-    }
-     
-    ConstChunk const& TupleChunkIterator::getChunk()
-    {
-        return chunk;
-    }
+const ArrayDesc& TupleChunk::getArrayDesc() const
+{
+	return array.desc;
+}
 
-    TupleChunkIterator::TupleChunkIterator(TupleChunk const& aChunk, int iterationMode)
-    : chunk(aChunk),
-      array(aChunk.array),
-      attrID(aChunk.attrID),
-      currPos(1),
-      last(size_t(chunk.lastPos[0] - array.start)),
-      mode(iterationMode)
-    {
-        reset();
-    }
+const AttributeDesc& TupleChunk::getAttributeDesc() const
+{
+	return array.desc.getAttributes()[attrID];
+}
+
+int TupleChunk::getCompressionMethod() const
+{
+	return getAttributeDesc().getDefaultCompressionMethod();
+}
+
+Coordinates const& TupleChunk::getFirstPosition(bool withOverlap) const
+{
+	return firstPos;
+}
+
+Coordinates const& TupleChunk::getLastPosition(bool withOverlap) const
+{
+	return lastPos;
+}
+
+boost::shared_ptr<ConstChunkIterator> TupleChunk::getConstIterator(int iterationMode) const
+{
+	return boost::shared_ptr<ConstChunkIterator>(new TupleChunkIterator(*this, iterationMode));
+}
+
+TupleChunk::TupleChunk(TupleArray const& arr, AttributeID att)
+: array(arr), attrID(att), firstPos(1), lastPos(1)
+{
+}
+
+//
+// TupleChunkIterator
+//
+int TupleChunkIterator::getMode()
+{
+	return mode;
+}
+
+ Value& TupleChunkIterator::getItem()
+{
+	if (i > last)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	return (*array.tuples[i])[attrID];
+}
+
+bool TupleChunkIterator::isEmpty()
+{
+	if (i > last)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	return !array.tuples[i];
+}
+
+bool TupleChunkIterator::end()
+{
+	return i > last;
+}
+
+inline bool TupleChunkIterator::isVisible() const
+{
+	return !((mode & IGNORE_EMPTY_CELLS) && !array.tuples[i])
+		&& !((mode & IGNORE_NULL_VALUES) && array.tuples[i] && (*array.tuples[i])[attrID].isNull());
+}
+
+void TupleChunkIterator::operator ++()
+{
+	if (i > last)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	while (++i <= last && !isVisible());
+}
+
+Coordinates const& TupleChunkIterator::getPosition()
+{
+	if (i > last)
+		throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+	currPos[0] = i + array.start;
+	return currPos;
+}
+
+bool TupleChunkIterator::setPosition(Coordinates const& pos)
+{
+	if (pos[0] < chunk.firstPos[0] || pos[0] > chunk.lastPos[0]) {
+		return false;
+	}
+	i = size_t(pos[0] - array.start);
+	return isVisible();
+}
+
+void TupleChunkIterator::reset()
+{
+	for (i = chunk.firstPos[0] - array.start; i <= last && !isVisible(); i++);
+}
+
+ConstChunk const& TupleChunkIterator::getChunk()
+{
+	return chunk;
+}
+
+TupleChunkIterator::TupleChunkIterator(TupleChunk const& aChunk, int iterationMode)
+: chunk(aChunk),
+  array(aChunk.array),
+  attrID(aChunk.attrID),
+  currPos(1),
+  last(size_t(chunk.lastPos[0] - array.start)),
+  mode(iterationMode)
+{
+	reset();
+}
 }
 
         

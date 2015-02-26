@@ -15,10 +15,10 @@ set(scidbtest_src
 	src/errdb.cpp
 	src/Exceptions.cpp
 	src/defaultexecutor.cpp
-    src/harnesstestexecutor.cpp
+	src/harnesstestexecutor.cpp
 	src/executorfactory.cpp
 	src/scidbtestcaseexecutor.cpp
-    src/scidbtest.cpp
+	src/scidbtest.cpp	
 )
 add_executable(scidbtest ${scidbtest_src})
 set_target_properties(scidbtest PROPERTIES COMPILE_FLAGS "--pedantic -Wall -Wno-long-long -g -DSCIDB_CLIENT")
@@ -75,6 +75,12 @@ else(${Boost_MAJOR_VERSION} LESS 2 AND ${Boost_MINOR_VERSION} LESS 46)
 endif(${Boost_MAJOR_VERSION} LESS 2 AND ${Boost_MINOR_VERSION} LESS 46)
 
 configure_file(test_config.ini config.ini)
+configure_file(runN.py "${GENERAL_HARNESSTEST_DIRECTORY}/runN.py" COPYONLY)
+configure_file(scidbtestprep.py "${GENERAL_OUTPUT_DIRECTORY}/scidbtestprep.py" COPYONLY)
+configure_file(mu_admin.py "${GENERAL_OUTPUT_DIRECTORY}/mu_admin.py")
+configure_file(log4j.properties "${GENERAL_OUTPUT_DIRECTORY}/log4j.properties" COPYONLY)
+configure_file("testcases/t/client/basic.py.in" "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/client/basic.py")
+configure_file("testcases/t/client/querylist.csv"  "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/client/querylist.csv")
 
 #_____________________________________________________________________________________________________________
 # CDASH report #

@@ -24,7 +24,15 @@ public:
 
     virtual ArrayDesc const&                        getArrayDesc() const;
     virtual boost::shared_ptr<ConstArrayIterator>   getConstIterator(AttributeID attr) const;
-    virtual bool                                    supportsRandomAccess() const;
+
+    /**
+     * Get the least restrictive access mode that the array supports.
+     * @return SINGLE_PASS
+     */
+    virtual Access getSupportedAccess() const
+    {
+        return SINGLE_PASS;
+    }
 
     ConstChunk*                                     getChunkByIndex(size_t index, AttributeID attr);
 

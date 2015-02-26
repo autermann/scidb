@@ -20,8 +20,8 @@
 * END_COPYRIGHT
 */
 
-/*
- * @file PhysicalExample.cpp
+/**
+ * @file PhysicalInput.cpp
  *
  * @author roman.simakov@gmail.com
  *
@@ -47,42 +47,44 @@ namespace scidb
 // Logger for network subsystem. static to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr oplogger(log4cxx::Logger::getLogger("scidb.ops.impl_input"));
 
-class PhysicalInput: public PhysicalOperator
+class PhysicalInput : public PhysicalOperator
 {
 public:
-    PhysicalInput(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalInput(std::string const& logicalName,
+                  std::string const& physicalName,
+                  Parameters const& parameters,
+                  ArrayDesc const& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
 
-        virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-        {
-                return false;
-        }
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
+    {
+        return true;
+    }
 
-        int64_t getSourceInstanceID() const
-        {
-        if (_parameters.size() == 3)
+    int64_t getSourceInstanceID() const
+    {
+        if (_parameters.size() >= 3)
         {
             assert(_parameters[2]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
             boost::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2];
             assert(paramExpr->isConstant());
             return paramExpr->getExpression()->evaluate().getInt64();
         }
-        return -2;
-        }
+        return COORDINATOR_INSTANCE_MASK;
+    }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                    const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector<ArrayDesc> const&) const
     {
-        int64_t sourceInstanceID = getSourceInstanceID();
-        if (sourceInstanceID == -1 )
-        {
+        InstanceID sourceInstanceID = getSourceInstanceID();
+        if (sourceInstanceID == ALL_INSTANCES_MASK) {
             //The file is loaded from multiple instances - the distribution could be possibly violated - assume the worst
             return ArrayDistribution(psUndefined);
         }
-        else
-        {
+        else {
             return ArrayDistribution(psLocalInstance);
         }
     }
@@ -98,28 +100,49 @@ public:
         assert(paramExpr->isConstant());
         const string fileName = paramExpr->getExpression()->evaluate().getString();
 
-        int64_t sourceInstanceID = getSourceInstanceID() == -2 ? query->getCoordinatorID() : getSourceInstanceID();
-
-        if (sourceInstanceID < -1 || sourceInstanceID >= (int64_t) query->getInstancesCount())
+        InstanceID sourceInstanceID = getSourceInstanceID();
+        
+        if (sourceInstanceID != COORDINATOR_INSTANCE_MASK && sourceInstanceID != ALL_INSTANCES_MASK && (size_t)sourceInstanceID >= query->getInstancesCount())
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_INVALID_INSTANCE_ID) << sourceInstanceID;
 
-        int64_t myInstanceID = query->getInstanceID();
+        if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) { 
+            sourceInstanceID = query->getCoordinatorInstanceID();
+        }
+
+        int64_t maxErrors = 0;
+        string shadowArray;
+        InstanceID myInstanceID = query->getInstanceID();
 
         boost::shared_ptr<Array> result;
+        string format;
+        if (_parameters.size() >= 4)
+        {
+            assert(_parameters[3]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
+            paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[3];
+            assert(paramExpr->isConstant());
+            format = paramExpr->getExpression()->evaluate().getString();
+            if (_parameters.size() >= 5)
+            {
+                assert(_parameters[4]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
+                paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[4];
+                assert(paramExpr->isConstant());
+                maxErrors = paramExpr->getExpression()->evaluate().getInt64();
+                if (_parameters.size() >= 6)
+                {
+                    assert(_parameters[5]->getParamType() == PARAM_ARRAY_REF);
+                    shadowArray = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[5])->getObjectName();
+                } 
+            }
+        } 
         try
         {
-            if (sourceInstanceID == -1 || sourceInstanceID == myInstanceID)
-            {
-               result = boost::shared_ptr<Array>(new InputArray(_schema, fileName, query));
-            }
-            else
-            {
-                result = boost::shared_ptr<Array>(new MemArray(_schema));
-            }
+            bool isBinary = compareStringsIgnoreCase(format, "opaque") == 0 || format[0] == '(';
+            result = boost::shared_ptr<Array>(new InputArray(_schema, fileName, format, query, 
+                                                             sourceInstanceID != ALL_INSTANCES_MASK && sourceInstanceID != myInstanceID ? AS_EMPTY : isBinary ? AS_BINARY_FILE : AS_TEXT_FILE, maxErrors, shadowArray, sourceInstanceID == ALL_INSTANCES_MASK));
         }
         catch(const Exception& e)
         {
-            if (e.getLongErrorCode() != SCIDB_LE_CANT_OPEN_FILE || sourceInstanceID == myInstanceID )
+            if (e.getLongErrorCode() != SCIDB_LE_CANT_OPEN_FILE || sourceInstanceID == myInstanceID)
             {
                 throw;
             }

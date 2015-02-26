@@ -51,99 +51,22 @@ namespace scidb {
 
 class PhysicalStore: public PhysicalOperator
 {
-    class StoreJob : public Job, protected SelfStatistics
-    {
-      private:
-        size_t shift;
-        size_t step;
-        shared_ptr<Array> dstArray;
-        shared_ptr<Array> srcArray;
-        vector< shared_ptr<ArrayIterator> > dstArrayIterators;
-        vector< shared_ptr<ConstArrayIterator> > srcArrayIterators;
-
-      public:
-        Coordinates lowBoundary;
-        Coordinates highBoundary;
-
-        StoreJob(size_t id, size_t nJobs, shared_ptr<Array> dst,
-                 shared_ptr<Array> src, size_t nDims, size_t nAttrs,
-                 shared_ptr<Query> query)
-        : Job(query), shift(id), step(nJobs), dstArray(dst), srcArray(src),
-          dstArrayIterators(nAttrs), srcArrayIterators(nAttrs), lowBoundary(nDims, MAX_COORDINATE), highBoundary(nDims, MIN_COORDINATE)
-        {
-            for (size_t i = 0; i < nAttrs; i++) {
-               dstArrayIterators[i] = dstArray->getIterator(i);
-               srcArrayIterators[i] = srcArray->getConstIterator(i);
-            }
-        }
-
-        virtual void run()
-        {
-            ArrayDesc const& dstArrayDesc = dstArray->getArrayDesc();
-            size_t nAttrs = dstArrayDesc.getAttributes().size();
-            Dimensions const& dims = dstArrayDesc.getDimensions();
-            size_t nDims = dims.size();
-                
-            Query::setCurrentQueryID(_query->getQueryID());
-
-            for (size_t i = shift; i != 0 && !srcArrayIterators[0]->end(); --i) {
-                for (size_t j = 0; j < nAttrs; j++) {
-                    ++(*srcArrayIterators[j]);
-                }
-            }
-
-            while(!srcArrayIterators[0]->end()) {
-                for (size_t i = 0; i < nAttrs; i++) {
-                    ConstChunk const& srcChunk = srcArrayIterators[i]->getChunk();
-                    Coordinates const& first = srcChunk.getFirstPosition(false);
-                    Coordinates const& last = srcChunk.getLastPosition(false);
-                    bool newHighBoundary = false;
-                    for (size_t j = 0; j < nDims; j++) {
-                        if (last[j] > highBoundary[j]) {
-                            if (dims[j].getLength() == INFINITE_LENGTH) { 
-                                newHighBoundary = true;
-                            } else { 
-                                highBoundary[j] = last[j];
-                            }
-                        }
-                        if (first[j] < lowBoundary[j]) {
-                            lowBoundary[j] = first[j];
-                        }
-                    }
-                    if (newHighBoundary) { 
-                        Coordinates high = srcChunk.getHighBoundary(false);
-                        for (size_t j = 0; j < nDims; j++) {
-                            if (high[j] > highBoundary[j]) {
-                                highBoundary[j] = high[j];
-                            }
-                        }
-                    }
-                    dstArrayIterators[i]->copyChunk(srcChunk);
-
-                    Query::validateQueryPtr(_query);
-
-                    for (size_t j = step; j != 0 && !srcArrayIterators[i]->end(); ++(*srcArrayIterators[i]), --j);
-                }
-            }
-        }
-    };
-
-
-   private:
-   ArrayID   _arrayID;   /**< ID of new array */
-   ArrayID   _updateableArrayID;   /**< ID of new array */
+  private:
+   ArrayUAID _arrayUAID;   /**< UAID of new array */
+   ArrayID _arrayID;   /**< ID of new array */
    VersionID _lastVersion;
    shared_ptr<SystemCatalog::LockDesc> _lock;
 
   public:
-        PhysicalStore(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-                PhysicalOperator(logicalName, physicalName, parameters, schema), _arrayID((ArrayID)~0), _updateableArrayID((ArrayID)~0)
-        {
-        }
+   PhysicalStore(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+        PhysicalOperator(logicalName, physicalName, parameters, schema),
+        _arrayUAID(0),
+        _arrayID(0)
+   {}
 
    void preSingleExecute(shared_ptr<Query> query)
    {
-        ArrayDesc desc;
+        ArrayDesc parentArrayDesc;
         shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
         assert(membership);
         if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
@@ -162,51 +85,55 @@ class PhysicalStore: public PhysicalOperator
         Dimensions const& dims =  _schema.getDimensions();        
         size_t nDims = dims.size();
         Dimensions newVersionDims(nDims);
-        bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(arrayName, desc, false);
+        bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(arrayName, parentArrayDesc, false);
         _lastVersion = 0;
         bool rc = false;
         if (!arrayExists) { 
             if (_schema.getId() != 0) {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName        ;
+                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
             }
             _lock->setLockMode(SystemCatalog::LockDesc::CRT);
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
-            desc = _schema;
-            desc.setId(SystemCatalog::getInstance()->addArray(desc, psRoundRobin));
+            parentArrayDesc = _schema;
+            SystemCatalog::getInstance()->addArray(parentArrayDesc, psRoundRobin);
         } else { 
-            if (_schema.getId() != desc.getId()) {
+            if (_schema.getId() != parentArrayDesc.getId()) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
             }
-            if (!desc.isImmutable()) { 
-                _lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
+            if (!parentArrayDesc.isImmutable()) { 
+                _lastVersion = SystemCatalog::getInstance()->getLastVersion(parentArrayDesc.getId());
             } 
         }
 
-        Dimensions const& dstDims = desc.getDimensions();        
+        Dimensions const& dstDims = parentArrayDesc.getDimensions();        
+        bool changeMapping = false;
 
         for (size_t i = 0; i < nDims; i++) {
             DimensionDesc const& dim = dims[i];
             string const& mappingArrayName = dim.getMappingArrayName();
             newVersionDims[i] = dim;
+            newVersionDims[i].setCurrStart(MAX_COORDINATE);
+            newVersionDims[i].setCurrEnd(MIN_COORDINATE);
             if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) { 
-                if (arrayExists && desc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName()) { 
+                if (arrayExists && parentArrayDesc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName() && !dstDims[i].getMappingArrayName().empty()) { 
                     throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CAN_NOT_CHANGE_MAPPING) << arrayName;
                 }
+                changeMapping = true;
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(mappingArrayName);
                 if (tmpMappingArray) { 
                     ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
-                    string newMappingArrayName = desc.createMappingArrayName(i, _lastVersion+1);
+                    string newMappingArrayName = parentArrayDesc.createMappingArrayName(i, _lastVersion+1);
                     if (SystemCatalog::getInstance()->containsArray(newMappingArrayName)) { 
                         throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << newMappingArrayName;
                     }
                     ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(), tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
-                    ArrayID mappingArrayID = SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
-                    assert(mappingArrayID > 0);
+                    SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
+                    assert(mappingArrayDesc.getId()>0);
                     newVersionDims[i] = DimensionDesc(dim.getBaseName(),
                                                       dim.getNamesAndAliases(),
-                                                      dim.getStartMin(), dim.getCurrStart(),
-                                                      dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(),
+                                                      dim.getStartMin(), MAX_COORDINATE,
+                                                      MIN_COORDINATE, dim.getEndMax(), dim.getChunkInterval(),
                                                       dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
                                                       newMappingArrayName,
                                                       dim.getComment(),
@@ -215,22 +142,22 @@ class PhysicalStore: public PhysicalOperator
                  }
             }
         }
-        if (desc.isImmutable()) {
-           return;
+        if (parentArrayDesc.isImmutable()) {
+            if (changeMapping) { 
+                SystemCatalog::getInstance()->updateArray(ArrayDesc(parentArrayDesc.getId(), parentArrayDesc.getUAId(), parentArrayDesc.getVersionId(), parentArrayDesc.getName(), parentArrayDesc.getAttributes(), newVersionDims));
+            };
+            return;
         }
 
-        _updateableArrayID = desc.getId();
-        _lock->setArrayId(_updateableArrayID);
+        _arrayUAID = parentArrayDesc.getUAId();
+        _lock->setArrayId(_arrayUAID);
         _lock->setArrayVersion(_lastVersion+1);
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
         assert(rc);
 
-        std::stringstream ss;
-        ss << arrayName << "@" << (_lastVersion+1);
-        string versionName = ss.str();
-        _schema = ArrayDesc(versionName, desc.getAttributes(), newVersionDims);
-        _arrayID = SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
-
+        _schema = ArrayDesc(ArrayDesc::makeVersionedName(arrayName, _lastVersion+1), parentArrayDesc.getAttributes(), newVersionDims);
+        SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
+        _arrayID = _schema.getId();
         _lock->setArrayVersionId(_arrayID);
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
         assert(rc);
@@ -240,8 +167,8 @@ class PhysicalStore: public PhysicalOperator
     virtual void postSingleExecute(shared_ptr<Query> query)
     {
         assert(_lock);
-        if (_updateableArrayID != (ArrayID)~0) {
-            SystemCatalog::getInstance()->createNewVersion(_updateableArrayID, _arrayID);
+        if (_arrayID != 0) {
+            SystemCatalog::getInstance()->createNewVersion(_arrayUAID, _arrayID);
         }
     }
 
@@ -261,8 +188,8 @@ class PhysicalStore: public PhysicalOperator
     shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
-        VersionID version(0);
-        string baseArrayName = splitArrayNameVersion(_schema.getName(), version);
+        VersionID version = ArrayDesc::getVersionFromName(_schema.getName());
+        string baseArrayName = ArrayDesc::makeUnversionedName(_schema.getName());
         query->exclusiveLock(baseArrayName);
 
         if (!_lock) {
@@ -290,18 +217,18 @@ class PhysicalStore: public PhysicalOperator
         shared_ptr<Array> dstArray = shared_ptr<Array>(new DBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
         ArrayDesc const& dstArrayDesc = dstArray->getArrayDesc();
         size_t nAttrs = dstArrayDesc.getAttributes().size();
-        ArrayID arrId = dstArray->getHandle();
 
         if (nAttrs == 0) { 
             return dstArray;
         }
-        if (nAttrs != srcArrayDesc.getAttributes().size()) { 
+        if (nAttrs > srcArrayDesc.getAttributes().size()) {
+            assert(nAttrs == srcArrayDesc.getAttributes().size()+1);
             srcArray = boost::shared_ptr<Array>(new NonEmptyableArray(srcArray));
         } 
 
         // Perform parallel evaluation of aggregate
-        shared_ptr<JobQueue> queue = ParallelAccumulatorArray::getQueue();
-        size_t nJobs = srcArray->supportsRandomAccess() ? Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS) : 1;
+        shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
+        size_t nJobs = srcArray->getSupportedAccess() == Array::RANDOM ? Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS) : 1;
         vector< shared_ptr<StoreJob> > jobs(nJobs);
         Dimensions const& dims = dstArrayDesc.getDimensions();
         Dimensions const& srcDims = srcArrayDesc.getDimensions();
@@ -313,40 +240,32 @@ class PhysicalStore: public PhysicalOperator
             queue->pushJob(jobs[i]);
         }
 
-        // Combine results
-        Coordinates lowBoundary(nDims);
-        Coordinates highBoundary(nDims);
-        for (size_t i = 0; i < nDims; i++) {
-            lowBoundary[i] = srcDims[i].getCurrStart();
-            highBoundary[i] = srcDims[i].getCurrEnd();
-        }
+        PhysicalBoundaries bounds = PhysicalBoundaries::createEmpty(nDims);
         int errorJob = -1;
         for (size_t i = 0; i < nJobs; i++) {
             if (!jobs[i]->wait()) {
                 errorJob = i;
-            } else {
-                for (size_t j = 0; j < nDims; j++) {
-                    if (jobs[i]->highBoundary[j] > highBoundary[j]) {
-                        highBoundary[j] = jobs[i]->highBoundary[j];
-                    }
-                    if (jobs[i]->lowBoundary[j] < lowBoundary[j]) {
-                        lowBoundary[j] = jobs[i]->lowBoundary[j];
-                    }
-                }
+            }
+            else {
+                bounds = bounds.unionWith(jobs[i]->bounds);
             }
         }
         if (errorJob >= 0) {
             jobs[errorJob]->rethrow();
         }
-        for (size_t i = 0; i < nDims; i++) {
-            if (lowBoundary[i] < dims[i].getStartMin()) {  
-                lowBoundary[i] = dims[i].getStartMin();
+
+        if(!dstArrayDesc.isImmutable())
+        {   //Destination array is mutable: collect the coordinates of all chunks created by all jobs
+            set<Coordinates, CoordinatesLess> createdChunks;
+            for(size_t i =0; i < nJobs; i++)
+            {
+                createdChunks.insert(jobs[i]->getCreatedChunks().begin(), jobs[i]->getCreatedChunks().end());
             }
-            if (highBoundary[i] > dims[i].getEndMax()) {  
-                highBoundary[i] = dims[i].getEndMax();
-            }
+            //Insert tombstone entries
+            StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
         }
-        SystemCatalog::getInstance()->updateArrayBoundaries(arrId, lowBoundary, highBoundary);
+
+        SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
         StorageManager::getInstance().flush();
         query->replicationBarrier();
 
@@ -357,6 +276,18 @@ class PhysicalStore: public PhysicalOperator
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(srcMappingArrayName);
                 if (tmpMappingArray) { 
                     DBArray dbMappingArray(dstMappingArrayName, query);
+                    ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
+                    ArrayDesc const& dbMappingArrayDesc = dbMappingArray.getArrayDesc();
+                    if (query->getCoordinatorID() == COORDINATOR_INSTANCE 
+                        && tmpMappingArrayDesc.getDimensions()[0].getChunkInterval() != dbMappingArrayDesc.getDimensions()[0].getChunkInterval()) { 
+                        SystemCatalog::getInstance()->updateArray(ArrayDesc(dbMappingArrayDesc.getId(),
+                                                                            dbMappingArrayDesc.getUAId(),
+                                                                            dbMappingArrayDesc.getVersionId(),
+                                                                            dbMappingArrayDesc.getName(),
+                                                                            dbMappingArrayDesc.getAttributes(),
+                                                                            tmpMappingArrayDesc.getDimensions(),
+                                                                            dbMappingArrayDesc.getFlags()));
+                    }
                     shared_ptr<ArrayIterator> srcArrayIterator = tmpMappingArray->getIterator(0);
                     shared_ptr<ArrayIterator> dstArrayIterator = dbMappingArray.getIterator(0);
                     Chunk& dstChunk = dstArrayIterator->newChunk(srcArrayIterator->getPosition(), 0);

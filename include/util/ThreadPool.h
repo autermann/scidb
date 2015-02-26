@@ -122,7 +122,7 @@ public:
     ~ThreadPool() { 
         stop();
     }
-            
+
     boost::shared_ptr<JobQueue> getQueue() const
     {
         return _queue;
@@ -135,6 +135,7 @@ public:
 
     // Waits completing current jobs
     void waitCurrentJobs();
+
 };
 
 

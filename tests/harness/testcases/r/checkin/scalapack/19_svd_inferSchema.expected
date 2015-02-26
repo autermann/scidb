@@ -1,0 +1,69 @@
+Query was executed successfully
+
+{r,c} x
+{0,0} 1
+
+Query was executed successfully
+
+r,i,u
+0,0,1
+
+i,sigma
+0,1
+
+i,c,v
+0,0,1
+
+r,i,u
+0,0,1
+
+i,sigma
+0,1
+
+i,c,v
+0,0,1
+
+i,sigma
+0,1
+
+[An error expected at this place for the query "gesvd(A_1c1, 'foo')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33.]
+
+r,i,u
+0,0,1
+
+Query was executed successfully
+
+i,sigma
+0,1
+
+Query was executed successfully
+
+i,c,v
+0,0,1
+
+Query was executed successfully
+
+Query was executed successfully
+
+i,j,x
+0,0,1
+
+i_1,i_2,u
+0,0,1
+
+Query was executed successfully
+
+Query was executed successfully
+
+h,i,x
+0,0,1
+
+i_1,i_2,u
+0,0,1
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

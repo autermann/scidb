@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalAllVersions.cpp
  *
  * @author knizhnik@garret.ru
  *
@@ -46,6 +46,23 @@ public:
     PhysicalAllVersions(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+    }
+
+    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
+    {
+        return true;
+    }
+
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
+    {
+        return false;
+    }
+
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const& inputDistributions,
+            std::vector< ArrayDesc> const& inputSchemas) const
+    {
+        return ArrayDistribution(psUndefined);
     }
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)

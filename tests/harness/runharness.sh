@@ -11,6 +11,7 @@
 harnessdir=$1
 dbname=$SCIDB_NIGHTLY_DBNAME
 cfgfile=$SCIDB_NIGHTLY_CFGFILE
+
 export IQUERY_HOST=localhost
 export IQUERY_PORT=8888
 
@@ -30,42 +31,106 @@ if ! [[ -n $dbname ]]; then
     cfgfile="./config.ini"
 fi
 
-# If planet coordinator
-if [[ `hostname` == "sciDB-Master" ]]; then
-    dbname="nightlyplanet"
+# rhel54-vm
+if [[ `hostname` == "rhel54-vm" ]]; then
+    dbname="nightly"
+    cfgfile="./config.ini"
+fi
+
+if [[ `hostname` == "rhel6-vm" ]]; then
+    dbname="rh6"
+    cfgfile="./config.ini"
+fi
+
+if [[ `hostname` == "ubuntu1204-vm" ]]; then
+    dbname="ubuntu1204vm"
+    cfgfile="./config.ini"
+fi
+
+# If ubuntu1104-vm coordinator
+if [[ `hostname` == "ubuntu1104-vm" ]]; then
+    ninst=$NUM_INSTANCES
+    dbname="ubuntu1104vm_i${ninst}"
     cfgfile="./config.ini"
 fi
 echo $dbname
 echo $cfgfile
-echo "Initializing and Starting SciDB..."
 
-scidb.py stopall $dbname  $cfgfile
-scidb.py initall $dbname  $cfgfile
-scidb.py startall $dbname  $cfgfile
+
+if [[ $USE_VALGRIND == 1 ]]; then
+    echo 'Killing SciDB instances on port 1239.'
+    ps aux | grep 1239 | awk '{print $2}'|xargs kill
+    echo 'Running SciDB under Valgrind...'
+    ./runN.py 1 $dbname --istart
+#    ./mktestsymlink.py $dbname $cfgfile
+    sleep 10
+    scidbtestharness --root-dir=testcases --suite-id=checkin,z_valgrind --report-file=Report.xml $@
+    exit 0
+fi
+
+
+function scidb_init_start() {
+    if [[ $SCIDB_INIT == "1" ]]; then
+        echo "Initializing and Starting SciDB..."
+        scidb.py stopall $dbname  $cfgfile
+	sudo -u postgres /opt/Continuous/bin/scidb.py init_syscat $dbname $cfgfile
+        scidb.py initall-force $dbname  $cfgfile
+        scidb.py startall $dbname  $cfgfile
+    else
+        echo "Stopping and Starting SciDB... (SCIDB_INIT variable set, most likely in ScidbSubmitBuild)"
+        scidb.py stopall $dbname  $cfgfile
+        scidb.py startall $dbname  $cfgfile
+    fi
+    scidb.py purge $dbname $cfgfile
+}
+
 pwd
-./mktestsymlink.py $dbname  $cfgfile
+scidb_init_start
 
-#echo "Executing scidbtestharness..."
-#initialization run
+scidbtestprep.py "linkdata" `pwd`/../../tests tests $dbname $cfgfile
+scidbtestprep.py "linkdata" `pwd`/../../doc/user/examples examples $dbname $cfgfile
+
 scidbtestharness --port 8888 --debug 5 --root-dir=testcases --test-id=no $@
 
-#echo "Executing runN.py."
 h_dir=`pwd`
-#cd ../basic
-# ./runN.py 1 $dbname unit 8888
-#scidbtestharness --port 8888 --debug 5 --root-dir=testcases --suite-id=checkin --report-file=Report_1.xml $@
-
-echo "Re-initializing SciDB..."
-scidb.py stopall $dbname  $cfgfile
-scidb.py initall $dbname  $cfgfile
-scidb.py startall $dbname  $cfgfile
-
+scidb_init_start
 # Set dbname for unit tests
 sedexpr="s/mydb/$dbname/g"
 sed -i -e "$sedexpr" testcases/t/checkin/other/unit.test
 
-echo "Executing scidbtestharness..."
-scidbtestharness --port 8888 --debug 5 --root-dir=testcases --report-file=Report.xml $@
+
+suites="aggregates,aql_neg_misc,compression,fits,iqueryabort,newaql,sparse,aql_misc,checkin,data_model,expression,flip_n_store,negative,other,pload,update,rankquantile,docscript,mpi"
+
+delim=","
+debugsuites="injecterror"
+skipfile='disable.tests'
+
+# Do not run these in CC until more tests are written -- very large gen code.
+clientsuites="client" 
+
+bldtype=`scidb --version | awk '{if ($1 == "Build") print $3}'`
+if [[ $bldtype == "Debug" || $bldtype == "CC" ]]; then
+    # Exclude the single instance configuration. injecterror does not work with this config.
+    if [[ $dbname != "nightly" ]]; then 
+	export suites=$suites$delim$debugsuites
+    fi
+fi
+
+# Some queries are not supported in single instance configuration. 
+# See ticket no. 1861
+if [[ $dbname == 'nightly' ]]; then
+    export skipfile='disable1i.tests'
+fi
+
+if [[ $bldtype == "RelWithDebInfo" ]]; then
+    export suites=$suites$delim$clientsuites
+fi
+
+echo "Executing scidbtestharness... $suites"
+export SCIDB_CLUSTER_NAME=$dbname
+export SCIDB_CONFIG_FILE=$cfgfile
+
+scidbtestharness --port 8888 --debug 5 --root-dir=testcases --suite-id=$suites --skip-tests=$skipfile --report-file=Report.xml $@
 
 echo "Stopping SciDB..."
 scidb.py stopall $dbname  $cfgfile

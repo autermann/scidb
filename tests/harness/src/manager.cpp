@@ -32,6 +32,7 @@
 # include <boost/thread/thread.hpp>
 # include <boost/thread/pthread/condition_variable.hpp>
 # include <boost/filesystem/operations.hpp>
+# include <boost/date_time/posix_time/posix_time.hpp>
 # include <log4cxx/logger.h>
 # include <log4cxx/ndc.h>
 
@@ -172,6 +173,10 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 		/* lock */
 		complete_es_mutex.lock();
 
+		boost::posix_time::ptime t_ptime=  boost::posix_time::microsec_clock::local_time();
+		stringstream t_ptime_s;
+		t_ptime_s << t_ptime;
+
 		if (retValue == SUCCESS)
 		{
 			if (ie.record)                 // PASS
@@ -202,6 +207,16 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 					result_str = "FILES_DIFFER";
 					failureReason = "Expected output and Actual Output differ. Check .diff file.";
 					complete_es.testcasesFailed++;
+
+					if (ie.save_failures)
+					{
+						string t_diffFile = ie.diff_file + "_" + t_ptime_s.str() + "_.diff";
+						bfs::copy_file(ie.diff_file,t_diffFile);
+						string t_logFile = ie.log_file + "_" + t_ptime_s.str() + "_.log";
+						bfs::copy_file(ie.log_file,t_logFile);
+						string t_outFile = ie.actual_rfile + "_" + t_ptime_s.str() + "_.out";
+						bfs::copy_file(ie.actual_rfile,t_outFile);
+					}
 				}
 				else                          // SYSTEM_EXCEPTION
 				{
@@ -213,6 +228,14 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 				}
 			}
 		}
+		else if (retValue == ERROR_CODES_DIFFER)
+		{
+			result = RESULT_ERROR_CODES_DIFFER;
+			result_str = "ERROR_CODES_DIFFER";
+			LOG4CXX_ERROR (logger, "Test case execution failed. ERROR CODES DIFFER.");
+			failureReason = "Expected error code does not match with actual error code.";
+			complete_es.testcasesFailed++;
+		}
 		else                                   // ANY EXCEPTION, error
 		{
 		    /* ANY EXCEPTION, error because of which executor failed to execute the test case
@@ -222,6 +245,14 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 			LOG4CXX_ERROR (logger, "Test case execution failed. Canceling further execution of this test case. Check respective log file.");
 			failureReason = "Test case execution failed. Check log file.";
 			complete_es.testcasesFailed++;
+
+			if (ie.save_failures)
+			{
+				string t_logFile = ie.log_file + "_" + t_ptime_s.str() + "_.log";
+				bfs::copy_file(ie.log_file,t_logFile);
+				string t_outFile = ie.actual_rfile + "_" + t_ptime_s.str() + "_.out";
+				bfs::copy_file(ie.actual_rfile,t_outFile);
+			}
 		}
 	} // END try
 
@@ -391,7 +422,7 @@ static void worker_function (void)
             LOG4CXX_DEBUG (logger, "notification job_read sent [" << local_ie.tcfile << "]");
 		}
 
-		Result r;
+		Result r = RESULT_FILES_DIFFER;
 		try
 		{
 			/* execute job */
@@ -681,7 +712,7 @@ void MANAGER :: getInfoForExecutorFromharness (const HarnessCommandLineOptions &
     _ie.keepPreviousRun    = c.keepPreviousRun;
     _ie.selftesting        = c.selfTesting;
     _ie.log_queries        = c.log_queries;
-
+    _ie.save_failures      = c.save_failures;
     _terminateOnFailure    = c.terminateOnFailure;
     _executorType          = executor_type;
 }

@@ -27,10 +27,12 @@
  *
  * @author roman.simakov@gmail.com
  */
-
-#include <system/Cluster.h>
-#include <network/NetworkManager.h>
+#include <string>
 #include <boost/shared_ptr.hpp>
+#include <system/Cluster.h>
+#include <array/Metadata.h>
+#include <network/NetworkManager.h>
+#include <system/SystemCatalog.h>
 
 namespace scidb
 {
@@ -45,8 +47,7 @@ boost::shared_ptr<const InstanceMembership> Cluster::getInstanceMembership()
    if (_lastMembership) {
       return _lastMembership;
    }
-   std::vector<InstanceID> instances;
-   NetworkManager::getInstance()->getPhysicalInstances(instances);
+   boost::shared_ptr<const Instances> instances = NetworkManager::getInstance()->getInstances();
    _lastMembership = boost::shared_ptr<const InstanceMembership>(new InstanceMembership(0, instances));
    return _lastMembership;
 }
@@ -75,11 +76,18 @@ InstanceID Cluster::getLocalInstanceId()
    return NetworkManager::getInstance()->getPhysicalInstanceID();
 }
 
+const string& Cluster::getUuid()
+{
+    if (_uuid.empty()) {
+        _uuid = SystemCatalog::getInstance()->getClusterUuid();
+    }
+    return _uuid;
+}
+
 } // namespace scidb
 
 namespace boost
 {
-   template<>
    bool operator< (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
       if (!l || !r) {
@@ -89,7 +97,6 @@ namespace boost
       return (*l.get()) < (*r.get());
    }
 
-   template<>
    bool operator== (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
                     boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
 
@@ -100,7 +107,6 @@ namespace boost
       return (*l.get()) == (*r.get());
    }
 
-   template<>
    bool operator!= (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
                     boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
        return (!operator==(l,r));

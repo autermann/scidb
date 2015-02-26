@@ -9,6 +9,8 @@ import sys
 import time
 import os
 import string
+import re
+import argparse
 
 # Just for sanity. You could probably run more if you wanted to
 MAX_SUPPORTED_INSTANCES = 20
@@ -17,45 +19,51 @@ MODE_INIT_START = 0
 MODE_START = 1
 MODE_CREATE_LOAD = 2
 MODE_INIT_START_TEST = 3
+MODE_INIT = 4
 
 mode = MODE_INIT_START_TEST
 
 # Number of instances
-numInstances = 3
+numInstances = 4
 # Name of this scidb instance.
 instanceName = "mydb"
 # Tests to run
 # Running all checkin tests
 # Port number (currently used for iquery)
 portNumber = "1239"
+
+args = sys.argv
 harnessArgs = []
+runNpyArgs = args[1:]
+if '--harness-args' in args:
+  harnessArgs = args[args.index('--harness-args')+1:]
+  runNpyArgs = args[1:args.index('--harness-args')]
 
+parser = argparse.ArgumentParser(
+  formatter_class=argparse.RawDescriptionHelpFormatter,
+  epilog='harness arguments:\n  --harness-args [argument [argument ...]]\n')
+parser.add_argument('numInstances', metavar='instances number', type=int, nargs='?', help='number of instances')
+parser.add_argument('instanceName', metavar='instance name', type=str, nargs='?', help='instance name')
+groupMode = parser.add_mutually_exclusive_group()
+groupMode.add_argument('--istart', dest='mode', action='store_const', const=MODE_INIT_START, help='initialize and start cluster')
+groupMode.add_argument('--start', dest='mode', action='store_const', const=MODE_START, help='start cluster')
+groupMode.add_argument('--create-load', dest='mode', action='store_const', const=MODE_CREATE_LOAD, help='launch createload.test')
+groupMode.add_argument('--init', dest='mode', action='store_const', const=MODE_INIT, help='initialize cluster')
+parser.add_argument('--port', dest='portNumber', type=int, nargs=1, help='SciDB port')
+parser.add_argument('--force', dest='forceRun', action='store_true', help='Force running tests on any SciDB build')
 
-if (len(sys.argv) > 1):
-  if (sys.argv[1] =="-h" or sys.argv[1]=="--help"):
-    print "Usage: runN.py <numInstances> <instanceName> [port-number] [harness options]"
-    print "Example runN.py 1 pavel --record"
-    print "Example runN.py 1 pavel --istart"
-    print "Example runN.py 1 pavel --start"
-    print "Example runN.py 1 pavel --create-load"
-    sys.exit(0)
-  numInstances = int(sys.argv[1])
+parser.set_defaults(
+  mode=mode,
+  numInstances=numInstances,
+  instanceName=instanceName,
+  portNumber=portNumber)
+args = vars(parser.parse_args(runNpyArgs))
 
-if (len(sys.argv) > 2):
-  instanceName = sys.argv[2]
-
-if (len(sys.argv) > 3):
-  if (sys.argv[3] == "--start"):
-    mode = MODE_START
-  elif (sys.argv[3] == "--istart"):
-    mode = MODE_INIT_START
-  elif sys.argv[3] == "--create-load":
-    mode = MODE_CREATE_LOAD
-  else:
-      portNumber = sys.argv[3]
-
-if (len(sys.argv) > 4):
-  harnessArgs = sys.argv[4:]
+numInstances = args['numInstances']
+instanceName = args['instanceName']
+mode = args['mode']
+port = args['portNumber']
+forceRun = args['forceRun']
 
 if ( numInstances < 1 or numInstances > MAX_SUPPORTED_INSTANCES ):
   print "Invalid <numInstances>:", numInstances, "must be between 1 and", MAX_SUPPORTED_INSTANCES
@@ -73,6 +81,7 @@ meta_file = binpath + "/data/meta.sql"
 plugins_dir = binpath + "/plugins"
 storage_dir = os.environ.get('SCIDB_STORAGE', binpath)
 pidfile = "/tmp/runN.pids"
+test_suite = os.environ.get('TEST_SUITE', "checkin")
 
 storage_file = storage_dir + '/storage.scidb'
 storage_files = []
@@ -102,9 +111,11 @@ def master_init():
   print "Initializing catalog..."
   subprocess.Popen(["sudo", "-u", "postgres", "./init-db.sh", instanceName, instanceName, instanceName, meta_file], 
                    cwd=binpath, stdout=open("init-stdout.log","w"), stderr=open("init-stderr.log","w")).wait()
-  subprocess.Popen([binpath + "/scidb", "--storage", storage_file, "--metadata", meta_file, "--plugins", plugins_dir, "-rc", connstr, "--initialize"], cwd=binpath).wait()
-  time.sleep(2)
-  
+  subprocess.Popen([binpath + "/scidb",
+                    "-p", str(portNumber),
+                    "--storage", storage_file, "--plugins", plugins_dir,
+                    "-rc", connstr, "--initialize"], cwd=binpath).wait()
+
 def instances_init():
   for i in range (0, numInstances):
     print "Initializing instance ", i + 1, "..."
@@ -114,17 +125,22 @@ def instances_init():
         instance_storage = storage_dir + "/instance" + str(i+1)
         subprocess.Popen(["rm", "-rf", instance_storage]).wait()
         subprocess.Popen(["mkdir", instance_storage]).wait()
-    subprocess.Popen([binpath + "/scidb", "--storage", storage_files[i], "--metadata", meta_file, "--plugins", plugins_dir, "-rc", connstr], cwd=instancePaths[i]).wait()
-    time.sleep(2)
-   
+    subprocess.Popen([binpath + "/scidb",
+                      "-p", str(int(portNumber)+i+1),
+                      "--storage", storage_files[i], "--plugins", plugins_dir,
+                      "-rc", connstr], cwd=instancePaths[i]).wait()
+
 # Start the single instance server. 
-def start(path,options,storage,port):
-  valgrindArgList = ["valgrind", "--num-callers=50", "--track-origins=yes", "-v", "--log-file=" + path + "/valgrind.log"]
+def getArgs(path,options,storage,port,argsOut):
+  valgrindArgList = ["valgrind", "--num-callers=50", "--track-origins=yes",
+#                     "--leak-check=full",
+#                     "--leak-resolution=high",
+#                     "--show-reachable=yes",
+                     "-v", "--log-file=" + path + "/valgrind.log"]
   argList = [binpath + "/scidb", "-p", port,
              "-m", "64",
              "--storage", storage,
              "-l", binpath + "/log1.properties",
-             "--metadata", meta_file,
              "--merge-sort-buffer", "64",
              "--plugins", plugins_dir,
              "-" + options + "c", connstr]
@@ -133,48 +149,156 @@ def start(path,options,storage,port):
   rle_arg = []
   if os.environ.get('USE_RLE', '0') == '1':
     rle_arg = ["--rle-chunk-format", "1"]
-    
-  argList.extend(rle_arg);
+
+  argList.extend(rle_arg)
+
+  prefetch_queue_size_arg = []
+  prefetch_queue_size = os.environ.get('PREFETCH_QUEUE_SIZE', None)
+  if not (prefetch_queue_size is None):
+    prefetch_queue_size_arg = ["--prefetch-queue-size=" + prefetch_queue_size ]
+  
+  argList.extend(prefetch_queue_size_arg)
+
+  tile_size_arg = []
+  tile_size = os.environ.get('TILE_SIZE', None)
+  if not (tile_size is None):
+    tile_size_arg = ["--tile-size=" + tile_size ]
+
+  argList.extend(tile_size_arg)
 
   if os.environ.get('USE_VALGRIND', '0') == '1':
-    print "Starting SciDB server under valgrind..."
-    arglist.extend(["--no-watchdog", "True"])
+    argList.extend(["--no-watchdog", "True"])
     valgrindArgList.extend(argList)
     argList = valgrindArgList
+    if dlaRunner != '0':
+      print "Using valgrind is not supported for DLA jobs"
+      sys.exit(1)
+  argsOut.extend(argList)
+
+def start(path,argList,my_env=os.environ):
+  if os.environ.get('USE_VALGRIND', '0') == '1':
+    print "Starting SciDB server under valgrind..."
   else:
     print "Starting SciDB server..."
-  p = subprocess.Popen(argList, cwd=path, stdout=open(path + "/scidb-stdout.log","w"),
-                                          stderr=open(path + "/scidb-stderr.log","w"))
+  p = subprocess.Popen(argList, cwd=path, env=my_env,
+                       stdout=open(path + "/scidb-stdout.log","w"),
+                       stderr=open(path + "/scidb-stderr.log","w"))
   return p
 
 def shutdown(p):
   p.terminate()
 
+def get_children(pid):
+  ps = subprocess.Popen(["ps", "-o", "pid", "--no-headers", "--ppid", str(pid)], stdout=subprocess.PIPE, cwd=".")
+  ps.wait()
+  out, _ = ps.communicate()
+  result = filter(len, map(string.strip, out.split(os.linesep)))
+  return result
+
 def check_pidfile():
+  RETRY_COUNT = int(os.environ.get('SCIDB_KILL_TIMEOUT', 5))
   if (os.path.exists(pidfile)):
-    f = open(pidfile, 'r')
-    for line in f:
-      pid = line.strip()
-      procfile = "/proc/" + pid + "/stat"
-      if (os.path.exists(procfile)):
-        f1 = open(procfile, 'r')
-        progname = string.split(f1.readline())[1]
-        f1.close()
-        if ( progname == "(scidb)" ):
-          print "NOTE: killing old scidb instance at PID " + pid
-          subprocess.Popen(["kill", "-9", pid], cwd=".").wait()
-          while (os.path.exists(procfile)):
-            time.sleep(1)
-    
+    def get_prog_name(pid):
+      result = None
+      # proc file name
+      pfn = "/proc/%s/stat" % pid
+      if os.path.exists(pfn):
+        # proc file
+        with open(pfn, 'r') as pf:
+          result = string.split(pf.readline())[1]
+          pf.close()
+      return result
+
+    def is_actual_watchdog(pid):
+      prog_name = get_prog_name(pid)
+      if prog_name is None:
+        return False
+      else:
+        return prog_name == "(scidb)" or (dlaRunner != '0' and prog_name== "(%s)" % dlaRunner)
+
+    watchdog_list = filter(is_actual_watchdog, map(string.strip, open(pidfile, 'r')))
+
+    def get_children_list(watchdog_list):
+      child_list = []
+      for watchdog_pid, item_list in zip(watchdog_list, map(get_children, watchdog_list)):
+        print 'Watchdog pid: %s  children: [%s]' % (watchdog_pid, ', '.join(item_list))
+        for item in item_list:
+          child_list.append(item)
+      return child_list
+
+    child_list = get_children_list(watchdog_list)
+
+    def kill(pid_list, signal):
+      killer_list = []
+      for pid in pid_list:
+        print "NOTE: killing old scidb instance at PID %s by %s signal" % (pid, signal)
+        killer_list.append(subprocess.Popen(["kill", signal, pid], cwd="."))
+
+      time.sleep(1)
+
+      for killer in killer_list:
+        killer.wait()
+
+    def wait(pid_list, condition, message):
+      retry = RETRY_COUNT
+      pid_list = filter(condition, pid_list)
+      while retry > 0 and len(pid_list):
+        print "%s, pid list is [%s]" % (message, ",".join(pid_list))
+        time.sleep(1)
+        pid_list = filter(condition, pid_list)
+        retry -= 1
+      return pid_list
+
+    def kill_and_wait(pid_list, signal, condition, message):
+      kill(pid_list, signal)
+      return wait(pid_list, condition, message)
+
+    watchdog_list = kill_and_wait(watchdog_list,
+                                  "-SIGTERM",
+                                  is_actual_watchdog,
+                                  "Waiting while SciDB processes are completing")
+    if len(watchdog_list):
+      watchdog_list = kill_and_wait(watchdog_list,
+                                    "-SIGKILL",
+                                    is_actual_watchdog,
+                                    "Waiting while SciDB processes are completing")
+      if len(watchdog_list):
+        sys.stderr.write('Some SciDB processes still runing: [%s]\n' % (','.join(watchdog_list)))
+        exit(-1)
+
+    def is_actual_pid(pid):
+      ps = subprocess.Popen(["ps", "ax", "-o", "pid", "--no-headers"],
+                            stdout=subprocess.PIPE,
+                            cwd=".")
+      ps.wait()
+      out, _ = ps.communicate()
+      pid_list = filter(len, map(string.strip, out.split(os.linesep)))
+      return pid in pid_list
+
+    child_list = wait(child_list, is_actual_pid, "Waiting while SciDB child processes are completing")
+
+    child_list = kill_and_wait(child_list,
+                                  "-SIGTERM",
+                                  is_actual_pid,
+                                  "Waiting while SciDB child processes are completing")
+    if len(child_list):
+      child_list = kill_and_wait(child_list,
+                                    "-SIGKILL",
+                                    is_actual_pid,
+                                    "Waiting while SciDB child processes are completing")
+      if len(child_list):
+          sys.stderr.write('Some SciDB child processes still runing: [%s]\n' % (','.join(child_list)))
+          exit(-1)
+
 def savepids(master_pid, instancePids):
   subprocess.Popen(["rm", "-f", pidfile], cwd=".").wait()
   f = open(pidfile, 'w')
   f.write(str(master_pid.pid))
-  print "Master pid: " + str(master_pid.pid) 
+  print "Master pid: %s children: [%s]" % (master_pid.pid, ', '.join(get_children(master_pid.pid)))
   f.write("\n")
   for popen in instancePids:
     f.write(str(popen.pid))
-    print "instance pid: " + str(popen.pid)
+    print "instance pid: %s children: [%s]" % (popen.pid, ', '.join(get_children(popen.pid)))
     f.write("\n")
   f.close()
 
@@ -183,39 +307,96 @@ def run_unit_tests():
   res = subprocess.Popen([ut_path + "/unit_tests", "-c", connstr], cwd=".", stderr=open("/dev/null","w"), stdout=open("/dev/null","w")).wait()
   if (res != 0):
     bad_results.append ( "UNIT_TESTS" )
-        
+
+def scidb_buildtype():
+  ps = subprocess.Popen([binpath + "/scidb", "--version"], stdout=subprocess.PIPE)
+  ps.wait()
+  out, _ = ps.communicate()
+  if ps.returncode != 0:
+    print "Error when running 'scidb --version'"
+    sys.exit(1)
+  
+  m = re.search("Build type: (.*)", out)
+  if not m:
+    print "Can't parse output of 'scidb --version'"
+    sys.exit(1)
+  return m.group(1)
+
 if __name__ == "__main__":
+  os.chdir(basepath)
 
-  os.chdir(basepath);
+  if scidb_buildtype() != "Debug" and not forceRun:
+    print "Please use Debug version of SciDB for testing! To force running use key --force"
+    exit()
 
+  dlaRunner = os.environ.get('RUN_DLA', '0')
   check_pidfile()
-   
-  if ( mode == MODE_INIT_START or mode == MODE_INIT_START_TEST or mode == MODE_CREATE_LOAD ): 
+
+  if mode in (MODE_INIT_START, MODE_INIT_START_TEST, MODE_CREATE_LOAD, MODE_INIT): 
     master_init()
     instances_init()
-  master_pid = start(binpath, "k", storage_file, portNumber)
-  
-  instancePids =[]
-  for i in range (0, numInstances):
-      instancePids.append(start(instancePaths[i], "", storage_files[i], str(int(portNumber)+i+1)));
-  if os.environ.get('USE_VALGRIND', '0') == '1':
-      time.sleep(10*(numInstances+1))
+
+  if mode == MODE_INIT:
+    sys.exit(0)
+
+  my_env=os.environ
+  if "LD_LIBRARY_PATH" in my_env:
+    my_env["LD_LIBRARY_PATH"] = binpath +":"+ my_env["LD_LIBRARY_PATH"]
   else:
-    time.sleep(5*(numInstances+1))
+    my_env["LD_LIBRARY_PATH"] = binpath
+  my_env["LD_LIBRARY_PATH"] = plugins_dir +":"+ my_env["LD_LIBRARY_PATH"]
+  instancePids =[]
+  master_pid=-1
+  if dlaRunner == '0':
+    args=[]
+    getArgs(binpath, "k", storage_file, portNumber, args)
+    master_pid = start(binpath, args, my_env)
+
+    for i in range (0, numInstances):
+      args=[]
+      print "debug: instancePaths[i] is " + instancePaths[i]
+      getArgs(instancePaths[i], "", storage_files[i], str(int(portNumber)+i+1), args)
+      worker_pid = start(instancePaths[i], args, my_env)
+      instancePids.append(worker_pid)
+      if os.environ.get('USE_VALGRIND', '0') == '1':
+        time.sleep(10*(numInstances+1))
+  else:
+    args=[dlaRunner, "-np", str(1), "-wd", str(binpath), "--output-filename", "./scidb-stderr.log"]
+    getArgs(binpath, "k", storage_file, portNumber, args)
+
+    for i in range (0, numInstances):
+      args.extend([":", "-np", str(1), "-wd", str(instancePaths[i]), "--output-filename", "./scidb-stderr.log"])
+      getArgs(instancePaths[i], "", storage_files[i], str(int(portNumber)+i+1), args)
+    master_pid = start(binpath, args, my_env)
+  time.sleep(3)
   savepids(master_pid, instancePids)
-  
+
+  # wait for instance to come on-line
+  while True:
+    p = subprocess.Popen([binpath + "/iquery", "-p", str(portNumber), "-naq", "list()", portNumber],
+                         stderr=open("/dev/null","w"), stdout=open("/dev/null","w")).wait()
+    if p == 0 :
+      break;
+    time.sleep(1)
+
   if ( mode != MODE_INIT_START_TEST ):
     if mode == MODE_CREATE_LOAD:
 	os.environ["PATH"] = binpath + ":" + os.environ["PATH"]
 	os.environ["IQUERY_HOST"] = 'localhost'
 	os.environ["IQUERY_PORT"] = portNumber
-	subprocess.Popen([binpath + "/scidbtestharness", "--plugins", plugins_dir, "--root-dir", "createload", "--test-name", "createload.test", "--debug", "5", "--port", portNumber] + harnessArgs, cwd=".", env=os.environ).wait()
+	subprocess.Popen([binpath + "/scidbtestharness", "--plugins",
+                          plugins_dir, "--root-dir", "createload",
+                          "--test-name", "createload.test",
+                          "--debug", "5", "--port", portNumber] + harnessArgs,
+                         cwd=".", env=os.environ).wait()
     sys.exit(0)
-
         
   # Add environment variables
   os.environ["PATH"] = binpath + ":" + os.environ["PATH"]
   os.environ["IQUERY_HOST"] = 'localhost'
   os.environ["IQUERY_PORT"] = portNumber
-  subprocess.Popen([binpath + "/scidbtestharness", "--plugins", plugins_dir, "--root-dir", "testcases", "--suite-id", "checkin", "--debug", "5", "--port", portNumber] + harnessArgs, cwd=".", env=os.environ).wait()
+  subprocess.Popen([binpath + "/scidbtestharness", "--plugins", plugins_dir,
+                    "--root-dir", "testcases", "--suite-id", test_suite,
+                    "--debug", "5", "--port", portNumber] + harnessArgs,
+                   cwd=".", env=os.environ).wait()
   sys.exit(0)

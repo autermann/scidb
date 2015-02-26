@@ -170,10 +170,10 @@ class CrossArrayIterator : public ConstArrayIterator
   private:
     CrossArray const& array;	
 	AttributeID attr;
-    boost::shared_ptr<ConstArrayIterator> leftIterator;
-    boost::shared_ptr<ConstArrayIterator> rightIterator;
     CrossChunk chunk;
 	Coordinates currentPos; 
+    boost::shared_ptr<ConstArrayIterator> leftIterator;
+    boost::shared_ptr<ConstArrayIterator> rightIterator;
     bool hasCurrent;
     bool chunkInitialized;
 };

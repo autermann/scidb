@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2011 SciDB, Inc.
+# Copyright (C) 2008-2012 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,12 +22,12 @@
 
 cmake_minimum_required(VERSION 2.6)
 
-project(SciDB)
+project(SciDB C CXX Fortran)
 
 set(SCIDB_VERSION_MAJOR "12")
-set(SCIDB_VERSION_MINOR "3")
+set(SCIDB_VERSION_MINOR "10")
 set(SCIDB_VERSION_PATCH "0")
-set(SCIDB_VERSION_CODENAME "Snowdrop-final")
+set(SCIDB_VERSION_CODENAME "Cheshire-final")
 
 set(SCIDB_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}.${SCIDB_VERSION_PATCH}")
 set(SCIDB_SHORT_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}")
@@ -45,36 +45,41 @@ find_package(Subversion)
 if (${CMAKE_VERSION} VERSION_GREATER 2.8 OR ${CMAKE_VERSION} VERSION_EQUAL 2.8)
     find_package(Git)
 endif()
-if(Subversion_SVN_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.svn")
-    # Get version from SVN working copy by default
-    Subversion_WC_INFO(${CMAKE_SOURCE_DIR} SciDB)
-    set(SCIDB_REVISION "${SciDB_WC_REVISION}")
-    message(STATUS "Reading revision from svn: ${SCIDB_REVISION}")
-    file(WRITE "${CMAKE_BINARY_DIR}/version.txt" ${SCIDB_REVISION})
-elseif(GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if(Subversion_SVN_EXECUTABLE)
+    EXECUTE_PROCESS(COMMAND ${Subversion_SVN_EXECUTABLE} info . OUTPUT_VARIABLE Subversion_INFO_OUT
+        ERROR_VARIABLE Subversion_svn_info_error RESULT_VARIABLE Subversion_svn_info_result
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (Subversion_svn_info_result EQUAL 0)
+        # Get version from SVN working copy by default
+        Subversion_WC_INFO(${CMAKE_SOURCE_DIR} SciDB)
+        set(SCIDB_REVISION "${SciDB_WC_REVISION}")
+        message(STATUS "Reading revision from svn: ${SCIDB_REVISION}")
+        file(WRITE "${CMAKE_BINARY_DIR}/version.txt" ${SCIDB_REVISION})
+    endif()
+endif()
+if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     # Get version from git-svn working copy 
-    execute_process(COMMAND ${GIT_EXECUTABLE} svn info
-        OUTPUT_VARIABLE GIT_SVN_INFO
+    execute_process(COMMAND ${GIT_EXECUTABLE} svn find-rev master
+        OUTPUT_VARIABLE SCIDB_REVISION
         RESULT_VARIABLE GIT_EXEC_RES
         OUTPUT_STRIP_TRAILING_WHITESPACE
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-    string(COMPARE NOTEQUAL ${GIT_EXEC_RES} 0 GIT_EXEC_RES)       
+    string(COMPARE NOTEQUAL ${GIT_EXEC_RES} 0 GIT_EXEC_RES) 
     if(${GIT_EXEC_RES})
         MESSAGE(FATAL_ERROR "Can not invoke GIT ${GIT_EXECUTABLE}. Check binary!")
     endif()
     
-    string(REGEX REPLACE ".*Revision: ([^\n]+)\n.*" "\\1"
-        SCIDB_REVISION "${GIT_SVN_INFO}")
-
     message(STATUS "Reading revision from git-svn: ${SCIDB_REVISION}")
 
     file(WRITE "${CMAKE_BINARY_DIR}/version.txt" ${SCIDB_REVISION})
-elseif(EXISTS "${CMAKE_SOURCE_DIR}/version.txt")
+endif()
+if(NOT SCIDB_REVISION AND EXISTS "${CMAKE_SOURCE_DIR}/version.txt")
     # Get version from plain source tarball/directory    
     file(READ "${CMAKE_SOURCE_DIR}/version.txt" SCIDB_REVISION)
     message(STATUS "Reading revision from file: ${SCIDB_REVISION}")
-else()
+endif()
+if(NOT SCIDB_REVISION)
     message(FATAL_ERROR "Can not fetch working copy version and can't find version.txt file.")
 endif()
 
@@ -82,7 +87,7 @@ set(SCIDB_VERSION "${SCIDB_VERSION}.${SCIDB_REVISION} (${SCIDB_VERSION_CODENAME}
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-message(STATUS "Build type (use -DCMAKE_BUILD_TYPE=[RelWithDebInfo]/Debug/Release/Profile/CC): ${CMAKE_BUILD_TYPE}")
+message(STATUS "Build type (use -DCMAKE_BUILD_TYPE=[RelWithDebInfo]/Debug/Release/Profile/CC/Valgrind): ${CMAKE_BUILD_TYPE}")
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo) # Default value for end user who want to install scidb from sources
@@ -99,19 +104,25 @@ endif ("${CMAKE_GENERATOR}" STREQUAL "Xcode")
 
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -DNDEBUG -ggdb3")
 set(CMAKE_CXX_FLAGS_PROFILE "-O2 -pg -DNDEBUG")
-set(CMAKE_CXX_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0")
+set(CMAKE_CXX_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0 -DCLEAN_EXIT")
+set(CMAKE_CXX_FLAGS_VALGRIND "-g -O0 -DCLEAN_EXIT")
 
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -DNDEBUG -ggdb3")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic -W -Wextra -Wall -Wno-long-long -Wno-unused-parameter -fPIC -D__STDC_FORMAT_MACROS")
 set(CMAKE_C_FLAGS_PROFILE "-O2 -pg -DNDEBUG")
-set(CMAKE_C_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0")
+set(CMAKE_C_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0 -DCLEAN_EXIT")
+set(CMAKE_C_FLAGS_VALGRIND "-g -O0 -DCLEAN_EXIT")
 
-#Just for detection debug mode in code
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fno-f2c")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I/usr/include/mpi")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${ALL_FLAGS}")
+set(CMAKE_Fortran_FLAGS_RELWITHDEBINFO "${CMAKE_Fortran_RELWITHDEBINFO} -DNDEBUG -ggdb3")
+set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -DDEBUG")  # Just for detection debug mode in code
+set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_PROFILE} -O2 -pg -DNDEBUG")
+set(CMAKE_Fortran_FLAGS_CC "${CMAKE_Fortran_FLAGS_CC} -fprofile-arcs -ftest-coverage")
 
 set(CMAKE_EXE_LINKER_FLAGS_PROFILE "-pg")
-set(CMAKE_LDFLAGS_CC "-fprofile-arcs -ftest-coverage -g")
+set(CMAKE_LDFLAGS_CC "-fprofile-arcs -ftest-coverage -g -DCLEAN_EXIT")
 
 set(GENERAL_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(GENERAL_TEST_DIRECTORY "${CMAKE_BINARY_DIR}/tests/basic")
@@ -139,13 +150,17 @@ if(${DISTRO_NAME_VER} MATCHES "RedHat-[0-9][.][0-9]" OR ${DISTRO_NAME_VER} MATCH
     set(LOG4CXX_USE_STATIC_LIBS ON)
     set(PROTOBUF_USE_STATIC_LIBS ON)
     set(LIBREADLINE_STATIC ON)
+    find_package(Curses REQUIRED)
     message(STATUS "This is Red Hat based distro and we switch on static building for some libs")
 endif()
 
-if((${DISTRO_NAME_VER} MATCHES "Fedora") AND NOT (${DISTRO_NAME_VER} MATCHES "16") )
-    set(Boost_USE_STATIC_LIBS ON)
-    message(STATUS "This is Fedora less then 16 and we switch on static building for boost")
-endif()
+if(${DISTRO_NAME_VER} MATCHES "Fedora") 
+    string(REPLACE "Fedora-" "" FEDORA_VERSION "${DISTRO_NAME_VER}")
+    if (FEDORA_VERSION LESS "16")
+      set(Boost_USE_STATIC_LIBS ON)
+      message(STATUS "This is Fedora less then 16 and we switch on static building for boost")
+    endif(FEDORA_VERSION LESS "16")
+endif(${DISTRO_NAME_VER} MATCHES "Fedora")
 
 find_package(Boost REQUIRED system program_options serialization regex filesystem thread)
 find_package(Protobuf REQUIRED)
@@ -248,8 +263,6 @@ macro(extractDebugInfo input_dir input_file targ)
 	            COMMAND chmod -x "${DEBUG_SYMBOLS_OUTPUT_DIRECTORY}/${input_file}${DEBUG_SYMBOLS_EXTENSION}"
 	            WORKING_DIRECTORY "${input_dir}"
 	        )
-		else()
-			message(WARNING "Can not generate debug info for ${input_file}")
 		endif()
     endif()
 endmacro(extractDebugInfo)
@@ -286,7 +299,7 @@ add_custom_target(uninstall
 # These are dummy target for adding misc files into the IDE projects like QtCreator
 # for easy access to edit
 
-#Add here your files or masks
+# Add here your files or masks
 file(GLOB MISC_FILES_SRC
     "doc/pages/*.dox"
     "doc/*.htm*"
@@ -294,6 +307,14 @@ file(GLOB MISC_FILES_SRC
     "doc/api/*"
     "doc/*.txt"
 )
+
+# Mirror the test and doc files to the build area
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/tests
+                                                           ${CMAKE_BINARY_DIR}/tests)
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/doc
+                                                           ${CMAKE_BINARY_DIR}/doc)
 
 add_library(misc_files EXCLUDE_FROM_ALL examples/point/point.cpp ${MISC_FILES_SRC})
 # End of dummy target

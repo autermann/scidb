@@ -38,6 +38,40 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: var().
+ *
+ * @par Synopsis:
+ *   var( srcArray [, attr {, groupbyDim}*] )
+ *
+ * @par Summary:
+ *   Produces a result array containing the variance among the values of an attribute.
+ *   If a list of groupbyDims is provided, one variance is calculated for every distinct group.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 0 or 1 attributes from srcAttrs. If no attribute is provided, the first attribute is used.
+ *   - an optional list of groupbyDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attr_var: the source attribute name, followed by '_var'.
+ *   <br> >
+ *   <br> [
+ *   <br>   groupbyDims (if a list of groupbyDims is provided); or
+ *   <br>   i: start=0, end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - same as aggregate(srcArray, var(attr), groupbyDims).
+ *
+ */
 class LogicalVar : public  LogicalOperator
 {
 public:

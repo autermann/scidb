@@ -339,11 +339,6 @@ namespace scidb
         return inputArray;
     }
 
-    bool DelegateArray::supportsRandomAccess() const
-    {
-        return inputArray->supportsRandomAccess();
-    }
-
     //
     // NonEmptyable array
     //
@@ -404,12 +399,14 @@ namespace scidb
     ConstChunk const& NonEmptyableArray::DummyBitmapArrayIterator::getChunk()
     {
         ConstChunk const& inputChunk = inputIterator->getChunk();
-        if (!inputChunk.isRLE()) {             
+        //if (!inputChunk.isRLE())              
+        if (!((NonEmptyableArray&)array).rle) 
+        {             
             return DelegateArrayIterator::getChunk();
         }
         if (!shapeChunk.isInitialized() || shapeChunk.getFirstPosition(false) != inputChunk.getFirstPosition(false)) {
             ArrayDesc const& arrayDesc = array.getArrayDesc();
-            Address addr(arrayDesc.getId(), attr, inputChunk.getFirstPosition(false));
+            Address addr(attr, inputChunk.getFirstPosition(false));
             shapeChunk.initialize(&array, &arrayDesc, addr, inputChunk.getCompressionMethod());
             shapeChunk.setSparse(inputChunk.isSparse());
             shapeChunk.fillRLEBitmap();
@@ -426,33 +423,28 @@ namespace scidb
     // Split array
     //
 
-SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& src, Coordinates const& fromPos, Coordinates const& tillPos)
+SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& src, Coordinates const& from, Coordinates const& till)
     : DelegateArray(desc, shared_ptr<Array>(), true),
-      from(fromPos),
-      till(tillPos),
-      size(fromPos.size()),
-      source(src),
-      empty(false)
+      _from(from),
+      _till(till),
+      _size(from.size()),
+      _src(src),
+      _empty(false)
     {
         Dimensions const& dims = desc.getDimensions();
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
-            size[i] = till[i] - from[i] + 1;
-            if (size[i] == 0) { 
-                empty = true;
+            _size[i] = _till[i] - _from[i] + 1;
+            if (_size[i] == 0) { 
+                _empty = true;
             }
-            if (till[i] > dims[i].getEndMax()) { 
-                till[i] = dims[i].getEndMax();
+            if (_till[i] > dims[i].getEndMax()) { 
+                _till[i] = dims[i].getEndMax();
             }
         }
     }
 
     SplitArray::~SplitArray() 
     { 
-    }
-
-    bool SplitArray::supportsRandomAccess() const
-    {
-        return false;
     }
 
     DelegateArrayIterator* SplitArray::createArrayIterator(AttributeID id) const
@@ -468,7 +460,7 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
             chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
             chunk.setRLE(false);
             char* dst = (char*)chunk.getData();
-            char* src = (char*)array.source.get();
+            char* src = (char*)array._src.get();
             Coordinates const& first = chunk.getFirstPosition(false);
             Coordinates pos = first;
             const size_t nDims = dims.size();
@@ -477,13 +469,13 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
                 size_t offs = 0;
                 bool oob = false;
                 for (size_t i = 0; i < nDims; i++) { 
-                    offs *= array.size[i];
-                    offs += pos[i] - array.from[i];
-                    oob |= pos[i] > array.till[i];
+                    offs *= array._size[i];
+                    offs += pos[i] - array._from[i];
+                    oob |= pos[i] > array._till[i];
                 }
                 if (!oob) { 
                     memcpy(dst, src + (offs*attrBitSize >> 3), 
-                           min(size_t(array.till[nDims-1] - pos[nDims-1] + 1), size_t(dims[nDims-1].getChunkInterval()))*attrBitSize >> 3);
+                           min(size_t(array._till[nDims-1] - pos[nDims-1] + 1), size_t(dims[nDims-1].getChunkInterval()))*attrBitSize >> 3);
                 }
                 dst += dstStrideSize;
                 size_t j = nDims-1; 
@@ -515,12 +507,12 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         size_t i = dims.size()-1;
-        while ((addr.coords[i] += dims[i].getChunkInterval()) > array.till[i]) { 
+        while ((addr.coords[i] += dims[i].getChunkInterval()) > array._till[i]) { 
             if (i == 0) { 
                 hasCurrent = false;
                 return;
             }
-            addr.coords[i] = array.from[i];
+            addr.coords[i] = array._from[i];
             i -= 1;
         } 
         chunkInitialized = false;
@@ -534,7 +526,7 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
     bool SplitArray::ArrayIterator::setPosition(Coordinates const& pos)
     {
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
-            if (pos[i] < array.from[i] || pos[i] > array.till[i]) { 
+            if (pos[i] < array._from[i] || pos[i] > array._till[i]) { 
                 return false;
             }
         }
@@ -546,9 +538,9 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
 
     void SplitArray::ArrayIterator::reset()
     {
-        addr.coords = array.from;
+        addr.coords = array._from;
         chunkInitialized = false;
-        hasCurrent = !array.empty;
+        hasCurrent = !array._empty;
     }
 
     SplitArray::ArrayIterator::ArrayIterator(SplitArray const& arr, AttributeID attrID)
@@ -565,7 +557,6 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
         if ((dims[nDims-1].getChunkInterval()*attrBitSize & 7) != 0)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_STRIDE_SHOULD_BE_BYTE_ALIGNED);
         chunk.allocate(size_t((chunkBitSize + 7) >> 3));
-        addr.arrId = arr.getHandle();
         addr.attId = attrID;
         reset();
     }
@@ -575,31 +566,57 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
     //
     MaterializedArray::ArrayIterator::ArrayIterator(MaterializedArray& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat)
     : DelegateArrayIterator(arr, attrID, input),
-      array(arr)
+      _array(arr),
+      _chunkToReturn(0)
     {     
     }
-
+    
     ConstChunk const& MaterializedArray::ArrayIterator::getChunk() 
     { 
+        if(_chunkToReturn)
+        {
+            return *_chunkToReturn;
+        }
+        
         ConstChunk const& chunk = inputIterator->getChunk();
-        MaterializeFormat format = array.format;
+        MaterializeFormat format = _array._format;
         if (chunk.isMaterialized() 
             && (format == PreserveFormat 
                 || (format == RLEFormat && chunk.isRLE())
                 || (format == DenseFormat && !chunk.isRLE() && !chunk.isSparse())))
         {
             ((ConstChunk&)chunk).overrideTileMode(false);
-            return chunk;
+            _chunkToReturn = &chunk;
+            return *_chunkToReturn;
         }
 #ifdef NO_MATERIALIZE_CACHE
-        if (!materializedChunk) {
-            materializedChunk = boost::shared_ptr<MemChunk>(new MemChunk());
+        if (!_materializedChunk) {
+            _materializedChunk = boost::shared_ptr<MemChunk>(new MemChunk());
         }
-        MaterializedArray::materialize(*materializedChunk, chunk, format);
+        MaterializedArray::materialize(*_materializedChunk, chunk, _format);
 #else      
-        materializedChunk = array.getMaterializedChunk(chunk);
+        _materializedChunk = _array.getMaterializedChunk(chunk);
 #endif
-        return *materializedChunk; 
+        _chunkToReturn = _materializedChunk.get();
+        return *_chunkToReturn;
+    }
+
+    void MaterializedArray::ArrayIterator::operator ++()
+    {
+        _chunkToReturn = 0;
+        DelegateArrayIterator::operator ++();
+    }
+
+    bool MaterializedArray::ArrayIterator::setPosition(Coordinates const& pos)
+    {
+        _chunkToReturn = 0;
+        return DelegateArrayIterator::setPosition(pos);
+    }
+
+    void MaterializedArray::ArrayIterator::reset()
+    {
+        _chunkToReturn = 0;;
+        DelegateArrayIterator::reset();
     }
 
     boost::shared_ptr<MemChunk> MaterializedArray::getMaterializedChunk(ConstChunk const& inputChunk)
@@ -610,30 +627,30 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
         Coordinates const& pos = inputChunk.getFirstPosition(false);
         AttributeID attr = inputChunk.getAttributeDesc().getId();
         {
-            ScopedMutexLock cs(mutex);
-            chunk = chunkCache[attr][pos];
+            ScopedMutexLock cs(_mutex);
+            chunk = _chunkCache[attr][pos];
             if (!chunk) {
-                chunk = boost::shared_ptr<MemChunk>(new MemChunk());
-                bitmap = bitmapCache[pos];
+                chunk.reset(new MemChunk());
+                bitmap = _bitmapCache[pos];
                 newChunk = true;
             }
         }
         if (newChunk) {
-            materialize(*chunk, inputChunk, format);
+            materialize(*chunk, inputChunk, _format);
             if (!bitmap) { 
                 bitmap = chunk->getEmptyBitmap();
             }
             chunk->setEmptyBitmap(bitmap);
             {
-                ScopedMutexLock cs(mutex);
-                if (chunkCache[attr].size() >= cacheSize) { 
-                    chunkCache[attr].erase(chunkCache[attr].begin());
+                ScopedMutexLock cs(_mutex);
+                if (_chunkCache[attr].size() >= _cacheSize) {
+                    _chunkCache[attr].erase(_chunkCache[attr].begin());
                 }
-                chunkCache[attr][pos] = chunk;
-                if (bitmapCache.size() >= cacheSize) { 
-                    bitmapCache.erase(bitmapCache.begin());
+                _chunkCache[attr][pos] = chunk;
+                if (_bitmapCache.size() >= _cacheSize) {
+                    _bitmapCache.erase(_bitmapCache.begin());
                 }
-                bitmapCache[pos] = bitmap;
+                _bitmapCache[pos] = bitmap;
             }
         }
         return chunk;
@@ -641,13 +658,13 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
 
     MaterializedArray::MaterializedArray(boost::shared_ptr<Array> input, MaterializeFormat chunkFormat)
     : DelegateArray(input->getArrayDesc(), input, true),
-      format(chunkFormat),
-      chunkCache(desc.getAttributes().size())
+      _format(chunkFormat),
+      _chunkCache(desc.getAttributes().size())
     {
 #ifndef SCIDB_CLIENT
-        cacheSize = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
+        _cacheSize = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
 #else
-        cacheSize = 1;
+        _cacheSize = 1;
 #endif
     }
 
@@ -690,7 +707,7 @@ size_t nMaterializedChunks = 0;
 
     DelegateArrayIterator* MaterializedArray::createArrayIterator(AttributeID id) const
     {  
-        return new MaterializedArray::ArrayIterator(*(MaterializedArray*)this, id, inputArray->getConstIterator(id), format);
+        return new MaterializedArray::ArrayIterator(*(MaterializedArray*)this, id, inputArray->getConstIterator(id), _format);
     }
     
 }

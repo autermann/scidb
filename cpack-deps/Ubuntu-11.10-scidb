@@ -1,1 +1,0 @@
-libpqxx-3.0 (>=3.0.2), python-paramiko (>=1.7.6), python-crypto (>=2.1.0), libscidbclient (>=11.12)

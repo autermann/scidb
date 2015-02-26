@@ -28,6 +28,7 @@ set(scidbclient_src
     ../array/Metadata.cpp
     ${CMAKE_BINARY_DIR}/src/system/Constants.cpp
     ../smgr/io/DBLoader.cpp
+    ../smgr/io/TemplateParser.cpp
     ../array/Array.cpp
     ../array/MemArray.cpp
     ../array/StreamArray.cpp
@@ -84,7 +85,7 @@ if(NOT WITHOUT_PYTHON_BINDING)
 
     add_custom_command(OUTPUT scidbpython.cxx ${GENERAL_OUTPUT_DIRECTORY}/libscidbpython.py
 
-        COMMAND ${SWIG_EXECUTABLE} -c++ -Wall -python -D${SWSIZE} -o ${CMAKE_CURRENT_BINARY_DIR}/scidbpython.cxx -outdir ${GENERAL_OUTPUT_DIRECTORY} -I${Boost_INCLUDE_DIRS} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src scidbpython.i
+        COMMAND ${SWIG_EXECUTABLE} -c++ -python -D${SWSIZE} -o ${CMAKE_CURRENT_BINARY_DIR}/scidbpython.cxx -outdir ${GENERAL_OUTPUT_DIRECTORY} -I${Boost_INCLUDE_DIRS} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src scidbpython.i
                 DEPENDS scidbpython.i scidbclient
 		COMMENT "Building SWIG source in ${SWSIZE} mode: See swigpython.out for errors and warning"
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

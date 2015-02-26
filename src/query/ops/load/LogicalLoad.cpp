@@ -35,6 +35,7 @@
 #include "system/Cluster.h"
 #include "system/Resources.h"
 #include "system/Warnings.h"
+#include "query/ops/input/LogicalInput.h"
 
 using namespace std;
 using namespace boost;
@@ -45,131 +46,57 @@ namespace scidb
 {
 
 /**
- * Must be called as LOAD('existing_array_name', '/path/to/file/on/instance')
+ * @brief The operator: load().
+ *
+ * @par Synopsis:
+ *   load( outputArray, filename, instance=-2, format="", maxErrors=0, shadowArray="" )
+ *
+ * @par Summary:
+ *   Loads data to an existing outputArray from a given file, and optionally stores to shadowArray.
+ *
+ * @par Input:
+ *   - outputArray: the output array to store data into.
+ *   - filename: where to load data from.
+ *   - instance: which instance; default is -2. ??
+ *   - format: ??
+ *   - maxErrors: ??
+ *   - shadowArray: if provided, the result array will be written to it.
+ *
+ * @par Output array:
+ *   n/a
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - Must be called as INPUT('existing_array_name', '/path/to/file/on/instance').
+ *   - This really needs to be checked by the author.
  */
-class LogicalLoad: public LogicalOperator
+class LogicalLoad: public LogicalInput
 {
-public:
-    LogicalLoad(const std::string& logicalName, const std::string& alias):
-        LogicalOperator(logicalName, alias)
+  public:
+    LogicalLoad(const std::string& logicalName, const std::string& alias)
+    : LogicalInput(logicalName, alias)
     {
-        ADD_PARAM_IN_ARRAY_NAME();       //0
-                ADD_PARAM_CONSTANT("string");//1
-                ADD_PARAM_VARIES();          //2
-    }
-
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
-    {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        switch (_parameters.size()) {
-          case 0:
-          case 1:
-            assert(false);
-            break;
-          case 2:
-            res.push_back(PARAM_CONSTANT("int64"));
-            break;
-        }
-        return res;
-    }
-
-
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
-    {
-        assert(inputSchemas.size() == 0);
-
-        const string &path = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
-                                      query, TID_STRING).getString();
-
-        int64_t instanceID = -2;
-        if (_parameters.size() == 3)
-        {
-            instanceID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
-                                     query, TID_INT64).getInt64();
-            if (instanceID < -2 || instanceID >= (int64_t) query->getInstancesCount())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
-                    _parameters[2]->getParsingContext()) << instanceID;
-        }
-
-        if (instanceID == -1)
-        {
-            //Distributed loading let's check file existence on all instances
-            map<InstanceID, bool> instancesMap;
-            Resources::getInstance()->fileExists(path, instancesMap, query);
-
-            bool fileDetected = false;
-            vector<InstanceID> instancesWithoutFile;
-            for (map<InstanceID, bool>::const_iterator it = instancesMap.begin(); it != instancesMap.end(); ++it)
-            {
-                if (it->second)
-                {
-                    if (!fileDetected)
-                        fileDetected = true;
-                }
-                else
-                {
-                    //Remembering file name on each missing file
-                    LOG4CXX_WARN(oplogger, "File '" << path << "' not found on instance #" << it->first);
-                    instancesWithoutFile.push_back(it->first);
-                }
-            }
-
-            //Such file not found on any instance. Failing with exception
-            if (!fileDetected)
-            {
-                throw USER_QUERY_EXCEPTION(
-                    SCIDB_SE_QPROC, SCIDB_LE_FILE_NOT_FOUND,
-                    _parameters[1]->getParsingContext()) << path;
-            }
-
-            //If some instances missing this file posting appropriate warning
-            if (instancesWithoutFile.size())
-            {
-                stringstream instancesList;
-                for (size_t i = 0, count = instancesWithoutFile.size();  i < count; ++i)
-                {
-                    instancesList << instancesWithoutFile[i] << (i == count - 1 ? "" : ", ");
-                }
-                LOG4CXX_WARN(oplogger, "File " << path << " not found on instances " << instancesList.str());
-                query->postWarning(SCIDB_WARNING(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES) << path << instancesList.str());
-            }
-        }
-        else if (instanceID == -2)
-        {
-            //This is loading from local instance. Throw error if file not found.
-            if (!Resources::getInstance()->fileExists(path, query->getInstanceID(), query))
-            {
-                throw USER_QUERY_EXCEPTION(
-                    SCIDB_SE_QPROC, SCIDB_LE_FILE_NOT_FOUND,
-                    _parameters[1]->getParsingContext()) << path;
-            }
-        }
-        else
-        {
-            //This is loading from single instance. Throw error if file not found.
-            if (!Resources::getInstance()->fileExists(path, instanceID, query))
-            {
-                throw USER_QUERY_EXCEPTION(
-                    SCIDB_SE_QPROC, SCIDB_LE_FILE_NOT_FOUND,
-                    _parameters[1]->getParsingContext()) << path;
-            }
-        }
-
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        ArrayDesc arrayDesc;
-
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
-
-        return arrayDesc;
     }
 
     void inferArrayAccess(boost::shared_ptr<Query>& query)
     {
-        LogicalOperator::inferArrayAccess(query);
+        LogicalInput::inferArrayAccess(query);
         assert(_parameters.size() > 0);
-        assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        assert(_parameters[0]->getParamType() == PARAM_SCHEMA);
+
+        const string& arrayName = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])
+            ->getSchema().getName();
+        if (!SystemCatalog::getInstance()->containsArray(arrayName))
+        {
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_ARRAY_DOESNT_EXIST,
+                _parameters[0]->getParsingContext()) << arrayName;
+        }
+
         assert(arrayName.find('@') == std::string::npos);
         boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
                                                                                      query->getQueryID(),

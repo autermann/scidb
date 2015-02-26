@@ -1,0 +1,14 @@
+--setup
+--start-query-logging
+
+create array foo <x:double> [i=1:10,10,0]
+store(build(foo, 1.0/i), foo)
+
+--test
+
+--shell --command "iquery -aq 'scan(foo)'" --store
+--shell --command "iquery -w 10 -aq 'scan(foo)'" --store
+
+--cleanup
+remove(foo)
+--stop-query-logging

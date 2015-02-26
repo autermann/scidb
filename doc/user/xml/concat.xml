@@ -6,9 +6,8 @@
     <refpurpose>Concatenate two arrays </refpurpose>
   </refnamediv>
   <refsynopsisdiv>
-    <synopsis><command>SELECT</command> * <command>INTO</command> <replaceable>target_array</replaceable> <command>FROM</command> concat(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>);
-
-store(concat(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>),<replaceable>target_array</replaceable>);</synopsis>
+    <synopsis><command>SELECT</command> * <command>FROM</command> concat(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>);</synopsis>
+    <synopsis>concat(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>);</synopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>Summary</title>

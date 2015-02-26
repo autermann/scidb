@@ -1,0 +1,11 @@
+--setup
+create empty array C<val:char>[i=0:1,2,0]
+store(build_sparse(C,'d',i=1), C)
+create not empty array D<val:char>[i=0:1,2,0]
+
+--test
+store(C,D)
+
+--cleanup
+remove(C)
+remove(D)

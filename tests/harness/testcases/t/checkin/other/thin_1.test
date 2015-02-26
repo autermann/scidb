@@ -5,17 +5,17 @@ store(build(A,x+10),A)
 
 --test
 thin(A,0,1)
-window(thin(A,0,1),1,stdev(a))
+#window(thin(A,0,1),0,0,stdev(a))
 thin(A,0,2)
-window(thin(A,0,2),2,max(a))
+window(thin(A,0,2),0,1,max(a))
 thin(A,0,3)
-window(thin(A,0,3),3,min(a))
+window(thin(A,0,3),1,1,min(a))
 thin(A,1,2)
-window(thin(A,1,2),2,sum(a))
+window(thin(A,1,2),0,1,sum(a))
 thin(A,1,3)
-window(thin(A,1,3),3,avg(a))
+window(thin(A,1,3),1,1,avg(a))
 thin(A,2,3)
-window(thin(A,2,3),1,var(a))
+#window(thin(A,2,3),0,0,var(a))
 
 --cleanup
 remove(A)

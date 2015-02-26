@@ -49,6 +49,7 @@
 #include "util/Atomic.h"
 #include "query/Aggregate.h"
 #include "query/Statistics.h"
+#include <system/BlockCyclic.h>
 #include "system/Cluster.h"
 #include "system/Warnings.h"
 #include "system/SystemCatalog.h"
@@ -56,13 +57,10 @@
 
 namespace boost
 {
-   template<>
    bool operator< (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
                    boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& r);
-   template<>
    bool operator== (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
                     boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& r);
-   template<>
    bool operator!= (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
                     boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& r);
 } // namespace boost
@@ -90,29 +88,6 @@ class MessageDesc;
 
 const size_t MAX_BARRIERS = 2;
 
-
-/**
- * Section with data structures used in SCATTER/GATHER implementation
- */
-struct SGContext
-{
-    /* Array pointer to SCATTER/GATHER result array.
-    * We must keep it in context because we use it both from
-    * physical operator and from every message handler storing
-    * received chunk.
-    */
-    boost::shared_ptr< Array> _resultSG;
-    std::vector<AggregatePtr> _aggregateList;
-
-    SGContext(boost::shared_ptr< Array> res):
-        _resultSG(res), _aggregateList(0)
-    {}
-
-    SGContext(boost::shared_ptr< Array> res, std::vector<AggregatePtr> const& aggList):
-        _resultSG(res), _aggregateList(aggList)
-    {}
-};
-
 /**
  * The query structure keeps track of query execution and manages the resources used by SciDB
  * in order to execute the query. The Query is a state of query processor to make
@@ -121,6 +96,12 @@ struct SGContext
 class Query : public boost::enable_shared_from_this<Query>
 {
  public:
+    class OperatorContext
+    {
+      public:
+        OperatorContext() {}
+        virtual ~OperatorContext() = 0;
+    };
     class ErrorHandler
     {
       public:
@@ -155,10 +136,10 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     static bool insert(QueryID queryID, boost::shared_ptr<Query>& query);
 
-    boost::shared_ptr<SGContext> _sgContext;
+    boost::shared_ptr<OperatorContext> _operatorContext;
 
     std::map< std::string, boost::shared_ptr<Array> > _temporaryArrays;
-    
+
     /**
      * The physical plan of query. Optimizer generates it for current step of incremental execution
      * from current logical plan. This plan is generated on coordinator and sent out to every instance for execution.
@@ -239,7 +220,7 @@ class Query : public boost::enable_shared_from_this<Query>
 
     /** Query commit state */
     typedef enum {
-        UNKNOWN, 
+        UNKNOWN,
         COMMITTED,
         ABORTED
     } CommitState;
@@ -258,7 +239,7 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * FIFO queue for SG messages
      */
-    boost::shared_ptr<scidb::WorkQueue> _sgQueue;
+    boost::shared_ptr<scidb::WorkQueue> _operatorQueue;
 
     /**
      *  Helper to invoke the finalizers with exception handling
@@ -321,6 +302,10 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     bool _doesExclusiveArrayAccess;
 
+    /**
+    * cache for the ProGrid, which depends only on numInstances
+    */
+    mutable ProcGrid* _procGrid; // only access via getProcGrid()
  public:
     Query();
     ~Query();
@@ -337,9 +322,17 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     static QueryID generateID();
 
-    static const std::map<QueryID, boost::shared_ptr<Query> >& getQueries() {
-        return _queries;
-    }
+    /**
+     * @return the number of queries currently in the system
+     * @param class Observer_tt
+     *{
+     *  bool operator!();
+     *
+     *  void operator()(const shared_ptr<scidb::Query>&)
+     *}
+     */
+    template<class Observer_tt>
+    static size_t listQueries(Observer_tt& observer);
 
     /**
      * Add an error handler to run after a query's "main" routine has completed
@@ -357,11 +350,23 @@ class Query : public boost::enable_shared_from_this<Query>
 
     Mutex resultCS; /** < Critical section for SG result */
 
-    bool isDDL; /* query is executed only at coordinator */
+    bool isDDL;
 
     RWLock queryLock;
 
     std::map<std::string, boost::shared_ptr<const ArrayDesc> > arrayDescByNameCache;
+
+    /**
+     * @brief _mappingArrays
+     * This is a map of mapping arrays for sending to the client.
+     * They must be ready for sending and AccumulatorArray.
+     */
+    std::map< std::string, boost::shared_ptr<Array> > _mappingArrays;
+
+    /**
+     * Program options which is used to run query
+     */
+    std::string programOptions;
 
     /**
      * Initialize a query
@@ -402,14 +407,22 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Get logical instance count
      */
-    size_t getInstancesCount()
+    size_t getInstancesCount() const
     {
         return _liveInstances.size();
     }
+
+    /**
+     * Info needed for ScaLAPACK-compatible chunk distributions
+     * Redistribution code and ScaLAPACK-based plugins need this,
+     * most operators do not.
+     */
+    const ProcGrid* getProcGrid() const;
+
     /**
      * Get logical instance ID
      */
-    InstanceID getInstanceID()
+    InstanceID getInstanceID() const
     {
         return _instanceID;
     }
@@ -420,6 +433,12 @@ class Query : public boost::enable_shared_from_this<Query>
     {
         return _coordinatorID;
     }
+
+    InstanceID getCoordinatorInstanceID()
+    {
+        return _coordinatorID == COORDINATOR_INSTANCE ? _instanceID : _coordinatorID;
+    }
+
     boost::shared_ptr<const InstanceLiveness> getCoordinatorLiveness()
     {
        return _coordinatorLiveness;
@@ -523,10 +542,10 @@ class Query : public boost::enable_shared_from_this<Query>
         return _errorQueue;
     }
 
-    boost::shared_ptr<scidb::WorkQueue> getSGQueue()
+    boost::shared_ptr<scidb::WorkQueue> getOperatorQueue()
     {
         ScopedMutexLock cs(errorMutex);
-        return _sgQueue;
+        return _operatorQueue;
     }
 
     /**
@@ -577,7 +596,7 @@ class Query : public boost::enable_shared_from_this<Query>
      * @return true if no exception is thrown
      */
     static bool validateQueryPtr(const boost::shared_ptr<Query>& query);
-  
+
     /**
      * Destroys query contexts for every still existing query
      */
@@ -605,7 +624,7 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Get temporary or persistent array
      * @param arrayName array name
-     * @return reference to the array 
+     * @return reference to the array
      * @exception SCIDB_LE_ARRAY_DOESNT_EXIST
      */
     boost::shared_ptr<Array> getArray(std::string const& arrayName);
@@ -685,12 +704,12 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Set result SG context. Thread safe.
      */
-    void setSGContext(boost::shared_ptr<SGContext> const& sgContext);
+    void setOperatorContext(boost::shared_ptr<OperatorContext> const& opContext);
 
     /**
      * Remove result SG context.
      */
-    void unsetSGContext();
+    void unsetOperatorContext();
 
     /**
      * Synchronize states of replics
@@ -701,7 +720,10 @@ class Query : public boost::enable_shared_from_this<Query>
      * @return SG Context. Thread safe.
      * wait until context is not NULL,
      */
-    boost::shared_ptr<SGContext> getSGContext();
+    boost::shared_ptr<OperatorContext> getOperatorContext(){
+        ScopedMutexLock lock(errorMutex);
+        return _operatorContext;
+    }
 
     /**
      * Mark query as started
@@ -751,27 +773,13 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     boost::shared_ptr<StatisticsMonitor> statisticsMonitor;
 
-    class QueryOddJob
-    {
-      public:
-        virtual ~QueryOddJob() {}
-        virtual void run(Query& query) = 0;
-    };
-
-    /**
-     * This handlers will be called on each instance during query closing.
-     */
-    std::queue<boost::shared_ptr<QueryOddJob> > _multiinstancePostOddJob;
-
-    void runMultiinstancePostOddJob();
-
     /**
      * Validates the query for errors
      * @throws scidb::SystemException if the query is in error state
      * @return true if no exception is thrown
      */
     bool validate();
-    
+
     void postWarning(const class Warning& warn);
 
     std::vector<Warning> getWarnings();
@@ -812,9 +820,8 @@ public:
         Query::setCurrentQueryID(queryID);
 
         ScopedMutexLock scope(Query::queriesMutex);
-        std::map<QueryID, boost::shared_ptr<Query> >::const_iterator i = Query::getQueries().find(queryID);
-        if (i != Query::getQueries().end()) {
-            _query = i->second;
+        _query = Query::getQueryByID(queryID, false, false);
+        if (_query) {
             _query->incUseCounter();
         }
     }
@@ -883,6 +890,22 @@ class RemoveErrorHandler : public Query::ErrorHandler
     const boost::shared_ptr<SystemCatalog::LockDesc> _lock;
 };
 
+template<class Observer_tt>
+size_t Query::listQueries(Observer_tt& observer)
+{
+    ScopedMutexLock mutexLock(queriesMutex);
+
+    if (!observer) {
+        return _queries.size();
+    }
+
+    for (std::map<QueryID, boost::shared_ptr<Query> >::const_iterator q = _queries.begin();
+         q != _queries.end(); ++q) {
+        observer(q->second);
+    }
+    return _queries.size();
+
+}
 
 } // namespace
 

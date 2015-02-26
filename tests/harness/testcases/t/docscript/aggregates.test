@@ -1,0 +1,126 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m4x4<attr1:double> [x=0:3,4,0,y=0:3,4,0]  
+load(m4x4, '../examples/m4x4.scidb')  
+--stop-igdata
+show(m4x4)
+--set-format auto
+scan(m4x4)  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m4x4_2attr<attr1:double,attr2:double> [x=0:3,4,0,y=0:3,4,0]  
+load(m4x4_2attr, '../examples/m4x4_2attr.scidb')  
+--stop-igdata
+show(m4x4_2attr)
+--set-format auto
+scan(m4x4_2attr)  
+--aql SELECT max(attr1),min(attr1) FROM m4x4  
+--aql SELECT max(attr1),min(attr1) INTO m4x4_max_min FROM m4x4  
+--set-format dcsv
+show(m4x4_max_min)
+--set-format auto
+--aql SELECT max(attr2), min(attr2) FROM m4x4_2attr  
+--set-format dcsv
+--aql SELECT max(m4x4)  
+--set-format auto
+aggregate(m4x4_2attr, max(attr2),min(attr1))  
+--shell  --command="cat '../examples/m4x4_null.scidb' " --store
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m4x4_null< attr1: int32 NULL>[i=1:4,4,0, j=1:4,4,0]  
+load(m4x4_null, '../examples/m4x4_null.scidb')  
+--stop-igdata
+--aql SELECT count(attr1) AS a, count(*) AS b FROM m4x4_null  
+--aql SELECT max(attr1) FROM m4x4 GROUP BY x  
+--start-igdata
+--aql SELECT max(attr1) INTO tmp1 FROM m4x4 GROUP BY x  
+--stop-igdata
+show(tmp1)
+--aql SELECT max(attr1) FROM m4x4 GROUP BY y  
+aggregate(m4x4, max(attr1), y)  
+--set-format auto
+--aql  SELECT max(attr1), min(attr1) FROM m4x4 REGRID AS (PARTITION BY x 2, y 2)  
+--set-format dcsv
+--start-igdata
+--aql  SELECT max(attr1), min(attr1) INTO tmp2 FROM m4x4 REGRID AS (PARTITION BY x 2, y 2)  
+--stop-igdata
+show(tmp2)
+--set-format auto
+regrid(m4x4, 2, 2, max(attr1), min(attr1))  
+--aql  SELECT sum(attr1) FROM m4x4 FIXED WINDOW AS (PARTITION BY x 1 PRECEDING AND 1 FOLLOWING, y 1 PRECEDING AND 1 FOLLOWING)  
+--set-format dcsv
+--start-igdata
+--aql  SELECT sum(attr1) INTO tmp3 FROM m4x4 FIXED WINDOW AS (PARTITION BY x 1 PRECEDING AND 1 FOLLOWING, y 1 PRECEDING AND 1 FOLLOWING)  
+--stop-igdata
+show(tmp3)
+--set-format auto
+window (m4x4,1,1,1,1,sum(attr1))  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m4x4_empty<val: double, label: string NULL>[i=0:3,4,0, j=0:3,4,0]  
+load(m4x4_empty, '../examples/m4x4_empty.scidb')  
+--set-format auto
+--stop-igdata
+scan(m4x4_empty)  
+--set-format dcsv
+--aql  SELECT sum(val) FROM m4x4_empty VARIABLE WINDOW AS (PARTITION BY i 1 PRECEDING AND 1 FOLLOWING)  
+--set-format auto
+variable_window(m4x4_empty, i, 1, 1, sum(val))  
+--set-format dcsv
+--start-igdata
+--aql CREATE ARRAY winnersFlat < event:string, year:int64, person:string, country: string, time:double > [i=0:*,1000000,0]  
+load(winnersFlat, '../examples/winners2.scidb')  
+--aql CREATE ARRAY winners <person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]  
+redimension_store(winnersFlat, winners)  
+--stop-igdata
+show(winners)
+--aql SELECT * FROM winners  
+--start-igdata
+--aql CREATE ARRAY perCountryMedalCount <medalCount: uint64 null> [country(string)=20,20,0]  
+--stop-igdata
+redimension_store (winners, perCountryMedalCount, count(*) as medalCount) 
+--aql SELECT * FROM perCountryMedalCount  
+--aql  SELECT * FROM sort(m4x4_empty, val)  
+--aql  SELECT * FROM sort(m4x4_empty, label)  
+--aql  SELECT * FROM sort(m4x4_empty, label desc)  
+--start-igdata
+CREATE ARRAY m4x4_double < val:double >[i=0:3,4,0,j=0:3,4,0]  
+load(m4x4_double, '../examples/m4x4_double.scidb')  
+--stop-igdata
+show(m4x4_double)
+--set-format auto
+scan(m4x4_double)  
+--aql SELECT * FROM rank(m4x4_double,val,j)  
+--aql  SELECT floor(val) INTO m4x4_floor FROM m4x4_double  
+--aql  SELECT * FROM rank(m4x4_floor,expr,j)  
+--aql  SELECT * FROM avg_rank(m4x4_floor,expr,j)  
+--set-format dcsv
+show(m4x4_floor)
+--set-format auto
+scan(m4x4_floor)  
+--set-format dcsv
+--aql  SELECT * FROM quantile(m4x4_floor,2)  
+--aql  SELECT * FROM quantile(m4x4_floor,8)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(m4x4)
+remove(m4x4_2attr)
+remove(m4x4_max_min)
+remove(m4x4_null)
+remove(tmp1)
+remove(tmp2)
+remove(tmp3)
+remove(m4x4_empty)
+remove(winnersFlat)
+remove(winners)
+remove(perCountryMedalCount)
+remove(m4x4_double)
+remove(m4x4_floor)

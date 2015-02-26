@@ -1,0 +1,53 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+create array letters <letter:string> [i=0:2,3,0] 
+--shell  --command="csv2scidb -s 1 -p S < ../examples/letters.csv > ../examples/letters.scidb "
+--aql load letters from '../examples/letters.scidb' 
+--stop-igdata
+scan(letters) 
+--start-igdata
+store(build(<number:int64 null>[i=0:4,5,0],i),numbers) 
+--stop-igdata
+scan(numbers) 
+--set-format auto
+cross(numbers,letters)  
+--set-format dcsv
+--start-igdata
+create array lettersPlus <letter:string, type:string> [i=0:2,3,0] 
+--shell  --command="csv2scidb -s 1 -p S < ../examples/lettersPlus.csv > ../examples/lettersPlus.scidb "
+--aql load lettersPlus from '../examples/lettersPlus.scidb' 
+--stop-igdata
+scan(lettersPlus) 
+--set-format auto
+cross(numbers,lettersPlus)  
+--set-format dcsv
+--start-igdata
+create array oddNumbers <number:int64 null> [i=0:4,5,0] 
+--shell  --command="csv2scidb -s 1 -p N < ../examples/oddNumbers.csv > ../examples/oddNumbers.scidb "
+--aql load oddNumbers from '../examples/oddNumbers.scidb' 
+--stop-igdata
+scan(oddNumbers) 
+--set-format auto
+cross(oddNumbers,letters)  
+--set-format dcsv
+--start-igdata
+store(build_sparse(<number:int64>[i=0:4,5,0],i,((i%2)=0)),evenNumbers) 
+--stop-igdata
+scan(evenNumbers) 
+--set-format dense
+cross(evenNumbers,letters)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(letters)
+remove(numbers)
+remove(lettersPlus)
+remove(oddNumbers)
+remove(evenNumbers)

@@ -1,0 +1,10 @@
+--setup
+--start-query-logging
+
+--test
+
+echo ('python basic.py')
+--shell --command "cd  testcases/t/client; python basic.py ${IQUERY_HOST} ${IQUERY_PORT}" --store
+
+--cleanup
+--stop-query-logging

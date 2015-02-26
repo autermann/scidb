@@ -24,6 +24,7 @@ import sys
 import traceback
 sys.path.append(os.getcwd()) # NOCHECKIN 
 sys.path.append('@CMAKE_INSTALL_PREFIX@' + '/lib')
+sys.path.append('/opt/scidb/12.7/lib')
 import scidbapi as scidb
 
 
@@ -42,6 +43,8 @@ def handleException(inst, exitWhenDone, op=None):
     if(exitWhenDone):
         exit(2)
 
+def print_dataitem(dtypeStr, dataitem):
+    print "Data: %s" % scidb.getTypedValue(dataitem, dtypeStr)
 
 def main():
     try: 
@@ -53,16 +56,15 @@ def main():
     # the third element of the triples below indicates whether a failure of the query should
     # terminate the program.  Cleanups, for example, use False for that.
     # a flag indicating whether they should cause exit on exception
-    queries = (("aql", "drop array simplearray", False),  # False: only a cleanup
-               ("aql", "CREATE immutable ARRAY simplearray < foo:int32, bar:char, baz:string > [ a=0:99, 10,0,  b=0:9, 10,0]", True),
+    queries = (("aql", "CREATE immutable ARRAY simplearray < foo:int32, bar:char, baz:string > [ a=0:99, 10,0,  b=0:9, 10,0]", True),
                ("aql", "load simplearray from '%s/simplearray.data'"% (os.getcwd(),), True))
 
     for triple in queries:
         try:
             result = db.executeQuery(triple[1], triple[0]) 
+            db.completeQuery(result.queryID)
         except Exception, inst:
             handleException(inst, triple[2], op= "Executing query: " + triple[1])
-    
 
     #
     # now run the select query and retain the results
@@ -93,32 +95,40 @@ def main():
         attrid = attrs[i].getId() 
         iters.append(result.array.getConstIterator(attrid))
         print "attribute attrid = %d loaded" % (attrid)
-        
-    for i in range(attrs.size()):
-        nc = -1
-        while not iters[i].end():
-            nc += 1
-            currentchunk = iters[i].getChunk()
-            chunkiter = currentchunk.getConstIterator((scidb.swig.ConstChunkIterator.IGNORE_EMPTY_CELLS |
-                                                       scidb.swig.ConstChunkIterator.IGNORE_OVERLAPS))
-            print "Chunk iterator %d loaded." % nc
-            
-            while not chunkiter.end():
-                dataitem = chunkiter.getItem()
-                # look up the value according to its attribute's typestring
-                item = scidb.getTypedValue(dataitem, attrs[i].getType()) # TBD: eliminate 2nd arg, make method on dataitem
+      
+    nc = 0; 
+    while not iters[0].end():
 
-                print "Data: %s" % item
-                chunkiter.increment_to_next()
-            
-            iters[i].increment_to_next();
+        for i in range (attrs.size()):
+            if (attrs[i].getName() == "EmptyTag"):
+                continue
+            print "Getting iterator for attribute %d, chunk %d.\n" % (i, nc)
+            currentchunk = iters[i].getChunk()
+            chunkiter = currentchunk.getConstIterator((scidb.swig.ConstChunkIterator.IGNORE_OVERLAPS)|(scidb.swig.ConstChunkIterator.IGNORE_EMPTY_CELLS))
         
+            printed=False
+            while not chunkiter.end():
+                if not chunkiter.isEmpty(): 
+                    dataitem = chunkiter.getItem()
+                    print_dataitem(attrs[i].getType(), dataitem)
+                    printed=True
+      
+                chunkiter.increment_to_next()
+            if printed:
+                print       # add an extra newline to separate the data from the next query
+
+        nc += 1;
+        for i in range(attrs.size()):
+          iters[i].increment_to_next();
+        
+    db.completeQuery(result.queryID)
     try:
         query="drop array simplearray"
-        db.executeQuery(query, "aql")
+        result=db.executeQuery(query, "aql")
+        db.completeQuery(result.queryID)
     except Exception, inst:
         handleException(inst, True, op="Executing query: " + query)
-      
+
     db.disconnect()     #Disconnect from the SciDB server. 
 
 

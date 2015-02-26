@@ -40,16 +40,19 @@ namespace scidb {
 class PhysicalCrossJoin: public PhysicalOperator
 {
 public:
-	PhysicalCrossJoin(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalCrossJoin(std::string const& logicalName,
+                      std::string const& physicalName,
+                      Parameters const& parameters,
+                      ArrayDesc const& schema):
 	    PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
 	}
 
-	virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
-        if (inputBoundaries[0].isEmpty() || inputBoundaries[1].isEmpty())
-        {
+        if (inputBoundaries[0].isEmpty() || inputBoundaries[1].isEmpty()) {
             return PhysicalBoundaries::createEmpty(_schema.getDimensions().size());
         }
 
@@ -72,13 +75,13 @@ public:
             {
                 const string &lJoinDimName = ((boost::shared_ptr<OperatorParamDimensionReference>&)_parameters[pi])->getObjectName();
                 const string &lJoinDimAlias = ((boost::shared_ptr<OperatorParamDimensionReference>&)_parameters[pi])->getArrayName();
-                if (lDim.hasNameOrAlias(lJoinDimName, lJoinDimAlias))
+                if (lDim.hasNameAndAlias(lJoinDimName, lJoinDimAlias))
                 {
                     const string &rJoinDimName = ((boost::shared_ptr<OperatorParamDimensionReference>&)_parameters[pi+1])->getObjectName();
                     const string &rJoinDimAlias = ((boost::shared_ptr<OperatorParamDimensionReference>&)_parameters[pi+1])->getArrayName();
                     for (size_t rdi = 0; rdi < numRightDims; rdi++)
                     {
-                        if (inputSchemas[1].getDimensions()[rdi].hasNameOrAlias(rJoinDimName, rJoinDimAlias))
+                        if (inputSchemas[1].getDimensions()[rdi].hasNameAndAlias(rJoinDimName, rJoinDimAlias))
                         {
                             newStart.push_back(leftStart[ldi] < rightStart[rdi] ?  rightStart[rdi] : leftStart[ldi]);
                             newEnd.push_back(leftEnd[ldi] > rightEnd[rdi] ? rightEnd[rdi] : leftEnd[ldi]);
@@ -105,7 +108,7 @@ public:
             {
                 const string &joinDimName = ((boost::shared_ptr<OperatorParamDimensionReference>&)_parameters[pi+1])->getObjectName();
                 const string &joinDimAlias = ((boost::shared_ptr<OperatorParamDimensionReference>&)_parameters[pi+1])->getArrayName();
-                if (dim.hasNameOrAlias(joinDimName, joinDimAlias))
+                if (dim.hasNameAndAlias(joinDimName, joinDimAlias))
                 {
                     found = true;
                     break;
@@ -121,14 +124,15 @@ public:
         return PhysicalBoundaries(newStart, newEnd);
     }
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
         //TODO[ap]: if ALL RIGHT SIDE non-join dimensions are one chunk, then true
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const& inputDistributions,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
         return ArrayDistribution(psUndefined);
     }
@@ -137,9 +141,18 @@ public:
      * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    boost::shared_ptr<Array> execute(
+            vector< boost::shared_ptr<Array> >& inputArrays,
+            boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
+
+        if (query->getInstancesCount() == 1 && inputArrays[1]->getSupportedAccess() == Array::SINGLE_PASS)
+        {
+            //We normally redistribute the right array. We lazily iterate over the left array. But if the right array is
+            //single pass only and we're on one node - then there's a problem.
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
 
         size_t lDimsSize = inputArrays[0]->getArrayDesc().getDimensions().size();
         size_t rDimsSize = inputArrays[1]->getArrayDesc().getDimensions().size();

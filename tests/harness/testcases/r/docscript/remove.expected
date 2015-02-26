@@ -1,0 +1,6 @@
+SCIDB QUERY : <store(build(<val:double>[i=0:9,10,0],1),source)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <remove(source)>
+[Query was executed successfully, ignoring data output by this query.]
+

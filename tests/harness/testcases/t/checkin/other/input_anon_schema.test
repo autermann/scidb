@@ -1,0 +1,8 @@
+--setup
+
+--test
+sg(input(<a:int32, b:int32> [x=0:3,3,0, y=0:3,3,0], '../tests/harness/testcases/data/M4x4.txt'), 0)
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST "load(<a:int32, b:int32> [x=0:3,3,0, y=0:3,3,0], '../tests/harness/testcases/data/M4x4.txt')"
+
+--cleanup
+

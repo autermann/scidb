@@ -40,21 +40,31 @@ namespace scidb {
 class PhysicalSlice: public PhysicalOperator
 {
 public:
-        PhysicalSlice(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-            PhysicalOperator(logicalName, physicalName, parameters, schema)
-        {
-        }
-
-        virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-        {
-            return false;
-        }
-
-     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    PhysicalSlice(std::string const& logicalName,
+                  std::string const& physicalName,
+                  Parameters const& parameters,
+                  ArrayDesc const& schema):
+        PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
-        if (inputBoundaries[0].isEmpty())
-        {
+    }
+
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
+    {
+        return true;
+    }
+
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const& sourceDistributions,
+            std::vector<ArrayDesc> const& sourceSchemas) const
+    {
+        return ArrayDistribution(psUndefined);
+    }
+
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
+    {
+        if (inputBoundaries[0].isEmpty()) {
             return PhysicalBoundaries::createEmpty(_schema.getDimensions().size());
         }
 
@@ -67,26 +77,22 @@ public:
 
         size_t nParams = _parameters.size();
         std::vector<std::string> sliceDimName(nParams/2);
-        for (size_t i = 0; i < nParams; i+=2)
-        {
+        for (size_t i = 0; i < nParams; i+=2) {
             sliceDimName[i >> 1]  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
         }
 
-        for (size_t i = 0; i < nDims; i++)
-        {
+        for (size_t i = 0; i < nDims; i++) {
             const std::string dimName = dims[i].getBaseName();
             int k = sliceDimName.size();
             while (--k >= 0
                    && sliceDimName[k] != dimName
                    && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1));
 
-            if (k < 0)
-            {   //dimension i is present in output
+            if (k < 0) {
+                //dimension i is present in output
                 newStart.push_back(inStart[i]);
                 newEnd.push_back(inEnd[i]);
-            }
-            else
-            {
+            } else {
                 //dimension i is not present in output; check value
                 Coordinate slice = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[k*2+1])->getExpression()->evaluate().getInt64();
                 if (!inputBoundaries[0].isInsideBox(slice,i))
@@ -109,14 +115,21 @@ public:
         return PhysicalBoundaries(newStart, newEnd);
     }
 
-        /***
-         * Slice is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-         * that overrides the chunkiterator method.
-         */
-        boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
+    /**
+      * Slice is a pipelined operator, hence it executes by returning
+      * an iterator-based array to the consumer
+      * that overrides the chunkiterator method.
+      */
+    boost::shared_ptr< Array> execute(
+            std::vector< boost::shared_ptr< Array> >& inputArrays,
             boost::shared_ptr<Query> query)
-         {
-                assert(inputArrays.size() == 1);
+    {
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
+        assert(inputArrays.size() == 1);
         boost::shared_ptr<Array> inputArray = inputArrays[0];
         ArrayDesc const& desc = inputArray->getArrayDesc();
         Dimensions const& dims = desc.getDimensions();
@@ -147,8 +160,8 @@ public:
                 mask |= (uint64_t)1 << i;
             }
         }
-                return boost::shared_ptr<Array>( new SliceArray(_schema, slice, mask, inputArray));
-         }
+        return boost::shared_ptr<Array>( new SliceArray(_schema, slice, mask, inputArray));
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSlice, "slice", "physicalSlice")

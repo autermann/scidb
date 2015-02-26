@@ -29,6 +29,7 @@
 #include "network/NetworkManager.h"
 #include "query/Operator.h"
 #include "query/QueryProcessor.h"
+#include "array/DelegateArray.h"
 #include "system/Cluster.h"
 
 #include "FITSInputArray.h"
@@ -47,9 +48,9 @@ public:
     {
     }
 
-    virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
     uint32_t getHDU() const
@@ -70,8 +71,9 @@ public:
         return query->getInstanceID();          // Otherwise, use current instance ID
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                     const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector<ArrayDesc> const&) const
     {
         return ArrayDistribution(psLocalInstance);
     }
@@ -87,6 +89,9 @@ public:
         boost::shared_ptr<Array> result;
         if (fileInstanceID == myInstanceID) {   // This is the instance containing the file
             result = boost::shared_ptr<Array>(new FITSInputArray(_schema, filePath, hdu, query));
+            if (_schema.getEmptyBitmapAttribute() != NULL) { 
+                result = boost::shared_ptr<Array>(new NonEmptyableArray(result));
+            }
         } else {                        // Otherwise, return empty array
             result = boost::shared_ptr<Array>(new MemArray(_schema));
         }

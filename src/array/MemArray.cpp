@@ -28,6 +28,7 @@
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
  */
 
+#include "log4cxx/logger.h"
 #include "util/FileIO.h"
 #include "array/MemArray.h"
 #include "system/Exceptions.h"
@@ -37,6 +38,7 @@
 #include "array/Compressor.h"
 #include "system/SciDBConfigOptions.h"
 #include "query/Statistics.h"
+#include <system/Utils.h>
 
 #define OPTIMIZED_SEQUENTIAL_MODE true
 
@@ -47,17 +49,42 @@ namespace scidb
 
     const size_t MAX_SPARSE_CHUNK_INIT_SIZE = 1024*1024;
 
+    // Logger for operator. static to prevent visibility of variable outside of file
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.memarray"));
+
     CoordinatesMapper::CoordinatesMapper(ConstChunk const& chunk)
     {
-        Dimensions const& dim = chunk.getArrayDesc().getDimensions();
-        nDims = dim.size();
-        origin = chunk.getFirstPosition(false);
-        chunkIntervals.resize(nDims); 
-        logicalChunkSize = 1;
-        for (size_t i = 0; i < nDims; i++) { 
-            origin[i] -= dim[i].getChunkOverlap();
-            logicalChunkSize *= (chunkIntervals[i] = dim[i].getChunkOverlap()*2 + dim[i].getChunkInterval());
+        init(chunk.getFirstPosition(true), chunk.getLastPosition(true)); // true - withOverlap
+    }
+
+    CoordinatesMapper::CoordinatesMapper(Coordinates const& firstPosition, Coordinates const& lastPosition)
+    {
+        init(firstPosition, lastPosition);
+    }
+
+    CoordinatesMapper::CoordinatesMapper(Coordinates const& chunkPos, Dimensions const& dims)
+    {
+        init(computeFirstChunkPosition(chunkPos, dims), computeLastChunkPosition(chunkPos, dims));
+    }
+
+    void CoordinatesMapper::init(Coordinates const& firstPosition, Coordinates const& lastPosition)
+    {
+        assert(firstPosition.size() == lastPosition.size());
+        assert(firstPosition.size() > 0);
+
+        _origin = firstPosition;
+        _nDims = _origin.size();
+        _chunkIntervals.resize(_nDims);
+        _logicalChunkSize = 1;
+
+        for (size_t i = 0; i < _nDims; i++)
+        {
+            assert ( lastPosition[i] >= _origin[i] );
+            _chunkIntervals[i] = lastPosition[i]-_origin[i]+1;
+            _logicalChunkSize *= _chunkIntervals[i];
         }
+
+        assert(_origin.size()>0);
     }
 
     //
@@ -74,96 +101,34 @@ namespace scidb
         initLRU();
     }
 
-    MemArray::MemArray(boost::shared_ptr<Array> input) : desc(input->getArrayDesc())
+    MemArray::MemArray(boost::shared_ptr<Array> input, bool vertical) : desc(input->getArrayDesc())
     {
         initLRU();
-        append(input);
+        append(input, vertical);
     }
 
     MemArray::~MemArray()
     {
-        if (swapFile >= 0) {
-            ::close(swapFile);
+        SharedMemCache::getInstance().cleanupArray(*this);
+        if (_swapFile >= 0) {
+            ::close(_swapFile);
         }
     }
 
     void MemArray::initLRU()
     {
-        usedMemSize = 0;
-        usedFileSize = 0;
-#ifdef SCIDB_CLIENT
-        usedMemThreshold = DEFAULT_MEM_THRESHOLD*MB;
-#else
-        usedMemThreshold = Config::getInstance()->getOption<int>(CONFIG_MEM_ARRAY_THRESHOLD)*MB;
-#endif
-        swapFile = -1;
+        _swapFile = -1;
+        _usedFileSize = 0;
     }
     
-    size_t totalMemChunkAllocatedSize;
-
     inline void MemArray::pinChunk(LruMemChunk& chunk)
     {
-        ScopedMutexLock cs(lruMutex);
-        if (chunk.accessCount++ == 0) {
-            if (chunk.data == NULL) {
-                if (usedMemSize > usedMemThreshold) {
-                    swapOut();
-                }
-                if (chunk.size != 0) { 
-                    assert(chunk.swapFileOffset >= 0);
-                    chunk.data = ::malloc(chunk.size);
-                    if (!chunk.data)
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
-                    __sync_add_and_fetch(&totalMemChunkAllocatedSize, chunk.size);
-                    File::readAll(swapFile, chunk.data, chunk.size, chunk.swapFileOffset);
-                    usedMemSize += chunk.size;
-                }
-            } else {
-                assert(!chunk.isEmpty());
-                chunk.unlink();
-            }
-        }
+        SharedMemCache::getInstance().pinChunk(chunk);
     }
 
     inline void MemArray::unpinChunk(LruMemChunk& chunk)
     {
-        ScopedMutexLock cs(lruMutex);
-        assert(chunk.accessCount > 0);
-        if (--chunk.accessCount == 0) {
-            if (chunk.data != NULL) {
-                if (chunk.swapFileSize < chunk.size) {
-                    usedMemSize += chunk.size - chunk.swapFileSize;
-                }
-                assert(chunk.isEmpty());
-                lru.link(&chunk);
-                if (usedMemSize > usedMemThreshold) {
-                    swapOut();
-                }
-            }
-        }
-    }
-
-    void MemArray::swapOut()
-    {
-        if (swapFile < 0) {
-            swapFile = File::createTemporary(getName());
-        }
-        while (!lru.isEmpty() && usedMemSize > usedMemThreshold) {
-            LruMemChunk* victim = lru.prev;
-            assert(victim->accessCount == 0);
-            assert(victim->data != NULL);
-            assert(!victim->isEmpty());
-            victim->unlink();
-            usedMemSize -= victim->size;
-            int64_t offset = victim->swapFileOffset;
-            if (offset < 0 || victim->swapFileSize < victim->size) {
-                offset = victim->swapFileOffset = usedFileSize;
-                usedFileSize += victim->size;
-                victim->swapFileSize = victim->size;
-            }
-            File::writeAll(swapFile, victim->data, victim->size, offset);
-            victim->free();
-        }
+        SharedMemCache::getInstance().unpinChunk(chunk);
     }
 
     string const& MemArray::getName() const
@@ -183,13 +148,13 @@ namespace scidb
 
     Chunk& MemArray::operator[](Address const& addr)
     {
-        ScopedMutexLock cs(lruMutex);
-        LruMemChunk& chunk = chunks[addr];
+        ScopedMutexLock cs(_mutex);
+        LruMemChunk& chunk = _chunks[addr];
         if (!chunk.isInitialized()) {
             AttributeDesc const* bitmapAttr = desc.getEmptyBitmapAttribute();
             Chunk* bitmapChunk = NULL;
             if (bitmapAttr != NULL && bitmapAttr->getId() != addr.attId) {
-                Address bitmapAddr(addr.arrId, bitmapAttr->getId(), addr.coords);
+                Address bitmapAddr(bitmapAttr->getId(), addr.coords);
                 bitmapChunk = &(*this)[bitmapAddr];
             }
             chunk.initialize(this, &desc, addr, desc.getAttributes()[addr.attId].getDefaultCompressionMethod());
@@ -197,11 +162,9 @@ namespace scidb
             if (bitmapChunk != NULL) { 
                 bitmapChunk->unPin();
             }
-            chunk.accessCount = 1;
             chunk.prune();
-        } else {
-            pinChunk(chunk);
         }
+        pinChunk(chunk);
         assert(chunk.isEmpty());
         return chunk;
     }
@@ -224,7 +187,6 @@ namespace scidb
     {
         arrayDesc = NULL;
         bitmapChunk = NULL;
-        data = NULL;
         size = 0;
         sparse = false;
         array = NULL;
@@ -292,13 +254,17 @@ namespace scidb
 
     void MemChunk::initialize(ConstChunk const& srcChunk)
     {
-        Address addr(srcChunk.getArrayDesc().getId(), srcChunk.getAttributeDesc().getId(), srcChunk.getFirstPosition(false));
+        Address addr(srcChunk.getAttributeDesc().getId(), srcChunk.getFirstPosition(false));
         initialize(&srcChunk.getArray(),
                    &srcChunk.getArrayDesc(),
                    addr,
                    srcChunk.getCompressionMethod());
         setSparse(srcChunk.isSparse());
+#ifndef SCIDB_CLIENT
+        setRLE((srcChunk.getAttributeDesc().isEmptyIndicator() && Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT)) || srcChunk.isRLE());
+#else 
         setRLE(srcChunk.isRLE());
+#endif
     }
 
     void MemChunk::initialize(Array const* arr, ArrayDesc const* desc, const Address& firstElem, int compMethod)
@@ -353,7 +319,7 @@ namespace scidb
 
     void* MemChunk::getData() const
     {
-        return data;
+        return data.get();
     }
 
     size_t MemChunk::getSize() const
@@ -363,31 +329,21 @@ namespace scidb
 
     void MemChunk::allocate(size_t size)
     {
-        if (this->size != size || data == NULL) {
-            if (data != NULL) {
-                __sync_sub_and_fetch(&totalMemChunkAllocatedSize, this->size);
-                ::free(data);
-                data = NULL;
-            }
-            this->size = size;
-            data = ::malloc(size);
-            if (!data)
-                throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
-            __sync_add_and_fetch(&totalMemChunkAllocatedSize, this->size);
-            currentStatistics->allocatedSize += size;
-            currentStatistics->allocatedChunks++;
+        if (this->size != size || getData()==NULL) {
+            reallocate(size);
         }
     }
 
     void MemChunk::reallocate(size_t newSize)
     {
-        void* newData = ::malloc(newSize);
+        char* newData = new char[newSize];
         if (!newData)
             throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
-        __sync_add_and_fetch(&totalMemChunkAllocatedSize, newSize - size);
-        memcpy(newData, data, newSize < size ? newSize : size);
-        ::free(data);
-        data = newData;
+        size_t minSize = newSize<size ? newSize : size;
+        if (data.get()!=NULL) {
+            memcpy(newData, data.get(), minSize);
+        }
+        data.reset(newData);
         size = newSize;
         currentStatistics->allocatedSize += newSize;
         currentStatistics->allocatedChunks++;
@@ -395,11 +351,7 @@ namespace scidb
 
     void MemChunk::free()
     {
-        if (data) { 
-            __sync_sub_and_fetch(&totalMemChunkAllocatedSize, size);
-            ::free(data);
-        }
-        data = NULL;
+        data.reset();
     }
 
     MemChunk::~MemChunk()
@@ -443,7 +395,7 @@ namespace scidb
         RLEChunkIterator iterator(*arrayDesc, addr.attId, this, NULL, ChunkIterator::NO_EMPTY_CHECK, dummyQuery); 
         boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap = iterator.getEmptyBitmap();
         allocate(emptyBitmap->packedSize());
-        emptyBitmap->pack((char*)data);
+        emptyBitmap->pack(static_cast<char*>(getData()));
         rle = true;
     }
 
@@ -464,7 +416,7 @@ namespace scidb
         PinBuffer scope(*this);
         boost::shared_ptr<Query> emptyQuery;
         return boost::shared_ptr<ConstChunkIterator>
-            (isRLE() ? getAttributeDesc().isEmptyIndicator() || data == NULL
+            (isRLE() ? getAttributeDesc().isEmptyIndicator() || getData() == NULL
                  ? (ConstChunkIterator*)new RLEBitmapChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode)
                  : (ConstChunkIterator*)new RLEConstChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode)
              : isSparse()
@@ -519,9 +471,8 @@ namespace scidb
     //
     // LruMemChunk
     //
-    LruMemChunk::LruMemChunk()
+    LruMemChunk::LruMemChunk(): _whereInLru(SharedMemCache::getLru().end())
     {
-        prune();
         swapFileOffset = -1;
         swapFileSize = 0;
         accessCount = 0;
@@ -531,6 +482,29 @@ namespace scidb
     {
         // If exception is raised during update of array, then access counter may be non zero
         //assert(accessCount == 0);
+    }
+
+    bool LruMemChunk::isEmpty() const {
+        return _whereInLru == SharedMemCache::getLru().end();
+    }
+
+    /**
+     * Take a note that this LruMemChunk has been removed from the Lru.
+     */
+    void LruMemChunk::prune() {
+        _whereInLru = SharedMemCache::getLru().end();
+    }
+
+    void LruMemChunk::removeFromLru() {
+        if (!isEmpty()) {
+            SharedMemCache::getLru().erase(_whereInLru);
+            prune();
+        }
+    }
+
+    void LruMemChunk::pushToLru() {
+        assert(isEmpty());
+        _whereInLru = SharedMemCache::getLru().push(this);
     }
 
     bool LruMemChunk::isTemporary() const
@@ -558,6 +532,121 @@ namespace scidb
         unPin();
     }
 
+    /**
+     * @brief SharedMemCache::SharedMemCache
+     */
+
+    SharedMemCache::SharedMemCache(): _usedMemSize(0),
+        _usedMemThreshold(DEFAULT_MEM_THRESHOLD * MB), /*<< must be rewritten after config load */
+        _swapNum(0), _loadsNum(0)
+    {
+    }
+
+    void SharedMemCache::pinChunk(LruMemChunk &chunk)
+    {
+        ScopedMutexLock cs(_mutex);
+        if (chunk.accessCount++ == 0) {
+            if (chunk.getData() == NULL) {
+                if (_usedMemSize > _usedMemThreshold) {
+                    swapOut();
+                }
+                if (chunk.size != 0) {
+                    assert(chunk.swapFileOffset >= 0);
+                    chunk.data.reset(new char[chunk.size]);
+                    if (!chunk.getData())
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
+                    const MemArray* array = (const MemArray*)chunk.array;
+                    File::readAll(array->_swapFile, chunk.getData(), chunk.size, chunk.swapFileOffset);
+                    ++_loadsNum;
+                    _usedMemSize += chunk.size;
+                }
+            } else {
+                assert(!chunk.isEmpty());
+                chunk.removeFromLru();
+            }
+        }
+    }
+
+    void SharedMemCache::unpinChunk(LruMemChunk &chunk)
+    {
+        ScopedMutexLock cs(_mutex);
+        assert(chunk.accessCount > 0);
+        if (--chunk.accessCount == 0) {
+            if (chunk.getData() != NULL) {
+                if (chunk.swapFileSize < chunk.size) {
+                    _usedMemSize += chunk.size - chunk.swapFileSize;
+                }
+                assert(chunk.isEmpty());
+                chunk.pushToLru();
+                if (_usedMemSize > _usedMemThreshold) {
+                    swapOut();
+                }
+            }
+        }
+    }
+
+    void SharedMemCache::swapOut()
+    {
+        // this function must be called under _mutex lock
+        while (!_theLru.empty() && _usedMemSize > _usedMemThreshold) {
+
+            LruMemChunk* victim = NULL;
+            bool popped = _theLru.pop(victim);
+            SCIDB_ASSERT(popped);
+            assert(victim!=NULL);
+            assert(victim->accessCount == 0);
+            assert(victim->getData() != NULL);
+            assert(!victim->isEmpty());
+            victim->prune();
+            _usedMemSize -= victim->size;
+            int64_t offset = victim->swapFileOffset;
+            MemArray* array = (MemArray*)victim->array;
+            if (offset < 0 || victim->swapFileSize < victim->size) {
+                offset = victim->swapFileOffset = array->_usedFileSize;
+                array->_usedFileSize += victim->size;
+                victim->swapFileSize = victim->size;
+            }
+            if (array->_swapFile < 0) {
+                array->_swapFile = File::createTemporary(array->getName());
+            }
+            File::writeAll(array->_swapFile, victim->getData(), victim->size, offset);
+            ++_swapNum;
+            victim->free();
+        }
+    }
+
+    void SharedMemCache::deleteChunk(LruMemChunk &chunk)
+    {
+        ScopedMutexLock cs(_mutex);
+        assert(chunk.accessCount == 0);
+        chunk.removeFromLru();
+    }
+
+    void SharedMemCache::cleanupArray(MemArray &array)
+    {
+        ScopedMutexLock cs(_mutex);
+        for (map<Address, LruMemChunk>::iterator i = array._chunks.begin(); i != array._chunks.end(); i++)
+        {
+            LruMemChunk &chunk = i->second;
+
+            assert(chunk.accessCount == 0);
+
+            /**
+             *  This code helps us to keep cache size correct even in case of
+             *  incorrectly handled errors
+             */
+            if (chunk.accessCount > 0) {
+                _usedMemSize -= chunk.size;
+                LOG4CXX_DEBUG(logger, "Warning: accessCount is " << chunk.accessCount << " due clean up of mem array '" << chunk.arrayDesc->getName());
+            }
+            if (!chunk.isEmpty()) {
+                chunk.removeFromLru();
+            }
+        }
+    }
+
+    SharedMemCache SharedMemCache::_sharedMemCache;
+
     //
     // Temporary (in-memory) array iterator
     //
@@ -571,9 +660,8 @@ namespace scidb
     MemArrayIterator::MemArrayIterator(MemArray& arr, AttributeID attId) : array(arr)
     {
         addr.attId = attId;
-        addr.arrId = 0;
         currChunk = NULL;
-        last = array.chunks.end();
+        last = array._chunks.end();
         positioned = false;
     }
 
@@ -608,14 +696,14 @@ namespace scidb
 
     bool MemArrayIterator::setPosition(Coordinates const& pos)
     {
-        ScopedMutexLock cs(array.lruMutex);
+        ScopedMutexLock cs(array._mutex);
         currChunk = NULL;
         addr.coords = pos;
         array.desc.getChunkPositionFor(addr.coords);
-        curr = array.chunks.find(addr);
+        curr = array._chunks.find(addr);
         positioned = true;
         if (curr != last) {
-            currChunk = &array.chunks[addr];
+            currChunk = &array._chunks[addr];
             return true;
         } else {
             return false;
@@ -630,7 +718,7 @@ namespace scidb
     void MemArrayIterator::reset()
     {
         positioned = true;
-        curr = array.chunks.begin();
+        curr = array._chunks.begin();
         while (curr != last && curr->second.addr.attId != addr.attId) {
             ++curr;
         }
@@ -640,10 +728,9 @@ namespace scidb
     void MemArrayIterator::deleteChunk(Chunk& aChunk)
     {
         LruMemChunk& chunk = (LruMemChunk&)aChunk;
-        assert(chunk.accessCount > 0);
         chunk.accessCount = 0;
-        array.usedMemSize -= chunk.size;
-        array.chunks.erase(chunk.addr);
+        SharedMemCache::getInstance().deleteChunk(chunk);
+        array._chunks.erase(chunk.addr);
     }
 
     Chunk& MemArrayIterator::newChunk(Coordinates const& pos)
@@ -1037,6 +1124,7 @@ namespace scidb
 
     void MemChunkIterator::flush()
     {
+        _needsFlush = false;
         DimensionDesc const& dim = array.getDimensions()[0];
         if ((Coordinate)dim.getLength() == MAX_COORDINATE
             && !(mode & ChunkIterator::SPARSE_CHUNK)
@@ -1063,6 +1151,8 @@ namespace scidb
     : array(desc),
       _query(query)
     {
+        //This class is used for both - const and non-const iterators. We only use flush if we are open for writing.
+        _needsFlush = newChunk || (iterationMode & ChunkIterator::APPEND_CHUNK);
         attr = &array.getAttributes()[attId];
         type =  TypeLibrary::getType(attr->getType());
         this->dataChunk = dataChunk;
@@ -1224,6 +1314,16 @@ namespace scidb
 
     MemChunkIterator::~MemChunkIterator()
     {
+        if (_needsFlush)
+        {
+            if (dataChunk) {
+                dataChunk->unPin();
+            }
+            if (bitmapChunk) {
+                bitmapChunk->unPin();
+            }
+        }
+
         if (dataChunkPinned) { 
             dataChunk->unPin();
         }
@@ -1239,7 +1339,7 @@ namespace scidb
     inline uint32_t SparseChunkIterator::binarySearch(uint64_t pos) {
         uint32_t l = 0;
         uint32_t r = nNonDefaultElems;
-        if (logicalChunkSize != (uint32_t)logicalChunkSize) {
+        if (_logicalChunkSize != (uint32_t)_logicalChunkSize) {
             SparseElem64* arr = elemsList64;
             while (l < r) {
                 uint32_t m = (l + r) >> 1;
@@ -1268,7 +1368,7 @@ namespace scidb
         if (elemsList != NULL) {
             currElemIndex = binarySearch(currElem);
             if (currElemIndex < nNonDefaultElems) {
-                if (logicalChunkSize != (uint32_t)logicalChunkSize) {
+                if (_logicalChunkSize != (uint32_t)_logicalChunkSize) {
                     nextNonDefaultElem = elemsList64[currElemIndex].position;
                     currElemOffs = elemsList64[currElemIndex].offset;
                     isNull = nextNonDefaultElem == currElem ? elemsList64[currElemIndex].isNull : isNullDefault;
@@ -1381,7 +1481,7 @@ namespace scidb
                 if (hasCurrent) {
                     currElemIndex += 1;
                 }
-                if (logicalChunkSize != (uint32_t)logicalChunkSize) {
+                if (_logicalChunkSize != (uint32_t)_logicalChunkSize) {
                     while (currElemIndex < nNonDefaultElems) {
                         if (!(mode & IGNORE_NULL_VALUES) || !elemsList64[currElemIndex].isNull)
                         {
@@ -1449,7 +1549,7 @@ namespace scidb
             if (hasCurrent) {
                 currElem += 1;
             }
-            while ((position_t)currElem < logicalChunkSize) {
+            while ((position_t)currElem < _logicalChunkSize) {
                 setCurrPosition();
                 if ((!(mode & IGNORE_NULL_VALUES) || !isNull)
                     && (!(mode & IGNORE_EMPTY_CELLS) || !isEmptyCell()))
@@ -1595,6 +1695,7 @@ namespace scidb
 
     void SparseChunkIterator::flush()
     {
+       _needsFlush = false;
        boost::shared_ptr<Query> query(getQuery());
        size_t nElems = elemsMap.size();
        if (nElems > size_t(
@@ -1606,7 +1707,7 @@ namespace scidb
             ))
         {
             MemChunk denseChunk;
-            Address addr(array.getId(), attrID, firstPos);
+            Address addr(attrID, firstPos);
             denseChunk.initialize(&dataChunk->getArray(), &array, addr, dataChunk->getCompressionMethod());
             {
                 boost::shared_ptr<ChunkIterator> dst = denseChunk.getIterator(query, NO_EMPTY_CHECK);
@@ -1623,11 +1724,11 @@ namespace scidb
         } else {
             size_t usedSize = elemSize == 1 ? ((used + 7) >> 3) : used;
             usedSize = (usedSize + 7) & ~7;
-            dataChunk->reallocate(nElems*((logicalChunkSize != (uint32_t)logicalChunkSize) ? sizeof(SparseElem64) : sizeof(SparseElem)) + usedSize);
+            dataChunk->reallocate(nElems*((_logicalChunkSize != (uint32_t)_logicalChunkSize) ? sizeof(SparseElem64) : sizeof(SparseElem)) + usedSize);
             SparseChunkHeader* hdr = (SparseChunkHeader*)dataChunk->getData();
             hdr->nElems = nElems;
             hdr->used = usedSize;
-            if (logicalChunkSize != (uint32_t)logicalChunkSize) {
+            if (_logicalChunkSize != (uint32_t)_logicalChunkSize) {
                 SparseElem64* se = (SparseElem64*)((char*)hdr + usedSize);
                 for (map<uint64_t, SparseMapValue>::iterator i = elemsMap.begin(); i != elemsMap.end(); i++, se++) {
                     se->position = i->first;
@@ -1665,13 +1766,15 @@ namespace scidb
       defaultValue(attrDesc.getDefaultValue()),
       firstPos(dataChunk->getFirstPosition(!(iterationMode & IGNORE_OVERLAPS))),
       lastPos(dataChunk->getLastPosition(!(iterationMode & IGNORE_OVERLAPS))),
-      currPos(origin.size()),
+      currPos(_origin.size()),
       isEmptyIndicator(attrDesc.isEmptyIndicator()),
       isNullDefault(defaultValue.isNull()),
       isNullable(attrDesc.isNullable()),
       skipDefaults((isNullDefault && (iterationMode & IGNORE_NULL_VALUES)) || (iterationMode & IGNORE_DEFAULT_VALUES) || ((iterationMode & IGNORE_EMPTY_CELLS) && isEmptyIndicator)),
       _query(query)
     {
+        //This class is used for both - const and non-const iterators. We only use flush if we are open for writing.
+        _needsFlush = newChunk || (iterationMode & ChunkIterator::APPEND_CHUNK);
         const Dimensions& dim = array.getDimensions();
         size_t nDims = dim.size();
         this->dataChunk = dataChunk;
@@ -1686,7 +1789,7 @@ namespace scidb
         for (size_t i = 0; i < nDims; i++) {
             visibleElems *= lastPos[i] - firstPos[i] + 1;
         }
-        checkBounds = (position_t)visibleElems != logicalChunkSize;
+        checkBounds = (position_t)visibleElems != _logicalChunkSize;
 
         if (newChunk) {
             double expectedDensity = dataChunk->getExpectedDensity();
@@ -1698,7 +1801,7 @@ namespace scidb
                     DEFAULT_SPARSE_CHUNK_INIT_SIZE;
 #endif
             }
-            size_t initElems = size_t(logicalChunkSize * expectedDensity);
+            size_t initElems = size_t(_logicalChunkSize * expectedDensity);
             if (initElems == 0) {
                 initElems = 1;
             }
@@ -1726,7 +1829,7 @@ namespace scidb
             used = hdr->used;
             nNonDefaultElems = hdr->nElems;
             if (iterationMode & APPEND_CHUNK) {
-                if (logicalChunkSize != (uint32_t)logicalChunkSize) {
+                if (_logicalChunkSize != (uint32_t)_logicalChunkSize) {
                     SparseElem64* se = (SparseElem64*)(buf + used);
                     for (size_t i = 0, n = nNonDefaultElems; i < n; i++, se++) {
                         SparseMapValue& val = elemsMap[se->position];
@@ -1756,7 +1859,7 @@ namespace scidb
                 if (bitmapChunk->isSparse()) {
                     emptyBitmapIterator = bitmapChunk->getIterator(query, SPARSE_CHUNK);
                 } else {
-                    size_t bitmapSize = (logicalChunkSize + 7) >> 3;
+                    size_t bitmapSize = (_logicalChunkSize + 7) >> 3;
                     assert(!bitmapChunk->isSparse());
                     bitmapChunk->allocate(bitmapSize);
                     emptyBitmap = (char*)bitmapChunk->getData();
@@ -1782,6 +1885,16 @@ namespace scidb
 
     SparseChunkIterator::~SparseChunkIterator()
     {
+        if (_needsFlush)
+        {
+            if (dataChunk) {
+                dataChunk->unPin();
+            }
+            if (bitmapChunk) {
+                bitmapChunk->unPin();
+            }
+        }
+
         if (dataChunkPinned) { 
             dataChunk->unPin();
         }
@@ -1852,7 +1965,7 @@ namespace scidb
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
             tilePos += tileSize;
-            hasCurrent = tilePos < logicalChunkSize;
+            hasCurrent = tilePos < _logicalChunkSize;
         } else {             
             ++emptyBitmapIterator;
             hasCurrent = !emptyBitmapIterator.end();
@@ -1865,7 +1978,7 @@ namespace scidb
             tilePos = coord2pos(coord);
             if (tilePos % tileSize)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TILE_NOT_ALIGNED);
-            return hasCurrent = tilePos < logicalChunkSize;
+            return hasCurrent = tilePos < _logicalChunkSize;
         } else { 
             if (!dataChunk->contains(coord, !(mode & IGNORE_OVERLAPS))) { 
                 return hasCurrent = false;
@@ -1873,6 +1986,7 @@ namespace scidb
             position_t pos = coord2pos(coord);
             return hasCurrent = emptyBitmapIterator.setPosition(pos);
         }
+        return false;
     }
 
     BaseChunkIterator::~BaseChunkIterator()
@@ -1927,13 +2041,12 @@ namespace scidb
         tileSize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
         size_t tilesPerChunk = Config::getInstance()->getOption<int>(CONFIG_TILES_PER_CHUNK);
         if (tilesPerChunk != 0) {
-            tileSize = max(tileSize, position_t(logicalChunkSize/tilesPerChunk));
+            tileSize = max(tileSize, position_t(_logicalChunkSize/tilesPerChunk));
         }
 #else
         tileSize = 1;
 #endif
         isEmptyable = array.getEmptyBitmapAttribute() != NULL;
-        isPlain = (nElems == logicalChunkSize);
         tilePos = 0;
     }
 
@@ -1953,12 +2066,13 @@ namespace scidb
             emptyBitmap = bitmap->getEmptyBitmap();
         }
         if (!emptyBitmap) { 
-            emptyBitmap = shared_ptr<RLEEmptyBitmap>(isPlain
-                                                     ? new RLEEmptyBitmap(logicalChunkSize)
-                                                     : new RLEEmptyBitmap(chunkIntervals, origin, data->getFirstPosition(true), data->getLastPosition(true)));
+            emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
         }
         if (hasOverlap && (iterationMode & IGNORE_OVERLAPS)) {
-            emptyBitmap = emptyBitmap->merge(RLEEmptyBitmap(chunkIntervals, origin, data->getFirstPosition(false), data->getLastPosition(false)));
+            emptyBitmap = emptyBitmap->cut(data->getFirstPosition(true),
+                                           data->getLastPosition(true),
+                                           data->getFirstPosition(false),
+                                           data->getLastPosition(false));
         }
         //assert(emptyBitmap->count() == payload.count() || (hasOverlap && emptyBitmap->count() < payload.count()));
         assert(emptyBitmap->count() <= payload.count());
@@ -1995,7 +2109,7 @@ namespace scidb
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
-            const position_t end = min(tilePos + tileSize, logicalChunkSize);
+            const position_t end = min(tilePos + tileSize, _logicalChunkSize);
             value.getTile(typeId)->unPackTile(payload, *emptyBitmap, tilePos, end);
         } else {
             payloadIterator.getItem(value);
@@ -2007,7 +2121,7 @@ namespace scidb
     {
         if (mode & TILE_MODE) {
             tilePos += tileSize;
-            hasCurrent = tilePos < logicalChunkSize;
+            hasCurrent = tilePos < _logicalChunkSize;
         } else {
             if (!hasCurrent)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -2044,13 +2158,13 @@ namespace scidb
 
     bool RLEConstChunkIterator::setPosition(Coordinates const& coord)
     {
-        if (BaseChunkIterator::setPosition(coord))
-        {
-            if (!payloadIterator.setPosition(emptyBitmapIterator.getPPos()))
-                throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-            return true;
+        if (!BaseChunkIterator::setPosition(coord)) {
+            return false;
         }
-        return false;
+        if (!(mode & TILE_MODE) && !payloadIterator.setPosition(emptyBitmapIterator.getPPos())) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+        }
+        return true;
     }
  
     //
@@ -2062,13 +2176,14 @@ namespace scidb
       value(type)
     {
         if (data->getData() == NULL) { 
-            emptyBitmap = shared_ptr<RLEEmptyBitmap>(isPlain
-                                                     ? new RLEEmptyBitmap(logicalChunkSize)
-                                                     : new RLEEmptyBitmap(chunkIntervals, origin, data->getFirstPosition(true), data->getLastPosition(true)));
+            emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
         } else { 
             emptyBitmap = data->getEmptyBitmap();
             if (hasOverlap && (iterationMode & IGNORE_OVERLAPS)) {
-                emptyBitmap = emptyBitmap->merge(RLEEmptyBitmap(chunkIntervals, origin, data->getFirstPosition(false), data->getLastPosition(false)));
+                emptyBitmap = emptyBitmap->cut(data->getFirstPosition(true),
+                                               data->getLastPosition(true),
+                                               data->getFirstPosition(false),
+                                               data->getLastPosition(false));
             }
         }
         emptyBitmapIterator = emptyBitmap->getIterator();
@@ -2081,7 +2196,7 @@ namespace scidb
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
-            const position_t end = min(tilePos + tileSize, logicalChunkSize);
+            const position_t end = min(tilePos + tileSize, _logicalChunkSize);
             value.getTile(typeId)->unPackTile(*emptyBitmap, tilePos, end);
             return value;
         } else {
@@ -2101,9 +2216,7 @@ namespace scidb
       appender(&payload),
       prevPos(0)
     {
-        emptyBitmap = shared_ptr<RLEEmptyBitmap>(isPlain
-                                                 ? new RLEEmptyBitmap(logicalChunkSize)
-                                                 : new RLEEmptyBitmap(chunkIntervals, origin, data->getFirstPosition(true), data->getLastPosition(true)));
+        emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
         emptyBitmapIterator = emptyBitmap->getIterator();
         hasCurrent = !emptyBitmapIterator.end();
 
@@ -2139,6 +2252,16 @@ namespace scidb
         }
     }
 
+    RLEChunkIterator::~RLEChunkIterator()
+    {
+        if (_needsFlush)
+        {
+            if (dataChunk) {
+                dataChunk->unPin();
+            }
+        }
+    }
+
     bool RLEChunkIterator::setPosition(Coordinates const& pos) 
     {        
         position_t prevTilePos = tilePos;
@@ -2162,7 +2285,7 @@ namespace scidb
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
-            const position_t end = min(tilePos + tileSize, logicalChunkSize);
+            const position_t end = min(tilePos + tileSize, _logicalChunkSize);
             tileValue.getTile()->unPackTile(payload, *emptyBitmap, tilePos, end);
             return tileValue;
         } else {
@@ -2181,7 +2304,7 @@ namespace scidb
         if (mode & TILE_MODE) {
             RLEPayload* tile = item.getTile();
             if (tile->count() == INFINITE_LENGTH) { 
-                const position_t end = min(tilePos + tileSize, logicalChunkSize);
+                const position_t end = min(tilePos + tileSize, _logicalChunkSize);
                 tile->trim(end - tilePos);
             }
             payload.append(*tile);
@@ -2225,6 +2348,9 @@ namespace scidb
                 values[pos - tilePos] = item;
 #endif
             } else { 
+                if (!type.variableSize() && item.size() > type.byteSize()) { 
+                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << item.size() << type.byteSize();
+                }
                 values[getPos()] = item;
             }
             if (emptyChunkIterator) {
@@ -2237,6 +2363,7 @@ namespace scidb
 
     void RLEChunkIterator::flush()
     {
+        _needsFlush = false;
         if (!(mode & (SEQUENTIAL_WRITE|TILE_MODE))) { 
             if (isEmptyIndicator) { 
                 RLEEmptyBitmap bitmap(values);
@@ -2255,23 +2382,38 @@ namespace scidb
                 }
             }
         } else {
-#if OPTIMIZED_SEQUENTIAL_MODE
-            if ((mode & (TILE_MODE|SEQUENTIAL_WRITE)) == SEQUENTIAL_WRITE) { 
-                if (!isEmptyable) { 
-                    position_t count = emptyBitmap->count();
-                    if (count != prevPos) { 
-                        assert(count > prevPos);
-                        appender.add(defaultValue, count - prevPos);
-                    }                    
+            // [dzhang Note:] the 'if' statement is introduced to avoid a bug that,
+            // in the particular case, the ending segment (of default values) failed to be added.
+            // However, the whole RLEChunkIterator logic is extremely complex and should be rewritten.
+            if ((mode & TILE_MODE) && (mode & SEQUENTIAL_WRITE) && !isEmptyable) {
+                assert(!isEmptyIndicator);
+                size_t logicalChunkSize = static_cast<size_t>(_logicalChunkSize);
+                if ((mode & SEQUENTIAL_WRITE) && payload.count() != logicalChunkSize) {
+                    RLEPayload tile(attr.getDefaultValue(), logicalChunkSize-payload.count(), type.byteSize(), type.bitSize()==1);
+                    payload.append(tile);
                 }
-                appender.flush();
             }
+
+            else {
+#if OPTIMIZED_SEQUENTIAL_MODE
+                if ((mode & (TILE_MODE|SEQUENTIAL_WRITE)) == SEQUENTIAL_WRITE) {
+                    if (!isEmptyable) {
+                        position_t count = emptyBitmap->count();
+                        if (count != prevPos) {
+                            assert(count > prevPos);
+                            appender.add(defaultValue, count - prevPos);
+                        }
+                    }
+                    appender.flush();
+                }
 #else
-            if ((mode & SEQUENTIAL_WRITE) && tilePos != logicalChunkSize) { 
-                RLEPayload tile(values, logicalChunkSize - tilePos, type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, !isEmptyIndicator);
-                payload.append(tile);
-            }
+                if ((mode & SEQUENTIAL_WRITE) && tilePos != _logicalChunkSize) {
+                    RLEPayload tile(values, _logicalChunkSize - tilePos, type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, !isEmptyIndicator);
+                    payload.append(tile);
+                }
 #endif
+            }
+
             if (emptyChunkIterator && (mode & TILE_MODE))
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_UPDATE_BITMAP_IN_TILE_MODE);
             if (isEmptyIndicator) { 
@@ -2310,7 +2452,7 @@ namespace scidb
 
     boost::shared_ptr<Query> RLEChunkIterator::getQuery() 
     {
-        return query.lock(); 
+        return query.lock();
     }
 
 }

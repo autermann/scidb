@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>show</refname>
+
+    <refpurpose>Produces a result array whose contents describe the schema of
+    an array you supply.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>show(<replaceable>named_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The show operator returns an array's schema. The argument
+    <replaceable>named_array</replaceable> must be an array that was
+    previously created and stored in SciDB.</para>
+
+    <para>You can use the show operator in the FROM clause of an AQL SELECT
+    statement, as a stand-alone operator in a AFL statement, or as an operand
+    within other SciDB operators.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example shows the schema for an array, creates and stores an
+      abridged version of that array, then shows the schema of the abridged
+      version.</para>
+
+      <procedure>
+        <step>
+          <para>Show the schema for the original array
+
+<para><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(champions);  </programlisting><screen>{i} schema
+{0} "champions&lt;person:string,country:string,time:double&gt; [year=1996:2008,13,0,event(string)=3,3,0]"
+</screen></para></para></para>
+        </step>
+
+        <step>
+          <para>Use the project and store operators to create an abridged
+          array that excludes the country and time attributes:
+<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> championsAbridged <command>FROM</command> project(champions,person);  </programlisting><screen>{year,event} person
+{1996,"dash"} "Bailey"
+{1996,"marathon"} "Thugwane"
+{1996,"steeplechase"} "Keter"
+{2000,"dash"} "Greene"
+{2000,"marathon"} "Abera"
+{2000,"steeplechase"} "Kosgei"
+{2004,"dash"} "Gatlin"
+{2004,"marathon"} "Baldini"
+{2004,"steeplechase"} "Kemboi"
+{2008,"dash"} "Bolt"
+{2008,"marathon"} "Wanjiru"
+{2008,"steeplechase"} "Kipruto"
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Show the schema for the abridged array:
+<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(championsAbridged);  </programlisting><screen>{i} schema
+{0} "championsAbridged&lt;person:string&gt; [year=1996:2008,13,0,event(string)=3,3,0]"
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

@@ -70,8 +70,25 @@ private:
     void handlePreparePhysicalPlan();
     void handleExecutePhysicalPlan();
     void handleQueryResult();
-    void handleChunk();
-    void handleAggregateChunk();
+
+    /**
+     * Helper to avoid duplicate code.
+     * When an empty-bitmap chunk is received, if RLE is true, the chunk is materialized, and getEmptyBitmap() is called on it.
+     * The returned shared_ptr<ConstRLEEmptyBitmap> will be stored in the SG context and will be used to process future chunks/aggregateChunks from the same sender.
+     * Note that an empty-bitmap attribute can never be of aggregate type.
+     */
+    void _handleChunkOrAggregateChunk(bool isAggregateChunk);
+
+    void handleChunk()
+    {
+        _handleChunkOrAggregateChunk(false);
+    }
+
+    void handleAggregateChunk()
+    {
+        _handleChunkOrAggregateChunk(true);
+    }
+
     void handleRemoteChunk();
     void handleFetchChunk();
     void handleSyncRequest();
@@ -90,7 +107,7 @@ private:
     void handleAbortQuery();
     void handleCommitQuery();
     void enqueue(boost::shared_ptr<WorkQueue>& q);
-};
+    };
 
 
 } // namespace

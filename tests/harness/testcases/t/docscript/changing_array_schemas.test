@@ -1,0 +1,121 @@
+
+--test
+--start-query-logging
+
+--shell  --command="cat ../examples/expo_example.txt " --store
+--set-format dcsv
+--start-igdata
+CREATE ARRAY device_probe <d:string, p:string, val:double> [i=1:25,5,0]  
+load(device_probe, '../examples/expo_example.scidb')  
+create array two_dim<val:double>[d(string)=5,5,0, p(string)=5,5,0]  
+--set-format dense
+--stop-igdata
+redimension_store(device_probe, two_dim)  
+--aql SELECT val FROM two_dim WHERE d='device-2' and p='probe-3'  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY redim_missing< val1:string,val2:string NULL,val3:double >[i=0:9,10,0]  
+--stop-igdata
+show(redim_missing)
+--start-igdata
+load(redim_missing, '../examples/redim_missing.scidb')  
+--stop-igdata
+scan(redim_missing)  
+--start-igdata
+CREATE ARRAY redim_target <val3:double> [val1(string)=2,2,0,val2(string)=5,5,0]  
+--set-format dense
+--stop-igdata
+redimension_store(redim_missing,redim_target)  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m4x4 <val:double>[i=0:3,4,0,j=0:3,4,0]  
+store(build(m4x4,i*4+j),m4x4)  
+--set-format dense
+--stop-igdata
+scan(m4x4)  
+--set-format dcsv
+show(m4x4)
+--start-igdata
+CREATE ARRAY m3x3 < val:double >[i=0:2,3,0,j=0:2,3,0]  
+load(m3x3, '../examples/m3x3.txt')  
+--set-format dense
+--stop-igdata
+--aql SELECT * INTO m1 FROM unpack(m3x3,k)  
+--set-format dcsv
+show(m1)
+show(m3x3)
+--set-format dense
+--aql SELECT * FROM m3x3  
+--aql SELECT * FROM reverse(m3x3)  
+--set-format dcsv
+show(m4x4)
+--set-format dense
+scan(m4x4)  
+--aql SELECT * FROM subarray(m4x4, 2, 2, 3, 4)  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m3x3x3 < val: double >[i=0:2,3,0,j=0:2,3,0,k=0:2,3,0]  
+--stop-igdata
+show(m3x3x3)
+--set-format dense
+--start-igdata
+store(build(m3x3x3, i+j+k), m3x3x3)  
+--stop-igdata
+scan(m3x3x3)  
+slice(m3x3x3,k,1)  
+--set-format dcsv
+show(m4x4)
+--set-format dense
+scan(m4x4)  
+thin(m4x4, 0, 2, 0, 2)  
+--aql SELECT * INTO m3x3_new FROM attribute_rename(m3x3,val,val2)  
+--set-format dcsv
+show(m3x3_new)
+--set-format dense
+--aql SELECT * INTO m3x3_new_attr FROM apply(m3x3,val2,val+10,val3,pow(val,2))  
+--set-format dcsv
+show(m3x3_new_attr)
+--set-format dense
+--aql SELECT val2, val3 FROM m3x3_new_attr  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY Dsp_raw<d: string, t: string, val: double >[i=1:25,5,0]  
+CREATE ARRAY Dsp<val: double>[d(string)=5,5,0,t(string)=5,5,0]  
+load(Dsp_raw, '../examples/expo_example.scidb')  
+redimension_store(Dsp_raw, Dsp)  
+--stop-igdata
+scan(Dsp) 
+show(Dsp)
+--start-igdata
+--aql SELECT * INTO Dsp_slice_0 FROM slice(Dsp, d, 'device-0')  
+--aql SELECT * INTO Dsp_slice_1 FROM slice(Dsp, d, 'device-1')  
+--aql SELECT * INTO Dsp_slice_2 FROM slice(Dsp, d, 'device-2')  
+--stop-igdata
+show(Dsp_slice_2)
+--aql SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2)  
+show(Dsp_1d)
+--aql SELECT * into Dsp_new FROM concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d))  
+show(Dsp_new)
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(device_probe)
+remove(two_dim)
+remove(redim_missing)
+remove(redim_target)
+remove(m4x4)
+remove(m3x3)
+remove(m1)
+remove(m3x3x3)
+remove(m3x3_new)
+remove(m3x3_new_attr)
+remove(Dsp_raw)
+remove(Dsp)
+remove(Dsp_slice_0)
+remove(Dsp_slice_1)
+remove(Dsp_slice_2)
+remove(Dsp_1d)
+remove(Dsp_new)

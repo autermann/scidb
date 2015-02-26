@@ -1,23 +1,27 @@
 --setup
+--start-query-logging
+
 --aql CREATE  ARRAY simple01a < COL000N: int32,COL001C: char,COL002S: string > [a=0:99,10,0,b=0:1,1,0]
 --aql load simple01a from '../tests/harness/testcases/data/simple01a.txt'
+
 --test
---sleep 4
 --aql update simple01a set COL000N = 99 where COL001C = 'R'
---sleep 4
+
 --aql update simple01a set COL000N = 99 where COL001C = 'T'
---sleep 4
+
 --aql update simple01a set COL001C = 'X' where COL000N = 21
---sleep 4
+
 --aql update simple01a set COL000N = 99 where COL001C = 'T' and COL000N = 19
---sleep 4
+
 --aql update simple01a set COL002S = 'XXX' where COL002S = 'P' and COL000N = 15
---sleep 4
+
 --aql update simple01a set COL000N = 77 where COL002S > 'V'
---sleep 4
+
 --aql update simple01a set COL000N = 88 where COL002S < 'K'
---sleep 4
+
 --aql update simple01a set COL002S = 'ZZZ' where COL000N%10 = 0
---sleep 4
+
 --cleanup
 --aql drop array simple01a 
+
+--stop-query-logging

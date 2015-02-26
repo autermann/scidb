@@ -45,6 +45,8 @@
 #include "system/SciDBConfigOptions.h"
 
 #include <log4cxx/logger.h>
+#include <query/ops/redimension/SyntheticDimHelper.h>
+#include <query/Operator.h>
 
 using namespace boost::assign;
 
@@ -264,8 +266,11 @@ namespace scidb
             dst->setVectorMode(vectorMode);
             size_t count = 0;
             while (!src->end()) {
-                if (!dst->setPosition(src->getPosition()))
+                if (!dst->setPosition(src->getPosition())) { 
+                    Coordinates const& pos = src->getPosition();
+                    dst->setPosition(pos);
                     throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                }
                 dst->writeItem(src->getItem());
                 count += 1;
                 ++(*src);
@@ -316,8 +321,66 @@ namespace scidb
         AttributeDesc const& attr = getAttributeDesc();
         char* dst = (char*)getData();
         Value const& defaultValue = attr.getDefaultValue();
-        if (dst != NULL && (isSparse() || isRLE() || with.isSparse() || with.isRLE() || attr.isNullable() || TypeLibrary::getType(attr.getType()).variableSize()
-                            || !defaultValue.isZero()))
+
+        // If it is in the middle of a redimension, and if there is a synthetic dimension, use the following algorithm:
+        // (a) Build an auxiliary structure describing #elements in each cell, not including the synthetic dim.
+        // (b) For each source element, adjust its coordinates by increasing the coordinate in the synthetic dim.
+        //
+        shared_ptr<RedimInfo> redimInfo;
+        boost::shared_ptr<SGContext> sgCtx = dynamic_pointer_cast<SGContext>(query->getOperatorContext());
+        if (sgCtx) {
+            redimInfo = sgCtx->_redimInfo;
+        }
+        if (redimInfo && redimInfo->_hasSynthetic) {
+            // During redim, there is always a empty tag, and the chunk can't be sparse.
+            assert(getArrayDesc().getEmptyBitmapAttribute());
+            assert(!isSparse());
+
+            // Build the auxiliary structure.
+            SyntheticDimHelper syntheticDimHelper(redimInfo->_dimSynthetic, redimInfo->_dim.getStart());
+            shared_ptr<MapCoordToCount> mapCoordToCount = make_shared<MapCoordToCount>();
+            syntheticDimHelper.updateMapCoordToCount(mapCoordToCount, reinterpret_cast<LruMemChunk*>(this));
+
+            // Iterate through the src, update each coord, and write to dest.
+            // Note that default values can't be ignored. Otherwise the coordinate in the synthetic dimension would mess up.
+            shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+            shared_ptr<ChunkIterator> dstIterator = getIterator(query, ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
+            while (!srcIterator->end()) {
+                Coordinates coord = srcIterator->getPosition();
+                syntheticDimHelper.calcNewCoord(coord, mapCoordToCount);
+                if (!dstIterator->setPosition(coord)) {
+                    char buf[100];
+                    sprintf(buf, "setPosition failed; the object has synthetic-dim coord=%ld; chunk interval is %d.",
+                            coord[redimInfo->_dimSynthetic], redimInfo->_dim.getChunkInterval());
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << buf;
+                }
+                Value const& value = srcIterator->getItem();
+                dstIterator->writeItem(value);
+                ++(*srcIterator);
+            }
+            dstIterator->flush();
+
+            return;
+        }
+
+        // If dst already has data, and
+        // Either
+        //   (a) there is a redimInfo (regardless to whether there is a synthetic dim);
+        // Or
+        //   (b) can't merge by bitwise-or.
+        // Then we have to iterate through the items.
+        //
+        // If there is a redimInfo (although no synthetic dim), we have to iterate through the items for the following reason:
+        // A conflict (i.e. two items falling into the same cell) should be resolved by choosing one of them, not bitwise-or them.
+        if ( (dst != NULL) &&
+                (
+                        ! isPossibleToMergeByBitwiseOr()
+                        ||
+                        ! with.isPossibleToMergeByBitwiseOr()
+                        ||
+                        redimInfo
+                )
+        )
         {
             int sparseMode = isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
             boost::shared_ptr<ChunkIterator> dstIterator = getIterator(query, sparseMode|ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
@@ -342,22 +405,17 @@ namespace scidb
                 }            
             }
             dstIterator->flush();
-        } else {
+        }
+
+        // Otherwise, we can merge faster.
+        else {
             PinBuffer scope(with);
             char* src = (char*)with.getData();
             if (dst == NULL) {
-                allocate(with.getSize());
-                setSparse(with.isSparse());
-                setRLE(with.isRLE());
-                memcpy(getData(), src, getSize());
+                allocateAndCopy(src, with.getSize(), with.isSparse(), with.isRLE(), with.count(), query);
             } else {
-                if (getSize() != with.getSize())
-                    throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_MERGE_CHUNKS_WITH_VARYING_SIZE);
-                for (size_t j = 0, n = getSize(); j < n; j++) {
-                    dst[j] |= src[j];
-                }
+                mergeByBitwiseOr(src, with.getSize(), query);
             }
-            write(query);
         }
     }
 
@@ -395,6 +453,7 @@ namespace scidb
                     if (!val2.isNull())
                     {
                         aggregate->merge(val, val2);
+
                     }
                     dstIterator->writeItem(val);
                 }
@@ -405,12 +464,76 @@ namespace scidb
         else
         {
             PinBuffer scope(with);
-            char* src = (char*)with.getData();
-            allocate(with.getSize());
-            setSparse(with.isSparse());
-            setRLE(with.isRLE());
-            memcpy(getData(), src, getSize());
-            write(query);
+            allocateAndCopy((char*)with.getData(), with.getSize(), with.isSparse(), with.isRLE(), with.count(), query);
+        }
+    }
+
+    void Chunk::nonEmptyableAggregateMerge(ConstChunk const& with, AggregatePtr const& aggregate, boost::shared_ptr<Query>& query)
+    {
+        if (getDiskChunk() != NULL)
+        {
+            throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CHUNK_ALREADY_EXISTS);
+        }
+
+        if (isReadOnly())
+        {
+            throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_UPDATE_READ_ONLY_CHUNK);
+        }
+
+        AttributeDesc const& attr = getAttributeDesc();
+
+        if (aggregate->getStateType().typeId() != attr.getType())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_TYPE_MISMATCH_BETWEEN_AGGREGATE_AND_CHUNK);
+        }
+
+        if (!attr.isNullable())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_AGGREGATE_STATE_MUST_BE_NULLABLE);//enforce equivalency w above merge()
+        }
+
+        assert(isRLE() && with.isRLE());
+
+        char* dst = static_cast<char*>(getData());
+        PinBuffer scope(with);
+        if (dst != NULL)
+        {
+            boost::shared_ptr<ChunkIterator>dstIterator = getIterator(query, ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
+            CoordinatesMapper mapper(with);
+            ConstRLEPayload inputPayload( static_cast<char*>(with.getData()));
+            ConstRLEPayload::iterator inputIter(&inputPayload);
+            Value val;
+            position_t lpos;
+            Coordinates cpos(mapper.getNumDims());
+
+            while (!inputIter.end())
+            {
+                //Missing Reason 0 is reserved by the system meaning "group does not exist".
+                //All other Missing Reasons may be used by the aggregate if needed.
+                if (inputIter.isNull() && inputIter.getMissingReason() == 0)
+                {
+                    inputIter.toNextSegment();
+                }
+                else
+                {
+                    inputIter.getItem(val);
+                    lpos = inputIter.getPPos();
+                    mapper.pos2coord(lpos, cpos);
+                    if (!dstIterator->setPosition(cpos))
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                    Value& val2 = dstIterator->getItem();
+                    if (val2.getMissingReason() != 0)
+                    {
+                        aggregate->merge(val, val2);
+                    }
+                    dstIterator->writeItem(val);
+                    ++inputIter;
+                }
+            }
+            dstIterator->flush();
+        }
+        else {
+            allocateAndCopy(static_cast<char*>(with.getData()), with.getSize(), with.isSparse(), with.isRLE(), with.count(), query);
         }
     }
 
@@ -469,17 +592,11 @@ namespace scidb
         return n;
     }
 
-
-
     size_t ConstChunk::getNumberOfElements(bool withOverlap) const
     {
-        Coordinates const& first = getFirstPosition(withOverlap);
-        Coordinates const& last = getLastPosition(withOverlap);
-        size_t size = 1;
-        for (size_t i = 0, n = first.size(); i < n; i++) {
-            size *= last[i] - first[i] + 1;
-        }
-        return size;
+        Coordinates low = getFirstPosition(withOverlap);
+        Coordinates high = getLastPosition(withOverlap);
+        return getChunkNumberOfElements(low, high);
     }
 
     ConstIterator::~ConstIterator() {}
@@ -649,14 +766,18 @@ namespace scidb
         return getArrayDesc().getId();
     }
 
-
-    void Array::append(boost::shared_ptr<Array> input, bool vertical)
+    void Array::append(boost::shared_ptr<Array>& input, bool const vertical, set<Coordinates, CoordinatesLess>* newChunkCoordinates)
     {
         if (vertical) {
             for (size_t i = 0, n = getArrayDesc().getAttributes().size(); i < n; i++) {
                 boost::shared_ptr<ArrayIterator> dst = getIterator(i);
                 boost::shared_ptr<ConstArrayIterator> src = input->getConstIterator(i);
-                while (!src->end()) {
+                while (!src->end())
+                {
+                    if(newChunkCoordinates && i == 0)
+                    {
+                        newChunkCoordinates->insert(src->getPosition());
+                    }
                     dst->copyChunk(src->getChunk());
                     ++(*dst);
                     ++(*src);
@@ -670,8 +791,14 @@ namespace scidb
                 dstIterators[i] = getIterator(i);
                 srcIterators[i] = input->getConstIterator(i);
             }
-            while (!srcIterators[0]->end()) {
-                for (size_t i = 0; i < nAttrs; i++) {
+            while (!srcIterators[0]->end())
+            {
+                if(newChunkCoordinates)
+                {
+                    newChunkCoordinates->insert(srcIterators[0]->getPosition());
+                }
+                for (size_t i = 0; i < nAttrs; i++)
+                {
                     boost::shared_ptr<ArrayIterator> dst = dstIterators[i];
                     boost::shared_ptr<ConstArrayIterator> src = srcIterators[i];
                     dst->copyChunk(src->getChunk());
@@ -682,11 +809,10 @@ namespace scidb
         }
     }
 
-    bool Array::supportsRandomAccess() const
+    boost::shared_ptr<CoordinateSet> Array::getChunkPositions() const
     {
-        return true;
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << "calling getChunkPositions on an invalid array";
     }
-
 
     static char* copyStride(char* dst, char* src, Coordinates const& first, Coordinates const& last, Dimensions const& dims, size_t step, size_t attrSize, size_t c)
     {
@@ -813,10 +939,35 @@ namespace scidb
     {
         const Coordinates& pos = chunk.getFirstPosition(false);
         Chunk& outChunk = newChunk(pos, chunk.getCompressionMethod());
+
+        //verify that the declared chunk intervals match. Otherwise the copy - could still work - but would either be an implicit reshape or outright dangerous
+        SCIDB_ASSERT(chunk.getArrayDesc().getDimensions().size() == outChunk.getArrayDesc().getDimensions().size());
+        for(size_t i = 0, n = chunk.getArrayDesc().getDimensions().size(); i < n; i++)
+        {
+            SCIDB_ASSERT(chunk.getArrayDesc().getDimensions()[i].getChunkInterval() == outChunk.getArrayDesc().getDimensions()[i].getChunkInterval());
+        }
+
         try {
             boost::shared_ptr<Query> query(getQuery());
             outChunk.setSparse(chunk.isSparse());
-            if (chunk.isMaterialized() && chunk.getArrayDesc().hasOverlap() == outChunk.getArrayDesc().hasOverlap() && chunk.getAttributeDesc().isNullable() == outChunk.getAttributeDesc().isNullable() && (chunk.isRLE() == outChunk.isRLE() || chunk.isSolid())) {
+
+            // If copying from an emptyable array to an non-emptyable array, we need to fill in the default values.
+            size_t nAttrsChunk = chunk.getArrayDesc().getAttributes().size();
+            size_t nAttrsOutChunk = outChunk.getArrayDesc().getAttributes().size();
+            assert(nAttrsChunk >= nAttrsOutChunk);
+            assert(nAttrsOutChunk+1 >= nAttrsChunk);
+            bool emptyableToNonEmptyable = (nAttrsOutChunk+1 == nAttrsChunk);
+
+            if (chunk.isMaterialized()
+                    && chunk.getArrayDesc().hasOverlap() == outChunk.getArrayDesc().hasOverlap()
+                    && chunk.getAttributeDesc().isNullable() == outChunk.getAttributeDesc().isNullable()
+                    // TEMPORARY flag is set for NID array and we  have to preserve non-RLE format for it
+                    && (chunk.isRLE() == outChunk.isRLE() || chunk.isSolid() || (chunk.getArrayDesc().getFlags() & ArrayDesc::TEMPORARY))
+                    // if emptyableToNonEmptyable, we cannot use memcpy because we need to insert defaultvalues
+                    && !emptyableToNonEmptyable
+                    && chunk.getNumberOfElements(true) == outChunk.getNumberOfElements(true)
+                )
+            {
                 PinBuffer scope(chunk);
                 outChunk.setRLE(chunk.isRLE());
                 if (emptyBitmap && chunk.getBitmapSize() == 0) { 
@@ -836,20 +987,26 @@ namespace scidb
                     chunk.makeClosure(outChunk, emptyBitmap);
                     outChunk.write(query);
                 } else { 
-                    boost::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(outChunk.getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
+                    boost::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(
+                            ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(outChunk.getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
                     boost::shared_ptr<ChunkIterator> dst = outChunk.getIterator(query,
-                                                                                (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(chunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
+                            (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(chunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
                     bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
                     src->setVectorMode(vectorMode);
                     dst->setVectorMode(vectorMode);
                     size_t count = 0;
                     while (!src->end()) {
-                        count += 1;
+                        if (!emptyableToNonEmptyable) {
+                            count += 1;
+                        }
                         dst->setPosition(src->getPosition());
                         dst->writeItem(src->getItem());
                         ++(*src);
                     }
                     if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().containsOverlaps()) {
+                        if (emptyableToNonEmptyable) {
+                            count = outChunk.getNumberOfElements(false); // false = no overlap
+                        }
                         outChunk.setCount(count);
                     }
                     dst->flush();

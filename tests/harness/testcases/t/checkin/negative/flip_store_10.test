@@ -10,9 +10,9 @@ store(join(build_sparse(T,x,1),build_sparse(TS,string(x+10),1)),A)
 
 --test
 redimension_store(A,B)
-list()
+--aql select name,schema from list()
 --aql update B set b = b + '_new' where x=1
-list()
+--aql select name,schema from list()
 redimension_store(B,A)
 scan(A)
 

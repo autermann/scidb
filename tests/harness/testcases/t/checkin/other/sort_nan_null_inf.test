@@ -1,0 +1,16 @@
+--setup
+
+CREATE EMPTY ARRAY SortNanNullInf < I : int64, V : double NULL > [ Line=0:*,6,0 ]
+load ( SortNanNullInf, '../tests/harness/testcases/data/sort_nan_null_inf.txt')
+
+--test
+--start-query-logging
+
+show(SortNanNullInf)
+sort(SortNanNullInf, V)
+
+--stop-query-logging
+--cleanup
+
+remove(SortNanNullInf)
+

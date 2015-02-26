@@ -1,0 +1,19 @@
+--setup
+--start-query-logging
+
+--shell --command " csv2scidb -s 1 -p SNSN < ../tests/harness/testcases/doc_data/olympic_data.csv > ../tests/harness/testcases/doc_data/olympic_data.scidb" --store
+
+--test
+--aql CREATE ARRAY winnersFlat < event:string,year:int64,person:string,time:double > [i=0:*,1000000,0]
+--aql LOAD winnersFlat FROM '../tests/harness/testcases/doc_data/olympic_data.scidb'
+--aql select * from analyze(winnersFlat)
+--aql CREATE ARRAY winners <person:string,time:double>[year=1996:2008,1000,0,event(string)=3,1000,0]
+--aql SELECT * FROM redimension_store(winnersFlat,winners)
+
+--cleanup
+--aql drop array winnersFlat
+--aql drop array winners
+
+--stop-query-logging
+
+

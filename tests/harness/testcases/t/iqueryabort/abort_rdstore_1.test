@@ -1,0 +1,41 @@
+--setup
+--start-query-logging
+
+CREATE IMMUTABLE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,10,0, y=0:1999,10,0]
+CREATE EMPTY ARRAY ABRREDIM <x:int64>[a(double)=*,20,0]
+
+#load(ABRLOAD,'../tests/harness/testcases/data/xyz_small.txt')
+--test 
+
+--start-igdata
+store(build(ABRLOAD, x+y), ABRLOAD)
+--stop-igdata
+
+count(ABRLOAD)
+count(ABRREDIM)
+
+--echo "killquery redimension_store (signal 2)"
+--shell --command "../utils/killquery.sh -afl 2 1 'redimension_store (ABRLOAD, ABRREDIM)'"
+
+--echo "killquery redimension_store (signal 15)"
+--shell --command "../utils/killquery.sh -afl 15 1 'redimension_store (ABRLOAD, ABRREDIM)'"
+
+--echo "killquery redimension_store (signal 9)"
+--shell --command "../utils/killquery.sh -afl 9 1 'redimension_store (ABRLOAD, ABRREDIM)'"
+
+--sleep 12
+count(ABRLOAD)
+versions(ABRLOAD)
+--echo "should be empty..."
+count(ABRREDIM)
+versions(ABRREDIM)
+
+project(list('arrays'),name,schema)
+--error "scan(ABRREDIM:a)"
+
+--echo "should be no mapping arrays..."
+
+--cleanup
+--stop-query-logging
+remove(ABRLOAD)
+remove(ABRREDIM)

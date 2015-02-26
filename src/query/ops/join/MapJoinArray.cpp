@@ -73,7 +73,7 @@ namespace scidb
             }
         }
         notMatched = true;
-        return (mode & IGNORE_EMPTY_CELLS) == 0;
+        return false;//(mode & IGNORE_EMPTY_CELLS) == 0;
     }
 
     void MapJoinChunkIterator::operator ++()

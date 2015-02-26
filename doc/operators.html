@@ -35,6 +35,7 @@
 <li><a href="#load_library">load library</a></li>
 <li><a href="#load">load</a></li>
 <li><a href="#lookup">lookup</a></li>
+<li><a href="#match">match</a></li>
 <li><a href="#materialize">materialize</a></li>
 <li><a href="#max">max</a></li>
 <li><a href="#merge">merge</a></li>
@@ -65,6 +66,7 @@
 <li><a href="#versions">versions</a></li>
 <li><a href="#window">window</a></li>
 <li><a href="#xgrid">xgrid</a></li>
+<li><a href="#mstat">mstat</a></li>
 </ul>
 </head>
 <body>
@@ -315,10 +317,14 @@ And second case refer to the attribute "y" of second input array.
 <dt><b>Description</b></dt>
 <dd>Incremental input of array from input text file. Unlike LOAD operator, input doesn't store result in the database
 <dt><b>Syntax</b></dt>
-<dd><u>input</u> ( <i>array-name</i>, <i>input-file-name</i> )
+<dd><u>input</u> ( <i>array-name</i>, <i>input-file-path</i> [ [ [ [ <i>, instance-id</i> [ <i>, input-format</i> [ <i>, max-errors</i> [ <i>, shadow-array</i> ] ] ] ] )
+<dd><i>instance-id</i> - instanceID or -1 (all instances) or -2 (coordinator). Default -2</dd>
+<dd><i>input-format</i> - "opaque", "text" or binary loader template, for example: "(int32,dummy(4),string)". Default "text"</dd>
+<dd><i>max-errors</i> - maximal number of conversion error which can be ignored. Default 0</dd>
+<dd><i>shadow-array</i> - name of shadow array containing information about conversion errors. It contains the same attributes as original array + position of  error in imported file. Attributes of shadow array contains text of error message or null if correspondent attribute was successfully loaded</dd>
 <dt><b>Example</b></dt>
-<dd><code>iquery -aq "store(input(testarr, 'data.dmp'), testarr2)"</code>
-</dd>
+<dd><code>iquery -aq "store(input(testarr, 'data.dmp'), testarr2)"</code></dd>
+<dd><code>iquery -aq "store(input(testarr, 'data.binary', -2, '(int32 null,float null,string null)', 10, foo_shadow), testarr2)"</code></dd>
 </dl>
 <h2><a name="inverse">inverse</a></h2>
 <dl>
@@ -398,9 +404,14 @@ When called without parameters returns list of arrays.
 <dt><b>Description</b></dt>
 <dd>Load an array from input text file. This is shorthand for <u>store</u>( <u>input</u>(<i>array-name</i>, <i>input-file-name</i>), <i>array-name</i>).
 <dt><b>Syntax</b></dt>
-<dd><u>load</u> ( <i>array-name</i>, <i>input-file-name</i> )
+<dd><u>load</u> ( <i>array-name</i>, <i>input-file-path</i> [ [ [ [ <i>, instance-id</i> [ <i>, input-format</i> [ <i>, max-errors</i> [ <i>, shadow-array</i> ] ] ] ] )
+<dd><i>instance-id</i> - instanceID or -1 (all instances) or -2 (coordinator). Default -2</dd>
+<dd><i>input-format</i> - "opaque", "text" or binary loader template, for example: "(int32,dummy(4),string)". Default "text"</dd>
+<dd><i>max-errors</i> - maximal number of conversion error which can be ignored. Default 0</dd>
+<dd><i>shadow-array</i> - name of shadow array containing information about conversion errors. It contains the same attributes as original array + position of  error in imported file. Attributes of shadow array contains text of error message or null if correspondent attribute was successfully loaded</dd>
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "load(testarr, 'data.dmp')"</code></dd>
+<dd><code>iquery -aq "load(testarr, 'data.binary', -2, '(int32 null,float null,string null)', 10, foo_shadow)"</code></dd>
 </dl>
 <h2><a name="lookup">lookup</a></h2>
 <dl>
@@ -411,6 +422,16 @@ Result array has the same shape as first array and the same attributes as second
 <dd><u>lookup</u> ( <i>pattern-array</i>, <i>source-array</i> )
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "lookup(pattern, dense)"</code></dd>
+</dl>
+<h2><a name="match">match</a></h2>
+<dl>
+<dt><b>Description</b></dt>
+<dd>Match pattern array with catalog array. For each cell in pattern array find closest non-empty cell in catalog array distance to which doesn't exceed specified error. Result array has the same shape as pattern array and combined list of attributes pattern and catalog attrbiutes + dimensiones of matched catalog element. Attributes and coordinates of matched catalog entry have "match_" prefix. 
+<dt><b>Syntax</b></dt>
+<dd><u>match</u> ( <i>pattern-array</i>, <i>catalog-array</i>, <i>error</i> )
+<dt><b>Example</b></dt>
+<dd><code>iquery -aq "match(sky_snaphot, stars_catalog, 50)"</code><br>
+</dd>
 </dl>
 <h2><a name="materialize">materialize</a></h2>
 <dl>
@@ -562,9 +583,12 @@ Reshape takes definition of attributes from the source array and definition of d
 <dt><b>Description</b></dt>
 <dd>Save array in specified file in text format. This operator is the opposite of the load() operator.
 <dt><b>Syntax</b></dt>
-<dd><u>save</u> ( <i>array-reference</i> , <i>file-path</i> )
+<dd><u>save</u> ( <i>array-reference</i> , <i>file-path</i> [ [ <i>, instance-id</i> [ <i>, store-format</i>  ] ] )
+<dd><i>instance-id</i> - instanceID or -1 (all instances) or -2 (coordinator). Default -2</dd>
+<dd><i>store-format</i> - "opaque", "store", "sparse", "dense", "csv", "csv+", "lcsv+"  or binary loader template, for example: "(int32,dummy(4),string)". Default "store"</dd>
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "save(testarr, '/data/testarr.dat')"</code></dd>
+<dd><code>iquery -aq "save(testarr, '/data/testarr.dat', -2, '(int32,float,string)')"</code></dd>
 </dl>
 <h2><a name="scan">scan</a></h2>
 <dl>
@@ -718,6 +742,30 @@ of the input array.
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "xgrid(matrix, 2, 2)"</code></dd>
 </dl>
+
+<h2><a name="mstat">mstat</a></h2>
+<dl>
+<dt><b>Description</b></dt>
+<dd>Collect mallinfo outputs on every instance. Contains 10 attributes with parameters.
+<ul>
+<li>arena - non-mmapped space allocated from system
+<li>ordblks - number of free chunks
+<li>smblks - number of fastbin blocks
+<li>hblks - number of mmapped regions
+<li>hblkhd - space in mmapped regions
+<li>usmblks - maximum total allocated space
+<li>fsmblks - space available in freed fastbin blocks
+<li>uordblks - total allocated space
+<li>fordblks - total free space
+<li>keepcost - top-most, releasable (via malloc_trim) space
+</ul>
+Read <code>man mallinfo</code> for more details.
+<dt><b>Syntax</b></dt>
+<dd><u>mstat</u> ()
+<dt><b>Example</b></dt>
+<dd><code>iquery -aq "mstat()"</code></dd>
+</dl>
+
 <h2><a name="sg">scatter/gather</a></h2>
 <dl>
 <dt><b>Description</b></dt>

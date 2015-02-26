@@ -119,7 +119,7 @@ private:
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
             desc = _schema;
-            desc.setId(SystemCatalog::getInstance()->addArray(desc, psRoundRobin));
+            SystemCatalog::getInstance()->addArray(desc, psRoundRobin);
         } else { 
             if (!desc.isImmutable()) { 
                 lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
@@ -127,15 +127,16 @@ private:
         }
  
         Dimensions const& dstDims = desc.getDimensions();        
- 
+        bool changeMapping = false;
         for (size_t i = 0; i < nDims; i++) {
             DimensionDesc const& dim = dims[i];
             string const& mappingArrayName = dim.getMappingArrayName();
             newVersionDims[i] = dim;
             if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) { 
-                if (arrayExists && desc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName()) { 
+                if (arrayExists && desc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName() && !dstDims[i].getMappingArrayName().empty()) { 
                     throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CAN_NOT_CHANGE_MAPPING) << arrayName;
                 }
+                changeMapping = true;
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(mappingArrayName);
                 if (tmpMappingArray) { 
                     ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
@@ -144,8 +145,8 @@ private:
                         throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << newMappingArrayName;
                     }
                     ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(), tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
-                    ArrayID mappingArrayID = SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
-                    assert(mappingArrayID > 0);
+                    SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
+                    assert(mappingArrayDesc.getId()>0);
                     newVersionDims[i] = DimensionDesc(dim.getBaseName(),
                                                       dim.getNamesAndAliases(),
                                                       dim.getStartMin(), dim.getCurrStart(),
@@ -159,6 +160,9 @@ private:
             }
         }
         if (desc.isImmutable()) {
+            if (changeMapping) { 
+                SystemCatalog::getInstance()->updateArray(ArrayDesc(desc.getId(), desc.getUAId(), desc.getVersionId(), desc.getName(), desc.getAttributes(), newVersionDims));
+            };
             return;
         }
         _updateableArrayID = desc.getId();
@@ -168,11 +172,10 @@ private:
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
         assert(rc);
 
-        _schema = ArrayDesc(formArrayNameVersion(desc.getName(), (lastVersion+1)),
+        _schema = ArrayDesc(ArrayDesc::makeVersionedName(desc.getName(), lastVersion+1),
                             desc.getAttributes(), newVersionDims);
-        
-        _arrayID = SystemCatalog::getInstance()->addArray(_schema, ps);
-
+        SystemCatalog::getInstance()->addArray(_schema, ps);
+        _arrayID = _schema.getId();
         _lock->setArrayVersionId(_arrayID);
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
         assert(rc);
@@ -186,9 +189,9 @@ private:
         }
     }
 
-    virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
@@ -196,13 +199,12 @@ private:
     {
         PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
         DimensionVector offset = getOffsetVector(inputSchemas);
-        DimensionVector shape = getShapeVector(inputSchemas);
 
         boost::shared_ptr<DistributionMapper> distMapper;
 
         if ( !offset.isEmpty() )
         {
-            distMapper = DistributionMapper::createOffsetMapper(offset,shape);
+            distMapper = DistributionMapper::createOffsetMapper(offset);
         }
 
         return ArrayDistribution(ps,distMapper);
@@ -217,28 +219,10 @@ private:
         else
         {
             DimensionVector result(_schema.getDimensions().size());
-            assert (_parameters.size() == _schema.getDimensions().size()*2 + 4);
+            assert (_parameters.size() == _schema.getDimensions().size() + 4);
             for (size_t i = 0; i < result.numDimensions(); i++)
             {
                 result[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i+4])->getExpression()->evaluate().getInt64();
-            }
-            return result;
-        }
-    }
-
-    DimensionVector getShapeVector(const vector<ArrayDesc> & inputSchemas) const
-    {
-        if (_parameters.size() <= 4)
-        {
-            return DimensionVector();
-        }
-        else
-        {
-            DimensionVector result(_schema.getDimensions().size());
-            assert (_parameters.size() == _schema.getDimensions().size()*2 + 4);
-            for (size_t i = 0; i < result.numDimensions(); i++)
-            {
-                result[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i + _schema.getDimensions().size() +4])->getExpression()->evaluate().getInt64();
             }
             return result;
         }
@@ -253,25 +237,23 @@ private:
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
             PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
-            int64_t instanceID = -1;
+            InstanceID instanceID = ALL_INSTANCES_MASK;
             std::string arrayName = "";
             DimensionVector offsetVector = getOffsetVector(vector<ArrayDesc>());
-            DimensionVector shapeVector = getShapeVector(vector<ArrayDesc>());
             shared_ptr<Array> srcArray = inputArrays[0];
 
             boost::shared_ptr <DistributionMapper> distMapper;
 
             if (!offsetVector.isEmpty())
             {
-                assert(offsetVector.numDimensions()==shapeVector.numDimensions());
-                distMapper = DistributionMapper::createOffsetMapper(offsetVector, shapeVector);
+                distMapper = DistributionMapper::createOffsetMapper(offsetVector);
             }
 
             bool storeResult=false;
 
             if (_parameters.size() >=2 )
             {
-            	instanceID = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64();
+            	instanceID = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt32();
             }
 
             if (_parameters.size() >= 3)
@@ -292,8 +274,9 @@ private:
             if (storeResult) {
                 assert(!arrayName.empty());
 
-                VersionID version(0);
-                string baseArrayName = splitArrayNameVersion(arrayName, version);
+                VersionID version = ArrayDesc::getVersionFromName(arrayName);
+                string baseArrayName = ArrayDesc::makeUnversionedName(arrayName);
+
                 query->exclusiveLock(baseArrayName);
 
                 if (!_lock) {

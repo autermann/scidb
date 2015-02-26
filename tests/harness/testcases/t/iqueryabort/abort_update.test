@@ -1,0 +1,30 @@
+--setup
+--start-query-logging
+
+--start-igdata
+store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)
+--stop-igdata
+
+--test
+
+--shell --command "../utils/killquery.sh -aql 2  2 'update ABRTEST set v=3'" --store 
+--shell --command "../utils/killquery.sh -aql 15 2 'update ABRTEST set v=3'" --store 
+--shell --command "../utils/killquery.sh -aql 9  2 'update ABRTEST set v=3'" --store 
+
+# clean abort for insert
+--shell --command "../utils/killquery.sh -afl 2  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*5 + 13), v1), v1, v), ABRTEST)'" --store
+--shell --command "../utils/killquery.sh -afl 9  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*v), v1), v1, v), ABRTEST)'" --store
+
+# should not have any changes (original pattern)
+subarray(ABRTEST, 0, 10)
+
+# This should now succeed. 
+--igdata "insert(attribute_rename(project(apply(filter(ABRTEST, I/2 <> 0), v1, v*v), v1), v1, v), ABRTEST)"
+--igdata --aql "update ABRTEST set v=3"
+
+count(versions(ABRTEST))
+
+--cleanup
+--stop-query-logging
+
+remove(ABRTEST)

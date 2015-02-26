@@ -38,6 +38,40 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: stdev().
+ *
+ * @par Synopsis:
+ *   stdev( srcArray [, attr {, groupbyDim}*] )
+ *
+ * @par Summary:
+ *   Produces a result array containing the standard deviation among the values of an attribute.
+ *   If a list of groupbyDims is provided, one standard deviation is calculated for every distinct group.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 0 or 1 attributes from srcAttrs. If no attribute is provided, the first attribute is used.
+ *   - an optional list of groupbyDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attr_max: the source attribute name, followed by '_stdev'.
+ *   <br> >
+ *   <br> [
+ *   <br>   groupbyDims (if a list of groupbyDims is provided); or
+ *   <br>   i: start=0, end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - same as aggregate(srcArray, stdev(attr), groupbyDims).
+ *
+ */
 class LogicalStdev : public  LogicalOperator
 {
 public:

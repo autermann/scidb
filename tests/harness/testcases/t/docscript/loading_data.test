@@ -1,0 +1,76 @@
+
+--test
+--start-query-logging
+
+--shell  --command="cat ../examples/olympic_data.csv " --store
+--shell  --command="csv2scidb -h " --store
+--shell  --command="cat ../examples/olympic_data.scidb " --store
+--set-format dcsv
+--start-igdata
+--aql CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]  
+--aql LOAD winnersFlat FROM '../examples/olympic_data.scidb'  
+--stop-igdata
+--aql SELECT * FROM analyze(winnersFlat)  
+--start-igdata
+--aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0] 
+--aql SELECT * FROM redimension_store(winnersFlat,winners)  
+--shell  --command="loadcsv.py -h " --store
+--aql SELECT * FROM list('types')  
+--aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
+--aql LOAD intensityFlat FROM '../examples/intensity_data.bin' AS '(string, int64, int64 null)'  
+--stop-igdata
+--aql SELECT * FROM analyze(intensityFlat) 
+--start-igdata
+--aql CREATE ARRAY intensity <measuredIntensity:int64 null> [exposure(string)=3,3,0, elapsedTime=0:40000,10000,0]  
+--aql SELECT * FROM redimension_store(intensityFlat,intensity)  
+remove(intensityFlat)  
+--aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
+--aql LOAD intensityFlat FROM '../examples/intensity_data.bin' AS '(string, int64, int64 null)'  
+--aql CREATE ARRAY intensityFlat_NoExposure < elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
+--aql LOAD intensityFlat_NoExposure FROM '../examples/intensity_data.bin' AS '(skip, int64, int64 null)'  
+--aql CREATE ARRAY intensityFlat_NoTime_NoMeasurement < exposure:string > [i=0:*,1000000,0]  
+--aql LOAD intensityFlat_NoTime_NoMeasurement FROM '../examples/intensity_data.bin' AS '(string, skip(8), skip(8) null)'  
+--stop-igdata
+show(intensity)
+--start-igdata
+--aql CREATE ARRAY intensityCopy < measuredIntensity:int64 NULL > [ exposure(string)=3,3,0, duration=0:40000,10000,0] 
+--aql LOAD intensityCopy FROM CURRENT INSTANCE '../examples/intensity_data.opaque' AS 'OPAQUE'  
+--shell  --command="cat ../examples/v4.scidb" --store
+--aql CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0] 
+--aql LOAD v4 FROM '../examples/v4.scidb'  
+--aql CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0] 
+--aql LOAD v4_dflt FROM '../examples/v4.scidb'  
+--shell  --command="cat ../examples/v4_null.scidb" --store
+--aql CREATE ARRAY v4_null <val1:int8,val2:int8 NULL> [i=0:3,4,0]  
+--aql LOAD v4_null FROM '../examples/v4_null.scidb'  
+remove(intensityFlat)  
+--aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:6,1000000,0]  
+--shell  --command="cat ../examples/csv-errors.txt" --store
+--shell  --command="cat '../examples/int4error.scidb' " --store
+--stop-igdata
+--aql LOAD intensityFlat FROM '../examples/int4error.scidb' AS 'text' ERRORS 99 SHADOW ARRAY intensityFlatShadow  
+show(intensityFlatShadow)
+--aql SELECT * FROM intensityFlatShadow  
+--aql SELECT * FROM intensityFlat  
+--start-igdata
+--aql SELECT intensityFlat.exposure AS exp, intensityFlatShadow.exposure AS expMSG, intensityFlat.elapsedTime AS elTime, intensityFlatShadow.elapsedTime AS elTimeMSG, intensityFlat.measuredIntensity AS Intensity, intensityFlatShadow.measuredIntensity AS IntensityMSG, row_offset INTO intensityFlatBadCells FROM intensityFlat, intensityFlatShadow  
+--stop-igdata
+--aql SELECT * FROM intensityFlatBadCells  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(winnersFlat)
+remove(winners)
+remove(intensity)
+remove(intensityFlat_NoExposure)
+remove(intensityFlat_NoTime_NoMeasurement)
+remove(intensityCopy)
+remove(v4)
+remove(v4_dflt)
+remove(v4_null)
+remove(intensityFlat)
+remove(intensityFlatShadow)
+remove(intensityFlatBadCells)

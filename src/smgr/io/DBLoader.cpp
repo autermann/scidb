@@ -28,11 +28,13 @@
 #define _LARGE_FILE_API     1 // access to files greater than 2Gb in AIX
 #endif
 
+#include "util/FileIO.h"
 
 #include <stdio.h>
 #include <ctype.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <float.h>
 #include <string>
 #include <errno.h>
 
@@ -41,6 +43,7 @@
 #include "log4cxx/logger.h"
 #include "log4cxx/basicconfigurator.h"
 #include "log4cxx/helpers/exception.h"
+#include <boost/archive/text_oarchive.hpp>
 
 #include "system/Exceptions.h"
 #include "query/TypeSystem.h"
@@ -51,12 +54,13 @@
 #include "array/DBArray.h"
 #include "smgr/io/Storage.h"
 #include "system/SystemCatalog.h"
-
+#include "smgr/io/TemplateParser.h"
 
 namespace scidb
 {
     using namespace std;
     using namespace boost;
+    using namespace boost::archive;
 
     // declared static to prevent visibility of variable outside of this file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.smgr.io.DBLoader"));
@@ -74,7 +78,7 @@ namespace scidb
         bool isEmptyable;
 
       public:
-        CompatibilityIterator(shared_ptr<ConstChunkIterator> iterator) 
+        CompatibilityIterator(shared_ptr<ConstChunkIterator> iterator, bool isSparse) 
         : inputIterator(iterator),
           firstPos(iterator->getFirstPosition()),
           lastPos(iterator->getLastPosition()),
@@ -82,18 +86,15 @@ namespace scidb
           mode(iterator->getMode()),
           isEmptyable(iterator->getChunk().getArrayDesc().getEmptyBitmapAttribute() != NULL)
         {
-            if (mode & ConstChunkIterator::IGNORE_DEFAULT_VALUES) {
-                if (iterator->getChunk().isSparse()) { 
-                    mode |= ConstChunkIterator::IGNORE_EMPTY_CELLS;
-                } else { 
-                    mode &= ~ConstChunkIterator::IGNORE_DEFAULT_VALUES;
-                }
+            if (isSparse) {
+                mode |= ConstChunkIterator::IGNORE_EMPTY_CELLS;
             }
+            mode &= ~ConstChunkIterator::IGNORE_DEFAULT_VALUES;
             reset();
         }
 
         bool skipDefaultValue() {
-            return (mode & ConstChunkIterator::IGNORE_DEFAULT_VALUES) && nextPos != NULL && currPos == *nextPos && inputIterator->getItem() == defaultValue;
+            return false;
         }
 
         int getMode() {
@@ -185,155 +186,67 @@ namespace scidb
         TKN_EOF
     };
 
-    class InputScanner
+    int DBLoader::defaultPrecision = 6;
+
+
+    static void s_fprintValue(FILE *f, const Value* v, TypeId const& valueType, FunctionPointer const converter, int precision = 6)
     {
-        FILE* f;
-        string value;
-
-      public:
-        string const& getValue()
+        if ( converter )
         {
-            return value;
+            Value strValue;
+            (*converter)(&v, &strValue, NULL);
+            fprintf(f, "\"%s\"", strValue.getString());
         }
-
-        InputScanner(string const& file)
+        else
         {
-            LOG4CXX_DEBUG(logger, "Attempting to open file '" << file << "' for loading");
-            f = fopen(file.c_str(), "r");
-            if (NULL == f )
-            {
-                int error = errno;
-                LOG4CXX_DEBUG(logger,"Attempted to open input file '" << file << "' and failed with errno = " << error);
-                if (!f)
-                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_OPEN_FILE) << file << error;
-            }
+            fprintf(f, "%s", ValueToString(valueType, *v, precision).c_str());
         }
-
-        ~InputScanner()
-        {
-            fclose(f);
-        }
-
-                long getFilePos() { if ( f ) return ftell ( f ); return -1; }
-
-        Token get()
-        {
-            int ch;
-
-            while ((ch = getc(f)) != EOF && isspace(ch)){}; // ignore whitespaces
-
-            if (ch == EOF) {
-                return TKN_EOF;
-            }
-
-            switch (ch) {
-              case '\'':
-                ch = getc(f);
-                if (ch == '\\') {
-                    ch = getc(f);
-                    switch (ch) {
-                      case '0':
-                        ch = 0;
-                        break;
-                      case 'n':
-                        ch = '\n';
-                        break;
-                      case 'r':
-                        ch = '\r';
-                        break;
-                      case 'f':
-                        ch = '\f';
-                        break;
-                      case 't':
-                        ch = '\t';
-                        break;
-                    }
-
-                }
-                if (ch == EOF)
-                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_UNTERMINATED_CHARACTER_CONSTANT);
-                value = (char)ch;
-                ch = getc(f);
-                if (ch != '\'')
-                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_UNTERMINATED_CHARACTER_CONSTANT);
-                return TKN_LITERAL;
-              case '"':
-                value.clear();
-                while (true) {
-                    ch = getc(f);
-                    if (ch == '\\') {
-                        ch = getc(f);
-                    }
-                    if (ch == EOF)
-                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_UNTERMINATED_STRING_LITERAL);
-                    if (ch == '\"') {
-                        return TKN_LITERAL;
-                    }
-                    value += (char)ch;
-                }
-                break;
-              case '{':
-                return TKN_COORD_BEGIN;
-              case '}':
-                return TKN_COORD_END;
-              case '(':
-                return TKN_TUPLE_BEGIN;
-              case ')':
-                return TKN_TUPLE_END;
-              case '[':
-                return TKN_ARRAY_BEGIN;
-              case ']':
-                return TKN_ARRAY_END;
-              case ',':
-                return TKN_COMMA;
-              case ';':
-                return TKN_SEMICOLON;
-              default:
-                value.clear();
-                while (ch != EOF && !isspace(ch) && ch != ')' && ch != ']'  && ch != '}' && ch != '(' && ch != '{' && ch != '[' && ch != ',') {
-                    value += (char)ch;
-                    ch = getc(f);
-                }
-                if (!value.size())
-                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_BAD_LITERAL);
-                if (ch != EOF) {
-                    ungetc(ch, f);
-                }
-                return TKN_LITERAL;
-            }
-        }
-    };
-
-    uint64_t DBLoader::save(string const& arrayName, string const& file,
-                            const boost::shared_ptr<Query>& query,
-                            string const& format, bool append)
-    {
-#ifndef SCIDB_CLIENT
-        ArrayDesc desc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, desc);
-        return save(DBArray(desc.getId(),query), file, format, append);
-#else
-        return 0;
-#endif
     }
 
-    uint64_t DBLoader::save(Array const& array, string const& file,
-                            string const& format, bool append)
+    static void s_fprintCoordinate(FILE *f,
+                                   Coordinate ordinalCoord,
+                                   DimensionDesc const& dimension,
+                                   Value const& origCoord, 
+                                   FunctionPointer const dimConverter)
     {
-        ArrayDesc const& desc = array.getArrayDesc();
-        size_t i, j;
-        uint64_t n = 0;
-
-        FILE* f = file == "console" || file == "stdout" ? stdout
-            : file == "stderr" ? stderr : fopen(file.c_str(), append ? "a" : "w");
-
-        if (NULL == f) {
-            int error = errno;
-            LOG4CXX_DEBUG(logger, "Attempted to open output file '" << file << "' and failed with errno = " << error);
-            if (!f)
-                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_OPEN_FILE) << file << error;
+        if (dimension.isInteger())
+        {
+            fprintf(f, "%"PRIi64, ordinalCoord);
         }
+        else
+        {
+            s_fprintValue(f, &origCoord, dimension.getType(), dimConverter);
+        }
+    }
 
+    static void s_fprintCoordinates(FILE *f,
+                                    Coordinates const& coords,
+                                    Dimensions const& dims,
+                                    vector<Value> const& origCoords, 
+                                    vector <FunctionPointer> const& dimConverters)
+    {
+        putc('{', f);
+        for (size_t i = 0; i < dims.size(); i++)
+        {
+            if (i != 0)
+            {
+                putc(',', f);
+            }
+            s_fprintCoordinate(f, coords[i], dims[i], origCoords[i], dimConverters[i]);
+        }
+        putc('}', f);
+    }
+
+
+
+    static uint64_t saveTextFormat(Array const& array,
+                                   ArrayDesc const& desc,
+                                   FILE* f,
+                                   std::string const& format)
+    {
+        size_t i, j;
+        uint64_t n = 0;        
+        int precision = DBLoader::defaultPrecision;
         Attributes const& attrs = desc.getAttributes();
         //If descriptor has empty flag we just ignore it and fill only iterators with actual data attributes
         bool omitEpmtyTag = desc.getEmptyBitmapAttribute();
@@ -347,7 +260,6 @@ namespace scidb
             vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(iteratorsCount);
             vector< TypeId> types(iteratorsCount);
             vector< FunctionPointer> converters(iteratorsCount);
-            Value strValue;
             Coordinates coord(nDimensions);
             int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS;
 
@@ -366,8 +278,8 @@ namespace scidb
                 ++j;
             }
 
-            if (format == "csv" || format == "csv+") {
-                bool withCoordinates = format == "csv+";
+            if (compareStringsIgnoreCase(format, "csv") == 0 || compareStringsIgnoreCase(format, "csv+") == 0) {
+                bool withCoordinates = compareStringsIgnoreCase(format, "csv+") == 0;
                 if (withCoordinates) {
                     for (i = 0; i < nDimensions; i++) {
                         if (i != 0) {
@@ -404,14 +316,18 @@ namespace scidb
                             if (i != 0 || withCoordinates) {
                                 fputc(',', f);
                             }
+                            Value strValue;
                             if (converters[i]) {
                                 const Value* v = &chunkIterators[i]->getItem();
-                                (*converters[i])(&v, &strValue, NULL);
-                                fprintf(f, "\"%s\"",  strValue.getString());
+                                if (!v->isNull())
+                                {
+                                    (*converters[i])(&v, &strValue, NULL);
+                                    fprintf(f, "\"%s\"",  strValue.getString());
+                                }
                             } else {
                                 Value const& val = chunkIterators[i]->getItem();
                                 if (!val.isNull()) {
-                                    fprintf(f, "%s",  ValueToString(types[i], val).c_str());
+                                    fprintf(f, "%s",  ValueToString(types[i], val, precision).c_str());
                                 }
                             }
                             ++(*chunkIterators[i]);
@@ -423,16 +339,19 @@ namespace scidb
                     }
                 }
             } else {
-                bool sparseFormat = (format == "sparse");
-                bool storeFormat = (format == "store");
+                bool sparseFormat = compareStringsIgnoreCase(format, "sparse") == 0;
+                bool denseFormat = compareStringsIgnoreCase(format, "dense") == 0;
+                bool storeFormat = compareStringsIgnoreCase(format, "store") == 0;
+                bool autoFormat = compareStringsIgnoreCase(format, "text") == 0;
+                        
                 bool startOfArray = true;
-                if (iteratorsCount == 1 && !storeFormat) {
-                    iterationMode |= ConstChunkIterator::IGNORE_DEFAULT_VALUES;
-                }
                 if (sparseFormat) {
                     iterationMode |= ConstChunkIterator::IGNORE_EMPTY_CELLS;
                 }
                 if (storeFormat) {
+                    if (precision < DBL_DIG) { 
+                        precision = DBL_DIG;
+                    }
                     iterationMode &= ~ConstChunkIterator::IGNORE_OVERLAPS;
                 }
                 // Set initial position
@@ -454,14 +373,18 @@ namespace scidb
                 chunkPos[nDimensions-1] -= dims[nDimensions-1].getChunkInterval();
                 {
                     // Iterate over all chunks
-                    bool firstItem = true;
+                    bool firstItem = true; 
                     while (!arrayIterators[0]->end()) {
                         // Get iterators for the current chunk
+                        bool isSparse = false;
                         for (i = 0; i < iteratorsCount; i++) {
                             ConstChunk const& chunk = arrayIterators[i]->getChunk();
                             chunkIterators[i] = chunk.getConstIterator(iterationMode);
+                            if (i == 0) { 
+                                isSparse = !denseFormat && ((!autoFormat && chunk.isSparse()) || (autoFormat && chunk.count()*100/chunk.getNumberOfElements(false) <= 10));
+                            }
                             if (chunk.isRLE()) { 
-                                chunkIterators[i] = shared_ptr<ConstChunkIterator>(new CompatibilityIterator(chunkIterators[i]));
+                                chunkIterators[i] = shared_ptr<ConstChunkIterator>(new CompatibilityIterator(chunkIterators[i], isSparse));
                             }
                         }
                         int j = nDimensions;
@@ -479,7 +402,6 @@ namespace scidb
                                     }
                                 }
                             }
-                            bool isSparse = chunkIterators[0]->getChunk().isSparse();
                             if (isSparse || storeFormat) {
                                 if (!firstItem) {
                                     firstItem = true;
@@ -584,9 +506,6 @@ namespace scidb
                                         putc('}', f);
                                     }
                                 } else {
-                                    if (chunkIterators[0]->isEmpty() && (iterationMode & ConstChunkIterator::IGNORE_DEFAULT_VALUES)) { 
-                                        goto nextItem;
-                                    }
                                     if (!firstItem) {
                                         putc(',', f);
                                     }
@@ -622,19 +541,20 @@ namespace scidb
                                         if (i != 0) {
                                             putc(',', f);
                                         }
+                                        Value strValue;
                                         if (converters[i]) {
                                             const Value* v = &chunkIterators[i]->getItem();
                                             (*converters[i])(&v, &strValue, NULL);
                                             fprintf(f, "\"%s\"",  strValue.getString());
                                         } else {
-                                            fprintf(f, "%s",  ValueToString(types[i], chunkIterators[i]->getItem(), storeFormat).c_str());
+                                            fprintf(f, "%s",  ValueToString(types[i], chunkIterators[i]->getItem(), precision).c_str());
                                         }
                                     }
                                 }
                                 n += 1;
                                 firstItem = false;
                                 putc(')', f);
-                             nextItem:
+
                                 for (i = 0; i < iteratorsCount; i++) {
                                     ++(*chunkIterators[i]);
                                 }
@@ -662,83 +582,28 @@ namespace scidb
                 fputc('\n', f);
             }
         }
-        if (f != stdout && f != stderr) {
-            fclose(f);
-        }
         return n;
     }
 
-    static void s_fprintValue(FILE *f, const Value* v, TypeId const& valueType, FunctionPointer const converter)
-    {
-        if ( converter )
-        {
-            Value strValue;
-            (*converter)(&v, &strValue, NULL);
-            fprintf(f, "\"%s\"", strValue.getString());
-        }
-        else
-        {
-            fprintf(f, "%s", ValueToString(valueType, *v).c_str());
-        }
-    }
 
-    static void s_fprintCoordinate(FILE *f,
-                                   Coordinate ordinalCoord,
-                                   DimensionDesc const& dimension,
-                                   Value const& origCoord, 
-                                   FunctionPointer const dimConverter)
+    static uint64_t saveWithLabels(Array const& array,
+                                   ArrayDesc const& desc,
+                                   FILE* f,
+                                   std::string const& format, 
+                                   boost::shared_ptr<Query> const& query)
     {
-        if (dimension.isInteger())
-        {
-            fprintf(f, "%"PRIi64, ordinalCoord);
-        }
-        else
-        {
-            s_fprintValue(f, &origCoord, dimension.getType(), dimConverter);
-        }
-    }
-
-    static void s_fprintCoordinates(FILE *f,
-                                    Coordinates const& coords,
-                                    Dimensions const& dims,
-                                    vector<Value> const& origCoords, 
-                                    vector <FunctionPointer> const& dimConverters)
-    {
-        putc('{', f);
-        for (size_t i = 0; i < dims.size(); i++)
-        {
-            if (i != 0)
-            {
-                putc(',', f);
-            }
-            s_fprintCoordinate(f, coords[i], dims[i], origCoords[i], dimConverters[i]);
-        }
-        putc('}', f);
-    }
-
-
-    uint64_t DBLoader::saveWithLabels(Array const& array,
-                                      std::string const& file,
-                                      std::string const& format,
-                                      bool append)
-    {
-        ArrayDesc const& desc = array.getArrayDesc();
         size_t i;
         uint64_t n = 0;
 
-        FILE* f = file == "console" || file == "stdout" ? stdout
-            : file == "stderr" ? stderr : fopen(file.c_str(), append ? "a" : "w");
-
-        if (NULL == f )
-        {
-            int error = errno;
-            LOG4CXX_DEBUG(logger, "Attempted to open output file '" << file << "' and failed with errno = " << error);
-            if (!f)
-                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_OPEN_FILE) << file << error;
-        }
-
         Attributes const& attrs = desc.getAttributes();
         size_t nAttributes = attrs.size();
+        
+        if (desc.getEmptyBitmapAttribute())
+        {
+            assert(desc.getEmptyBitmapAttribute()->getId() == desc.getAttributes().size()-1);
+            nAttributes--;
+        }
+
         if (nAttributes != 0)
         {
             Dimensions const& dims = desc.getDimensions();
@@ -777,8 +642,12 @@ namespace scidb
                 }
             }
 
-            if (format == "lcsv+")
+            bool dcsv = compareStringsIgnoreCase(format, "dcsv") == 0;
+            if (compareStringsIgnoreCase(format, "lcsv+") == 0 || dcsv)
             {
+                if (dcsv)
+                    fputc('{', f);
+
                 for (i = 0; i < nDimensions; i++)
                 {
                     if (i != 0)
@@ -787,9 +656,20 @@ namespace scidb
                     }
                     fprintf(f, "%s", dims[i].getBaseName().c_str());
                 }
-                for (i = 0; i < nAttributes; i++)
+                if (dcsv)
+                {
+                    fputs("} ", f);
+                }
+                else
                 {
                     fputc(',', f);
+                }
+                for (i = 0; i < nAttributes; i++)
+                {
+                    if (i != 0)
+                    {
+                        fputc(',', f);
+                    }
                     fprintf(f, "%s", attrs[i].getName().c_str());
                 }
 
@@ -805,13 +685,16 @@ namespace scidb
                         ConstChunk const& chunk = arrayIterators[i]->getChunk();
                         chunkIterators[i] = chunk.getConstIterator(iterationMode);
                         if (chunk.isRLE()) { 
-                            chunkIterators[i] = shared_ptr<ConstChunkIterator>(new CompatibilityIterator(chunkIterators[i]));
+                            chunkIterators[i] = shared_ptr<ConstChunkIterator>(new CompatibilityIterator(chunkIterators[i], chunk.isSparse()));
                         }
                     }
                     while (!chunkIterators[0]->end())
                     {
                         Coordinates const& pos = chunkIterators[0]->getPosition();
-                        array.getOriginalPosition(origPos, pos);
+                        array.getOriginalPosition(origPos, pos, query);
+
+                        if (dcsv)
+                            fputc('{', f);
                         for (i = 0; i < nDimensions; i++)
                         {
                             if (i != 0)
@@ -820,11 +703,21 @@ namespace scidb
                             }
                             s_fprintCoordinate(f, pos[i], dims[i], origPos[i], dimConverters[i]);
                         }
-
-                        for (i = 0; i < nAttributes; i++)
+                        if (dcsv)
+                        {
+                            fputs("} ", f);
+                        }
+                        else
                         {
                             fputc(',', f);
-                            s_fprintValue(f, &chunkIterators[i]->getItem(), attTypes[i], attConverters[i]);
+                        }
+                        for (i = 0; i < nAttributes; i++)
+                        {
+                            if (i != 0)
+                            {
+                                fputc(',', f);
+                            }
+                            s_fprintValue(f, &chunkIterators[i]->getItem(), attTypes[i], attConverters[i], DBLoader::defaultPrecision);
                             ++(*chunkIterators[i]);
                         }
                         fputc('\n', f);
@@ -840,10 +733,6 @@ namespace scidb
                 Coordinates coord(nDimensions);
 
                 bool startOfArray = true;
-                if (nAttributes == 1)
-                {
-                    iterationMode |= ConstChunkIterator::IGNORE_DEFAULT_VALUES;
-                }
 
                 // Set initial position
                 Coordinates chunkPos(nDimensions);
@@ -920,7 +809,7 @@ namespace scidb
                                 if (!chunkIterators[0]->getChunk().isSparse())
                                 {
                                     Coordinates const& pos = chunkIterators[0]->getPosition();
-                                    array.getOriginalPosition(origPos, pos);
+                                    array.getOriginalPosition(origPos, pos, query);
                                     int nbr = 0;
                                     for (i = nDimensions-1; pos[i] != ++coord[i]; i--)
                                     {
@@ -995,7 +884,7 @@ namespace scidb
                                         }
                                         startOfArray = false;
                                     }
-                                    array.getOriginalPosition(origPos, chunkIterators[0]->getPosition());
+                                    array.getOriginalPosition(origPos, chunkIterators[0]->getPosition(), query);
                                     s_fprintCoordinates(f, chunkIterators[0]->getPosition(), dims, origPos, dimConverters);
                                 }
                                 putc('(', f);
@@ -1008,7 +897,7 @@ namespace scidb
                                             putc(',', f);
                                         }
 
-                                        s_fprintValue(f, &chunkIterators[i]->getItem(), attTypes[i], attConverters[i]);
+                                        s_fprintValue(f, &chunkIterators[i]->getItem(), attTypes[i], attConverters[i], DBLoader::defaultPrecision);
                                     }
                                 }
                                 n += 1;
@@ -1048,12 +937,278 @@ namespace scidb
                 fputc('\n', f);
             }
         }
+        return n;
+    }
 
-        if (f != stdout && f != stderr)
-        {
-            fclose(f);
+#ifndef SCIDB_CLIENT
+    static uint64_t saveOpaque(Array const& array, ArrayDesc const& desc, FILE* f, boost::shared_ptr<Query> const& query)
+    {
+        size_t nAttrs = desc.getAttributes().size(); 
+        vector< boost::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
+        uint64_t n;
+        OpaqueChunkHeader hdr;
+        hdr.signature = OpaqueChunkHeader::calculateSignature(desc);
+        hdr.magic = OPAQUE_CHUNK_MAGIC;
+        
+        hdr.flags = OpaqueChunkHeader::ARRAY_METADATA;
+        stringstream ss;
+        text_oarchive oa(ss);        
+        oa & desc;
+        string const& s = ss.str();
+        hdr.size = s.size();
+        if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
+            || fwrite(&s[0], 1, hdr.size, f) != hdr.size)
+        { 
+            throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+        }
+        
+        for (size_t i = 0; i < nAttrs; i++) {
+            arrayIterators[i] = array.getConstIterator(i);
+        }
+        for (n = 0; !arrayIterators[0]->end(); n++) {
+            for (size_t i = 0; i < nAttrs; i++) {
+                ConstChunk const* chunk = &arrayIterators[i]->getChunk();
+                if (!chunk->isRLE()) { 
+                    chunk = chunk->materialize();
+                }
+                Coordinates const& pos = chunk->getFirstPosition(false);
+                PinBuffer scope(*chunk);
+                hdr.size = chunk->getSize();
+                hdr.attrId = i;
+                hdr.compressionMethod = chunk->getCompressionMethod();
+                hdr.flags = 0;                                
+                if (chunk->isRLE()) { 
+                    hdr.flags |= OpaqueChunkHeader::RLE_FORMAT;
+                    if (!chunk->getAttributeDesc().isEmptyIndicator()) { 
+                        // RLE chunks received from other nodes by SG contain empty bitmap. 
+                        // There is no need to save this bitmap in each chunk - so just cut it.
+                        ConstRLEPayload payload((char*)chunk->getData());
+                        assert(hdr.size >= payload.packedSize());
+                        hdr.size = payload.packedSize();
+                    }
+                }
+                if (chunk->isSparse()) { 
+                    hdr.flags |= OpaqueChunkHeader::SPARSE_CHUNK;
+                }
+                hdr.nDims = pos.size();
+                if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
+                    || fwrite(&pos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims
+                    || fwrite(chunk->getData(), 1, hdr.size, f) != hdr.size) 
+                { 
+                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                }
+            }
+            for (size_t i = 0; i < nAttrs; i++) {
+                ++(*arrayIterators[i]);
+            }
+        }
+        Dimensions const& dims = desc.getDimensions();
+        for (size_t i = 0; i < dims.size(); i++) { 
+            if (dims[i].getType() != TID_INT64) {
+                string indexName = dims[i].getMappingArrayName();
+                if (!indexName.empty()) { 
+                    boost::shared_ptr<Array> indexArray = query->getArray(indexName);
+                    boost::shared_ptr<ConstArrayIterator> it = indexArray->getConstIterator(0);
+                    ConstChunk const& chunk = it->getChunk();
+                    Coordinates const& pos = chunk.getFirstPosition(false);
+                    PinBuffer scope(chunk);
+                    size_t chunkInterval = indexArray->getArrayDesc().getDimensions()[0].getChunkInterval();
+                    hdr.size = chunkInterval == 0 ? 0 : chunk.getSize();
+                    hdr.attrId = i;
+                    hdr.compressionMethod = 0;
+                    hdr.flags = OpaqueChunkHeader::COORDINATE_MAPPING;                
+                    hdr.nDims = pos.size();
+                    assert(hdr.nDims == 1);
+                    if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
+                        || fwrite(&pos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims
+                        || fwrite(&chunkInterval, sizeof(chunkInterval), 1, f) != 1
+                        || (chunkInterval != 0 && fwrite(chunk.getData(), 1, hdr.size, f) != hdr.size)) 
+                    { 
+                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                    }
+                }
+            }
         }
         return n;
     }
 
+    static uint64_t saveUsingTemplate(Array const& array, ArrayDesc const& desc, FILE* f, string const& format, boost::shared_ptr<Query> const& query)
+    {
+        ExchangeTemplate templ = TemplateParser::parse(desc, format, false);
+        int nAttrs = templ.columns.size();
+        vector< boost::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
+        vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrs);
+        vector< Value > cnvValues(nAttrs);
+        vector<char> padBuffer;
+        int firstAttr = -1;
+        uint64_t n;
+        size_t nMissingReasonOverflows = 0;
+
+        for (int i = 0; i < nAttrs; i++) {
+            if (!templ.columns[i].skip) { 
+                if (firstAttr < 0) { 
+                    firstAttr = (int)i;
+                }
+                arrayIterators[i] = array.getConstIterator(i);
+                if (templ.columns[i].converter) { 
+                    cnvValues[i] = Value(templ.columns[i].externalType);
+                }
+                if (templ.columns[i].fixedSize > padBuffer.size()) { 
+                    padBuffer.resize(templ.columns[i].fixedSize);
+                }
+            }
+        }
+        if (firstAttr < 0) { 
+            return 0;
+        }
+        for (n = 0; !arrayIterators[firstAttr]->end(); n++) {
+            for (int i = firstAttr; i < nAttrs; i++) {
+                if (!templ.columns[i].skip) { 
+                    chunkIterators[i] = arrayIterators[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS);
+                }
+            }
+            while (!chunkIterators[firstAttr]->end()) {                
+                for (int i = firstAttr; i < nAttrs; i++) { 
+                    ExchangeTemplate::Column const& column = templ.columns[i];
+                    if (!column.skip) {
+                        Value const* v = &chunkIterators[i]->getItem();
+                        if (column.nullable) {
+                            if (v->getMissingReason() > 127) {
+                                LOG4CXX_WARN(logger, "Missing reason " << v->getMissingReason() << " can not be stored in binary file");
+                                nMissingReasonOverflows += 1;
+                            }
+                            int8_t missingReason = (int8_t)v->getMissingReason();
+                            if (fwrite(&missingReason, sizeof(missingReason), 1, f) != 1) { 
+                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                            }
+                        }
+                        if (v->isNull()) { 
+                            if (!column.nullable) {
+                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
+                            }
+                            char filler = 0;
+                            size_t size = column.fixedSize == 0 ? 4 : column.fixedSize; // for varying size type write 4-bytes counter
+                            if (fwrite(&filler, 1, size, f) != size) {
+                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                            }
+                        } else { 
+                            if (column.converter) { 
+                                column.converter(&v, &cnvValues[i], NULL);
+                                v = &cnvValues[i];
+                            }
+                            uint32_t size = (uint32_t)v->size();
+                            if (column.fixedSize == 0) { // varying size type
+                                if (fwrite(&size, sizeof(size), 1, f) != 1
+                                    || fwrite(v->data(), 1, size, f) != size) 
+                                { 
+                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                }
+                            } else { 
+                                if (size > column.fixedSize) {  
+                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
+                                }
+                                if (fwrite(v->data(), 1, size, f) != size) 
+                                { 
+                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                }
+                                if (size < column.fixedSize) { 
+                                    size_t padSize = column.fixedSize - size;
+                                    assert(padSize <= padBuffer.size());
+                                    if (fwrite(&padBuffer[0], 1, padSize, f) != padSize) 
+                                    {         
+                                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                    }      
+                                }
+                            }
+                        }        
+                        ++(*chunkIterators[i]);
+                    }       
+                }               
+            }
+            for (int i = firstAttr; i < nAttrs; i++) {
+                if (!templ.columns[i].skip) { 
+                    ++(*arrayIterators[i]);
+                }
+            }
+        }
+        if (nMissingReasonOverflows > 0) { 
+            query->postWarning(SCIDB_WARNING(SCIDB_W_MISSING_REASON_OUT_OF_BOUNDS));
+        }
+        return n;
+    }
+
+
+    uint64_t DBLoader::save(string const& arrayName, string const& file,
+                            const boost::shared_ptr<Query>& query,
+                            string const& format, bool append)
+    {
+        ArrayDesc desc;
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, desc);
+        return save(DBArray(desc.getId(),query), file, query, format, append);
+    }
+#else
+
+    uint64_t DBLoader::save(string const& arrayName, string const& file,
+                            const boost::shared_ptr<Query>& query,
+                            string const& format, bool append)
+    {
+        return 0;
+    }
+#endif
+
+    uint64_t DBLoader::save(Array const& array, string const& file,
+                            const boost::shared_ptr<Query>& query,
+                            string const& format, bool append)
+    {
+        ArrayDesc const& desc = array.getArrayDesc();
+        uint64_t n = 0;
+
+        FILE* f;
+        bool isBinary = compareStringsIgnoreCase(format, "opaque") == 0 || format[0] == '(';
+        if (file == "console" || file == "stdout") { 
+            f = stdout;
+        } else if (file == "stderr") { 
+            f = stderr;
+        } else {
+            f = fopen(file.c_str(), isBinary ? append ? "ab" : "wb" : append ? "a" : "w");
+            if (NULL == f) {
+                int error = errno;
+                LOG4CXX_DEBUG(logger, "Attempted to open output file '" << file << "' and failed with errno = " << error);
+                if (!f)
+                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_OPEN_FILE) << file << error;
+            }
+            struct flock flc;
+            flc.l_type = F_WRLCK;
+            flc.l_whence = SEEK_SET;
+            flc.l_start = 0;
+            flc.l_len = 1;
+            
+            int rc = fcntl(fileno(f), F_SETLK, &flc);
+            if (rc != 0 && errno == EACCES) { 
+                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_LOCK_FILE) << file;
+            }
+        }
+        if (compareStringsIgnoreCase(format, "lcsv+") == 0 || compareStringsIgnoreCase(format, "lsparse") == 0
+            || compareStringsIgnoreCase(format, "dcsv") == 0)
+        {
+            n = saveWithLabels(array, desc, f, format, query);
+        } 
+#ifndef SCIDB_CLIENT
+        else if (compareStringsIgnoreCase(format, "opaque") == 0) { 
+            n = saveOpaque(array, desc, f, query);
+        }
+        else if (format[0] == '(') 
+        { 
+            n = saveUsingTemplate(array, desc, f, format, query);
+        } 
+#endif
+        else 
+        {
+            n = saveTextFormat(array, desc, f, format);
+        }
+        if (f != stdout && f != stderr) {
+            fclose(f);
+        }
+        return n;
+    }
 }

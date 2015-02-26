@@ -39,22 +39,42 @@ namespace scidb {
 using namespace boost;
 using namespace std;
 
-class PhysicalCross: public  PhysicalOperator{
+class PhysicalCross : public  PhysicalOperator
+{
   public:
-	PhysicalCross(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+    PhysicalCross(std::string const& logicalName,
+                  std::string const& physicalName,
+                  Parameters const& parameters,
+                  ArrayDesc const& schema)
     :  PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
 	}
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
         return inputBoundaries[0].crossWith(inputBoundaries[1]);
     }
 
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
+    {
+        return true;
+    }
+
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector< ArrayDesc> const&) const
+    {
+        return ArrayDistribution(psUndefined);
+    }
+
+    boost::shared_ptr<Array> execute(
+            std::vector< boost::shared_ptr<Array> >& inputArrays,
+            boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 2);
+
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
         if ( query->getInstancesCount() > 1) { 

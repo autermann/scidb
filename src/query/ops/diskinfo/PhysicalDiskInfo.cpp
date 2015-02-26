@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalDiskInfo.cpp
  *
  * @author knizhnik@garret.ru
  *

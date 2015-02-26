@@ -103,7 +103,7 @@ public:
         }
         double E = alpha_m * m * m / c;
 
-        const uint32_t pow_2_32 = 0xffffffff;
+        const double pow_2_32 = 0xffffffff;
 
         //corrections
         if (E <= (5 / 2. * m))
@@ -121,7 +121,7 @@ public:
         }
         else if (E > (1 / 30. * pow_2_32))
         {
-            E = -pow_2_32 * log(1 - E / (double)pow_2_32);
+            E = -pow_2_32 * log(1 - E / pow_2_32);
         }
 
         return (uint64_t)E;

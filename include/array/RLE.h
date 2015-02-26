@@ -30,6 +30,7 @@
 #include <string.h>
 #include <map>
 #include <vector>
+#include <boost/utility.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/split_member.hpp>
@@ -58,164 +59,6 @@ typedef std::map<position_t, Value> ValueMap;
 #endif
 
 extern bool checkChunkMagic(ConstChunk const& chunk);
-
-class RLEBitmap 
-{
-    size_t nSegments;
-    position_t* occ; // occ[0] is last occurrence of 0 in first sequence of 0, 
-    // occ[1] - last coccurence of 1 of first sequnce of 1,...:
-    // case 1:
-    // 0,0,1,1,1,1,0,0,1,0,0,0,1,1,1
-    // occ= 1,5,7,8,11,14
-    // case 2:
-    // 1,1,0,0,1,0,0,0,0,0,0
-    // occ= -1,1,3,4,10
-
-    std::vector<position_t> container;
-
-  public:
-    /**
-     * Check if bit at specified position is set
-     */
-    bool isSet(position_t pos) const { 
-        size_t l = 0, r = nSegments;
-        while (l < r) { 
-            size_t m = (l + r) >> 1;
-            if (occ[m] < pos) { 
-                l = m + 1;
-            } else { 
-                r = m;
-            }
-        }
-        assert(r < nSegments);
-        return r & 1;
-    }
-
-    struct Segment {
-        position_t start; 
-        position_t length;
-    };
-
-    /**
-     * Get next i-th segment of set bits 
-     */
-    bool getSetSegment(size_t i, Segment& segm) const {
-        i <<= 1;
-        if (i+1 < nSegments) {
-            segm.start = occ[i] + 1;
-            segm.length = occ[i+1] - segm.start + 1;
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Get next i-th segment of clear bits 
-     */
-    bool getClearSegment(size_t i, Segment& segm) const {
-        if (occ[0] < 0) { 
-            i += 1;
-        }
-        i <<= 1;
-        if (i < nSegments) {
-            segm.start = i == 0 ? 0 : occ[i-1] + 1;
-            segm.length = occ[i] - segm.start + 1;
-            return true;
-        }
-        return false;
-    }
-
-
-    /**
-     * Find segment of clear bits with position greater or equal than specified.
-     * @return segment index which should be used in getClearSegment
-     */
-    size_t findClearSegment(position_t pos) const { 
-        size_t l = 0, r = nSegments;
-        while (l < r) { 
-            size_t m = (l + r) >> 1;
-            if (occ[m] < pos) { 
-                l = m + 1;
-            } else { 
-                r = m;
-            }
-        }
-        return (r + 1) >> 1;
-    }
-
-    /**
-     * Find segment of set bits with position greater or equal than specified.
-     * @return segment index which should be used in getClearSegment
-     */
-    size_t findSetSegment(position_t pos) const { 
-        size_t l = 0, r = nSegments;
-        while (l < r) { 
-            size_t m = (l + r) >> 1;
-            if (occ[m] < pos) { 
-                l = m + 1;
-            } else { 
-                r = m;
-            }
-        }
-        return r >> 1;
-    }
-
-
-    /**
-     * Method to be called to save bitmap in chunk body
-     */
-    void pack(char* dst) { 
-        *(size_t*)dst = nSegments;
-        dst += sizeof(size_t);
-        memcpy(dst, occ, nSegments*sizeof(position_t));
-    }
-    
-    /**
-     * Get size needed to pack bitmap (used to dermine size of chunk)
-     */
-    size_t packedSize() {
-        return sizeof(size_t) + nSegments*sizeof(position_t);
-    }
-
-    /**
-     * Assignment operator
-     */
-    RLEBitmap& operator=(RLEBitmap const& other);
-        
-    /**
-     * Default constructor
-     */
-    RLEBitmap() {
-        nSegments = 0;
-        occ = NULL;
-    }
-
-    /**
-     * Copy constructor
-     */
-    RLEBitmap(RLEBitmap const& other) {
-        *this = other;
-    }
-
-    /**
-     * Constructor for initializing Bitmap with raw chunk data
-     */
-    RLEBitmap(char const* src) {
-        nSegments = *(size_t*)src;
-        occ = (position_t*)(src + sizeof(size_t));
-    }
-
-    /**
-     * Constructor of bitmap from ValueMap (which is used to be filled by ChunkIterator)
-     */
-    RLEBitmap(ValueMap& vm, uint64_t chunkSize, bool defaultVal); 
-
-    /**
-     * Constructor of RLE bitmap from dense bit vector 
-     */
-    RLEBitmap(char* data, size_t chunkSize);
-};
-
 
 class RLEEmptyBitmap;
 class ConstRLEEmptyBitmap
@@ -430,6 +273,22 @@ public:
     boost::shared_ptr<RLEEmptyBitmap> merge(ConstRLEEmptyBitmap const& other);
 
     /**
+     * Extract subregion from bitmap.
+     *
+     * @param lowerOrigin lower coordinates of original array.
+     * @param upperOrigin upper coordinates of original array.
+     * @param lowerResult lower coordinates of subarray.
+     * @param lowreResult lower coordinates of subarray.
+     *
+     * @return bitmap with same shape and zeros in (Original MINUS Subarray) areas.
+     */
+    boost::shared_ptr<RLEEmptyBitmap> cut(
+            Coordinates const& lowerOrigin,
+            Coordinates const& upperOrigin,
+            Coordinates const& lowerResult,
+            Coordinates const& upperResult) const;
+
+    /**
      * Merge THIS with MERGEBITS and return the result as a new RLEEmptyBitmap
      * MERGEBITS must have one BIT for each "1" in THIS.
      */
@@ -467,7 +326,7 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
     {
         if (nSegs > 0)
         {
-            assert(segm.lPosition > container[nSegs-1].lPosition + container[nSegs-1].length &&
+            assert(segm.lPosition >= container[nSegs-1].lPosition + container[nSegs-1].length &&
                    segm.pPosition >= container[nSegs-1].pPosition + container[nSegs-1].length);
         }
 
@@ -559,11 +418,6 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
     RLEEmptyBitmap(char* data, size_t numBits);
 
     /**
-     * Constructor for initializing Bitmap with specified ranges
-     */
-    RLEEmptyBitmap(Coordinates const& chunkSize, Coordinates const& origin, Coordinates const& first, Coordinates const& last);
-
-    /**
      * Constructor for initializing Bitmap from specified chunk
      */
     RLEEmptyBitmap(ConstChunk const& chunk);
@@ -571,8 +425,21 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
 
 class RLEPayload;
 
-//Payload that is constructed from memory allocated elsewhere - not responsible for freeing memory.
-//Cannot add values
+/**
+  * class ConstRLEPayload
+  * This class allows to store values as stride-major-ordered array with RLE-pack of data.
+  * We have the "payload" array where we store values.
+  * "payload" array splited to separated parts, which name "segment"
+  * Every "segment" has description (struct Segment), all Segments stored to "container"
+  * Every Segment has following fields:
+  *  - pPosition - physical position (stride-major-order) of first value from segment
+  *  - valueIndex - byte number inside "payload" array where located data for this segment, or "missingReason" if segment absent (nulls, empty, etc)
+  *  - same - bit which describes, contain this segment equal values or different
+  *  - null - bit which desribes, what exactly represent valueIndex.
+  *
+  * NOTE: Payload that is constructed from memory allocated elsewhere - not responsible for freeing memory.
+  * NOTE: Cannot add values
+  */
 class ConstRLEPayload
 {
 friend class boost::serialization::access;
@@ -684,7 +551,7 @@ public:
      * Return pointer for raw data for non-nullable types
      */
     char* getRawValue(size_t index) const { 
-        return payload + index*(elemSize == 0 ? 4 : elemSize); 
+        return payload + index*(elemSize == 0 ? 4 : elemSize);
     }
 
     /**
@@ -707,10 +574,17 @@ public:
     }
 
     /**
-     * Get payload size
+     * Get payload size in bytes
      */
     size_t payloadSize() const { 
         return dataSize;
+    }
+
+    /**
+     * Get number of items in payload
+     */
+    size_t payloadCount() const {
+        return dataSize / (elemSize == 0 ? 4 : elemSize);
     }
 
     /**
@@ -743,7 +617,7 @@ public:
     void pack(char* dst) const;
 
     /**
-     * Get size needed to pack bitmap (used to dermine size of chunk)
+     * Get size needed to pack bitmap (used to determine size of chunk)
      */
     size_t packedSize() const;
 
@@ -907,6 +781,13 @@ public:
             return true;
         }
 
+        /**
+          * Should applied just for bool-typed RLE (bitmap tiles).
+          * Skip @param count positions in payload and return number of "1" values.
+          * Data Tile just store values without knownledge about physical positions inside tile, while a bitmap helps to understand where which value stay.
+          * It is important for skip data from data tile:
+          *   you call dataReader += bitmapReader.skip(physicalPositionsCount) and receive the consistent positions inside bitmapReader and dataReader.
+          */
         uint64_t skip(uint64_t count)
         {  
             uint64_t setBits = 0;
@@ -918,7 +799,7 @@ public:
                         setBits += _payload->checkBit(_cs->valueIndex) ? tail : 0;
                     }  else {
                         position_t beg = _cs->valueIndex + _currPpos - _cs->pPosition; 
-                        position_t end = _cs->pPosition + _cs->length();
+                        position_t end = _cs->valueIndex + _cs->length();
                         while (beg < end) { 
                             setBits += _payload->checkBit(beg++);
                         }
@@ -1026,7 +907,7 @@ class RLEPayload : public ConstRLEPayload
     }
 
     /**
-     * @return number of elemts
+     * @return number of elements
      */
     size_t getValuesCount() const  {
         if (isBoolean)
@@ -1126,6 +1007,15 @@ class RLEPayload : public ConstRLEPayload
     RLEPayload(ValueMap& vm, size_t nElems, size_t elemSize, Value const& defaultVal, bool isBoolean, bool subsequent);
 
     /**
+     * Constructor which is used to fill a non-emptyable RLE chunk with default values.
+     * @param[in]  defaultVal  the default value of the attribute
+     * @param[in]  logicalSize the number of logical cells in the chunk
+     * @param[in]  elemSize    fixed size of element (in bytes), 0 for varying size types
+     * @param[in]  isBoolean   whether the element is of boolean type
+     */
+    RLEPayload(Value const& defaultVal, size_t logicalSize, size_t elemSize, bool isBoolean);
+
+    /**
      * Constructor of RLE bitmap from dense non-nullable data
      */
     RLEPayload(char* rawData, size_t rawSize, size_t varOffs, size_t elemSize, size_t nElems, bool isBoolean);
@@ -1138,7 +1028,7 @@ class RLEPayload : public ConstRLEPayload
     //
     // Yet another appender: correct handling of boolean and varying size types
     //
-    class append_iterator
+    class append_iterator : boost::noncopyable
     {
         RLEPayload* result;
         std::vector<char> varPart;
@@ -1154,11 +1044,25 @@ class RLEPayload : public ConstRLEPayload
             return result;
         }
 
-        append_iterator(RLEPayload* dstPayload);
-        append_iterator(size_t bitSize);
+        explicit append_iterator(RLEPayload* dstPayload);
+        explicit append_iterator(size_t bitSize);
         void flush();
         void add(Value const& v, uint64_t count = 1);
-        uint64_t add(iterator& inputIterator, uint64_t limit);
+        /**
+         * add not more than @param limit values from @param inputIterator
+         * Flag @param setupPrevVal just a workaround for bug with mixed
+         * add(iterator&, limit) and add(Value const&) calls - after that payload
+         * can be broken.
+         * I did not fix bug directly according to potential performance regression
+         *
+         * @return count of added value from @param inputIterator
+         * please note - this method add just single segment from @param inputIterator.
+         * if your @param limit can be larger than segmentLength from @param inputIterator
+         * you should compare @return and @param limit, and repeat call with
+         * (@param limit = @param limit - @return)
+         * (if @param inputIterator still has values, of course).
+         */
+        uint64_t add(iterator& inputIterator, uint64_t limit, bool setupPrevVal = false);
         ~append_iterator();
     };
      

@@ -8,9 +8,9 @@ store(build(B,string(y+10)),B)
 --test
 --aql select * into C from A,B
 --aql update A set a = a + 10
---sleep 2
+
 --aql update B set a = a + '_'
---sleep 2
+
 --aql select * into D from B,A
 --aql select * into E from C cross join D
 

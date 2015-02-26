@@ -2,29 +2,65 @@ Query was executed successfully
 
 Query was executed successfully
 
-[("a"),("a"),("a")]
+{i} a
+{0} "a"
+{1} "a"
+{2} "a"
 
-[("a"),("b"),("a")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "a"
 
-[("a"),("b"),("c")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "c"
 
-[(0),(1),(2),(),(),(),(),(),(),()]
+{a} i
+{"a"} 0
+{"b"} 1
+{"c"} 2
 
-[("a"),("b"),("c")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "c"
 
-[("a"),("a"),("a")]
+{i} a
+{0} "a"
+{1} "a"
+{2} "a"
 
-[("a"),("b"),("a")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "a"
 
-[("a"),("b"),("c")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "c"
 
-[(0),(1),(2),(),(),(),(),(),(),()]
+{a} i
+{"a"} 0
+{"b"} 1
+{"c"} 2
 
-[(0),(1),(2),(),(),(),(),(),(),()]
+{a} i
+{"a"} 0
+{"b"} 1
+{"c"} 2
 
-[("a"),("b"),("c")]
+{no} value
+{0} "a"
+{1} "b"
+{2} "c"
 
-[("a"),("b"),("c")]
+{no} value
+{0} "a"
+{1} "b"
+{2} "c"
 
 [An error expected at this place for the query "select * from foo@4". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
 
@@ -34,21 +70,45 @@ Query was executed successfully
 
 [An error expected at this place for the query "select * from foo:i". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NO_MAPPING_ARRAY. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NO_MAPPING_ARRAY.]
 
-[("a"),("b"),("c")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "c"
 
-[("a"),("a"),("a")]
+{i} a
+{0} "a"
+{1} "a"
+{2} "a"
 
-[("a"),("b"),("a")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "a"
 
-[("a"),("b"),("c")]
+{i} a
+{0} "a"
+{1} "b"
+{2} "c"
 
-[(0),(1),(2),(),(),(),(),(),(),()]
+{a} i
+{"a"} 0
+{"b"} 1
+{"c"} 2
 
-[(0),(1),(2),(),(),(),(),(),(),()]
+{a} i
+{"a"} 0
+{"b"} 1
+{"c"} 2
 
-[("a"),("b"),("c")]
+{no} value
+{0} "a"
+{1} "b"
+{2} "c"
 
-[("a"),("b"),("c")]
+{no} value
+{0} "a"
+{1} "b"
+{2} "c"
 
 [An error expected at this place for the query "scan(foo@4)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
 

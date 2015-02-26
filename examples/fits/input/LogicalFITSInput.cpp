@@ -62,7 +62,8 @@ public:
             case 3:
                 res.push_back(PARAM_CONSTANT("uint64"));
                 break;
-            default:
+            case 0:
+            case 1:
                 assert(false);
         }
         return res;

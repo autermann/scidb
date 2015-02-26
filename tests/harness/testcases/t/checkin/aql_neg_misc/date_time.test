@@ -15,7 +15,7 @@ store(build(A,datetime('10/10/2010 01:12:21')),A)
 --error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND --aql="select a * a from A"
 --error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND --aql="select a / a from A"
 --error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND --aql="select a % a from A"
---error --code=scidb::SCIDB_SE_TYPE::SCIDB_LE_AGGREGATE_DOESNT_SUPPORT_TYPE "sum(A)"
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND "sum(A)"
 
 --error --code=scidb::SCIDB_SE_TYPE_CONVERSION::SCIDB_LE_INVALID_SPECIFIED_DATE "build(A,'2011-13-10')"
 --error --code=scidb::SCIDB_SE_TYPE_CONVERSION::SCIDB_LE_INVALID_SPECIFIED_DATE "build(A,'2011-10-32')"

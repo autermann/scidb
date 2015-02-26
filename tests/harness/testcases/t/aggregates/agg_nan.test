@@ -1,0 +1,54 @@
+--setup
+--start-query-logging
+# Ticket number : 1782
+# Tests to verify the correct handling of NaN & NA on 1D and 2D arrays
+
+
+create array foo<val:double> [x=0:4,5,0]
+load (foo, '../tests/harness/testcases/data/nan.txt')
+
+create array foo1<val:double> [x=0:4,5,0]
+load (foo1, '../tests/harness/testcases/data/nan1.txt')
+
+create array foo2<val:double> [x=0:4,5,0]
+load (foo2, '../tests/harness/testcases/data/nan2.txt')
+
+create array foo3<val:double null> [x=0:3,2,0 ,y=1:4,3,0]
+load (foo3, '../tests/harness/testcases/data/nanull2d.txt')
+
+
+
+--test
+min(foo)
+max(foo)
+min(foo1)
+max(foo1)
+aggregate(foo,min(val),max(val))
+aggregate(foo1,min(val),max(val))
+aggregate(foo2,min(val),max(val))
+
+aggregate(build(foo1,iif(x=0,na,x)), min(val),max(val),avg(val))
+aggregate(build(foo1,iif(x=2,na,x)), min(val),max(val),avg(val))
+aggregate(build(foo1,iif(x=1,na,x)), min(val),max(val),avg(val))
+
+--aql update foo2 set val= 1 where x=0
+aggregate(foo2, min(val),max(val),avg(val))
+load (foo2, '../tests/harness/testcases/data/nan2.txt')
+--aql update foo2 set val= 1 where x=3
+ aggregate(foo2, min(val),max(val),avg(val))
+--aql  update foo2 set val= 1/(1.0-1.0) where x=2
+aggregate(foo2, min(val),max(val),avg(val))
+
+sort(foo3,10)
+aggregate(foo3, min(val),max(val),avg(val))
+max(subarray(foo3,0,1,1,2))
+min(subarray(foo3,0,1,1,2))
+avg(subarray(foo3,0,1,1,2))
+
+
+--cleanup
+remove(foo)
+remove(foo1)
+remove(foo2)
+remove(foo3)
+--stop-query-logging

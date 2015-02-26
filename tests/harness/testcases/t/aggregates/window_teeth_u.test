@@ -6,8 +6,7 @@ load(teeth_u, '../tests/harness/testcases/data/teeth.txt')
 
 --test
 
-window(teeth_u,1,1,sum(val),avg(val),count(val),count(*))
-window(teeth_u,3,3,sum(val),avg(val),count(val),count(*),var(val))
+window(teeth_u,1,1,1,1,sum(val),avg(val),count(val),count(*),var(val))
 
 
 --cleanup

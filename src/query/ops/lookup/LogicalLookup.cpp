@@ -34,6 +34,37 @@ namespace scidb {
 
 using namespace std;
 
+/**
+ * @brief The operator: lookup().
+ *
+ * @par Synopsis:
+ *   lookup( coordArray, srcArray )
+ *
+ * @par Summary:
+ *   Retrieves the elements from srcArray, using coordinates stored in coordArray.
+ *
+ * @par Input:
+ *   - coordArray: coordDims will be used as the dims in the output array, coordAttrs define coordinates in srcArray.
+ *   - srcArray: srcDims and srcAttrs.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs: attributes are from srcArray.
+ *   <br> >
+ *   <br> [
+ *   <br>   coordDims: dimensions are from coordArray.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalLookup: public  LogicalOperator
 {
 public:

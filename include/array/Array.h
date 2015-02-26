@@ -33,6 +33,7 @@
 #define ARRAY_H_
 
 #include <boost/shared_ptr.hpp>
+#include <boost/noncopyable.hpp>
 #include "array/Metadata.h"
 #include "query/Aggregate.h"
 #include "query/TypeSystem.h"
@@ -295,7 +296,7 @@ class ConstChunkIterator : public ConstIterator
          * Intended tile mode
          */
         INTENDED_TILE_MODE = 1024
-     };
+    };
 
     /**
      * Get current iteration mode
@@ -365,7 +366,28 @@ class ConstChunkIterator : public ConstIterator
  */
 class ChunkIterator : public ConstChunkIterator
 {
+protected:
+    /**
+     * Exception-safety control flag. This is checked by the 
+     * RLEChunkIterator, MemChunkIterator and SparseChunkIterator during destruction.
+     * It is used to make sure unPin() is called upon destruction, unless flush() already executed.
+     * 
+     * It would be ideal to place the whole machinery into the superclass. However it's not
+     * possible because it's unsafe call subclass methods from the superclass destructor
+     * 
+     * Ergo, if you override the flush method, you need to pay careful attention to this flag.
+     *
+     * However the situation will improve because soon we WILL get rid of MemChunkIterator and
+     * SparseChunkIterator. Then, RLEChunkIterator will be the only class that needs an auto-flush
+     * mechanism and all will be contained in that class.
+     * --AP 9.4.2012
+     */
+    bool _needsFlush;
+
 public:
+    ChunkIterator(): _needsFlush(true)
+    {}
+
     /**
      * Update the current element value
      */
@@ -394,6 +416,23 @@ public:
 class ConstChunk : public SharedBuffer
 {
   public:
+    /**
+     * Check if this chunk may participate in a merge simply by bitwise or.
+     * Possible if: not sparse, not RLE, attr not nullable, type not variable size, and default value is zero.
+     */
+    virtual bool isPossibleToMergeByBitwiseOr() const {
+        if (isSparse() || isRLE()) {
+            return false;
+        }
+
+        AttributeDesc const& attr = getAttributeDesc();
+        if (attr.isNullable() || TypeLibrary::getType(attr.getType()).variableSize()) {
+            return false;
+        }
+
+        return attr.getDefaultValue().isZero();
+    }
+
     /**
      * Check if chunk contains plain data: non nullable, non-emptyable, non-sparse
      */
@@ -449,9 +488,8 @@ class ConstChunk : public SharedBuffer
     */
    size_t getNumberOfElements(bool withOverlap) const;
 
-    
     /**
-     * If chunk contains no hgaps in its data: has no overlaps and fully belongs to non-emptyable array.
+     * If chunk contains no gaps in its data: has no overlaps and fully belongs to non-emptyable array.
      */
    bool isSolid() const;
 
@@ -519,6 +557,41 @@ class Chunk : public ConstChunk
    }
 
  public:
+
+   /**
+    * Allocate and memcpy from a raw byte array.
+    */
+   virtual void allocateAndCopy(char const* input, size_t byteSize, bool isSparse, bool isRle, size_t count, boost::shared_ptr<Query>& query) {
+       assert(getData()==NULL);
+       assert(input!=NULL);
+
+       allocate(byteSize);
+       setSparse(isSparse);
+       setRLE(isRle);
+       setCount(count);
+       memcpy(getData(), input, byteSize);
+
+       write(query);
+   }
+
+   /**
+    * Merge by bitwise-or with a byte array.
+    */
+   virtual void mergeByBitwiseOr(char const* input, size_t byteSize, boost::shared_ptr<Query>& query) {
+       assert(isPossibleToMergeByBitwiseOr());
+
+       if (byteSize != getSize()) {
+           throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_MERGE_CHUNKS_WITH_VARYING_SIZE);
+       }
+       char* dst = static_cast<char*>(getData());
+       assert(dst!=NULL);
+       assert(input!=NULL);
+
+       bitwiseOpAndAssign<WrapperForOr<uint64_t>, WrapperForOr<char> >(dst, input, byteSize);
+
+       write(query);
+   }
+
    virtual bool isReadOnly() const {
       return false;
    }
@@ -555,9 +628,31 @@ class Chunk : public ConstChunk
 
    virtual void merge(ConstChunk const& with,
                       boost::shared_ptr<Query>& query);
+
+   /**
+    * Perform a generic aggregate-merge of this with another chunk.
+    * This is an older algorithm. Currently only used by aggregating redimension.
+    * @param[in] with chunk to merge with. Must be filled out by an aggregating op.
+    * @param[in] aggregate the aggregate to use
+    * @param[in] query the query context
+    */
    virtual void aggregateMerge(ConstChunk const& with,
                                AggregatePtr const& aggregate,
                                boost::shared_ptr<Query>& query);
+
+   /** 
+    * Perform an aggregate-merge of this with another chunk.
+    * This function is optimized for current group-by aggregates, which 
+    * are liable to produce sparse chunks with many nulls. This method does NOT work
+    * if the intermediate aggregating array is emptyable (which is what redimension uses).
+    * @param[in] with chunk to merge with. Must be filled out by an aggregating op.
+    * @param[in] aggregate the aggregate to use
+    * @param[in] query the query context
+    */ 
+   virtual void nonEmptyableAggregateMerge(ConstChunk const& with,
+                                   AggregatePtr const& aggregate,
+                                   boost::shared_ptr<Query>& query);
+
    virtual void write(boost::shared_ptr<Query>& query);
    virtual void truncate(Coordinate lastCoord);
    virtual void setCount(size_t count);
@@ -668,17 +763,46 @@ class Array:
 #endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_ACCEPT_PROTECTED_BASE_CLASSES
 {
 public:
+
+    /**
+     * An enum that defines three levels of Array read access policy - ranging from most restrictive to least restrictive.
+     */
+    enum Access
+    {
+        /**
+         * Most restrictive access policy wherein the array can only be iterated over one time.
+         * If you need to read multiple attributes, you need to read all of the attributes horizontally, at the same time.
+         * Imagine that reading the array is like scanning from a pipe - after a single scan, the data is no longer available.
+         * This is the only supported access mode for InputArray and MergeSortArray
+         */
+        SINGLE_PASS = 0,
+
+        /**
+         * A policy wherein the array can be iterated over several times, and various attributes can be scanned independently,
+         * but the ArrayIterator::setPosition() function is not supported.
+         * This is less restrictive than SINGLE_PASS.
+         * This is the least restrictive access mode fsupported by ConcatArray
+         */
+        MULTI_PASS  = 1,
+
+        /**
+         * A policy wherein the client of the array can use the full functionality of the API.
+         * This is the least restrictive access policy and it's supported by the vast majority of Array subtypes.
+         */
+        RANDOM      = 2
+    };
+
     virtual ~Array() {}
 
     /**
      * Get array name
      */
-        virtual std::string const& getName() const;
+    virtual std::string const& getName() const;
 
     /**
      * Get array identifier
      */
-        virtual ArrayID getHandle() const;
+    virtual ArrayID getHandle() const;
 
     virtual bool isRLE() const
     {
@@ -686,10 +810,43 @@ public:
     }
 
     /**
-     * Checks if array iterator supports random access
-     * @return true if array iterator implements setPosition method
+     * Determine if this array has an easily accessible list of chunk positions. In fact, a set of chunk positions can
+     * be generated from ANY array simply by iterating over all of the chunks once. However, this function will return true
+     * if retrieving the chunk positions is a separate routine that is more efficient than iterating over all chunks.
+     * All materialized arrays can and should implement this function.
+     * @return true if this array supports calling getChunkPositions(). false otherwise.
      */
-    virtual bool supportsRandomAccess() const;
+    virtual bool hasChunkPositions() const
+    {
+        return false;
+    }
+
+    /**
+     * Build and return a list of the chunk positions. Only callable if hasChunkPositions() returns true, throws otherwise.
+     * @return the sorted set of coordinates, containing the first coordinate of every chunk present in the array
+     */
+    virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const;
+
+    /**
+     * Determine if the array is materialized; which means all chunks are populated either memory or on disk, and available on request.
+     * This returns false by default as that is the case with all arrays. It returns true for MemArray, etc.
+     * @return true if this is materialized; false otherwise
+     */
+    virtual bool isMaterialized() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the least restrictive access mode that the array supports. The default for the abstract superclass is RANDOM
+     * as a matter of convenience, since the vast majority of our arrays support it. Subclasses that have access
+     * restrictions are responsible for overriding this appropriately.
+     * @return the least restrictive access mode
+     */
+    virtual Access getSupportedAccess() const
+    {
+        return RANDOM;
+    }
 
     /**
      * Extract subarray between specified coordinates in the buffer.
@@ -704,9 +861,12 @@ public:
 
     /**
      * Append data from the array
-     * @param input source array
+     * @param[in] input source array
+     * @param[in] vertical the traversal order of appending: if true - append all chunks for attribute 0, then attribute 1...
+     *            If false - append the first chunk for all attributes, then the second chunk...
+     * @param[out] newChunkCoordinates if set - the method shall insert the coordinates of all appended chunks into the set pointed to.
      */
-    virtual void append(boost::shared_ptr<Array> input, bool vertical = true);
+    virtual void append(boost::shared_ptr<Array>& input, bool const vertical = true,  std::set<Coordinates, CoordinatesLess>* newChunkCoordinates = NULL);
 
     /**
      * Get array descriptor
@@ -720,7 +880,7 @@ public:
      */
     virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attr);
 
-        /**
+    /**
      * Get read-only iterator
      * @param attr attribute ID
      * @return read-only iterator through chunks of spcified attribute
@@ -768,6 +928,43 @@ class PinBuffer {
         if (pinned) {
             buffer.unPin();
         }
+    }
+};
+
+
+/**
+ * Constructed around a chunk pointer to automatically unpin the chunk on destruction.
+ * May be initially constructed with NULL pointer, in which case the poiter may (or may not) be reset
+ * to a valid chunk pointer.
+ */
+class UnPinner : public boost::noncopyable
+{
+private:
+    Chunk* _buffer;
+
+public:
+    /**
+     * Create an unpinner.
+     * @param buffer the chunk pointer; can be NULL
+     */
+    UnPinner(Chunk* buffer) : _buffer(buffer)
+    {}
+
+    ~UnPinner()
+    {
+        if (_buffer)
+        {
+            _buffer->unPin();
+        }
+    }
+
+    /**
+     * Set or reset the unpinner pointer.
+     * @param buf the chunk pointer; can be NULL
+     */
+    void set(Chunk* buf)
+    {
+        _buffer = buf;
     }
 };
 

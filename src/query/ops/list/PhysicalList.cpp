@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalList.cpp
  *
  * @author knizhnik@garret.ru
  *
@@ -29,6 +29,7 @@
  */
 
 #include <string.h>
+#include <sstream>
 
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
@@ -37,6 +38,8 @@
 #include "query/UDT.h"
 #include "query/TypeSystem.h"
 #include "util/PluginManager.h"
+#include <smgr/io/Storage.h>
+#include "ListArrayBuilder.h"
 
 using namespace std;
 using namespace boost;
@@ -52,17 +55,9 @@ public:
     {
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    string getMainParameter() const
     {
-        return ArrayDistribution(psLocalInstance);
-    }
-
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
-    {
-        vector<string> list;
         string what;
-        bool showSystem = false;
         if (_parameters.size() >= 1)
         {
             what = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
@@ -70,6 +65,38 @@ public:
         else
         {
             what = "arrays";
+        }
+        return what;
+    }
+
+    bool coordinatorOnly() const
+    {
+        if(getMainParameter() == "chunk descriptors" || getMainParameter() == "chunk map")
+        {
+            return false;
+        }
+        return true;
+    }
+
+    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    {
+        if ( !coordinatorOnly() )
+        {
+            return ArrayDistribution(psUndefined);
+        }
+        return ArrayDistribution(psLocalInstance);
+    }
+
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    {
+        vector<string> list;
+        string what = getMainParameter();
+        bool showSystem = false;
+
+        if( coordinatorOnly() && query->getCoordinatorID() != COORDINATOR_INSTANCE )
+        {
+            return shared_ptr<Array> (new MemArray(_schema));
         }
 
         if (_parameters.size() == 2)
@@ -79,6 +106,13 @@ public:
 
         if (what == "aggregates") {
             AggregateLibrary::getInstance()->getAggregateNames(list);
+            vector< boost::shared_ptr<Tuple> > tuples(list.size());
+            for (size_t i = 0; i < tuples.size(); i++) {
+                Tuple& tuple = *new Tuple(1);
+                tuples[i] = boost::shared_ptr<Tuple>(&tuple);
+                tuple[0].setString(list[i].c_str());
+            }
+            return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
         } else if (what == "arrays") {
             SystemCatalog::getInstance()->getArrays(list);
             if (!showSystem)
@@ -96,7 +130,39 @@ public:
                     }
                 }
             }
-        } else if (what == "operators") { 
+            vector< boost::shared_ptr<Tuple> > tuples(list.size());
+            ArrayDesc desc;
+            stringstream ss;
+            for (size_t i = 0; i < tuples.size(); i++) {
+                Tuple& tuple = *new Tuple(4);
+                tuples[i] = boost::shared_ptr<Tuple>(&tuple);
+                tuple[0].setString(list[i].c_str());
+
+                bool available = true;
+                boost::shared_ptr<Exception> exception;
+                SystemCatalog::getInstance()->getArrayDesc(list[i], desc, false, exception);
+                if (exception.get())
+                {
+                    if (exception->getLongErrorCode() == SCIDB_LE_TYPE_NOT_REGISTERED)
+                    {
+                        available = false;
+                    }
+                    else
+                    {
+                        exception->raise();
+                    }
+                }
+
+                tuple[1].setInt64(desc.getId());
+
+                ss.str("");
+                printSchema(ss, desc);
+                tuple[2].setString(ss.str().c_str());
+
+                tuple[3].setBool(available);
+            }
+            return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
+        } else if (what == "operators") {
             OperatorLibrary::getInstance()->getLogicalNames(list);
             vector< boost::shared_ptr<Tuple> > tuples(list.size());
             for (size_t i = 0; i < tuples.size(); i++) {
@@ -177,33 +243,49 @@ public:
             return shared_ptr<Array>(new TupleArray(_schema, tuples));
          } else if (what == "queries") {
             vector<boost::shared_ptr<Tuple> > tuples;
-            ScopedMutexLock scope(Query::queriesMutex);
-            for (map<QueryID, shared_ptr<Query> >::const_iterator i = Query::getQueries().begin();
-                 i != Query::getQueries().end(); ++i)
-            {
-                const Query& query = *i->second;
-                Tuple& tuple = *new Tuple(6);
-                tuples.push_back(shared_ptr<Tuple>(&tuple));
-                tuple[0].setString(query.queryString.c_str());
-                tuple[1].setInt64(i->first);
-                tuple[2].setDateTime(query.getCreationTime());
-                tuple[3].setInt32(query.getErrorCode());
-                tuple[4].setString(query.getErrorDescription().c_str());
-                tuple[5].setBool(query.idle());
-            }
+
+            boost::function<void (const boost::shared_ptr<scidb::Query>&)> f;
+            // pre-allocate the tuples vector
+            tuples.reserve(scidb::Query::listQueries(f));
+
+            // populate the tuples vector
+            f = boost::bind(&PhysicalList::listQuery, &tuples, _1);
+            scidb::Query::listQueries(f);
+
             return shared_ptr<Array>(new TupleArray(_schema, tuples));
          } else if (what == "instances") {
            return listInstances(query);
-        } else {
+         } else if (what == "chunk descriptors") {
+             ListChunkDescriptorsArrayBuilder builder;
+             builder.initialize(query);
+             StorageManager::getInstance().listChunkDescriptors(builder);
+             return builder.getArray();
+         } else if (what == "chunk map") {
+             ListChunkMapArrayBuilder builder;
+             builder.initialize(query);
+             StorageManager::getInstance().listChunkMap(builder);
+             return builder.getArray();
+         } else {
            assert(0);
         }
-        vector< boost::shared_ptr<Tuple> > tuples(list.size());
-        for (size_t i = 0; i < tuples.size(); i++) { 
-            Tuple& tuple = *new Tuple(1);
-            tuples[i] = boost::shared_ptr<Tuple>(&tuple);
-            tuple[0].setData(list[i].c_str(), list[i].length() + 1);
-        } 
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
+
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "PhysicalList::execute";
+        return boost::shared_ptr<Array>();
+    }
+
+    static void listQuery(vector<boost::shared_ptr<Tuple> > *tuples,
+                          const boost::shared_ptr<Query>& q)
+    {
+        const Query& query = *q;
+        shared_ptr<Tuple> tuplePtr(new Tuple(6));
+        tuples->push_back(tuplePtr);
+        Tuple& tuple = *tuplePtr;
+        tuple[0].setString(query.queryString.c_str());
+        tuple[1].setInt64(query.getQueryID());
+        tuple[2].setDateTime(query.getCreationTime());
+        tuple[3].setInt32(query.getErrorCode());
+        tuple[4].setString(query.getErrorDescription().c_str());
+        tuple[5].setBool(query.idle());
     }
 
    boost::shared_ptr<Array> listInstances(const boost::shared_ptr<Query>& query)
@@ -219,7 +301,7 @@ public:
       for (Instances::const_iterator iter = instances.begin();
            iter != instances.end(); ++iter) {
 
-         shared_ptr<Tuple> tuplePtr(new Tuple(4));
+         shared_ptr<Tuple> tuplePtr(new Tuple(5));
          Tuple& tuple = *tuplePtr.get();
          tuples.push_back(tuplePtr);
 
@@ -247,6 +329,7 @@ public:
                                   % date.tm_sec));
             tuple[3].setString(out.c_str());
          }
+         tuple[4].setString(instanceDesc.getPath().c_str());
       }
       return shared_ptr<Array>(new TupleArray(_schema, tuples));
    }

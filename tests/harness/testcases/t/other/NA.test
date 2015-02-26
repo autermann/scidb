@@ -19,7 +19,7 @@ multiply(scale22,na22)
 multiply(na22,na22)
 
 # show that the NA can be saved dto an ascii file
-save(na22,'naSaved.txt', 'store')
+save(na22,'naSaved.txt', -1, 'store')
 
 # and show that NA can be loaded back from an ascii file
 load(na22loaded, 'naSaved.txt', -1)

@@ -1,0 +1,159 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>cross</refname>
+
+    <refpurpose>Produces a result array whose set of cells consists of every
+    possible combination of a cell from one source array and a cell from
+    another source array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>cross(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The cross operator calculates the full cross product of two arrays.
+    If the left array has m dimensions and the right array has n dimensions,
+    the result array will have m + n dimensions. If the left array has x
+    non-empty cells and the right array has y non-empty cells, the result
+    array will have x <symbol role="symbolfont">×</symbol> y non-empty
+    cells.</para>
+
+    <para>For example, consider a 2-dimensional array A with dimensions i, j,
+    and a 1-dimensional array B with dimension k. Within the result array
+    produced by cross(A,B), the cell at coordinate position {i, j, k} is the
+    concatenation of cell {i, j} of A with cell {k} of B.</para>
+
+    <para>If the two source arrays have a pair of like-named variables (i.e.,
+    attributes or dimensions), the result array will include one variable with
+    that name and another variable with that name plus the suffix "_2."</para>
+
+    <para>If a cell of one source array is empty, all associated cells in the
+    result array will be empty.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Examples</title>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, each of which includes only one attribute.</para>
+
+      <procedure>
+        <step>
+          <para>Show the first array:<para><programlisting>AFL% scan(letters);</programlisting><screen>{i} letter
+{0} "A"
+{1} "B"
+{2} "C"
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Show the second array:<para><programlisting>AFL% scan(numbers);</programlisting><screen>{i} number
+{0} 0
+{1} 1
+{2} 2
+{3} 3
+{4} 4
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product:<para><programlisting>AFL% cross(numbers,letters);  </programlisting><screen>[
+[(0,"A"),(0,"B"),(0,"C")],
+[(1,"A"),(1,"B"),(1,"C")],
+[(2,"A"),(2,"B"),(2,"C")],
+[(3,"A"),(3,"B"),(3,"C")],
+[(4,"A"),(4,"B"),(4,"C")]
+]</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, one of which has multiple attributes.</para>
+
+      <procedure>
+        <step>
+          <para>Show the first array:<para><programlisting>AFL% scan(lettersPlus);</programlisting><screen>{i} letter,type
+{0} "A","vowel"
+{1} "B","consonant"
+{2} "C","consonant"
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product with the array called
+          "numbers":<para><programlisting>AFL% cross(numbers,lettersPlus);  </programlisting><screen>[
+[(0,"A","vowel"),(0,"B","consonant"),(0,"C","consonant")],
+[(1,"A","vowel"),(1,"B","consonant"),(1,"C","consonant")],
+[(2,"A","vowel"),(2,"B","consonant"),(2,"C","consonant")],
+[(3,"A","vowel"),(3,"B","consonant"),(3,"C","consonant")],
+[(4,"A","vowel"),(4,"B","consonant"),(4,"C","consonant")]
+]</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, one of which includes some null-valued attributes.</para>
+
+      <procedure>
+        <step>
+          <para>Show the array containing some null values (where the even
+          numbers would be):<para><programlisting>AFL% scan(oddNumbers);</programlisting><screen>{i} number
+{0} null
+{1} 1
+{2} null
+{3} 3
+{4} null
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product with the letters
+          array:<para><programlisting>AFL% cross(oddNumbers,letters);  </programlisting><screen>[
+[(null,"A"),(null,"B"),(null,"C")],
+[(1,"A"),(1,"B"),(1,"C")],
+[(null,"A"),(null,"B"),(null,"C")],
+[(3,"A"),(3,"B"),(3,"C")],
+[(null,"A"),(null,"B"),(null,"C")]
+]</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, one of which includes some empty cells.</para>
+
+      <procedure>
+        <step>
+          <para>Show the array containing some empty cells (where the odd
+          numbers would be):<para><programlisting>AFL% scan(evenNumbers);</programlisting><screen>{i} number
+{0} 0
+{2} 2
+{4} 4
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product with the letters
+          array:<para><programlisting>AFL% cross(evenNumbers,letters);  </programlisting><screen>[
+[(0,"A"),(0,"B"),(0,"C")],
+[(),(),()],
+[(2,"A"),(2,"B"),(2,"C")],
+[(),(),()],
+[(4,"A"),(4,"B"),(4,"C")]
+]</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

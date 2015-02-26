@@ -36,6 +36,31 @@ using namespace std;
 
 namespace scidb {
 
+/**
+ * @brief The operator: remove().
+ *
+ * @par Synopsis:
+ *   remove( arrayToRemove )
+ *
+ * @par Summary:
+ *   Drops an array.
+ *
+ * @par Input:
+ *   - arrayToRemove: the array to drop.
+ *
+ * @par Output array:
+ *   NULL
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalRemove: public LogicalOperator
 {
 public:
@@ -44,28 +69,19 @@ public:
 	{
 		ADD_PARAM_IN_ARRAY_NAME()
 	    _properties.exclusive = true;
+		_properties.ddl = true;
 	}
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
 	{
         assert(schemas.size() == 0);
-        assert(_parameters.size() == 1);
-        assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-
-        const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-
-        //query->exclusiveLock(arrayName);
-
-        ArrayDesc desc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, desc);
-
-        return desc;
+        return ArrayDesc();
 	}
 
     void inferArrayAccess(boost::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
-        assert(_parameters.size() > 0);
+        assert(_parameters.size() == 1);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
         const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         assert(arrayName.find('@') == std::string::npos);

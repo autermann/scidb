@@ -24,6 +24,8 @@ add_subdirectory("data_gen")
 add_subdirectory("harness")
 add_subdirectory("unit")
 add_subdirectory("benchmarks")
+add_subdirectory("utils")
+add_subdirectory("mu")
 #
 #  PGB: Adding this to help me to build a couple of fast and dirty examples
 #       of how things like the UDF SDK would work.

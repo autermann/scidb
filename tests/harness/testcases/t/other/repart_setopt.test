@@ -1,0 +1,13 @@
+--test
+--start-query-logging
+--set-format lcsv+
+project(filter(setopt('repart-algorithm', 'auto'), No = 0), new)
+project(filter(setopt('repart-algorithm', 'dense'), No = 0), new)
+project(filter(setopt('repart-algorithm', 'sparse'), No = 0), new)
+--error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ERROR_NEAR_CONFIG_OPTION "setopt('repart-algorithm', 'invalid')" 
+--reset-format
+--stop-query-logging
+
+--cleanup
+# TODO: return value which was before test
+

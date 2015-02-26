@@ -33,24 +33,49 @@
 
 namespace scidb {
 
-/***
- * Helper function to add empty tag attribute to the array
- * Constructs a new array descriptor with empty tag attribute
- ***/
-inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
-{
-    Attributes const& inputAttributes = desc.getAttributes();
-	Attributes newAttributes;
-    for (size_t i = 0, n = inputAttributes.size(); i < n; i++) { 
-        newAttributes.push_back(inputAttributes[i]);
-    }
-    if (desc.getEmptyBitmapAttribute() == NULL) { 
-        newAttributes.push_back(AttributeDesc((AttributeID)newAttributes.size(),
-                                             DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
-    }
-	return ArrayDesc(desc.getName(), newAttributes, desc.getDimensions());
-}
-
+/**
+ * @brief The operator: between().
+ *
+ * @par Synopsis:
+ *   between( srcArray {, lowCoord}+ {, highCoord}+ )
+ *
+ * @par Summary:
+ *   Produces a result array from a specified, contiguous region of a source array.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - the low coordinates
+ *   - the high coordinates
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - between(A, 2011, 1, 2012, 2) <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - Almost the same as subarray. The only difference is that the dimensions retain the original start/end/boundaries.
+ *
+ */
 class LogicalBetween: public  LogicalOperator
 {
   public:

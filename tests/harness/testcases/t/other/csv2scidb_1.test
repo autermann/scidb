@@ -7,6 +7,8 @@ CREATE EMPTY ARRAY Raw_CSVLoad_2 < tax_id : int32, gene_id : int64, go_id : stri
 
 CREATE EMPTY ARRAY Raw_CSVLoad_3 < Probe_ID : string, Platform_ID : string, Entrez_Gene_ID : int32, Symbol   : string, Synonyms : string, Description : string, TaxOn_ID : int32, Count_Gene  : int32, Count_RefSeq  : int32, Unique_to_Gene : bool, Unique_to_Genome : bool, Unique_to_RefSeq : bool > [ Line=0:*,10,0]
 
+CREATE ARRAY Raw_CSVLoad_4 < Probe_ID : string, Platform_ID : string, Entrez_Gene_ID : int32, Symbol   : string, Synonyms : string, Description : string, TaxOn_ID : int32, Count_Gene  : int32, Count_RefSeq  : int32, Unique_to_Gene : bool, Unique_to_Genome : bool, Unique_to_RefSeq : bool > [ Line ]
+
 --test
 
 echo ('cat ./testcases/data/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load ' )
@@ -27,6 +29,18 @@ echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 -p SSNSSSN
 
 load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )
 
+# without chunk size specified... see #1560
+echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 -p SSNSSSNNNSSS > /tmp/csv2scidb_test_4.load')
+
+--shell --command " cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 -p SSNSSSNNNSSS > /tmp/csv2scidb_test_4.load "
+--start-igdata
+load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load' )
+--stop-igdata
+
+subarray (Raw_CSVLoad_4, 0,100)
+
+show ( Raw_CSVLoad_4 )
+
 --cleanup
 
 remove ( Raw_CSVLoad_1 )
@@ -35,8 +49,11 @@ remove ( Raw_CSVLoad_2 )
 
 remove ( Raw_CSVLoad_3 )
 
+remove ( Raw_CSVLoad_4 )
+
 --shell --command " rm -rf /tmp/csv2scidb_test_1.load " --store 
 --shell --command " rm -rf /tmp/csv2scidb_test_2.load " --store
 --shell --command " rm -rf /tmp/csv2scidb_test_3.load " --store
+--shell --command " rm -rf /tmp/csv2scidb_test_4.load " --store
 
 --stop-query-logging

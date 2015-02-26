@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>sample</refname>
+
+    <refpurpose>Produces a result array by selecting random chunks of a source
+    array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>sample(<replaceable>array</replaceable>,<replaceable>probability</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The sample operator selects chunks from an array at random, subject
+    to a probability you supply.</para>
+
+    <para>You can use the sample operator in the FROM clause of an AQL SELECT
+    statement, as a stand-alone operator in a AFL statement, or as an operand
+    within other SciDB operators.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example selects random chunks from a 1-dimensional 3-chunk
+      array.</para>
+
+      <procedure>
+        <step>
+          <para>Create a 1-dimensional array with dimension size of 6 and
+          chunk size of 2:
+<programlisting language='test'>
+--afl CREATE ARRAY vector1&lt;val:double&gt;[i=0:5,2,0]; --show-query=yes --show-output=no
+</programlisting>
+	  </para>
+        </step>
+
+        <step>
+          <para>Put values of 0–5 into vector1:
+<programlisting language='test'>
+--afl store(build(vector1,i),vector1); --show-query=yes --show-output=yes
+</programlisting>
+	  </para>
+        </step>
+
+        <step>
+          <para>Sample chunks from the array with the probability of .30 that
+          a chunk is included:
+<programlisting language='test'>
+--afl sample(vector1,.3); --show-query=yes --show-output=yes --show-output-in-test-file=no
+</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

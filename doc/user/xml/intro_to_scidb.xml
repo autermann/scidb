@@ -1,247 +1,495 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!-- This document was created with Syntext Serna Free. -->
-<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
 <chapter id="ch01" remap="h1">
-  <title>Introduction to SciDB
-  </title>
-  <para>SciDB is an all-in-one data management and advanced analytics platform. It provides massively scalable complex analytics inside a next-generation database with data versioning to support the needs of commercial and scientific applications. SciDB is an open source software platform that runs on a grid of commodity hardware or in a cloud.</para>
-  <para>Paradigm4 Enterprise SciDB with Paradigm4 Extensions is an enterprise distribution of SciDB with additional linear algebra operations, high availability options, and client connector features.</para>
-  <para> Unlike conventional relational databases designed around a row or column-oriented table data model, SciDB is an array database. The native array data model provides compact data storage and high performance operations on ordered data such as spatial (location-based) data, temporal (time series) data, and matrix-based data for linear algebra operations.</para>
-  <para> This document is a User&apos;s Guide, written for scientists and developers in various application areas who want to use SciDB as their scalable data management and analytic platform.</para>
-  <para> This chapter introduces the key technical concepts in SciDB&mdash;its array data model, basic system architecture including distributed data management, salient features of the local storage manager, and the system catalog. It also provides an introduction to SciDB&apos;s array languages—Array Query Language (AQL) and Array Functional Language (AFL)—and an overview of transactions in SciDB.</para>
+  <title>Introduction to SciDB</title>
+
+  <para>SciDB is an all-in-one data management and advanced analytics
+  platform. It provides massively scalable complex analytics inside a
+  next-generation database with data versioning to support the needs of
+  commercial and scientific applications. SciDB is an open source software
+  platform that runs on a grid of commodity hardware or in a cloud.</para>
+
+  <para>Paradigm4 Enterprise SciDB with Paradigm4 Extensions is an enterprise
+  distribution of SciDB with additional linear algebra operations, timeseries
+  processing, high availability options, and client connector features.</para>
+
+  <para>Unlike conventional relational databases designed around a row or
+  column-oriented table data model, SciDB is an array database. The native
+  array data model provides compact data storage and high performance
+  operations on ordered data such as spatial (location-based) data, temporal
+  (time series) data, and matrix-based data for linear algebra
+  operations.</para>
+
+  <para>This document is a User's Guide, written for scientists and developers
+  in various application areas who want to use SciDB as their scalable data
+  management and analytic platform.</para>
+
+  <para>This chapter introduces the key technical concepts in SciDB—its array
+  data model, basic system architecture including distributed data management,
+  salient features of the local storage manager, and the system catalog. It
+  also provides an introduction to SciDB's array languages—Array Query
+  Language (AQL) and Array Functional Language (AFL)—and an overview of
+  transactions in SciDB.</para>
+
   <sect1 remap="h2" xreflabel="array_data_model" xml:id="ArrayDataModel">
     <title>Array Data Model</title>
-    <para>SciDB uses multidimensional arrays as its basic storage and processing unit. A user creates a SciDB array by specifying<emphasis> dimensions</emphasis> and<emphasis> attributes</emphasis> of the array.</para>
-    <para><emphasis role="bold"> Dimensions</emphasis></para>
-    <para>An n-dimensional SciDB array has dimensions <emphasis>d1</emphasis>, <emphasis>d2</emphasis>, ..., <emphasis>dn</emphasis>. The <emphasis>size</emphasis> of the dimension is the number of ordered values in that dimension. For example, a 2-dimensional array may have dimensions <emphasis>i</emphasis> and <emphasis>j</emphasis>, each with values (1, 2, 3, ..., 10) and (1, 2, ..., 30) respectively.</para>
-    <para>Basic array dimensions are 64-bit integers. SciDB also supports arrays with one or more noninteger dimensions, such as variable-length strings (<emphasis>alpha</emphasis>,<emphasis> beta</emphasis>,<emphasis> gamma</emphasis>, ...) or floating-point values (1.2, 2.76, 4.3, ...).</para>
-    <para>When the total number of values or cardinality of a dimension is known in advance, the SciDB array can be declared with a<emphasis> bounded</emphasis> dimension. However, in many cases, the cardinality of the dimension may not be known at array creation time. In such cases, the SciDB array can be declared with an<emphasis> unbounded</emphasis> dimension.</para>
-    <para><emphasis role="bold">Attributes</emphasis></para>
-    <para>Each combination of dimension values identifies a cell or element of the array, which can hold multiple data values called attributes (<emphasis>a1</emphasis>, <emphasis>a2</emphasis>, ..., <emphasis>am</emphasis>). Each data value is referred to as an <emphasis>attribute</emphasis>, and belongs to one of the supported datatypes in SciDB.</para>
-    <para> At array creation time, the user must specify:</para>
+
+    <para>SciDB uses multidimensional arrays as its basic storage and
+    processing unit. A user creates a SciDB array by specifying<emphasis>
+    dimensions</emphasis> and<emphasis> attributes</emphasis> of the
+    array.</para>
+
+    <para>
+      <emphasis role="bold">Dimensions</emphasis>
+    </para>
+
+    <para>An n-dimensional SciDB array has dimensions <emphasis>d1</emphasis>,
+    <emphasis>d2</emphasis>, ..., <emphasis>dn</emphasis>. The
+    <emphasis>size</emphasis> of the dimension is the number of ordered values
+    in that dimension. For example, a 2-dimensional array may have dimensions
+    <emphasis>i</emphasis> and <emphasis>j</emphasis>, each with values (1, 2,
+    3, ..., 10) and (1, 2, ..., 30) respectively.</para>
+
+    <para>Basic array dimensions are 64-bit integers. SciDB also supports
+    arrays with one or more noninteger dimensions, such as variable-length
+    strings (<emphasis>alpha</emphasis>,<emphasis> beta</emphasis>,<emphasis>
+    gamma</emphasis>, ...) or floating-point values (1.2, 2.76, 4.3, ...).
+    Version 12.10 of SciDB and Paradigm4 support non-int64 dimensions only
+    partially.</para>
+
+    <para>When the total number of values or cardinality of a dimension is
+    known in advance, the SciDB array can be declared with a<emphasis>
+    bounded</emphasis> dimension. However, in many cases, the cardinality of
+    the dimension may not be known at array creation time. In such cases, the
+    SciDB array can be declared with an<emphasis> unbounded</emphasis>
+    dimension.</para>
+
+    <para>
+      <emphasis role="bold">Attributes</emphasis>
+    </para>
+
+    <para>Each combination of dimension values identifies a cell or element of
+    the array, which can hold multiple data values called attributes
+    (<emphasis>a1</emphasis>, <emphasis>a2</emphasis>, ...,
+    <emphasis>am</emphasis>). Each data value is referred to as an
+    <emphasis>attribute</emphasis>, and belongs to one of the supported
+    datatypes in SciDB.</para>
+
+    <para>At array creation time, the user must specify:</para>
+
     <itemizedlist>
       <listitem>
-        <para> An array name.</para>
+        <para>An array name.</para>
       </listitem>
+
       <listitem>
-        <para> Array dimensions. The name and size of each dimension must be declared.</para>
+        <para>Array dimensions. The name and size of each dimension must be
+        declared.</para>
       </listitem>
+
       <listitem>
-        <para> Array attributes of the array. The name and data type of the each attribute must be declared.</para>
+        <para>Array attributes of the array. The name and data type of the
+        each attribute must be declared.</para>
       </listitem>
     </itemizedlist>
-    <para>Once you have created a SciDB database and defined the arrays, you must prepare and load data into it. Loaded data is then available to be accessed and queried using SciDB&apos;s built-in analytics capabilities. </para>
+
+    <para>Once you have created a SciDB database and defined the arrays, you
+    must prepare and load data into it. Loaded data is then available to be
+    accessed and queried using SciDB's built-in analytics capabilities.</para>
   </sect1>
+
   <sect1 remap="h2" xml:id="BasicArchitecture">
     <title>Basic Architecture</title>
-    <para> SciDB uses a <emphasis> shared-nothing</emphasis> architecture which is shown in the illustration below.</para>
+
+    <para>SciDB uses a <emphasis> shared-nothing</emphasis> architecture which
+    is shown in the illustration below.</para>
+
     <informalfigure>
-      <graphic fileref="../graphics/scidb_arch.png" align="center" scale="40"/>
+      <graphic align="center" contentdepth="500" depth="300"
+               fileref="../graphics/scidb_arch.png" scale="80" valign="top"
+               width="400"/>
     </informalfigure>
-    <para>SciDB is deployed on a cluster of servers, each with processing, memory, and local storage, interconnected using a standard ethernet and TCP/IP network. Each physical server hosts a SciDB instance that is responsible for local storage and processing.</para>
-    <para>External applications, when they connect to a SciDB database, connect to one of the instances in the cluster. While all instances in the SciDB cluster participate in query execution and data storage, one server is the <emphasis>coordinator</emphasis> and orchestrates query execution and result fetching. It is the responsibility of the coordinator instance to mediate all communication between the SciDB external client and the entire SciDB database. The rest of the system instances are referred to as <emphasis>worker</emphasis> instances and work on behalf of the coordinator for query processing.</para>
-    <para>SciDB&apos;s scale-out architecture is ideally suited for hardware grids as well as clouds, where additional severs may be added to scale the total capacity.</para>
+
+    <para>SciDB is deployed on a cluster of servers, each with processing,
+    memory, and local storage, interconnected using a standard ethernet and
+    TCP/IP network. Each physical server hosts a SciDB instance that is
+    responsible for local storage and processing.</para>
+
+    <para>External applications, when they connect to a SciDB database,
+    connect to one of the instances in the cluster. While all instances in the
+    SciDB cluster participate in query execution and data storage, one server
+    is the <emphasis>coordinator</emphasis> and orchestrates query execution
+    and result fetching. It is the responsibility of the coordinator instance
+    to mediate all communication between the SciDB external client and the
+    entire SciDB database. The rest of the system instances are referred to as
+    <emphasis>worker</emphasis> instances and work on behalf of the
+    coordinator for query processing.</para>
+
+    <para>SciDB's scale-out architecture is ideally suited for hardware grids
+    as well as clouds, where additional severs may be added to scale the total
+    capacity.</para>
+
     <sect2 remap="h3" xml:id="ChunkingandScalability">
       <title>Chunking and Scalability</title>
-      <para>When data is loaded, it is partitioned and stored on each instance of the SciDB database. SciDB uses<emphasis> chunking</emphasis>, a partitioning technique for multidimensional arrays where each instance is responsible for storing and updating a subset of the array locally, and for executing queries that use the locally stored data. By distributing data uniformly across all instances, SciDB is able to deliver scalable performance on computationally or I/O intensive analytic operations on very large data sets.</para>
-      <para>The details of chunking are shown in this section. Remember that you do not need to manage chunk distribution beyond specifying chunk size.</para>
-      <para>Chunking is specified for each array as follows. Each dimension of an array is divided into chunks. For example, an array with dimensions <literal>i</literal> and <literal>j</literal>, where <literal>i</literal> is of length 10 and chunk size 5 and <literal>j</literal> is of length 30 and chunk size 10 would be chunked as follows:</para>
-      <graphic fileref="../graphics/chunked_dimensions.png" align="center" scale="70"/>
-      <para>Chunks are arranged in row-major order in this example, and stored within the cluster using a round-robin distribution as follows. Suppose a cluster has instances 1 through 4, the placement of data is shown below.</para>
-      <para> C<subscript>11</subscript> -&gt; server 1 </para>
-      <para> C<subscript>12</subscript> -&gt; server 2 </para>
-      <para> C<subscript>13</subscript> -&gt; server 3 </para>
-      <para> C<subscript>21</subscript> -&gt; server 4 </para>
-      <para> C<subscript>22</subscript> -&gt; server 1 </para>
-      <para> C<subscript>23</subscript> -&gt; server 2 </para>
-      <para> This scheme is generalized to arrays with more dimensions by arranging the chunks in left-to-right dimension order.</para>
+
+      <para>When data is loaded, it is partitioned and stored on each instance
+      of the SciDB database. SciDB uses<emphasis> chunking</emphasis>, a
+      partitioning technique for multidimensional arrays where each instance
+      is responsible for storing and updating a subset of the array locally,
+      and for executing queries that use the locally stored data. By
+      distributing data uniformly across all instances, SciDB is able to
+      deliver scalable performance on computationally or I/O intensive
+      analytic operations on very large data sets.</para>
+
+      <para>The details of chunking are shown in this section. Remember that
+      you do not need to manage chunk distribution beyond specifying chunk
+      size.</para>
+
+      <para>Chunking is specified for each array as follows. Each dimension of
+      an array is divided into chunks. For example, an array with dimensions
+      <literal>i</literal> and <literal>j</literal>, where
+      <literal>i</literal> is of length 10 and chunk size 5 and
+      <literal>j</literal> is of length 30 and chunk size 10 would be chunked
+      as follows:</para>
+
+      <graphic align="center" fileref="../graphics/chunked_dimensions.png"
+               scale="70"/>
+
+      <para>Chunks are stored allocated to instances of the SciDB cluster
+      according to a hash-based scheme.</para>
     </sect2>
+
     <sect2 remap="h3" xml:id="ChunkAdjacency">
       <title>Chunk Overlap</title>
-      <para> It is sometimes advantageous to have neighboring chunks of an array overlap with each other. Overlap is specified for each dimension of an array. For example, consider an array A as follows:<programlisting>A&lt;a: int32&gt;[i=1:10,5,1, j=1:30,10,5]</programlisting></para>
-      <para>Array A has has two dimensions, <literal>i</literal> and <literal>j</literal>. Dimension <literal>i</literal> is of length 10, chunk size 5, and had chunk overlap 1. Dimension <literal>j</literal> has length 30, chunk size 10, and chunk overlap 5. This overlap causes SciDB to store adjoining cells in each dimension from the <emphasis>overlap area</emphasis> in both chunks.</para>
+
+      <para>It is sometimes advantageous to have neighboring chunks of an
+      array overlap with each other. Overlap is specified for each dimension
+      of an array. For example, consider an array A as
+      follows:<programlisting>A&lt;a: int32&gt;[i=1:10,5,1, j=1:30,10,5]</programlisting></para>
+
+      <para>Array A has two dimensions, <literal>i</literal> and
+      <literal>j</literal>. Dimension <literal>i</literal> is of length 10,
+      chunk size 5, and had chunk overlap 1. Dimension <literal>j</literal>
+      has length 30, chunk size 10, and chunk overlap 5. This overlap causes
+      SciDB to store adjoining cells in each dimension from the
+      <emphasis>overlap area</emphasis> in both chunks.</para>
+
       <para>Some advantages of chunk overlap are:</para>
+
       <itemizedlist>
         <listitem>
-          <para> Speeding up nearest-neighbor queries, where each chunk may need access to a few elements from its neighboring chunks,</para>
+          <para>Speeding up nearest-neighbor queries, where each chunk may
+          need access to a few elements from its neighboring chunks,</para>
         </listitem>
+
         <listitem>
-          <para> Detecting data clusters or data features that straddle more than one chunk.</para>
+          <para>Detecting data clusters or data features that straddle more
+          than one chunk.</para>
         </listitem>
       </itemizedlist>
-      <para>SciDB supports operators that can be used to add or change the chunk overlap within an existing array.</para>
+
+      <para>SciDB supports operators that can be used to add or change the
+      chunk overlap within an existing array.</para>
     </sect2>
   </sect1>
+
   <sect1 remap="h2" xml:id="SciDBstoragemanagement">
     <title>SciDB Array Storage</title>
-    <para>SciDB arrays consist of array chunk storage and array metadata stored in the system catalog. When arrays are created, updated, or removed, they are done using transactions. Transactions span array storage and the system catalog and ensure consistency of the overall database as queries are executed.</para>
-    <para>The following sections  describe SciDB&apos;s instance storage, system catalog, and transaction model. </para>
+
+    <para>SciDB arrays consist of array chunk storage and array metadata
+    stored in the system catalog. When arrays are created, updated, or
+    removed, they are done using transactions. Transactions span array storage
+    and the system catalog and ensure consistency of the overall database as
+    queries are executed.</para>
+
+    <para>The following sections describe SciDB's instance storage, system
+    catalog, and transaction model.</para>
+
     <sect2 remap="h3" xml:id="StorageManagement">
       <title>Instance Storage</title>
+
       <variablelist>
         <varlistentry>
           <term>Vertical partitioning</term>
+
           <listitem>
-            <para>Each local SciDB instance  divides logical chunks of an array into per-attribute chunks, a technique referred to as <emphasis>vertical partitioning</emphasis>. All basic array processing steps&mdash;storage, query processing, and data transfer between instances&mdash;use single-attribute chunks. SciDB uses run-length encoding internally to compress
-      repeated values or commonly occurring patterns typical in
-      scientific applications. Frequently accessed chunks are maintained in an in-memory
-      cache and accelerate query processing by eliminating expensive
-      disk fetches for repeatedly accessed data.</para>
+            <para>Each local SciDB instance divides logical chunks of an array
+            into per-attribute chunks, a technique referred to as
+            <emphasis>vertical partitioning</emphasis>. All basic array
+            processing steps—storage, query processing, and data transfer
+            between instances—use single-attribute chunks. SciDB uses
+            run-length encoding internally to compress repeated values or
+            commonly occurring patterns typical in scientific applications.
+            Frequently accessed chunks are maintained in an in-memory cache
+            and accelerate query processing by eliminating expensive disk
+            fetches for repeatedly accessed data.</para>
           </listitem>
         </varlistentry>
+
         <varlistentry>
           <term>Storage of array versions</term>
+
           <listitem>
-            <para>SciDB uses a &quot;no overwrite&quot; storage model. No overwrite means that data is never overwritten; each query that stores or updates existing arrays writes a new full chunk or a new <emphasis>delta chunk</emphasis>. Delta chunks are calculated by differencing the new version with the prior version and only storing the difference. The SciDB storage manager stores &quot;reverse&quot; deltas&mdash;this means that the most recent version is maintained as a full chunk, and prior versions are maintained as a list or chain of reverse deltas. The delta chain is stored in the &quot;reserve&quot; portion of each chunk, an additional area over and above the total size of the chunk. If the reserve area for the chunk fills up, a new chunk is allocated within the same segment or a new segment and linked into the delta chain.</para>
+            <para>SciDB uses a "no overwrite" storage model. No overwrite
+            means that data is never overwritten; each query that stores or
+            updates existing arrays writes a new full chunk or a new
+            <emphasis>delta chunk</emphasis>. Delta chunks are calculated by
+            differencing the new version with the prior version and only
+            storing the difference. The SciDB storage manager stores "reverse"
+            deltas—this means that the most recent version is maintained as a
+            full chunk, and prior versions are maintained as a list or chain
+            of reverse deltas. The delta chain is stored in the "reserve"
+            portion of each chunk, an additional area over and above the total
+            size of the chunk. If the reserve area for the chunk fills up, a
+            new chunk is allocated within the same segment or a new segment
+            and linked into the delta chain.</para>
           </listitem>
         </varlistentry>
+
         <varlistentry>
           <term>Storage segments</term>
+
           <listitem>
-            <para>The local storage manager manages space allocation, placement, and reclamation within the local storage manager using <emphasis>segments</emphasis>. A storage segment is a contiguous portion of the storage file reserved for successive chunks of the same array. This is designed to optimize queries issued on a very large array to use sequential disk I/O and hence maximize the rate of data transfer during a query.</para>
-            <para>Segments also serve as the unit of storage reclaim, so that as array chunks are created, written, and ultimately removed, a segment is reclaimed and reallocated for new chunks or arrays once all its member chunks have been removed. This allows for reuse of storage space.</para>
+            <para>The local storage manager manages space allocation,
+            placement, and reclamation within the local storage manager using
+            <emphasis>segments</emphasis>. A storage segment is a contiguous
+            portion of the storage file reserved for successive chunks of the
+            same array. This is designed to optimize queries issued on a very
+            large array to use sequential disk I/O and hence maximize the rate
+            of data transfer during a query.</para>
+
+            <para>Segments also serve as the unit of storage reclaim, so that
+            as array chunks are created, written, and ultimately removed, a
+            segment is reclaimed and reallocated for new chunks or arrays once
+            all its member chunks have been removed. This allows for reuse of
+            storage space.</para>
           </listitem>
         </varlistentry>
+
         <varlistentry>
           <term>Transient storage</term>
+
           <listitem>
-            <para>SciDB  uses temporary data files or &quot;scratch space&quot;  during query execution. This is specified during initialization and start-up as the <literal>tmp-path</literal> configuration setting. Temporary files are managed using the operating system&apos;s <emphasis>tempfile</emphasis> mechanism. Data written to tempfile only last for the lifetime of a query. They are removed upon successful completion or abort of the query.</para>
+            <para>SciDB uses temporary data files or "scratch space" during
+            query execution. This is specified during initialization and
+            start-up as the <literal>tmp-path</literal> configuration setting.
+            Temporary files are managed using the operating system's
+            <emphasis>tempfile</emphasis> mechanism. Data written to tempfile
+            only last for the lifetime of a query. They are removed upon
+            successful completion or abort of the query.</para>
           </listitem>
         </varlistentry>
       </variablelist>
     </sect2>
+
     <sect2 remap="h3" xml:id="LocalStorage">
       <title>SciDB System Catalog</title>
-      <para>SciDB relies on a system catalog that is a repository of
-the following information:<itemizedlist>
+
+      <para>SciDB relies on a system catalog that is a repository of the
+      following information:<itemizedlist>
           <listitem>
-            <para>Configuration and status information about the SciDB cluster,</para>
+            <para>Configuration and status information about the SciDB
+            cluster,</para>
           </listitem>
+
           <listitem>
-            <para>Array-related metadata such as array definitions, array versions,
-   and associations between arrays and other related objects,</para>
+            <para>Array-related metadata such as array definitions, array
+            versions, and associations between arrays and other related
+            objects,</para>
           </listitem>
+
           <listitem>
-            <para>Information about SciDB extensions, such as plug-in libraries
-   containing user-defined objects, which are described in the section &quot;Array Processing.&quot;</para>
+            <para>Information about SciDB extensions, such as plug-in
+            libraries containing user-defined objects, which are described in
+            the section "Array Processing."</para>
           </listitem>
         </itemizedlist></para>
+
       <para>The system catalog in current versions of SciDB is implemented as
-PostgresSQL tables. The tables are shared between all SciDB instances within the
-cluster.</para>
+      PostgresSQL tables. The tables are shared between all SciDB instances
+      within the cluster.</para>
     </sect2>
+
     <sect2 remap="h3" xml:id="transactions">
       <title>Transaction Model</title>
+
       <para>SciDB combines traditional ACID semantics with versioned, no
-      overwrite array storage. When using versioned arrays, write
-      transactions create new versions of the array&mdash;they do not
-      modify pre-existing versions of the array. </para>
+      overwrite array storage. When using versioned arrays, write transactions
+      create new versions of the array—they do not modify pre-existing
+      versions of the array.</para>
+
       <para>The scope of a transaction in SciDB is a single statement. Each
-      statement involves many operations
-      on one or more arrays. Ultimately, the transaction stores the result into a
-      destination array.</para>
-      <para>SciDB implements array-level locking. Locks are acquired at
-      the beginning of a transaction and are used to protect arrays
-      during queries. Locks are released upon completion of the
-      query. If a query aborts, pending changes are undone at all
-      instances in the system catalog, and the database is returned
-      to a prior consistent state. </para>
+      statement involves many operations on one or more arrays. Ultimately,
+      the transaction stores the result into a destination array.</para>
+
+      <para>SciDB implements array-level locking. Locks are acquired at the
+      beginning of a transaction and are used to protect arrays during
+      queries. Locks are released upon completion of the query. If a query
+      aborts, pending changes are undone at all instances in the system
+      catalog, and the database is returned to a prior consistent
+      state.</para>
     </sect2>
   </sect1>
+
   <sect1 remap="h2" xml:id="DatabaseConcepts">
     <title>Array Processing</title>
-    <para>SciDB&apos;s query languages provide the basic framework for scalable array processing.</para>
+
+    <para>SciDB's query languages provide the basic framework for scalable
+    array processing.</para>
+
     <sect2 remap="h3" xml:id="ArrayLanguages">
-      <title>Array Language</title>
-      <para> SciDB provides two query language interfaces.</para>
+      <title>Array Languages</title>
+
+      <para>SciDB provides two query language interfaces.</para>
+
       <itemizedlist>
         <listitem>
-          <para> AQL, the Array Query Language</para>
+          <para>AQL, the Array Query Language</para>
         </listitem>
+
         <listitem>
-          <para> AFL, the Array Functional Language</para>
+          <para>AFL, the Array Functional Language</para>
         </listitem>
       </itemizedlist>
-      <para> SciDB&apos;s Array Query Language (AQL) is a high-level declarative language for working with SciDB arrays. It is similar to the SQL language for relational databases, but uses an array-based data model and a more comprehensive analytical query set compared with standard relational databases.</para>
-      <para>AQL represents the full set of data management and analytic capabilities including data loading, data selection and projection, aggregation, and joins.</para>
-      <para> The AQL language includes two classes of queries:</para>
+
+      <para>SciDB's Array Query Language (AQL) is a high-level declarative
+      language for working with SciDB arrays. It is similar to the SQL
+      language for relational databases, but uses an array-based data model
+      and a more comprehensive analytical query set compared with standard
+      relational databases.</para>
+
+      <para>AQL represents the full set of data management and analytic
+      capabilities including data loading, data selection and projection,
+      aggregation, and joins.</para>
+
+      <para>The AQL language includes two classes of queries:</para>
+
       <itemizedlist>
         <listitem>
-          <para><emphasis role="bold">Data Definition Language</emphasis>  (DDL) : commands to define arrays and load data.</para>
+          <para><emphasis role="bold">Data Definition Language</emphasis>
+          (DDL) : commands to define arrays and load data.</para>
         </listitem>
+
         <listitem>
-          <para><emphasis role="bold">Data Manipulation Language</emphasis>  (DML) : commands to access and operate on array data.</para>
+          <para><emphasis role="bold">Data Manipulation Language</emphasis>
+          (DML) : commands to access and operate on array data.</para>
         </listitem>
       </itemizedlist>
-      <para>AQL  statements are handled by the SciDB query compiler which translates and optimizes incoming statements into an execution plan.</para>
-      <para>SciDB&apos;s Array Functional Language (AFL) is a functional language for working with SciDB arrays. AFL <emphasis>operators</emphasis> are used to compose queries or statements. </para>
+
+      <para>AQL statements are handled by the SciDB query compiler which
+      translates and optimizes incoming statements into an execution
+      plan.</para>
+
+      <para>SciDB's Array Functional Language (AFL) is a functional language
+      for working with SciDB arrays. AFL <emphasis>operators</emphasis> are
+      used to compose queries or statements.</para>
     </sect2>
+
     <sect2 remap="h3" xml:id="BuildingBlocks">
       <title>Query Building Blocks</title>
-      <para>There are four  building blocks that you use to control and access your data. These building blocks are:<variablelist>
+
+      <para>There are four building blocks that you use to control and access
+      your data. These building blocks are:<variablelist>
           <varlistentry>
             <term>
               <emphasis>Operators</emphasis>
             </term>
+
             <listitem>
-              <para>SciDB operators, such as join, take one or more SciDB arrays as input and return a SciDB array as output.</para>
+              <para>SciDB operators, such as join, take one or more SciDB
+              arrays as input and return a SciDB array as output.</para>
             </listitem>
           </varlistentry>
+
           <varlistentry>
             <term>
               <emphasis>Functions</emphasis>
             </term>
+
             <listitem>
-              <para>SciDB functions, such as sqrt, take scalar values from literals or SciDB arrays and return a scalar value.</para>
+              <para>SciDB functions, such as sqrt, take scalar values from
+              literals or SciDB arrays and return a scalar value.</para>
             </listitem>
           </varlistentry>
+
           <varlistentry>
             <term>
               <emphasis>Data types</emphasis>
             </term>
+
             <listitem>
-              <para>Data types define the classes of values that SciDB can store and perform operations on.</para>
+              <para>Data types define the classes of values that SciDB can
+              store and perform operations on.</para>
             </listitem>
           </varlistentry>
+
           <varlistentry>
             <term>
               <emphasis>Aggregates</emphasis>
             </term>
+
             <listitem>
-              <para>SciDB aggregates take an arbitrarily large set of values as input and return a scalar value.</para>
+              <para>SciDB aggregates take an arbitrarily large set of values
+              as input and return a scalar value.</para>
             </listitem>
           </varlistentry>
         </variablelist></para>
-      <para>Any of these building blocks can be user-defined, that is, users can write new operators, data types, functions, and aggregates.</para>
+
+      <para>Any of these building blocks can be user-defined, that is, users
+      can write new operators, data types, functions, and aggregates.</para>
     </sect2>
+
     <sect2 remap="h3" xml:id="ACIDandTransactions">
       <title>Pipelined Array Processing</title>
+
       <para>When a SciDB query is issued, it is setup as a pipeline of
-       operators. Operators are responsible for data processing and 
-       aggregation as well as intermediate data exchange and data
-       storage.</para>
+      operators. Operators are responsible for data processing and aggregation
+      as well as intermediate data exchange and data storage.</para>
+
       <para>Execution begins when the client issues a request to fetch a chunk
-       from the result array. Data is then scanned from array
-       storage on all instances and streamed into and out of each
-       operator one chunk at a time. This model of query execution is
-       sometimes referred to as <emphasis>pull-based</emphasis>
-       execution and the operators that use this model are
-       called <emphasis>streaming</emphasis> operators. Unless
-       required by the data processing algorithm, all SciDB operators
-       are streaming operators. Some operators implement algorithms
-       that require the entire array to be materialized in memory at
-       all instances at once. These are referred to
-       as <emphasis>materializing</emphasis> operators. </para>
+      from the result array. Data is then scanned from array storage on all
+      instances and streamed into and out of each operator one chunk at a
+      time. This model of query execution is sometimes referred to as
+      <emphasis>pull-based</emphasis> execution and the operators that use
+      this model are called <emphasis>streaming</emphasis> operators. Unless
+      required by the data processing algorithm, all SciDB operators are
+      streaming operators. Some operators implement algorithms that require
+      the entire array to be materialized in memory at all instances at once.
+      These are referred to as <emphasis>materializing</emphasis>
+      operators.</para>
     </sect2>
   </sect1>
+
   <sect1 remap="h2" xml:id="Clientsandconnectors">
     <title>Clients and Connectors</title>
-    <para>The SciDB software package that you downloaded contains a special command line utility called<emphasis> iquery</emphasis> which provides an interactive Linux shell and supports both AQL and AFL. For more information about iquery, see Getting Started With SciDB Development.</para>
-    <para>Client applications connect to SciDB using an appropriate connector package which implements the client-side of the SciDB client-server protocol. Once connected via the connector, the user may issue queries written in either AFL or AQL, and fetch the result of a query using an iterator interface.</para>
+
+    <para>The SciDB software package that you downloaded contains a special
+    command line utility called<emphasis> iquery</emphasis> which provides an
+    interactive Linux shell and supports both AQL and AFL. For more
+    information about iquery, see Getting Started With SciDB
+    Development.</para>
+
+    <para>Client applications connect to SciDB using an appropriate connector
+    package which implements the client-side of the SciDB client-server
+    protocol. Once connected via the connector, the user may issue queries
+    written in either AFL or AQL, and fetch the result of a query using an
+    iterator interface.</para>
   </sect1>
+
   <sect1 remap="h2" xml:id="ConventionsUsedinthisDocument">
-    <title>Conventions Used in this Document</title>
-    <para> Code to be typed in verbatim is shown in <literal>fixed-width font</literal>. Code that is to be replaced with an actual string is shown in<emphasis> italics</emphasis>. Optional arguments are shown in square brackets [].</para>
-<para>AQL commands are shown in <command><code>FIXED-WIDTH BOLD CAPS</code></command>. When necessary, a line of code may be preceded by the <code>AQL%</code> or <code>AFL%</code> prompt to show which language the query is issued from.</para>
+    <title>Conventions Used in This Document</title>
+
+    <para>Code to be typed in verbatim is shown in <literal>fixed-width
+    font</literal>. Code that is to be replaced with an actual string is shown
+    in<emphasis> italics</emphasis>. Optional arguments are shown in square
+    brackets [].</para>
+
+    <para>AQL commands are shown in <command>
+        <code>FIXED-WIDTH BOLD CAPS</code>
+      </command>. When necessary, a line of code may be preceded by the
+    <code>AQL%</code> or <code>AFL%</code> prompt to show which language the
+    query is issued from.</para>
   </sect1>
 </chapter>

@@ -1,0 +1,14 @@
+SCIDB QUERY : <../utils/killquery.sh -afl 2  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'>
+Attempting  to kill (-2) iquery command after 2 seconds...
+SUCCESS: kill returned code: 0
+
+SCIDB QUERY : <../utils/killquery.sh -afl 15 2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'>
+Attempting  to kill (-15) iquery command after 2 seconds...
+SUCCESS: kill returned code: 0
+
+SCIDB QUERY : <../utils/killquery.sh -afl 9  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)'>
+Attempting  to kill (-9) iquery command after 2 seconds...
+SUCCESS: kill returned code: 0
+
+[An error expected at this place for the query "remove(ABRTEST)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST long code = 20. Expected long code = 20.]
+

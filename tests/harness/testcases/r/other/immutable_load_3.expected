@@ -2,10 +2,10 @@ SCIDB QUERY : <create immutable empty array bounded <a:int64>[x=0:10,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(bounded,'../tests/harness/testcases/data/unbounded_empty.txt')>
-[An error expected at this place for the query "load(bounded,'../tests/harness/testcases/data/unbounded_empty.txt')". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED..]
+[An error expected at this place for the query "load(bounded,'../tests/harness/testcases/data/unbounded_empty.txt')". And it failed.]
 
 SCIDB QUERY : <scan(bounded)>
-[]
+{x} a
 
 Query was executed successfully
 

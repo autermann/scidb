@@ -100,6 +100,8 @@ struct _iqueryState
     bool verbose;
 
     bool ignoreErrors;
+
+    std::string format;
 } iqueryState;
 
 void saveHistory()
@@ -206,20 +208,11 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
         }
         else
         {
-            scidb::DBLoader dbSaver;
-
-            if (format == "lcsv+" || format == "lsparse")
-            {
-                dbSaver.saveWithLabels(*queryResult.array,
-                                       cfg->getOption<string>(CONFIG_RESULT_FILE),
-                                       format,
-                                       !iqueryState.firstSaving);
-            }
-            else
-            {
-                dbSaver.save(*queryResult.array, cfg->getOption<string>(CONFIG_RESULT_FILE),
-                             format, !iqueryState.firstSaving);
-            }
+            scidb::DBLoader::defaultPrecision = cfg->getOption<int>(CONFIG_PRECISION);
+            
+            scidb::DBLoader::save(*queryResult.array, cfg->getOption<string>(CONFIG_RESULT_FILE),
+                                  boost::shared_ptr<scidb::Query>(),
+                                  format, !iqueryState.firstSaving);
             iqueryState.firstSaving = false;
         }
 
@@ -254,10 +247,9 @@ void executeSciDBQuery(const string &queryString)
 {
     scidb::QueryResult queryResult;
     const scidb::SciDB& sciDB = scidb::getSciDB();
-    scidb::Config *cfg = scidb::Config::getInstance();
-    string const& format = cfg->getOption<string>(CONFIG_RESULT_FORMAT);
+    string const& format = iqueryState.format;
 
-    sciDB.prepareQuery(queryString, !iqueryState.aql, queryResult, iqueryState.connection);
+    sciDB.prepareQuery(queryString, !iqueryState.aql, "", queryResult, iqueryState.connection);
 
     iqueryState.currentQueryID = queryResult.queryID;
 
@@ -328,6 +320,7 @@ void executeCommandOrQuery(const string &query)
                         "set no timer   - Stop reporting query setup time" << endl <<
                         "set verbose    - Start reporting details from engine" << endl <<
                         "set no verbose - Stop reporting details from engine" << endl <<
+                        "set format auto|csv|dense|csv+|lcsv+|text|sparse|lsparse|store|text|opaque|dcsv - Switch output format." << endl <<
                         "quit or exit   - End iquery session" << endl;
                     break;
 
@@ -336,19 +329,20 @@ void executeCommandOrQuery(const string &query)
                         "Lang:    " << (iqueryState.aql ? "AQL" : "AFL") << endl <<
                         "Fetch:   " << (iqueryState.nofetch ? "NO" : "YES") << endl <<
                         "Timer:   " << (iqueryState.timer ? "YES" : "NO") << endl <<
-                        "Verbose: " << (iqueryState.verbose ? "YES" : "NO") << endl;
+                        "Verbose: " << (iqueryState.verbose ? "YES" : "NO") << endl <<
+                        "Format:  " << iqueryState.format << endl;
                     break;
 
                 case IqueryCmd::FETCH:
-                    iqueryState.nofetch = !((const SimpleIqueryCmd*)p.getResult())->getValue();
+                    iqueryState.nofetch = !((const IntIqueryCmd*)p.getResult())->getValue();
                     break;
 
                 case IqueryCmd::VERBOSE:
-                    iqueryState.verbose = ((const SimpleIqueryCmd*)p.getResult())->getValue();
+                    iqueryState.verbose = ((const IntIqueryCmd*)p.getResult())->getValue();
                     break;
 
                 case IqueryCmd::TIMER:
-                    iqueryState.timer = ((const SimpleIqueryCmd*)p.getResult())->getValue();
+                    iqueryState.timer = ((const IntIqueryCmd*)p.getResult())->getValue();
                     break;
 
                 case IqueryCmd::QUIT:
@@ -357,8 +351,27 @@ void executeCommandOrQuery(const string &query)
                     break;
 
                 case IqueryCmd::LANG:
-                    iqueryState.aql = (((const SimpleIqueryCmd*)p.getResult())->getValue() == 0) ? true : false;
+                    iqueryState.aql = (((const IntIqueryCmd*)p.getResult())->getValue() == 0) ? true : false;
                     break;
+
+                case IqueryCmd::FORMAT:
+                    iqueryState.format = ((const StrIqueryCmd*)p.getResult())->getValue();
+                    break;
+
+                case IqueryCmd::BINARY_FORMAT:
+                {
+                    string fmt = ((const StrIqueryCmd*)p.getResult())->getValue();
+                    boost::trim(fmt);
+                    if (fmt[0] != '(' || fmt[fmt.size() - 1] != ')')
+                    {
+                        cerr << "Binary format template should be surrounded by parentheses" << endl;
+                    }
+                    else
+                    {
+                        iqueryState.format = fmt;
+                    }
+                    break;
+                }
 
                 default:
                     assert(0);
@@ -463,6 +476,8 @@ int main(int argc, char* argv[])
         scidb::Config *cfg = scidb::Config::getInstance();
 
         cfg->addOption
+            (CONFIG_PRECISION, 'w', "precision", "PRECISION", "", scidb::Config::INTEGER,
+                "Precision for printing floating point numbers. Default is 6", 6, false)
             (CONFIG_HOST, 'c', "host", "host", "IQUERY_HOST", scidb::Config::STRING,
                 "Host of one of the cluster instances. Default is 'localhost'", string("localhost"), false)
             (CONFIG_PORT, 'p', "port", "port", "IQUERY_PORT", scidb::Config::INTEGER,
@@ -482,7 +497,7 @@ int main(int argc, char* argv[])
             (CONFIG_NO_FETCH, 'n', "no-fetch", "", "", scidb::Config::BOOLEAN,
                 "Skip data fetching. Disabled by default'", false, false)
             (CONFIG_RESULT_FORMAT, 'o', "format", "format", "", scidb::Config::STRING,
-                "Output format: auto, csv, csv+, lcsv+, sparse, lsparse. Default is 'auto'.", string("auto"), false)
+                "Output format: auto, csv, dense, csv+, lcsv+, text, sparse, lsparse, store, text, opaque, dcsv. Default is 'auto'.", string("auto"), false)
             (CONFIG_PLUGINS_DIRECTORY, 'u', "plugins", "plugins", "", scidb::Config::STRING,
                 "Path to the plugins directory",
                 string(scidb::SCIDB_INSTALL_PREFIX()) + string("/lib/scidb/plugins"),
@@ -511,6 +526,7 @@ int main(int argc, char* argv[])
         iqueryState.nofetch = cfg->getOption<bool>(CONFIG_NO_FETCH);
         iqueryState.timer = cfg->getOption<bool>(CONFIG_TIMER);
         iqueryState.ignoreErrors = cfg->getOption<bool>(CONFIG_IGNORE_ERRORS);
+        iqueryState.format = cfg->getOption<string>(CONFIG_RESULT_FORMAT);
 
         if (!queryString.empty())
         {
@@ -596,6 +612,7 @@ int main(int argc, char* argv[])
     		// Parsing next line of query(ies)
     		char currC = 0;     // Character in current position
     		char prevC = 0; // Character in previous position
+    		bool eoq = false;
     		for (size_t pos = 0; pos < queries.size(); ++pos)
     		{
     			prevC = currC;
@@ -630,7 +647,7 @@ int main(int argc, char* argv[])
     			{
     				executeCommandOrQuery(query);
     				query = "";
-
+    				eoq = true;
     				++iqueryState.col;
     			}
     			// All other just added to query
@@ -641,6 +658,9 @@ int main(int argc, char* argv[])
     			}
     		}
     		
+    		if (eoq)
+    		    boost::trim_left(query);
+
     		// Adding last part of query to history 
     		if (iqueryState.interactive)
     			add_history(queries.c_str());

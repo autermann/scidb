@@ -1,0 +1,81 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+--aql create array ddFlat <patientID:int64,elapsedTime:int64,pulse:int64,ppm:int64> [csvRow=0:1000,1000,0]  
+--shell  --command="csv2scidb -s 1 -p NNNN < ../examples/doseData.csv > ../examples/doseData.scidb "
+--stop-igdata
+--aql load ddFlat from '../examples/doseData.scidb'  
+--start-igdata
+--aql create array doseData <pulse:int64,ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0] 
+--stop-igdata
+redimension_store(ddFlat,doseData) 
+--start-igdata
+--aql create array ppmFunction <ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0,pulse=0:300,301,0] 
+--stop-igdata
+redimension_store(doseData,ppmFunction) 
+--start-igdata
+--aql create array pulseFunction <pulse:int64> [patientID=1:100,100,0, elapsedTime=0:999,1000,0, ppm=0:10000,10001,0] 
+--stop-igdata
+redimension_store(doseData,pulseFunction) 
+--start-igdata
+--aql create array nwFlat <event:string,year:int64,person:string,country:string,time:double> [csvRow=0:11,12,0] 
+--shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/nationWinners.csv > ../examples/nationWinners.scidb "
+--aql load nwFlat from '../examples/nationWinners.scidb'  
+--aql create array nationWinners <person:string,country:string,time:double> [event(string)=3,3,0,year=1996:2008,13,0]  
+--stop-igdata
+redimension_store(nwFlat,nationWinners) 
+--start-igdata
+--aql create array victoryCountPerCountryYear <victoryCount:uint64 null> [year=1996:2008,13,0,country(string)=300,300,0]  
+--stop-igdata
+redimension_store (nationWinners, victoryCountPerCountryYear, count(*) as victoryCount) 
+--start-igdata
+--aql create array vPer_CY_Synthetic <person:string,event:string,time:double> [country(string)=300,300,0,year=1996:2008,13,0,synD=1:6,6,0] 
+--stop-igdata
+redimension_store(nationWinners,vPer_CY_Synthetic) 
+--start-igdata
+--aql create array arbitraryWinner <person:string,event:string,time:double> [country(string)=300,300,0,year=1996:2008,13,0] 
+--stop-igdata
+redimension_store(nationWinners,arbitraryWinner) 
+scan(nationWinners) 
+--start-igdata
+--aql create array victoryCountPerCountry <victoryCount:uint64 null> [country(string)=300,300,0]  
+--stop-igdata
+redimension_store (nationWinners, victoryCountPerCountry, count(*) as victoryCount) 
+--start-igdata
+--aql create array vPer_C_Synthetic <person:string,event:string,time:double> [country(string)=300,300,0,synD=1:6,6,0] 
+--stop-igdata
+redimension_store(nationWinners,vPer_C_Synthetic) 
+--start-igdata
+--aql create array namesFlat < givenName:string, surname:string, a:int64, b:int64 null, c:int64, d:int64> [ csvRow=0:6,6,0 ] 
+--shell  --command="csv2scidb -s 1 -p SSNNNN < ../examples/namesData.csv > ../examples/namesData.scidb "
+--aql load namesFlat from '../examples/namesData.scidb'  
+--aql create array names <a:int64, b:int64 null, c:int64, d:int64> [givenName(string)=5,5,0,surname(string)=5,5,0] 
+--stop-igdata
+redimension_store(namesFlat,names) 
+--start-igdata
+--aql create array namesRedimensioned <b:int64 null, c:int64, avgD:double null> [surname(string)=5,5,0] 
+--stop-igdata
+redimension_store (names, namesRedimensioned, avg(d) as avgD) 
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(ddFlat)
+remove(doseData)
+remove(ppmFunction)
+remove(pulseFunction)
+remove(nwFlat)
+remove(nationWinners)
+remove(victoryCountPerCountryYear)
+remove(vPer_CY_Synthetic)
+remove(arbitraryWinner)
+remove(victoryCountPerCountry)
+remove(vPer_C_Synthetic)
+remove(namesFlat)
+remove(names)
+remove(namesRedimensioned)

@@ -20,17 +20,17 @@
 * END_COPYRIGHT
 */
 
-/*
- * PhysicalApply.cpp
+/**
+ * @file PhysicalRepart.cpp
  *
- *  Created on: Apr 20, 2010
- *      Author: Knizhnik
+ * @author Konstantin Knizhnik <knizhnik@garret.ru>
  */
 
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "RepartArray.h"
 #include "network/NetworkManager.h"
+#include "array/DelegateArray.h"
 
 
 using namespace std;
@@ -40,49 +40,146 @@ namespace scidb {
 
 class PhysicalRepart: public PhysicalOperator
 {
-public:
-        PhysicalRepart(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-            PhysicalOperator(logicalName, physicalName, parameters, schema)
-        {
+  private:
+    RepartAlgorithm _algorithm;
+    bool _denseOpenOnce;
+    uint64_t _sequenceScanThreshold;
+
+  public:
+    PhysicalRepart(std::string const& logicalName,
+                   std::string const& physicalName,
+                   Parameters const& parameters,
+                   ArrayDesc const & schema) :
+        PhysicalOperator(logicalName, physicalName, parameters, schema),
+        _algorithm(static_cast<RepartAlgorithm>(
+                       Config::getInstance()->
+                       getOption<int>(CONFIG_REPART_ALGORITHM))),
+        _denseOpenOnce(Config::getInstance()->
+                       getOption<bool>(CONFIG_REPART_DENSE_OPEN_ONCE)),
+        _sequenceScanThreshold(Config::getInstance()->
+                               getOption<int>(CONFIG_REPART_SEQ_SCAN_THRESHOLD))
+    {
+    }
+
+    virtual bool changesDistribution(
+            std::vector<ArrayDesc> const& sourceSchema) const
+    {
+        if (sourceSchema.size() != 1) {
+            throw SYSTEM_EXCEPTION(
+                        SCIDB_SE_OPERATOR,
+                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
+                    << getLogicalName();
         }
 
-    virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-    {
-        Dimensions dims = inputSchemas[0].getDimensions();
+        Dimensions const& source = sourceSchema[0].getDimensions();
+        Dimensions const& result = _schema.getDimensions();
 
-        for (size_t i = 0; i < dims.size(); i++)
+        for (size_t i = 0, count = source.size(); i < count; ++i)
         {
-            DimensionDesc dim = dims[i];
-            DimensionDesc newDim = _schema.getDimensions()[i];
+            uint32_t sourceInterval = source[i].getChunkInterval();
+            uint32_t resultInterval = result[i].getChunkInterval();
+            if (sourceInterval != resultInterval) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-            if (dim.getChunkInterval() != newDim.getChunkInterval() ||
-                dim.getChunkOverlap() != newDim.getChunkOverlap())
-            {
+    virtual bool outputFullChunks(
+            std::vector<ArrayDesc> const& sourceSchema) const
+    {
+        if (sourceSchema.size() != 1) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
+        Dimensions const& source = sourceSchema[0].getDimensions();
+        Dimensions const& result = _schema.getDimensions();
+
+        for (size_t i = 0, count = source.size(); i < count; ++i)
+        {
+            uint32_t sourceInterval = source[i].getChunkInterval();
+            uint32_t resultInterval = result[i].getChunkInterval();
+            if (sourceInterval < resultInterval) {
+                return false;
+            }
+            if (sourceInterval % resultInterval != 0) {
+                return false;
+            }
+            uint32_t sourceOverlap =  source[i].getChunkOverlap();
+            uint32_t resultOverlap =  result[i].getChunkOverlap();
+            if (sourceOverlap < resultOverlap) {
                 return false;
             }
         }
         return true;
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& sourceBoundaries,
+            std::vector<ArrayDesc> const& sourceSchema) const
     {
-        return inputBoundaries[0];
+        if (sourceBoundaries.size() != 1 ||
+                sourceSchema.size() != 1) {
+            throw SYSTEM_EXCEPTION(
+                        SCIDB_SE_OPERATOR,
+                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
+                    << getLogicalName();
+        }
+        return sourceBoundaries[0];
     }
 
-   /***
-    * Repart is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-    * that overrides the chunkiterator method.
-    */
-   boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
-   {
-      assert(inputArrays.size() == 1);
-      std::vector<ArrayDesc> inputSchemas(1);
-      inputSchemas[0] = inputArrays[0]->getArrayDesc();
-      return boost::shared_ptr<Array>(isChunkPreserving(inputSchemas) 
-                                      ? (Array*)new DelegateArray(_schema, inputArrays[0], true)
-                                      : (Array*)new RepartArray(_schema, inputArrays[0], query));
-   }
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const& sourceDistribution,
+            std::vector< ArrayDesc> const& sourceSchema) const
+    {
+        if (sourceDistribution.size() != 1 ||
+                sourceSchema.size() != 1) {
+            throw SYSTEM_EXCEPTION(
+                        SCIDB_SE_OPERATOR,
+                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
+                    << getLogicalName();
+        }
+        if (changesDistribution(sourceSchema)) {
+            return ArrayDistribution(psUndefined);
+        } else {
+            return sourceDistribution[0];
+        }
+    }
+    /**
+          * Repart is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+          * that overrides the chunkiterator method.
+          */
+    boost::shared_ptr<Array> execute(
+            std::vector< boost::shared_ptr<Array> >& sourceArray,
+            boost::shared_ptr<Query> query)
+    {
+        if (sourceArray.size() != 1) {
+            throw SYSTEM_EXCEPTION(
+                        SCIDB_SE_OPERATOR,
+                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
+                    << getLogicalName();
+        }
+
+        if (sourceArray[0]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR,
+                                   SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
+                    << getLogicalName();
+        }
+
+        std::vector<ArrayDesc> sourceSchema(1);
+        sourceSchema[0] = sourceArray[0]->getArrayDesc();
+        bool singleInstance = (false == (query->getInstancesCount() > 1));
+
+        return boost::shared_ptr<Array>(
+                    createRepartArray(_schema, sourceArray[0], query,
+                                      _algorithm,
+                                      _denseOpenOnce,
+                                      outputFullChunks(sourceSchema),
+                                      singleInstance,
+                                      _tileMode,
+                                      _sequenceScanThreshold));
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalRepart, "repart", "physicalRepart")

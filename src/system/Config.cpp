@@ -56,6 +56,21 @@ using namespace boost::algorithm;
 namespace scidb
 {
 
+const char* toString(RepartAlgorithm value)
+{
+    switch(value) {
+    case RepartAuto:
+        return "auto";
+    case RepartDense:
+        return "dense";
+    case RepartSparse:
+        return "sparse";
+    default:
+        SCIDB_ASSERT(false);
+        return NULL; // make gcc happy
+    }
+}
+
 static value_semantic* optTypeToValSem(Config::ConfigOptionType optionType);
 
 static void stringToVector(const string& str, vector<string>& strs);
@@ -84,6 +99,38 @@ Config::ConfigAddOption& Config::ConfigAddOption::operator()(
 	return *this;
 }
 
+Config::ConfigAddOption& Config::ConfigAddOption::operator()(
+        int32_t option,
+        char shortCmdLineArg,
+        const std::string &longCmdLineArg,
+        const std::string &configOption,
+        const std::string &envVariable,
+        const std::vector< std::string > &envDefinition,
+        const std::string &description,
+        const boost::any &value,
+        bool required)
+{
+    _owner->addOption(option, shortCmdLineArg, longCmdLineArg, configOption,
+            envVariable, envDefinition, description, value, required);
+    return *this;
+}
+
+void Config::ConfigOption::init(const boost::any &value)
+{
+    if (!value.empty())
+    {
+        setValue(value);
+    }
+    else
+    {
+        // If we not have default value but option not required, so
+        // throw exception here to avoid getting unsetted option in future.
+        //TODO: exception here?
+        if (!_required)
+            assert(0);
+    }
+}
+
 Config::ConfigOption::ConfigOption(
 		char shortCmdLineArg,
 		const std::string &longCmdLineArg,
@@ -102,18 +149,99 @@ Config::ConfigOption::ConfigOption(
 	_activated(false),
 	_description(description)
 {
-	if (!value.empty())
-	{
-		setValue(value);
-	}
-	else
-	{
-		// If we not have default value but option not required, so
-		// throw exception here to avoid getting unsetted option in future.
-		//TODO: exception here?
-		if (!required)
-			assert(0);
-	}
+    init(value);
+}
+
+Config::ConfigOption::ConfigOption(
+        char shortCmdLineArg,
+        const std::string &longCmdLineArg,
+        const std::string &configOption,
+        const std::string &envVariable,
+        const std::vector< std::string > &envDefinition,
+        const std::string &description,
+        const boost::any &value,
+        bool required) :
+    _short(shortCmdLineArg),
+    _long(longCmdLineArg),
+    _config(configOption),
+    _env(envVariable),
+    _type(Config::SET),
+    _set(envDefinition),
+    _required(required),
+    _activated(false),
+    _description(description)
+{
+    SCIDB_ASSERT(_set.empty() == false);
+    _description += " Possible values: [";
+    for (size_t i = 0, count = _set.size(); i < count; ++i) {
+        if (i != 0) {
+            _description += ",";
+        }
+        _description += _set[i];
+    }
+    _description += " ]";
+    init(value);
+}
+
+void Config::ConfigOption::setValue(const std::string& value)
+{
+    switch(_type) {
+    case STRING: {
+        _value = boost::any(value);
+        break;
+    }
+    case SET: {
+        int result = -1;
+        int position = 0;
+        BOOST_FOREACH(const std::string& element, _set) {
+            if (element == value) {
+                result = position;
+                break;
+            } else {
+                ++position;
+            }
+        }
+        if (result == -1) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION,
+                                   SCIDB_LE_ERROR_NEAR_CONFIG_OPTION)
+                    << (std::string("invalid value \"") + value + "\"")
+                    << getConfigName();
+        } else {
+            _value = boost::any(result);
+        }
+        break;
+    }
+    case INTEGER:
+    case REAL:
+    case BOOLEAN:
+    case STRING_LIST:
+    default:
+        SCIDB_ASSERT(false);
+    }
+}
+
+void Config::ConfigOption::setValue(const int& value)
+{
+    SCIDB_ASSERT(_type == INTEGER);
+    _value = boost::any(value);
+}
+
+void Config::ConfigOption::setValue(const double& value)
+{
+    SCIDB_ASSERT(_type == REAL);
+    _value = boost::any(value);
+}
+
+void Config::ConfigOption::setValue(const bool& value)
+{
+    SCIDB_ASSERT(_type == BOOLEAN);
+    _value = boost::any(value);
+}
+
+void Config::ConfigOption::setValue(const std::vector< std::string >& value)
+{
+    SCIDB_ASSERT(_type == STRING_LIST);
+    _value = boost::any(value);
 }
 
 void Config::ConfigOption::setValue(const boost::any &value)
@@ -122,27 +250,47 @@ void Config::ConfigOption::setValue(const boost::any &value)
 	// Exception will be thrown if value type in any not match specified.
 	switch(_type)
 	{
-		case STRING:
-			boost::any_cast<std::string>(value);
+        case SET:
+        case STRING:
+            setValue(boost::any_cast<std::string>(value));
 			break;
 		case INTEGER:
-			boost::any_cast<int>(value);
+            setValue(boost::any_cast<int>(value));
 			break;
 		case REAL:
-			boost::any_cast<double>(value);
+            setValue(boost::any_cast<double>(value));
 			break;
 		case BOOLEAN:
-			boost::any_cast<bool>(value);
+            setValue(boost::any_cast<bool>(value));
 			break;
 		case STRING_LIST:
-			boost::any_cast<vector<string> >(value);
+            setValue(boost::any_cast< std::vector< std::string > >(value));
 			break;
 		default:
 			//TODO: Throw scidb's exceptions here?
 			assert(false);
 	}
+}
 
-	_value = value;
+std::string Config::ConfigOption::getValueAsString() const
+{
+    switch (_type)
+    {
+    case Config::BOOLEAN:
+        return boost::lexical_cast<std::string>(boost::any_cast<bool>(_value));
+        break;
+    case Config::STRING:
+        return boost::any_cast<std::string>(_value);
+    case Config::SET:
+        return _set[boost::any_cast<int>(_value)];
+    case Config::INTEGER:
+        return boost::lexical_cast<std::string>(boost::any_cast<int>(_value));
+    case Config::REAL:
+        return boost::lexical_cast<std::string>(boost::any_cast<double>(_value));
+    default:
+        assert(0);
+    }
+    return "";
 }
 
 Config::ConfigAddOption Config::addOption(
@@ -161,10 +309,45 @@ Config::ConfigAddOption Config::addOption(
 
 	_longArgToOption[longCmdLineArg] = option;
 
-	_values[option] = new Config::ConfigOption(shortCmdLineArg,
-			longCmdLineArg, configOption, envVariable, type, description, value, required);
-
+    _values[option] = new Config::ConfigOption(
+                shortCmdLineArg,
+                longCmdLineArg,
+                configOption,
+                envVariable,
+                type,
+                description,
+                value,
+                required);
 	return ConfigAddOption(this);
+}
+
+Config::ConfigAddOption Config::addOption(
+        int32_t option,
+        char shortCmdLineArg,
+        const std::string &longCmdLineArg,
+        const std::string &configOption,
+        const std::string &envVariable,
+        const std::vector< std::string > &envDefinition,
+        const std::string &description,
+        const boost::any &value,
+        bool required)
+{
+    // For accessing command line arguments, long argument always must be defined
+    assert (!(shortCmdLineArg != 0 && longCmdLineArg == ""));
+
+    _longArgToOption[longCmdLineArg] = option;
+
+    _values[option] = new Config::ConfigOption(
+                shortCmdLineArg,
+                longCmdLineArg,
+                configOption,
+                envVariable,
+                envDefinition,
+                description,
+                envDefinition[boost::any_cast<int>(value)],
+                required);
+
+    return ConfigAddOption(this);
 }
 
 std::string Config::toString()
@@ -174,7 +357,7 @@ std::string Config::toString()
     {
         ConfigOption *opt = p.second;
         assert(opt);
-        ss << opt->_long << " : " << optionValueToString(opt) << endl;
+        ss << opt->getLongName() << " : " << opt->getValueAsString() << endl;
     }
     return ss.str();
 }
@@ -189,35 +372,36 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	BOOST_FOREACH(opt_pair p, _values)
 	{
 		ConfigOption *opt = p.second;
-		if (opt->_env != "")
+        if (opt->getEnvName() != "")
 		{
-			char *env = getenv(opt->_env.c_str());
+            char *env = getenv(opt->getEnvName().c_str());
 			if (env != NULL)
 			{
-				switch (opt->_type)
+                switch (opt->getType())
 				{
 					case Config::BOOLEAN:
-						opt->_value = lexical_cast<bool>(env);
+                        opt->setValue(lexical_cast<bool>(env));
 						break;
 					case Config::STRING:
-						opt->_value = lexical_cast<string>(env);
+                    case Config::SET:
+                        opt->setValue(lexical_cast<string>(env));
 						break;
 					case Config::INTEGER:
-						opt->_value = lexical_cast<int>(env);
+                        opt->setValue(lexical_cast<int>(env));
 						break;
 					case Config::REAL:
-						opt->_value = lexical_cast<double>(env);
+                        opt->setValue(lexical_cast<double>(env));
 						break;
 					case Config::STRING_LIST:
 					{
 						vector<string> strs;
 						stringToVector(env, strs);
-						opt->_value = strs;
+                        opt->setValue(strs);
 						break;
 					}
 				}
 				
-				opt->_activated = true;
+                opt->setActivated();
 
 				BOOST_FOREACH(void (*hook)(int32_t), _hooks)
 				{
@@ -237,34 +421,41 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	{
 		ConfigOption *opt = p.second;
 
-		if (opt->_long != "")
+        if (opt->getLongName() != "")
 		{
 			string arg;
-			if (opt->_short)
+            if (opt->getShortName())
 			{
-				arg = str(format("%s,%c") % opt->_long % opt->_short);
+                arg = str(format("%s,%c") % opt->getLongName() % opt->getShortName());
 			}
 			else
 			{
-				arg = opt->_long;
+                arg = opt->getLongName();
 			}
 	
-			switch(opt->_type)
+            switch(opt->getType())
 			{
               case Config::BOOLEAN:
-                helpDesc.add_options()(arg.c_str(), opt->_description.c_str());
-                if (!boost::any_cast<bool>(opt->_value)) { 
-                    argsDesc.add_options()(arg.c_str(), opt->_description.c_str());
+                helpDesc.add_options()(arg.c_str(),
+                                       opt->getDescription().c_str());
+                if (!boost::any_cast<bool>(opt->getValue())) {
+                    argsDesc.add_options()(arg.c_str(),
+                                           opt->getDescription().c_str());
                 } else { 
-                    argsDesc.add_options()
-                        (arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
+                    argsDesc.add_options()(arg.c_str(),
+                                           optTypeToValSem(opt->getType()),
+                                           opt->getDescription().c_str());
                 }
                 break;
               default:
                 helpDesc.add_options()
-                    (arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
+                    (arg.c_str(),
+                     optTypeToValSem(opt->getType()),
+                     opt->getDescription().c_str());
                 argsDesc.add_options()
-                    (arg.c_str(), optTypeToValSem(opt->_type), opt->_description.c_str());
+                    (arg.c_str(),
+                     optTypeToValSem(opt->getType()),
+                     opt->getDescription().c_str());
 			}
 		}
 	}
@@ -281,17 +472,17 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	catch (const boost::program_options::error &e)
 	{
 		cerr << "Error during options parsing: " << e.what() << ". Use --help option for details." << endl;
-		exit(1);
+        ::exit(1);
 	}
 	catch (const std::exception &e)
 	{
 		cerr << "Unknown exception during options parsing: " << e.what() << endl;
-		exit(1);
+        ::exit(1);
 	}
 	catch (...)
 	{
 		cerr << "Unknown exception during options parsing" << endl;
-		exit(1);
+        ::exit(1);
 	}
 
 	notify(cmdLineArgs);
@@ -300,27 +491,33 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	{
 		ConfigOption *opt = p.second;
 
-		if (cmdLineArgs.count(opt->_long))
+        if (cmdLineArgs.count(opt->getLongName()))
 		{
-			switch (opt->_type)
+            switch (opt->getType())
 			{
 				case Config::BOOLEAN:
-                  opt->_value = !boost::any_cast<bool>(opt->_value) ? true : cmdLineArgs[opt->_long].empty() || cmdLineArgs[opt->_long].as<bool>();
-					break;
+                    // If the default value is false, the presence of the option in the command line indicates a true.
+                    // For example, to enable watchdog, the command line has "--no-watchdog".
+                    opt->setValue(!boost::any_cast<bool>(opt->getValue()) ?
+                            true :
+                            cmdLineArgs[opt->getLongName()].empty() || cmdLineArgs[opt->getLongName()].as<bool>()
+                            );
+                    break;
+                case Config::SET:
 				case Config::STRING:
-					opt->_value = cmdLineArgs[opt->_long].as<string>();
+                    opt->setValue(cmdLineArgs[opt->getLongName()].as<string>());
 					break;
 				case Config::INTEGER:
-					opt->_value = cmdLineArgs[opt->_long].as<int>();
+                    opt->setValue(cmdLineArgs[opt->getLongName()].as<int>());
 					break;
 				case Config::REAL:
-					opt->_value = cmdLineArgs[opt->_long].as<double>();
+                    opt->setValue(cmdLineArgs[opt->getLongName()].as<double>());
 					break;
 				case Config::STRING_LIST:
-					opt->_value = cmdLineArgs[opt->_long].as<vector<string> >();
+                    opt->setValue(cmdLineArgs[opt->getLongName()].as<std::vector< std::string> >());
 			}
 
-			opt->_activated = true;
+            opt->setActivated();
 			
 			BOOST_FOREACH(void (*hook)(int32_t), _hooks)
 			{
@@ -361,7 +558,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                     bool found = false;
                     BOOST_FOREACH(const opt_pair &p, _values)
                     {
-                        if (p.second->_config == member)
+                        if (p.second->getConfigName() == member)
                         {
                             found = true;
                             break;
@@ -379,55 +576,58 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                 {
                     ConfigOption *opt = p.second;
 
-                    if (!opt->_activated)
+                    if (!opt->getActivated())
                     {
                         try
                         {
-                            switch (opt->_type)
+                            switch (opt->getType())
                             {
                                 case Config::BOOLEAN:
                                 {
-                                    if (root.isMember(opt->_config)) {
-                                        opt->_value = bool(root[opt->_config].asBool());
-                                        opt->_activated = true;
+                                    if (root.isMember(opt->getConfigName())) {
+                                        opt->setValue(bool(root[opt->getConfigName()].asBool()));
+                                        opt->setActivated();
                                     }
                                     break;
                                 }
                                 case Config::STRING:
+                                case Config::SET:
                                 {
-                                    if (root.isMember(opt->_config)) {
-                                        string val = root[opt->_config].asString();
-                                        opt->_value = val;
-                                        opt->_activated = true;
+                                    if (root.isMember(opt->getConfigName())) {
+                                        std::string value = root[opt->getConfigName()].asString();
+                                        opt->setValue(value);
+                                        opt->setActivated();
                                     }
                                     break;
                                 }
                                 case Config::INTEGER:
                                 {
-                                    if (root.isMember(opt->_config)) {
-                                        opt->_value = int(root[opt->_config].asInt());
-                                        opt->_activated = true;
+                                    if (root.isMember(opt->getConfigName())) {
+                                        int value = root[opt->getConfigName()].asInt();
+                                        opt->setValue(value);
+                                        opt->setActivated();
                                     }
                                     break;
                                 }
                                 case Config::REAL:
                                 {
-                                    if (root.isMember(opt->_config)) {
-                                        opt->_value = double(root[opt->_config].asDouble());
-                                        opt->_activated = true;
+                                    if (root.isMember(opt->getConfigName())) {
+                                        double value = root[opt->getConfigName()].asDouble();
+                                        opt->setValue(value);
+                                        opt->setActivated();
                                     }
                                     break;
                                 }
                                 case Config::STRING_LIST:
                                 {
-                                    if (root.isMember(opt->_config)) {
+                                    if (root.isMember(opt->getConfigName())) {
                                         vector<string> strs;
-                                        const Json::Value lst = root[opt->_config];
+                                        const Json::Value lst = root[opt->getConfigName()];
                                         for (unsigned int i = 0; i < lst.size(); i++) {
                                             strs.push_back(lst[i].asString());
                                         }
-                                        opt->_value = strs;
-                                        opt->_activated = true;
+                                        opt->setValue(strs);
+                                        opt->setActivated();
                                     }
                                     break;
                                 }
@@ -435,10 +635,10 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                         }
                         catch(const std::exception &e)
                         {
-                            throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_ERROR_NEAR_CONFIG_OPTION) << e.what() << opt->_config;
+                            throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_ERROR_NEAR_CONFIG_OPTION) << e.what() << opt->getConfigName();
                         }
 
-                        if (opt->_activated) {
+                        if (opt->getActivated()) {
                             BOOST_FOREACH(void (*hook)(int32_t), _hooks)
                             {
                                 hook(p.first);
@@ -461,42 +661,42 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	BOOST_FOREACH(opt_pair p, _values)
 	{
 		ConfigOption *opt = p.second;
-		if ((opt->_required && !opt->_activated) 
-			|| (!opt->_required && opt->_value.empty()))
+        if ((opt->getRequired() && !opt->getActivated())
+            || (!opt->getRequired() && opt->getValue().empty()))
 		{
 			//FIXME: Replace with scidb exception
 			stringstream ss;
 			ss << "One of program options required but value not set or value is empty. "
 				  "You can set this option with next way(s):\n";
-			if (opt->_short != 0 || opt->_long != "")
+            if (opt->getShortName() != 0 || opt->getLongName() != "")
 			{
 				ss << "* Through command line argument ";
-				if (opt->_short)
-					ss << "-" << opt->_short;
+                if (opt->getShortName())
+                    ss << "-" << opt->getShortName();
 				
-				if (opt->_long != "")
+                if (opt->getLongName() != "")
 				{
-					if (opt->_short != 0)
+                    if (opt->getShortName() != 0)
 						ss << " (";
-					ss << "--" << opt->_long;
-					if (opt->_short != 0)
+                    ss << "--" << opt->getLongName();
+                    if (opt->getShortName() != 0)
 						ss << ")";
 				}
 				ss << endl;
 			}
 			
-			if (opt->_env != "")
+            if (opt->getEnvName() != "")
 			{
-				ss << "* Through environment variable '" << opt->_env << "'" << endl;
+                ss << "* Through environment variable '" << opt->getEnvName() << "'" << endl;
 			}
 
-			if (opt->_config != "")
+            if (opt->getConfigName() != "")
 			{
-				ss << "* Through config variable '" << opt->_config << "'" << endl;
+                ss << "* Through config variable '" << opt->getConfigName() << "'" << endl;
 			}
 
 			cerr << ss.str();
-			exit(1);
+            ::exit(1);
 		}
 	}
 }
@@ -537,7 +737,7 @@ const std::string& Config::getConfigFileName() const
 bool Config::optionActivated(int32_t option)
 {
 	assert(_values[option]);
-	return _values[option]->_activated;
+    return _values[option]->getActivated();
 }
 
 void Config::setOption(int32_t option, const boost::any &value)
@@ -553,24 +753,21 @@ std::string Config::setOptionValue(std::string const& name, std::string const& n
     if (i == _longArgToOption.end())
         throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_UNKNOWN_CONFIG_OPTION) << name;
     ConfigOption *opt = _values[i->second];
-    std::string oldValue;
-    switch (opt->_type)
+    std::string oldValue = getOptionValue(name);
+    switch (opt->getType())
     {
       case Config::BOOLEAN:
-        oldValue = boost::lexical_cast<std::string>(boost::any_cast<bool>(opt->_value));
-        opt->_value = boost::lexical_cast<bool>(newValue);
+        opt->setValue(boost::lexical_cast<bool>(newValue));
         break;
       case Config::STRING:
-        oldValue = boost::any_cast<std::string>(opt->_value);
-        opt->_value = newValue;
+      case Config::SET:
+        opt->setValue(newValue);
         break;
       case Config::INTEGER:
-        oldValue = boost::lexical_cast<std::string>(boost::any_cast<int>(opt->_value));
-        opt->_value = boost::lexical_cast<int>(newValue);
+        opt->setValue(boost::lexical_cast<int>(newValue));
         break;
       case Config::REAL:
-        oldValue = boost::lexical_cast<std::string>(boost::any_cast<double>(opt->_value));
-        opt->_value = boost::lexical_cast<double>(newValue);
+        opt->setValue(boost::lexical_cast<double>(newValue));
         break;
       default:
         assert(0);
@@ -584,27 +781,7 @@ std::string Config::getOptionValue(std::string const& name)
     if (i == _longArgToOption.end())
         throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_UNKNOWN_CONFIG_OPTION) << name;
     ConfigOption *opt = _values[i->second];
-    return optionValueToString(opt);
-}
-
-std::string Config::optionValueToString(ConfigOption *opt)
-{
-    assert(opt);
-    switch (opt->_type)
-    {
-      case Config::BOOLEAN:
-        return boost::lexical_cast<std::string>(boost::any_cast<bool>(opt->_value));
-        break;
-      case Config::STRING:
-        return boost::any_cast<std::string>(opt->_value);
-      case Config::INTEGER:
-        return boost::lexical_cast<std::string>(boost::any_cast<int>(opt->_value));
-      case Config::REAL:
-        return boost::lexical_cast<std::string>(boost::any_cast<double>(opt->_value));
-      default:
-        assert(0);
-    }
-    return "";
+    return opt->getValueAsString();
 }
 
 static value_semantic* optTypeToValSem(Config::ConfigOptionType optionType)
@@ -614,6 +791,7 @@ static value_semantic* optTypeToValSem(Config::ConfigOptionType optionType)
 		case Config::BOOLEAN:
           return value<bool>()->implicit_value(true)->default_value(true);
 		case Config::STRING:
+        case Config::SET:
 			return value<string>();
 		case Config::INTEGER:
 			return value<int>();
@@ -624,6 +802,9 @@ static value_semantic* optTypeToValSem(Config::ConfigOptionType optionType)
 		default:
 			assert(0);
 	}
+
+	throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "optTypetoValSem";
+	return NULL;
 }
 
 //TODO: Maybe replace with something more complicated? (e.g. little boost::spirit parser)

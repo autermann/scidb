@@ -21,6 +21,7 @@ import os
 import sys
 sys.path.append(os.getcwd()) # NOCHECKIN 
 sys.path.append('@CMAKE_INSTALL_PREFIX@' + '/lib')
+sys.path.append('/opt/scidb/12.7/lib')
 import scidbapi as scidb
 
 
@@ -28,10 +29,28 @@ def usage():
   print "Usage: python sample2.py"
   sys.exit(2)
 
+def partition(mystr,mysep):
+  mylist = mystr.split(mysep)
+  lside = mylist[0]
+  mside = mysep
+  rside = ''
+  for i in range( len(mylist) ):
+    if i > 0:
+      rside = rside + mylist[i] + mysep
+  rside = rside[0:-1]
+  return( [lside,mside,rside] )
+
 def q_execute(query, db):
     #print >> sys.stderr, "DEBUG q_execute: '%s','%s'" % (query[0], query[2],)
-    return db.executeQuery(query[2], query[0])
+  try: 
+    result=db.executeQuery(query[2], query[0])
+  except Exception, e: 
+    handleException(e, True, op="query execution")
+  return result
 
+def q_complete(result): 
+  db.completeQuery(result.queryID)
+  
 def print_dataitem(dtypeStr, dataitem):
   print "Data: %s" % scidb.getTypedValue(dataitem, dtypeStr)
 
@@ -55,29 +74,30 @@ def print_result(res):
     for i in range (attrs.size()): 
         attrid = attrs[i].getId()
         iters.append(res.array.getConstIterator(attrid))
-          
-        for i in range (attrs.size()):
-            if (attrs[i].getName() == "EmptyTag"):
-                continue
-            nc = 0
-            while not iters[0].end():
-                out_file.write("Getting iterator for attribute %d, chunk %d.\n" % (i, nc))
-                currentchunk = iters[i].getChunk()
-                chunkiter = currentchunk.getConstIterator((scidb.swig.ConstChunkIterator.IGNORE_OVERLAPS)|(scidb.swig.ConstChunkIterator.IGNORE_EMPTY_CELLS))
+      
+    nc = 0    
+    while not iters[0].end():
+      for i in range (attrs.size()):
+        if (attrs[i].getName() == "EmptyTag"):
+          continue
+        print "Getting iterator for attribute %d, chunk %d.\n" % (i, nc)
+        currentchunk = iters[i].getChunk()
+        chunkiter = currentchunk.getConstIterator((scidb.swig.ConstChunkIterator.IGNORE_OVERLAPS)|(scidb.swig.ConstChunkIterator.IGNORE_EMPTY_CELLS))
+        
+        printed=False
+        while not chunkiter.end():
+          if not chunkiter.isEmpty(): 
+            dataitem = chunkiter.getItem()
+            print_dataitem(attrs[i].getType(), dataitem)
+            printed=True
+      
+          chunkiter.increment_to_next()
+        if printed:
+          print       # add an extra newline to separate the data from the next query
 
-                printed=False
-                while not chunkiter.end():
-                    if not chunkiter.isEmpty(): 
-                        dataitem = chunkiter.getItem()
-                        print_dataitem(attrs[i].getType(), dataitem)
-                        printed=True
-                
-                    chunkiter.increment_to_next()
-                if printed:
-                    print       # add an extra newline to separate the data from the next query
-
-                nc += 1;
-                iters[i].increment_to_next();
+      nc += 1;
+      for i in range(attrs.size()):
+        iters[i].increment_to_next();
     
     
 if __name__ == "__main__":    
@@ -91,8 +111,9 @@ if __name__ == "__main__":
         fileHandle = open(ifile,'r')
         for row in fileHandle:
             stmt.append(row)
+	fileHandle.close()
         for stmt_str in stmt:
-            query = stmt_str.partition(',')
+            query = partition(stmt_str,',')
             if( len(query[2].strip()) > 3 ):
                 qno+=1
                 # remove any trailing newline from the query
@@ -112,8 +133,10 @@ if __name__ == "__main__":
                         print_result(qr)
                     else:
                         out_file.write( "Query was executed successfully\n" )
-                        out_file.close()
+                    q_complete(qr)
                 except Exception, inst:
                     print >> sys.stderr, "Exception while executing query: ", query[2]
                     print "     Exception Type: %s" % type(inst)     # the exception instance
                     print "     %s" % inst
+		out_file.close()
+    print "Done!"

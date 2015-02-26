@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>save</refname>
+
+    <refpurpose>Save array data to a file</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>AFL% save(<replaceable>array</replaceable>,<replaceable>filepath</replaceable>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The AFL save operator works like the AQL SAVE statement. It saves
+    the data from the cells of a SciDB array into a file.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example creates a a matrix with two attributes and saves the
+      cell values to a file.</para>
+
+      <procedure>
+        <step>
+          <para>Create a 2-dimensional array containing values 100–108:
+          <para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j+100),array1);  </programlisting></para></para>
+        </step>
+
+        <step>
+          <para>Create a 2-dimensional array containing values 200–208:
+          <para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j+200),array2);  </programlisting></para></para>
+        </step>
+
+        <step>
+          <para>Join array1 and array2 and store the output in an array
+          storage_array: <para><programlisting>AFL% store(join(array1,array2),storage_array);  </programlisting><screen>{i,j} val,val_2
+{0,0} 100,200
+{0,1} 101,201
+{0,2} 102,202
+{1,0} 103,203
+{1,1} 104,204
+{1,2} 105,205
+{2,0} 106,206
+{2,1} 107,207
+{2,2} 108,208
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Save the contents of storage_array to a file. <para><programlisting>AFL% save(storage_array,'/tmp/storage_array.txt');  </programlisting><screen>{i,j} val,val_2
+{0,0} 100,200
+{0,1} 101,201
+{0,2} 102,202
+{1,0} 103,203
+{1,1} 104,204
+{1,2} 105,205
+{2,0} 106,206
+{2,1} 107,207
+{2,2} 108,208
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

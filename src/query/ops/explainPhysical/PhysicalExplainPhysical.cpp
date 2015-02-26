@@ -46,9 +46,10 @@ namespace scidb
 class PhysicalExplainPhysical: public PhysicalOperator
 {
 public:
-        PhysicalExplainPhysical(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalExplainPhysical(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, vector<boost::shared_ptr<Tuple> >()));
     }
 
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
@@ -57,7 +58,7 @@ public:
         return ArrayDistribution(psLocalInstance);
     }
 
-   boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    void preSingleExecute(boost::shared_ptr<Query> query)
     {
         bool afl = false;
 
@@ -93,8 +94,16 @@ public:
         Tuple& tuple = *new Tuple(1);
         tuples[0] = boost::shared_ptr<Tuple>(&tuple);
         tuple[0].setData(planString.str().c_str(), planString.str().length() + 1);
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
     }
+
+   boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+   {
+       return _result;
+   }
+
+private:
+   boost::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalExplainPhysical, "explain_physical", "physicalExplainPhysical")

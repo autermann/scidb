@@ -1,0 +1,18 @@
+--start-query-logging
+create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0]
+create array winnersCanonical <person:string,country:string,time:double> [year=1996:2008,13,0, event(string)=3,3,0]
+create array yec <person:string,time:double> [year=1996:2008,13,0, event(string)=3,3,0, country(string)=200,200,0]
+load winnersFlat from ../tests/harness/testcases/doc_data/winners2.scidb
+
+--shell --command "csv2scidb -s 1 -p SNSSN < ../tests/harness/testcases/doc_data/winners2.csv > ../tests/harness/testcases/doc_data/winners2.scidb"
+
+redimension_store(winnersFlat, winnersCanonical)
+
+redimension_store(winnersCanonical,yec)
+
+--cleanup
+--aql drop array winnersFlat
+--aql drop array winnersCanonical
+--aql drop array yec
+
+--stop-query-logging

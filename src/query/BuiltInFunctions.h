@@ -566,6 +566,11 @@ void missingReason(const Value** args, Value* res, void*)
     res->setInt32(args[0]->getMissingReason());
 }
 
+void missing(const Value** args, Value* res, void*)
+{
+    res->setNull(args[0]->getInt32());
+}
+
 void identicalConversion(const Value** args, Value* res, void*)
 {
     *res = *args[0];

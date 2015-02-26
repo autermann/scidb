@@ -5,13 +5,13 @@ load(overlap, '../tests/harness/testcases/data/overlap.txt')
 
 --test
 
---aql select sum(a) from overlap window 3,3 as W
---aql select count(*) from overlap window 3,3 as W
---aql select count(W) from overlap window 3,3 as W
---aql select avg(a) from overlap window 3,3 as W
---aql select sum(select a from W) from overlap window 3,3 as W
---aql select sum(W) from overlap window 3,3 as W
+--aql select sum(a) from overlap fixed window W as (partition by x 1 preceding and 1 following, y 1 preceding and 1 following)
+--aql select count(*) from overlap fixed window W as (partition by x 1 preceding and 1 following, y 1 preceding and 1 following)
+--aql select count(*) over W from overlap fixed window W as (partition by x 1 preceding and 1 following, y 1 preceding and 1 following)
+--aql select avg(a) from overlap fixed window W as (partition by x 1 preceding and 1 following, y 1 preceding and 1 following)
+--aql select sum(a) over W from overlap fixed window W as (partition by x 1 preceding and 1 following, y 1 preceding and 1 following)
 
+--aql select sum(a) over W1, sum(a) over W2 from overlap fixed window W1 as (partition by x 1 preceding and 1 following, y 1 preceding and 1 following), fixed window W2 as (partition by x 2 preceding and 2 following, y 2 preceding and 2 following)
 
 --cleanup
 remove(overlap)

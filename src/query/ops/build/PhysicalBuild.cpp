@@ -30,7 +30,7 @@
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "BuildArray.h"
-
+#include "query/ops/input/InputArray.h"
 
 using namespace std;
 using namespace boost;
@@ -42,20 +42,56 @@ class PhysicalBuild: public PhysicalOperator
 {
 public:
 	PhysicalBuild(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-	    PhysicalOperator(logicalName, physicalName, parameters, schema)
+	    PhysicalOperator(logicalName, physicalName, parameters, schema),
+	    _asArrayLiteral(false)
 	{
+        if (_parameters.size() == 3)
+        {
+            _asArrayLiteral = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getBool();
+        }
 	}
+
+    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+                                                    const std::vector< ArrayDesc> & inputSchemas) const
+    {
+        if (_asArrayLiteral)
+            return ArrayDistribution(psLocalInstance);
+        return ArrayDistribution(psRoundRobin);
+    }
 
 	/***
 	 * Build is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 0);
-		return boost::shared_ptr<Array>(new BuildArray(query, _schema,
-                                                ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()));
-	 }
+        assert(inputArrays.size() == 0);
+
+        boost::shared_ptr<Expression> expr = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression();
+        if (_asArrayLiteral)
+        {
+            //We will produce this array only on coordinator
+            if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
+            {
+                //InputArray is very access-restrictive, but we're building it from a string - so it's small!
+                //So why don't we just materialize the whole literal array:
+                shared_ptr<Array> input(new InputArray(_schema, expr->evaluate().getString(), "", query, AS_STRING));
+                shared_ptr<Array> materializedInput(new MemArray(input,false));
+                return materializedInput;
+            }
+            else
+            {
+                return boost::shared_ptr<Array>(new MemArray(_schema));
+            }
+        }
+        else
+        {
+            return boost::shared_ptr<Array>(new BuildArray(query, _schema, expr));
+        }
+    }
+
+private:
+    bool _asArrayLiteral;
 };
     
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalBuild, "build", "physicalBuild")

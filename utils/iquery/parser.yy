@@ -31,15 +31,20 @@
     std::string* stringVal;
 	class IqueryCmd* node;
 	bool boolean;
+	const char* constString;
 }
 
 %type <node> start commands set setlang setfetch settimer setverbose help quit knownerror afl_help
+             setformat
+
+%type <constString> format
 
 %type <int64Val> langtype
 
 %destructor { delete $$; } IDENTIFIER STRING_LITERAL
 
-%token SET LANG AFL AQL NO FETCH VERBOSE TIMER HELP QUIT
+%token SET LANG AFL AQL NO FETCH VERBOSE TIMER HELP QUIT FORMAT
+       AUTO OPAQUE CSV CSV_PLUS LCSV_PLUS DENSE LSPARSE SPARSE TEXT DCSV
 
 %token	EOQ     	0 "end of query"
 %token	EOL			"end of line"
@@ -72,6 +77,7 @@ commands:
     | setfetch
     | settimer
     | setverbose
+    | setformat
     | help
     | quit
     | afl_help
@@ -92,14 +98,14 @@ knownerror:
 set:
     SET
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::SET, 1);
+        $$ = new IqueryCmd(IqueryCmd::SET);
     }
     ;
 
 setlang:
     SET LANG langtype
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::LANG, $3);
+        $$ = new IntIqueryCmd(IqueryCmd::LANG, $3);
     }
     ;
 
@@ -117,47 +123,102 @@ langtype:
 setfetch:
     SET FETCH
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::FETCH, 1);
+        $$ = new IntIqueryCmd(IqueryCmd::FETCH, 1);
     }
     | SET NO FETCH
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::FETCH, 0);
+        $$ = new IntIqueryCmd(IqueryCmd::FETCH, 0);
     }
     ;
 
 settimer:
     SET TIMER
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::TIMER, 1);
+        $$ = new IntIqueryCmd(IqueryCmd::TIMER, 1);
     }
     | SET NO TIMER
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::TIMER, 0);
+        $$ = new IntIqueryCmd(IqueryCmd::TIMER, 0);
     }
     ;
 
 setverbose:
     SET VERBOSE
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::VERBOSE, 1);
+        $$ = new IntIqueryCmd(IqueryCmd::VERBOSE, 1);
     }
     | SET NO VERBOSE
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::VERBOSE, 0);
+        $$ = new IntIqueryCmd(IqueryCmd::VERBOSE, 0);
+    }
+    ;
+
+setformat:
+    SET FORMAT STRING_LITERAL
+    {
+        $$ = new StrIqueryCmd(IqueryCmd::BINARY_FORMAT, *$3);
+        delete $3;
+    }
+    | SET FORMAT format
+    {
+        $$ = new StrIqueryCmd(IqueryCmd::FORMAT, $3);
+    }
+    ;
+
+format:
+    AUTO
+    {
+        $$ = "auto";
+    }
+    | OPAQUE
+    {
+        $$ = "opaque";
+    }
+    | CSV
+    {
+        $$ = "csv";
+    }
+    | CSV_PLUS
+    {
+        $$ = "csv+";
+    }
+    | LCSV_PLUS
+    {
+        $$ = "lcsv+";
+    }
+    | DENSE
+    {
+        $$ = "dense";
+    }
+    | LSPARSE
+    {
+        $$ = "lsparse";
+    }
+    | SPARSE
+    {
+        $$ = "sparse";
+    }
+    | TEXT
+    {
+        $$ = "text";
+    }
+    | DCSV
+    {
+        $$ = "dcsv";
     }
     ;
 
 help:
     HELP
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::HELP, 1);
+        $$ = new IqueryCmd(IqueryCmd::HELP);
     }
     ;
 
 quit:
     QUIT
     {
-        $$ = new SimpleIqueryCmd(SimpleIqueryCmd::QUIT, 1);
+        $$ = new IqueryCmd(IqueryCmd::QUIT);
     }
     ;
 

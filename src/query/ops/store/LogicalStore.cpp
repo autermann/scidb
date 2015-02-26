@@ -46,6 +46,37 @@ inline string stripVersion(string const& s)
     return (v != string::npos) ? (s.substr(0, v) + s.substr(s.find(':'))) : s;
 }
 
+/**
+ * @brief The operator: store().
+ *
+ * @par Synopsis:
+ *   store( srcArray, outputArray )
+ *
+ * @par Summary:
+ *   Stores an array to the database. Each execution of store() causes a new version of the array to be created.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDim.
+ *   - outputArray: an existing array in the database, with the same schema as srcArray.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalStore: public  LogicalOperator
 {
 public:
@@ -189,7 +220,7 @@ public:
                 {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
                 }
-                if (srcDims[i].getType() != TID_INT64 && stripVersion(srcDims[i].getMappingArrayName()) != stripVersion(dstDims[i].getMappingArrayName()))
+                if (srcDims[i].getType() != TID_INT64 && stripVersion(srcDims[i].getMappingArrayName()) != stripVersion(dstDims[i].getMappingArrayName()) && !dstDims[i].getMappingArrayName().empty() && srcDims[i].getMappingArrayName().empty())
                 {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_STORE_ERROR1);
                 }
@@ -218,7 +249,7 @@ public:
                                            dim.getFuncMapOffset(),
                                            dim.getFuncMapScale());
             }
-            return ArrayDesc(dstDesc.getId(), arrayName, dstDesc.getAttributes(), newDims, dstDesc.getFlags());
+            return ArrayDesc(dstDesc.getId(), dstDesc.getUAId(), dstDesc.getVersionId(), arrayName, dstDesc.getAttributes(), newDims, dstDesc.getFlags());
         }
 	}
 };

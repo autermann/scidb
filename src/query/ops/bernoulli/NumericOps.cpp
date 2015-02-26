@@ -559,7 +559,7 @@ NumericOperations::ntuniform()
 double
 NumericOperations::qtilenorm(double prob)
 {                               
-  double p, x;                 
+    double p = 0, x = 0;
 	//
 	// Checks. 
 	//

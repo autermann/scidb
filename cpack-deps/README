@@ -1,3 +1,0 @@
-Since CPack can't resolve dependencies itself, files in this dir will describe
-needed runtime dependencies for each distro version. Files format must be:
-distroname-distroversion

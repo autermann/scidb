@@ -140,7 +140,8 @@ int HarnessTestExecutor :: prepareShellscript (void)
 			if (boost::iequals (tokens[0],"scidbtestharness"))
 			{
 				char buf[BUFSIZ];
-				getcwd (buf, BUFSIZ);
+				char* shouldBeBuf = getcwd (buf, BUFSIZ);
+				if (shouldBeBuf!=buf) assert(false);
 				string NewLine = buf;
 				int option_record_found=0, option_logdest_found=0, option_selftesting_found=0;
 				NewLine = NewLine + "/" + line;

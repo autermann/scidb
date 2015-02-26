@@ -21,7 +21,7 @@
 */
 
 /**
- * @file TransposeArray.cpp
+ * @file TransposeArray.h
  *
  * @brief Transpose array implementation
  *

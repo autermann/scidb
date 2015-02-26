@@ -160,7 +160,7 @@ namespace scidb {
     void ReshapeChunk::initialize(Coordinates const& pos, bool isSparse)
     {
         ArrayDesc const& desc = array.getArrayDesc();
-        Address addr(desc.getId(), attrID, pos);
+        Address addr(attrID, pos);
         chunk.initialize(&array, &desc, addr, desc.getAttributes()[attrID].getDefaultCompressionMethod());
         sparse = isSparse;
         setInputChunk(chunk);

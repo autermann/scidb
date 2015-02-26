@@ -5,7 +5,7 @@
 store(build(A,x+1),A)
 
 --test
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ATTRIBUTE_NOT_EXIST --aql="select sum(A) from A group by x as part"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ATTRIBUTE_NOT_EXIST --aql="select sum(A) from A group by x"
 
 
 --cleanup

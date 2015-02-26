@@ -1,0 +1,21 @@
+#Specifying an array name, but not the attributes (should try to load into an existing array).
+
+--setup
+--start-query-logging
+
+--test
+
+#--start-igdata
+--shell --command " cat ./testcases/data/sm10.csv | loadcsv.py  -a 'array_sm10' -v -x -c 3  -l -L -b -d 'localhost' -p $IQUERY_PORT "  
+
+
+
+#--stop-igdata
+
+scan( array_sm10 )
+
+--cleanup
+
+
+--stop-query-logging
+

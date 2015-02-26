@@ -37,6 +37,35 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: help().
+ *
+ * @par Synopsis:
+ *   help( operator )
+ *
+ * @par Summary:
+ *   Produces a single-element array containing the help information for an operator.
+ *
+ * @par Input:
+ *   - operator: the name of an operator.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   help: string
+ *   <br> >
+ *   <br> [
+ *   <br>   i: start=end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *
+ */
 class LogicalHelp: public LogicalOperator
 {
 public:
@@ -44,7 +73,6 @@ public:
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_VARIES()
-                _properties.ddl = true;
         _usage = "scan([<operator name>])";
     }
 

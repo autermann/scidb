@@ -37,7 +37,7 @@ using namespace std;
 /***
  * Helper function to generate descriptor of xgrid array
  ***/
-    inline ArrayDesc createXgridDesc(ArrayDesc const& desc, vector<int> const& grid)
+inline ArrayDesc createXgridDesc(ArrayDesc const& desc, vector<int> const& grid)
 {
     Dimensions const& dims = desc.getDimensions();
     Dimensions newDims(dims.size());
@@ -54,7 +54,57 @@ using namespace std;
         return ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
 }
 
-
+/**
+ * @brief The operator: xgrid().
+ *
+ * @par Synopsis:
+ *   xgrid( srcArray {, scale}+ )
+ *
+ * @par Summary:
+ *   Produces a result array by 'scaling up' the source array.
+ *   Within each dimension, the operator duplicates each cell a specified number of times before moving to the next cell.
+ *   A scale must be provided for every dimension.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - scale: for each dimension, a scale is provided telling how much larger the dimension should grow.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims where every dimension is expanded by a given scale
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - xgrid(A, 1, 2) <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  3,      7,     31.64
+ *     <br> 2011,  4,      7,     31.64
+ *     <br> 2011,  5,      6,     19.98
+ *     <br> 2011,  6,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      5,     41.65
+ *     <br> 2012,  3,      9,     40.68
+ *     <br> 2012,  4,      9,     40.68
+ *     <br> 2012,  5,      8,     26.64
+ *     <br> 2012,  6,      8,     26.64
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalXgrid: public  LogicalOperator
 {
   public:

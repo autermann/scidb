@@ -8,50 +8,88 @@ SCIDB QUERY : <create immutable empty array D <a:int64> [x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(A,x+10),A)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <store(build_sparse(D,x+5,x<>1),D)>
-[{0}(5),{2}(7)]
+{x} a
+{0} 5
+{2} 7
+
+SCIDB QUERY : <create array B_short <x:int64>[a=11:13,2,0]>
+Query was executed successfully
 
 SCIDB QUERY : <redimension(A,B)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{10} 0
+{11} 1
+{12} 2
 
 SCIDB QUERY : <redimension(D,B)>
-[{7}(2)]
+{a} x
+{5} 0
+{7} 2
 
 SCIDB QUERY : <store(redimension(A,B),B)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{10} 0
+{11} 1
+{12} 2
 
 SCIDB QUERY : <store(redimension(A,B),C)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{10} 0
+{11} 1
+{12} 2
 
 SCIDB QUERY : <scan(B)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{10} 0
+{11} 1
+{12} 2
 
 SCIDB QUERY : <unpack(B,row)>
-{9}[(),(10,0),(11,1),(12,2),(),()]
+{row} a,x
+{0} 10,0
+{1} 11,1
+{2} 12,2
 
 SCIDB QUERY : <unpack(C,row)>
-{9}[(),(10,0),(11,1),(12,2),(),()]
+{row} a,x
+{0} 10,0
+{1} 11,1
+{2} 12,2
 
 SCIDB QUERY : <unpack(redimension(B,D),row)>
-[(0,10),(1,11),(2,12)]
+{row} x,a
+{0} 0,10
+{1} 1,11
+{2} 2,12
 
 SCIDB QUERY : <unpack(redimension(D,B),row)>
-{3}[(),(),(5,0),(),(7,2),()]
+{row} a,x
+{0} 5,0
+{1} 7,2
+
+SCIDB QUERY : <redimension(A, <x:int64>[a=11:13,2,0])>
+[An error expected at this place for the query "redimension(A, <x:int64>[a=11:13,2,0])". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION.]
+
+SCIDB QUERY : <redimension_store(A, B_short)>
+[An error expected at this place for the query "redimension_store(A, B_short)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION.]
 
 SCIDB QUERY : <max(B)>
-[(2)]
+{i} x_max
+{0} 2
 
 SCIDB QUERY : <min(B)>
-[(0)]
+{i} x_min
+{0} 0
 
 SCIDB QUERY : <avg(B)>
-[(1)]
+{i} x_avg
+{0} 1
 
 SCIDB QUERY : <rename(B,B1)>
 Query was executed successfully
@@ -60,53 +98,80 @@ SCIDB QUERY : <rename(B1,B)>
 Query was executed successfully
 
 SCIDB QUERY : <subarray(B,10,11)>
-[{1}(1)]
+{a} x
+{0} 0
+{1} 1
 
 SCIDB QUERY : <between(B,11,20)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{11} 1
+{12} 2
 
 SCIDB QUERY : <filter(B,x>1)>
-[{12}(2)]
+{a} x
+{12} 2
 
 SCIDB QUERY : <project(B,x)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{10} 0
+{11} 1
+{12} 2
 
 SCIDB QUERY : <join(B,B)>
-[{9}(),{10}(0,0),{11}(1,1)];
-[{12}(2,2),{13}(),{14}()]
+{a} x,x
+{10} 0,0
+{11} 1,1
+{12} 2,2
 
 SCIDB QUERY : <cross(B,B)>
-[[{9,9}(),{9,10}(),{9,11}(),{10,9}(),{10,10}(0,0),{10,11}(0,1),{11,9}(),{11,10}(1,0),{11,11}(1,1)]];
-[[{9,12}(),{9,13}(),{9,14}(),{10,12}(0,2),{10,13}(),{10,14}(),{11,12}(1,2),{11,13}(),{11,14}()]];
-[[{12,9}(),{12,10}(2,0),{12,11}(2,1),{13,9}(),{13,10}(),{13,11}(),{14,9}(),{14,10}(),{14,11}()]];
-[[{12,12}(2,2),{12,13}(),{12,14}(),{13,12}(),{13,13}(),{13,14}(),{14,12}(),{14,13}(),{14,14}()]]
+{a,a} x,x
+{10,10} 0,0
+{10,11} 0,1
+{11,10} 1,0
+{11,11} 1,1
+{10,12} 0,2
+{11,12} 1,2
+{12,10} 2,0
+{12,11} 2,1
+{12,12} 2,2
 
 SCIDB QUERY : <apply(B,z,x-a)>
-[{9}(),{10}(0,-10),{11}(1,-10)];
-[{12}(2,-10),{13}(),{14}()]
+{a} x,z
+{10} 0,-10
+{11} 1,-10
+{12} 2,-10
 
 SCIDB QUERY : <count(B)>
-[(3)]
+{i} count
+{0} 3
 
 SCIDB QUERY : <sum(B)>
-[(3)]
+{i} x_sum
+{0} 3
 
 SCIDB QUERY : <sort(B,x)>
-[(0),(1),(2)]
+{n} x
+{0} 0
+{1} 1
+{2} 2
 
 SCIDB QUERY : <sort(B,x desc)>
-[(2),(1),(0)]
+{n} x
+{0} 2
+{1} 1
+{2} 0
 
 SCIDB QUERY : <max(C)>
-[(2)]
+{i} x_max
+{0} 2
 
 SCIDB QUERY : <min(C)>
-[(0)]
+{i} x_min
+{0} 0
 
 SCIDB QUERY : <avg(C)>
-[(1)]
+{i} x_avg
+{0} 1
 
 SCIDB QUERY : <rename(C,C1)>
 Query was executed successfully
@@ -115,44 +180,68 @@ SCIDB QUERY : <rename(C1,C)>
 Query was executed successfully
 
 SCIDB QUERY : <subarray(C,10,11)>
-[{1}(1)]
+{a} x
+{0} 0
+{1} 1
 
 SCIDB QUERY : <between(C,11,20)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{11} 1
+{12} 2
 
 SCIDB QUERY : <filter(C,x>1)>
-[{12}(2)]
+{a} x
+{12} 2
 
 SCIDB QUERY : <project(C,x)>
-[{11}(1)];
-[{12}(2)]
+{a} x
+{10} 0
+{11} 1
+{12} 2
 
 SCIDB QUERY : <join(C,C)>
-[{9}(),{10}(0,0),{11}(1,1)];
-[{12}(2,2),{13}(),{14}()]
+{a} x,x
+{10} 0,0
+{11} 1,1
+{12} 2,2
 
 SCIDB QUERY : <cross(C,C)>
-[[{9,9}(),{9,10}(),{9,11}(),{10,9}(),{10,10}(0,0),{10,11}(0,1),{11,9}(),{11,10}(1,0),{11,11}(1,1)]];
-[[{9,12}(),{9,13}(),{9,14}(),{10,12}(0,2),{10,13}(),{10,14}(),{11,12}(1,2),{11,13}(),{11,14}()]];
-[[{12,9}(),{12,10}(2,0),{12,11}(2,1),{13,9}(),{13,10}(),{13,11}(),{14,9}(),{14,10}(),{14,11}()]];
-[[{12,12}(2,2),{12,13}(),{12,14}(),{13,12}(),{13,13}(),{13,14}(),{14,12}(),{14,13}(),{14,14}()]]
+{a,a} x,x
+{10,10} 0,0
+{10,11} 0,1
+{11,10} 1,0
+{11,11} 1,1
+{10,12} 0,2
+{11,12} 1,2
+{12,10} 2,0
+{12,11} 2,1
+{12,12} 2,2
 
 SCIDB QUERY : <apply(C,z,x-a)>
-[{9}(),{10}(0,-10),{11}(1,-10)];
-[{12}(2,-10),{13}(),{14}()]
+{a} x,z
+{10} 0,-10
+{11} 1,-10
+{12} 2,-10
 
 SCIDB QUERY : <count(C)>
-[(3)]
+{i} count
+{0} 3
 
 SCIDB QUERY : <sum(C)>
-[(3)]
+{i} x_sum
+{0} 3
 
 SCIDB QUERY : <sort(C,x)>
-[(0),(1),(2)]
+{n} x
+{0} 0
+{1} 1
+{2} 2
 
 SCIDB QUERY : <sort(C,x desc)>
-[(2),(1),(0)]
+{n} x
+{0} 2
+{1} 1
+{2} 0
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully
@@ -164,5 +253,8 @@ SCIDB QUERY : <remove(C)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(D)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(B_short)>
 Query was executed successfully
 

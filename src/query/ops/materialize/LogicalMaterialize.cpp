@@ -37,6 +37,34 @@ namespace scidb
 {
 
 /**
+ * @brief The operator: materialize().
+ *
+ * @par Synopsis:
+ *   materialize( srcArray, format )
+ *
+ * @par Summary:
+ *   Produces a materialized version of an source array.
+ *
+ * @par Input:
+ *   - srcArray: the sourcce array with srcDims and srcAttrs.
+ *   - format: uint32, the materialize format.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
  *
  */
 class LogicalMaterialize: public LogicalOperator

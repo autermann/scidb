@@ -38,6 +38,32 @@ namespace scidb {
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: rename().
+ *
+ * @par Synopsis:
+ *   rename( oldArray, newArray )
+ *
+ * @par Summary:
+ *   Changes the name of an array.
+ *
+ * @par Input:
+ *   - oldArray: an existing array.
+ *   - newArray: the new name of the array.
+ *
+ * @par Output array:
+ *   NULL
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalRename: public LogicalOperator
 {
 public:
@@ -45,18 +71,17 @@ public:
 	    LogicalOperator(logicalName, alias)
 	{
 	    _properties.exclusive = true;
+	    _properties.ddl = true;
 		ADD_PARAM_IN_ARRAY_NAME()
 		ADD_PARAM_OUT_ARRAY_NAME()
 	}
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
-	{
+    {
         assert(schemas.size() == 0);
         assert(_parameters.size() == 2);
-        assert(((boost::shared_ptr<OperatorParam>&)_parameters[0])->getParamType() == PARAM_ARRAY_REF);
         assert(((boost::shared_ptr<OperatorParam>&)_parameters[1])->getParamType() == PARAM_ARRAY_REF);
 
-        const string &oldArrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         const string &newArrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
 
         if (SystemCatalog::getInstance()->containsArray(newArrayName))
@@ -65,10 +90,7 @@ public:
                 _parameters[1]->getParsingContext()) << newArrayName;
         }
 
-        ArrayDesc desc;
-        SystemCatalog::getInstance()->getArrayDesc(oldArrayName, desc);
-
-        return ArrayDesc(desc.getId(), newArrayName, desc.getAttributes(), desc.getDimensions(), desc.getFlags());
+        return ArrayDesc();
 	}
 
     void inferArrayAccess(boost::shared_ptr<Query>& query)

@@ -70,7 +70,10 @@ namespace scidb
     class MergeSortArray : public Array
     {
       public:
-        bool supportsRandomAccess() const;
+        virtual Access getSupportedAccess() const
+        {
+            return SINGLE_PASS;
+        }
         virtual ArrayDesc const& getArrayDesc() const;
         virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const;
 

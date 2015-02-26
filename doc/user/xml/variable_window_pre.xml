@@ -1,0 +1,60 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>variable_window</refname>
+    <refpurpose>Select nonempty cells from a variable size 1-dimensional window</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> variable_window(<replaceable>array</replaceable>,<replaceable>dimension</replaceable>,<replaceable>left_edge</replaceable>,
+     <replaceable>right_edge</replaceable>,<replaceable>aggregate_call</replaceable>)</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>
+
+The <code>variable_window</code> command aggregates along a
+1-dimensional window of variable length. The window is defined by the
+left and right edges, however, this type of window aggregate excludes
+cells that are empty.
+</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+
+      <para>This example aggregates the sum along a 1-dimensional
+      variable window that collects one nonempty value preceding and
+      one nonempty value following a cell.  This example uses the load
+      file examples/m4x4.scidb, shown here:
+
+<programlisting language='test'>
+--shell --show-query=no --command=cat ../examples/m4x4.scidb
+</programlisting>
+</para>
+      <procedure>
+        <step>
+          <para>Create an array called m4x4_emp:
+<programlisting language='test'>
+--afl CREATE empty ARRAY m4x4 &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no --show-query=yes
+</programlisting>
+</para>
+        </step>
+        <step>
+          <para>Load the file m4x4.scidb into m4x4_empty:
+<programlisting language='test'>
+--aql LOAD m4x4 FROM '../examples/m4x4.scidb'; --show-output=no --show-query=yes
+</programlisting></para>
+        </step>
+        <step>
+          <para>Use variable_window to select one value preceding  and the one value following a cell. The window proceeds along the i dimension and calculates the sum of the windowed values.
+
+<programlisting language='test'>
+--aql SELECT * FROM variable_window(m4x4,i,1,1,sum(val)); --output-format=dense --chunkify=yes
+</programlisting>
+</para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

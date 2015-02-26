@@ -1,0 +1,18 @@
+ --setup
+--start-query-logging
+
+--test
+
+--start-igdata
+
+--shell --command "cat ./testcases/data/test.csv | loadcsv.py -a 'loadArr' -s '<i:int64,j:int64,k:int64,val1:double,val2:double>[n=0:*,10,0]' -x  -A 'targetArr2' -S '<val1:double,val2:double>[i=0:*,10,0,j=0:*,10,0,k=0:*,10,0]' -X -z RSI  -v -c 10 -n 1 -l -L -b -d 'localhost' -p $IQUERY_PORT "
+
+
+
+
+
+--stop-igdata
+scan(targetArr2 )
+--cleanup
+--stop-query-logging
+

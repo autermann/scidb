@@ -37,6 +37,41 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: join().
+ *
+ * @par Synopsis:
+ *   join( leftArray, rightArray )
+ *
+ * @par Summary:
+ *   Combines the attributes of two arrays at matching dimension values.
+ *   The two arrays must have the same dimension start coordinates, the same chunk size, and the same chunk overlap.
+ *   The join result has the same dimension names as the first input.
+ *   The cell in the result array contains the concatenation of the attributes from the two source cells.
+ *   If a pair of join dimensions have different lengths, the result array uses the smaller of the two.
+ *
+ * @par Input:
+ *   - leftArray: the left-side source array with leftAttrs and leftDims.
+ *   - rightArray: the right-side source array with rightAttrs and rightDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   leftAttrs + rightAttrs: in case an attribute in rightAttrs conflicts with an attribute in leftAttrs, '_2' will be appended.
+ *   <br> >
+ *   <br> [
+ *   <br>   leftDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - join() is a special case of cross_join() with all pairs of dimensions given.
+ *
+ */
 class LogicalJoin: public LogicalOperator
 {
   public:
@@ -59,18 +94,20 @@ class LogicalJoin: public LogicalOperator
         Dimensions const& rightDimensions = rightArrayDesc.getDimensions();
         size_t totalAttributes = leftAttributes.size() + rightAttributes.size();
         int nBitmaps = 0;
+        bool mapJoin = false;
         nBitmaps += (leftArrayDesc.getEmptyBitmapAttribute() != NULL);
         nBitmaps += (rightArrayDesc.getEmptyBitmapAttribute() != NULL); 
         if (nBitmaps == 2) { 
             totalAttributes -= 1;
         }
-        if (nBitmaps == 0) {
-            for (size_t i = 0, n = leftDimensions.size(); i < n; i++) {
-                if (leftDimensions[i].getType() != TID_INT64) { 
-                    totalAttributes += 1;
-                    break;
-                }
+        for (size_t i = 0, n = leftDimensions.size(); i < n; i++) {
+            if (leftDimensions[i].getType() != TID_INT64) { 
+                mapJoin = true;
+                break;
             }
+        }
+        if (nBitmaps == 0 && mapJoin) {
+            nBitmaps += 1;
         }
         Attributes joinAttributes(totalAttributes);
 
@@ -111,13 +148,14 @@ class LogicalJoin: public LogicalOperator
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LOGICAL_JOIN_ERROR2);
            }
            leftDimensions[i].addAlias(leftArrayDesc.getName());
-           Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
-           Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
-           Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
-           leftDimensions[i].setCurrStart(newCurrStart);
-           leftDimensions[i].setCurrEnd(newCurrEnd);
-           leftDimensions[i].setEndMax(newEndMax);
-
+           if (!mapJoin) {
+               Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
+               Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
+               Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
+               leftDimensions[i].setCurrStart(newCurrStart);
+               leftDimensions[i].setCurrEnd(newCurrEnd);
+               leftDimensions[i].setEndMax(newEndMax);
+           }
            BOOST_FOREACH(const ObjectNames::NamesPairType &rDimName, rightDimensions[i].getNamesAndAliases())
            {
                BOOST_FOREACH(const string &alias, rDimName.second)

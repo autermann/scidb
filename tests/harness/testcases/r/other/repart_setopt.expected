@@ -1,0 +1,15 @@
+SCIDB QUERY : <project(filter(setopt('repart-algorithm', 'auto'), No = 0), new)>
+No,new
+0,"auto"
+
+SCIDB QUERY : <project(filter(setopt('repart-algorithm', 'dense'), No = 0), new)>
+No,new
+0,"dense"
+
+SCIDB QUERY : <project(filter(setopt('repart-algorithm', 'sparse'), No = 0), new)>
+No,new
+0,"sparse"
+
+SCIDB QUERY : <setopt('repart-algorithm', 'invalid')>
+[An error expected at this place for the query "setopt('repart-algorithm', 'invalid')". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ERROR_NEAR_CONFIG_OPTION. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ERROR_NEAR_CONFIG_OPTION.]
+

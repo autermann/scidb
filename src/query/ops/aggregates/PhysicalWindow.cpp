@@ -41,27 +41,30 @@ using namespace std;
 class PhysicalWindow: public  PhysicalOperator
 {
 private:
-    vector<size_t> _window;
+    vector<WindowBoundaries> _window;
 
 public:
     PhysicalWindow(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
 	     PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
         size_t nDims = _schema.getDimensions().size();
-        _window = vector<size_t>(nDims);
-        for (size_t i = 0; i < nDims; i++)
+        _window = vector<WindowBoundaries>(nDims);
+        for (size_t i = 0, size = nDims * 2, boundaryNo = 0; i < size; i+=2, ++boundaryNo)
         {
-            _window[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate().getInt64();
+            _window[boundaryNo] = WindowBoundaries(
+                    ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate().getInt64(),
+                    ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i+1])->getExpression()->evaluate().getInt64()
+                    );
         }
 	}
 
     virtual bool requiresRepart(ArrayDesc const& inputSchema) const
     {
         Dimensions const& dims = inputSchema.getDimensions();
-        for (size_t i = 0l; i < dims.size(); i++)
+        for (size_t i = 0; i < dims.size(); i++)
         {
             DimensionDesc const& srcDim = dims[i];
-            if(srcDim.getChunkOverlap() < _window[i]/2)
+            if(srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
             {
                 return true;
             }
@@ -78,7 +81,10 @@ public:
         {
             DimensionDesc inDim = inputSchema.getDimensions()[i];
 
-            size_t overlap = inDim.getChunkOverlap() >= _window[i]/2 ? inDim.getChunkOverlap() : _window[i]/2;
+            size_t overlap = inDim.getChunkOverlap() >=
+                std::max(_window[i]._boundaries.first, _window[i]._boundaries.second)
+                ? inDim.getChunkOverlap()
+                : std::max(_window[i]._boundaries.first, _window[i]._boundaries.second);
 
             dims.push_back( DimensionDesc(inDim.getBaseName(),
                                           inDim.getNamesAndAliases(),
@@ -107,7 +113,7 @@ public:
         for (size_t i = 0, n = dims.size(); i < n; i++)
         {
             DimensionDesc const& srcDim = dims[i];
-            if (srcDim.getChunkOverlap() < _window[i]/2)
+            if (srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_WINDOW_ERROR2);
         }
     }
@@ -120,13 +126,18 @@ public:
     {
         assert(inputArrays.size() == 1);
 
+        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
         ArrayDesc const& inDesc = inputArrays[0]->getArrayDesc();
         verifyInputSchema(inDesc);
 
         vector<AttributeID> inputAttrIDs;
         vector<AggregatePtr> aggregates;
 
-        for (size_t i = inDesc.getDimensions().size(); i<_parameters.size(); i++)
+        for (size_t i = inDesc.getDimensions().size() * 2, size = _parameters.size(); i < size; i++)
         {
             AttributeID inAttId;
 

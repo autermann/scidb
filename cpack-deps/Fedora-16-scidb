@@ -1,1 +1,0 @@
-postgresql-libs >= 8.3.7, python-paramiko >= 1.7.5, python-crypto >= 2.0.1, libscidbclient >= 11.12

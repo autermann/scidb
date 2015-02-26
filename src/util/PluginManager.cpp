@@ -178,10 +178,11 @@ private:
  * Loading includes several parts:
  * 1) Loading library itself.
  * 2) Call function and get a version of plugin
- * 3) Call function and get a vector of logical operator factories for adding into OperatorLibrary
- * 4) Call function and get a vector of physical operator factories for adding into OperatorLibrary
- * 5) Call function and get vector of user defined types for adding into typesystem
- * 6) Call function and get a vector of user defined scalar function for adding into FunctionLibrary
+ * 3) Call function and get vector of user defined types for adding into typesystem
+ * 4) Call function and get a vector of logical operator factories for adding into OperatorLibrary
+ * 5) Call function and get a vector of physical operator factories for adding into OperatorLibrary
+ * 6) Call function and get a vector of aggregate pointers for adding into AggregateLibrary
+ * 7) Call function and get a vector of user defined scalar function for adding into FunctionLibrary
  */
 void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalog)
 {
@@ -192,6 +193,14 @@ void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalo
     void* library = pluginDesc.handle;
     if (was)
         return;
+
+    GetTypes getTypes = reinterpret_cast<GetTypes>(reinterpret_cast<size_t>(openSymbol(library, "GetTypes")));
+    if (getTypes) {
+        const vector<Type>& types = getTypes();
+        for (size_t i = 0; i < types.size(); i++) {
+            TypeLibrary::registerType(types[i]);
+        }
+    }
 
 #ifndef SCIDB_CLIENT
     GetLogicalOperatorFactories getLogicalOperatorFactories = reinterpret_cast<GetLogicalOperatorFactories>(reinterpret_cast<size_t>(openSymbol(library, "GetLogicalOperatorFactories")));
@@ -220,14 +229,6 @@ void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalo
     }
 
 #endif
-    GetTypes getTypes = reinterpret_cast<GetTypes>(reinterpret_cast<size_t>(openSymbol(library, "GetTypes")));
-    if (getTypes) {
-        const vector<Type>& types = getTypes();
-        for (size_t i = 0; i < types.size(); i++) {
-            TypeLibrary::registerType(types[i]);
-        }
-    }
-
     GetFunctions getFunctions = reinterpret_cast<GetFunctions>(reinterpret_cast<size_t>(openSymbol(library, "GetFunctions")));
     if (getFunctions) {
         vector< FunctionDescription> functions = getFunctions();
@@ -254,6 +255,8 @@ void PluginManager::unLoadLibrary(const string& libraryName)
         throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR, SCIDB_LE_CANT_UNLOAD_MODULE) << libraryName;
 #ifndef SCIDB_CLIENT
     SystemCatalog::getInstance()->removeLibrary(libraryName);
+
+    LOG4CXX_WARN(logger, "Unloading '" << libraryName << "' library. Some arrays may be unavailable after server restart");
 #endif
 }
 

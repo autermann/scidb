@@ -398,8 +398,8 @@ void ChunkDelta::createDelta_Subtractive(const ConstChunk& srcChunk, const Const
                                                            deltaChunkAD.getAliases(),
                                                            deltaChunkAD.getReserve());
                 Attributes attrs(1, attrDesc);
-                ArrayDesc denseDesc(-0xf, "Temporary Array", attrs, srcChunk.getArrayDesc().getDimensions(), srcChunk.getArrayDesc().getFlags());
-                Address address(deltaChunk.getAddress().arrId, 0, deltaChunk.getAddress().coords);
+                ArrayDesc denseDesc("Temporary Array", attrs, srcChunk.getArrayDesc().getDimensions(), srcChunk.getArrayDesc().getFlags());
+                Address address(0, deltaChunk.getAddress().coords);
                 denseData.initialize(&deltaChunk.getArray(), 
                                      &denseDesc,
                                      address,
@@ -524,8 +524,8 @@ void ChunkDelta::applyDeltas_Subtractive(const ConstChunk& srcChunk, SharedBuffe
                                                                    deltaChunkAD.getAliases(),
                                                                    deltaChunkAD.getReserve());
                         Attributes attrs(1, attrDesc);
-                        ArrayDesc arrDesc(-0xf, "Temporary Array", attrs, srcChunk.getArrayDesc().getDimensions(), srcChunk.getArrayDesc().getFlags());
-                        Address tmpAddr(0, 0, srcChunk.getFirstPosition(false));
+                        ArrayDesc arrDesc("Temporary Array", attrs, srcChunk.getArrayDesc().getDimensions(), srcChunk.getArrayDesc().getFlags());
+                        Address tmpAddr(0, srcChunk.getFirstPosition(false));
                         densePart.initialize(&srcChunk.getArray(),
                                              &arrDesc,
                                              tmpAddr,

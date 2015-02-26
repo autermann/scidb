@@ -1,0 +1,19 @@
+--setup
+--start-query-logging
+
+create empty array ABRLOAD <v : int64> [I=0:2000,20,0, J=0:1000,20,0]
+
+--test 
+
+--shell --command "../utils/killquery.sh -afl 2  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' " --store
+--shell --command "../utils/killquery.sh -afl 15 2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' " --store
+--shell --command "../utils/killquery.sh -afl 9  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' " --store
+
+--echo "array should be empty (0 rows)..."
+count(ABRLOAD)
+
+--stop-query-logging
+
+--cleanup
+remove(ABRLOAD)
+

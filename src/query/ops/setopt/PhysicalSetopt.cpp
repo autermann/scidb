@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalSetopt.cpp
  *
  * @author knizhnik@garret.ru
  *

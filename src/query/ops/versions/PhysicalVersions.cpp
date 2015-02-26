@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalVersions.cpp
  *
  * @author knizhnik@garret.ru
  *
@@ -46,6 +46,7 @@ public:
     PhysicalVersions(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, vector<boost::shared_ptr<Tuple> >()));
     }
 
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
@@ -54,9 +55,8 @@ public:
         return ArrayDistribution(psLocalInstance);
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    void preSingleExecute(boost::shared_ptr<Query> query)
     {
-        assert(inputArrays.size() == 0);
         assert(_parameters.size() == 1);
 
         const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
@@ -74,8 +74,19 @@ public:
             tuple[1] = Value(TypeLibrary::getType(TID_DATETIME));
             tuple[1].setDateTime(versions[i].getTimeStamp());
         } 
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
     }
+
+    boost::shared_ptr<Array> execute(
+        std::vector<boost::shared_ptr<Array> >& inputArrays,
+        boost::shared_ptr<Query> query)
+    {
+        assert(inputArrays.size() == 0);
+        return _result;
+    }
+
+private:
+    boost::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalVersions, "versions", "physicalVersions")

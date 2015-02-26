@@ -75,7 +75,7 @@ public:
      * If the event is signalled before the call to wait,
      * the wait will never return. The signal will cause the wait()'s of *all* threads to return.
      * @param cs associated with this event, the same mutex has to be used the corresponding wait/signal
-     * @param errorChecker if set, it will be invoked periaodically and
+     * @param errorChecker if set, it will be invoked periodically and
      *                     the false return code will force this wait() to return regardless of whether the signal is received.
      * @note The errorChecker must also check for the condition predicate for which this Event is used because of the unavoidable
      *       race condition between the timer expiring (in pthread_cond_timedwait) and another thread signalling.

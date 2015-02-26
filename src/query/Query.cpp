@@ -51,6 +51,7 @@
 #include "system/Cluster.h"
 #include "util/iqsort.h"
 #include "util/LockManager.h"
+#include <system/BlockCyclic.h>
 #include <system/Exceptions.h>
 #include <system/System.h>
 #include <network/MessageUtils.h>
@@ -62,7 +63,6 @@ using namespace boost;
 
 namespace boost
 {
-   template<>
    bool operator< (shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
                    shared_ptr<scidb::SystemCatalog::LockDesc> const& r) {
       if (!l || !r) {
@@ -72,7 +72,6 @@ namespace boost
       return (l->getArrayName() < r->getArrayName());
    }
 
-   template<>
    bool operator== (shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
                     shared_ptr<scidb::SystemCatalog::LockDesc> const& r) {
          assert(false);
@@ -80,7 +79,6 @@ namespace boost
          return false;
    }
 
-   template<>
    bool operator!= (shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
                     shared_ptr<scidb::SystemCatalog::LockDesc> const& r) {
        return !operator==(l,r);
@@ -95,7 +93,7 @@ namespace std
    {
       return l < r;
    }
-}
+} // namespace
 
 namespace scidb
 {
@@ -171,8 +169,21 @@ boost::shared_ptr<Query> Query::createDetached()
 
 Query::Query():
     _queryID(INVALID_QUERY_ID), _instanceID(INVALID_INSTANCE), _coordinatorID(INVALID_INSTANCE), _error(SYSTEM_EXCEPTION_SPTR(SCIDB_E_NO_ERROR, SCIDB_E_NO_ERROR)),
-    completionStatus(INIT), _commitState(UNKNOWN), _creationTime(time(NULL)), _useCounter(0), _doesExclusiveArrayAccess(false), isDDL(false)
+    completionStatus(INIT), _commitState(UNKNOWN), _creationTime(time(NULL)), _useCounter(0), _doesExclusiveArrayAccess(false), _procGrid(NULL), isDDL(false)
 {
+}
+
+Query::~Query()
+{
+    if (statisticsMonitor) {
+        statisticsMonitor->pushStatistics(*this);
+    }
+    for (map< string, shared_ptr<RWLock> >::const_iterator i = locks.begin(); i != locks.end(); i++) {
+        LOG4CXX_DEBUG(logger, "Release lock of array " << i->first << " for query " << _queryID);
+        i->second->unLock();
+    }
+
+    delete _procGrid ; _procGrid = NULL ;
 }
 
 void Query::init(QueryID queryID, InstanceID coordID, InstanceID localInstanceID,
@@ -229,9 +240,9 @@ void Query::init(QueryID queryID, InstanceID coordID, InstanceID localInstanceID
       assert(_errorQueue);
       _mpiReceiveQueue = NetworkManager::getInstance()->createWorkQueue();
       assert(_mpiReceiveQueue);
-      _sgQueue = NetworkManager::getInstance()->createWorkQueue();
-      _sgQueue->stop();
-      assert(_sgQueue);
+      _operatorQueue = NetworkManager::getInstance()->createWorkQueue();
+      _operatorQueue->stop();
+      assert(_operatorQueue);
    }
    // register for notifications
    InstanceLivenessNotification::PublishListener listener =
@@ -305,18 +316,18 @@ void Query::start()
 {
     ScopedMutexLock cs(errorMutex);
     checkNoError();
-    if (completionStatus == INIT) { 
+    if (completionStatus == INIT) {
         completionStatus = START;
-    } 
+    }
 }
 
 void Query::stop()
 {
     ScopedMutexLock cs(errorMutex);
     checkNoError();
-    if (completionStatus == START) { 
+    if (completionStatus == START) {
         completionStatus = INIT;
-    } 
+    }
 }
 
 void Query::pushErrorHandler(const boost::shared_ptr<ErrorHandler>& eh)
@@ -450,7 +461,7 @@ void Query::sharedLock(string const& arrayName)
     {
         ScopedMutexLock cs(lockMutex);
         lock = locks[arrayName];
-        if (lock) { 
+        if (lock) {
             return;
         }
         locks[arrayName] = lock = LockManager::getInstance()->getLock(arrayName);
@@ -467,12 +478,12 @@ void Query::exclusiveLock(string const& arrayName)
     {
         ScopedMutexLock cs(lockMutex);
         lock = locks[arrayName];
-        if (lock) { 
-            if (lock->getNumberOfReaders() == 0) { 
+        if (lock) {
+            if (lock->getNumberOfReaders() == 0) {
                 return;
             }
             lock->unLockRead();
-        } else { 
+        } else {
             locks[arrayName] = lock = LockManager::getInstance()->getLock(arrayName);
         }
     }
@@ -536,7 +547,7 @@ void Query::handleAbort()
         errorHandlersOnStack.swap(_errorHandlers);
         finalizersOnStack.swap(_finalizers);
     }
-    if (!errorHandlersOnStack.empty()) { 
+    if (!errorHandlersOnStack.empty()) {
         LOG4CXX_ERROR(logger, "Query (" << queryId << ") error handlers ("
                      << errorHandlersOnStack.size() << ") are being executed");
         invokeErrorHandlers(errorHandlersOnStack);
@@ -587,19 +598,15 @@ void Query::handleCommit()
 void Query::handleComplete()
 {
     handleCommit();
-    if (!isDDL) {
-        boost::shared_ptr<MessageDesc>  msg(makeCommitMessage(_queryID));
-        NetworkManager::getInstance()->broadcast(msg);
-    }
+    boost::shared_ptr<MessageDesc>  msg(makeCommitMessage(_queryID));
+    NetworkManager::getInstance()->broadcast(msg);
 }
 
 void Query::handleCancel()
 {
     handleAbort();
-    if (!isDDL) {
-        boost::shared_ptr<MessageDesc>  msg(makeAbortMessage(_queryID));
-        NetworkManager::getInstance()->broadcast(msg);
-    }
+    boost::shared_ptr<MessageDesc>  msg(makeAbortMessage(_queryID));
+    NetworkManager::getInstance()->broadcast(msg);
 }
 
 void Query::handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>& newLiveness)
@@ -648,9 +655,10 @@ void Query::handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>
            _errorQueue->enqueue(item);
        }
    } catch (const WorkQueue::OverflowException& ) {
-      LOG4CXX_ERROR(logger, "Overflow exception from the work queue");
+       LOG4CXX_ERROR(logger, "Overflow exception from the error queue, queryID="<<_queryID);
       // XXX TODO: deal with this exception
       assert(false);
+      throw;
    }
 }
 
@@ -662,7 +670,7 @@ InstanceID Query::getPhysicalCoordinatorID()
    }
    if (_coordinatorID == INVALID_INSTANCE) {
       return INVALID_INSTANCE;
-   }   
+   }
    assert(_liveInstances.size() > 0);
    assert(_liveInstances.size() > _coordinatorID);
    return  _liveInstances[_coordinatorID];
@@ -735,18 +743,6 @@ void Query::setCurrentQueryID(QueryID queryID)
 }
 #endif
 
-Query::~Query()
-{
-    if (statisticsMonitor) {
-        statisticsMonitor->pushStatistics(*this);
-    }
-    runMultiinstancePostOddJob();
-    for (map< string, shared_ptr<RWLock> >::const_iterator i = locks.begin(); i != locks.end(); i++) { 
-        LOG4CXX_DEBUG(logger, "Release lock of array " << i->first << " for query " << _queryID);
-        i->second->unLock();
-    }
-}
-
 boost::shared_ptr<Query> Query::getQueryByID(QueryID queryID, bool create, bool raise)
 {
     shared_ptr<Query> query;
@@ -793,13 +789,18 @@ extern size_t totalMemChunkAllocatedSize;
 
 void dumpMemoryUsage(const QueryID queryId)
 {
-#ifdef DEBUG
+#ifndef NDEBUG
 #ifdef HAVE_MALLOC_STATS
     if (Config::getInstance()->getOption<bool>(CONFIG_OUTPUT_PROC_STATS)) {
         cerr << "Stats after query ID ("<<queryId<<") :" << endl;
         malloc_stats();
 #ifndef SCIDB_CLIENT
-        cerr << "Allocated size for DBChunks: " << totalDBChunkAllocatedSize << ", allocated size for MemChunks: " << totalMemChunkAllocatedSize << endl;
+        cerr <<
+                "Allocated size for DBChunks: " << totalDBChunkAllocatedSize <<
+                ", allocated size for MemChunks: " << SharedMemCache::getInstance().getUsedMemSize() <<
+                ", MemChunks were swapped out: " << SharedMemCache::getInstance().getSwapNum() <<
+                ", MemChunks were loaded: " << SharedMemCache::getInstance().getLoadsNum() <<
+                endl;
 #endif
     }
 #endif
@@ -826,7 +827,7 @@ void Query::destroy()
 
         _mpiReceiveQueue.swap(mpiQueue);
         _errorQueue.swap(errQueue);
-        _sgQueue.swap(sgQueue);
+        _operatorQueue.swap(sgQueue);
 
         // Unregister this query from liveness notifications
         InstanceLivenessNotification::removePublishListener(_livenessListenerID);
@@ -872,27 +873,24 @@ bool Query::validate()
    return true;
 }
 
-void Query::setSGContext(shared_ptr<SGContext> const& sgContext)
+Query::OperatorContext::~OperatorContext()
 {
-    assert(sgContext);
-    ScopedMutexLock lock(errorMutex);
-    _sgContext = sgContext;
-    _sgQueue->start();
 }
 
-void Query::unsetSGContext()
+void Query::setOperatorContext(shared_ptr<OperatorContext> const& opContext)
 {
-    assert(_sgContext);
+    assert(opContext);
     ScopedMutexLock lock(errorMutex);
-    _sgContext.reset();
-    _sgQueue->stop();
+    _operatorContext = opContext;
+    _operatorQueue->start();
 }
 
-boost::shared_ptr<SGContext> Query::getSGContext()
+void Query::unsetOperatorContext()
 {
+    assert(_operatorContext);
     ScopedMutexLock lock(errorMutex);
-    assert(_sgContext);
-    return _sgContext;
+    _operatorContext.reset();
+    _operatorQueue->stop();
 }
 
 void Query::replicationBarrier()
@@ -939,14 +937,14 @@ void Query::replicationBarrier()
     replicaSem.enter(replicasVec.size(), ec);
 }
 
-ostream& writeStatistics(ostream& os, shared_ptr<PhysicalQueryPlanNode> instance, size_t tab)
+ostream& writeStatistics(ostream& os, shared_ptr<PhysicalQueryPlanNode> node, size_t tab)
 {
     string tabStr(tab*4, ' ');
-    shared_ptr<PhysicalOperator> op = instance->getPhysicalOperator();
+    shared_ptr<PhysicalOperator> op = node->getPhysicalOperator();
     os << tabStr << "*" << op->getPhysicalName() << "*: " << endl;
     writeStatistics(os, op->getStatistics(), tab + 1);
-    for (size_t i = 0; i < instance->getChildren().size(); i++) {
-        writeStatistics(os, instance->getChildren()[i], tab + 1);
+    for (size_t i = 0; i < node->getChildren().size(); i++) {
+        writeStatistics(os, node->getChildren()[i], tab + 1);
     }
     return os;
 }
@@ -964,15 +962,6 @@ std::ostream& Query::writeStatistics(std::ostream& os) const
     os << endl << "=== Current state of system statistics: ===" << endl;
     scidb::writeStatistics(os, StatisticsScope::systemStatistics, 0);
     return os;
-}
-
-void Query::runMultiinstancePostOddJob()
-{
-    while (!_multiinstancePostOddJob.empty())
-    {
-        _multiinstancePostOddJob.front()->run(*this);
-        _multiinstancePostOddJob.pop();
-    }
 }
 
 void Query::postWarning(const Warning& warn)
@@ -1115,7 +1104,7 @@ void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog
       SystemCatalog::getInstance()->deleteArray(arrayName);
    } else if (newVersion != 0) {
       assert(coordLock->getLockMode() == SystemCatalog::LockDesc::WR);
-      string newArrayVersionName = formArrayNameVersion(arrayName,newVersion);
+      string newArrayVersionName = ArrayDesc::makeVersionedName(arrayName,newVersion);
       SystemCatalog::getInstance()->deleteArray(newArrayVersionName);
    }
 }
@@ -1133,7 +1122,7 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
    uint64_t timestamp = lock->getTimestamp();
 
    if (newVersion != 0) {
-       
+
        if (forceCoordLockCheck) {
            shared_ptr<SystemCatalog::LockDesc> coordLock;
            do {  //XXX TODO: fix the wait, possibly with batching the checks
@@ -1150,7 +1139,7 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
                         << " No rollback is possible.");
        }
        VersionID lastVersion = SystemCatalog::getInstance()->getLastVersion(arrayId);
-       
+
        assert(lastVersion <= newVersion);
        if (lastVersion < newVersion && newArrayVersionId > 0 && rollback) {
            rollback(lastVersion, arrayId, newArrayVersionId, timestamp);
@@ -1166,14 +1155,14 @@ void UpdateErrorHandler::doRollback(VersionID lastVersion,
                                     uint64_t timestamp)
 {
    // if a query stopped before the coordinator recorded the new array version id
-   // there is no rollback to do 
+   // there is no rollback to do
    assert(baseArrayId>0);
    if (newArrayId>0) {
        std::map<ArrayID,VersionID> undoArray;
        undoArray[baseArrayId] = lastVersion;
        try {
            StorageManager::getInstance().rollback(undoArray);
-           StorageManager::getInstance().remove(newArrayId); 
+           StorageManager::getInstance().remove(baseArrayId, newArrayId);
            SystemCatalog::getInstance()->deleteArrayCache(newArrayId);
        } catch (const scidb::Exception& e) {
            LOG4CXX_ERROR(logger, "UpdateErrorHandler::doRollback:"
@@ -1183,9 +1172,9 @@ void UpdateErrorHandler::doRollback(VersionID lastVersion,
                          << ". Error: "<< e.what());
            throw; //XXX TODO: anything to do ???
        }
-   } else { 
+   } else {
        try {
-           StorageManager::getInstance().remove(baseArrayId, false, timestamp); 
+           StorageManager::getInstance().remove(baseArrayId, baseArrayId, timestamp);
        } catch (const scidb::Exception& e) {
            LOG4CXX_ERROR(logger, "UpdateErrorHandler::doRollback:"
                          << " baseArrayId = "<< baseArrayId
@@ -1193,7 +1182,7 @@ void UpdateErrorHandler::doRollback(VersionID lastVersion,
                          << ". Error: "<< e.what());
            throw; //XXX TODO: anything to do ???
        }
-   }       
+   }
 }
 
 void Query::releaseLocks(const shared_ptr<Query>& q)
@@ -1212,7 +1201,7 @@ boost::shared_ptr<Array> Query::getTemporaryArray(std::string const& arrayName)
 {
     boost::shared_ptr<Array> tmpArray;
     std::map< std::string, boost::shared_ptr<Array> >::const_iterator i = _temporaryArrays.find(arrayName);
-    if (i != _temporaryArrays.end()) { 
+    if (i != _temporaryArrays.end()) {
         tmpArray = i->second;
     }
     return tmpArray;
@@ -1254,7 +1243,7 @@ void Query::acquireLocks()
             }
 
             bool rc = SystemCatalog::getInstance()->lockArray(lock, errorChecker);
-            assert(rc);
+            if (!rc) assert(false);
         }
         validate();
     } catch (std::exception&) {
@@ -1263,4 +1252,17 @@ void Query::acquireLocks()
     }
 }
 
+const ProcGrid* Query::getProcGrid() const
+{
+    // logically const, but we made _procGrid mutable to allow the caching
+    // NOTE: Tigor may wish to push this down into the MPI context when
+    //       that code is further along.  But for now, Query is a fine object
+    //       on which to cache the generated procGrid
+    if (!_procGrid) {
+        _procGrid = new ProcGrid(getInstancesCount());
+    }
+    return _procGrid;
+}
+
 } // namespace
+

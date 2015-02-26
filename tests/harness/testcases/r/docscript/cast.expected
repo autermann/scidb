@@ -1,0 +1,40 @@
+SCIDB QUERY : <create array winnersFewFlat <event:string,year:int64,person:string,country:string,time:double> [i=0:*,12,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load winnersFewFlat from '../examples/winnersFew.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array champions <person:string,country:string,time:double> [year=1996:2008,1,0, event(string)=3,1,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(winnersFewFlat,champions)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(project(champions,time),winningTime)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(winningTime)>
+{i} schema
+{0} "winningTime<time:double> [year=1996:2008,1,0,event(string)=3,1,0]"
+
+SCIDB QUERY : <store ( cast ( winningTime, <time_in_seconds:double null> [year=1996:2008,1,0, eventCode=0:2,1,0] ), winningTimeRecast )>
+{year,eventCode} time_in_seconds
+{1996,0} 9.84
+{1996,1} 7956
+{2000,0} 9.87
+{2000,1} 7811
+{2000,2} 503.17
+{2008,1} 7596
+
+SCIDB QUERY : <show(winningTimeRecast)>
+{i} schema
+{0} "winningTimeRecast<time_in_seconds:double NULL> [year=1996:2008,1,0,eventCode=0:2,1,0]"
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

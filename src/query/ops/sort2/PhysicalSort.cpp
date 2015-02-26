@@ -35,48 +35,54 @@ using namespace boost;
 
 namespace scidb
 {
-    class PhysicalSort2: public  PhysicalOperator
+
+class PhysicalSort2 : public  PhysicalOperator
+{
+public:
+    PhysicalSort2(std::string const& logicalName,
+                  std::string const& physicalName,
+                  Parameters const& parameters,
+                  ArrayDesc const& schema):
+        PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
-      public:
-        PhysicalSort2(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-            PhysicalOperator(logicalName, physicalName, parameters, schema)
-        {
-        }
-        
-        virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
-        {
-            return false;
-        }
+    }
 
-        virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-        {
-            return false;
-        }
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
+    {
+        return true;
+    }
 
-        virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                     const std::vector< ArrayDesc> & inputSchemas) const
-        {
-            return ArrayDistribution(psUndefined);
-        }
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
+    {
+        return false;
+    }
 
-        virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                       const std::vector< ArrayDesc> & inputSchemas) const
-        {
-            return inputBoundaries[0];
-        }
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector< ArrayDesc> const&) const
+    {
+        return ArrayDistribution(psUndefined);
+    }
 
-        boost::shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
-        {
-            if (inputArrays.size() > 1) { 
-                SortContext* ctx = (SortContext*)query->userDefinedContext;
-                boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new MergeSortArray(query, _schema, inputArrays, ctx->keys));
-                delete ctx;
-                return result;
-            }
-            return inputArrays[0];
-        }
-    };
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
+    {
+        return inputBoundaries[0];
+    }
 
-    DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSort2, "sort2", "physicalSort2")
+    boost::shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    {
+        if (inputArrays.size() > 1) {
+            SortContext* ctx = (SortContext*)query->userDefinedContext;
+            boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new MergeSortArray(query, _schema, inputArrays, ctx->keys));
+            delete ctx;
+            return result;
+        }
+        return inputArrays[0];
+    }
+};
+
+DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSort2, "sort2", "physicalSort2")
 
 } //namespace scidb

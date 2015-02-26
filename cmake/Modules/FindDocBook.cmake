@@ -28,9 +28,15 @@
 
 include(FindPackageHandleStandardArgs)
 
+# Ubuntu: /usr/share/xml/docbook/stylesheet/docbook-xsl/fo
+# Red Hat 5.4: /usr/share/sgml/docbook/xsl-stylesheets-1.69.1-5.1/fo/
+# Fedora 16: /usr/share/sgml/docbook/xsl-stylesheets-1.76.1/fo
+# Fedora 17: /usr/share/sgml/docbook/xsl-stylesheets-1.76-1/fo
 find_program(DOCBOOK_XSL_FILE docbook.xsl ${DOCBOOK_XSL_FILE_DIR}
-    /usr/share/xml/docbook/stylesheet/docbook-xsl/fo)
-
+  PATHS /usr/share/xml/docbook/stylesheet/docbook-xsl/fo
+        /usr/share/sgml/docbook/xsl-stylesheets-1.69.1-5.1/fo
+        /usr/share/sgml/docbook/xsl-stylesheets-1.76.1/fo
+        /usr/share/sgml/docbook/xsl-stylesheets-1.76-1/fo)
 find_package_handle_standard_args(docbook.xsl DEFAULT_MSG DOCBOOK_XSL_FILE)
 
 mark_as_advanced(DOCBOOK_XSL_FILE)

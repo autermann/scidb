@@ -44,7 +44,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.ech
 class PhysicalEcho: public PhysicalOperator
 {
 public:
-	PhysicalEcho(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalEcho(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
@@ -54,13 +54,20 @@ public:
     {
         assert(inputArrays.size() == 0);
         assert(_parameters.size() == 1);
-        std::string const& text = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
-        vector<boost::shared_ptr<Tuple> > tuples(1);
-        Tuple& tuple = *new Tuple(1);
-        tuples[0] = shared_ptr<Tuple>(&tuple);
-        tuple[0].setString(text.c_str());
-        LOG4CXX_TRACE(logger, text);
-        return shared_ptr<Array>(new TupleArray(_schema, tuples));
+
+        //We will produce this array only on coordinator
+        if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
+        {
+            std::string const& text = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+            vector<boost::shared_ptr<Tuple> > tuples(1);
+            Tuple& tuple = *new Tuple(1);
+            tuples[0] = shared_ptr<Tuple>(&tuple);
+            tuple[0].setString(text.c_str());
+            LOG4CXX_TRACE(logger, text);
+            return shared_ptr<Array>(new TupleArray(_schema, tuples));
+        }
+
+        return boost::shared_ptr<Array>(new MemArray(_schema));
     }
 };
 

@@ -44,6 +44,7 @@ message(STATUS "Configuring ${SYSTEM_H_IN} as ${SYSTEM_H}")
 configure_file(${SYSTEM_H_IN} ${SYSTEM_H})
 
 set(system_src
+    System.cpp
     Config.cpp
     Exceptions.cpp
     Cluster.cpp
@@ -53,6 +54,7 @@ set(system_src
     Resources.cpp
     Warnings.cpp
     ErrorsLibrary.cpp
+    BlockCyclic.cpp
 )
 
 file(GLOB system_include "*.h")

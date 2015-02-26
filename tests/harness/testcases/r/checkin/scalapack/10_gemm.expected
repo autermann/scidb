@@ -1,0 +1,463 @@
+SCIDB QUERY : <create immutable array ident11c1<a: double >   [r=0:0,1,0, c=0:0,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array ident11c2<a: double >   [r=0:0,2,0, c=0:0,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array ident22c1<a: double >   [r=0:1,1,0, c=0:1,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array ident22c2<a: double >   [r=0:1,2,0, c=0:1,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(ident11c1, IIF(r=c, 1, 0)), ident11c1)>
+{r,c} a
+{0,0} 1
+
+SCIDB QUERY : <store(build(ident11c2, IIF(r=c, 1, 0)), ident11c2)>
+{r,c} a
+{0,0} 1
+
+SCIDB QUERY : <store(build(ident22c1, IIF(r=c, 1, 0)), ident22c1)>
+{r,c} a
+{0,0} 1
+{0,1} 0
+{1,0} 0
+{1,1} 1
+
+SCIDB QUERY : <store(build(ident22c2, IIF(r=c, 1, 0)), ident22c2)>
+{r,c} a
+{0,0} 1
+{0,1} 0
+{1,0} 0
+{1,1} 1
+
+SCIDB QUERY : <create immutable array ident11nzc1<a: double >   [r=3:3,1,0, c=5:5,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array ident11nzc2<a: double >   [r=3:3,2,0, c=5:5,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array ident22nzc1<a: double >   [r=3:4,1,0, c=5:6,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array ident22nzc2<a: double >   [r=3:4,2,0, c=5:6,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(ident11nzc1, IIF(r+2=c, 1, 0)), ident11nzc1)>
+{r,c} a
+{3,5} 1
+
+SCIDB QUERY : <store(build(ident11nzc2, IIF(r+2=c, 1, 0)), ident11nzc2)>
+{r,c} a
+{3,5} 1
+
+SCIDB QUERY : <store(build(ident22nzc1, IIF(r+2=c, 1, 0)), ident22nzc1)>
+{r,c} a
+{3,5} 1
+{3,6} 0
+{4,5} 0
+{4,6} 1
+
+SCIDB QUERY : <store(build(ident22nzc2, IIF(r+2=c, 1, 0)), ident22nzc2)>
+{r,c} a
+{3,5} 1
+{3,6} 0
+{4,5} 0
+{4,6} 1
+
+SCIDB QUERY : <create immutable array intRows11c1<a: double > [r=0:0,1,0, c=0:0,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows22c1<a: double > [r=0:1,1,0, c=0:1,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows22c2<a: double > [r=0:1,2,0, c=0:1,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(intRows11c1, 1+r*1+c),      intRows11c1)>
+{r,c} a
+{0,0} 1
+
+SCIDB QUERY : <store(build(intRows22c1, 1+r*2+c),      intRows22c1)>
+{r,c} a
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <store(build(intRows22c2, 1+r*2+c),      intRows22c2)>
+{r,c} a
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <create immutable array intRows11nzc1<a: double > [r=7:7,1,0, c=11:11,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows22nzc1<a: double > [r=7:8,1,0, c=11:12,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows22nzc2<a: double > [r=7:8,2,0, c=11:12,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(intRows11nzc1, 1+(r-7)*1+(c-11)),      intRows11nzc1)>
+{r,c} a
+{7,11} 1
+
+SCIDB QUERY : <store(build(intRows22nzc1, 1+(r-7)*2+(c-11)),      intRows22nzc1)>
+{r,c} a
+{7,11} 1
+{7,12} 2
+{8,11} 3
+{8,12} 4
+
+SCIDB QUERY : <store(build(intRows22nzc2, 1+(r-7)*2+(c-11)),      intRows22nzc2)>
+{r,c} a
+{7,11} 1
+{7,12} 2
+{8,11} 3
+{8,12} 4
+
+SCIDB QUERY : <create immutable array intRows12c1<a: double > [r=0:0,1,0, c=0:1,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows12c2<a: double > [r=0:0,2,0, c=0:1,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows21c1<a: double > [r=0:1,1,0, c=0:0,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows21c2<a: double > [r=0:1,2,0, c=0:0,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(intRows12c1, 1+r*2+c),      intRows12c1)>
+{r,c} a
+{0,0} 1
+{0,1} 2
+
+SCIDB QUERY : <store(build(intRows12c2, 1+r*2+c),      intRows12c2)>
+{r,c} a
+{0,0} 1
+{0,1} 2
+
+SCIDB QUERY : <store(build(intRows21c1, 1+r*1+c),      intRows21c1)>
+{r,c} a
+{0,0} 1
+{1,0} 2
+
+SCIDB QUERY : <store(build(intRows21c2, 1+r*1+c),      intRows21c2)>
+{r,c} a
+{0,0} 1
+{1,0} 2
+
+SCIDB QUERY : <create immutable array intRows12nzc1<a: double > [r=13:13,1,0, c=17:18,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows12nzc2<a: double > [r=13:13,2,0, c=17:18,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows21nzc1<a: double > [r=13:14,1,0, c=17:17,1,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create immutable array intRows21nzc2<a: double > [r=13:14,2,0, c=17:17,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(intRows12nzc1, 1+(r-13)*2+(c-17)),      intRows12nzc1)>
+{r,c} a
+{13,17} 1
+{13,18} 2
+
+SCIDB QUERY : <store(build(intRows12nzc2, 1+(r-13)*2+(c-17)),      intRows12nzc2)>
+{r,c} a
+{13,17} 1
+{13,18} 2
+
+SCIDB QUERY : <store(build(intRows21nzc1, 1+(r-13)*1+(c-17)),      intRows21nzc1)>
+{r,c} a
+{13,17} 1
+{14,17} 2
+
+SCIDB QUERY : <store(build(intRows21nzc2, 1+(r-13)*1+(c-17)),      intRows21nzc2)>
+{r,c} a
+{13,17} 1
+{14,17} 2
+
+SCIDB QUERY : <create immutable array fileDense66c33 <a: double >   [r=0:5,3,0, c=0:5,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load(fileDense66c33,'../tests/harness/testcases/data/dense.txt')>
+{r,c} a
+{0,0} 11
+{0,1} 12
+{0,2} 13
+{1,0} 21
+{1,1} 22
+{1,2} 23
+{2,0} 31
+{2,1} 32
+{2,2} 33
+{0,3} 14
+{0,4} 15
+{0,5} 16
+{1,3} 24
+{1,4} 25
+{1,5} 26
+{2,3} 34
+{2,4} 35
+{2,5} 36
+{3,0} 41
+{3,1} 42
+{3,2} 43
+{4,0} 51
+{4,1} 52
+{4,2} 53
+{5,0} 61
+{5,1} 62
+{5,2} 63
+{3,3} 44
+{3,4} 45
+{3,5} 46
+{4,3} 54
+{4,4} 55
+{4,5} 56
+{5,3} 64
+{5,4} 65
+{5,5} 66
+
+SCIDB QUERY : <create immutable array output66c66 <a: double > [r=0:5,6,0, c=0:5,6,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load_library('dense_linear_algebra')>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(ident11c1,   ident11c1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <store(gemm(ident11c1,   ident11c1, build(ident11c1,0)), tmp)>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <remove(tmp)>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(intRows11c1,   ident11c1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <gemm(ident11c1,   intRows11c1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <gemm(intRows11c1, intRows11c1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <gemm(intRows11nzc1,   ident11nzc1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <gemm(ident11nzc1,   intRows11nzc1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <gemm(intRows11nzc1, intRows11nzc1, build(ident11c1,0))>
+{r,c} gemm
+{0,0} 1
+
+SCIDB QUERY : <gemm(intRows22c1,   ident22c1, build(ident22c1,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <gemm(ident22c1,   intRows22c1, build(ident22c1,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <gemm(intRows22c1, intRows22c1, build(ident22c1,0))>
+{r,c} gemm
+{0,0} 7
+{0,1} 10
+{1,0} 15
+{1,1} 22
+
+SCIDB QUERY : <gemm(intRows22c2,   ident22c2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <gemm(ident22c2,   intRows22c2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <gemm(intRows22c2, intRows22c2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 7
+{0,1} 10
+{1,0} 15
+{1,1} 22
+
+next three should have same answers as prior 3
+SCIDB QUERY : <gemm(intRows22nzc2,   ident22nzc2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <gemm(ident22nzc2,   intRows22nzc2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 3
+{1,1} 4
+
+SCIDB QUERY : <gemm(intRows22nzc2, intRows22nzc2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 7
+{0,1} 10
+{1,0} 15
+{1,1} 22
+
+SCIDB QUERY : <repart(gemm(fileDense66c33, fileDense66c33, build(fileDense66c33,0)), output66c66)>
+{r,c} gemm
+{0,0} 3091
+{0,1} 3172
+{0,2} 3253
+{0,3} 3334
+{0,4} 3415
+{0,5} 3496
+{1,0} 5251
+{1,1} 5392
+{1,2} 5533
+{1,3} 5674
+{1,4} 5815
+{1,5} 5956
+{2,0} 7411
+{2,1} 7612
+{2,2} 7813
+{2,3} 8014
+{2,4} 8215
+{2,5} 8416
+{3,0} 9571
+{3,1} 9832
+{3,2} 10093
+{3,3} 10354
+{3,4} 10615
+{3,5} 10876
+{4,0} 11731
+{4,1} 12052
+{4,2} 12373
+{4,3} 12694
+{4,4} 13015
+{4,5} 13336
+{5,0} 13891
+{5,1} 14272
+{5,2} 14653
+{5,3} 15034
+{5,4} 15415
+{5,5} 15796
+
+SCIDB QUERY : <gemm(intRows12c2, intRows21c2, build(ident11c2,0))>
+{r,c} gemm
+{0,0} 5
+
+SCIDB QUERY : <gemm(intRows21c2, intRows12c2, build(ident22c2,0))>
+{r,c} gemm
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 4
+
+next output (by rows) should be 7, 15, 10, 22
+SCIDB QUERY : <transpose(gemm(intRows22c2, intRows22c2, build(ident22c2,0)))>
+{c,r} gemm
+{0,0} 7
+{0,1} 15
+{1,0} 10
+{1,1} 22
+
+SCIDB QUERY : <remove(ident11c1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident11c2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident22c1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident22c2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident11nzc1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident11nzc2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident22nzc1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(ident22nzc2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows11c1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows22c1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows22c2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows11nzc1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows22nzc1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows22nzc2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows12c1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows21c1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows12c2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows21c2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows12nzc1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows21nzc1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows12nzc2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(intRows21nzc2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(fileDense66c33)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(output66c66)>
+Query was executed successfully
+

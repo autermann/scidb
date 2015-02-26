@@ -14,19 +14,29 @@ SCIDB QUERY : <create immutable empty array E <x:int32> [a=0:2,2,1]>
 Query was executed successfully
 
 SCIDB QUERY : <select * into A from build(A,x+10)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into B from A where x>=1>
-[(),(11),(12)]
+{x} a
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into C from A where x>1>
-[(),(),(12)]
+{a} x
+{2} 12
 
 SCIDB QUERY : <select * into D from A where x<1 or a=12>
-[(10),(),(12)]
+{x} a
+{0} 10
+{2} 12
 
 SCIDB QUERY : <select * into E from A where a<>12>
-[(10),(11),()]
+{a} x
+{0} 10
+{1} 11
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

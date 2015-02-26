@@ -59,7 +59,7 @@ public:
     {
         std::ostringstream out;
         out<<cm;
-        CPPUNIT_ASSERT(out.str() == "[20,20]:1 | [0,0]:0 [0,10]:1 [0,40]:0 [0,60]:3 | [10,20]:0 [10,30]:1 | ");
+        CPPUNIT_ASSERT(out.str() == "[0,0]:0 [0,10]:1 [0,40]:0 [0,60]:3 | [10,20]:0 [10,30]:1 | [20,20]:1 | ");
         out.str("");
 
         Coordinates coords(2);

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>approxdc</refname>
+
+    <refpurpose>Approximate count of number of distinct values</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>AQL% <command>SELECT</command> approxdc(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
+
+    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,approxdc(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The approxdc aggregate takes a set of values from an array attribute
+    and returns an approximate count of the number of distinct values
+    present.</para>
+
+    <para>The approxdc operator does not count null values.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>These examples find the approximate number of distinct words in an
+      array or in various subsets of the array.</para>
+
+      <procedure>
+        <step>
+          <para>Show the array schema:<programlisting>select * from show(wordOfConversation);</programlisting>This
+          query returns:<screen>wordOfConversation
+&lt;wordID:int64&gt; 
+[languageID=1:1000,100,0,
+conversationID=1:5000000,1000,0,
+timeOffsetInSeconds=1:10000,1000,100]</screen></para>
+        </step>
+
+        <step>
+          <para>Show the approximate count of distinct words in the
+          array:<programlisting>SELECT approxdc(wordID) 
+       FROM wordOfConversation;</programlisting></para>
+        </step>
+
+        <step>
+          <para>For each language represented in the array, show the
+          approximate count of distinct words used in all conversations in
+          that language:<programlisting>SELECT approxdc(wordID) 
+       FROM wordOfConversation 
+       GROUP BY languageID;</programlisting></para>
+        </step>
+
+        <step>
+          <para>For each conversation represented in the array, show the
+          approximate count of distinct words used:<programlisting>SELECT approxdc(wordID) 
+       FROM wordOfConversation 
+       GROUP BY conversationID;</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

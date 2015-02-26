@@ -46,9 +46,10 @@ namespace scidb
 class PhysicalExplainLogical: public PhysicalOperator
 {
 public:
-        PhysicalExplainLogical(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalExplainLogical(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, vector<boost::shared_ptr<Tuple> >()));
     }
 
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
@@ -57,7 +58,7 @@ public:
         return ArrayDistribution(psLocalInstance);
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    void preSingleExecute(boost::shared_ptr<Query> query)
     {
         bool afl = false;
 
@@ -66,34 +67,39 @@ public:
 
         if (_parameters.size() == 2)
         {
-                string languageSpec = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
-                if (languageSpec == "afl")
-                {       afl = true; }
+            string languageSpec = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
+            afl = languageSpec == "afl";
         }
 
-                boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
-                boost::shared_ptr<Query> innerQuery = Query::createDetached();
-                innerQuery->init(INVALID_QUERY_ID-1,
-                                 query->mapLogicalToPhysical(query->getCoordinatorID()),
-                                 query->mapLogicalToPhysical(query->getInstanceID()),
-                                 query->getCoordinatorLiveness());
-                innerQuery->queryString = queryString;
+        boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+        boost::shared_ptr<Query> innerQuery = Query::createDetached();
+        innerQuery->init(INVALID_QUERY_ID-1,
+                         query->mapLogicalToPhysical(query->getCoordinatorID()),
+                         query->mapLogicalToPhysical(query->getInstanceID()),
+                         query->getCoordinatorLiveness());
+        innerQuery->queryString = queryString;
 
-                queryProcessor->parseLogical(innerQuery, afl);
-                queryProcessor->inferTypes(innerQuery);
+        queryProcessor->parseLogical(innerQuery, afl);
+        queryProcessor->inferTypes(innerQuery);
 
-//              boost::shared_ptr< Optimizer> optimizer =  Optimizer::create();
-//              queryProcessor->optimize(optimizer, innerQuery);
+        std::ostringstream planString;
+        innerQuery->logicalPlan->toString(planString);
 
-                std::ostringstream planString;
-                innerQuery->logicalPlan->toString(planString);
+        vector< boost::shared_ptr<Tuple> > tuples(1);
+        Tuple& tuple = *new Tuple(1);
+        tuples[0] = boost::shared_ptr<Tuple>(&tuple);
+        tuple[0].setData(planString.str().c_str(), planString.str().length() + 1);
 
-                vector< boost::shared_ptr<Tuple> > tuples(1);
-                Tuple& tuple = *new Tuple(1);
-                tuples[0] = boost::shared_ptr<Tuple>(&tuple);
-                tuple[0].setData(planString.str().c_str(), planString.str().length() + 1);
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
+        _result = boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
     }
+
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    {
+        return _result;
+    }
+
+private:
+    boost::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalExplainLogical, "explain_logical", "physicalExplainLogical")

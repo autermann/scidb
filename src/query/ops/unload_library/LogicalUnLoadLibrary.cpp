@@ -35,6 +35,31 @@
 namespace scidb
 {
 
+/**
+ * @brief The operator: unload_library().
+ *
+ * @par Synopsis:
+ *   unload_library( library )
+ *
+ * @par Summary:
+ *   Unloads a SciDB plugin.
+ *
+ * @par Input:
+ *   - library: the name of the library to unload.
+ *
+ * @par Output array:
+ *   - NULL
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - This operator is the reverse of load_library().
+ *
+ */
 class LogicalUnLoadLibrary: public LogicalOperator
 {
 public:

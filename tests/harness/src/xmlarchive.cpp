@@ -130,12 +130,13 @@ void XMLArchive :: save (const struct IndividualTestInfo &iti)
 	string TestcaseResult;
 	switch (iti.testEi.result)
 	{
-		case RESULT_PASS             : TestcaseResult = "PASS";      break;
-		case RESULT_SYSTEM_EXCEPTION : /* fallthrough */
-		case RESULT_CONFIG_EXCEPTION : /* fallthrough */
-		case RESULT_FILES_DIFFER     : TestcaseResult = "FAIL";      break;
-		case RESULT_SKIPPED          : TestcaseResult = "SKIPPED";   break;
-		case RESULT_RECORDED         : TestcaseResult = "RECORDED";  break;
+		case RESULT_PASS               : TestcaseResult = "PASS";                break;
+		case RESULT_ERROR_CODES_DIFFER : TestcaseResult = "ERROR_CODES_DIFFER";  break;
+		case RESULT_SYSTEM_EXCEPTION   : /* fallthrough */
+		case RESULT_CONFIG_EXCEPTION   : /* fallthrough */
+		case RESULT_FILES_DIFFER       : TestcaseResult = "FAIL";                break;
+		case RESULT_SKIPPED            : TestcaseResult = "SKIPPED";             break;
+		case RESULT_RECORDED           : TestcaseResult = "RECORDED";            break;
 	}
 	putCHAR (XML_CHAR_TAB);
 	(*this) << BOOST_SERIALIZATION_NVP(TestcaseResult);

@@ -95,123 +95,190 @@ SCIDB QUERY : <create immutable empty array edTs_nf <a:double default 1.1 compre
 Query was executed successfully
 
 SCIDB QUERY : <select * into Ts_rle from build_sparse(Ts,x+0.2,x<>0)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into Ts_d from build_sparse(Ts,x+0.2,x<>x)>
-[]
+{x} a
 
 SCIDB QUERY : <select * into Ts_ns from build_sparse(Ts,x+0.2,x<>1 or x<>-1)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into Ts_be from build_sparse(Ts,x+0.2,x=0 or x=3)>
-[{0}(0.2)];
-[{3}(3.2)]
+{x} a
+{0} 0.2
+{3} 3.2
 
 SCIDB QUERY : <select * into Ts_z from build_sparse(Ts,x+0.2,x=-1)>
-[{-1}(-0.8)]
+{x} a
+{-1} -0.8
 
 SCIDB QUERY : <select * into Ts_bz from build_sparse(Ts,x+0.2,x=9)>
-[]
+{x} a
 
 SCIDB QUERY : <select * into Ts_nf from build_sparse(Ts,x+0.2,x=x)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into eTs_rle from build_sparse(eTs,x+0.2,x<>0)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into eTs_d from build_sparse(eTs,x+0.2,x<>x)>
-[]
+{x} a
 
 SCIDB QUERY : <select * into eTs_ns from build_sparse(eTs,x+0.2,x<>1 or x<>-1)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into eTs_be from build_sparse(eTs,x+0.2,x=0 or x=3)>
-[{0}(0.2)];
-[{3}(3.2)]
+{x} a
+{0} 0.2
+{3} 3.2
 
 SCIDB QUERY : <select * into eTs_z from build_sparse(eTs,x+0.2,x=-1)>
-[{-1}(-0.8)]
+{x} a
+{-1} -0.8
 
 SCIDB QUERY : <select * into eTs_bz from build_sparse(eTs,x+0.2,x=9)>
-[]
+{x} a
 
 SCIDB QUERY : <select * into eTs_nf from build_sparse(eTs,x+0.2,x=x)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_rle from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_d from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_ns from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_be from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_z from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_bz from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into dTs_nf from build_sparse(dTs,x+0.2,true)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into edTs_rle from build_sparse(edTs,x+0.2,x<>0)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into edTs_d from build_sparse(edTs,x+0.2,x<>x)>
-[]
+{x} a
 
 SCIDB QUERY : <select * into edTs_ns from build_sparse(edTs,x+0.2,x<>1 or x<>-1)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <select * into edTs_be from build_sparse(edTs,x+0.2,x=0 or x=3)>
-[{0}(0.2)];
-[{3}(3.2)]
+{x} a
+{0} 0.2
+{3} 3.2
 
 SCIDB QUERY : <select * into edTs_z from build_sparse(edTs,x+0.2,x=-1)>
-[{-1}(-0.8)]
+{x} a
+{-1} -0.8
 
 SCIDB QUERY : <select * into edTs_bz from build_sparse(edTs,x+0.2,x=9)>
-[]
+{x} a
 
 SCIDB QUERY : <select * into edTs_nf from build_sparse(edTs,x+0.2,x=x)>
-[{-2}(-1.8),{-1}(-0.8)];
-[{0}(0.2),{1}(1.2)];
-[{2}(2.2),{3}(3.2)]
+{x} a
+{-2} -1.8
+{-1} -0.8
+{0} 0.2
+{1} 1.2
+{2} 2.2
+{3} 3.2
 
 SCIDB QUERY : <remove(Ts)>
 Query was executed successfully

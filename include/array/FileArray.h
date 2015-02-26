@@ -78,6 +78,14 @@ class FileArray : public Array
 
     void writeChunk(FileChunk* chunk);
 
+    /**
+     * @see Array::isMaterialized()
+     */
+    virtual bool isMaterialized() const
+    {
+        return true;
+    }
+
   private:
     void init(ArrayDesc const& arr, char const* filePath);
 

@@ -37,12 +37,14 @@
 
 #include "stdint.h"
 #include "boost/asio.hpp"
+#include <log4cxx/logger.h>
+#include <vector>
 
 #include "array/Metadata.h"
-#include "network/proto/scidb_msg.pb.h"
 #include "array/Array.h"
 #include "util/Semaphore.h"
-#include "util/NetworkMessage.h"
+#include <util/NetworkMessage.h>
+#include <util/Network.h>
 
 namespace scidb
 {
@@ -57,7 +59,7 @@ const uint32_t NET_PROTOCOL_CURRENT_VER = NET_PROTOCOL_VER3;
  */
 enum MessageType
 {
-    mtNone,
+    mtNone=SYSTEM_NONE_MSG_ID,
     mtExecuteQuery,
     mtPreparePhysicalPlan,
     mtExecutePhysicalPlan,
@@ -86,18 +88,18 @@ enum MessageType
     mtCommit,
     mtCompleteQuery,
     mtControl,
-    mtSystemMax // must be last
+    mtSystemMax // must be last, make sure scidb::SYSTEM_MAX_MSG_ID is set to this value
 };
 
 
 struct MessageHeader
 {
    uint16_t netProtocolVersion;         /** < Version of network protocol */
-   uint16_t messageType;                        /** < Type of message */
+   uint16_t messageType;                /** < Type of message */
    uint32_t recordSize;                 /** < The size of structured part of message to know what buffer size we must allocate */
    uint32_t binarySize;                 /** < The size of unstructured part of message to know what buffer size we must allocate */
-   InstanceID sourceInstanceID;            /** < The source instance number */
-   uint64_t queryID;               /** < Query ID */
+   InstanceID sourceInstanceID;         /** < The source instance number */
+   uint64_t queryID;                    /** < Query ID */
 };
 
 
@@ -108,9 +110,9 @@ class MessageDesc
 {
 public:
    MessageDesc();
-   MessageDesc(MessageType messageType);
+   MessageDesc(MessageID messageType);
    MessageDesc(boost::shared_ptr< SharedBuffer > binary);
-   MessageDesc(MessageType messageType, boost::shared_ptr< SharedBuffer > binary);
+   MessageDesc(MessageID messageType, boost::shared_ptr< SharedBuffer > binary);
    virtual ~MessageDesc() {}
    void writeConstBuffers(std::vector<boost::asio::const_buffer>& constBuffers);
    bool parseRecord(size_t bufferSize);
@@ -127,7 +129,7 @@ public:
       _messageHeader.sourceInstanceID = instanceId;
    }
 
-template <class Derived>
+   template <class Derived>
     boost::shared_ptr<Derived> getRecord() {
         return boost::static_pointer_cast<Derived>(_record);
     }
@@ -169,18 +171,18 @@ template <class Derived>
 
     virtual MessagePtr createRecord(MessageID messageType)
     {
-       return createRecordByType(static_cast<MessageType>(messageType));
+       return createRecordByType(static_cast<MessageID>(messageType));
     }
 
 private:
 
-    void init(MessageType messageType);
+    void init(MessageID messageType);
     MessageHeader _messageHeader;   /** < Message header */
     MessagePtr _record;             /** < Structured part of message */
     boost::shared_ptr< SharedBuffer > _binary;     /** < Buffer for binary data to be transfered */
     boost::asio::streambuf _recordStream; /** < Buffer for serializing Google Protocol Buffers objects */
 
-    static MessagePtr createRecordByType(MessageType messageType);
+    static MessagePtr createRecordByType(MessageID messageType);
 
     friend class BaseConnection;
     friend class Connection;
@@ -196,7 +198,6 @@ class BaseConnection
 protected:
 
         boost::asio::ip::tcp::socket _socket;
-        boost::shared_ptr<MessageDesc> _messageDesc;
         /**
          * Set socket options such as TCP_KEEP_ALIVE
          */
@@ -204,27 +205,96 @@ protected:
 
 public:
         BaseConnection(boost::asio::io_service& ioService);
-        ~BaseConnection();
+        virtual ~BaseConnection();
 
         /// Connect to remote site
         void connect(std::string address, uint16_t port);
 
-        void disconnect();
+        virtual void disconnect();
 
         boost::asio::ip::tcp::socket& getSocket() {
-                return _socket;
+            return _socket;
         }
 
         /**
          * Send message to peer and read message from it.
          * @param inMessageDesc a message descriptor for sending message.
-         * @param binary a buffer for writing binary data to. If it has
-         * default value, buffer will be allocated.
+         * @param template MessageDesc_tt must implement MessageDesc APIs
          * @return message descriptor of received message.
+         * @throw System::Exception
          */
-        boost::shared_ptr<MessageDesc> sendAndReadMessage(boost::shared_ptr<MessageDesc>& inMessageDesc);
+        template <class MessageDesc_tt>
+        boost::shared_ptr<MessageDesc_tt> sendAndReadMessage(boost::shared_ptr<MessageDesc>& inMessageDesc);
+
+         /**
+         * Send message to peer
+         * @param inMessageDesc a message descriptor for sending message.
+         * @throw System::Exception
+         */
+        void send(boost::shared_ptr<MessageDesc>& messageDesc);
+
+        /**
+         * Receive message from peer
+         * @param template MessageDesc_tt must implement MessageDesc APIs
+         * @return message descriptor of received message
+         * @throw System::Exception
+         */
+        template <class MessageDesc_tt>
+        boost::shared_ptr<MessageDesc_tt> receive();
+
+        static log4cxx::LoggerPtr logger;
 };
 
+template <class MessageDesc_tt>
+boost::shared_ptr<MessageDesc_tt> BaseConnection::sendAndReadMessage(boost::shared_ptr<MessageDesc>& messageDesc)
+{
+    LOG4CXX_TRACE(BaseConnection::logger, "The sendAndReadMessage: begin");
+    send(messageDesc);
+    boost::shared_ptr<MessageDesc_tt> resultDesc = receive<MessageDesc_tt>();
+    LOG4CXX_TRACE(BaseConnection::logger, "The sendAndReadMessage: end");
+    return resultDesc;
+}
+
+template <class MessageDesc_tt>
+boost::shared_ptr<MessageDesc_tt> BaseConnection::receive()
+{
+    LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: begin");
+    boost::shared_ptr<MessageDesc_tt> resultDesc(new MessageDesc_tt());
+    try
+    {
+        // Reading message description
+        size_t readBytes = read(_socket, boost::asio::buffer(&resultDesc->_messageHeader, sizeof(resultDesc->_messageHeader)));
+        assert(readBytes == sizeof(resultDesc->_messageHeader));
+        assert(resultDesc->validate());
+        // TODO: This must not be an assert but exception of correct handled backward compatibility
+        assert(resultDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER);
+
+        // Reading serialized structured part
+        readBytes = read(_socket, resultDesc->_recordStream.prepare(resultDesc->_messageHeader.recordSize));
+        assert(readBytes == resultDesc->_messageHeader.recordSize);
+        LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: recordSize=" << resultDesc->_messageHeader.recordSize);
+        bool rc = resultDesc->parseRecord(readBytes);
+        if (!rc) assert(false);
+
+        resultDesc->prepareBinaryBuffer();
+
+        if (resultDesc->_messageHeader.binarySize > 0)
+        {
+            readBytes = read(_socket, boost::asio::buffer(resultDesc->_binary->getData(), resultDesc->_binary->getSize()));
+            assert(readBytes == resultDesc->_binary->getSize());
+        }
+
+        LOG4CXX_TRACE(BaseConnection::logger, "read message: messageType=" << resultDesc->_messageHeader.messageType <<
+                      " ; binarySize=" << resultDesc->_messageHeader.binarySize);
+
+        LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: end");
+    }
+    catch (const boost::exception &e)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_CANT_SEND_RECEIVE);
+    }
+    return resultDesc;
+}
 
 }
 

@@ -22,7 +22,7 @@
 */
 
 /*
- * @file 
+ * @file
  *
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  *
@@ -33,5 +33,4 @@
 #define SYSTEM_H_
 
 #cmakedefine HAVE_MALLOC_STATS
-
 #endif //SYSTEM_H_

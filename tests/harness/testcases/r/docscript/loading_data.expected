@@ -1,0 +1,263 @@
+SCIDB QUERY : <cat ../examples/olympic_data.csv >
+event,year,person,time
+dash,1996,Bailey,9.84
+dash,2000,Greene,9.87
+dash,2004,Gatlin,9.85
+dash,2008,Bolt,9.69
+steeplechase,1996,Keter,487.12
+steeplechase,2000,Kosgei,503.17
+steeplechase,2004,Kemboi,485.81
+steeplechase,2008,Kipruto,490.34
+marathon,1996,Thugwane,7956
+marathon,2000,Abera,7811
+marathon,2004,Baldini,7855
+marathon,2008,Wanjiru,7596
+
+SCIDB QUERY : <csv2scidb -h >
+
+SCIDB QUERY : <cat ../examples/olympic_data.scidb >
+{0}[
+("dash",1996,"Bailey",9.84),
+("dash",2000,"Greene",9.87),
+("dash",2004,"Gatlin",9.85),
+("dash",2008,"Bolt",9.69),
+("steeplechase",1996,"Keter",487.12),
+("steeplechase",2000,"Kosgei",503.17),
+("steeplechase",2004,"Kemboi",485.81),
+("steeplechase",2008,"Kipruto",490.34),
+("marathon",1996,"Thugwane",7956),
+("marathon",2000,"Abera",7811),
+("marathon",2004,"Baldini",7855),
+("marathon",2008,"Wanjiru",7596)
+]
+
+SCIDB QUERY : <CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD winnersFlat FROM '../examples/olympic_data.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * FROM analyze(winnersFlat)>
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "event","dash","steeplechase",3,12
+{1} "person","Abera","Wanjiru",12,12
+{2} "time","9.69","7956",12,12
+{3} "year","1996","2008",4,12
+
+SCIDB QUERY : <CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * FROM redimension_store(winnersFlat,winners)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <loadcsv.py -h >
+Usage: loadcsv.py [options]
+
+SciDB Parallel CSV Loader
+
+Options:
+  -h, --help            show this help message and exit
+  -d DB_ADDRESS         SciDB Coordinator Hostname or IP Address (Default =
+                        "localhost")
+  -p DB_PORT            SciDB Coordinator Port (Default = 1239)
+  -r DB_ROOT            SciDB Installation Root Folder (Default =
+                        "/opt/scidb/12.10")
+  -i INPUT_FILE         CSV Input File (Default = stdin)
+  -n SKIP               # Lines to Skip (Default = 0)
+  -t TYPE_PATTERN       CSV Field Types Pattern: N number, S string, s
+                        nullable-string, C char (e.g., "NNsCS")
+  -D DELIMITER          Delimiter (Default = ",")
+  -f STARTING_COORDINATE
+                        Starting Coordinate (Default = 0)
+  -c CHUNK_SIZE         Chunk Size (Default = 500000)
+  -o OUTPUT_BASE        Output File Base Name (Default = INPUT_FILE or
+                        "stdin.csv")
+  -m                    Create Intermediate CSV Files (not FIFOs)
+  -l                    Leave Intermediate CSV Files
+  -M                    Create Intermediate DLF Files (not FIFOs)
+  -L                    Leave Intermediate DLF Files
+  -P SSH_PORT           SSH Port (Default = System Default)
+  -u SSH_USERNAME       SSH Username
+  -k SSH_KEYFILE        SSH Key/Identity File
+  -b                    SSH Bypass Strict Host Key Checking
+  -a LOAD_NAME          Load Array Name
+  -s LOAD_SCHEMA        Load Array Schema
+  -w SHADOW_NAME        Shadow Array Name
+  -e ERRORS_ALLOWED     # Load Errors Allowed per Instance (Default = 0)
+  -x                    Remove Load and Shadow Arrays Before Loading (if they
+                        exist)
+  -A TARGET_NAME        Target Array Name
+  -S TARGET_SCHEMA      Target Array Schema
+  -X                    Remove Target Array Before Loading (if it exists)
+  -v                    Display Verbose Messages
+  -V                    Display SciDB Version Information
+  -q                    Quiet Mode
+
+SCIDB QUERY : <SELECT * FROM list('types')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD intensityFlat FROM '../examples/intensity_data.bin' AS '(string, int64, int64 null)'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * FROM analyze(intensityFlat)>
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "elapsedTime","0","7",8,24
+{1} "exposure","High","Medium",3,24
+{2} "measuredIntensity","29","100",16,20
+
+SCIDB QUERY : <CREATE ARRAY intensity <measuredIntensity:int64 null> [exposure(string)=3,3,0, elapsedTime=0:40000,10000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * FROM redimension_store(intensityFlat,intensity)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <remove(intensityFlat)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD intensityFlat FROM '../examples/intensity_data.bin' AS '(string, int64, int64 null)'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY intensityFlat_NoExposure < elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD intensityFlat_NoExposure FROM '../examples/intensity_data.bin' AS '(skip, int64, int64 null)'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY intensityFlat_NoTime_NoMeasurement < exposure:string > [i=0:*,1000000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD intensityFlat_NoTime_NoMeasurement FROM '../examples/intensity_data.bin' AS '(string, skip(8), skip(8) null)'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <show(intensity)>
+{i} schema
+{0} "intensity<measuredIntensity:int64 NULL> [exposure(string)=3,3,0,elapsedTime=0:40000,10000,0]"
+
+SCIDB QUERY : <CREATE ARRAY intensityCopy < measuredIntensity:int64 NULL > [ exposure(string)=3,3,0, duration=0:40000,10000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD intensityCopy FROM CURRENT INSTANCE '../examples/intensity_data.opaque' AS 'OPAQUE'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <cat ../examples/v4.scidb>
+[
+ (0,100),(1,99),(2,),(3,97)
+]
+SCIDB QUERY : <CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD v4 FROM '../examples/v4.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD v4_dflt FROM '../examples/v4.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <cat ../examples/v4_null.scidb>
+[
+ (0,100),(1,99),(2,null),(3,97)
+]
+SCIDB QUERY : <CREATE ARRAY v4_null <val1:int8,val2:int8 NULL> [i=0:3,4,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD v4_null FROM '../examples/v4_null.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <remove(intensityFlat)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:6,1000000,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <cat ../examples/csv-errors.txt>
+exposure,elapsedTime,measuredIntensity
+High,777,100
+High,Jack,99
+Medium,777,100
+Medium,888,95
+Medium,Jess,Jill
+Low,?,Josh
+Low,1888,?
+
+SCIDB QUERY : <cat '../examples/int4error.scidb' >
+{0}[
+("High",777,100),
+("High",Jack,99),
+("Medium",777,100),
+("Medium",888,95),
+("Medium",Jess,Jill),
+("Low",?,Josh),
+("Low",1888,?)
+]
+
+SCIDB QUERY : <LOAD intensityFlat FROM '../examples/int4error.scidb' AS 'text' ERRORS 99 SHADOW ARRAY intensityFlatShadow>
+{i} exposure,elapsedTime,measuredIntensity
+{0} "High",777,100
+{1} "High",0,99
+{2} "Medium",777,100
+{3} "Medium",888,95
+{4} "Medium",0,null
+{5} "Low",0,null
+{6} "Low",1888,null
+
+SCIDB QUERY : <show(intensityFlatShadow)>
+{i} schema
+{0} "intensityFlatShadow<exposure:string NULL,elapsedTime:string NULL,measuredIntensity:string NULL,row_offset:int64> [i=0:6,1000000,0]"
+
+SCIDB QUERY : <SELECT * FROM intensityFlatShadow>
+{i} exposure,elapsedTime,measuredIntensity,row_offset
+{1} null,"Failed to parse string",null,35
+{4} null,"Failed to parse string","Failed to parse string",94
+{5} null,"Assigning NULL to non-nullable attribute","Failed to parse string",110
+
+SCIDB QUERY : <SELECT * FROM intensityFlat>
+{i} exposure,elapsedTime,measuredIntensity
+{0} "High",777,100
+{1} "High",0,99
+{2} "Medium",777,100
+{3} "Medium",888,95
+{4} "Medium",0,null
+{5} "Low",0,null
+{6} "Low",1888,null
+
+SCIDB QUERY : <SELECT intensityFlat.exposure AS exp, intensityFlatShadow.exposure AS expMSG, intensityFlat.elapsedTime AS elTime, intensityFlatShadow.elapsedTime AS elTimeMSG, intensityFlat.measuredIntensity AS Intensity, intensityFlatShadow.measuredIntensity AS IntensityMSG, row_offset INTO intensityFlatBadCells FROM intensityFlat, intensityFlatShadow>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <SELECT * FROM intensityFlatBadCells>
+{i} exp,expMSG,elTime,elTimeMSG,Intensity,IntensityMSG,row_offset
+{1} "High",null,0,"Failed to parse string",99,null,35
+{4} "Medium",null,0,"Failed to parse string",null,"Failed to parse string",94
+{5} "Low",null,0,"Assigning NULL to non-nullable attribute",null,"Failed to parse string",110
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

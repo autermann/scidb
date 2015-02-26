@@ -17,35 +17,71 @@ SCIDB QUERY : <create empty array F <a:double null> [x=0:2,3,0,y=-1:2,2,1]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(A,x+10),A)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <store(build(B,x+10.5),B)>
-[(10.5),(11.5),(12.5)]
+{x} a
+{0} 10.5
+{1} 11.5
+{2} 12.5
 
 SCIDB QUERY : <store(build_sparse(C,x+10.5,x<>1),C)>
-[{0}(10.5),{2}(12.5)]
+{x} a
+{0} 10.5
+{2} 12.5
 
 SCIDB QUERY : <store(build(D,iif(x=2,null,x+10.5)),D)>
-[(10.5),(11.5),(null)]
+{x} a
+{0} 10.5
+{1} 11.5
+{2} null
 
 SCIDB QUERY : <store(build(E,iif(x=2,null,x+10.5)),E)>
-[[(10.5),(10.5)],[(11.5),(11.5)],[(null),(null)]];[[(10.5),(10.5)],[(11.5),(11.5)],[(null),(null)]]
+{x,y} a
+{0,-1} 10.5
+{0,0} 10.5
+{1,-1} 11.5
+{1,0} 11.5
+{2,-1} null
+{2,0} null
+{0,1} 10.5
+{0,2} 10.5
+{1,1} 11.5
+{1,2} 11.5
+{2,1} null
+{2,2} null
 
 SCIDB QUERY : <store(build_sparse(F,iif(x=2,null,x+10.5),x<>0 and y<>0),F)>
-[[{1,-1}(11.5)]];
-[[{1,1}(11.5),{1,2}(11.5)]]
+{x,y} a
+{1,-1} 11.5
+{2,-1} null
+{1,1} 11.5
+{1,2} 11.5
+{2,1} null
+{2,2} null
 
 SCIDB QUERY : <normalize(A)>
 [An error expected at this place for the query "normalize(A)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR3.]
 
 SCIDB QUERY : <normalize(B)>
-[(0.525822),(0.575901),(0.625979)]
+{x} a
+{0} 0.525822
+{1} 0.575901
+{2} 0.625979
 
 SCIDB QUERY : <normalize(C)>
-[{0}(0.643192),{2}(0.765705)]
+{x} a
+{0} 0.643192
+{2} 0.765705
 
 SCIDB QUERY : <normalize(D)>
-[(0.674269),(0.738485),(null)]
+{x} a
+{0} 0.674269
+{1} 0.738485
+{2} null
 
 SCIDB QUERY : <normalize(E)>
 [An error expected at this place for the query "normalize(E)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2.]

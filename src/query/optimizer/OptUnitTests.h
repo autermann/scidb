@@ -59,7 +59,7 @@ class OptimizerTests: public CppUnit::TestFixture
 {
 
     typedef boost::shared_ptr<PhysicalOperator> PhysOpPtr;
-    typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysInstancePtr;
+    typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
 
 CPPUNIT_TEST_SUITE(OptimizerTests);
         CPPUNIT_TEST(testBoundaries);
@@ -72,6 +72,7 @@ CPPUNIT_TEST_SUITE(OptimizerTests);
 //        CPPUNIT_TEST(testTwoPhase);
         CPPUNIT_TEST(testMultiply);
         CPPUNIT_TEST(testFlipStoreRewrite);
+        CPPUNIT_TEST(testReplication);
     CPPUNIT_TEST_SUITE_END();
 
 private:
@@ -109,25 +110,29 @@ private:
     Coordinates _dummyFlippedEnd;
     ArrayID _dummyFlippedId;
 
+    ArrayDesc _dummyReplicatedArray;
+    ArrayID _dummyReplicatedArrayId;
+
 public:
 
 #define ASSERT_OPERATOR(instance, opName) (CPPUNIT_ASSERT( instance ->getPhysicalOperator()->getPhysicalName() == opName ))
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, PartitioningSchema ps = psRoundRobin)
     {
         SystemCatalog* systemCat = SystemCatalog::getInstance();
         if (systemCat->containsArray(desc.getName()))
         {
             systemCat->deleteArray(desc.getName());
         }
-        ArrayID id = systemCat->addArray(desc, psRoundRobin);
-        return id;
+        ArrayDesc d2 = desc;
+        systemCat->addArray(d2, ps);
+        return d2.getId();
     }
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end, PartitioningSchema ps = psRoundRobin)
     {
-        ArrayID id = s_addArray(desc);
-        SystemCatalog::getInstance()->updateArrayBoundaries(id, start, end);
+        ArrayID id = s_addArray(desc, ps);
+        SystemCatalog::getInstance()->updateArrayBoundaries(desc, PhysicalBoundaries(start, end));
         return id;
     }
 
@@ -209,9 +214,10 @@ public:
         _dummyFlippedArray = ArrayDesc("opttest_dummy_flipped", dummyFlippedAttributes, dummyFlippedDimensions);
         _dummyFlippedId = s_addArray(_dummyFlippedArray);
 
+        _dummyReplicatedArray = ArrayDesc("opttest_dummy_replicated_array", dummyArrayAttributes, dummyArrayDimensions);
+        _dummyReplicatedArrayId = s_addArray(_dummyReplicatedArray,_dummyArrayStart, _dummyArrayEnd, psReplication);
+
         ////////////////
-        Config *cfg = Config::getInstance();
-        cfg->setOption(CONFIG_OPTIMIZER_TYPE, 1);
 
         HabilisOptimizer *hopt = new HabilisOptimizer();
         hopt->_featureMask=0;
@@ -230,6 +236,7 @@ public:
         systemCat->deleteArray(_singleDimId);
         systemCat->deleteArray(_partiallyFilledId);
         systemCat->deleteArray(_dummyFlippedId);
+        systemCat->deleteArray(_dummyReplicatedArrayId);
     }
     
     boost::shared_ptr<Query> getQuery()
@@ -272,25 +279,25 @@ public:
         return query->getCurrentPhysicalPlan();
     }
 
-    int countDfInstances(boost::shared_ptr<PhysicalPlan> pp)
+    int countDfNodes(boost::shared_ptr<PhysicalPlan> pp)
     {
         int result = 1;
-        boost::shared_ptr<PhysicalQueryPlanNode> instance = pp->getRoot();
+        boost::shared_ptr<PhysicalQueryPlanNode> node = pp->getRoot();
 
-        while (instance->getChildren().size() > 0)
+        while (node->getChildren().size() > 0)
         {
-            instance = instance->getChildren()[0];
+            node = node->getChildren()[0];
             result++;
         }
         return result;
     }
 
-    int countTotalInstances(PhysInstancePtr instance)
+    int countTotalNodes(PhysNodePtr node)
     {
         int result = 1;
-        for (size_t i = 0; i < instance->getChildren().size(); i++)
+        for (size_t i = 0; i < node->getChildren().size(); i++)
         {
-            result += countTotalInstances(instance->getChildren()[i]);
+            result += countTotalNodes(node->getChildren()[i]);
         }
         return result;
     }
@@ -538,7 +545,7 @@ public:
     {
         boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("scan(opttest_dummy_array)");
         CPPUNIT_ASSERT(pp->isDdl()==false);
-        CPPUNIT_ASSERT(countDfInstances(pp) == 1);
+        CPPUNIT_ASSERT(countDfNodes(pp) == 1);
         ASSERT_OPERATOR(pp->getRoot(), "physicalScan");
         CPPUNIT_ASSERT(pp->getRoot()->hasParent() == false);
         ArrayDesc opSchema = pp->getRoot()->getPhysicalOperator()->getSchema();
@@ -546,7 +553,7 @@ public:
 
         pp = habilis_generatePPlanFor("scan(opttest_dummy_array)");
         CPPUNIT_ASSERT(pp->isDdl()==false);
-        CPPUNIT_ASSERT(countDfInstances(pp) == 1);
+        CPPUNIT_ASSERT(countDfNodes(pp) == 1);
         ASSERT_OPERATOR(pp->getRoot(), "physicalScan");
         CPPUNIT_ASSERT(pp->getRoot()->hasParent() == false);
         opSchema = pp->getRoot()->getPhysicalOperator()->getSchema();
@@ -557,37 +564,37 @@ public:
     {
         boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor(query);
 
-        CPPUNIT_ASSERT(countDfInstances(pp) == 2);
-        PhysInstancePtr expectedSubArrayInstance = pp->getRoot();
-        ASSERT_OPERATOR(expectedSubArrayInstance,opName);
-        PhysOpPtr expectedSubArrayOp = expectedSubArrayInstance->getPhysicalOperator();
-        CPPUNIT_ASSERT(expectedSubArrayInstance->getChildren().size() == 1);
-        CPPUNIT_ASSERT(expectedSubArrayInstance->hasParent() == false);
+        CPPUNIT_ASSERT(countDfNodes(pp) == 2);
+        PhysNodePtr expectedSubArrayNode = pp->getRoot();
+        ASSERT_OPERATOR(expectedSubArrayNode,opName);
+        PhysOpPtr expectedSubArrayOp = expectedSubArrayNode->getPhysicalOperator();
+        CPPUNIT_ASSERT(expectedSubArrayNode->getChildren().size() == 1);
+        CPPUNIT_ASSERT(expectedSubArrayNode->hasParent() == false);
 
-        PhysInstancePtr expectedScanInstance = expectedSubArrayInstance->getChildren()[0];
-        PhysOpPtr expectedScanOp = expectedScanInstance->getPhysicalOperator();
+        PhysNodePtr expectedScanNode = expectedSubArrayNode->getChildren()[0];
+        PhysOpPtr expectedScanOp = expectedScanNode->getPhysicalOperator();
 
-        ASSERT_OPERATOR(expectedScanInstance, "physicalScan");
-        CPPUNIT_ASSERT(expectedScanInstance->getParent()==expectedSubArrayInstance);
-        CPPUNIT_ASSERT(expectedScanInstance->getChildren().size() == 0);
+        ASSERT_OPERATOR(expectedScanNode, "physicalScan");
+        CPPUNIT_ASSERT(expectedScanNode->getParent()==expectedSubArrayNode);
+        CPPUNIT_ASSERT(expectedScanNode->getChildren().size() == 0);
         CPPUNIT_ASSERT(equivalent (expectedScanOp->getSchema(), _dummyArray));
         CPPUNIT_ASSERT(!equivalent (expectedScanOp->getSchema(), expectedSubArrayOp->getSchema()));
 
         pp = habilis_generatePPlanFor(query);
 
-        CPPUNIT_ASSERT(countDfInstances(pp) == 2);
-        expectedSubArrayInstance = pp->getRoot();
-        ASSERT_OPERATOR(expectedSubArrayInstance,opName);
-        expectedSubArrayOp = expectedSubArrayInstance->getPhysicalOperator();
-        CPPUNIT_ASSERT(expectedSubArrayInstance->getChildren().size() == 1);
-        CPPUNIT_ASSERT(expectedSubArrayInstance->hasParent() == false);
+        CPPUNIT_ASSERT(countDfNodes(pp) == 2);
+        expectedSubArrayNode = pp->getRoot();
+        ASSERT_OPERATOR(expectedSubArrayNode,opName);
+        expectedSubArrayOp = expectedSubArrayNode->getPhysicalOperator();
+        CPPUNIT_ASSERT(expectedSubArrayNode->getChildren().size() == 1);
+        CPPUNIT_ASSERT(expectedSubArrayNode->hasParent() == false);
 
-        expectedScanInstance = expectedSubArrayInstance->getChildren()[0];
-        expectedScanOp = expectedScanInstance->getPhysicalOperator();
+        expectedScanNode = expectedSubArrayNode->getChildren()[0];
+        expectedScanOp = expectedScanNode->getPhysicalOperator();
 
-        ASSERT_OPERATOR(expectedScanInstance, "physicalScan");
-        CPPUNIT_ASSERT(expectedScanInstance->getParent()==expectedSubArrayInstance);
-        CPPUNIT_ASSERT(expectedScanInstance->getChildren().size() == 0);
+        ASSERT_OPERATOR(expectedScanNode, "physicalScan");
+        CPPUNIT_ASSERT(expectedScanNode->getParent()==expectedSubArrayNode);
+        CPPUNIT_ASSERT(expectedScanNode->getChildren().size() == 0);
         CPPUNIT_ASSERT(equivalent (expectedScanOp->getSchema(), _dummyArray));
         CPPUNIT_ASSERT(!equivalent (expectedScanOp->getSchema(), expectedSubArrayOp->getSchema()));
     }
@@ -608,26 +615,26 @@ public:
 
         boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("input(opttest_dummy_array, '/tmp/tmpfile')");
 
-        CPPUNIT_ASSERT(countDfInstances(pp) == 1);
-        PhysInstancePtr expectedInputInstance = pp->getRoot();
-        ASSERT_OPERATOR(expectedInputInstance, "impl_input");
-        PhysOpPtr expectedInputOp = expectedInputInstance->getPhysicalOperator();
+        CPPUNIT_ASSERT(countDfNodes(pp) == 1);
+        PhysNodePtr expectedInputNode = pp->getRoot();
+        ASSERT_OPERATOR(expectedInputNode, "impl_input");
+        PhysOpPtr expectedInputOp = expectedInputNode->getPhysicalOperator();
 
         CPPUNIT_ASSERT(equivalent (expectedInputOp->getSchema(), _dummyArray) );
-        CPPUNIT_ASSERT(expectedInputInstance->hasParent() == false);
-        CPPUNIT_ASSERT(expectedInputInstance->getChildren().size() == 0);
+        CPPUNIT_ASSERT(expectedInputNode->hasParent() == false);
+        CPPUNIT_ASSERT(expectedInputNode->getChildren().size() == 0);
 
         pp = habilis_generatePPlanFor("input(opttest_dummy_array, '/tmp/tmpfile')");
 
-        CPPUNIT_ASSERT(countDfInstances(pp) == 1);
-        expectedInputInstance = pp->getRoot();
-        ASSERT_OPERATOR(expectedInputInstance, "impl_input");
+        CPPUNIT_ASSERT(countDfNodes(pp) == 1);
+        expectedInputNode = pp->getRoot();
+        ASSERT_OPERATOR(expectedInputNode, "impl_input");
 
-        expectedInputOp = expectedInputInstance->getPhysicalOperator();
+        expectedInputOp = expectedInputNode->getPhysicalOperator();
 
         CPPUNIT_ASSERT(equivalent (expectedInputOp->getSchema(), _dummyArray) );
-        CPPUNIT_ASSERT(expectedInputInstance->hasParent() == false);
-        CPPUNIT_ASSERT(expectedInputInstance->getChildren().size() == 0);
+        CPPUNIT_ASSERT(expectedInputNode->hasParent() == false);
+        CPPUNIT_ASSERT(expectedInputNode->getChildren().size() == 0);
     }
 
     void testConcatSgInsert()
@@ -635,60 +642,60 @@ public:
         //this test case will need to change as optimizer gets smarter about concat
         boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("concat(opttest_dummy_array, opttest_dummy_array)");
 
-        CPPUNIT_ASSERT(countDfInstances(pp) == 2);
-        CPPUNIT_ASSERT(countTotalInstances(pp->getRoot()) == 3);
+        CPPUNIT_ASSERT(countDfNodes(pp) == 2);
+        CPPUNIT_ASSERT(countTotalNodes(pp->getRoot()) == 3);
 
-        PhysInstancePtr expectedConcatInstance = pp->getRoot();
-        ASSERT_OPERATOR(expectedConcatInstance, "physicalConcat");
+        PhysNodePtr expectedConcatNode = pp->getRoot();
+        ASSERT_OPERATOR(expectedConcatNode, "physicalConcat");
 
-        PhysOpPtr expectedConcatOp = expectedConcatInstance->getPhysicalOperator();
-        CPPUNIT_ASSERT(expectedConcatInstance->hasParent() == false);
-        CPPUNIT_ASSERT(expectedConcatInstance->getChildren().size() == 2);
+        PhysOpPtr expectedConcatOp = expectedConcatNode->getPhysicalOperator();
+        CPPUNIT_ASSERT(expectedConcatNode->hasParent() == false);
+        CPPUNIT_ASSERT(expectedConcatNode->getChildren().size() == 2);
 
-        PhysInstancePtr expectedScanLeftInstance = expectedConcatInstance->getChildren()[0];
-        PhysOpPtr expectedScanLeftOp = expectedScanLeftInstance->getPhysicalOperator();
+        PhysNodePtr expectedScanLeftNode = expectedConcatNode->getChildren()[0];
+        PhysOpPtr expectedScanLeftOp = expectedScanLeftNode->getPhysicalOperator();
 
-        CPPUNIT_ASSERT(expectedScanLeftInstance->getChildren().size() == 0);
-        CPPUNIT_ASSERT(expectedScanLeftInstance->getParent() == expectedConcatInstance);
+        CPPUNIT_ASSERT(expectedScanLeftNode->getChildren().size() == 0);
+        CPPUNIT_ASSERT(expectedScanLeftNode->getParent() == expectedConcatNode);
         CPPUNIT_ASSERT(equivalent(expectedScanLeftOp->getSchema(), _dummyArray) ||
                 equivalent(expectedScanLeftOp->getSchema(), _dummyShiftedArray));
         CPPUNIT_ASSERT(!equivalent(expectedScanLeftOp->getSchema(), expectedConcatOp->getSchema()));
 
-        PhysInstancePtr expectedScanRightInstance = expectedConcatInstance->getChildren()[0];
-        PhysOpPtr expectedScanRightOp = expectedScanRightInstance->getPhysicalOperator();
+        PhysNodePtr expectedScanRightNode = expectedConcatNode->getChildren()[0];
+        PhysOpPtr expectedScanRightOp = expectedScanRightNode->getPhysicalOperator();
 
-        CPPUNIT_ASSERT(expectedScanRightInstance->getParent() == expectedConcatInstance);
-        CPPUNIT_ASSERT(expectedScanRightInstance->getChildren().size() == 0);
+        CPPUNIT_ASSERT(expectedScanRightNode->getParent() == expectedConcatNode);
+        CPPUNIT_ASSERT(expectedScanRightNode->getChildren().size() == 0);
         CPPUNIT_ASSERT(equivalent(expectedScanRightOp->getSchema(), _dummyArray) ||
                 equivalent(expectedScanRightOp->getSchema(), _dummyShiftedArray));
         CPPUNIT_ASSERT(!equivalent(expectedScanRightOp->getSchema(), expectedConcatOp->getSchema()));
 
         pp = habilis_generatePPlanFor("concat(opttest_dummy_array, opttest_dummy_array)");
 
-        CPPUNIT_ASSERT(countDfInstances(pp) == 2);
-        CPPUNIT_ASSERT(countTotalInstances(pp->getRoot()) == 3);
+        CPPUNIT_ASSERT(countDfNodes(pp) == 2);
+        CPPUNIT_ASSERT(countTotalNodes(pp->getRoot()) == 3);
 
-        expectedConcatInstance = pp->getRoot();
-        ASSERT_OPERATOR(expectedConcatInstance, "physicalConcat");
-        expectedConcatOp = expectedConcatInstance->getPhysicalOperator();
+        expectedConcatNode = pp->getRoot();
+        ASSERT_OPERATOR(expectedConcatNode, "physicalConcat");
+        expectedConcatOp = expectedConcatNode->getPhysicalOperator();
 
-        CPPUNIT_ASSERT(expectedConcatInstance->hasParent() == false);
-        CPPUNIT_ASSERT(expectedConcatInstance->getChildren().size() == 2);
+        CPPUNIT_ASSERT(expectedConcatNode->hasParent() == false);
+        CPPUNIT_ASSERT(expectedConcatNode->getChildren().size() == 2);
 
-        expectedScanLeftInstance = expectedConcatInstance->getChildren()[0];
-        expectedScanLeftOp = expectedScanLeftInstance->getPhysicalOperator();
+        expectedScanLeftNode = expectedConcatNode->getChildren()[0];
+        expectedScanLeftOp = expectedScanLeftNode->getPhysicalOperator();
 
-        CPPUNIT_ASSERT(expectedScanLeftInstance->getChildren().size() == 0);
-        CPPUNIT_ASSERT(expectedScanLeftInstance->getParent() == expectedConcatInstance);
+        CPPUNIT_ASSERT(expectedScanLeftNode->getChildren().size() == 0);
+        CPPUNIT_ASSERT(expectedScanLeftNode->getParent() == expectedConcatNode);
         CPPUNIT_ASSERT(equivalent(expectedScanLeftOp->getSchema(), _dummyArray) ||
                 equivalent(expectedScanLeftOp->getSchema(), _dummyShiftedArray));
         CPPUNIT_ASSERT(!equivalent(expectedScanLeftOp->getSchema(), expectedConcatOp->getSchema()));
 
-        expectedScanRightInstance = expectedConcatInstance->getChildren()[0];
-        expectedScanRightOp = expectedScanRightInstance->getPhysicalOperator();
+        expectedScanRightNode = expectedConcatNode->getChildren()[0];
+        expectedScanRightOp = expectedScanRightNode->getPhysicalOperator();
 
-        CPPUNIT_ASSERT(expectedScanRightInstance->getParent() == expectedConcatInstance);
-        CPPUNIT_ASSERT(expectedScanRightInstance->getChildren().size() == 0);
+        CPPUNIT_ASSERT(expectedScanRightNode->getParent() == expectedConcatNode);
+        CPPUNIT_ASSERT(expectedScanRightNode->getChildren().size() == 0);
         CPPUNIT_ASSERT(equivalent(expectedScanRightOp->getSchema(), _dummyArray) ||
                 equivalent(expectedScanRightOp->getSchema(), _dummyShiftedArray));
         CPPUNIT_ASSERT(!equivalent(expectedScanRightOp->getSchema(), expectedConcatOp->getSchema()));
@@ -700,7 +707,7 @@ public:
         boost::shared_ptr<PhysicalPlan> pp;
         ArrayDistribution dist;
 
-        PhysInstancePtr root, leftChild, rightChild;
+        PhysNodePtr root, leftChild, rightChild;
 
         //remove all sgs
         pp = habilis_generatePPlanFor("subarray(subarray(opttest_dummy_array, 5,5,10,10),2,3,2,4)");
@@ -710,15 +717,13 @@ public:
 
         root = pp->getRoot();
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0] == 7 && dist.getMapper()->_distOffsetVector[1]==8);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 7 && dist.getMapper()->getOffsetVector()[1]==8);
         ASSERT_OPERATOR(root,"physicalSubArray");
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0] == 5 && dist.getMapper()->_distOffsetVector[1]==5);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 5 && dist.getMapper()->getOffsetVector()[1]==5);
         ASSERT_OPERATOR(root,"physicalSubArray");
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
@@ -737,23 +742,20 @@ public:
         root = pp->getRoot();
         ASSERT_OPERATOR(root,"physicalSubArray");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0] ==4 && dist.getMapper()->_distOffsetVector[1]==4);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] ==4 && dist.getMapper()->getOffsetVector()[1]==4);
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
         ASSERT_OPERATOR(root,"physicalJoin");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0] == 3 && dist.getMapper()->_distOffsetVector[1]==3);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 3 && dist.getMapper()->getOffsetVector()[1]==3);
         CPPUNIT_ASSERT(root->getChildren().size() == 2);
 
         leftChild = root->getChildren()[0];
         ASSERT_OPERATOR(leftChild,"physicalSubArray");
         CPPUNIT_ASSERT(leftChild->getDataWidth() == leftChild->getChildren()[0]->getDataWidth() * 4.0 / 81.0);
         dist = leftChild->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0]==3 && dist.getMapper()->_distOffsetVector[1]==3);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==3 && dist.getMapper()->getOffsetVector()[1]==3);
         CPPUNIT_ASSERT(leftChild->getChildren().size() == 1);
 
         leftChild = leftChild->getChildren()[0];
@@ -765,15 +767,13 @@ public:
         rightChild = root->getChildren()[1];
         ASSERT_OPERATOR(rightChild,"impl_sg");
         dist = rightChild->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0]==3 && dist.getMapper()->_distOffsetVector[1]==3);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==3 && dist.getMapper()->getOffsetVector()[1]==3);
         CPPUNIT_ASSERT(rightChild->getChildren().size() == 1);
 
         rightChild = rightChild->getChildren()[0];
         ASSERT_OPERATOR(rightChild,"physicalSubArray");
         dist = rightChild->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0]==1 && dist.getMapper()->_distOffsetVector[1]==1);
-        CPPUNIT_ASSERT(dist.getMapper()->_distShapeVector[0]==10 && dist.getMapper()->_distShapeVector[1]==10);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==1 && dist.getMapper()->getOffsetVector()[1]==1);
         CPPUNIT_ASSERT(rightChild->getChildren().size() == 1);
 
         rightChild = rightChild->getChildren()[0];
@@ -787,7 +787,7 @@ public:
         root = pp->getRoot();
         ASSERT_OPERATOR(root,"physicalSubArray");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0] == 1 && dist.getMapper()->_distOffsetVector[1]==1);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 1 && dist.getMapper()->getOffsetVector()[1]==1);
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
@@ -820,7 +820,7 @@ public:
         root = root->getChildren()[0];
         ASSERT_OPERATOR(root,"physicalSubArray");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->_distOffsetVector[0]==3 && dist.getMapper()->_distOffsetVector[1]==4);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==3 && dist.getMapper()->getOffsetVector()[1]==4);
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
@@ -994,7 +994,7 @@ public:
     {
         std::ostringstream out;
         boost::shared_ptr<PhysicalPlan> pp;
-        PhysInstancePtr root, child;
+        PhysNodePtr root, child;
 
         pp = habilis_generatePPlanFor("sum(opttest_single_dim)");
         //        pp->toString(out);
@@ -1112,7 +1112,7 @@ public:
     {
         std::ostringstream out;
         boost::shared_ptr<PhysicalPlan> pp;
-        PhysInstancePtr root, child;
+        PhysNodePtr root, child;
 
         //SG results of subarray to match results of multply
         pp
@@ -1158,7 +1158,7 @@ public:
     void testFlipStoreRewrite()
     {
         boost::shared_ptr<PhysicalPlan> pp;
-        PhysInstancePtr root;
+        PhysNodePtr root;
 
         pp = habilis_generatePPlanFor( "select * into some_weird_array_we_hope_does_not_exist from opttest_dummy_array", false);
         root = pp->getRoot();
@@ -1170,7 +1170,7 @@ public:
 
         pp = habilis_generatePPlanFor (" select * into opttest_dummy_flipped from opttest_dummy_array", false);
         root = pp->getRoot();
-        ASSERT_OPERATOR(root, "PhysicalFlipStore");
+        ASSERT_OPERATOR(root, "PhysicalRedimensionStore");
 
         bool thrown = false;
         try
@@ -1182,8 +1182,87 @@ public:
             thrown = true;
         }
         CPPUNIT_ASSERT(!thrown);
-
     }
+
+    void testReplication()
+    {
+        boost::shared_ptr<PhysicalPlan> pp;
+        PhysNodePtr root;
+        std::ostringstream out;
+
+
+        //Verify that there's a reduceDistro (not sg!) inserted between scan and store.
+        pp = habilis_generatePPlanFor( "store(opttest_dummy_replicated_array, some_weird_array_we_hope_does_not_exist)");
+//        pp->toString(out);
+//        std::cout<<out.str();
+//        out.str("");
+        root = pp->getRoot();
+        ASSERT_OPERATOR(root, "physicalStore");
+        root = root->getChildren()[0];
+        ASSERT_OPERATOR(root, "physicalReduceDistro");
+        root = root->getChildren()[0];
+        ASSERT_OPERATOR(root, "physicalScan");
+
+        //Verify that there's a reduceDistro inserted between scan and aggregate so we get the correct count
+        pp = habilis_generatePPlanFor( "aggregate(opttest_dummy_replicated_array, count(*))");
+//        pp->toString(out);
+//        std::cout<<out.str();
+//        out.str("");
+        root = pp->getRoot();
+        ASSERT_OPERATOR(root, "physical_aggregate");
+        root = root->getChildren()[0];
+        ASSERT_OPERATOR(root, "physicalReduceDistro");
+        root = root->getChildren()[0];
+        ASSERT_OPERATOR(root, "physicalScan");
+
+        //Verify there's reduce distro inserted on the right
+        pp = habilis_generatePPlanFor( "join(opttest_dummy_array, opttest_dummy_replicated_array)");
+//        pp->toString(out);
+//        std::cout<<out.str();
+//        out.str("");
+        root = pp->getRoot();
+        ASSERT_OPERATOR(root, "physicalJoin");
+        PhysNodePtr child = root->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalScan");
+        child = root->getChildren()[1]->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalReduceDistro");
+
+        //Verify there's reduce distro inserted on both sides
+        pp = habilis_generatePPlanFor( "merge(opttest_dummy_replicated_array, opttest_dummy_replicated_array)");
+//        pp->toString(out);
+//        std::cout<<out.str();
+//        out.str("");
+        root = pp->getRoot();
+        ASSERT_OPERATOR(root, "physicalMerge");
+        child = root->getChildren()[0]->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalReduceDistro");
+        child = root->getChildren()[1]->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalReduceDistro");
+
+        //Verify there's reduce distro inserted on the left
+        pp = habilis_generatePPlanFor( "join(opttest_dummy_replicated_array, opttest_dummy_array)");
+//        pp->toString(out);
+//        std::cout<<out.str();
+//        out.str("");
+        root = pp->getRoot();
+        ASSERT_OPERATOR(root, "physicalJoin");
+        child = root->getChildren()[0]->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalReduceDistro");
+        child = root->getChildren()[1];
+        ASSERT_OPERATOR(child, "physicalScan");
+
+        pp = habilis_generatePPlanFor( "merge(opttest_dummy_array, opttest_dummy_replicated_array)");
+//        pp->toString(out);
+//        std::cout<<out.str();
+//        out.str("");
+        root = pp->getRoot();
+        ASSERT_OPERATOR(root, "physicalMerge");
+        child = root->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalScan");
+        child = root->getChildren()[1]->getChildren()[0];
+        ASSERT_OPERATOR(child, "physicalReduceDistro");
+    }
+
 };
 CPPUNIT_TEST_SUITE_REGISTRATION(OptimizerTests);
 

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>adddim</refname>
+
+    <refpurpose>Produces a result array with one more dimension than a given
+    source array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>AQL%  <command>SELECT</command> * <command>FROM</command> adddim(<replaceable>array</replaceable>,<replaceable>new_dimension</replaceable>);</synopsis>
+
+    <synopsis>AFL%  adddim(<replaceable>array</replaceable>,<replaceable>new_dimension</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The adddim operator adds a stub dimension to an array to increase
+    its dimensionality. The datatype of the new dimension is int64. The size
+    of the new dimension is 1.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example creates a 2-dimensional array from 1-dimensional
+      arrays.</para>
+
+      <procedure>
+        <step>
+          <para>Create a vector of zeros:<programlisting language='test'>--afl store(build(&lt;val:double&gt;[i=0:4,5,0],0),vector0);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Create a vector of ones:<programlisting language='test'>--afl store(build(&lt;val:double&gt;[j=0:4,5,0],1),vector1);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Concatenate these vectors without increasing their
+          dimensionality. Note that the output is
+          1-dimensional:<programlisting language='test'>concat(vector0,vector1);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Use adddim to add a dimension to both vectors and then
+          concatenate them. The result will have two
+          dimensions:<programlisting  language='test'>--afl concat(adddim(vector0,x),adddim(vector1,y)); --chunkify=yes --output-format=auto </programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

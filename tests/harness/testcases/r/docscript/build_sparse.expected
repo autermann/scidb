@@ -1,0 +1,7 @@
+SCIDB QUERY : <build_sparse(<val:double>[i=0:3,4,0,j=0:3,4,0],1,i=j)>
+{i,j} val
+{0,0} 1
+{1,1} 1
+{2,2} 1
+{3,3} 1
+

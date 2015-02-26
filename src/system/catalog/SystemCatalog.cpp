@@ -35,6 +35,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <limits.h>
 
 #include <boost/random.hpp>
 
@@ -45,7 +46,7 @@
 #include <pqxx/binarystring>
 #include <libpq-fe.h>
 
-#include "log4cxx/logger.h"
+#include <log4cxx/logger.h>
 
 #include "system/Config.h"
 #include "smgr/io/Storage.h"
@@ -60,6 +61,8 @@
 #include "query/Expression.h"
 #include "query/parser/Serialize.h"
 
+#include "system/catalog/data/CatalogMetadata.h"
+
 using namespace std;
 using namespace pqxx;
 using namespace pqxx::prepare;
@@ -72,19 +75,6 @@ namespace scidb
 
     boost::mt19937 _rng;
     Mutex SystemCatalog::_pgLock;
-
-    std::string getExeDir()
-    {
-        char exepath[1024] = {0};
-        readlink("/proc/self/exe", exepath, sizeof(exepath));
-        for (size_t i = strlen(exepath) - 1; i !=0; i--) {
-            if (exepath[i] == '/') {
-                exepath[i] = 0;
-                break;
-            }
-        }
-        return exepath;
-    }
 
     SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
                                       QueryID  queryId,
@@ -158,16 +148,13 @@ namespace scidb
         try
         {
             work tr(*_connection);
-            const string metaSql = Config::getInstance()->getOption<string>(CONFIG_METADATA);
-            ifstream ifs(metaSql.c_str(), ios::in);
-            if(!ifs.is_open())
-                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_OPEN_FILE) << metaSql << errno;
-            string sql((istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>());
-            ifs.close();
-            tr.exec(sql);
+            tr.exec(string(CURRENT_METADATA));
 
             result query_res = tr.exec("select get_cluster_uuid as uuid from get_cluster_uuid()");
             _uuid = query_res[0].at("uuid").as(string());
+            query_res = tr.exec("select get_metadata_version as version from get_metadata_version()");
+            _metadataVersion = query_res[0].at("version").as(int());
+            assert(METADATA_VERSION == _metadataVersion);
             _initialized = true;
 
             tr.commit();
@@ -189,7 +176,7 @@ namespace scidb
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when initializing cluster";
         }
 
-        LOG4CXX_TRACE(logger, "Initialized cluster uuid = " << _uuid);
+        LOG4CXX_TRACE(logger, "Initialized cluster uuid = " << _uuid << ", metadata version = " << _metadataVersion);
 
         return _uuid;
     }
@@ -207,7 +194,28 @@ namespace scidb
     int totalNewArrays;
     int maxTotalNewArrays;
 
-    ArrayID SystemCatalog::addArray(const ArrayDesc &array_desc, PartitioningSchema ps)
+    //Not thread safe. Must be called with active connection under _pgLock.
+    inline void fillArrayIdentifiers(pqxx::connection *connection, work& tr, string const& array_name, ArrayID arrId, ArrayUAID& uaid, VersionID& vid)
+    {
+        uaid = arrId;
+        vid = 0;
+        if(ArrayDesc::isNameVersioned(array_name))
+        {
+            vid = ArrayDesc::getVersionFromName(array_name);
+            string unv_name = ArrayDesc::makeUnversionedName(array_name);
+            string sql_u = "select id, name, partitioning_schema, flags, comment from \"array\" where name = $1";
+
+            connection->prepare("find-by-name2", sql_u)("varchar", treat_string);
+            result query_res_u = tr.prepared("find-by-name2")(unv_name).exec();
+            if (query_res_u.size() <= 0)
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << unv_name;
+            }
+            uaid = query_res_u[0].at("id").as(int64_t());
+        }
+    }
+
+    void SystemCatalog::addArray(ArrayDesc &array_desc, PartitioningSchema ps)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::addArray ( array_name = " << array_desc.getName() << ")");
         LOG4CXX_TRACE(logger, "New Array    = " << array_desc );
@@ -219,16 +227,27 @@ namespace scidb
         }
 
         assert(_connection);
-        ArrayID array_id = array_desc.getId();
+        ArrayID arrId = array_desc.getId();
+        string array_name = array_desc.getName();
 
         try
         {
             work tr(*_connection);
 
-            if (array_id == 0) { 
+            if (arrId == 0)
+            {
                 result query_res = tr.exec("select nextval from nextval('array_id_seq')");
-                array_id = query_res[0].at("nextval").as(int64_t());
-            } 
+                arrId = query_res[0].at("nextval").as(int64_t());
+            }
+            else
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Calling addArray with populated descriptor";
+            }
+
+            ArrayUAID uaid;
+            VersionID vid;
+            fillArrayIdentifiers(_connection, tr, array_name, arrId, uaid, vid);
+
             string sql1 = "insert into \"array\"(id, name, partitioning_schema, flags, comment) values ($1, $2, $3, $4, $5)";
             _connection->prepare(sql1, sql1)
                 ("bigint", treat_direct)
@@ -237,7 +256,7 @@ namespace scidb
                 ("integer", treat_direct)
                 ("varchar", treat_string);
             tr.prepared(sql1)
-                (array_id)
+                (arrId)
                 (array_desc.getName())
                 ((int) ps)
                 (array_desc.getFlags())
@@ -263,7 +282,7 @@ namespace scidb
             {
                 AttributeDesc const& attr = attributes[i];
                 tr.prepared(sql2)
-                    (array_id)
+                    (arrId)
                     (i)
                     (attr.getName())
                     (attr.getType())
@@ -311,7 +330,7 @@ namespace scidb
             {
                 DimensionDesc const& dim = dims[i];
                 tr.prepared(sql3)
-                    (array_id)
+                    (arrId)
                     (i)
                     (dim.getBaseName())
                     (dim.getStartMin())
@@ -331,8 +350,8 @@ namespace scidb
             }
 
             tr.commit();
-
-            LOG4CXX_DEBUG(logger, "Create array " << array_desc.getName() << "(" << array_id << ") in query " << Query::getCurrentQueryID());
+            LOG4CXX_DEBUG(logger, "Create array " << array_desc.getName() << "(" << arrId << ") in query " << Query::getCurrentQueryID());
+            array_desc.setIds(arrId, uaid, vid);
         }
         catch (const sql_error &e)
         {
@@ -350,8 +369,6 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when adding array";
         }
-
-        return array_id;
     }
 
     size_t SystemCatalog::countReferences(std::string const& arrayName)
@@ -512,7 +529,11 @@ namespace scidb
 
             tr.commit();
             *oldArrayDesc = array_desc;
-        }
+            boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
+            if (query) {
+                query->arrayDescByNameCache.erase(oldArrayDesc->getName());
+            }
+        } 
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -683,6 +704,26 @@ namespace scidb
 
     bool SystemCatalog::getArrayDesc(const string &array_name, ArrayDesc &array_desc, const bool throwException)
     {
+        boost::shared_ptr<Exception> exception;
+        getArrayDesc(array_name, array_desc, throwException, exception);
+
+        if (exception.get())
+        {
+            if (exception->getLongErrorCode() == SCIDB_LE_ARRAY_DOESNT_EXIST)
+            {
+                return false;
+            }
+            else
+            {
+                exception->raise();
+            }
+        }
+
+        return true;
+    }
+
+    void SystemCatalog::getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException, boost::shared_ptr<Exception> &exception)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( name = " << array_name << ")");
 
         boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
@@ -690,7 +731,8 @@ namespace scidb
             boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(array_name);
             if (tmpArray) { 
                 array_desc = tmpArray->getArrayDesc();
-                return true;
+                assert(array_desc.getUAId()!=0);
+                return;
             }
         }
 
@@ -700,7 +742,8 @@ namespace scidb
         if (ad) {
             assert(ad->getName() == array_name);
             array_desc = *ad;
-            return true;
+            assert(array_desc.getUAId()!=0);
+            return;
         }
 
         LOG4CXX_TRACE(logger, "Failed to find array_name = " << array_name << " locally.");
@@ -712,15 +755,21 @@ namespace scidb
             string sql1 = "select id, name, partitioning_schema, flags, comment from \"array\" where name = $1";
             _connection->prepare("find-by-name", sql1)("varchar", treat_string);
             result query_res1 = tr.prepared("find-by-name")(array_name).exec();
-
             if (query_res1.size() <= 0)
             {
+                boost::shared_ptr<SystemException> e = boost::shared_ptr<SystemException> (new SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST));
+                *e.get() << array_name;
                 if (throwException) {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << array_name;
+                    throw SystemException(*e.get());
                 }
-                return false;
+                exception = e;
+                return;
             }
-            ArrayID array_id = query_res1[0].at("id").as(int64_t());
+			ArrayID array_id = query_res1[0].at("id").as(int64_t());
+			ArrayUAID uaid;
+			VersionID vid;
+            fillArrayIdentifiers(_connection, tr, array_name, array_id, uaid, vid);
+            int flags = query_res1[0].at("flags").as(int());
 
             string sql2 = "select id, name, type, flags, default_compression_method, reserve, default_missing_reason, default_value, comment "
                 " from \"array_attribute\" where array_id = $1 order by id";
@@ -750,14 +799,41 @@ namespace scidb
                         // Else fallback to null or zero as before
                         else
                         {
-                            defaultValue = Value(TypeLibrary::getType(i.at("type").as(TypeId())));
+                            TypeId typeId = i.at("type").as(TypeId());
+                            try
+                            {
+                                defaultValue = Value(TypeLibrary::getType(typeId));
+                            }
+                            catch (const SystemException &e)
+                            {
+                                if (throwException)
+                                    throw;
+
+                                if (!exception.get())
+                                {
+                                    exception = e.copy();
+                                }
+                            }
                             if (i.at("flags").as(int16_t()) & AttributeDesc::IS_NULLABLE)
                             {
                                 defaultValue.setNull();
                             }
                             else
                             {
-                                defaultValue.setZero();
+                                try
+                                {
+                                    setDefaultValue(defaultValue, typeId);
+                                }
+                                catch (const UserException &e)
+                                {
+                                    if (throwException)
+                                        throw;
+
+                                    if (!exception.get())
+                                    {
+                                        exception = e.copy();
+                                    }
+                                }
                             }
                         }
                     }
@@ -810,11 +886,11 @@ namespace scidb
                 }
             }
 
-            boost::shared_ptr<ArrayDesc> newDesc(new ArrayDesc(array_id,
+            boost::shared_ptr<ArrayDesc> newDesc(new ArrayDesc(array_id, uaid, vid,
                                                                query_res1[0].at("name").as(string()),
                                                                attributes,
                                                                dimensions,
-                                                               query_res1[0].at("flags").as(int()),
+                                                               flags,
                                                                query_res1[0].at("comment").as(string())));
             newDesc->setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
@@ -837,7 +913,7 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting array";
         }
-        return true;
+        assert(array_desc.getUAId()!=0);
     }
 
     void SystemCatalog::getArrayDesc(const ArrayID array_id, ArrayDesc &array_desc)
@@ -855,6 +931,7 @@ namespace scidb
         std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator adIter = _arrDescCache.find(array_id);
         if (adIter != _arrDescCache.end() && !((adIter->second)->isInvalidated())) {
             assert(adIter->second->getId() == array_id);
+            assert(adIter->second->getUAId() != 0);
             return adIter->second;
         } 
         LOG4CXX_TRACE(logger, "Failed to find array_id = " << array_id << " locally.");
@@ -866,12 +943,16 @@ namespace scidb
             string sql1 = "select id, name, partitioning_schema, flags, comment from \"array\" where id = $1";
             _connection->prepare("find-by-id", sql1)("bigint", treat_direct);
             result query_res1 = tr.prepared("find-by-id")(array_id).exec();
-
             if (query_res1.size() <= 0)
             {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAYID_DOESNT_EXIST) << array_id;
             }
-            ArrayID array_id = query_res1[0].at("id").as(int64_t());
+
+            assert(array_id ==  query_res1[0].at("id").as(uint64_t()));
+            string array_name = query_res1[0].at("name").as(string());
+            ArrayUAID uaid;
+            VersionID vid;
+            fillArrayIdentifiers(_connection, tr, array_name, array_id, uaid, vid);
 
             string sql2 = "select id, name, type, flags, default_compression_method, reserve, default_missing_reason, default_value, comment "
                 " from \"array_attribute\" where array_id = $1 order by id";
@@ -901,14 +982,15 @@ namespace scidb
                         // Else fallback to null or zero as before
                         else
                         {
-                            defaultValue = Value(TypeLibrary::getType(i.at("type").as(TypeId())));
+                            TypeId typeId = i.at("type").as(TypeId());
+                            defaultValue = Value(TypeLibrary::getType(typeId));
                             if (i.at("flags").as(int16_t()) & AttributeDesc::IS_NULLABLE)
                             {
                                 defaultValue.setNull();
                             }
                             else
                             {
-                                defaultValue.setZero();
+                                setDefaultValue(defaultValue, typeId);
                             }
                         }
                     }
@@ -961,7 +1043,7 @@ namespace scidb
                             ));
                 }
             }
-            newDesc = boost::shared_ptr<ArrayDesc>(new ArrayDesc(array_id,
+            newDesc = boost::shared_ptr<ArrayDesc>(new ArrayDesc(array_id, uaid, vid,
                                                                  query_res1[0].at("name").as(string()),
                                                                  attributes,
                                                                  dimensions,
@@ -992,6 +1074,8 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when getting array";
         }
+
+        assert(newDesc->getUAId()!=0);
         return newDesc;
     }
 
@@ -1483,9 +1567,14 @@ namespace scidb
         return Coordinates();
     }
 
-    void SystemCatalog::updateArrayBoundaries(const ArrayID array_id, Coordinates const& low, Coordinates const& high)
+    void SystemCatalog::updateArrayBoundaries(ArrayDesc const& desc, PhysicalBoundaries const& bounds)
     {
-        LOG4CXX_TRACE(logger, "SystemCatalog::updateArrayBoundaries( array_id = " << array_id << ", low = [" << low << "], high = [" << high << "])");
+        PhysicalBoundaries trimmed = bounds.trimToDims(desc.getDimensions());
+        Coordinates const& low = trimmed.getStartCoords();
+        Coordinates const& high = trimmed.getEndCoords();
+        ArrayID array_id = desc.getId();
+
+        LOG4CXX_DEBUG(logger, "SystemCatalog::updateArrayBoundaries( array_id = " << desc.getId() << ", low = [" << low << "], high = [" << high << "])");
 
         ScopedMutexLock mutexLock(_pgLock);
         try
@@ -1580,12 +1669,13 @@ namespace scidb
             result query_res = tr.exec("select nextval from nextval('instance_id_seq')");
             instance_id = query_res[0].at("nextval").as(int64_t());
 
-            string sql1 = "insert into \"instance\"(instance_id, host, port, online_since) values ($1, $2, $3, 'infinity')";
+            string sql1 = "insert into \"instance\"(instance_id, host, port, path, online_since) values ($1, $2, $3, $4, 'infinity')";
             _connection->prepare(sql1, sql1)
                 ("bigint", treat_direct)
                 ("varchar", treat_string)
+                ("int", treat_direct)
                 ("varchar", treat_string);
-            tr.prepared(sql1)(instance_id)(instance.getHost())(instance.getPort()).exec();
+            tr.prepared(sql1)(instance_id)(instance.getHost())(instance.getPort())(instance.getPath()).exec();
 
             tr.commit();
         }
@@ -1620,7 +1710,7 @@ namespace scidb
         {
             work tr(*_connection);
 
-            string sql = "select instance_id, host, port, date_part('epoch', online_since)::bigint as ts from \"instance\" order by instance_id";
+            string sql = "select instance_id, host, port, path, date_part('epoch', online_since)::bigint as ts from \"instance\" order by instance_id";
             result query_res = tr.exec(sql);
 
             if (query_res.size() > 0)
@@ -1633,7 +1723,9 @@ namespace scidb
                             i.at("instance_id").as(uint64_t()),
                             i.at("host").as(string()),
                             i.at("port").as(uint16_t()),
-                            i.at("ts").as(uint64_t()) ));
+                            i.at("ts").as(uint64_t()),
+                            i.at("path").as(string())
+                                     ));
 
                 }
             }
@@ -1672,18 +1764,20 @@ namespace scidb
         {
             work tr(*_connection);
 
-            string sql = "select instance_id, host, port, date_part('epoch', online_since)::bigint as ts from \"instance\" where instance_id = $1";
+            string sql = "select instance_id, host, port, path, date_part('epoch', online_since)::bigint as ts from \"instance\" where instance_id = $1";
             _connection->prepare(sql, sql)("bigint", treat_direct);
             result query_res = tr.prepared(sql)(instance_id).exec();
 
-            if (query_res.size() <= 0)
+            if (query_res.size() <= 0) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_INSTANCE_DOESNT_EXIST) << instance_id;
-
+            }
             instance = InstanceDesc(
                 query_res[0].at("instance_id").as(uint64_t()),
                 query_res[0].at("host").as(string()),
                 query_res[0].at("port").as(uint16_t()),
-                query_res[0].at("ts").as(uint64_t()) );
+                query_res[0].at("ts").as(uint64_t()),
+                query_res[0].at("path").as(string())
+                                    );
 
             tr.commit();
         }
@@ -1721,7 +1815,7 @@ namespace scidb
             string sql = "update \"instance\" set host = $1, port = $2, online_since = 'now' where instance_id = $3";
             _connection->prepare(sql, sql)
                 ("varchar", treat_string)
-                ("varchar", treat_string)
+                ("int", treat_direct)
                 ("bigint", treat_direct);
 
             tr.prepared(sql)(host)(port)(instance_id).exec();
@@ -1840,7 +1934,7 @@ namespace scidb
     }
 
 
-    void SystemCatalog::connect(const std::string& connectionString)
+    void SystemCatalog::connect(const std::string& connectionString, bool doUpgrade)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::connect( connect string ='" << connectionString << ")");
 
@@ -1859,6 +1953,18 @@ namespace scidb
             {
                 result query_res = tr.exec("select get_cluster_uuid as uuid from get_cluster_uuid()");
                 _uuid = query_res[0].at("uuid").as(string());
+
+                query_res = tr.exec("select count(*) from pg_proc where proname = 'get_metadata_version'");
+                if (query_res[0].at("count").as(bool()))
+                {
+                    query_res = tr.exec("select get_metadata_version as version from get_metadata_version()");
+                    _metadataVersion = query_res[0].at("version").as(int());
+                }
+                else
+                {
+                    LOG4CXX_WARN(logger, "Can not find procedure get_metadata_version in catalog. Assuming catalog metadata version is 0");
+                    _metadataVersion = 0;
+                }
             }
         }
         catch (const sql_error &e)
@@ -1882,6 +1988,51 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
                 "Unknown exception when connecting to system catalog";
+        }
+
+        if (_initialized && doUpgrade)
+        {
+            if (_metadataVersion > METADATA_VERSION)
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CATALOG_NEWER_THAN_SCIDB)
+                        << METADATA_VERSION << _metadataVersion;
+            }
+            else if (_metadataVersion < METADATA_VERSION)
+            {
+                LOG4CXX_WARN(logger, "Catalog metadata version (" << _metadataVersion
+                        << ") lower than SciDB metadata version (" << METADATA_VERSION
+                        << "). Trying to upgrade catalog...");
+
+                try
+                {
+                    work tr(*_connection);
+                    sleep(5);
+                    for(int ver = _metadataVersion + 1; ver <= METADATA_VERSION; ++ver)
+                    {
+                        LOG4CXX_WARN(logger, "Upgrading metadata from " << ver-1 << " to " << ver);
+                        string upgradeScript(METADATA_UPGRADES_LIST[ver]);
+                        tr.exec(string(METADATA_UPGRADES_LIST[ver]));
+                    }
+                    tr.commit();
+                    _metadataVersion = METADATA_VERSION;
+                }
+                catch (const sql_error &e)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
+                }
+                catch (const Exception &e)
+                {
+                    throw;
+                }
+                catch (const std::exception &e)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
+                }
+                catch (...)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when upgrading metadata";
+                }
+            }
         }
     }
 
@@ -2022,7 +2173,8 @@ namespace scidb
     SystemCatalog::SystemCatalog() :
     _initialized(false),
     _connection(NULL),
-    _uuid("")
+    _uuid(""),
+    _metadataVersion(-1)
     {
 
     }
@@ -2047,6 +2199,11 @@ namespace scidb
             }
         }
     }
+
+int SystemCatalog::getMetadataVersion() const
+{
+    return _metadataVersion;
+}
 
 std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& lockDesc)
 {

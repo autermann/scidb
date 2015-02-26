@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>substitute</refname>
+    <refpurpose>Substitute new value for null values in an array</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> substitute(<replaceable>null_array</replaceable>,
+<replaceable>substitute_array</replaceable><optional>, <replaceable>attribute_1</replaceable>,<replaceable>attribute_2</replaceable>,...</optional>);</synopsis>
+    <synopsis>substitute(<replaceable>null_array</replaceable>,<replaceable>substitute_array</replaceable><optional>,<replaceable>attribute_1</replaceable>,<replaceable>attribute_2</replaceable>,...</optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>
+Substitute null values in one array with non-null values from another array. The arrays must have the same dimension start index.
+</para>
+    <para>The substitute operator will render attributes in <replaceable>null_array</replaceable> non-nullable. If an attribute
+has null values, you can use this operator to substitute null values in the array and change the nullability of the attribute in the schema.</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example replaces all null values in an array with zero.</para>
+      <procedure>
+        <step>
+          <para>Create an array m4x4_null with a nullable attribute:
+<programlisting language='test'>
+--afl CREATE ARRAY m4x4_null &lt;val:double null&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no --show-query=yes
+</programlisting></para>
+        </step>
+        <step>
+          <para>Store null in the second row of m4x4_null and 100 in all the other cells:
+
+<programlisting language='test'>
+--afl store(build(m4x4_null,iif(i=1,null,100)),m4x4_null); --show-query=yes --show-output=yes
+</programlisting></para>
+
+        </step>
+        <step>
+          <para>Create a single-cell array called substitute_array
+<programlisting language='test'>
+--afl CREATE ARRAY substitute_array &lt;missing:double&gt;[i=0:0,1,0]; --show-query=no --show-output=no
+</programlisting></para>
+        </step>
+        <step>
+          <para>Put value 0 into substitute_array:
+<programlisting language='test'>
+--afl store(build(substitute_array,0),substitute_array); --show-query=yes --show-output=yes
+</programlisting>
+	  </para>
+        </step>
+        <step>
+          <para>Use the substitute operator to replace the null-valued cells in m4x4_null with 0-valued cells:
+<programlisting language='test'>
+--afl substitute(m4x4_null,substitute_array); --show-query=yes --show-output=yes
+</programlisting>
+</para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

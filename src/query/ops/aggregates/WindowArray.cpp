@@ -28,9 +28,10 @@
  * @author Konstantin Knizhnik <knizhnik@garret.ru>, poliocough@gmail.com
  */
 
-#include "WindowArray.h"
 #include <log4cxx/logger.h>
 #include <math.h>
+
+#include "WindowArray.h"
 
 using namespace std;
 using namespace boost;
@@ -80,8 +81,8 @@ namespace scidb
 
         for (size_t i = 0; i < _nDims; i++)
         {
-            windowStart[i] = std::max<Coordinate>(currPos[i] - _chunk->array._window[i]/2, _chunk->array._dimensions[i].getStartMin());
-            windowEnd[i] = std::min<Coordinate>(currPos[i] - _chunk->array._window[i]/2 + _chunk->array._window[i] - 1, _chunk->array._dimensions[i].getEndMax());
+            windowStart[i] = std::max(currPos[i] - _chunk->array._window[i]._boundaries.first, _chunk->array._dimensions[i].getStartMin());
+            windowEnd[i] = std::min(currPos[i] + _chunk->array._window[i]._boundaries.second, _chunk->array._dimensions[i].getEndMax());
         }
 
         uint64_t wsIpos = _chunk->coord2pos(windowStart);
@@ -252,8 +253,10 @@ namespace scidb
         Coordinates currGridPos(nDims);
 
         for (size_t i = 0; i < nDims; i++) {
-            currGridPos[i] = firstGridPos[i] = max(_currPos[i] - _array._window[i]/2, _array._dimensions[i].getStartMin());
-            lastGridPos[i] = min(_currPos[i] - _array._window[i]/2 + _array._window[i] - 1, _array._dimensions[i].getEndMax());
+            currGridPos[i] = firstGridPos[i] = std::max(_currPos[i] - _chunk->array._window[i]._boundaries.first,
+                _chunk->array._dimensions[i].getStartMin());
+            lastGridPos[i] = std::min(_currPos[i] + _chunk->array._window[i]._boundaries.second,
+                _chunk->array._dimensions[i].getEndMax());
         }
 
         currGridPos[nDims-1] -= 1;
@@ -609,12 +612,12 @@ namespace scidb
        double perElementCost =  2* log(nInputElements) / log(2.0) + 2 * _nDims;
        for (size_t i =0; i<_nDims; i++)
        {
-           if (array._window[i]!=1)
+           if (array._window[i]._boundaries.first + array._window[i]._boundaries.second + 1 != 1)
            {
                //we have to iterate over window size in the last dimension
                if(i==_nDims-1)
                {
-                   perElementCost *= array._window[i];
+                   perElementCost *= array._window[i]._boundaries.first + array._window[i]._boundaries.second + 1;
                }
                else //and over the chunk size in all other dimensions
                {
@@ -632,7 +635,7 @@ namespace scidb
        double windowArea = 1;
        for (size_t i = 0; i<_nDims; i++)
        {
-           windowArea *= array._window[i];
+           windowArea *= array._window[i]._boundaries.first + array._window[i]._boundaries.second + 1;
        }
        // where each probe is a binary search over the input tree
        double probeFillCost = nResultElements * windowArea * log(nInputElements) / log(2.0);
@@ -759,7 +762,7 @@ namespace scidb
     }
 
     WindowArray::WindowArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& inputArray,
-                             vector<size_t> const& window, vector<AttributeID> const& inputAttrIDs, vector<AggregatePtr> const& aggregates):
+                             vector<WindowBoundaries> const& window, vector<AttributeID> const& inputAttrIDs, vector<AggregatePtr> const& aggregates):
       _desc(desc),
       _inputDesc(inputArray->getArrayDesc()),
       _window(window),

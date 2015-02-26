@@ -44,7 +44,15 @@ namespace scidb
         if (tileMode) { 
             iterationMode |= ChunkIterator::TILE_MODE;
         } else { 
-            iterationMode &= ~ChunkIterator::TILE_MODE;
+            if (iterationMode & ChunkIterator::TILE_MODE) {
+                BetweenChunk* self = (BetweenChunk*)this;
+                self->tileMode = true;
+                AttributeDesc const* emptyAttr = array.getInputArray()->getArrayDesc().getEmptyBitmapAttribute();
+                if (emptyAttr != NULL) { 
+                    self->emptyBitmapIterator = array.getInputArray()->getConstIterator(emptyAttr->getId());
+                }
+            }
+            // iterationMode &= ~ChunkIterator::TILE_MODE;
         }        
         iterationMode &= ~ChunkIterator::INTENDED_TILE_MODE;
         return boost::shared_ptr<ConstChunkIterator>(
@@ -147,7 +155,11 @@ namespace scidb
                     while (i < nDims && coord[i] >= chunk.firstPos[i]) { 
                         if (coord[i] > chunk.lastPos[i]) { 
                             do { 
-                                if (i == 0) { 
+                                if (i == 0) {
+                                    position_t count = emptyBitmap->count();
+                                    if (count > pos) {
+                                        appender.add(falseVal, count - pos);
+                                    }
                                     goto EndOfTile;
                                 }
                                 i -= 1;
@@ -389,12 +401,12 @@ namespace scidb
     {
         if (iterationMode & TILE_MODE) { 
             if (chunk.emptyBitmapIterator) {
-                emptyBitmapIterator = chunk.emptyBitmapIterator->getChunk().getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
+                emptyBitmapIterator = chunk.emptyBitmapIterator->getChunk().getConstIterator((iterationMode & IGNORE_OVERLAPS)|TILE_MODE|IGNORE_EMPTY_CELLS);
             } else { 
                 ArrayDesc const& arrayDesc = chunk.getArrayDesc();
-                Address addr(0, arrayDesc.getEmptyBitmapAttribute()->getId(), chunk.getFirstPosition(false));
+                Address addr(arrayDesc.getEmptyBitmapAttribute()->getId(), chunk.getFirstPosition(false));
                 shapeChunk.initialize(&array, &arrayDesc, addr, 0);
-                emptyBitmapIterator = shapeChunk.getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
+                emptyBitmapIterator = shapeChunk.getConstIterator((iterationMode & IGNORE_OVERLAPS)|TILE_MODE|IGNORE_EMPTY_CELLS);
             }
             hasCurrent = !inputIterator->end();
         } else {
@@ -464,7 +476,7 @@ namespace scidb
     //
     // Between array iterator methods
     //
-    BetweenArrayIterator::BetweenArrayIterator(BetweenArray const& arr, AttributeID attrID, AttributeID inputAttrID) 
+    BetweenArrayIterator::BetweenArrayIterator(BetweenArray const& arr, AttributeID attrID, AttributeID inputAttrID, bool doReset)
     : DelegateArrayIterator(arr, attrID, arr.inputArray->getConstIterator(inputAttrID)),
       array(arr), 
       lowPos(arr.lowPos),
@@ -475,7 +487,10 @@ namespace scidb
         ArrayDesc const& desc = arr.getArrayDesc();
         desc.getChunkPositionFor(lowPos);
         desc.getChunkPositionFor(highPos);
-        reset();
+        if ( doReset )
+        {
+            reset();
+        }
 	}
 
 	bool BetweenArrayIterator::end()
@@ -483,26 +498,55 @@ namespace scidb
         return !hasCurrent;
     }
 
+	bool BetweenArrayIterator::insideBox(Coordinates const& coords) const
+	{
+	    Dimensions const& dims = array.dims;
+	    size_t nDims = dims.size();
+	    for(size_t i=0; i<nDims; i++)
+	    {
+	        if(coords[i]<lowPos[i] || coords[i] >= highPos[i] + dims[i].getChunkInterval())
+	        {
+	            return false;
+	        }
+	    }
+	    return true;
+	}
+
 	void BetweenArrayIterator::operator ++()
     {
-        const Dimensions& dims = array.dims;
+        Dimensions const& dims = array.dims;
         size_t nDims = dims.size();
         chunkInitialized = false;
-        while (true) { 
+        hasCurrent = false;
+        ++(*inputIterator);
+        if(inputIterator->end()) { return; }
+
+        Coordinates const& currPos = inputIterator->getPosition();
+        if (insideBox(currPos))
+        {
+            pos=currPos;
+            hasCurrent = true;
+            return;
+        }
+        while (true)
+        { 
             size_t i = nDims-1;
-            while ((pos[i] += dims[i].getChunkInterval()) > highPos[i]) { 
-                if (i == 0) { 
+            while ((pos[i] += dims[i].getChunkInterval()) > highPos[i])
+            {
+                if (i == 0)
+                {
                     hasCurrent = false;
                     return;
                 }
-                pos[i] = lowPos[i];
+                pos[i]  = lowPos[i];
                 i -= 1;
             }
-            if (inputIterator->setPosition(pos)) { 
+            if (inputIterator->setPosition(pos))
+            {
                 hasCurrent = true;
                 return;
             }
-        }        
+        }
     }
 
     Coordinates const& BetweenArrayIterator::getPosition()
@@ -528,17 +572,70 @@ namespace scidb
 
 	void BetweenArrayIterator::reset()
 	{
+ 		chunkInitialized = false;
+        hasCurrent = false;
         const Dimensions& dims = array.dims;
         size_t nDims = dims.size();
- 		for (size_t i = 0; i < nDims; i++) {
+        for (size_t i = 0; i < nDims; i++) {
             pos[i] = lowPos[i];
         }
-        chunkInitialized = false;
         pos[nDims-1] -= dims[nDims-1].getChunkInterval();
-        ++(*this);
+        if(!inputIterator->end())
+        {
+            Coordinates const& currPos = inputIterator->getPosition();
+            hasCurrent = insideBox(currPos);
+            if(!hasCurrent)
+            {
+                ++(*this);
+            }
+            else
+            {
+                pos = currPos;
+            }
+        }
 	}
     
-    //[
+	BetweenArraySequentialIterator::BetweenArraySequentialIterator(BetweenArray const& between, AttributeID attrID, AttributeID inputAttrID):
+        BetweenArrayIterator(between, attrID, inputAttrID, false)
+    {
+	    //need to call this class's reset, not parent's.
+	    reset();
+    }
+    
+    void BetweenArraySequentialIterator::operator ++()
+    {
+        hasCurrent = false;
+        chunkInitialized = false;
+        while (!hasCurrent && !inputIterator->end())
+        {
+            ++(*inputIterator);
+            if(inputIterator->end()) { return; }
+            pos = inputIterator->getPosition();
+            hasCurrent = insideBox(pos);
+        }
+    }
+    
+    void BetweenArraySequentialIterator::reset()
+    {
+        chunkInitialized = false;
+        inputIterator->reset();
+
+        if (inputIterator->end())
+        {
+            hasCurrent = false;
+        }
+        else
+        {
+            pos = inputIterator->getPosition();
+            hasCurrent = insideBox(pos);
+            if(!hasCurrent)
+            {
+                ++(*this);
+            }
+        }
+    }
+    
+    //
     // Between array methods
     //
     BetweenArray::BetweenArray(ArrayDesc& array, Coordinates const& from, Coordinates const& till, boost::shared_ptr<Array> input, bool tile)
@@ -548,6 +645,13 @@ namespace scidb
       dims(desc.getDimensions()),
       tileMode(tile)
 	{
+        double numChunksInBox = 1;
+        ArrayDesc const& inputDesc = input->getArrayDesc();
+        for (size_t i=0, n = inputDesc.getDimensions().size(); i<n; i++)
+        {
+            numChunksInBox *= inputDesc.getNumChunksAlongDimension(i, lowPos[i], highPos[i]);
+        }
+        useSequentialIterator = (numChunksInBox > BETWEEN_SEQUENTIAL_ITERATOR_THRESHOLD );
     }
     
     DelegateArrayIterator* BetweenArray::createArrayIterator(AttributeID attrID) const
@@ -556,7 +660,15 @@ namespace scidb
         if (inputAttrID >= inputArray->getArrayDesc().getAttributes().size()) {
             inputAttrID = 0;
         }
-        return new BetweenArrayIterator(*this, attrID, inputAttrID);
+
+        if(useSequentialIterator)
+        {
+            return new BetweenArraySequentialIterator(*this, attrID, inputAttrID);
+        }
+        else
+        {
+            return new BetweenArrayIterator(*this, attrID, inputAttrID);
+        }
     }
 
 

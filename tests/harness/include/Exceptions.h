@@ -63,7 +63,7 @@ class ERROR
 		ERROR (std::string m) : _msg(m) {}
 
 		virtual std::string what (void) throw();
-		~ERROR () throw () {}
+		virtual ~ERROR () throw () {}
 
 	protected :
 		std::string _msg;

@@ -61,8 +61,10 @@ extern const size_t MB = 1024*1024;
 
 extern const size_t GB = 1024*MB;
 
-extern const size_t DEFAULT_MEM_THRESHOLD = 100;
+extern const size_t DEFAULT_MEM_THRESHOLD = 1024;
 extern const double DEFAULT_DENSE_CHUNK_THRESHOLD = 1.0;
 extern const double DEFAULT_SPARSE_CHUNK_INIT_SIZE = 0.01;
 extern const int DEFAULT_STRING_SIZE_ESTIMATION = 10;
+
+extern const int METADATA_VERSION = 1;
 }

@@ -49,7 +49,6 @@ namespace scidb
     class ParallelAccumulatorArray : public StreamArray, public boost::enable_shared_from_this<ParallelAccumulatorArray>
     {
       public:
-        static boost::shared_ptr<JobQueue>  getQueue();
         ParallelAccumulatorArray(boost::shared_ptr<Array> pipe);
         ~ParallelAccumulatorArray();
         void start(const boost::shared_ptr<Query>& query);
@@ -94,10 +93,6 @@ namespace scidb
         };
 
         void doNewJob(boost::shared_ptr<ChunkPrefetchJob> job);
-
-        static boost::shared_ptr<ThreadPool> threadPool;
-        static boost::shared_ptr<JobQueue> queue;
-        static Mutex initCriticalSection;
 
         boost::shared_ptr<Array> pipe;
         vector< boost::shared_ptr<ConstArrayIterator> > iterators;

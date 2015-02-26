@@ -38,6 +38,46 @@ namespace scidb {
 using namespace std;
 
 
+/**
+ * @brief The operator: regrid().
+ *
+ * @par Synopsis:
+ *   regrid( srcArray {, blockSize}+ {, AGGREGATE_CALL}+ )
+ *   <br> AGGREGATE_CALL := AGGREGATE_FUNC(inputAttr) [as resultName]
+ *   <br> AGGREGATE_FUNC := approxdc | avg | count | max | min | sum | stdev | var | some_use_defined_aggregate_function
+ *
+ * @par Summary:
+ *   Partitions the cells in the source array into blocks (with the given blockSize in each dimension), and for each block,
+ *   calculates the required aggregates.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *   - A list of blockSizes, one for each dimension.
+ *   - 1 or more aggregate calls.
+ *     Each aggregate call has an AGGREGATE_FUNC, an inputAttr and a resultName.
+ *     The default resultName is inputAttr followed by '_' and then AGGREGATE_FUNC.
+ *     For instance, the default resultName for sum(sales) is 'sales_sum'.
+ *     The count aggregate may take * as the input attribute, meaning to count all the items in the group including null items.
+ *     The default resultName for count(*) is 'count'.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   the aggregate calls' resultNames
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims, with reduced size in every dimension
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - Regrid does not allow a block to span chunks. So for every dimension, the chunk interval needs to be a multiple of the block size.
+ *
+ */
 class LogicalRegrid: public LogicalOperator
 {
 public:
@@ -89,16 +129,19 @@ public:
                                         srcDim.getStart(),
                                         srcDim.getEndMax() == MAX_COORDINATE ? MAX_COORDINATE : srcDim.getStart() + (srcDim.getLength() + interval - 1)/interval - 1,
                                         srcDim.getEndMax() == MAX_COORDINATE ? MAX_COORDINATE : srcDim.getStart() + (srcDim.getLength() + interval - 1)/interval - 1,
-                                        (srcDim.getChunkInterval() + interval - 1) / interval,
+                                        srcDim.getChunkInterval(),
                                         0  );
         }
 
         ArrayDesc outSchema(inputDesc.getName(), Attributes(), outDims);
 
-        for (size_t i = nDims; i<_parameters.size(); i++)
+        for (size_t i = nDims, j=_parameters.size(); i<j; i++)
         {
             addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], inputDesc, outSchema);
         }
+
+        AttributeDesc et ((AttributeID) outSchema.getAttributes().size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+        outSchema.addAttribute(et);
 
         return outSchema;
     }

@@ -88,6 +88,18 @@ void ClientMessageHandleJob::run()
     LOG4CXX_TRACE(logger, "Finishing client message handling: type=" << messageType)
 }
 
+string ClientMessageHandleJob::getProgramOptions(std::string const& programOptions) const
+{
+    stringstream ip;
+    boost::system::error_code ec;
+    boost::asio::ip::tcp::endpoint endpoint = _connection->getSocket().remote_endpoint(ec);
+    if (!ec) {
+        ip << endpoint.address().to_string() << ":" << endpoint.port();
+    }
+    ip << programOptions;
+    return ip.str();
+}
+
 
 void ClientMessageHandleJob::prepareClientQuery()
 {
@@ -98,12 +110,13 @@ void ClientMessageHandleJob::prepareClientQuery()
         // Getting needed parameters for execution
         const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
         bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
+        string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
 
         queryResult.queryID = Query::generateID();
         assert(queryResult.queryID > 0);
-        _connection->startQuery(queryResult.queryID);
+        _connection->attachQuery(queryResult.queryID);
 
-        scidb.prepareQuery(queryString, afl, queryResult);
+        scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
 
         // Creating message with result for sending to client
         boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtQueryResult);
@@ -164,7 +177,7 @@ void ClientMessageHandleJob::handleExecuteOrPrepareError(const Exception& err,
         }
     }
     assert(_connection);
-    _connection->stopQuery(queryResult.queryID);
+    _connection->detachQuery(queryResult.queryID);
 }
 
 void ClientMessageHandleJob::executeClientQuery()
@@ -176,14 +189,15 @@ void ClientMessageHandleJob::executeClientQuery()
         // Getting needed parameters for execution
         const string queryString = _messageDesc->getRecord<scidb_msg::Query>()->query();
         bool afl = _messageDesc->getRecord<scidb_msg::Query>()->afl();
+        const string programOptions = _messageDesc->getRecord<scidb_msg::Query>()->program_options();
 
         queryResult.queryID = _messageDesc->getQueryID();
 
         if (queryResult.queryID <= 0) {
             queryResult.queryID = Query::generateID();
             assert(queryResult.queryID > 0);
-            _connection->startQuery(queryResult.queryID);
-            scidb.prepareQuery(queryString, afl, queryResult);
+            _connection->attachQuery(queryResult.queryID);
+            scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
         }
 
         scidb.executeQuery(queryString, afl, queryResult);
@@ -232,26 +246,14 @@ void ClientMessageHandleJob::executeClientQuery()
                 dimension->set_chunk_overlap(dimensions[i].getChunkOverlap());
                 dimension->set_type_id(dimensions[i].getType());
                 dimension->set_flags(dimensions[i].getFlags());
-                dimension->set_mapping_array_name(dimensions[i].getMappingArrayName());
-
-                if (dimensions[i].getType() != TID_INT64 && !dimensions[i].getMappingArrayName().empty()) { 
-                    try { 
-                        boost::shared_ptr<Array> mappingArray = query->getArray(dimensions[i].getMappingArrayName());
-                        boost::shared_ptr<ConstArrayIterator> mappingArrayIterator = mappingArray->getConstIterator(0);
-                        if (!mappingArrayIterator->end()) {
-                            dimension->set_coordinates_mapping_size(mappingArray->getArrayDesc().getDimensions()[0].getLength());
-                            ConstChunk const& chunk = mappingArrayIterator->getChunk();
-                            PinBuffer scope(chunk);
-                            dimension->set_coordinates_mapping(string((char*)chunk.getData(), chunk.getSize()));
-                        }
-                    } 
-                    catch (const Exception& e)
-                    {
-                        if (e.getLongErrorCode() != SCIDB_LE_ARRAY_DOESNT_EXIST) 
-                        {
-                            LOG4CXX_ERROR(logger, "Failed to get coordinates mapping array: " << e.what());
-                        }
-                    } 
+                dimension->set_mapping_array_name("");
+                if (dimensions[i].getType() != TID_INT64 && !dimensions[i].getMappingArrayName().empty()) {
+                    boost::shared_ptr<Array> mappingArray = query->getArray(dimensions[i].getMappingArrayName());
+                    boost::shared_ptr<ConstArrayIterator> mappingArrayIterator = mappingArray->getConstIterator(0);
+                    if (!mappingArrayIterator->end()) {
+                        dimension->set_mapping_array_name(dimensions[i].getMappingArrayName());
+                        dimension->set_coordinates_mapping_size(mappingArray->getArrayDesc().getDimensions()[0].getLength());
+                    }
                 }
             }
         }
@@ -303,11 +305,19 @@ void ClientMessageHandleJob::fetchChunk()
         ScopedRWLockRead shared(query->queryLock, noopEc);
         StatisticsScope sScope(&query->statistics);
         uint32_t attributeId = _messageDesc->getRecord<scidb_msg::Fetch>()->attribute_id();
+        string arrayName = _messageDesc->getRecord<scidb_msg::Fetch>()->array_name();
         LOG4CXX_TRACE(logger, "Fetching chunk of " << attributeId << " attribute in context of " << queryID << " query")
 
-        boost::shared_ptr<Array> resultArray = query->getCurrentResultArray();
-        assert(resultArray); //XXX TODO: this needs to be an exception
-        boost::shared_ptr< ConstArrayIterator> iter = resultArray->getConstIterator(attributeId);
+        boost::shared_ptr<Array> fetchArray;
+
+        map<string, shared_ptr<Array> >::const_iterator i = query->_mappingArrays.find(arrayName);
+        if (i != query->_mappingArrays.end() ) {
+            fetchArray = i->second;
+        } else {
+            fetchArray = query->getCurrentResultArray();
+        }
+        assert(fetchArray); //XXX TODO: this needs to be an exception
+        boost::shared_ptr< ConstArrayIterator> iter = fetchArray->getConstIterator(attributeId);
 
         boost::shared_ptr<MessageDesc> chunkMsg;
         boost::shared_ptr<scidb_msg::Chunk> chunkRecord;
@@ -386,7 +396,7 @@ void ClientMessageHandleJob::cancelQuery()
     {
         scidb.cancelQuery(queryID);
         if (_connection) { 
-            _connection->stopQuery(queryID);
+            _connection->detachQuery(queryID);
             _connection->sendMessage(makeOkMessage(queryID));
         }
         LOG4CXX_TRACE(logger, "The query " << queryID << " execution was canceled")
@@ -411,7 +421,7 @@ void ClientMessageHandleJob::completeQuery()
     {
         scidb.completeQuery(queryID);
         if (_connection) {
-            _connection->stopQuery(queryID);
+            _connection->detachQuery(queryID);
             _connection->sendMessage(makeOkMessage(queryID));
         }
         LOG4CXX_TRACE(logger, "The query " << queryID << " execution was completed")

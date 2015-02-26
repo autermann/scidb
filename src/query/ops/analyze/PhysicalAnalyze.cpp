@@ -191,11 +191,8 @@ boost::shared_ptr<Array> PhysicalAnalyze::execute(vector<boost::shared_ptr<Array
         ++(*cIter[4]);
     }
 
-    if ((attributesCount - 1) % ANALYZE_CHUNK_SIZE != 0)
-    {
-        for (size_t j = 0; j < ANALYZE_ATTRIBUTES; j++)
-            cIter[j]->flush();
-    }
+    for (size_t j = 0; j < ANALYZE_ATTRIBUTES; j++)
+        cIter[j]->flush();
     // end of output
 
     LOG4CXX_DEBUG(logger, "Analyze is finished");

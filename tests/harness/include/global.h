@@ -74,6 +74,7 @@ REGEX_FLAG_EXCLUDE_NAME
 # define FAILURE   -1
 # define SUCCESS    0
 # define EXIT       1
+# define ERROR_CODES_DIFFER 2
 
 # define LOGGER_PUSH_NDCTAG(tag) \
 {\
@@ -99,7 +100,8 @@ enum Result
 	RESULT_CONFIG_EXCEPTION,
 	RESULT_FILES_DIFFER,
 	RESULT_SKIPPED,
-	RESULT_RECORDED
+	RESULT_RECORDED,
+	RESULT_ERROR_CODES_DIFFER
 };
 
 enum ExecutorType
@@ -157,11 +159,13 @@ struct InfoForExecutor
     int                sleepTime;
     std::string        logDir;
     std::string        logDestination;
+    std::string        log_prop_file;
     int                debugLevel;
     bool               record;
     bool               keepPreviousRun;
     bool               selftesting;
     bool               log_queries;
+    bool               save_failures;
 
 	std::string        expected_rfile;
 	std::string        actual_rfile;
@@ -198,6 +202,7 @@ struct ExecutorCommandLineOptions
     int            debugLevel;
     bool           record;
     bool           log_queries;
+    bool           save_failures;
 };
 
 /* commandline options for harness */
@@ -215,6 +220,7 @@ struct HarnessCommandLineOptions
     int                     sleepTime;
     std::string             logDir;
     std::string             logDestination;
+    std::string             log_prop_file;
     std::string             reportFilename;
     int                     parallelTestCases;
     int                     debugLevel;
@@ -225,6 +231,7 @@ struct HarnessCommandLineOptions
     bool                    cleanupLog;
     bool                    selfTesting;
     bool                    log_queries;
+    bool                    save_failures;
 };
 
 } //END namespace scidbtestharness

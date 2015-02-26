@@ -30,6 +30,7 @@
 #include <sstream>
 #include <boost/foreach.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem/path.hpp>
 
 #ifndef SCIDB_CLIENT
 #include "system/Config.h"
@@ -50,7 +51,7 @@ namespace scidb
  */
 std::ostream& operator<<(std::ostream& stream,const Coordinates& ob)
 {
-        stream << "[";
+        stream << "{";
         for (size_t i=0,n=ob.size(); i<n; i++)
         {
                 if (i)
@@ -58,8 +59,15 @@ std::ostream& operator<<(std::ostream& stream,const Coordinates& ob)
                 else
                         stream << ob[i];
         }
-        stream << "]";
+        stream << "}";
         return stream;
+}
+
+
+std::ostream& operator<<(std::ostream& stream, const CoordsToStr& w)
+{
+    stream << w._co;
+    return stream;
 }
 
 ObjectNames::ObjectNames()
@@ -84,7 +92,7 @@ void ObjectNames::addName(const std::string &name)
     trim(trimmedName);
     assert(trimmedName != "");
 
-    if (hasNameOrAlias(name))
+    if (hasNameAndAlias(name))
         return;
 
     _names[name] = set<string>();
@@ -119,7 +127,7 @@ void ObjectNames::addAlias(const std::string &alias)
     }
 }
 
-bool ObjectNames::hasNameOrAlias(const std::string &name, const std::string &alias) const
+bool ObjectNames::hasNameAndAlias(const std::string &name, const std::string &alias) const
 {
     NamesType::const_iterator nameIt = _names.find(name);
 
@@ -186,7 +194,9 @@ void printNames (std::ostream& stream, const ObjectNames::NamesType &ob)
  */
 ArrayDesc::ArrayDesc() :
         _accessCount(0),
-        _id(0),
+        _arrId(0),
+        _uAId(0),
+        _versionId(0),
         _name(""),
         _bitmapAttr(NULL),
         _flags(0),
@@ -198,7 +208,9 @@ ArrayDesc::ArrayDesc(const std::string &name,
                      const Dimensions &dimensions,
                      int32_t flags) :
     _accessCount(0),
-    _id(0),
+    _arrId(0),
+    _uAId(0),
+    _versionId(0),
     _name(name),
     _attributes(attributes),
     _dimensions(dimensions),
@@ -209,12 +221,15 @@ ArrayDesc::ArrayDesc(const std::string &name,
     initializeDimensions();
 }
 
-ArrayDesc::ArrayDesc(ArrayID id, const std::string &name,
+ArrayDesc::ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
+                     const std::string &name,
                      const Attributes& attributes,
                      const Dimensions &dimensions,
                      int32_t flags, std::string const& comment) :
     _accessCount(0),
-    _id(id),
+    _arrId(arrId),
+    _uAId(uAId),
+    _versionId(vId),
     _name(name),
     _attributes(attributes),
     _dimensions(dimensions),
@@ -222,6 +237,9 @@ ArrayDesc::ArrayDesc(ArrayID id, const std::string &name,
     _comment(comment),
     _ps(psUndefined)
 {
+    //either both 0 or not...
+    assert(arrId == 0 || uAId != 0);
+
     locateBitmapAttribute();
     initializeDimensions();
 }
@@ -229,7 +247,9 @@ ArrayDesc::ArrayDesc(ArrayID id, const std::string &name,
 
 ArrayDesc::ArrayDesc(ArrayDesc const& other)
 {
-    _id = other._id;
+    _arrId = other._arrId;
+    _uAId = other._uAId;
+    _versionId = other._versionId;
     _name = other._name;
     _attributes = other._attributes;
     _attributesWithoutBitmap = other._attributesWithoutBitmap;
@@ -254,7 +274,9 @@ bool ArrayDesc::operator ==(ArrayDesc const& other) const
 
 ArrayDesc& ArrayDesc::operator = (ArrayDesc const& other)
 {
-    _id = other._id;
+    _arrId = other._arrId;
+    _uAId = other._uAId;
+    _versionId = other._versionId;
     _name = other._name;
     _attributes = other._attributes;
     _attributesWithoutBitmap = other._attributesWithoutBitmap;
@@ -294,7 +316,7 @@ void ArrayDesc::trim()
             dim._startMin = dim._currStart;
         }
         if (dim._endMax == MAX_COORDINATE && dim._currEnd != MIN_COORDINATE) { 
-            dim._endMax = _bitmapAttr != NULL ? dim._currEnd : (dim._startMin + (dim._currEnd - dim._startMin + dim._chunkInterval) / dim._chunkInterval * dim._chunkInterval + dim._chunkOverlap - 1);
+            dim._endMax = (dim._startMin + (dim._currEnd - dim._startMin + dim._chunkInterval) / dim._chunkInterval * dim._chunkInterval + dim._chunkOverlap - 1);
         }
     }
 }
@@ -312,13 +334,17 @@ bool ArrayDesc::containsOverlaps() const
 
 std::string const& ArrayDesc::getMappingArrayName(size_t dimension) const
 {
-    return _dimensions[dimension].getMappingArrayName();
+    std::string const& mappingArrayName = _dimensions[dimension].getMappingArrayName();
+    if (mappingArrayName.empty()) { 
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_ARRAY) << _dimensions[dimension].getBaseName() << _name;
+    }
+    return mappingArrayName;
 }
 
 string ArrayDesc::createMappingArrayName(size_t dimension, VersionID version) const
 {
     stringstream ss;
-    ss << "NID_" << _id << '@' << version << ':' << _dimensions[dimension].getBaseName();
+    ss << "NID_" << _arrId << '@' << version << ':' << _dimensions[dimension].getBaseName();
     return ss.str();
 }
 
@@ -361,7 +387,7 @@ uint64_t ArrayDesc::getChunkNumber(Coordinates const& pos) const
 {
     Dimensions const& dims = _dimensions;
     uint64_t no = 0;
-    /// The goal here is to produce good hash function without using array dime nsion sizes (which can be changed in case of unboundary arrays)
+    /// The goal here is to produce good hash function without using array dimension sizes (which can be changed in case of unboundary arrays)
     for (size_t i = 0, n = pos.size(); i < n; i++)
     {
         // 1013 is prime number close to 1024. 1024*1024 is assumed to be optimal chunk size for 2-d array.
@@ -394,6 +420,40 @@ void ArrayDesc::getChunkPositionFor(Coordinates& pos) const
     }
 }
 
+void ArrayDesc::getChunkBoundaries(Coordinates const& chunkPosition,
+                                   bool withOverlap,
+                                   Coordinates& lowerBound,
+                                   Coordinates& upperBound) const
+{
+#ifndef NDEBUG
+    do
+    {
+        Coordinates alignedChunkPosition = chunkPosition;
+        getChunkPositionFor(alignedChunkPosition);
+        SCIDB_ASSERT(alignedChunkPosition == chunkPosition);
+    }
+    while(false);
+#endif /* NDEBUG */
+    Dimensions const& d = getDimensions();
+    Dimensions::size_type const n = d.size();
+    SCIDB_ASSERT(n == chunkPosition.size());
+    lowerBound = chunkPosition;
+    upperBound = chunkPosition;
+    for (size_t i = 0; i < n; i++) {
+        upperBound[i] += d[i].getChunkInterval() - 1;
+    }
+    if (withOverlap) {
+        for (size_t i = 0; i < n; i++) {
+            lowerBound[i] -= d[i].getChunkOverlap();
+            upperBound[i] += d[i].getChunkOverlap();
+        }
+    }
+    for (size_t i = 0; i < n; ++i) {
+        lowerBound[i] = std::max(lowerBound[i], d[i].getStart());
+        upperBound[i] = std::min(upperBound[i], d[i].getEndMax());
+    }
+}
+
 void ArrayDesc::locateBitmapAttribute()
 {
     _bitmapAttr = NULL;
@@ -406,32 +466,16 @@ void ArrayDesc::locateBitmapAttribute()
     }
 }
 
-ArrayID ArrayDesc::getId() const
-{
-        return _id;
-}
-
-const std::string& ArrayDesc::getName() const
-{
-        return _name;
-}
-
-const std::string& ArrayDesc::getComment() const
-{
-        return _comment;
-}
-
-void ArrayDesc::setName(const std::string& name)
-{
-    _name = name;
-}
-
 uint64_t ArrayDesc::getSize() const
 {
     uint64_t size = 1;
-    for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
+    uint64_t max = std::numeric_limits<uint64_t>::max();
+    for (size_t i = 0, n = _dimensions.size(); i < n; i++)
+    {
         uint64_t length = _dimensions[i].getLength();
-        if (length == INFINITE_LENGTH) {
+        //check for uint64_t overflow
+        if (length >= INFINITE_LENGTH || length > max / size)
+        {
             return INFINITE_LENGTH;
         }
         size *= length;
@@ -481,16 +525,6 @@ uint64_t ArrayDesc::getNumberOfChunks() const
     return nChunks*_attributes.size();
 }
 
-const Attributes& ArrayDesc::getAttributes(bool excludeEmptyBitmap) const
-{
-    return excludeEmptyBitmap ? _attributesWithoutBitmap : _attributes;
-}
-
-const Dimensions& ArrayDesc::getDimensions() const
-{
-        return _dimensions;
-}
-
 void ArrayDesc::cutOverlap() 
 {
     for (size_t i = 0, n = _dimensions.size(); i < n; i++) { 
@@ -530,11 +564,6 @@ Dimensions ArrayDesc::grabDimensions(VersionID version) const
         }
     }
     return dims;
-}
-
-const AttributeDesc* ArrayDesc::getEmptyBitmapAttribute() const
-{
-    return _bitmapAttr;
 }
 
 void ArrayDesc::addAlias(const std::string &alias)
@@ -622,6 +651,18 @@ void ArrayDesc::addAttribute(AttributeDesc const& newAttribute)
         _attributesWithoutBitmap.push_back(newAttribute);
     }
 }
+
+double ArrayDesc::getNumChunksAlongDimension(size_t dimension, Coordinate start, Coordinate end) const
+{
+    assert(dimension < _dimensions.size());
+    if(start==MAX_COORDINATE && end ==MIN_COORDINATE)
+    {
+        start = _dimensions[dimension].getStartMin();
+        end = _dimensions[dimension].getEndMax();
+    }
+    return ceil((end * 1.0 - start + 1.0) / _dimensions[dimension].getChunkInterval());
+}
+
 
 void printSchema(std::ostream& stream,const ArrayDesc& ob)
 {
@@ -711,7 +752,7 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
         if (flags & IS_NULLABLE) {
             _defaultValue.setNull();
         } else {
-            _defaultValue.setZero();
+            setDefaultValue(_defaultValue, type);
         }
     }
 }
@@ -746,7 +787,7 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
         if (flags & IS_NULLABLE) {
             _defaultValue.setNull();
         } else {
-            _defaultValue.setZero();
+            setDefaultValue(_defaultValue, type);
         }
     }
 }
@@ -873,7 +914,7 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
         stream << "\n--- " << att.getComment() << "\n";
     }
     //don't print NOT NULL because it default behaviour
-    stream << att.getName() << ':' <<  TypeLibrary::getType(att.getType()).name()
+    stream << att.getName() << ':' << att.getType()
                  << (att.getFlags() & AttributeDesc::IS_NULLABLE ? " NULL" : "");
     if (!att.getDefaultValue().isZero()) {
         stream << " DEFAULT " << ValueToString(att.getType(), att.getDefaultValue());
@@ -1025,9 +1066,9 @@ Coordinate DimensionDesc::getLowBoundary() const
 {
 #ifndef SCIDB_CLIENT
     if (_startMin == MIN_COORDINATE) {
-        if (_array->_id != 0) {
+        if (_array->getId() != 0) {
             size_t index = this - &_array->_dimensions[0];
-            return SystemCatalog::getInstance()->getLowBoundary(_array->_id)[index];
+            return SystemCatalog::getInstance()->getLowBoundary(_array->getId())[index];
         } else {
             return _currStart;
         }
@@ -1040,9 +1081,9 @@ Coordinate DimensionDesc::getHighBoundary() const
 {
 #ifndef SCIDB_CLIENT
     if (_endMax == MAX_COORDINATE) {
-        if (_array->_id != 0) {
+        if (_array->getId() != 0) {
             size_t index = this - &_array->_dimensions[0];
-            return SystemCatalog::getInstance()->getHighBoundary(_array->_id)[index];
+            return SystemCatalog::getInstance()->getHighBoundary(_array->getId())[index];
         } else {
             return _currEnd;
         }
@@ -1063,19 +1104,33 @@ uint64_t DimensionDesc::getLength() const
 
 uint64_t DimensionDesc::getCurrLength() const
 {
+    Coordinate low = _startMin;
+    Coordinate high = _endMax;
 #ifndef SCIDB_CLIENT
     if (_startMin == MIN_COORDINATE || _endMax == MAX_COORDINATE) {
-        if (_array->_id != 0) {
+        if (_array->getId() != 0) {
             size_t index = this - &_array->_dimensions[0];
-            Coordinate low = _startMin == MIN_COORDINATE ? SystemCatalog::getInstance()->getLowBoundary(_array->_id)[index] : _startMin;
-            Coordinate high = _endMax == MAX_COORDINATE ? SystemCatalog::getInstance()->getHighBoundary(_array->_id)[index] : _endMax;
-            return high - low + 1;
+            if (_startMin == MIN_COORDINATE) {
+                low = SystemCatalog::getInstance()->getLowBoundary(_array->getId())[index];
+            }
+            if (_endMax == MAX_COORDINATE) {
+                high = SystemCatalog::getInstance()->getHighBoundary(_array->getId())[index];
+            }
         } else {
-            return _currEnd - _currStart + 1;
+            low = _currStart;
+            high = _currEnd;
         }
     }
 #endif
-    return _endMax - _startMin + 1;
+    /*
+     * check for empty array - according to informal agreement,
+     * high boundary for empty array is MAX_COORDINATE
+     */
+    if (low == MAX_COORDINATE || high == MIN_COORDINATE) {
+        return 0;
+    } else {
+        return high - low + 1;
+    }
 }
 
 Coordinate DimensionDesc::getStartMin() const
@@ -1223,19 +1278,24 @@ InstanceDesc::InstanceDesc() :
 {
 }
 
-InstanceDesc::InstanceDesc(const std::string &host, uint16_t port) :
+InstanceDesc::InstanceDesc(const std::string &host, uint16_t port, const std::string &path) :
         _host(host),
         _port(port),
         _online(~0)
 {
+     boost::filesystem::path p(path);
+     _path = p.normalize().string();
 }
 
-InstanceDesc::InstanceDesc(uint64_t instance_id, const std::string &host, uint16_t port, uint64_t online) :
+InstanceDesc::InstanceDesc(uint64_t instance_id, const std::string &host,
+                           uint16_t port, uint64_t online, const std::string &path) :
         _instance_id(instance_id),
         _host(host),
         _port(port),
         _online(online)
 {
+    boost::filesystem::path p(path);
+    _path = p.normalize().string();
 }
 
 uint64_t InstanceDesc::getInstanceId() const
@@ -1246,6 +1306,11 @@ uint64_t InstanceDesc::getInstanceId() const
 const std::string& InstanceDesc::getHost() const
 {
         return _host;
+}
+
+const std::string& InstanceDesc::getPath() const
+{
+        return _path;
 }
 
 uint16_t InstanceDesc::getPort() const
@@ -1261,29 +1326,12 @@ uint64_t InstanceDesc::getOnlineSince() const
 std::ostream& operator<<(std::ostream& stream,const InstanceDesc& instance)
 {
 
-   stream << "instance { id = " << instance.getInstanceId() << ", host = " << instance.getHost() << ", port = " << instance.getPort() << ", went on-line since " << instance.getOnlineSince();
-
+    stream << "instance { id = " << instance.getInstanceId()
+           << ", host = " << instance.getHost() << ", port = " << instance.getPort()
+           << ", has been on-line since " << instance.getOnlineSince()
+           << ", path = " << instance.getPath();
 
   return stream;
-}
-
-std::string splitArrayNameVersion(std::string const& versionName, VersionID& ver)
-{
-   ver = 0;
-   size_t pos = versionName.find('@');
-   if (pos != std::string::npos) {
-      ver = atol(&versionName[pos+1]);
-      return versionName.substr(0, pos);
-   }
-   return versionName;
-}
-
-std::string formArrayNameVersion(std::string const& arrayName, VersionID const& version)
-{
-   assert(version!=0);
-   std::stringstream ss;
-   ss << arrayName << "@" << version;
-   return ss.str();
 }
 
 } // namespace

@@ -131,7 +131,7 @@ public:
      * @param queryResult a reference to QueryResult structure with description of query execution result.
      * @param connection is handle to connection returned by connect method.
      */
-    virtual void prepareQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection = NULL) const = 0;
+    virtual void prepareQuery(const std::string& queryString, bool afl, const std::string& programOptions, QueryResult& queryResult, void* connection = NULL) const = 0;
 
     /**
      * Execute a query string. Throws exception if an error occurred.

@@ -141,7 +141,7 @@ Value::CZString::CZString( const CZString &other )
 : cstr_( other.index_ != noDuplication &&  other.cstr_ != 0
                 ?  duplicateStringValue( other.cstr_ )
                 : other.cstr_ )
-   , index_( other.cstr_ ? (other.index_ == noDuplication ? noDuplication : duplicate)
+   , index_( other.cstr_ ? (other.index_ == static_cast<unsigned>(noDuplication) ? static_cast<unsigned>(noDuplication) : static_cast<unsigned>(duplicate))
                          : other.index_ )
 {
 }
@@ -319,7 +319,7 @@ Value::Value( double value )
 
 Value::Value( const char *value )
    : type_( stringValue )
-   , allocated_( true )
+   , allocated_( -1 )
    , comments_( 0 )
 # ifdef JSON_VALUE_USE_INTERNAL_MAP
    , itemIsUsed_( 0 )
@@ -332,7 +332,7 @@ Value::Value( const char *value )
 Value::Value( const char *beginValue, 
               const char *endValue )
    : type_( stringValue )
-   , allocated_( true )
+   , allocated_( -1 )
    , comments_( 0 )
 # ifdef JSON_VALUE_USE_INTERNAL_MAP
    , itemIsUsed_( 0 )
@@ -345,7 +345,7 @@ Value::Value( const char *beginValue,
 
 Value::Value( const std::string &value )
    : type_( stringValue )
-   , allocated_( true )
+   , allocated_( -1 )
    , comments_( 0 )
 # ifdef JSON_VALUE_USE_INTERNAL_MAP
    , itemIsUsed_( 0 )
@@ -412,7 +412,7 @@ Value::Value( const Value &other )
       if ( other.value_.string_ )
       {
          value_.string_ = duplicateStringValue( other.value_.string_ );
-         allocated_ = true;
+         allocated_ = -1;
       }
       else
          value_.string_ = 0;

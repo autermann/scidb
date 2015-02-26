@@ -53,7 +53,7 @@ namespace scidb
  * by calling  create() method. It selects implementation of optimizer
  * according to parameter in configuration.
  */
-class Optimizer
+class Optimizer : boost::noncopyable
 {
 protected:
     /**
@@ -61,11 +61,8 @@ protected:
      *  including headers. Each function must be implemented in related .cpp file
      *  with optimizer implementation.
      */
-    static boost::shared_ptr<Optimizer> createL2POptimizer();
-    static boost::shared_ptr<Optimizer> createHabilis();
-
-    virtual boost::shared_ptr< LogicalQueryPlanNode> logicalRewriteIfNeeded(const boost::shared_ptr<Query>& query,
-                                                                            boost::shared_ptr< LogicalQueryPlanNode> instance);
+    virtual boost::shared_ptr<LogicalQueryPlanNode> logicalRewriteIfNeeded(const boost::shared_ptr<Query>& query,
+                                                                            boost::shared_ptr< LogicalQueryPlanNode> node);
 
   public:
     virtual ~Optimizer() {}
@@ -81,21 +78,10 @@ protected:
      * @return physical plan to be executed.
      *
      */
-    virtual boost::shared_ptr< PhysicalPlan> optimize(const boost::shared_ptr<Query>& query,
+    virtual boost::shared_ptr<PhysicalPlan> optimize(const boost::shared_ptr<Query>& query,
                                                       boost::shared_ptr< LogicalPlan>& logicalPlan) = 0;
 
-    static boost::shared_ptr<Optimizer> create()
-    {
-        switch (Config::getInstance()->getOption<int>(CONFIG_OPTIMIZER_TYPE))
-            {
-                case 0:
-            return createL2POptimizer();
-
-                default:
-            case 1:
-                return createHabilis();
-            }
-    }
+    static boost::shared_ptr<Optimizer> create();
 };
 
 } // namespace

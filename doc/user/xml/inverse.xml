@@ -21,7 +21,7 @@ i.e., the determinant of the matrix must be nonzero.
       <para>This example find the matrix inverse of a 3<symbol role="symbolfont">&times;</symbol>3 matrix.</para>
       <procedure>
         <step>
-          <para>Create a matrix m3x3:<programlisting>CREATE ARRAY &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
+          <para>Create a matrix m3x3:<programlisting>CREATE ARRAY m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
         </step>
         <step>
           <para>Put values of 1 and 2 into m3x3 to represent a nonsingular matrix:<programlisting>store(build(m3x3,iif(i=j,1,2)),m3x3);</programlisting>This query outputs:<screen>[

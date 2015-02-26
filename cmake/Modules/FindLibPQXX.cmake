@@ -108,4 +108,3 @@ endif(LIBPQXX_INCLUDE_DIR)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(LibPQXX DEFAULT_MSG LIBPQXX_LIBRARY_DIRS LIBPQXX_INCLUDE_DIRS)
-

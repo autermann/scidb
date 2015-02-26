@@ -34,7 +34,8 @@
 #include "array/Metadata.h"
 #include "system/SystemCatalog.h"
 #include "util/PluginManager.h"
-
+#include <smgr/io/Storage.h>
+#include "ListArrayBuilder.h"
 
 namespace scidb
 {
@@ -42,6 +43,48 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: list().
+ *
+ * @par Synopsis:
+ *   list( what='arrays', showSystem=false )
+ *
+ * @par Summary:
+ *   Produces a result array and loads data from a given file, and optionally stores to shadowArray.
+ *   The available things to list include:
+ *   - aggregates: show all the aggregate operators.
+ *   - arrays: show all the arrays.
+ *   - chunk descriptors: show all the chunk descriptors.
+ *   - chunk map: show the chunk map.
+ *   - functions: show all the functions.
+ *   - instances: show all SciDB instances.
+ *   - libraries: show all the libraries that are loaded in the current SciDB session.
+ *   - operators: show all the operators and the libraries in which they reside.
+ *   - types: show all the datatypes that SciDB supports.
+ *   - queries: show all the active queries.
+ *
+ * @par Input:
+ *   - what: what to list.
+ *   - showSystem: whether to show systems information.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   The list of attributes depends on the input.
+ *   <br> >
+ *   <br> [
+ *   <br>   No: sequence number
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalList: public LogicalOperator
 {
 public:
@@ -49,7 +92,6 @@ public:
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_VARIES()
-        _properties.ddl = true;
     }
 
     std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
@@ -96,9 +138,15 @@ public:
         } else if (what == "arrays") {
             vector<string> arrays;
             SystemCatalog::getInstance()->getArrays(arrays);
+
+            attributes.push_back(AttributeDesc((AttributeID)1, "id",  TID_INT64, 0, 0));
+            attributes.push_back(AttributeDesc((AttributeID)2, "schema",  TID_STRING, 0, 0));
+            attributes.push_back(AttributeDesc((AttributeID)3, "availability",  TID_BOOL, 0, 0));
+
             if (!showSystem)
             {
                 vector<string>::iterator it = arrays.begin();
+
                 //TODO: In future it better to have some flag in system catalog which will indicate that
                 //      this object is system. For now we just check symbols which not allowed in user
                 //      objects.
@@ -146,18 +194,30 @@ public:
             attributes.push_back(AttributeDesc(3, "error_code",  TID_INT32, 0, 0));
             attributes.push_back(AttributeDesc(4, "error",  TID_STRING, 0, 0));
             attributes.push_back(AttributeDesc(5, "idle",  TID_BOOL, 0, 0));
-            size = Query::getQueries().size();
+            boost::function<void(const shared_ptr<scidb::Query>&)> f;
+            size = Query::listQueries(f);
         } else if (what == "instances") {
             boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
             size = queryLiveness->getNumInstances();
+            attributes.reserve(5);
             attributes.push_back(AttributeDesc(1, "port",  TID_UINT16, 0, 0));
             attributes.push_back(AttributeDesc(2, "instance_id",  TID_UINT64, 0, 0));
             attributes.push_back(AttributeDesc(3, "online_since",  TID_STRING, 0, 0));
-        } else {
+            attributes.push_back(AttributeDesc(4, "instance_path",  TID_STRING, 0, 0));
+        } else if (what == "chunk descriptors" ) {
+            ListChunkDescriptorsArrayBuilder builder;
+            return builder.getSchema(query);
+        } else if (what == "chunk map") {
+            ListChunkMapArrayBuilder builder;
+            return builder.getSchema(query);
+        }
+        else {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LIST_ERROR1,
                         _parameters[0]->getParsingContext());
         }
-        dimensions[0] = DimensionDesc("No", 0, 0, size-1, size-1, size, 0);
+
+        size_t chunkInterval = size>0 ? size : 1;
+        dimensions[0] = DimensionDesc("No", 0, 0, size-1, size-1, chunkInterval, 0);
         return ArrayDesc(what, attributes, dimensions);
     }
 };

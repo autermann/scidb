@@ -208,6 +208,10 @@ public:
         return _nullable;
     }
 
+    bool isConstant() const {
+        return _props.size() == 1 && _props[0].isConst;
+    }
+
     const std::vector<BindInfo>& getBindings() const {
         return _bindings;
     }

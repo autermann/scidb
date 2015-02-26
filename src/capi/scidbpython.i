@@ -33,7 +33,7 @@ section of that chapter."
 %enddef
 
 %module(docstring=MODULE_DOCSTRING) libscidbpython
-
+#pragma SWIG nowarn=362,389,319,325,309,401,520,403,503
 
 %{ 
 #define SWIG_FILE_WITH_INIT
@@ -57,6 +57,12 @@ using namespace boost;
 #include "Python.h"
 #include "../include/SciDBAPI.h"
 #include "../src/array/Metadata.cpp"
+
+#if PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION == 4
+#ifndef PyInt_FromSize_t
+#define PyInt_FromSize_t(x) PyInt_FromLong((long)x)
+#endif
+#endif 
 
 using namespace scidb;
 %}

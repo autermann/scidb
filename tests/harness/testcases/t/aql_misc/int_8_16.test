@@ -26,23 +26,23 @@ load(C, '../tests/harness/testcases/data/pattern.txt')
 --aql select * from C where a<b
 --aql select * from C where a%b<1
 
---sleep 2
+
 --aql update C set a=127 where i=1
---sleep 2
+
 --aql update C set a=128 where i=2
---sleep 2
+
 --aql update C set a=-128 where i=1
---sleep 2
+
 --aql update C set a=-129 where i=1
---sleep 2
+
 --aql update C set b=32767 where j=1
---sleep 2
+
 --aql update C set a=32768 where i=1
---sleep 2
+
 --aql update C set a=-32768 where j=1
---sleep 2
+
 --aql update C set a=-32769 where j=1
---sleep 2
+
 
 --cleanup
 remove(A)

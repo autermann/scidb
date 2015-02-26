@@ -130,12 +130,24 @@ typedef enum
     caseWhenClauseList,
     loadLibraryStatement,
     unloadLibraryStatement,
-    groupByAsClause,
     asterisk,
     anonymousSchema,
     int64List,
     referenceQuirk,
-    redimensionClause
+    redimensionClause,
+    windowRangesList,
+    windowDimensionRange,
+    olapAggregate,
+    windowClauseList,
+    regridDimension,
+    regridDimensionsList,
+    thinClause,
+    thinDimension,
+    thinDimensionsList,
+    renameArrayStatement,
+    cancelQueryStatement,
+    orderByList,
+    insertIntoStatement
 } AstNodeType;
 
 
@@ -213,6 +225,7 @@ typedef enum
     selectClauseArgFromClause,
     selectClauseArgFilterClause,
     selectClauseArgGRWClause, //Group-by, Regrid and Window
+    selectClauseArgOrderByClause,
     selectClauseArgCount,
 
     // namedExpr
@@ -228,18 +241,32 @@ typedef enum
 
     // groupByClause
     groupByClauseArgList = 0,
-    groupByClauseArgAs,
     groupByClauseArgCount,
 
     // regridClause
-    regridClauseArgSizesList = 0,
-    regridClauseArgAs,
+    regridClauseArgDimensionsList = 0,
     regridClauseArgCount,
 
+    //regridDimension
+    regridDimensionArgName = 0,
+    regridDimensionArgStep,
+    regridDimensionArgCount,
+
     // windowClause
-    windowClauseArgSizesList = 0,
-    windowClauseArgAs,
+    windowClauseArgName = 0,
+    windowClauseArgRangesList,
+    windowClauseArgVariableWindowFlag,
     windowClauseArgCount,
+
+    // windowDimensionRange
+    windowDimensionRangeArgName = 0,
+    windowDimensionRangeArgPreceding,
+    windowDimensionRangeArgFollowing,
+    windowDimensionRangeArgCount,
+
+    // windowDimensionCurrent
+    windowDimensionCurrentArgName = 0,
+    windowDimensionCurrentArgCount,
 
     // indexClause
     indexClauseArgName = 0,
@@ -249,6 +276,9 @@ typedef enum
     loadStatementArgArrayName = 0,
     loadStatementArgInstanceId,
     loadStatementArgFileName,
+    loadStatementArgFormat,
+    loadStatementArgErrors,
+    loadStatementArgShadow,
     loadStatementArgCount,
 
     // saveStatement
@@ -314,7 +344,37 @@ typedef enum
     //anonymousSchema
     anonymousSchemaClauseEmpty = 0,
     anonymousSchemaClauseSchema,
-    anonymousSchemaArgCount
+    anonymousSchemaArgCount,
+
+    // olapAggregate
+    olapAggregateArgFunction = 0,
+    olapAggregateArgPartitionName,
+    olapAggregateArgCount,
+
+    //thinClause
+    thinClauseArgArrayReference = 0,
+    thinClauseArgDimensionsList,
+    thinClauseArgCount,
+
+    //thinDimension
+    thinDimensionClauseArgName = 0,
+    thinDimensionClauseArgStart,
+    thinDimensionClauseArgStep,
+    thinDimensionClauseArgCount,
+
+    //renameArrayStatement
+    renameArrayStatementArgOldName = 0,
+    renameArrayStatementArgNewName,
+    renameArrayStatementArgCount,
+
+    //cancelQueryStatement
+    cancelQueryStatementArgQueryId = 0,
+    cancelQueryStatementArgCount,
+
+    //insertIntoStatement
+    insertIntoStatementArgDestination = 0,
+    insertIntoStatementArgSource,
+    insertIntoStatementArgCount
 } AstNodeArguments;
 
 typedef enum
@@ -324,6 +384,8 @@ typedef enum
 } SortQuirk;
 
 class AstNode;
+
+typedef std::pair<AstNode*, AstNode*> PairOfNodes;
 
 typedef std::vector<AstNode*> AstNodes;
 

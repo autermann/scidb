@@ -55,7 +55,14 @@ namespace scidb
 
         virtual ArrayDesc const& getArrayDesc() const;
 
-        virtual bool supportsRandomAccess() const;
+        /**
+         * Get the least restrictive access mode that the array supports.
+         * @return SINGLE_PASS
+         */
+        virtual Access getSupportedAccess() const
+        {
+            return SINGLE_PASS;
+        }
 
         virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
         virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;

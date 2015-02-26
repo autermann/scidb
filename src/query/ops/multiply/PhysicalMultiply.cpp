@@ -33,21 +33,25 @@
 namespace scidb
 {
 
-class PhysicalMultiply: public  PhysicalOperator
+class PhysicalMultiply : public  PhysicalOperator
 {
 public:
-	PhysicalMultiply(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalMultiply(std::string const& logicalName,
+                     std::string const& physicalName,
+                     Parameters const& parameters,
+                     ArrayDesc const& schema):
 	    PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
 	}
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const& inputDistributions,
+            std::vector<ArrayDesc> const& inputSchemas) const
     {
         DimensionDesc const& d1 = inputSchemas[0].getDimensions()[0];
         DimensionDesc const& d2 = inputSchemas[1].getDimensions()[1];

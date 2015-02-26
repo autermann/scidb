@@ -35,11 +35,41 @@ namespace scidb
 {
 
 /**
- * SCATTER/GATHER distributes array chunks over every instance of cluster.
- * It has one input and outputs a local part of array after redistribution.
- * It's only operator uses the network manager.
- * Logical operator for SG must not be presented in logical plan and will be
- * inserted by optimizer directly into physical plan.
+ * @brief The operator: sg().
+ *
+ * @par Synopsis:
+ *   sg( srcArray, instanceId [, outputArray, isStore = True] )
+ *
+ * @par Summary:
+ *   SCATTER/GATHER distributes array chunks over every instance of cluster.
+ *   It has one input and outputs a local part of array after redistribution.
+ *   It's only operator uses the network manager.
+ *   Logical operator for SG must not be present in logical plan, but will be
+ *   inserted by the optimizer directly into the physical plan.
+ *
+ * @par Input:
+ *   - srcArray: the souce array, with srcAttrs and srcDims.
+ *   - instanceId:
+ *   - outputArray: if present, the result will be stored
+ *   - isStore: ??
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - The author should explain what it means to have outputArray but isStore=False.
+ *
  */
 class LogicalSG: public LogicalOperator
 {

@@ -7,9 +7,9 @@ store(build(C,x+100),C)
 
 --test
 --aql update A set a = a + 10
---sleep 2
+
 --aql update C set a = a + 50
---sleep 2
+
 --aql select * from A cross join B
 --aql select * from A cross join C
 --aql select * into D from A cross join A

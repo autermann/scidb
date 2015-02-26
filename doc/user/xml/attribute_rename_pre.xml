@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>attribute_rename</refname>
+
+    <refpurpose>Produces a result array with the same dimensions, attributes,
+    and cell values as a source array, but with one or more of the attributes
+    renamed.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>attribute_rename(<replaceable>array</replaceable>,<replaceable>old_attribute1</replaceable>,<replaceable>new_attribute1</replaceable>
+<optional>, <replaceable>old_attribute2</replaceable>,<replaceable>new_attribute2</replaceable></optional>...);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The attribute_rename operator produces a result array that is nearly
+    identical to a source array, except that one or more attributes are
+    renamed.</para>
+
+    <para>You can use the attribute_rename operator in the FROM clause of an
+    AQL SELECT statement, as a stand-alone operator in a AFL statement, or as
+    an operand within other SciDB operators..</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example takes a 2-D array with three attributes and produces
+      an identical array, except the third attribute is renamed.</para>
+
+      <procedure>
+        <step>
+          <para>Show the source_array:<programlisting language='test'>
+--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winnersFew.csv &gt; ../examples/winnersFew.scidb --show-query=no --show-output=no
+--aql load winnersFlat from '../examples/winnersFew.scidb' --show-query=no --show-output=no
+--afl create array champions &lt;person:string,country:string,time:double&gt; [year=1996:2008,13,0, event(string)=3,3,0] --show-query=no --show-output=no
+--afl redimension_store(winnersFlat,champions) --show-query=no --show-output=no
+--afl scan(champions)</programlisting></para>
+        </step>
+
+        <step>
+          <para>Use the project operator to exclude the person attribute, and
+          to reorder the remaining attributes:<programlisting language='test'>--afl attribute_rename(champions,time,time_in_seconds)</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

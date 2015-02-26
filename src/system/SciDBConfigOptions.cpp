@@ -24,6 +24,7 @@
 
 #include "system/Config.h"
 #include "SciDBConfigOptions.h"
+#include <unistd.h>
 
 using namespace std;
 
@@ -57,6 +58,8 @@ void initConfig(int argc, char* argv[])
     Config *cfg = Config::getInstance();
 
     cfg->addOption
+        (CONFIG_PRECISION, 'w', "precision", "PRECISION", "", scidb::Config::INTEGER,
+               "Precision for printing floating point numbers. Default is 6", 6, false)
         (CONFIG_CATALOG_CONNECTION_STRING, 'c', "catalog", "CATALOG", "", Config::STRING,
             "Catalog connection string. In order to create use utils/prepare-db.sh")
         (CONFIG_LOG4CXX_PROPERTIES, 'l', "log-properties", "LOG_PROPERTIES", "",
@@ -82,12 +85,8 @@ void initConfig(int argc, char* argv[])
                 string("./storage.scidb"), false)
         (CONFIG_PLUGINS, 'u', "plugins", "PLUGINS", "", Config::STRING, "Plugins folder.",
             string(SCIDB_INSTALL_PREFIX()) + string("/lib/scidb/plugins"), false)
-        (CONFIG_METADATA, 0, "metadata", "METADATA", "", Config::STRING, "File with metadata of system catalog",
-            string(SCIDB_INSTALL_PREFIX()) + string("/share/scidb/meta.sql"), false)
         (CONFIG_CACHE_SIZE, 'm', "cache", "CACHE", "", Config::INTEGER,
             "Size of storage cache (Mb).", 256, false)
-        (CONFIG_OPTIMIZER_TYPE, 'o', "optimizer", "OPTIMIZER", "", Config::INTEGER,
-            "Optimizer type: 0 - L2P, 1 - Habilis (default)", 1, false)
         (CONFIG_CONFIGURATION_FILE, 'f', "config", "", "", Config::STRING,
                 "Instance configuration file.", string(""), false)
         (CONFIG_HELP, 'h', "help", "", "", Config::BOOLEAN, "Show this text.",
@@ -103,7 +102,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_STRING_SIZE_ESTIMATION, 0, "string-size-estimation", "STRING_SIZE_ESTIMATION", "", Config::INTEGER,
             "Average string size (bytes).", DEFAULT_STRING_SIZE_ESTIMATION, false)
         (CONFIG_CHUNK_CLUSTER_SIZE, 0, "chunk-segment-size", "CHUNK_SEGMENT_SIZE", "", Config::INTEGER,
-         "Size of chunks segment (bytes).", 0/*1024*1024*1024*/, false)
+         "Size of chunks segment (bytes).", 85*1024*1024, false)
         (CONFIG_READ_AHEAD_SIZE, 0, "read-ahead-size", "READ_AHEAD_SIZE", "", Config::INTEGER,
             "Total size of read ahead chunks (bytes).", 64*1024*1024, false)
         (CONFIG_DAEMONIZE, 'd', "daemon", "", "", Config::BOOLEAN, "Run scidb in background.",
@@ -111,9 +110,9 @@ void initConfig(int argc, char* argv[])
         (CONFIG_SAVE_RAM, 0, "save-ram", "", "SAVE_RAM", Config::BOOLEAN, "Minimize memory footprint of SciDB.",
                 false, false)
         (CONFIG_MEM_ARRAY_THRESHOLD, 'a', "mem-array-threshold", "MEM_ARRAY_THRESHOLD", "", Config::INTEGER,
-                "Maximal size of memory used by temporary in-memory array (Mb)", 1024, false)
-        (CONFIG_TMP_DIR, 0, "tmp-dir", "", "TMP_DIR", Config::STRING, "Directory for SciDB temporary files",
-                string("/tmp"), false)
+                "Maximal size of memory used by temporary in-memory array (Mb)", (int)DEFAULT_MEM_THRESHOLD, false)
+        (CONFIG_TMP_PATH, 0, "tmp-path", "", "TMP_PATH", Config::STRING, "Directory for SciDB temporary files",
+                string("./tmp"), false)
         (CONFIG_EXEC_THREADS, 't', "threads", "EXEC_THREADS", "", Config::INTEGER,
                 "Number of execution threads for concurrent processing of chunks of one query", 4, false)
         (CONFIG_PREFETCHED_CHUNKS, 'q', "prefetch-queue-size", "PREFETCHED_CHUNKS", "", Config::INTEGER,
@@ -128,13 +127,13 @@ void initConfig(int argc, char* argv[])
                 "Size of memory used for network buffers (Mb)", 512, false)
         (CONFIG_ASYNC_IO_BUFFER, 0, "async-io-buffer", "ASYNC_IO_BUFFER", "", Config::INTEGER,
                 "Maximal size of connection output IO queue (Mb)", 64, false)
-        (CONFIG_CHUNK_RESERVE, 0, "chunk-reserve", "CHUNK_RESERVE", "", Config::INTEGER,
-                "Percent of chunks size preallocated for adding deltas", 10, false)
+        (CONFIG_CHUNK_RESERVE, 0, "chunk-reserve", "CHUNK_RESERVE", "", Config::INTEGER, "Percent of chunks size preallocated for adding deltas", 0, false)
+        (CONFIG_ENABLE_DELTA_ENCODING, 0, "enable-delta-encoding", "ENABLE_DELTA_ENCODING", "", Config::BOOLEAN, "True if system should attempt to compute delta chunk versions", false, false)
         (CONFIG_VERSION, 'V', "version", "", "", Config::BOOLEAN, "Version.",
                 false, false)
-        (CONFIG_STATISTICS_MONITOR, 0, "stat_monitor", "STAT_MONITOR", "", Config::INTEGER,
+        (CONFIG_STATISTICS_MONITOR, 0, "stat-monitor", "STAT_MONITOR", "", Config::INTEGER,
                 "Statistics monitor type: 0 - none, 1 - Logger, 2 - Postgres", 0, false)
-        (CONFIG_STATISTICS_MONITOR_PARAMS, 0, "stat_monitor_params", "STAT_MONITOR_PARAMS", "STAT_MONITOR_PARAMS",
+        (CONFIG_STATISTICS_MONITOR_PARAMS, 0, "stat-monitor-params", "STAT_MONITOR_PARAMS", "STAT_MONITOR_PARAMS",
             Config::STRING, "Parameters for statistics monitor: logger name or connection string", string(""), false)
         (CONFIG_LOG_LEVEL, 0, "log-level", "LOG_LEVEL", "LOG_LEVEL", Config::STRING,
          "Level for basic log4cxx logger. Ignored if log-properties option is used. Default level is ERROR", string("error"), false)
@@ -162,10 +161,30 @@ void initConfig(int argc, char* argv[])
     
         (CONFIG_STRICT_CACHE_LIMIT, 0, "strict-cache-limit", "STRICT_CACHE_LIMIT", "", Config::BOOLEAN, "Block thread if cache is overflown", false, false)
         (CONFIG_REPART_SEQ_SCAN_THRESHOLD, 0, "repart-seq-scan-threshold", "REPART_SEQ_SCAN_THRESHOLD", "", Config::INTEGER, "Number of chunks in array cause repart to use sequential scan through source array", 1000000, false)
-        (CONFIG_REPART_USE_SPARSE_ALGORITHM, 0, "repart-use-sparse-algorithm", "REPART_USE_SPARSE_ALGORITHM", "", Config::BOOLEAN, "Use algorithm optimized for sparse data in REPART", false, false)
+        /*
+          Use query "setopt('repart-algorithm', 'value') where value is
+            * 'dense'
+            * 'sparse'
+            * 'auto'
+          for select repart algorithm
+         */
+        (CONFIG_REPART_ALGORITHM, 0, "repart-algorithm",
+            "REPART_ALGORITHM", "",
+            getDefinition<RepartAlgorithm>(3),
+         "Algorithm for repart", 0, false)
+        (CONFIG_REPART_DENSE_OPEN_ONCE, 0, "repart-dense-open-once",
+         "REPART_DENSE_OPEN_ONCE", "", Config::BOOLEAN,
+         "Dense algorithm of repart will open every source chunk just once",
+         false, false)
+        (CONFIG_REPART_DISABLE_TILE_MODE, 0, "repart-disable-tile-mode",
+         "REPART_DISABLE_TILE_MODE", "", Config::BOOLEAN,
+         "Disable tile mode for repart operator",
+         false, false)
         (CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE, 0, "replication-receive-queue-size", "REPLICATION_RECEIVE_QUEUE_SIZE", "", Config::INTEGER, "The length of incoming replication queue (across all connections)", 1000, false)
         (CONFIG_REPLICATION_SEND_QUEUE_SIZE, 0, "replication-send-queue-size", "REPLICATION_SEND_QUEUE_SIZE", "", Config::INTEGER, "The length of outgoing replication queue (across all connections)", 1000, false)
         (CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT, 0, "array-emptyable-by-default", "ARRAY_EMPTYABLE_BY_DEFAULT", "", Config::BOOLEAN, "Be default arrays are emptyable", true, false)
+        (CONFIG_LOAD_SCAN_BUFFER, 0, "load-scan-buffer", "LOAD_SCAN_BUFFER", "", Config::INTEGER, "Number of MB for one input buffer used in InputScanner", 1, false)
+        (CONFIG_MPI_DIR, 0, "mpi-dir", "MPI_DIR", "", Config::STRING, "Location of OpenMPI installation.", string("/usr"), false) //the Ubuntu openmpi package is installed into /usr
         ;
 
     cfg->addHook(configHook);
@@ -176,6 +195,14 @@ void initConfig(int argc, char* argv[])
     if (!cfg->optionActivated(CONFIG_PORT) && cfg->getOption<bool>(CONFIG_COORDINATOR))
     {
         cfg->setOption(CONFIG_PORT, 1239);
+    }
+
+    // By default, change tmp-path to ./tmp
+    if (!cfg->optionActivated(CONFIG_TMP_PATH)) {
+        const string& storageConfigPath = cfg->getOption<string>(CONFIG_STORAGE_URL);
+        string storageConfigDir = getDir(storageConfigPath);
+        storageConfigDir += "/tmp";
+        cfg->setOption(CONFIG_TMP_PATH, storageConfigDir);
     }
 }
 

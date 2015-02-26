@@ -38,6 +38,36 @@ using namespace boost;
 namespace scidb
 {
 
+/**
+ * @brief The operator: echo().
+ *
+ * @par Synopsis:
+ *   echo( str )
+ *
+ * @par Summary:
+ *   Produces a single-element array containing the input string.
+ *
+ * @par Input:
+ *   - str: an input string.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   text: string
+ *   <br> >
+ *   <br> [
+ *   <br>   i: start=end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - For internal usage.
+ *
+ */
 class LogicalEcho: public LogicalOperator
 {
 public:

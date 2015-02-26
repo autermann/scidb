@@ -251,8 +251,10 @@ public:
   void dumbData(){
     for (std::map<int, std::vector<int> >::const_iterator it = groupsFrom.begin(); it != groupsFrom.end(); ++it) {
       int groupId = it->first;
+      groupId = groupId;
       for (size_t j = 0; j < it->second.size(); ++j) {
         int obsid = it->second[j];
+        obsid = obsid;
         //cout << "##########" << groupId << " "<<  obsid <<endl;
       }
     }
@@ -264,6 +266,7 @@ public:
 
     for (std::map<int, std::vector<int> >::const_iterator it = groupsFrom.begin(); it != groupsFrom.end(); ++it) {
       int groupId = it->first;
+      groupId = groupId;
 
       // sort by and group by time
       std::map <int, std::vector<ObsPos*> > obsidInTime; // map <time, obs>. could be multiple obsid in a time
@@ -285,14 +288,14 @@ public:
       for (std::map <int, std::vector<ObsPos*> >::const_iterator cur = obsidInTime.begin(); cur != obsidInTime.end(); ++cur) {
         const std::vector<ObsPos*> &curObs = cur->second;
         for (size_t j = 0; j < curObs.size(); ++j) {
-          ObsPos *obs = curObs[j];
+          //ObsPos *obs = curObs[j];
           //csvGr.written(::sprintf (csvGr.curbuf(), firstObs ? "%d %d" : ",%d %d", obs->centerx, obs->centery));
           //cout << obs->centerx << " "<< obs->centery << "   --- ";
           if (firstObs) firstObs = false;
           //csvGrob.written(::sprintf (csvGrob.curbuf(), "%d,%d\n", groupId, obs->obsid));
           //cout << obs-> obsid << " Time: "<< cur->first << endl;
         }
-        /*
+        /* 
         if (prevTime >= 0) { // write polygon trajectory
           csvGrtr.written(::sprintf (csvGrtr.curbuf(), "%d;%d;%d;POLYGON((", groupId, prevTime, cur->first));
           int firstX = -1, firstY = -1;
@@ -322,6 +325,7 @@ public:
         prevTime = cur->first;
         prevObs = cur->second;
       }
+      prevTime = prevTime;
       //csvGr.written(::sprintf (csvGr.curbuf(), ")\n"));
     }
     //csvGr.close ();

@@ -39,10 +39,44 @@ using namespace std;
 namespace scidb
 {
 
-class Sum : public  LogicalOperator
+/**
+ * @brief The operator: sum().
+ *
+ * @par Synopsis:
+ *   sum( srcArray [, attr {, groupbyDim}*] )
+ *
+ * @par Summary:
+ *   Produces a result array containing the sum value among the values of an attribute.
+ *   If a list of groupbyDims is provided, one sum value is calculated for every distinct group.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 0 or 1 attributes from srcAttrs. If no attribute is provided, the first attribute is used.
+ *   - an optional list of groupbyDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attr_sum: the source attribute name, followed by '_sum'.
+ *   <br> >
+ *   <br> [
+ *   <br>   groupbyDims (if a list of groupbyDims is provided); or
+ *   <br>   i: start=0, end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - same as aggregate(srcArray, sum(attr), groupbyDims).
+ *
+ */
+class LogicalSum : public  LogicalOperator
 {
 public:
-    Sum(const std::string& logicalName, const std::string& alias):
+    LogicalSum(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_INPUT()
@@ -112,7 +146,7 @@ public:
     }
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Sum, "sum")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSum, "sum")
 
 } //namespace scidb
 

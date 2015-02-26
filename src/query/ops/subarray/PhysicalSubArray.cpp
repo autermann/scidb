@@ -107,12 +107,12 @@ public:
         return result;
     }
 
-    virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
-    virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
     {
         boost::shared_ptr<Query> query(_query.lock());
         ArrayDesc const& input = inputSchemas[0];
@@ -146,24 +146,10 @@ public:
         return result;
     }
 
-    virtual DimensionVector getShapeVector(const std::vector< ArrayDesc> & inputSchemas) const
-    {
-        Dimensions const& inputDimensions = (inputSchemas[0]).getDimensions();
-        size_t numCoords = inputDimensions.size();
-        DimensionVector result(numCoords);
-        for (size_t i = 0; i < numCoords; i++)
-        {
-            result[i] = inputDimensions[i].getLength();
-        }
-        return result;
-    }
-
-
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
         DimensionVector offset = getOffsetVector(inputSchemas);
-        DimensionVector shape = getShapeVector(inputSchemas);
         boost::shared_ptr<DistributionMapper> distMapper;
         ArrayDistribution inputDistro = inputDistributions[0];
 
@@ -176,7 +162,7 @@ public:
             boost::shared_ptr<DistributionMapper> inputMapper = inputDistro.getMapper();
             if (!offset.isEmpty())
             {
-                distMapper = DistributionMapper::createOffsetMapper(offset,shape) ->combine(inputMapper);
+                distMapper = DistributionMapper::createOffsetMapper(offset) ->combine(inputMapper);
             }
             else
             {
@@ -218,6 +204,11 @@ public:
                                       boost::shared_ptr< Query> query)
     {
         assert(inputArrays.size() == 1);
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
         boost::shared_ptr< Array> array = inputArrays[0];
         ArrayDesc const& desc = array->getArrayDesc();
         Dimensions const& srcDims = desc.getDimensions();

@@ -37,6 +37,40 @@ inline bool hasSingleAttribute(ArrayDesc const& desc)
     return desc.getAttributes(true).size() == 1;
 }
 
+/**
+ * @brief The operator: multiply().
+ *
+ * @par Synopsis:
+ *   multiply( leftArray, rightArray )
+ *
+ * @par Summary:
+ *   Produces a result array via matrix multiplication.
+ *   Both matrices must have a single numeric attribute.
+ *   The two matrices must have the same size of 'inner' dimension and same chunk size along that dimension.
+ *
+ * @par Input:
+ *   - leftArray: the left matrix with two dimensions: leftDim1, leftDim2
+ *   - rightArray: the right matrix with two dimensions: rightDim1, rightDim2
+ *
+ * @par Output array:
+ *        <
+ *   <br>   'multiply': the result attribute name
+ *   <br> >
+ *   <br> [
+ *   <br>   leftDim1
+ *   <br>   rightDim2
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalMultiply : public  LogicalOperator
 {
 public:

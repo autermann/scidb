@@ -193,7 +193,7 @@ namespace scidb {
                     if (arrayIterator.iterators[i] == arrayIterator.getInputIterator()) { 
                         _iterators[i] = inputIterator;
                     } else {
-                        _iterators[i] = arrayIterator.iterators[i]->getChunk().getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
+                        _iterators[i] = arrayIterator.iterators[i]->getChunk().getConstIterator(iterationMode);
                         
                     }
                 }
@@ -218,7 +218,7 @@ namespace scidb {
                 emptyBitmapIterator = arrayIterator.emptyBitmapIterator->getChunk().getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
             } else { 
                 ArrayDesc const& arrayDesc = chunk->getArrayDesc();
-                Address addr(0, arrayDesc.getEmptyBitmapAttribute()->getId(), chunk->getFirstPosition(false));
+                Address addr(arrayDesc.getEmptyBitmapAttribute()->getId(), chunk->getFirstPosition(false));
                 shapeChunk.initialize(&_array, &arrayDesc, addr, 0);
                 emptyBitmapIterator = shapeChunk.getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
             }
@@ -236,12 +236,18 @@ namespace scidb {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
         RLEPayload* emptyBitmap = emptyBitmapIterator->getItem().getTile();
         RLEPayload::iterator ei(emptyBitmap);
+
+#ifndef NDEBUG
         position_t prevPos = 0;
+#endif
+
         Value trueVal, falseVal;
         trueVal.setBool(true);
         falseVal.setBool(false);
         while (!ei.end()) {
+#ifndef NDEBUG
             position_t currPos = ei.getPPos();
+#endif
             assert (prevPos == currPos);
             uint64_t count;
             if (ei.checkBit()) { 
@@ -253,7 +259,10 @@ namespace scidb {
                 appender.add(falseVal, count);
             }
             ei += count;
+
+#ifndef NDEBUG
             prevPos = currPos + count;
+#endif
         }
         appender.flush();
         return tileValue;

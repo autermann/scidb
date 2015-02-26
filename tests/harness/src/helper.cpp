@@ -375,7 +375,7 @@ string converttoid (string rootdir, string filename)
 string converttopath (string suiteid)
 {
 	string :: size_type dot;
-
+	boost::algorithm::trim(suiteid);
 	while ((dot = suiteid.find ('.')) != string::npos)
 		suiteid.replace (dot, 1, "/");
 

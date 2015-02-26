@@ -48,8 +48,7 @@ namespace scidb
     DBArray::DBArray(const DBArray& other)
     : _desc(other._desc),
       _query(other._query)
-    {
-    }
+    {}
 
     DBArray::DBArray(ArrayID id, const boost::shared_ptr<Query>& query) 
     : _query(query)
@@ -103,6 +102,31 @@ namespace scidb
 
     boost::shared_ptr<ConstArrayIterator> DBArray::getConstIterator(AttributeID attId) const
     {
-        return ((DBArray*)this)->getIterator(attId);
+        boost::shared_ptr<Query> query(_query.lock());
+        return StorageManager::getInstance().getConstArrayIterator(_desc, attId, query);
+    }
+
+    boost::shared_ptr<CoordinateSet> DBArray::getChunkPositions() const
+    {
+        if( !hasChunkPositions() )
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << "calling getChunkPositions on an invalid array";
+        }
+        boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<CoordinateSet> result (new CoordinateSet());
+        if(query)
+        {
+            StorageManager::getInstance().getChunkPositions(_desc, query, *(result.get()));
+        }
+        return result;
+    }
+
+    void DBArray::populateFrom(boost::shared_ptr<Array>& input)
+    {
+        bool vertical = (input->getSupportedAccess() == Array::RANDOM);
+        set<Coordinates, CoordinatesLess> newChunkCoords;
+        Array::append(input, vertical, &newChunkCoords);
+        boost::shared_ptr<Query> query(_query.lock());
+        StorageManager::getInstance().removeDeadChunks(_desc, newChunkCoords, query);
     }
 }

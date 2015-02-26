@@ -5,6 +5,7 @@ create immutable empty array B <x:int64> [a=0:14,3,0]
 create immutable empty array D <a:int64> [x=0:2,3,0]
 store(build(A,x+10),A)
 store(build_sparse(D,x+5,x<>1),D)
+create array B_short <x:int64>[a=11:13,2,0]
 
 --test
 redimension(A,B)
@@ -16,7 +17,8 @@ unpack(B,row)
 unpack(C,row)
 unpack(redimension(B,D),row)
 unpack(redimension(D,B),row)
-
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION "redimension(A, <x:int64>[a=11:13,2,0])"
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION "redimension_store(A, B_short)"
 max(B)
 min(B)
 avg(B)
@@ -56,4 +58,5 @@ remove(A)
 remove(B)
 remove(C)
 remove(D)
+remove(B_short)
 --stop-query-logging

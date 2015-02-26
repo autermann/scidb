@@ -1,6 +1,7 @@
 Query was executed successfully
 
-[("A")]
+{No} name,schema
+{0} "A","A<a:int32> [x=0:2,3,0]"
 
 [An error expected at this place for the query "store(build_sparse(A,'test',1),B)". And it failed with error code = scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING. Expected error code = scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING.]
 

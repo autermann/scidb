@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>attributes</refname>
+
+    <refpurpose>Produces a 1-dimensional result array where each cell
+    describes one attribute of a stored array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>attributes(<replaceable>named_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The attributes operator produces a result array where each cell
+    describes an attribute of the named array. Each cell includes the
+    attribute name, the attribute data type, a Boolean flag representing
+    whether or not the attribute can be null, and the sequence number of the
+    attribute as it appears in the named array. The argument
+    <replaceable>named_array</replaceable> must be an array that was
+    previously created and stored in SciDB.</para>
+
+    <para>You can use the attributes operator in the FROM clause of an AQL
+    SELECT statement, as a stand-alone operator in a AFL statement, or as an
+    operand within other SciDB operators.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example first shows a stored array, then creates a result
+      array describing its attributes, then creates a result array describing
+      each of its nullable attributes.</para>
+
+      <procedure>
+        <step>
+          <para>Show the source_array:<programlisting language='test'>
+--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winnersFew.csv &gt; ../examples/winnersFew.scidb --show-query=no --show-output=no
+--aql load winnersFlat from '../examples/winnersFew.scidb' --show-query=no --show-output=no
+--afl create array champions &lt;person:string,country:string,time:double null&gt; [year=1996:2008,13,0, event(string)=3,3,0] --show-query=no --show-output=no
+--afl redimension_store(winnersFlat,champions) --show-query=no --show-output=no
+--afl scan(champions)</programlisting></para>
+        </step>
+
+        <step>
+          <para>Create a result array describing the attributes of the named
+          array:<programlisting language='test'>--aql select * from attributes(champions);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Create a result array describing the nullable attributes of
+          the named array:<programlisting language='test'>--aql select * from attributes(champions) where nullable = true;</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

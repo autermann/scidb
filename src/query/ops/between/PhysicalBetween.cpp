@@ -101,6 +101,12 @@ public:
                                      boost::shared_ptr<Query> query)
    {
       assert(inputArrays.size() == 1);
+
+      if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
+      {
+          throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+      }
+
       Coordinates lowPos = getWindowStart(query);
       Coordinates highPos = getWindowEnd(query);
 

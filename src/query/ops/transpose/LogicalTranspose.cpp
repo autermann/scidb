@@ -33,6 +33,36 @@
 namespace scidb
 {
 
+/**
+ * @brief The operator: transpose().
+ *
+ * @par Synopsis:
+ *   transpose( srcArray )
+ *
+ * @par Summary:
+ *   Produces an array with the same data in srcArray but with the list of dimensions reversd.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs.
+ *   <br> >
+ *   <br> [
+ *   <br>   reverse order of srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalTranspose : public LogicalOperator
 {
 public:

@@ -1,0 +1,20 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+store(build(<val:double>[i=0:2,3,0,j=0:2,3,0],i*3+j+100),array1)  
+store(build(<val:double>[i=0:2,3,0,j=0:2,3,0],i*3+j+200),array2)  
+--stop-igdata
+store(join(array1,array2),storage_array)  
+save(storage_array,'/tmp/storage_array.txt')  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(array1)
+remove(array2)
+remove(storage_array)

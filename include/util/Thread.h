@@ -67,10 +67,18 @@ public:
         virtual ~Thread();
 };
 
+/**
+ * class Functor_tt
+ * {
+ *  operator() ();
+ *  clear();
+ * }
+ */
+template<class Functor_tt>
 class Destructor
 {
  public:
-    Destructor(boost::function<void()>& w) : _work(w)
+    Destructor(Functor_tt& w) : _work(w)
     {
     }
     ~Destructor()
@@ -81,12 +89,11 @@ class Destructor
     }
     void disarm()
     {
-        boost::function<void()> tmp;
-        _work.swap(tmp);
+        _work.clear();
    }
  private:
 
-    boost::function<void()> _work;
+    Functor_tt _work;
 };
 
 } //namespace

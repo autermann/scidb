@@ -1,0 +1,95 @@
+Source: scidb
+Section: database
+Priority: extra
+Maintainer: SciDB support list <support@lists.scidb.org>
+Build-Depends: debhelper (>= 8.0.0), cmake, bison, flex, libcppunit-dev, libbz2-dev, libpqxx3-dev,
+               libprotobuf-dev, protobuf-compiler, zlib1g-dev, liblog4cxx10-dev,
+               libboost1.46-all-dev, libreadline-dev, fop, xsltproc, doxygen, python, subversion,
+               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev
+Standards-Version: 3.9.2
+Homepage: http://scidb.org
+
+Package: scidb
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-paramiko, python-crypto
+Recommends: postgresql-client-8.4
+Suggests: postgresql-8.4, postgresql-contrib-8.4
+Description: SciDB - database for extra large data processing
+
+Package: scidb-dbg
+Architecture: any
+Depends: scidb (= ${binary:Version})
+Description: SciDB - database for extra large data processing (debug symbols)
+
+Package: libscidbclient
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: SciDB client library
+
+Package: libscidbclient-dbg
+Architecture: any
+Depends: libscidbclient (= ${binary:Version})
+Description: SciDB client library (debug symbols)
+
+Package: scidb-utils
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient (>= ${source:Upstream-Version}~)
+Description: SciDB querying tool and other utilities
+
+Package: scidb-utils-dbg
+Architecture: any
+Depends: scidb-utils (= ${binary:Version})
+Description: SciDB querying tool and other utilities (debug symbols)
+
+Package: scidb-dev-tools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient (>= ${source:Upstream-Version}~)
+Description: SciDB developer and tester utilities
+
+Package: scidb-dev-tools-dbg
+Architecture: any
+Depends: scidb-dev-tools (= ${binary:Version})
+Description: SciDB developer and tester utilities (debug symbols)
+
+Package: scidb-plugins
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient (= ${binary:Version}), libscalapack-mpi1 (>=1.8.0), libscalapack-mpi1 (<1.8.1), libopenmpi1.3 (>=1.4.3), libopenmpi1.3 (<1.4.4)
+Recommends: openmpi-bin (>=1.4.3), openmpi-bin (<1.4.4), openmpi-common (>=1.4.3), openmpi-common (<1.4.4)
+Description: SciDB server and client plugins
+
+Package: scidb-plugins-dbg
+Architecture: any
+Depends: scidb-plugins (= ${binary:Version})
+Description: SciDB server and client plugins (debug symbols)
+
+Package: libscidbclient-python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python, libscidbclient (>= ${source:Upstream-Version}~)
+Description: SciDB client library python connector
+
+Package: libscidbclient-python-dbg
+Architecture: any
+Depends: libscidbclient-python (= ${binary:Version})
+Description: SciDB client library python connector (debug symbols)
+
+Package: scidb-dev
+Architecture: all
+Depends: libscidbclient (= ${binary:Version})
+Description: SciDB headers
+
+Package: scidb-doc
+Architecture: all
+Depends:
+Description: SciDB documentation
+
+Package: scidb-all
+Architecture: any
+Depends: scidb (= ${binary:Version}), libscidbclient (= ${binary:Version}), scidb-utils (= ${binary:Version}), scidb-plugins (= ${binary:Version}), libscidbclient-python (= ${binary:Version}), scidb-doc (= ${binary:Version})
+Description: Install entire SciDB
+
+Package: scidb-all-coord
+Architecture: any
+Depends: scidb (= ${binary:Version}), libscidbclient (= ${binary:Version}), scidb-utils (= ${binary:Version}), scidb-plugins (= ${binary:Version}), libscidbclient-python (= ${binary:Version}), scidb-doc (= ${binary:Version}), postgresql-client-8.4, postgresql-8.4, postgresql-contrib-8.4
+Description: Install entire SciDB and PostgreSQL
+
+

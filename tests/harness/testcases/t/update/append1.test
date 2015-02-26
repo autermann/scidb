@@ -1,4 +1,5 @@
 --setup
+--start-query-logging
 
 create immutable array unbounded <a:int64>[x=0:*,5,0]
 load(unbounded,'../tests/harness/testcases/data/unbounded.txt')
@@ -7,31 +8,20 @@ load(unbounded,'../tests/harness/testcases/data/unbounded.txt')
 
 --test
 
---sleep 4
-
 ## ../../tests/basic/update/append.aql
 store(input(unbounded,  '../tests/harness/testcases/data/append.txt'), unbounded)
 
---sleep 4
-
 ## ../../tests/basic/update/append2.aql
 store(input(unbounded,  '../tests/harness/testcases/data/append2.txt'), unbounded)
-  
---sleep 4
 
 ## ../../tests/basic/update/append3.aql
 store(input(unbounded,  '../tests/harness/testcases/data/append3.txt'), unbounded)
   
---sleep 4
-
 ## ../../tests/basic/update/append4.aql
 scan(unbounded)  
-
---sleep 4
-
-
-
 
 --cleanup
 
 remove(unbounded) 
+
+--stop-query-logging

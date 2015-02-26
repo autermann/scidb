@@ -581,13 +581,19 @@ void Connection::connectAsyncInternal(const string& address, uint16_t port)
                                        boost::asio::placeholders::iterator));
 }
 
-void Connection::startQuery(QueryID queryID)
+void Connection::attachQuery(QueryID queryID, ClientContext::DisconnectHandler& dh)
 {
     ScopedMutexLock mutexLock(_mutex);
-    _activeClientQueries.insert(queryID);
+    _activeClientQueries[queryID] = dh;
 }
 
-void Connection::stopQuery(QueryID queryID)
+void Connection::attachQuery(QueryID queryID)
+{
+    ClientContext::DisconnectHandler dh;
+    attachQuery(queryID, dh);
+}
+
+void Connection::detachQuery(QueryID queryID)
 {
     ScopedMutexLock mutexLock(_mutex);
     _activeClientQueries.erase(queryID);
@@ -600,17 +606,19 @@ void Connection::disconnectInternal()
    _connectionState = NOT_CONNECTED;
    _query.reset();
    _remoteIp = boost::asio::ip::address();
-   set<QueryID> clientQueries;
+   map<QueryID,ClientContext::DisconnectHandler> clientQueries;
    {
        ScopedMutexLock mutexLock(_mutex);
        clientQueries.swap(_activeClientQueries);
    }
    LOG4CXX_TRACE(logger, str(format("Number of active client queries %lld") % clientQueries.size()));
-   for (std::set<QueryID>::const_iterator i = clientQueries.begin(); i != clientQueries.end(); ++i)
+   for (std::map<QueryID,ClientContext::DisconnectHandler>::const_iterator i = clientQueries.begin();
+        i != clientQueries.end(); ++i)
    {
        assert(_instanceID == CLIENT_INSTANCE);
-       QueryID queryID = *i;
-       _networkManager.cancelClientQuery(queryID);
+       QueryID queryID = i->first;
+       const ClientContext::DisconnectHandler& dh = i->second;
+       _networkManager.cancelClientQuery(queryID, dh);
    }
 }
 
@@ -627,7 +635,6 @@ void Connection::handleReadError(const boost::system::error_code& error)
    if (error != boost::asio::error::eof) {
       LOG4CXX_ERROR(logger, "Network error while reading, #"
                     << error.value() << "('" << error.message() << "')");
-
    } else {
       LOG4CXX_TRACE(logger, "Sender disconnected");
    }
@@ -647,15 +654,13 @@ Connection::~Connection()
 void Connection::abortMessages()
 {
     MultiChannelQueue connQ(_instanceID);
-   {
-      ScopedMutexLock mutexLock(_mutex);
-      connQ.swap(_messageQueue);
-   }
-
-   LOG4CXX_TRACE(logger, "Aborting "<< connQ.size()
-                 << " buffered connection messages to "
-                 << getPeerId());
-
+    {
+        ScopedMutexLock mutexLock(_mutex);
+        connQ.swap(_messageQueue);
+    }
+    LOG4CXX_TRACE(logger, "Aborting "<< connQ.size()
+                  << " buffered connection messages to "
+                  << getPeerId());
    connQ.abortMessages();
 }
 
@@ -825,22 +830,28 @@ Connection::MultiChannelQueue::setRemoteState(NetworkManager::MessageQueueType m
         assert(false);
         return status;
     }
-    if (remoteGenId > _remoteGenId) {
-        _remoteGenId = remoteGenId;
-    } else if (remoteGenId < _remoteGenId) {
+    if (remoteGenId < _remoteGenId) {
         assert(false);
         return status;
     }
     if (localGenId > _localGenId) {
         assert(false);
         return status;
-    } else if (localGenId < _localGenId) {
+    }
+    if (localGenId < _localGenId) {
         localSn = 0;
     }
 
     boost::shared_ptr<Channel>& channel = _channels[mqt];
     if (!channel) {
         channel = boost::make_shared<Channel>(_instanceId, mqt);
+    }
+    if (!channel->validateRemoteState(rSize, localSn, remoteSn)) {
+        assert(false);
+        return status;
+    }
+    if (remoteGenId > _remoteGenId) {
+        _remoteGenId = remoteGenId;
     }
     bool isActiveBefore = channel->isActive();
 
@@ -920,6 +931,14 @@ Connection::MultiChannelQueue::swap(MultiChannelQueue& other)
     const uint64_t size = _size;
     _size = other._size;
     other._size = size;
+
+    const uint64_t remoteGenId = _remoteGenId;
+    _remoteGenId = other._remoteGenId;
+    other._remoteGenId = remoteGenId;
+
+    const uint64_t localGenId = _localGenId;
+    _localGenId = other._localGenId;
+    other._localGenId = localGenId;
 
     _channels.swap(other._channels);
 }

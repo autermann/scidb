@@ -1,10 +1,16 @@
 #!/bin/sh
 
-cores=`ls core*`
+cores=`ls core*SciDB*`
+mpi_cores=`ls core*scidb_mpi_slave*`
 
 
-for i in $cores
-do
-    echo "Processing corefile: $i"
-    gdb scidb --core=$i --eval-command="thread apply all bt" --eval-command="info program" --batch > stack.$i 2>&1
+for i in $cores; do
+    echo "Processing SciDB corefile: $i"
+    gdb @CMAKE_INSTALL_PREFIX@/scidb --core=$i --eval-command="thread apply all bt" --eval-command="info program" --batch > stack.SciDB.$i 2>&1
 done
+
+for i in $mpi_cores; do
+    echo "Processing mpi core: $i"
+    gdb  @CMAKE_INSTALL_PREFIX@/lib/scidb/plugins/scidb_mpi_slave --core=$i --eval-command="thread apply all bt" --eval-command="info program" --batch > stack.scidb_mpi_slave.$i 2>&1
+done
+

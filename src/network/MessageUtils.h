@@ -31,6 +31,7 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include "network/proto/scidb_msg.pb.h"
 #include "network/BaseConnection.h"
 #include "array/Array.h"
 #include "system/Exceptions.h"

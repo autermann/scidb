@@ -35,7 +35,6 @@
 
 #include "array/DelegateArray.h"
 #include "array/Metadata.h"
-#include "array/RLEArray.h"
 #include "query/LogicalExpression.h"
 #include "query/Expression.h"
 

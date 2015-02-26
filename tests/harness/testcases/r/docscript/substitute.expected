@@ -1,0 +1,52 @@
+SCIDB QUERY : <CREATE ARRAY m4x4_null <val:double null>[i=0:3,4,0,j=0:3,4,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build(m4x4_null,iif(i=1,null,100)),m4x4_null)>
+{i,j} val
+{0,0} 100
+{0,1} 100
+{0,2} 100
+{0,3} 100
+{1,0} null
+{1,1} null
+{1,2} null
+{1,3} null
+{2,0} 100
+{2,1} 100
+{2,2} 100
+{2,3} 100
+{3,0} 100
+{3,1} 100
+{3,2} 100
+{3,3} 100
+
+SCIDB QUERY : <CREATE ARRAY substitute_array <missing:double>[i=0:0,1,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build(substitute_array,0),substitute_array)>
+{i} missing
+{0} 0
+
+SCIDB QUERY : <substitute(m4x4_null,substitute_array)>
+{i,j} val
+{0,0} 100
+{0,1} 100
+{0,2} 100
+{0,3} 100
+{1,0} 0
+{1,1} 0
+{1,2} 0
+{1,3} 0
+{2,0} 100
+{2,1} 100
+{2,2} 100
+{2,3} 100
+{3,0} 100
+{3,1} 100
+{3,2} 100
+{3,3} 100
+
+Query was executed successfully
+
+Query was executed successfully
+

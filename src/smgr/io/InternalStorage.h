@@ -47,102 +47,16 @@
 #include <query/Query.h>
 #include <util/InjectedError.h>
 #include "ReplicationManager.h"
+#include <boost/unordered_map.hpp>
+#include <system/Constants.h>
 
 namespace scidb
 {
     const size_t MAX_SEGMENTS = 100;
-    const size_t MAX_COORDINATES = 100;
     const size_t HEADER_SIZE = 4*1024; // align header on page boundary to allow aligned IO operations
     const size_t N_LATCHES = 101;
 
     typedef uint64_t ClusterID;
-
-    /**
-     * Internal API to the storage. Used to provide abstract interface to storage manager (including DFS support)
-     */
-    class InternalStorage : public Storage
-    {
-      public:
-        /**
-         * Decompress chunk from the specified buffer
-         * @param chunk destination chunk to receive decompressed data
-         * @param buf buffer containing compressed data.
-         */
-        virtual void decompressChunk(Chunk* chunk, CompressedBuffer const& buf) = 0;
-
-        /**
-         * Compress chunk to the specified buffer
-         * @param chunk chunk to be compressed
-         * @param buf buffer where compressed data will be placed. It is inteded to be initialized using default constructore and will be filled by this method.
-         */
-        virtual void compressChunk(Chunk const* chunk, CompressedBuffer& buf) = 0;
-
-        /**
-         * Pin chunk in memory: prevent cache replacement algorithm to throw away this chunk from memory
-         * @param chunk chunk to be pinned in memory
-         */
-        virtual void pinChunk(Chunk const* chunk) = 0;
-
-        /**
-         * Unpin chunk in memory: decrement access couter for this chunk
-         * @param chunk chunk to be unpinned
-         */
-        virtual void unpinChunk(Chunk const* chunk) = 0;
-
-        /**
-         * Check if there is chunk with sepcified address
-         * @param addr chunk address
-         */
-        virtual bool containsChunk(const Address& addr) = 0;
-
-        /**
-         * Write new chunk in the storage.
-         * @param chunk new chunk created by newChunk Method
-         */
-        virtual void writeChunk(Chunk* chunk, boost::shared_ptr<Query>& query) = 0;
-
-        /**
-         * Read chunk from the storage. This method throws an exception when instance with requested address doesn exists.
-         * @param addr chunk address
-         */
-        virtual Chunk* readChunk(const Address& addr) = 0;
-
-        /**
-         * Load chunk body from the storage.
-         * @param chunk loaded chunk
-         */
-        virtual void loadChunk(Chunk* chunk) = 0;
-
-        /**
-         * Get latch for the specified chunk
-         * @param chunk chunk to be locked
-         */
-        virtual RWLock& getChunkLatch(DBChunk* chunk) = 0;
-
-        /**
-         * Create new chunk int the storage. There should be no chunk with such address in the storage.
-         * @param addr chunk address
-         * @param compressionMethod compression method for this chunk
-         */
-        virtual Chunk* newChunk(const Address& addr, int compressionMethod) = 0;
-
-        /**
-         * Clone chunk
-         * @param addr chunk address
-         * @param srcChunk chunk to be cloned
-         */
-        virtual Chunk* cloneChunk(const Address& addr, DBChunk const& srcChunk) = 0;
-        
-        /**
-         * Delete chunk
-         * @param chunk chunk to be deleted
-         */
-        virtual void deleteChunk(Chunk& chunk) = 0;
-
-        virtual size_t getNumberOfInstances() const = 0;
-
-        virtual Array const& getDBArray(ArrayID) = 0;
-    };
 
     /**
      * Position in the storage
@@ -169,7 +83,6 @@ namespace scidb
                 ? segmentNo < other.segmentNo
                 : offs < other.offs;
         }
-
     };
 
     /**
@@ -192,8 +105,40 @@ namespace scidb
         enum Flags {
             SPARSE_CHUNK = 1,
             DELTA_CHUNK = 2,
-            RLE_CHUNK = 4
+            RLE_CHUNK = 4,
+            TOMBSTONE = 8
         };
+
+        /**
+         * Check if a given flag is set.
+         * Usage:
+         * ChunkHeader hdr; bool isTombstone = hdr.is<TOMBSTONE>();
+         * @return true if the template argument flag is set, false otherwise.
+         */
+        template<Flags FLAG>
+        inline bool is() const
+        {
+            return flags & FLAG;
+        }
+
+        /**
+         * Set one of the flags in the chunk header.
+         * Usage:
+         * ChunkHeader tombHdr; tombHdr.set<TOMBSTONE>(true);
+         * @param[in] the value to set the flag to
+         */
+        template<Flags FLAG>
+        inline void set(bool value)
+        {
+            if(value)
+            {
+                flags |= FLAG;
+            }
+            else
+            {
+                flags &= ~(FLAG);
+            }
+        }
     };
 
     /**
@@ -202,9 +147,9 @@ namespace scidb
     struct ChunkDescriptor
     {
         ChunkHeader hdr;
-        Coordinate  coords[MAX_COORDINATES];
+        Coordinate  coords[MAX_NUM_DIMS_SUPPORTED];
 
-        void getAddress(Address& addr) const;
+        void getAddress(StorageAddress& addr) const;
         std::string toString() const
         {
             std::stringstream ss;           
@@ -214,7 +159,7 @@ namespace scidb
                << ", attId=" << hdr.attId
                << ", instanceId=" << hdr.instanceId
                << ", coords=[ ";
-            for (uint16_t i=0; (i < hdr.nCoordinates) && (i < MAX_COORDINATES); ++i) {
+            for (uint16_t i=0; (i < hdr.nCoordinates) && (i < MAX_NUM_DIMS_SUPPORTED); ++i) {
                 ss << coords[i] << " ";
             }
             ss << "]";
@@ -226,8 +171,8 @@ namespace scidb
      * Transaction log record
      */
     struct TransLogRecordHeader {
-        ArrayID     array;
-        ArrayID     versionArrayID;
+        ArrayUAID     arrayUAID;
+        ArrayID     arrayId;
         VersionID   version;
         uint32_t    oldSize;
         uint64_t    newHdrPos;
@@ -240,7 +185,6 @@ namespace scidb
     };
 
     class CachedStorage;
-    class LocalStorage;
 
     /**
      * Abstract class declaring methods for manipulation with deltas.
@@ -297,26 +241,26 @@ namespace scidb
     class DBChunk : public Chunk
     {
         friend class CachedStorage;
-        friend class LocalStorage;
+        friend class ListChunkMapArrayBuilder;
       private:
-        DBChunk* next; // L2-list to implement LRU
-        DBChunk* prev;
-        Address addr; // address of first chunk element
-        void*   data; // uncompressed data (may be NULL if swapped out)
-        ChunkHeader hdr; // chunk header
-        int     accessCount; // number of active chunk accessors
-        int     nWriters;
-        bool    raw; // true if chunk is currently initialized or loaded from the disk
-        bool    waiting; // true if some thread is waiting completetion of chunk load from the disk
-        uint64_t timestamp;
-        Coordinates firstPosWithOverlaps;
-        Coordinates lastPos;
-        Coordinates lastPosWithOverlaps;
+        DBChunk* _next; // L2-list to implement LRU
+        DBChunk* _prev;
+        StorageAddress _addr; // StorageAddress of first chunk element
+        void*   _data; // uncompressed data (may be NULL if swapped out)
+        ChunkHeader _hdr; // chunk header
+        int     _accessCount; // number of active chunk accessors
+        int     _nWriters;
+        bool    _raw; // true if chunk is currently initialized or loaded from the disk
+        bool    _waiting; // true if some thread is waiting completetion of chunk load from the disk
+        uint64_t _timestamp;
+        Coordinates _firstPosWithOverlaps;
+        Coordinates _lastPos;
+        Coordinates _lastPosWithOverlaps;
         boost::shared_ptr<ArrayDesc> _arrayDesc; // array descriptor *current* copy
-        InternalStorage* storage;
-        DBChunk* cloneOf;
-        vector<DBChunk*> clones;
-        pthread_t loader;
+        Storage* _storage;
+        DBChunk* _cloneOf;
+        vector<DBChunk*> _clones;
+        pthread_t _loader;
         
         void updateArrayDescriptor();
         void init();
@@ -336,7 +280,7 @@ namespace scidb
         bool isTemporary() const;
         
         void setAddress(const ChunkDescriptor& desc);
-        void setAddress(const Address& firstElem, int compressionMethod);
+        void setAddress(const StorageAddress& firstElem, int compressionMethod);
 
         boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
 
@@ -378,39 +322,39 @@ namespace scidb
 
         Array const& getArray() const;
         
-        const Address& getAddress() const
+        const StorageAddress& getAddress() const
         {
-            return addr;
+            return _addr;
         }
 
         const ChunkHeader& getHeader() const
         {
-            return hdr;
+            return _hdr;
         }
 
         uint64_t getTimestamp() const
         {
-            return timestamp;
+            return _timestamp;
         }
 
         size_t getCompressedSize() const
         {
-            return hdr.compressedSize;
+            return _hdr.compressedSize;
         }
 
         void setCompressedSize(size_t size)
         {
-            hdr.compressedSize = size;
+            _hdr.compressedSize = size;
         }
 
         bool isRaw() const
         {
-            return raw;
+            return _raw;
         }
 
         void setRaw(bool status)
         {
-            raw = status;
+            _raw = status;
         }
         
         DBChunk();
@@ -420,8 +364,10 @@ namespace scidb
     /**
      * Storage with LRU in-memory cache of chunks
      */
-    class CachedStorage : public InternalStorage
+    class CachedStorage : public Storage, InjectedErrorListener<WriteChunkInjectedError>
     {
+      //Inner Structures
+      private:
         struct CoordinateMap
         {
             shared_ptr<AttributeMultiMap> attrMap;
@@ -444,7 +390,6 @@ namespace scidb
             ~CoordinateMapInitializer();
         };
 
-      protected:
         struct ChunkInitializer 
         { 
             CachedStorage& storage;
@@ -453,66 +398,7 @@ namespace scidb
             ChunkInitializer(CachedStorage* sto, DBChunk& chn) : storage(*sto), chunk(chn) {}
             ~ChunkInitializer();
         };
-            
-        vector<Compressor*> compressors;
-        map<Address, DBChunk, AddressLess> chunkMap; // map to get chunk by address
-        map<ArrayID, boost::shared_ptr<DBArray> > dbArrayCache;
-        size_t cacheSize; // maximal size of memory used by cached chunks
-        size_t cacheUsed; // current size of memory used by cached chunks (it can be larger than cacheSize if all chunks are pinned)
-        Mutex mutex; // mutex used to synchronize access to the storage
-        Event loadEvent; // event to notify threads waiting for completion of chunk load
-        Event initEvent; // event to notify threads waiting for completion of chunk load
-        DBChunk lru; // header of LRU L2-list
-        Scatter* scatter; // scatter of chunks for virtual partitioning of the data
-        uint64_t timestamp;
 
-        bool strictCacheLimit;
-        bool cacheOverflowFlag;
-        Event cacheOverflowEvent;
-
-        void notifyChunkReady(DBChunk& chunk);
-        void open(size_t cacheSize, const vector<Compressor*>& compressors);
-        virtual int  chooseCompressionMethod(DBChunk& chunk, void* buf);
-        virtual DBChunk* lookupChunk(const Address& addr, bool create);
-        virtual void freeChunk(DBChunk& chunk);
-        virtual void addChunkToCache(DBChunk& chunk);
-        virtual uint64_t getCurrentTimestamp() const {
-            return timestamp;
-        }
-      private:
-        map< string, CoordinateMap> _coordinateMap;
-        CoordinateMap& getCoordinateMap(string const& indexName, DimensionDesc const& dim,
-                                        const boost::shared_ptr<Query>& query);
-      public:
-        virtual void   close();
-        virtual void   loadChunk(Chunk* chunk);
-        virtual RWLock&getChunkLatch(DBChunk* chunk);
-        virtual void   pinChunk(Chunk const* chunk);
-        virtual void   unpinChunk(Chunk const* chunk);
-        virtual bool   containsChunk(const Address& addr);
-        virtual void   decompressChunk(Chunk* chunk, CompressedBuffer const& buf);
-        virtual void   compressChunk(Chunk const* chunk, CompressedBuffer& buf);
-        virtual Chunk* newChunk(const Address& addr, int compressionMethod);
-        virtual void   deleteChunk(Chunk& chunk);
-        virtual Chunk* cloneChunk(const Address& addr, DBChunk const& srcChunk);
-        virtual void   setScatter(Scatter* scatter);
-        virtual void   remove(ArrayID arrId, bool allVersions, uint64_t timestamp);
-        virtual Coordinate mapCoordinate(string const& indexName, DimensionDesc const& dim, Value const& value,
-                                         CoordinateMappingMode mode, const boost::shared_ptr<Query>& query);
-        virtual Value  reverseMapCoordinate(string const& indexName, DimensionDesc const& dim, Coordinate pos,
-                                            const boost::shared_ptr<Query>& query);
-        virtual void   removeCoordinateMap(string const& indexName);
-        virtual Array const& getDBArray(ArrayID);
-        virtual void   cloneChunk(Coordinates const& pos, AttributeID attrID, ArrayID originalArrayID, ArrayID cloneArrayID);
-       
-    };
-
-    //
-    // Local storage implementation. This storage manage data located in one or more raw partitions or files at the local instance file system.
-    //
-    class LocalStorage : public CachedStorage, InjectedErrorListener<WriteChunkInjectedError>
-    {
-      protected:
         struct SegmentHeader {
             uint64_t used;
         };
@@ -539,23 +425,7 @@ namespace scidb
                 used = 0;
             }
         };
-
-        ClusterID getClusterID(uint32_t segmentNo, uint64_t offs) const
-        {
-            return offs / hdr.clusterSize * MAX_SEGMENTS + segmentNo;
-        }
-
-        ClusterID getClusterID(DiskPos const& pos) const
-        {
-            return getClusterID(pos.segmentNo, pos.offs);
-        }
-
-        void getClusterPos(DiskPos& clusterPos, ClusterID id) const
-        {
-            clusterPos.offs = id / MAX_SEGMENTS * hdr.clusterSize;
-            clusterPos.segmentNo = uint32_t(id % MAX_SEGMENTS);
-        }
-
+       
         class DBArrayIterator;
 
         class DeltaChunk : public ConstChunk
@@ -586,43 +456,32 @@ namespace scidb
           private:
             void extract() const;
 
-            DBArrayIterator& arrayIterator;
-            DBChunk*  inputChunk;
-            VersionID version;
-            MemChunk  versionChunk;
-            bool      extracted;
-            size_t    accessCount;
+            DBArrayIterator& _arrayIterator;
+            DBChunk*  _inputChunk;
+            VersionID _version;
+            MemChunk  _versionChunk;
+            bool      _extracted;
+            size_t    _accessCount;
         };
 
         class DBArrayIterator : public ArrayIterator
         {
             friend class DeltaChunk;
 
-            Address addr;
-            int defaultCompressionMethod;
-            Chunk* currChunk;
-            LocalStorage* storage;
-            const ArrayDesc& array;
-            uint64_t timestamp;
-            VersionID version;
-            DeltaChunk deltaChunk;
-            DeltaChunk deltaBitmapChunk;
-            AttributeDesc const& attrDesc;
-            bool positioned;
-            PartitioningSchema ps;
+            Chunk* _currChunk;
+            CachedStorage* _storage;
+            const ArrayDesc& _arrayDesc;
+            DeltaChunk _deltaChunk;
+            DeltaChunk _deltaBitmapChunk;
+            AttributeDesc const& _attrDesc;
+            StorageAddress _address;
             boost::weak_ptr<Query> _query;
-
-            void setCurrent();
-
-            void position() {
-                if (!positioned) {
-                    reset();
-                }
-            }
+            bool const _writeMode;
 
           public:
-            DBArrayIterator(LocalStorage* storage, const ArrayDesc& arrDesc,
-                            AttributeID attId, boost::shared_ptr<Query>& query);
+            DBArrayIterator(CachedStorage* storage, const ArrayDesc& arrDesc,
+                            AttributeID attId, boost::shared_ptr<Query>& query,
+                            bool writeMode);
 
             ~DBArrayIterator();
 
@@ -638,38 +497,133 @@ namespace scidb
             virtual Chunk& newChunk(Coordinates const& pos, int compressionMethod);
             virtual boost::shared_ptr<Query> getQuery() { return _query.lock(); }
         };
-        union {
-            StorageHeader hdr;
-            char          filler[HEADER_SIZE];
+
+      private:
+      //Fields
+        union
+        {
+            StorageHeader _hdr;
+            char          _filler[HEADER_SIZE];
         };
-        vector<Segment> segments;
-        long totalAvailable; // total available space in the storage (Gb)
 
-        int sd[MAX_SEGMENTS]; // file descriptors of segments
-        int32_t _writeLogThreshold;
+        map< string, CoordinateMap> _coordinateMap;
 
-        int hd; // storage header file descriptor
-        int log[2]; // _ransaction logs
-        uint64_t logSizeLimit; // transaciton log size limit
-        uint64_t logSize;
-        int currLog;
-        int redundancy;
-        int nInstances;
-        bool syncReplication;
+        vector<Compressor*> _compressors;
 
-        RWLock latches[N_LATCHES];
-        set<uint64_t> freeHeaders;
-        map<ArrayID, Cluster> clusters;
-        map<ClusterID, size_t> liveChunksInCluster;
-        vector< set<uint64_t> > freeClusters;
-        size_t readAheadSize;
-
-        void freeCluster(ClusterID cid);
+        typedef map <StorageAddress, boost::shared_ptr<DBChunk> > InnerChunkMap;
+        typedef boost::unordered_map<ArrayUAID, shared_ptr< InnerChunkMap > > ChunkMap;
 
         /**
-         * Create clone of the chunk but do not write it to the disk
+         * The root of the chunk map.
          */
-        Chunk* cloneChunk(const Address& addr, DBChunk const& srcChunk, ChunkDescriptor& cloneDesc);
+        ChunkMap _chunkMap;
+
+        map<ArrayID, boost::shared_ptr<DBArray> > _dbArrayCache;
+        size_t _cacheSize; // maximal size of memory used by cached chunks
+        size_t _cacheUsed; // current size of memory used by cached chunks (it can be larger than cacheSize if all chunks are pinned)
+        Mutex _mutex; // mutex used to synchronize access to the storage
+        Event _loadEvent; // event to notify threads waiting for completion of chunk load
+        Event _initEvent; // event to notify threads waiting for completion of chunk load
+        DBChunk _lru; // header of LRU L2-list
+        uint64_t _timestamp;
+
+        bool _strictCacheLimit;
+        bool _cacheOverflowFlag;
+        Event _cacheOverflowEvent;
+
+        vector<Segment> _segments;
+        long _totalAvailable; // total available space in the storage (Gb)
+
+        int _sd[MAX_SEGMENTS]; // file descriptors of segments
+        int32_t _writeLogThreshold;
+
+        int _hd; // storage header file descriptor
+        int _log[2]; // _ransaction logs
+        uint64_t _logSizeLimit; // transaciton log size limit
+        uint64_t _logSize;
+        int _currLog;
+        int _redundancy;
+        int _nInstances;
+        bool _syncReplication;
+        bool _enableDeltaEncoding;
+
+        RWLock _latches[N_LATCHES];
+        set<uint64_t> _freeHeaders;
+        map<ArrayID, Cluster> _clusters;
+        map<ClusterID, size_t> _liveChunksInCluster;
+        vector< set<uint64_t> > _freeClusters;
+
+        /// Cached RM pointer
+        ReplicationManager* _replicationManager;
+
+      //Methods:
+        CoordinateMap& getCoordinateMap(string const& indexName, DimensionDesc const& dim,
+                                        const boost::shared_ptr<Query>& query);
+
+        Chunk* cloneChunk(ArrayDesc const& dstDesc, StorageAddress const& addr, DBChunk const& srcChunk, boost::shared_ptr<Query>& query);
+        Chunk* cloneChunk(ArrayDesc const& dstDesc, StorageAddress const& addr, DBChunk const& srcChunk, ChunkDescriptor& cloneDesc);
+        Chunk* cloneChunk(ArrayDesc const& dstDesc, StorageAddress const& addr, DBChunk const& srcChunk);
+
+        /**
+         * Perform metadata/lock recovery and storage rollback as part of the intialization.
+         * It may block waiting for the remote coordinator recovery to occur.
+         */
+        void doTxnRecoveryOnStartup();
+
+        /**
+         * Wait for the replica items (i.e. chunks) to be sent to NetworkManager
+         * @param replicas a list of replica items to wait on
+         */
+        void waitForReplicas(std::vector<boost::shared_ptr<ReplicationManager::Item> >& replicas);
+
+        /**
+         * Abort any outstanding replica items (in case of errors)
+         * @param replicas a list of replica items to abort
+         */
+        void abortReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >* replicasVec);
+
+        /**
+         * Unpin and free chunk (in case of errors)
+         * @param chunk to clean up
+         * @note it does not put the chunk on the LRU list
+         */
+        void cleanChunk(DBChunk* chunk);
+
+        void notifyChunkReady(DBChunk& chunk);
+
+        int chooseCompressionMethod(DBChunk& chunk, void* buf);
+        
+        /**
+         * Determine if a particular chunk exists in the storage and return a pointer to it.
+         * @param desc the array descriptor of the array
+         * @param addr the address of the chunk in the array
+         * @return pointer to the unloaded chunk object. Null if no such chunk is present.
+         */
+        DBChunk* lookupChunk(ArrayDesc const& desc, StorageAddress const& addr);
+        void freeChunk(DBChunk& chunk);
+        void addChunkToCache(DBChunk& chunk);
+        uint64_t getCurrentTimestamp() const
+        {
+            return _timestamp;
+        }
+
+        ClusterID getClusterID(uint32_t segmentNo, uint64_t offs) const
+        {
+            return offs / _hdr.clusterSize * MAX_SEGMENTS + segmentNo;
+        }
+
+        ClusterID getClusterID(DiskPos const& pos) const
+        {
+            return getClusterID(pos.segmentNo, pos.offs);
+        }
+
+        void getClusterPos(DiskPos& clusterPos, ClusterID id) const
+        {
+            clusterPos.offs = id / MAX_SEGMENTS * _hdr.clusterSize;
+            clusterPos.segmentNo = uint32_t(id % MAX_SEGMENTS);
+        }
+
+        void freeCluster(ClusterID cid);
 
         /**
          * Get random segment for new chunk. Probability of choosing segment "i" is proportional to savilable
@@ -710,7 +664,7 @@ namespace scidb
         /**
          * Replicate chunk
          */
-        void replicate(Address const& addr, DBChunk& chunk, void const* data,
+        void replicate(ArrayDesc const& desc, StorageAddress const& addr, DBChunk* chunk, void const* data,
                        size_t compressedSize, size_t decompressedSize,
                        boost::shared_ptr<Query>& query,
                        std::vector<boost::shared_ptr<ReplicationManager::Item> >& replicas);
@@ -718,217 +672,241 @@ namespace scidb
         /**
          * Assign replication instances for the particular chunk
          */
-        void getReplicasInstanceId(InstanceID* replicas, DBChunk const& chunk) const;
+        void getReplicasInstanceId(InstanceID* replicas, ArrayDesc const& desc, StorageAddress const& address) const;
 
         /**
          * Check if chunk should be considered by DBArraIterator
          */
-        bool isResponsibleFor(DBChunk const& chunk, boost::shared_ptr<Query>& query);
+        bool isResponsibleFor(DBChunk const& chunk, boost::shared_ptr<Query> const& query);
+
+        /**
+         * Determine if a given chunk is a primary replica on this instance
+         * @param chunk to examine
+         * @return true if the chunk is a primary replica
+         */
+        bool isPrimaryReplica(DBChunk const* chunk)
+        {
+            assert(chunk);
+            bool res = (chunk->getHeader().instanceId == _hdr.instanceId);
+            assert(res || (_redundancy > 0));
+            return res;
+        }
 
         /**
          * Recover instance
          * @param recoveredInstance ID of recovered instance
          */
-        virtual void recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query);
-
-        /**
-         * Clone chunk
-         * @param addr chunk address
-         * @param srcChunk chunk to be cloned
-         */
-        virtual Chunk* cloneChunk(const Address& addr, DBChunk const& srcChunk);
-
-        /**
-         * Create new version of the chunknk
-         * @param addr chunk address
-         * @param srcChunk chunk to be patched
-         */
-        Chunk* patchChunk(const Address& addr, ConstChunk const& srcChunk, boost::shared_ptr<Query>& query);
-
-        /**
-         * Get chunk with specified array and attributes IDs having address greater than specified
-         * @param addr address of chunk, if success "coords" component of addr is updated with coordinates of next chunk
-         * @param timestamp query timestamp
-         * @return next chunk or NULL if not found
-         */
-        DBChunk* nextChunk(Address& addr, uint64_t timestamp, ArrayDesc const& desc, PartitioningSchema ps, boost::shared_ptr<Query>& query);
+        void recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query);
 
         void getDiskInfo(DiskInfo& info);
 
-      private:
-        virtual Chunk* cloneChunk(const Address& addr, DBChunk const& srcChunk, boost::shared_ptr<Query>& query);
+        /**
+         * Delete helper: unlink all the clones that point to this chunk.
+         * @param chunk the chunk to be deleted
+         */
+        void unlinkChunkClones(DBChunk& chunk);
 
         /**
-         * Perform metadata/lock recovery and storage rollback as part of the intialization.
-         * It may block waiting for the remote coordinator recovery to occur.
+         * Delete all descriptors that are associated with a given array ID from the header file.
+         * @param arrId the array ID to be removed.
          */
-        void doTxnRecoveryOnStartup();
+        void deleteDescriptorsFor(ArrayID arrId);
 
         /**
-         * Wait for the replica items (i.e. chunks) to be sent to NetworkManager
-         * @param replicas a list of replica items to wait on
+         * Helper: remove an immutable array from the storage
+         * @param arrID the id of the array
+         * @param timestamp, values above 0 optional. If above 0, remove only chunks whose timestamp is >= timestamp
          */
-        void waitForReplicas(std::vector<boost::shared_ptr<ReplicationManager::Item> >& replicas);
+        void removeImmutableArray(ArrayID arrID, uint64_t timestamp);
 
         /**
-         * Abort any outstanding replica items (in case of errors)
-         * @param replicas a list of replica items to abort
+         * Helper: remove a mutable array from the storage
+         * @param uaId the unversioned ID
+         * @param arrId the versioned ID
          */
-        void abortReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >* replicasVec);
-
-        /// Cached RM pointer
-        ReplicationManager* _replicationManager;
-
-      public:
-        LocalStorage();
-        /**
-         * Open storage manager
-         * @param headerPath path to the storage header file: file containing information about locally available chunks
-         * @param transactionLogPath path to the transaciotns log (there are two logs forming cyclic buffer with extenions *_1 and *_2)
-         * @param transLogLimit maximal size of transaction log file
-         * @param segments database segments: raw partitions or files containing data
-         * @param cacheSize chunk cache size: amount of memory in bytes which can be used to cache most frequently used
-         * chunks
-         * @param compressors vector of available compressors
-         */
-        void open(const string& headerPath, const string& transactionLogPath, uint64_t transLogLimit, vector<Segment> const& segments, size_t cacheSize, const vector<Compressor*>& compressors);
-
-        /**
-         * Rollback uncompleted updates
-         * @param map of updated array which has to be rollbacked
-         */
-        virtual void rollback(std::map<ArrayID,VersionID> const& undoUpdates);
-
-        /**
-         * Open storage using privided descriptor file
-         * Description file has the following format:
-         * ----------------------
-         * <storage-header-path>
-         * <segment1-size-Mb> <segment1-path>
-         * <segment2-size-Mb> <segment2-path>
-         * ...
-         * ----------------------
-         */
-        virtual void open(const string& storageDescriptorFilePath, size_t cacheSize);
-        virtual void close();
-        virtual void flush();
-        virtual boost::shared_ptr<ArrayIterator> getArrayIterator(const ArrayDesc& arrDesc, AttributeID attId,
-                                                                  boost::shared_ptr<Query>& query);
-        virtual void writeChunk(Chunk* chunk, boost::shared_ptr<Query>& query);
-        virtual void loadChunk(Chunk* chunk);
-        virtual RWLock&getChunkLatch(DBChunk* chunk);
-        virtual Chunk* readChunk(const Address& addr);
-        virtual void compressChunk(Chunk const* chunk, CompressedBuffer& buf);
-        virtual bool isLocal();
-        virtual void setInstanceId(InstanceID id);
-        virtual InstanceID getInstanceId() const;
-        virtual size_t getNumberOfInstances() const;
-
-        virtual void remove(ArrayID id, bool allVersions, uint64_t timestamp);
-
-        static LocalStorage instance;
-    };
-
-    //
-    // Global storage implementation. This storage manages chunks located in DFS directory.
-    //
-    class GlobalStorage : public CachedStorage
-    {
-      protected:
-        class DBArrayIterator : public ArrayIterator
-        {
-            DIR* dir;
-            Address addr;
-            int defaultCompressionMethod;
-            Chunk* currChunk;
-            GlobalStorage* storage;
-            ArrayDesc const& array;
-            uint64_t timestamp;
-            boost::weak_ptr<Query> _query;
-
-            void setCurrent();
-
-          public:
-            DBArrayIterator(GlobalStorage* storage, const ArrayDesc& arrDesc,
-                            AttributeID attId, boost::shared_ptr<Query>& query);
-            ~DBArrayIterator();
-
-            virtual ConstChunk const& getChunk();
-            virtual bool end();
-            virtual void operator ++();
-            virtual Coordinates const& getPosition();
-            virtual bool setPosition(Coordinates const& pos);
-            virtual void reset();
-            virtual void   deleteChunk(Chunk& chunk);
-            virtual Chunk& newChunk(Coordinates const& pos);
-            virtual Chunk& newChunk(Coordinates const& pos, int compressionMethod);
-            virtual boost::shared_ptr<Query> getQuery() { return _query.lock(); }
-        };
-
-        string dfsDir;
-        string headerFilePath;
-        InstanceID instanceId;
-        size_t nInstances;
-
-        /**
-         * Force wrinting of specified amount of data to the disk.
-         * Exception is thrown if write failed
-         */
-        void writeAll(int fd, const void* data, size_t size);
-
-        /**
-         * Read requested amount of bytes from the disk.
-         * Exception is thrown if read failed
-         */
-        void readAll(int fd, void* data, size_t size);
-
-        virtual string getChunkPath(const Address& addr, bool withCoordinates = false);
-        virtual void freeChunk(DBChunk& chunk);
+        void removeMutableArray(ArrayUAID uaId, ArrayID arrId);
 
       public:
         /**
-         * Open global storage
-         * @param headerPath path to the database local header file
-         * @param rootDir root directory in the distributes file system where database chunks are located
-         * @param cacheSize chunk cache size: amount of memory in bytes which can be used to cache most frequently used
-         * chunks
-         * @param compressors vector of available compressors
+         * Default and mostly no-op. Initializes the file descriptors.
          */
-        void open(const string& headerPath, const string& rootDir, size_t cacheSize, const vector<Compressor*>& compressors);
+        CachedStorage();
 
         /**
-         * Rollback uncompleted updates
-         * @param map of updated array which has to be rollbacked
-         */
-        virtual void rollback(std::map<ArrayID,VersionID> const& undoUpdates);
-
-        virtual void recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query);
-
-        virtual void getDiskInfo(DiskInfo& info);
+         * @see Storage::getChunkPositions
+         */       
+        void getChunkPositions(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, CoordinateSet& chunkPositions);
 
         /**
-         * Open global storage using provided descriptor file
-         * Description file has the following format:
-         * ----------------------
-         * <storage-header-path>
-         * <distributed-file-system-directory>
-         * ----------------------
+         * @see Storage::close
          */
-        virtual void   open(const string& storageDescriptorFilePath, size_t cacheSize);
-        virtual void   flush();
-        virtual boost::shared_ptr<ArrayIterator> getArrayIterator(const ArrayDesc& arrDesc, AttributeID attId,
+        void close();
+
+        /**
+         * @see Storage::loadChunk
+         */
+        void loadChunk(ArrayDesc const& desc, Chunk* chunk);
+
+        /**
+         * @see Storage::getChunkLatch
+         */
+        RWLock&getChunkLatch(DBChunk* chunk);
+
+        /**
+         * @see Storage::pinChunk
+         */
+        void pinChunk(Chunk const* chunk);
+
+        /**
+         * @see Storage::unpinChunk
+         */
+        void unpinChunk(Chunk const* chunk);
+
+        /**
+         * @see Storage::decompressChunk
+         */
+        void decompressChunk(Chunk* chunk, CompressedBuffer const& buf);
+
+        /**
+         * @see Storage::compressChunk
+         */
+        void compressChunk(Chunk const* chunk, CompressedBuffer& buf);
+        
+        /**
+         * @see Storage::createChunk
+         */
+        Chunk* createChunk(ArrayDesc const& desc, StorageAddress const& addr, int compressionMethod);
+
+        /**
+         * @see Storage::deleteChunk
+         */
+        void deleteChunk(Chunk& chunk);
+
+	    /**
+         * @see Storage::remove
+         */
+        void remove(ArrayUAID uaId, ArrayID arrId, uint64_t timestamp);
+
+        /**
+         * @see Storage::mapCoordinate
+         */
+        Coordinate mapCoordinate(string const& indexName, DimensionDesc const& dim, Value const& value,
+                                 CoordinateMappingMode mode, const boost::shared_ptr<Query>& query);
+
+        /**
+         * @see Storage::reverseMapCoordinate
+         */
+        Value reverseMapCoordinate(string const& indexName, DimensionDesc const& dim, Coordinate pos, const boost::shared_ptr<Query>& query);
+
+        /**
+         * @see Storage::removeCoordinateMap
+         */
+        void removeCoordinateMap(string const& indexName);
+
+	    /**
+	     * @see Storage::cloneChunk
+         */
+        void cloneChunk(Coordinates const& pos, ArrayDesc const& targetDesc, AttributeID targetAttrID, ArrayDesc const& sourceDesc, AttributeID sourceAttrID) ;
+
+        /**
+         * @see Storage::rollback
+         */
+        void rollback(std::map<ArrayID,VersionID> const& undoUpdates);
+
+        /**
+         * @see Storage::open
+         */
+        void open(const string& storageDescriptorFilePath, size_t cacheSize);
+
+        /**
+         * @see Storage::flush
+         */
+        void flush();
+
+        /**
+         * @see Storage::getDBArray
+         */
+        Array const& getDBArray(ArrayID);
+
+        /**
+         * @see Storage::getArrayIterator
+         */
+        boost::shared_ptr<ArrayIterator> getArrayIterator(const ArrayDesc& arrDesc, AttributeID attId,
                                                                   boost::shared_ptr<Query>& query);
-        virtual void   writeChunk(Chunk* chunk, boost::shared_ptr<Query>& query);
-        virtual Chunk* readChunk(const Address& addr);
-        virtual void   compressChunk(Chunk const* chunk, CompressedBuffer& buf);
-        virtual bool   containsChunk(const Address& addr);
-        virtual bool   isLocal();
-        virtual void   setInstanceId(InstanceID id);
-        virtual InstanceID getInstanceId() const;
-        virtual size_t getNumberOfInstances() const;
-        virtual void   remove(ArrayID id, bool allVersions, uint64_t timestamp);
 
-        static GlobalStorage instance;
+        /**
+         * @see Storage::getConstArrayIterator
+         */
+        boost::shared_ptr<ConstArrayIterator> getConstArrayIterator(const ArrayDesc& arrDesc,
+                                                                            AttributeID attId,
+                                                                            boost::shared_ptr<Query>& query);
+
+        /**
+         * @see Storage::writeChunk
+         */
+        void writeChunk(Chunk* chunk, boost::shared_ptr<Query>& query);
+
+        /**
+         * @see Storage::readChunk
+         */
+        Chunk* readChunk(ArrayDesc const& desc, StorageAddress const& addr);
+
+        /**
+         * @see Storage::setInstanceId
+         */
+        void setInstanceId(InstanceID id);
+
+        /**
+         * @see Storage::getInstanceId
+         */
+        InstanceID getInstanceId() const;
+
+        /**
+         * @see Storage::getNumberOfInstances
+         */
+        size_t getNumberOfInstances() const;
+
+        /**
+         * @see Storage::getPrimaryInstanceId
+         */
+        InstanceID getPrimaryInstanceId(ArrayDesc const& desc, StorageAddress const& address) const;
+
+        /**
+         * @see Storage::listChunkDescriptors
+         */
+        void listChunkDescriptors(ListChunkDescriptorsArrayBuilder& builder);
+
+        /**
+         * @see Storage::listChunkMap
+         */
+        void listChunkMap(ListChunkMapArrayBuilder& builder);
+
+        /**
+         * @see Storage::findNextChunk
+         */
+        bool findNextChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address);
+
+        /**
+         * @see Storage::findChunk
+         */
+        bool findChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address);
+
+        /**
+         * @see Storage::removeLocalChunkVersion
+         */
+        void removeLocalChunkVersion(ArrayDesc const& arrayDesc, Coordinates const& coords);
+
+        /**
+         * @see Storage::removeChunkVersion
+         */
+        void removeChunkVersion(ArrayDesc const& arrayDesc, Coordinates const& coords, boost::shared_ptr<Query>& query);
+
+        /**
+         * @see Storage::removeDeadChunks
+         */
+        void removeDeadChunks(ArrayDesc const& arrayDesc, set<Coordinates, CoordinatesLess> const& liveChunks, boost::shared_ptr<Query>& query);
+
+        static CachedStorage instance;
     };
 }
 

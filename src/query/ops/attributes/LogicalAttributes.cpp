@@ -39,6 +39,48 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: attributes().
+ *
+ * @par Synopsis:
+ *   attributes( srcArray )
+ *
+ * @par Summary:
+ *   Produces a 1D result array where each cell describes one attribute of the source array.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   name: string
+ *   <br>   type_id: string
+ *   <br>   nullable: bool
+ *   <br> >
+ *   <br> [
+ *   <br>   No: start=0, end=#attributes less 1, chunk interval=#attributes.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - attributes(A) <name:string, type_id:string, nullable:bool> [No] =
+ *     <br> No,   name,    type_id, nullable
+ *     <br> 0, "quantity", "uint64", false
+ *     <br> 1,   "sales",  "double", false
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalAttributes: public LogicalOperator
 {
 public:
@@ -46,7 +88,6 @@ public:
         LogicalOperator(logicalName, alias)
     {
     	ADD_PARAM_IN_ARRAY_NAME()
-        _properties.ddl = true;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)

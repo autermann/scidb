@@ -34,10 +34,40 @@
 namespace scidb
 {
 
-class Scan: public  LogicalOperator
+/**
+ * @brief The operator: scan().
+ *
+ * @par Synopsis:
+ *   scan( srcArray )
+ *
+ * @par Summary:
+ *   Produces a result array that is equivalent to a stored array.
+ *
+ * @par Input:
+ *   - srcArray: the array to scan, with srcAttrs and srcDims
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
+class LogicalScan: public  LogicalOperator
 {
 public:
-    Scan(const std::string& logicalName, const std::string& alias):
+    LogicalScan(const std::string& logicalName, const std::string& alias):
                     LogicalOperator(logicalName, alias)
     {
         _properties.tile = true;
@@ -85,7 +115,7 @@ public:
     }
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Scan, "scan")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalScan, "scan")
 
 } //namespace scidb
 

@@ -1,0 +1,620 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<chapter>
+  <title>Changing Array Schemas: Transforming Your SciDB Array</title>
+
+  <sect1>
+     
+
+    <title>Redimensioning an Array</title>
+
+     
+
+    <para>A common use case for creating and loading SciDB arrays is using
+    data from a data warehouse. This data set may be very large and formatted
+    as a csv file. You can use the csv2scidb utility to convert a csv file to
+    the 1-dimensional array format and load the file into a SciDB array. Once
+    you have a 1-dimensional SciDB array, you can redimension the array to
+    convert the attributes to dimensions.</para>
+
+     
+
+    <para>For example, suppose you have a csv file like this: <para><screen>d,p,val
+"device-0","probe-0",0.01
+"device-1","probe-0",2.04
+"device-2","probe-0",6.09
+"device-3","probe-0",12.16
+"device-4","probe-0",20.25
+"device-0","probe-1",30.36
+"device-1","probe-1",42.49
+"device-2","probe-1",56.64
+"device-3","probe-1",72.81
+"device-4","probe-1",91
+"device-0","probe-2",111.21
+"device-1","probe-2",133.44
+"device-2","probe-2",157.69
+"device-3","probe-2",183.96
+"device-4","probe-2",212.25
+"device-0","probe-3",242.56
+"device-1","probe-3",274.89
+"device-2","probe-3",309.24
+"device-3","probe-3",345.61
+"device-4","probe-3",384
+"device-0","probe-4",424.41
+"device-1","probe-4",466.84
+"device-2","probe-4",511.29
+"device-3","probe-4",557.76
+"device-4","probe-4",606.25
+</screen> This data has three columns, two of which are stings and one
+    which is a floating-point number. The column headers are 'd','t',and
+    'val'. To load this data set, create a 1-dimensional SciDB array with
+    three attributes and load the data into it. For this example, the array is
+    named expo. The dimension name is i, the dimension size is 25, the chunk
+    size is 5. The attributes are s, of type string, p of type string, and val
+    of type double. <para><programlisting>AFL% CREATE ARRAY device_probe &lt;d:string, p:string, val:double&gt; [i=1:25,5,0];  </programlisting></para></para></para>
+
+     
+
+    <para>When you examine the data, notice that it could be expressed in a
+    2-dimensional format like this: <informaltable frame="all">
+        <?dbfo keep-together="always" ?>
+
+        <tgroup cols="6">
+          <colspec colname="c1"/>
+
+          <colspec colname="cgen1"/>
+
+          <colspec colname="c2"/>
+
+          <colspec colname="c3"/>
+
+          <colspec colname="c4"/>
+
+          <colspec colname="c5"/>
+
+          <tbody>
+            <row>
+              <entry/>
+
+              <entry>probe-0</entry>
+
+              <entry>probe-1</entry>
+
+              <entry>probe-2</entry>
+
+              <entry>probe-3</entry>
+
+              <entry>probe-4</entry>
+            </row>
+
+            <row>
+              <entry>device-0</entry>
+
+              <entry>0.01</entry>
+
+              <entry>30.36</entry>
+
+              <entry>111.21</entry>
+
+              <entry>242.56</entry>
+
+              <entry>424.41</entry>
+            </row>
+
+            <row>
+              <entry>device-1</entry>
+
+              <entry>2.04</entry>
+
+              <entry>42.49</entry>
+
+              <entry>133.44</entry>
+
+              <entry>274.89</entry>
+
+              <entry>466.84</entry>
+            </row>
+
+            <row>
+              <entry>device-2</entry>
+
+              <entry>6.09</entry>
+
+              <entry>56.64</entry>
+
+              <entry>157.69</entry>
+
+              <entry>309.24</entry>
+
+              <entry>511.29</entry>
+            </row>
+
+            <row>
+              <entry>device-3</entry>
+
+              <entry>12.16</entry>
+
+              <entry>72.81</entry>
+
+              <entry>183.96</entry>
+
+              <entry>345.61</entry>
+
+              <entry>557.76</entry>
+            </row>
+
+            <row>
+              <entry>device-4</entry>
+
+              <entry>20.25</entry>
+
+              <entry>91</entry>
+
+              <entry>212.25</entry>
+
+              <entry>384</entry>
+
+              <entry>606.25</entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>SciDB allows you to redimension the data so that you can
+    store it in this 2-dimensional format. First, create an array with 2
+    dimensions: <para><programlisting>AFL% create array two_dim&lt;val:double&gt;[d(string)=5,5,0, p(string)=5,5,0];  </programlisting> Each of the dimensions is of size 5, corresponding to
+    a dimension in the 5-by-5 table. Now, you can use the redimension_store
+    operator to redimension the array device_probe into the array two_dim:
+    <para><programlisting>AFL% redimension_store(device_probe, two_dim);  </programlisting><screen>[
+[(0.01),(30.36),(111.21),(242.56),(424.41)],
+[(2.04),(42.49),(133.44),(274.89),(466.84)],
+[(6.09),(56.64),(157.69),(309.24),(511.29)],
+[(12.16),(72.81),(183.96),(345.61),(557.76)],
+[(20.25),(91),(212.25),(384),(606.25)]
+]</screen> Now the data is stored so that device and probe
+    numbers are the dimensions of the array. This means that you can use the
+    dimension indices to select data from the array. For example, to select
+    the second device from the third probe, use the dimension indices:
+    <para><programlisting>AQL% <command>SELECT</command> val <command>FROM</command> two_dim <command>WHERE</command> d='device-2' <command>AND</command> p='probe-3';  </programlisting><screen>[
+[(),(),(),(),()],
+[(),(),(),(),()],
+[(),(),(),(309.24),()],
+[(),(),(),(),()],
+[(),(),(),(),()]
+]</screen></para></para></para></para>
+
+     The redimension and redimension_store operators can yield result arrays with fewer cells than the source array.  This can occur when there are "cell collisions.'  A cell collision occurs when a single cell location of the result array has more than one corresponding cell in the source array.  There are three techniques for handling cell collisions:  Synthetic dimensions, aggregation, and randomly choosing a cell from among the candidate cells.  For an example of aggregation, see the previous chapter.  For elaboration about all three techniques, see the sections of the AFL Operator Reference about the redimension and redimension_store operators.
+
+    <sect2><title>Redimensioning Arrays Containing Null Values </title>
+    <para>Nullable attributes are handled in a special manner by
+    redimension_store. If the source array contains null values for the
+    attribute being transformed, these cells will be dropped during the
+    redimension_store. For example, consider the 1-dimensional array
+    redim_missing: <para><programlisting>AFL% CREATE ARRAY redim_missing&lt; val1:string,val2:string NULL,val3:double &gt;[i=0:9,10,0];  </programlisting><programlisting>AFL% show(redim_missing)</programlisting><screen><command>redim_missing</command>
+
+&lt; val1:string,
+val2:string NULL,
+val3:double &gt;
+
+[i=0:9,10,0]</screen><programlisting>AFL% scan(redim_missing);   </programlisting><screen>{i} val1,val2,val3
+{0} "0","0",1
+{1} "0","1",0.540302
+{2} "0","2",-0.416147
+{3} "0","3",-0.989992
+{4} "0","4",-0.653644
+{5} "1",null,0.7
+{6} "1","1",0.841471
+{7} "1","2",0.909297
+{8} "1","3",0.14112
+{9} "1","4",-0.756802
+</screen></para></para> <para>Suppose you want to change the first two
+    attributes into dimension indices and store the third attribute in the
+    resulting 2-dimensional array. Create an array redim_target to store the
+    redimension results: <para><programlisting>AFL% CREATE ARRAY redim_target &lt;val3:double&gt; [val1(string)=2,2,0,val2(string)=5,5,0];  </programlisting></para></para> <para>
+        <para><programlisting>AFL% redimension_store(redim_missing,redim_target);   </programlisting><screen>[
+[(1),(0.540302),(-0.416147),(-0.989992),(-0.653644)],
+[(),(0.841471),(0.909297),(0.14112),(-0.756802)]
+]</screen></para></para> If it is important to preserve cells with NULL attribute values,
+    you must use the substitute operator first to convert NULL values into
+    non-NULL values. This procedure is described in the Reference Guide
+    section on the <code>substitute</code> operator.</sect2>
+
+     
+  </sect1>
+
+  <sect1>
+    <title>Array Transformations</title>
+
+    <para>Once you have created, loaded, and redimensioned a SciDB array, you
+    may want to change some aspect of that array. SciDB offers functionality
+    to transform the variables of an array in several ways (attributes and
+    dimensions).</para>
+
+    <para>The array transformation operations produce a result array with a
+    new schema. They do not modify the source array. Array transformation
+    operations have the signature: <synopsis>AQL% <command>SELECT </command> * 
+      <command>FROM </command> operation( <replaceable>source_array </replaceable>, <replaceable>parameters </replaceable>)
+      </synopsis> This query outputs a SciDB array. To store that array
+    result, use the <code> <command>INTO</command> </code> clause: <synopsis>AQL% <command>SELECT </command> * 
+      <command>INTO</command>	<replaceable>result_array</replaceable>
+      <command>FROM </command> operation( <replaceable>source_array </replaceable>, <replaceable>parameters </replaceable>)
+      </synopsis></para>
+
+    <sect2>
+      <title>Rearranging Array Data</title>
+
+      <para>SciDB offers functionality to rearrange an array data:
+      <itemizedlist>
+          <listitem>
+            <para><emphasis role="bold">Reshaping </emphasis> an array by
+            changing the dimension sizes. This is performed with the
+            <code>reshape </code> command.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">Unpacking </emphasis> a
+            multidimensional array into a 1-dimensional array is performed
+            with the <code>unpack </code> command.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">Reversing </emphasis> the cells in an
+            array is performed with the <code>reverse </code> command.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">Sorting </emphasis> the cells in an
+            array or within subarrays corresponding to each dimension, is
+            performed with the <code>sort </code> command.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>For example, you might want to reshape your array from an
+      <emphasis>m </emphasis>-by- <emphasis>n </emphasis> array to a 2
+      <emphasis>m </emphasis>-by- <emphasis>n </emphasis>/2 array. The
+      <code>reshape </code> command allows you to transform an array into
+      another compatible schema. Consider a 4 <symbol role="symbolfont">×
+      </symbol>4 array, <code>m4x4 </code>, with contents and schema as
+      follows: <para><programlisting>AFL% CREATE ARRAY m4x4 &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];  </programlisting><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen><programlisting>AFL% show(m4x4)</programlisting><screen><command>m4x4</command>
+
+&lt; val:double &gt;
+
+[i=0:3,4,0,
+j=0:3,4,0]</screen> As long as the two array schemas have the same number of
+      cells, you can use reshape to transform one schema into the other. A 4
+      <symbol role="symbolfont">× </symbol>4 array has 16 cells, so you can
+      use any schema with 16 cells, such as 8 <symbol role="symbolfont">×
+      </symbol>2, as the new schema: </para></para>
+
+      <para>A special case of reshaping is unpacking a multidimensional array
+      to a 1-dimensional result array. When you unpack an array, the
+      coordinates of the array cells are stored in the attributes to the
+      result array. This is particularly useful if you are planning to save
+      your data to csv format. Unpacking also excludes all empty cells from
+      the result array.</para>
+
+      <para>The <code>unpack</code> command takes the second and higher
+      dimensions of an array and transforms them into attributes along the
+      first dimension. The result array consists of the dimension values of
+      the input array with the attribute values from the corresponding cells
+      appended. So, an attribute value <code>val </code> that was in row 1,
+      column 3 of a 2-dimensional array will be transformed into a cell with
+      attribute values 1,3, <code>val</code>. For example, a 2-dimensional,
+      1-attribute array will output a 1-dimensional, 3-attribute array as
+      follows: <para><programlisting>AFL% CREATE ARRAY m3x3  &lt; val:double &gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m1 <command>FROM</command> unpack(m3x3,k);  </programlisting><screen>[(0,0,0),(0,1,1),(0,2,2),(1,0,3),(1,1,4),(1,2,5),(2,0,6),(2,1,7),(2,2,8)]
+</screen><screen><command>m1</command>
+
+&lt; i:int64,
+j:int64,
+val:double &gt;
+
+[k=0:*,9,0]</screen></para></para>
+
+      <para>You can reverse the ordering of the data in each dimension of an
+      array with the <code>reverse </code> command: <para><screen><command>m3x3</command>
+
+&lt; val:double &gt;
+
+[i=0:2,3,0,
+j=0:2,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> m3x3;   </programlisting><screen>[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]</screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> reverse(m3x3);  </programlisting><screen>[
+[(8),(7),(6)],
+[(5),(4),(3)],
+[(2),(1),(0)]
+]</screen></para></para>
+    </sect2>
+
+    <sect2>
+      <title>Reduce an Array</title>
+
+      <para>One common array task is selecting subsets of an array. SciDB
+      allows you to reduce an array to contiguous subsets of the array cells
+      or noncontiguous subsets of the array's cells. <itemizedlist>
+          <listitem>
+            <para>A <emphasis role="bold">subarray </emphasis> is a contiguous
+            block of cells from an array. This action is performed by the
+            <code>subarray </code> command.</para>
+          </listitem>
+
+          <listitem>
+            <para>An array <emphasis role="bold">slice </emphasis> is a subset
+            of the array defined by planes of the array. This action is
+            performed by the <code>slice </code> command.</para>
+          </listitem>
+
+          <listitem>
+            <para>A dimension can be winnowed or <emphasis role="bold">thinned
+            </emphasis> by selecting data at intervals along its entirety.
+            This action is performed by the <code>thin </code> command.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>You can select part of an existing array into another array with
+      the <code>subarray </code> command. For example, you can select a 2-by-2
+      array of the last two values from each dimension of the array <code>m4x4
+      </code> with the following <code>subarray </code> command:
+      <para><programlisting>AFL% show(m4x4)</programlisting><screen><command>m4x4</command>
+
+&lt; val:double &gt;
+
+[i=0:3,4,0,
+j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> subarray(m4x4, 2, 2, 3, 4);  </programlisting><screen>[
+[(10),(11)],
+[(14),(15)]
+]</screen></para></para></para>
+
+      <para>If you have a 3-dimensional array, you might want to select just a
+      flat 2-dimensional slice, as like the cross-hatched section of this
+      image: <informalfigure>
+          <mediaobject>
+            <imageobject>
+              <imagedata fileref="../graphics/slice_3d.png" scale="60"/>
+            </imageobject>
+          </mediaobject>
+        </informalfigure></para>
+
+      <para>For example, you can select the data in a horizontal slice in the
+      middle of a 3-dimensional array <code>m3x3x3 </code> by using the
+      <code>slice </code> command and specifying the value for dimension
+      <code>k</code>: <para><programlisting>AFL% show(m3x3x3)</programlisting><screen><command>m3x3x3</command>
+
+&lt; val:double &gt;
+
+[i=0:2,3,0,
+j=0:2,3,0,
+k=0:2,3,0]</screen><programlisting>AFL% scan(m3x3x3);   </programlisting><screen>[
+[
+[(0),(1),(2)],
+[(1),(2),(3)],
+[(2),(3),(4)]
+],
+[
+[(1),(2),(3)],
+[(2),(3),(4)],
+[(3),(4),(5)]
+],
+[
+[(2),(3),(4)],
+[(3),(4),(5)],
+[(4),(5),(6)]
+]
+]</screen><programlisting>AFL% slice(m3x3x3,k,1);  </programlisting><screen>[
+[(1),(2),(3)],
+[(2),(3),(4)],
+[(3),(4),(5)]
+]</screen></para></para>
+
+      <para>You may want to sample data uniformly across an entire dimension.
+      The <code>thin </code> command selects elements from given array
+      dimensions at defined intervals. For example, you can select every other
+      element from every other row: <para><programlisting>AFL% show(m4x4)</programlisting><screen><command>m4x4</command>
+
+&lt; val:double &gt;
+
+[i=0:3,4,0,
+j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen><programlisting>AFL% thin(m4x4, 0, 2, 0, 2);  </programlisting><screen>[
+[(0),(2)],
+[(8),(10)]
+]</screen></para></para>
+    </sect2>
+  </sect1>
+
+  <sect1>
+    <title>Changing Array Attributes</title>
+
+    <para>An array's attributes contain the data stored in the array. You can
+    transform attributes by <itemizedlist>
+        <listitem>
+          <para>Changing the name of the attribute.</para>
+        </listitem>
+
+        <listitem>
+          <para>Adding an attribute.</para>
+        </listitem>
+
+        <listitem>
+          <para>Changing the order of attributes in a cell.</para>
+        </listitem>
+
+        <listitem>
+          <para>Deleting an attribute.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>You can change the name of an attribute with the
+    <code>attribute_rename </code> command: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m3x3_new <command>FROM</command> attribute_rename(m3x3,val,val2);  </programlisting><screen>[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]</screen><programlisting>AFL% show(m3x3_new)</programlisting><screen><command>m3x3_new</command>
+
+&lt; val2:double &gt;
+
+[i=0:2,3,0,
+j=0:2,3,0]</screen></para></para>
+
+    <para>You can add attributes to an existing array with the
+    <code>apply</code> command: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m3x3_new_attr <command>FROM</command> apply(m3x3,val2,val+10,val3,pow(val,2));  </programlisting><screen>[
+[(0,10,0),(1,11,1),(2,12,4)],
+[(3,13,9),(4,14,16),(5,15,25)],
+[(6,16,36),(7,17,49),(8,18,64)]
+]</screen><programlisting>AFL% show(m3x3_new_attr)</programlisting><screen><command>m3x3_new_attr</command>
+
+&lt; val:double,
+val2:double,
+val3:double &gt;
+
+[i=0:2,3,0,
+j=0:2,3,0]</screen></para></para>
+
+    <para>You can select a subset of an array's attributes and return them
+    using the following statement. <para><programlisting>AQL% <command>SELECT</command> val2, val3 <command>FROM</command> m3x3_new_attr;  </programlisting><screen>[
+[(10,0),(11,1),(12,4)],
+[(13,9),(14,16),(15,25)],
+[(16,36),(17,49),(18,64)]
+]</screen></para></para>
+  </sect1>
+
+  <sect1>
+    <title>Changing Array Dimensions</title>
+
+    <sect2>
+      <title>Changing Chunk Size</title>
+
+      <para>If you have created an array with a particular chunk size and then
+      later find that you need a different chunk size, you can use the
+      <code>repart </code> command to change the chunk size. For example,
+      suppose you have an array that is 1000-by-1000 with chunk size 100 in
+      each dimension: <programlisting>AQL%
+	  <command>SELECT </command> *
+	  <command>FROM </command> show(chunks);
+	</programlisting> <screen>[("chunks&lt;val1:double,val2:double&gt;
+	  [i=0:999,100,0,j=0:999,100,0]")]
+	</screen>You can repartition the chunks to be 10 along one dimension and 1000
+      in the other:</para>
+
+      <programlisting>AQL%
+	<command>SELECT </command> * 
+	<command>INTO </command> chunks_part 
+	<command>FROM </command> repart(chunks,&lt;val1:double,val2:double&gt;[i=0:999,10,0,j=0:999,1000,0]);
+      </programlisting>
+
+      <programlisting>AQL%
+	<command>SELECT	</command> *
+	<command>FROM </command> show(chunks_part);
+      </programlisting>
+
+      <screen>[("chunks_part&lt;val1:double,val2:double&gt;[i=0:999,10,0,j=0:999,1000,0]")]
+      </screen>
+
+      <para>Repartitioning is also important if you want the change the chunk
+      overlap to speed up nearest-neighbor or window aggregate queries.
+      <programlisting>AQL%
+	  <command>SELECT </command> * 
+	  <command>INTO </command> chunks_overlap 
+	  <command> FROM </command> repart(chunks,&lt;val1:double,val2:double&gt;[i=0:999,100,10,j=0:999,100,10]);
+	</programlisting></para>
+    </sect2>
+
+    <sect2>
+      <title>Appending a Dimension</title>
+
+      <para>You may need to append dimensions to existing arrays, particularly
+      when you want to do more complicated transformations to your array. This
+      example demonstrates how you can take slices from an existing array and
+      then reassemble them into a array with a different schema. Consider the
+      following 2-dimensional array: <para><programlisting>AFL% scan(Dsp)  </programlisting><screen>{d,t} val
+{"device-0","probe-0"} 0.01
+{"device-0","probe-1"} 30.36
+{"device-0","probe-2"} 111.21
+{"device-0","probe-3"} 242.56
+{"device-0","probe-4"} 424.41
+{"device-1","probe-0"} 2.04
+{"device-1","probe-1"} 42.49
+{"device-1","probe-2"} 133.44
+{"device-1","probe-3"} 274.89
+{"device-1","probe-4"} 466.84
+{"device-2","probe-0"} 6.09
+{"device-2","probe-1"} 56.64
+{"device-2","probe-2"} 157.69
+{"device-2","probe-3"} 309.24
+{"device-2","probe-4"} 511.29
+{"device-3","probe-0"} 12.16
+{"device-3","probe-1"} 72.81
+{"device-3","probe-2"} 183.96
+{"device-3","probe-3"} 345.61
+{"device-3","probe-4"} 557.76
+{"device-4","probe-0"} 20.25
+{"device-4","probe-1"} 91
+{"device-4","probe-2"} 212.25
+{"device-4","probe-3"} 384
+{"device-4","probe-4"} 606.25
+</screen><programlisting>AFL% show(Dsp)</programlisting><screen><command>Dsp</command>
+
+&lt; val:double &gt;
+
+[d(string)=5,5,0,
+t(string)=5,5,0]</screen></para></para>
+
+      <para>Suppose you want to examine a sample plane from each dimension of
+      the array. You can use the slice command to select array slices from
+      array <code>Dsp </code>: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_0 <command>FROM</command> slice(Dsp, d, 'device-0');  </programlisting><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_1 <command>FROM</command> slice(Dsp, d, 'device-1');  </programlisting><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_2 <command>FROM</command> slice(Dsp, d, 'device-2');  </programlisting>The slices are 1-dimensional. <para><programlisting>AFL% show(Dsp_slice_2)</programlisting><screen><command>Dsp_slice_2</command>
+
+&lt; val:double &gt;
+
+[t(string)=5,5,0]</screen> Concatenating these slices will create a 1-d array:
+      <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_1d <command>FROM</command> concat(Dsp_slice_0, Dsp_slice_2);  </programlisting><screen>{t} val
+{0} 0.01
+{1} 30.36
+{2} 111.21
+{3} 242.56
+{4} 424.41
+{5} 6.09
+{6} 56.64
+{7} 157.69
+{8} 309.24
+{9} 511.29
+</screen><programlisting>AFL% show(Dsp_1d)</programlisting><screen><command>Dsp_1d</command>
+
+&lt; val:double &gt;
+
+[t=0:9,5,0]</screen> To concatenate these arrays into a 2-dimensional array, you
+      need to add a dimension to both. The <code>adddim</code> command will
+      add a stub dimension to the array to increase its dimensionality.
+      <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_new <command>FROM</command> concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d));
+</programlisting><screen>{d,t} val
+{0,"probe-0"} 0.01
+{0,"probe-1"} 30.36
+{0,"probe-2"} 111.21
+{0,"probe-3"} 242.56
+{0,"probe-4"} 424.41
+{1,"probe-0"} 6.09
+{1,"probe-1"} 56.64
+{1,"probe-2"} 157.69
+{1,"probe-3"} 309.24
+{1,"probe-4"} 511.29
+</screen><programlisting>AFL% show(Dsp_new)</programlisting><screen><command>Dsp_new</command>
+
+&lt; val:double &gt;
+
+[d=0:1,1,0,
+t(string)=5,5,0]</screen></para></para></para></para></para>
+    </sect2>
+  </sect1>
+</chapter>

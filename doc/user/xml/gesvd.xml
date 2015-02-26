@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>gesvd</refname>
+
+    <refpurpose>Generalized singular value decomposition</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis> gesvd(<replaceable>array</replaceable>,<replaceable>output_option</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>Details to be supplied in a future release of the
+    documentation.</para>
+  </refsect1>
+</refentry>

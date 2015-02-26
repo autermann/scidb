@@ -48,10 +48,21 @@ public:
     {
     }
 
+    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    {
+       return ArrayDistribution(psLocalInstance);
+    }
+
     boost::shared_ptr<Array> execute(vector<boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         vector<boost::shared_ptr<Tuple> > tuples;
         uint32_t hdu = 0;
+
+        if (query->getCoordinatorID() != COORDINATOR_INSTANCE )
+        {
+            return shared_ptr<Array> (new MemArray(_schema));
+        }
 
         const string &filePath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 

@@ -148,6 +148,12 @@ inline void check_zero ( SciDB_Rational * r )
 }
 
 //
+void construct_rational(const Value** args, Value* res, void*)
+{
+    *(SciDB_Rational *)res->data() = SciDB_Rational();
+}
+
+//
 // The type has three "constructor" functions: 
 //	String -> Rational
 //	Int -> Rational

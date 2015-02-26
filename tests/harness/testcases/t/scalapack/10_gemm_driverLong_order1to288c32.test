@@ -1,0 +1,20 @@
+--setup
+
+--shell --command "echo [dense_linear_algebra]                > /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+--shell --command "echo tests=GEMM                             >> /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+--shell --command "echo error-limit=20                        >> /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+
+--test
+
+--shell --command "echo size-list=+:1:288:1                 >> /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+
+--shell --command "python ../../bin/dla_driver.py /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg 1> /tmp/10_gemm_driverLong_order1to288c32.$PPID.stdout 2> /tmp/10_gemm_driverLong_order1to288c32.$PPID.stderr"
+--shell --command "cat /tmp/10_gemm_driverLong_order1to288c32.$PPID.stderr"
+--shell --command "cat /tmp/10_gemm_driverLong_order1to288c32.$PPID.stdout" --store
+
+--cleanup
+--shell --command "rm /tmp/10_gemm_driverLong_order1to288c32.$PPID.cfg"
+--shell --command "rm /tmp/10_gemm_driverLong_order1to288c32.$PPID.stdout"
+--shell --command "rm /tmp/10_gemm_driverLong_order1to288c32.$PPID.stderr" 

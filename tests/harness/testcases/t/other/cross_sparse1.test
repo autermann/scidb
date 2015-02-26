@@ -1,0 +1,31 @@
+--setup
+--start-query-logging
+#Ticket number : 1635
+#Tests for cross operator on the 2-D sparse array
+#Tests for simple 2-D arrays
+
+create array A <a:int32>[x=0:3,2,0 , y=0:3,2,0 ]
+create array B <a:int32>[x=0:3,2,0 , y=0:3,2,0 ]
+store(build_sparse(A,x*y+100,x<>1),A)
+store(build_sparse(B,x*y+10,x<>2),A)
+
+--test
+cross(A,B)
+count(cross(A,B))
+cross(B,A)
+count(cross(B,A))
+--aql select * into C from A where x=2 or x=3
+show(C)
+cross(A,C)
+count(cross(A,C))
+cross(C,A)
+count(cross(C,A))
+
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)
+
+--stop-query-logging
+

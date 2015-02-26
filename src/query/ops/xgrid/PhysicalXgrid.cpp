@@ -38,26 +38,30 @@ namespace scidb {
 using namespace boost;
 using namespace std;
 
-class PhysicalXgrid: public  PhysicalOperator
+class PhysicalXgrid : public  PhysicalOperator
 {
   public:
-	PhysicalXgrid(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-	     PhysicalOperator(logicalName, physicalName, parameters, schema)
-	{
-	}
-
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    PhysicalXgrid(std::string const& logicalName,
+                  std::string const& physicalName,
+                  Parameters const& parameters,
+                  ArrayDesc const& schema):
+        PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
-        //TODO:OPTAPI testme
-        return true;
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                       const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
-        if (inputBoundaries[0].isEmpty())
-        {
-            return PhysicalBoundaries::createEmpty(_schema.getDimensions().size());
+        //TODO:OPTAPI testme
+        return false;
+    }
+
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
+    {
+        if (inputBoundaries[0].isEmpty()) {
+            return PhysicalBoundaries::createEmpty(
+                        _schema.getDimensions().size());
         }
 
         const Coordinates& inStart = inputBoundaries[0].getStartCoords();
@@ -80,11 +84,12 @@ class PhysicalXgrid: public  PhysicalOperator
 	 * Xgrid is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    boost::shared_ptr<Array> execute(
+            vector< boost::shared_ptr<Array> >& inputArrays,
+            boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
-        size_t nDims = _schema.getDimensions().size();        
-		assert(_parameters.size() == nDims);
+		assert(_parameters.size() == _schema.getDimensions().size());
 		return boost::shared_ptr<Array>(new XgridArray(_schema, inputArrays[0]));
 	 }
 };

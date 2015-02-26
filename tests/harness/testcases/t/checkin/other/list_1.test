@@ -1,19 +1,25 @@
 --setup
 --start-query-logging
+load_library('point')
+load_library('more_math')
 
 --test
-
-list()
-list('arrays')
 list('operators')
-list('types')
 list('functions')
 --igdata "store(list('queries'),query_array)"
 attributes(query_array)
+list('aggregates')
+
+--start-igdata
+--aql select name,schema from list()
+--aql select name,schema from list('arrays')
+list('types')
 list('libraries')
+--aql select name,schema from list()
+--aql select name,schema from list('arrays')
+--stop-igdata
+
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_LIST_ERROR1 "list('error_test')"
-list()
-list('arrays')
 
 --cleanup
 remove(query_array)

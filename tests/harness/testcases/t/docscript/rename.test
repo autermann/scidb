@@ -1,0 +1,20 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+store(build(<val:double>[i=0:9,10,0],1),source)  
+--stop-igdata
+list('arrays')  
+--start-igdata
+rename(source,target)  
+--stop-igdata
+list('arrays') 
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(target)

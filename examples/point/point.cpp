@@ -83,6 +83,7 @@ public:
     {
         _types.push_back(Type("point", 2 * sizeof(double) * 8));
 
+        _functionDescs.push_back(FunctionDescription("point", ArgTypes(), TypeId("point"), &construct_point));
         _functionDescs.push_back(FunctionDescription("str2point", list_of(TID_STRING), TypeId("point"), &str2Point));
         _functionDescs.push_back(FunctionDescription("point2str", list_of("point"), TID_STRING, &point2Str));
         _functionDescs.push_back(FunctionDescription("+",  list_of("point")("point"), TypeId("point"), &sumPoints));

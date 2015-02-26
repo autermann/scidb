@@ -1,0 +1,31 @@
+SCIDB QUERY : <CREATE ARRAY m4x4 <val:double>[i=0:3,4,0,j=0:3,4,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build(m4x4,i*4+j),m4x4)>
+{i,j} val
+{0,0} 0
+{0,1} 1
+{0,2} 2
+{0,3} 3
+{1,0} 4
+{1,1} 5
+{1,2} 6
+{1,3} 7
+{2,0} 8
+{2,1} 9
+{2,2} 10
+{2,3} 11
+{3,0} 12
+{3,1} 13
+{3,2} 14
+{3,3} 15
+
+SCIDB QUERY : <subarray(m4x4,2,2,3,3)>
+{i,j} val
+{0,0} 10
+{0,1} 11
+{1,0} 14
+{1,1} 15
+
+Query was executed successfully
+

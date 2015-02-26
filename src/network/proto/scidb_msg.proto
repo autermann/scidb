@@ -46,6 +46,7 @@ message Query
 {
 	required string query = 1;
 	required bool afl = 2 [default = false];
+        optional string program_options = 3 [default = "unknown"];
 }
 
 /**
@@ -53,9 +54,10 @@ message Query
  */
 message Fetch
 {
-	optional uint32 attribute_id = 2;
-	optional bool position_only = 3;
-	optional uint32 obj_type = 4; // 0 - for remote array; 1 - for merged array. Should be copy to Chunk message field.
+    optional uint32 attribute_id = 2;
+    optional bool position_only = 3;
+    optional uint32 obj_type = 4; // 0 - for remote array; 1 - for merged array. Should be copy to Chunk message field.
+    optional string array_name = 5; // a name of mapping array to fetch: result array or mapping array
 }
 
 /**
@@ -75,7 +77,11 @@ message Chunk
 	repeated int64 next_coordinates = 10;
 	optional uint32 obj_type = 11; // 0 - for remote array; 1 - for merged array. Should be copy from Fetch message field.
     optional uint32 count  = 12;
-	optional uint64 cloned_array_id = 13;
+    optional bool tombstone = 13 [default = false]; 
+
+    //used when cloning chunk from array A to array B: ID of array A and attID
+    optional uint64 source_array_id = 14;
+    optional uint64 source_attribute_id = 15;
 
     message Warning
     {
@@ -88,7 +94,7 @@ message Chunk
         required string strings_namespace = 7;
     }
 
-    repeated Warning warnings = 14;//warnings posted during execution
+    repeated Warning warnings = 16;//warnings posted during execution
 }
 
 /**
@@ -109,18 +115,18 @@ message QueryResult
 	
 	message DimensionDesc
 	{
-		required string name = 1;
-		required int64 start_min = 2;
-		required int64 curr_start = 3;
-		required int64 curr_end = 4;
-		required int64 end_max = 5;
-		required uint32 chunk_interval = 6;
-		required uint32 chunk_overlap = 7;
-		required string type_id = 8;
-		required int32 flags = 9;
-		required string mapping_array_name = 10;
-      	optional int64 coordinates_mapping_size = 11;
-    	optional bytes coordinates_mapping = 12;
+            required string name = 1;
+            required int64 start_min = 2;
+            required int64 curr_start = 3;
+            required int64 curr_end = 4;
+            required int64 end_max = 5;
+            required uint32 chunk_interval = 6;
+            required uint32 chunk_overlap = 7;
+            required string type_id = 8;
+            required int32 flags = 9;
+            required string mapping_array_name = 10;
+            optional int64 coordinates_mapping_size = 11;
+            optional bytes coordinates_mapping = 12;
 	}
 
     message Warning
@@ -223,6 +229,9 @@ message ResourcesFileExistsResponse
     required bool exits_flag = 2;
 }
 
+/**
+* Message used to convey flow control information
+*/
 message Control
 {
   message Channel
@@ -235,4 +244,35 @@ message Control
   required uint64 local_gen_id = 1;
   required uint64 remote_gen_id = 2; 
   repeated Channel channels = 3;
+}
+
+/**
+*  MPI slave -> SciDB handshake
+*/
+message MpiSlaveHandshake
+{
+  required string cluster_uuid = 1;
+  required uint64 instance_id = 2;
+  required uint64 launch_id = 3;
+  required uint64 rank = 4;
+  required uint64 pid  = 5;
+  required uint64 ppid = 6;
+}
+
+/**
+*  MPI slave -> SciDB command result
+*/
+message MpiSlaveResult
+{
+  required uint64 launch_id = 1;
+  required int64 status = 3;
+}
+
+/**
+* SciDB -> MPI slave command
+*/
+message MpiSlaveCommand
+{
+  required string command = 1;
+  repeated string args = 2;
 }

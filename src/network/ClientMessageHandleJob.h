@@ -67,6 +67,8 @@ class ClientMessageHandleJob: public Job
     boost::shared_ptr<Connection> _connection;
     boost::shared_ptr<MessageDesc> _messageDesc;
 
+    std::string getProgramOptions(const string &programOptions) const;
+
     /**
      *  This method process message mtPrepareQuery containing client query string.
      *  At the end of work it send response to client by _connection.

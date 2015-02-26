@@ -6,11 +6,9 @@
     <refpurpose>Cross-product join with equality predicates</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
-    <synopsis><command>SELECT</command> * <command>INTO</command> <replaceable>target_array</replaceable> 
-   <command>FROM</command> cross_join(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>,<replaceable>left_dim1</replaceable>,<replaceable>right_dim1</replaceable>,...);
-
-store(cross_join(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>,<replaceable>left_dim1</replaceable>,<replaceable>right_dim1</replaceable>,...),
-   <replaceable>target_array</replaceable>);</synopsis>
+    <synopsis><command>SELECT</command> *  
+   <command>FROM</command> cross_join(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>,<replaceable>left_dim1</replaceable>,<replaceable>right_dim1</replaceable>,...);</synopsis>
+    <synopsis>cross_join(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>,<replaceable>left_dim1</replaceable>,<replaceable>right_dim1</replaceable>,...);</synopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>Summary</title>
@@ -26,7 +24,7 @@ cross_join(A, B, j, k) results in a 2-dimensional array with coordinates {i, j} 
 position {i, j} of the output is computed as the concatenation of cells {i, j} of A with cell at coordinate {k=j}
 of B.
 </para>
-<para>If the join dimensions are different lengths, the cross-join will return the smaller dimension for the join points.</para>
+    <para>If the join dimensions are different lengths, the cross-join will return the smaller dimension for the join points.</para>
   </refsect1>
   <refsect1>
     <title>Example</title>

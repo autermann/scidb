@@ -1,0 +1,31 @@
+--setup
+--start-query-logging
+#Ticket number : 1635
+#Tests for cross operator on NID type arrays
+
+create  array A <a:char,b:char>[x=0:3,2,0]
+create array B <b:char>[a(char)=4,2,0]
+create array C <a:char>[b(char)=4,2,0]
+create array T <a:char>[x=0:3,2,0]
+store(join(build_sparse(T,string(x+1),x<>2),build_sparse(T,string(x+5),x<>0)),A)
+
+
+--test
+redimension_store(A,B)
+redimension_store(A,C)
+cross(A,B)
+cross(B,A)
+cross(B,C)
+cross(C,B)
+cross(subarray(A,1,3),B)
+count(cross(subarray(A,1,3),B))
+cross(xgrid(A,2),B)
+count(cross(xgrid(A,2),B))
+
+
+
+--cleanup
+remove(A)
+remove(B)
+remove(C)
+remove(T)

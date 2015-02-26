@@ -1,0 +1,17 @@
+SCIDB QUERY : <CREATE ARRAY vector1<val:double>[i=0:5,2,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build(vector1,i),vector1)>
+{i} val
+{0} 0
+{1} 1
+{2} 2
+{3} 3
+{4} 4
+{5} 5
+
+SCIDB QUERY : <sample(vector1,.3)>
+[Query was executed successfully, ignoring data output by this query.]
+
+Query was executed successfully
+

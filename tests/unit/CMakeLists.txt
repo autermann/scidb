@@ -22,7 +22,7 @@
 
 if(CPPUNIT_FOUND)
     add_executable(unit_tests unit_tests.cpp)
-    target_link_libraries(unit_tests cppunit)
+    target_link_libraries(unit_tests ${CPPUNIT_LIBRARIES})
     target_link_libraries(unit_tests pqxx) 
     target_link_libraries(unit_tests catalog_lib)
     target_link_libraries(unit_tests util_lib)

@@ -40,6 +40,7 @@
 #include <boost/shared_ptr.hpp>
 #include <assert.h>
 #include <cstring>
+#include <cmath>
 #include "limits.h"
 
 #include "system/Exceptions.h"
@@ -48,6 +49,7 @@
 #include "util/StringUtil.h"
 #include "util/PluginObjects.h"
 #include <array/RLE.h>
+#include <util/na.h>
 
 namespace scidb
 {
@@ -173,8 +175,8 @@ public:
     bool variableSize() const {
         return _bitSize == 0;
     }
-	
-	bool isVoid() const { 
+
+    bool isVoid() const {
 		return (0 ==  _typeId.compare(TID_VOID));
 	}
 
@@ -184,17 +186,25 @@ public:
 
     bool operator==(const Type& ob) const {
         return (0 == _typeId.compare(ob.typeId()));
-	}
+    }
 
     bool operator==(const std::string& ob) const {
         return (0 == _typeId.compare(ob));
-	}
+    }
+
+    bool operator!=(const Type& ob) const {
+        return (0 != _typeId.compare(ob.typeId()));
+    }
+
+    bool operator!=(const std::string& ob) const {
+        return (0 != _typeId.compare(ob));
+    }
 };
 
 struct Type_less {
     bool operator()(const Type &f1, const Type &f2) const
     {
-		return ( f1 < f2 );
+        return ( f1 < f2 );
     }
 };
 
@@ -237,11 +247,11 @@ public:
 
     static const std::vector<Type> getTypes(const std::vector<TypeId> typeIds)
     {
-		std::vector<Type> result;
-		for( size_t i = 0, l = typeIds.size(); i < l; i++ ) 
-			result.push_back(_instance._getType(typeIds[i]));
+        std::vector<Type> result;
+        for( size_t i = 0, l = typeIds.size(); i < l; i++ )
+            result.push_back(_instance._getType(typeIds[i]));
 
-		return result;
+        return result;
     }
 
     static void registerType(const Type& type)
@@ -281,6 +291,8 @@ public:
 class Value
 {
 private:
+    typedef int64_t builtinbuf_t ;
+
     /**
      *  _missingReason is an overloaded element. It contains information 
 	 *  related to the 'missing' code for data, but also details about 
@@ -307,7 +319,7 @@ private:
 	*/
     union { 
         void*   _data;
-        int64_t _builtinBuf;
+        builtinbuf_t _builtinBuf;
     };
 
     /**
@@ -400,6 +412,24 @@ public:
             free(_data);
         }
         delete _tile;
+    }
+
+    /**
+     * Get the total in-memory footprint of the Value.
+     * @param dataSize the size of the stored data, in bytes
+     * @return the total in-memory footprint that would be occupied by allocating new Value(size)
+     */
+    inline static size_t getFootprint(size_t dataSize)
+    {
+        //if the datatype is smaller than _builtinBuf, it's stored inside _builtinBuf.
+        if (dataSize > sizeof(builtinbuf_t ))
+        {
+            return sizeof(Value) + dataSize;
+        }
+        else
+        {
+            return sizeof(Value);
+        }
     }
 
 	/**
@@ -515,6 +545,29 @@ public:
         }
         _size = size;
 //        _missingReason = -3;
+    }
+
+    /** 
+     * Allocate space for value
+	 * @param size in bytes of the data buffer.
+	 */
+    inline void setSize(const size_t size)
+    {
+        if (_missingReason == -2)
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
+
+        if (size > sizeof(_builtinBuf)) { 
+            _data = (_size <= sizeof(_builtinBuf)) ? malloc(size) : realloc(_data, size);
+            if (_data == NULL) { 
+                throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
+            }
+        } else { 
+            if (_size > sizeof(_builtinBuf)) { 
+                free(_data);
+            }
+        }
+        _size = size;
+        _missingReason = -1;
     }
 
 	/**
@@ -734,7 +787,6 @@ public:
         _tile = payload;
         _missingReason = -3;
     }
-        
 };
 
 /**
@@ -745,7 +797,7 @@ public:
  * @param value a value to be converted
  * @return string with value
  */
-std::string ValueToString(const TypeId type, const Value& value, bool verbose = false);
+std::string ValueToString(const TypeId type, const Value& value, int precision = 6);
 
 
 /**
@@ -771,6 +823,13 @@ void DoubleToValue(const TypeId type, double d, Value& value);
 
 bool isBuiltinType(const TypeId type);
 
+/**
+ * Returns default value for specified type
+ * @param[out] value Default value for this type
+ * @param[in] typeId Input typeId
+ */
+void setDefaultValue(Value &value, const TypeId typeId);
+
 TypeId propagateType(const TypeId type);
 TypeId propagateTypeToReal(const TypeId type);
 
@@ -782,6 +841,102 @@ TypeId propagateTypeToReal(const TypeId type);
 time_t parseDateTime(std::string const& str);
 
 void parseDateTimeTz(std::string const& str, Value& result);
+
+/**
+ * The three-value logic is introduced to improve efficiency for calls to isNan.
+ * If isNan takes as input a TypeId, every time isNan is called on a value, string comparisions would be needed
+ * to check if the type is equal to TID_DOUBLE and/or TID_FLOAT.
+ * With the introduction of DoubleFloatOther, the caller can do the string comparison once for a collection of values.
+ */
+enum DoubleFloatOther
+{
+    DOUBLE_TYPE,
+    FLOAT_TYPE,
+    OTHER_TYPE
+};
+
+/**
+ * Given a TypeId, tell whether it is double, float, or other.
+ * @param[in] type   a string type
+ * @return one constant in DoubleFloatOther
+ */
+inline DoubleFloatOther getDoubleFloatOther(TypeId const& type)
+{
+    if (type==TID_DOUBLE) {
+        return DOUBLE_TYPE;
+    } else if (type==TID_FLOAT) {
+        return FLOAT_TYPE;
+    }
+    return OTHER_TYPE;
+}
+
+/**
+ * A value can be in one of below, assuming null < na < nan < regular
+ */
+enum NullNaNanRegular
+{
+    NULL_VALUE,
+    NA_VALUE,
+    NAN_VALUE,
+    REGULAR_VALUE
+};
+
+/**
+ * Given a value, tell whether it is Null, Na, Nan, or a regular value.
+ * @param[in] v      a value
+ * @param[in] type   an enum DoubleFloatOther
+ * @return one constant in NullNaNanRegular
+ */
+inline NullNaNanRegular getNullNaNanRegular(Value const& v, DoubleFloatOther type)
+{
+    if (v.isNull()) {
+        return NULL_VALUE;
+    }
+    if (type==DOUBLE_TYPE) {
+        double d = v.getDouble();
+        if (isNAonly(d)) {
+            return NA_VALUE;
+        } else if (std::isnan(d)) {
+            return NAN_VALUE;
+        }
+    } else if (type==FLOAT_TYPE) {
+        float d = v.getFloat();
+        if (isNAonly(d)) {
+            return NA_VALUE;
+        } else if (std::isnan(d)) {
+            return NAN_VALUE;
+        }
+    }
+    return REGULAR_VALUE;
+}
+
+/**
+ * Check if a value is NaN.
+ * @param[in] v     a value
+ * @param[in] type  an enum DoubleFloatOther
+ * @return    true iff the value is Nan
+ *
+ */
+inline bool isNan(const Value& v, DoubleFloatOther type)
+{
+    if (type==DOUBLE_TYPE) {
+        return std::isnan(v.getDouble());
+    } else if (type==FLOAT_TYPE) {
+        return std::isnan(v.getFloat());
+    }
+    return false;
+}
+
+/**
+ * Check if a value is Null or NaN.
+ * @param[in] v     a value
+ * @param[in] type  an enum DoubleFloatOther
+ * @return    true iff the value is either Null or Nan
+ */
+inline bool isNullOrNan(const Value& v, DoubleFloatOther type)
+{
+    return v.isNull() || isNan(v, type);
+}
 
 } //namespace
 

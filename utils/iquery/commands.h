@@ -32,6 +32,8 @@
 #ifndef IQUERY_COMMANDS
 #define IQUERY_COMMANDS
 
+#include <string>
+
 class IqueryCmd
 {
 public:
@@ -43,7 +45,9 @@ public:
         TIMER,
         FETCH,
         HELP,
-        QUIT
+        QUIT,
+        FORMAT,
+        BINARY_FORMAT
     };
 
     IqueryCmd(Type cmdtype):
@@ -63,10 +67,10 @@ private:
     Type _cmdtype;
 };
 
-class SimpleIqueryCmd: public IqueryCmd
+class IntIqueryCmd: public IqueryCmd
 {
 public:
-    SimpleIqueryCmd(Type cmdtype, int value):
+    IntIqueryCmd(Type cmdtype, int value):
         IqueryCmd(cmdtype),
         _value(value)
     {
@@ -81,4 +85,21 @@ private:
     int _value;
 };
 
+class StrIqueryCmd: public IqueryCmd
+{
+public:
+    StrIqueryCmd(Type cmdtype, const std::string& value):
+        IqueryCmd(cmdtype),
+        _value(value)
+    {
+    }
+
+    const std::string& getValue() const
+    {
+        return _value;
+    }
+
+private:
+    std::string _value;
+};
 #endif //IQUERY_COMMANDS

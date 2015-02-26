@@ -31,6 +31,7 @@ set (find_stars_src
 
 add_library(findstars SHARED ${find_stars_src})
 set_target_properties(findstars PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
+extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "libfindstars${CMAKE_SHARED_LIBRARY_SUFFIX}" findstars)
 
 if (APPLE)
   set_target_properties(findstars PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")

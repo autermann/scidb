@@ -130,6 +130,12 @@ public:
     {
 		assert(inputArrays.size() == 2);
 
+        if (inputArrays[1]->getSupportedAccess() != Array::RANDOM && query->getInstancesCount() == 1)
+        {
+            //We need to random access for the second array, but if we are on multiple nodes - we will redistribute and materialize it anyway
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
         //if no parameters are given, we assume we are substituting all nullable attributes
         vector<bool> substituteAttrs (inputArrays[0]->getArrayDesc().getAttributes().size(), _parameters.size() == 0 ? true : false);
         for (size_t i = 0, n = _parameters.size(); i < n; i++)

@@ -38,6 +38,36 @@ using namespace boost;
 namespace scidb
 {
 
+/**
+ * @brief The operator: show().
+ *
+ * @par Synopsis:
+ *   show( schemaArray | schema )
+ *
+ * @par Summary:
+ *   Shows the schema of an array.
+ *
+ * @par Input:
+ *   - schemaArray | schema: an array where the schema is used, or the schema itself.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   schema: string
+ *   <br> >
+ *   <br> [
+ *   <br>   i: start=end=0, chunk interval=1
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalShow: public LogicalOperator
 {
 public:
@@ -45,7 +75,6 @@ public:
         LogicalOperator(logicalName, alias)
     {
     	ADD_PARAM_SCHEMA();
-		_properties.ddl = true;
     	_usage = "show(<array name | anonymous schema>)";
     }
 

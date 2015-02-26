@@ -117,7 +117,8 @@ public:
     void postSingleExecute(shared_ptr<Query> query)
     {
         assert(!_oldArrayName.empty());
-        SystemCatalog::getInstance()->renameArray(_oldArrayName, _schema.getName());
+        const string& newArrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
+        SystemCatalog::getInstance()->renameArray(_oldArrayName, newArrayName);
     }
 
 private:

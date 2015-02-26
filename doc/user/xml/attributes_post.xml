@@ -1,0 +1,69 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>attributes</refname>
+
+    <refpurpose>Produces a 1-dimensional result array where each cell
+    describes one attribute of a stored array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>attributes(<replaceable>named_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The attributes operator produces a result array where each cell
+    describes an attribute of the named array. Each cell includes the
+    attribute name, the attribute data type, a Boolean flag representing
+    whether or not the attribute can be null, and the sequence number of the
+    attribute as it appears in the named array. The argument
+    <replaceable>named_array</replaceable> must be an array that was
+    previously created and stored in SciDB.</para>
+
+    <para>You can use the attributes operator in the FROM clause of an AQL
+    SELECT statement, as a stand-alone operator in a AFL statement, or as an
+    operand within other SciDB operators.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example first shows a stored array, then creates a result
+      array describing its attributes, then creates a result array describing
+      each of its nullable attributes.</para>
+
+      <procedure>
+        <step>
+          <para>Show the source_array:<para><programlisting>AFL% scan(champions)</programlisting><screen>{year,event} person,country,time
+{1996,"dash"} "Bailey","Canada",9.84
+{1996,"marathon"} "Thugwane","RSA",7956
+{2000,"dash"} "Greene","USA",9.87
+{2000,"marathon"} "Abera","Ethiopia",7811
+{2000,"steeplechase"} "Kosgei","Kenya",503.17
+{2008,"marathon"} "Wanjiru","Kenya",7596
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Create a result array describing the attributes of the named
+          array:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> attributes(champions);</programlisting><screen>{No} name,type_id,nullable
+{0} "person","string",false
+{1} "country","string",false
+{2} "time","double",true
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Create a result array describing the nullable attributes of
+          the named array:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> attributes(champions) <command>WHERE</command> nullable = true;</programlisting><screen>{No} name,type_id,nullable
+{2} "time","double",true
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

@@ -1,0 +1,8 @@
+--setup
+
+--test
+
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvdWithMetrics.sh svd"
+
+--cleanup
+

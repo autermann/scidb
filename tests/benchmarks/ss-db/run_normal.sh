@@ -6,7 +6,7 @@ XSTARTS=(503000 491000 504000 501000 493000)
 U1=7499
 U2=9999
 U3=999
-window=25
+window="12,12"
 count=1
 ### SSDB directory
 THIS=`pwd`
@@ -35,19 +35,15 @@ init(){
  
  # Create Data Set Normal 
  echo "Create Normal Array"
- iquery -naq "CREATE IMMUTABLE ARRAY normal <a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32, j:int32, k:int32>[Z=0:399,1,0 ,J=0:7499,7500,0, I=0:7499,7500,0]"
- iquery -naq "CREATE IMMUTABLE ARRAY normal_space <I:int32, J:int32, index:int32>[id=0:399,400,0]"
- 
- # Hack array for Q9
- iquery -naq "create array normal_groups_augmented<normal_groups_augmented<oid:int64,x:int64 NULL,y:int64 NULL> [group=0:*,1000,0,oid_2=0:*,100,0,observation=0:19,20,0]"
- iquery -naq "redimension_store(cross_join(substitute(normal_groups,build(<oid:int64>[i=0:0,1,0],0)) as a,substitute(normal_groups,build(<oid:int64>[i=0:0,1,0],0)) as b,a.group,b.group),normal_groups_augmented)"
+ #iquery -naq "CREATE IMMUTABLE ARRAY normal <a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32, j:int32, k:int32>[Z=0:399,1,0 ,J=0:7499,7500,0, I=0:7499,7500,0]"
+ #iquery -naq "CREATE IMMUTABLE ARRAY normal_space <I:int32, J:int32, index:int32>[id=0:399,400,0]"
  
  # Load Data Normal 
  echo "Loading Normal data .."
  START=$(date +%s)
  ## Parallel version
- iquery -naq "load(normal, '/data/normal/bench',-1)"
- iquery -naq "load(normal_space, '/data/normal/bench.pos')"
+ #iquery -naq "load(normal, '/data/normal/bench',-1)"
+ #iquery -naq "load(normal_space, '/data/normal/bench.pos')"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Loading Time: $DIFF seconds"
@@ -69,18 +65,25 @@ init(){
  echo "Grouping Time: $DIFF seconds"
  
 
- # pre-reparting the array 
- echo "Pre-Reparting the Array"
- iquery -naq "store(repart(subarray(normal,0,0,0,19,U1,U1),<a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32,j:int32, k:int32>[Z=0:19,1,0,J=0:7499,7500,2,I=0:7499,7500,2]),normal_reparted)"
- 
+ #pre-reparting the Main array 
+ #NOTE: This is commented out because inlining the repart directly in Q3 is better way to go, though it's slower.
+ #echo "Pre-Reparting the Main Array"
+ #iquery -naq "store(repart(subarray(normal,0,0,0,19,$U1,$U1),<a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32,j:int32, k:int32>[Z=0:19,1,0,J=0:7499,7500,2,I=0:7499,7500,2]),normal_reparted)"
+  
  # Split the observations
  echo "Pre-Observation spliting"
- python scripts/split_normal.py
+ #python scripts/split_normal.py
+ 
+ # Redimension the Group array and precompute the groups centers
+ iquery -naq "create array temp<check:bool NULL>[oid=0:*,1000,0]"
+ iquery -naq "create array normal_groups_dim<x:int64 NULL,y:int64 NULL> [group=0:*,1000,0,oid=0:*,1000,0,observation=0:*,20,0]"
+ iquery -naq "redimension_store(normal_groups,normal_groups_dim)"
+ iquery -naq "store(aggregate(normal_groups,avg(x),avg(y),group),normal_groups_centers)"
 }
 
 q1(){
  START=$(date +%s)
- iquery -r /dev/null -aq "avg(subarray(normal,0,0,0,19,U1,U1),a)"
+ iquery -r /dev/null -aq "avg(between(normal,0,0,0,19,$U1,$U1),a)"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Q1: $DIFF seconds"
@@ -88,7 +91,7 @@ q1(){
 
 q2(){
  START=$(date +%s)
- iquery -r /dev/null -aq "findstars(subarray(normal,0,0,0,0,U1,U1),a,900)"
+ iquery -r /dev/null -aq "findstars(between(normal,0,0,0,0,$U1,$U1),a,900)"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Q2: $DIFF seconds"
@@ -96,9 +99,8 @@ q2(){
 
 q3(){
  START=$(date +%s)
- #iquery -r /dev/null -aq "thin(window(subarray(normal_reparted,0,0,0,19,7499,7499),1,4,4,avg(a)),0,1,2,3,2,3)"
- #This is another version that should be faster
- iquery -r /dev/null -aq "avg(thin(window(subarray(project(normal_reparted,a), 0,0,0,19,$U1,$U1),1,4,4,avg(a)),0,1,2,3,2,3))"
+ #iquery -r /dev/null -aq "avg(thin(window(between(project(normal_reparted,a), 0,0,0,19,$U1,$U1),1,4,4,avg(a)),0,1,2,3,2,3))"
+ iquery -r /dev/null -aq "thin(window(repart(subarray(project(normal,a),0,0,0,19,7499,7499),<a:int32>[Z=0:19,1,0,J=0:7499,7500,2,I=0:7499,7500,2]),1,4,4,avg(a)),0,1,2,3,2,3)"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Q3: $DIFF seconds"
@@ -107,7 +109,7 @@ q3(){
 q4(){
   START=$(date +%s)
   for (( i=0; i < 20 ; i++ )) do
-    iquery -r /dev/null -aq  "avg(filter(subarray(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),sumPixel)" 
+    iquery -r /dev/null -o csv+ -aq  "avg(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),sumPixel)" 
   done
   wait
   END=$(date +%s)
@@ -118,7 +120,7 @@ q4(){
 q5(){
   START=$(date +%s)
   for (( i=0; i < 20 ; i++ )) do
-    iquery -r /dev/null -aq  "filter(subarray(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),polygon is not null)" 
+    iquery -r /dev/null -o csv+ -aq  "filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),polygon is not null)" 
   done
   wait
   END=$(date +%s)
@@ -129,7 +131,7 @@ q5(){
 q6(){
   START=$(date +%s)
   for (( i=0; i < 20 ; i++ )) do
-    iquery -o csv+ -r /dev/null -aq  "filter(window(filter(subarray(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),$window,$window,count(center)),center_count>$count)"
+    iquery -r /dev/null -o csv+ -aq  "filter(window(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),$window,$window,count(center)),center_count>$count)"
   done
   wait
   END=$(date +%s)
@@ -157,35 +159,8 @@ q8(){
   iquery -naq "create empty array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]"
   iquery -naq "load(Points,'/tmp/Points.dat')"
 
-
   START=$(date +%s)
-  iquery -r /dev/null -o csv+ -aq  "
-       aggregate(
-          cross_join(normal_groups,
-          filter(
-                sum ( 
-                        project ( 
-                                apply ( 
-                                        cross ( 
-                                                subarray ( Points, 0,3 ),
-                                                join ( 
-                                                        subarray (normal_groups, NULL,NULL,NULL,18) AS Pi,
-                                                        subarray (normal_groups, NULL,1,NULL,NULL) AS Pj
-                                                )
-                                        ),
-                                        crosses,
-                                        iif (((((Pi.y <= Points.y) AND (Pj.y > Points.y)) OR 
-                                        ((Pi.y > Points.y) AND (Pj.y <= Points.y))) AND 
-                                        (Points.x < Pi.x + ((Points.y - Pi.y) / (Pj.y - Pi.y)) * (Pj.x - Pi.x)) AND (Pi.x is not null and Pi.y is not null and Pj.x is not null and Pj.y is not null)),
-                                        1, 0 )
-                                ),
-                                crosses
-                        ),
-                        crosses,Pj.group
-                ),
-           crosses_sum > 0)
-        ),
-        avg(normal_groups.x),avg(normal_groups.y),normal_groups.group)"
+  python scripts/q8.py
   END=$(date +%s)
   DIFF=$(( $END - $START ))
   echo "Q8: $DIFF seconds"
@@ -193,7 +168,10 @@ q8(){
 
 q9(){
   START=$(date +%s)
-  iquery -r /dev/null -o csv+ -aq  "Aggregate(filter(cross(normal_groups_augmented,project(filter(subarray(normal_obs_12,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U3,${YSTARTS[$ind]}+$U3),polygon is not null),oid)),normal_obs_12.oid=normal_groups_augmented.oid_2 and normal_groups_augmented.oid_2>0),avg(normal_groups_augmented.x),avg(normal_groups_augmented.y),normal_groups_augmented.group)"
+  #for (( i=0; i < 20 ; i++ )) do
+   #iquery -r /dev/null -o csv+ -aq  "cross_join(cross_join(normal_groups_dim, redimension_store(project(apply(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U3,${YSTARTS[$ind]}+$U3),polygon is not null),check,true),oid,check), temp) as b, normal_groups_dim.oid,b.oid) as A,normal_groups_centers as C,A.group,C.group)"
+  #done
+  python scripts/q9.py $ind
   END=$(date +%s)
   DIFF=$(( $END - $START ))
   echo "Q9: $DIFF seconds"

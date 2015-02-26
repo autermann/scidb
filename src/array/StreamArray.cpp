@@ -53,11 +53,6 @@ namespace scidb
     {
     }
 
-    bool StreamArray::supportsRandomAccess() const
-    {
-        return false;
-    }
-
     string const& StreamArray::getName() const
     {
         return desc.getName();
@@ -162,7 +157,7 @@ namespace scidb
         if (inputChunk.isMaterialized()) {
             return &inputChunk;
         }
-        Address addr(desc.getId(), attId, inputChunk.getFirstPosition(false));
+        Address addr(attId, inputChunk.getFirstPosition(false));
         chunk.initialize(this, &desc, addr, inputChunk.getCompressionMethod());
         chunk.setBitmapChunk((Chunk*)&inputChunk);
         boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|ChunkIterator::IGNORE_EMPTY_CELLS);
@@ -332,7 +327,7 @@ namespace scidb
         Coordinates minPos = inputIterators[attId][min]->getPosition();
         ConstChunk const& inputChunk = inputIterators[attId][min]->getChunk();
 
-        Address addr(desc.getId(), attId, minPos);
+        Address addr(attId, minPos);
         chunk.initialize(this, &desc, addr, inputChunk.getCompressionMethod());
         chunk.setBitmapChunk((Chunk*)&inputChunk);
         boost::shared_ptr<Query> emptyQuery;

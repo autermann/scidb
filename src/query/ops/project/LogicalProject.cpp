@@ -36,6 +36,37 @@ namespace scidb
 
 using namespace std;
 
+/**
+ * @brief The operator: project().
+ *
+ * @par Synopsis:
+ *   project( srcArray {, selectedAttr}+ )
+ *
+ * @par Summary:
+ *   Produces a result array that includes some attributes of the source array.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *   - a list of at least one selectedAttrs from the source array.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   selectedAttrs: the selected attributes
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalProject: public  LogicalOperator
 {
 public:

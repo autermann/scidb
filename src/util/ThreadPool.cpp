@@ -29,13 +29,15 @@
  */
 
 #include "util/Thread.h"
+#include "system/Config.h"
+#include "system/SciDBConfigOptions.h"
 
 
 namespace scidb
 {
 
 ThreadPool::ThreadPool(size_t threadCount, boost::shared_ptr<JobQueue> queue)
-:  _queue(queue), _currentJobs(threadCount), _threadCount(threadCount)
+: _queue(queue), _currentJobs(threadCount), _threadCount(threadCount)
 {
     _shutdown = false;
     if (_threadCount <= 0) {

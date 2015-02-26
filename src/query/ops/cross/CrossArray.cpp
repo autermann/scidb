@@ -127,7 +127,7 @@ namespace scidb
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        if (attrID > array.nLeftAttrs + array.nRightAttrs) { 
+        if (attrID >= array.nLeftAttrs + array.nRightAttrs) {
             return trueValue;
         }
         return inputIterator->getItem();
@@ -200,11 +200,36 @@ namespace scidb
     CrossArrayIterator::CrossArrayIterator(CrossArray const& cross, AttributeID attrID) 
     : array(cross), 
       attr(attrID), 
-      leftIterator(cross.leftArray->getConstIterator(attrID < cross.nLeftAttrs ? attrID : 0)),
-      rightIterator(cross.rightArray->getConstIterator(attrID < cross.nLeftAttrs || attrID - cross.nLeftAttrs > cross.nRightAttrs ? 0 : attrID - cross.nLeftAttrs)),
       chunk(cross, attrID),
       chunkInitialized(false)
     {
+        ArrayDesc const& leftDesc = cross.leftArray->getArrayDesc();
+        ArrayDesc const& rightDesc = cross.rightArray->getArrayDesc();
+        AttributeID leftAttrID = 0, rightAttrID = 0;
+        if(attrID < cross.nLeftAttrs)
+        {
+            leftAttrID = attrID;
+            if(rightDesc.getEmptyBitmapAttribute())
+            {
+                rightAttrID = rightDesc.getEmptyBitmapAttribute()->getId();
+            }
+        }
+        else
+        {
+            if(leftDesc.getEmptyBitmapAttribute())
+            {
+                leftAttrID = leftDesc.getEmptyBitmapAttribute()->getId();
+            }
+
+            //This happens UNLESS left is emptyable and right is not
+            if(attrID - cross.nLeftAttrs < cross.nRightAttrs)
+            {
+                rightAttrID = attrID - cross.nLeftAttrs;
+            }
+        }
+
+        leftIterator = cross.leftArray->getConstIterator(leftAttrID);
+        rightIterator = cross.rightArray->getConstIterator(rightAttrID);
         reset();
 	}
 

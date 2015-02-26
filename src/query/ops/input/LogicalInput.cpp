@@ -34,6 +34,7 @@
 #include "system/SystemCatalog.h"
 #include "system/Cluster.h"
 #include "system/Resources.h"
+#include "LogicalInput.h"
 
 using namespace std;
 using namespace boost;
@@ -46,125 +47,232 @@ namespace scidb
 /**
  * Must be called as INPUT('existing_array_name', '/path/to/file/on/instance')
  */
-class LogicalInput: public LogicalOperator
+
+LogicalInput::LogicalInput(const std::string& logicalName, const std::string& alias): LogicalOperator(logicalName, alias)
 {
-public:
-    LogicalInput(const std::string& logicalName, const std::string& alias):
-        LogicalOperator(logicalName, alias)
+    ADD_PARAM_SCHEMA();   //0
+    ADD_PARAM_CONSTANT("string");//1
+    ADD_PARAM_VARIES();          //2
+}
+
+std::vector<boost::shared_ptr<OperatorParamPlaceholder> > LogicalInput::nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+{
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+    res.push_back(END_OF_VARIES_PARAMS());
+    switch (_parameters.size()) {
+      case 0:
+      case 1:
+        assert(false);
+        break;
+      case 2:
+        res.push_back(PARAM_CONSTANT("int64"));
+        break;
+      case 3:
+        res.push_back(PARAM_CONSTANT("string"));
+        break;
+      case 4:
+        res.push_back(PARAM_CONSTANT("int64"));
+        break;
+      case 5:
+        res.push_back(PARAM_OUT_ARRAY_NAME());
+        break;
+    }
+    return res;
+}
+
+
+ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+{
+    assert(inputSchemas.size() == 0);
+
+    InstanceID instanceID = COORDINATOR_INSTANCE_MASK;
+    if (_parameters.size() >= 3)
     {
-        ADD_PARAM_IN_ARRAY_NAME();   //0
-        ADD_PARAM_CONSTANT("string");//1
-        ADD_PARAM_VARIES();          //2
+        instanceID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
+                                  query, TID_INT64).getInt64();
+        if (instanceID != COORDINATOR_INSTANCE_MASK && instanceID != ALL_INSTANCES_MASK && (size_t)instanceID >= query->getInstancesCount())
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
+                                       _parameters[2]->getParsingContext()) << instanceID;
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
-    {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        switch (_parameters.size()) {
-          case 0:
-          case 1:
-            assert(false);
-            break;
-          case 2:
-            res.push_back(PARAM_CONSTANT("int64"));
-            break;
+    const string &path = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+                                  query, TID_STRING).getString();
+
+    string format;
+    if (_parameters.size() >= 4) {
+        format = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[3])->getExpression(),
+                                            query, TID_STRING).getString();
+        if (format[0] != '('
+            && !format.empty()
+            && compareStringsIgnoreCase(format, "opaque") != 0
+            && compareStringsIgnoreCase(format, "text") != 0)
+        {
+            throw  USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNSUPPORTED_FORMAT,
+                                        _parameters[3]->getParsingContext()) << format;
         }
-        return res;
+    }
+    if (instanceID == ALL_INSTANCES_MASK)
+    {
+        /* Let's support it: lets each instance assign unique coordiantes to its chunks based on distribution function.
+        * It is based on two assumptions:
+        * - coordinates are not iportant (as in SQL)
+        * - there can be holes in array
+        *
+                    if (format[0] == '(') { // binary template loader
+                        throw  USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
+                                               _parameters[2]->getParsingContext()) << "-1 can not be used for binary template loader";
+                    }
+        */
+        //Distributed loading let's check file existence on all instances
+        map<InstanceID, bool> instancesMap;
+        Resources::getInstance()->fileExists(path, instancesMap, query);
+
+        bool fileDetected = false;
+        vector<InstanceID> instancesWithoutFile;
+        for (map<InstanceID, bool>::const_iterator it = instancesMap.begin(); it != instancesMap.end(); ++it)
+        {
+            if (it->second)
+            {
+                if (!fileDetected)
+                    fileDetected = true;
+            }
+            else
+            {
+                //Remembering file name on each missing file
+                LOG4CXX_WARN(oplogger, "File '" << path << "' not found on instance #" << it->first);
+                instancesWithoutFile.push_back(it->first);
+            }
+        }
+
+        //Such file not found on any instance. Failing with exception
+        if (!fileDetected)
+        {
+            throw USER_QUERY_EXCEPTION(
+                SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
+                _parameters[1]->getParsingContext()) << path;
+        }
+
+        //If some instances missing this file posting appropriate warning
+        if (instancesWithoutFile.size())
+        {
+            stringstream instancesList;
+            for (size_t i = 0, count = instancesWithoutFile.size();  i < count; ++i)
+            {
+                instancesList << instancesWithoutFile[i] << (i == count - 1 ? "" : ", ");
+            }
+            LOG4CXX_WARN(oplogger, "File " << path << " not found on instances " << instancesList.str());
+            query->postWarning(SCIDB_WARNING(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES) << path << instancesList.str());
+        }
+    }
+    else if (instanceID == COORDINATOR_INSTANCE_MASK)
+    {
+        //This is loading from local instance. Throw error if file not found.
+        if (path.find('@') == string::npos && !Resources::getInstance()->fileExists(path, query->getInstanceID(), query))
+        {
+            throw USER_QUERY_EXCEPTION(
+                SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
+                _parameters[1]->getParsingContext()) << path;
+        }
+    }
+    else
+    {
+        //This is loading from single instance. Throw error if file not found.
+        if (!Resources::getInstance()->fileExists(path, instanceID, query))
+        {
+            throw USER_QUERY_EXCEPTION(
+                SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
+                _parameters[1]->getParsingContext()) << path;
+        }
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc arrayDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+
+    Dimensions const& srcDims = arrayDesc.getDimensions();
+    size_t nDims = srcDims.size();
+    Dimensions dstDims(nDims);
+
+    //Use array name from catalog if possible or generate temporary name
+    string inputArrayName = arrayDesc.getName();
+    PartitioningSchema partitioningSchema = instanceID == ALL_INSTANCES_MASK ? psUndefined : psLocalInstance;
+    if (!SystemCatalog::getInstance()->containsArray(inputArrayName))
     {
-        assert(inputSchemas.size() == 0);
-
-        int64_t instanceID = -2;
-        if (_parameters.size() == 3)
-        {
-            instanceID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
-                                      query, TID_INT64).getInt64();
-            if (instanceID < -2 ||   instanceID >= (int64_t) query->getInstancesCount())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
-                                           _parameters[2]->getParsingContext()) << instanceID;
-        }
-
-        const string &path = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
-                                      query, TID_STRING).getString();
-
-        if (instanceID == -1)
-        {
-            //Distributed loading let's check file existence on all instances
-            map<InstanceID, bool> instancesMap;
-            Resources::getInstance()->fileExists(path, instancesMap, query);
-
-            bool fileDetected = false;
-            vector<InstanceID> instancesWithoutFile;
-            for (map<InstanceID, bool>::const_iterator it = instancesMap.begin(); it != instancesMap.end(); ++it)
-            {
-                if (it->second)
-                {
-                    if (!fileDetected)
-                        fileDetected = true;
-                }
-                else
-                {
-                    //Remembering file name on each missing file
-                    LOG4CXX_WARN(oplogger, "File '" << path << "' not found on instance #" << it->first);
-                    instancesWithoutFile.push_back(it->first);
-                }
-            }
-
-            //Such file not found on any instance. Failing with exception
-            if (!fileDetected)
-            {
-                throw USER_QUERY_EXCEPTION(
-                    SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                    _parameters[1]->getParsingContext()) << path;
-            }
-
-            //If some instances missing this file posting appropriate warning
-            if (instancesWithoutFile.size())
-            {
-                stringstream instancesList;
-                for (size_t i = 0, count = instancesWithoutFile.size();  i < count; ++i)
-                {
-                    instancesList << instancesWithoutFile[i] << (i == count - 1 ? "" : ", ");
-                }
-                LOG4CXX_WARN(oplogger, "File " << path << " not found on instances " << instancesList.str());
-                query->postWarning(SCIDB_WARNING(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES) << path << instancesList.str());
-            }
-        }
-        else if (instanceID == -2)
-        {
-            //This is loading from local instance. Throw error if file not found.
-            if (!Resources::getInstance()->fileExists(path, query->getInstanceID(), query))
-            {
-                throw USER_QUERY_EXCEPTION(
-                    SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                    _parameters[1]->getParsingContext()) << path;
-            }
-        }
-        else
-        {
-            //This is loading from single instance. Throw error if file not found.
-            if (!Resources::getInstance()->fileExists(path, instanceID, query))
-            {
-                throw USER_QUERY_EXCEPTION(
-                    SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                    _parameters[1]->getParsingContext()) << path;
-            }
-        }
-
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-
-        ArrayDesc arrayDesc;
-
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
-
-        return arrayDesc;
+        size_t tmpArrayNo = 0;
+        do {
+            std::stringstream ss;
+            ss << "tmp_input_array_" << ++tmpArrayNo;
+            inputArrayName = ss.str();
+        } while (query->getTemporaryArray(inputArrayName));
+    }
+    else
+    {
+        partitioningSchema = arrayDesc.getPartitioningSchema();
     }
 
-};
+    for (size_t i = 0; i < nDims; i++) {
+        DimensionDesc const& srcDim = srcDims[i];
+        if (srcDim.getType() != TID_INT64) {
+            string mappingArrayName = inputArrayName + '.' + srcDim.getBaseName();
+            string tmpMappingArrayName;
+            size_t tmpArrayNo = 0;
+            do {
+                std::stringstream ss;
+                ss << mappingArrayName << '$' << ++tmpArrayNo;
+                tmpMappingArrayName = ss.str();
+            } while (query->getTemporaryArray(tmpMappingArrayName));
 
+            Dimensions indexMapDim(1);
+            Attributes indexMapAttr(1);
+            // Actual boundaries of NID array are not know now. So just use some "estimations"...
+            // Them will be updated lately when NID will be loaded. But please notice that printing result of such query
+            // with coordinates in iquery may not work correctly.
+            Coordinate from = srcDim.getStart();
+            Coordinate till = srcDim.getEndMax();
+            uint32_t chunkInterval = uint32_t(till-from+1);
+            indexMapDim[0] = DimensionDesc("no", from, from, till, till, chunkInterval, 0);
+            indexMapAttr[0] = AttributeDesc(0, "value", srcDim.getType(), 0, 0);
+            ArrayDesc mappingArrayDesc(tmpMappingArrayName,
+                                       indexMapAttr,
+                                       indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY);
+            query->setTemporaryArray(shared_ptr<Array>(new MemArray(mappingArrayDesc)));
+
+
+            dstDims[i] = DimensionDesc(srcDim.getBaseName(), srcDim.getNamesAndAliases(),
+                                       srcDim.getStartMin(), srcDim.getCurrStart(), srcDim.getCurrEnd(), srcDim.getEndMax(),
+                                       srcDim.getChunkInterval(), srcDim.getChunkOverlap(),
+                                       srcDim.getType(),
+                                       srcDim.getFlags(),
+                                       tmpMappingArrayName,
+                                       srcDim.getComment(),
+                                       srcDim.getFuncMapOffset(),
+                                       srcDim.getFuncMapScale());
+        } else {
+            dstDims[i] = srcDim;
+        }
+    }
+    ArrayDesc newDesc(inputArrayName, arrayDesc.getAttributes(), dstDims, arrayDesc.getFlags());
+    newDesc.setPartitioningSchema(partitioningSchema);
+    return newDesc;
+}
+
+void LogicalInput::inferArrayAccess(boost::shared_ptr<Query>& query)
+{
+    string shadowArrayName;
+    if (_parameters.size() >= 6) {
+        assert(_parameters[5]->getParamType() == PARAM_ARRAY_REF);
+        shadowArrayName = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[5])->getObjectName();
+    }
+    if (!shadowArrayName.empty()) {
+        assert(shadowArrayName.find('@') == std::string::npos);
+        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(shadowArrayName,
+                                                                                     query->getQueryID(),
+                                                                                     Cluster::getInstance()->getLocalInstanceId(),
+                                                                                     SystemCatalog::LockDesc::COORD,
+                                                                                     SystemCatalog::LockDesc::WR));
+        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        assert(resLock);
+        assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
+    }
+}
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalInput, "input")
 

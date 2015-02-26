@@ -37,6 +37,65 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: cross_join().
+ *
+ * @par Synopsis:
+ *   cross_join( leftArray, rightArray {, attrLeft, attrRight}* )
+ *
+ * @par Summary:
+ *   Calculates the cross product of two arrays, with 0 or more equality conditions on the dimensions.
+ *   Assume p pairs of equality conditions exist. The result is an (m+n-p) dimensional array.
+ *   From the coordinates of each cell in the result array, a single cell in leftArray and a single cell in rightArray can be located.
+ *   The cell in the result array contains the concatenation of the attributes from the two source cells.
+ *   If a pair of join dimensions have different lengths, the result array uses the smaller of the two.
+ *
+ * @par Input:
+ *   - leftArray: the left-side source array with leftAttrs and leftDims.
+ *   - rightArray: the right-side source array with rightAttrs and rightDims.
+ *   - 0 or more pairs of an attribute from leftArray and an attribute from rightArray.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   leftAttrs + rightAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   leftDims + (rightDims - leftDims)
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *
+ *   - Given array B <v:uint64> [k] =
+ *     <br> k,  v
+ *     <br> 1,  10
+ *     <br> 2,  20
+ *     <br> 3,  30
+ *     <br> 4,  40
+ *     <br> 5,  50
+ *   - cross_join(A, B, item, k) <quantity: uint64, sales:double, v:uint64> [year, item] =
+ *     <br> year, item, quantity, sales,  v
+ *     <br> 2011,  2,      7,     31.64,  20
+ *     <br> 2011,  3,      6,     19.98,  30
+ *     <br> 2012,  1,      5,     41.65,  10
+ *     <br> 2012,  2,      9,     40.68,  20
+ *     <br> 2012,  3,      8,     26.64,  30
+ *
+ * @par Errors:
+ *   - SCIDB_SE_OPERATOR::SCIDB_LE_OP_CROSSJOIN-ERROR2: if the number of input dimensions is not even.
+ *   - SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_FONFORMANT: if any join dimension is not an integer dimension, or if a pair of join dimensions
+ *     do not have the same start, chunk interval, or overlap.
+ *
+ * @par Notes:
+ *   - Joining non-integer dimensions does not work.
+ *
+ */
 class LogicalCrossJoin: public LogicalOperator
 {
   public:
@@ -121,7 +180,7 @@ class LogicalCrossJoin: public LogicalOperator
                 if (l == 0)
                     throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_NOT_EXIST,
                                                leftDim->getParsingContext()) << leftDimName;
-            } while (!leftDimensions[--l].hasNameOrAlias(leftDimName, leftDimArray));
+            } while (!leftDimensions[--l].hasNameAndAlias(leftDimName, leftDimArray));
             
             if ((leftCrossJoinOnMask & ((uint64_t)1 << l)) != 0)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CROSSJOIN_ERROR1,
@@ -134,7 +193,7 @@ class LogicalCrossJoin: public LogicalOperator
                 if (r == 0)
                     throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_NOT_EXIST,
                                                rightDim->getParsingContext()) << rightDimName;
-            } while (!rightDimensions[--r].hasNameOrAlias(rightDimName, rightDimArray));
+            } while (!rightDimensions[--r].hasNameAndAlias(rightDimName, rightDimArray));
             
             if ((rightCrossJoinOnMask & ((uint64_t)1 << r)) != 0)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CROSSJOIN_ERROR1,

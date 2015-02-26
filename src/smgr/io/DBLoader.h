@@ -41,6 +41,7 @@ namespace scidb
     class DBLoader
     {
       public:
+        static int defaultPrecision;
 
         /**
          * Save data from in text format in specified file
@@ -62,17 +63,9 @@ namespace scidb
          * @return number of saved tuples
          */
         static uint64_t save(Array const& array, std::string const& file,
+                             const boost::shared_ptr<Query>& query,
                              std::string const& format = "auto", bool append = false);
 
-        /**
-         * Save data in text format in specified file, replacing ordinal coordinates
-         * with non-integer dimension values.
-         * @param array array to be saved
-         * @param file path to the exported data file
-         * @param format output format: must be "lcsv+" or "lsparse"
-         * @return number of saved tuples
-         */
-        static uint64_t saveWithLabels(Array const& array, std::string const& file, std::string const& format = "lcsv+", bool append = false);
     };
 }
 

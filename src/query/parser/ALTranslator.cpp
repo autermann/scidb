@@ -88,7 +88,9 @@ static shared_ptr<OperatorParamAggregateCall> passAggregateCall(AstNode *ast, co
 
 static shared_ptr<LogicalExpression> passConstant(AstNode *ast);
 
-static shared_ptr<LogicalExpression> passReference(AstNode *ast);
+static void passReference(const AstNode* ast, std::string& alias, std::string& name);
+
+static shared_ptr<LogicalExpression> passAttributeReference(AstNode *ast);
 
 static bool placeholdersVectorContainType(const vector<shared_ptr<OperatorParamPlaceholder> > &placeholders,
     OperatorParamPlaceholderType placeholderType);
@@ -112,6 +114,9 @@ static shared_ptr<LogicalQueryPlanNode> passImplicitScan(AstNode *ast, shared_pt
 static shared_ptr<LogicalQueryPlanNode> passFilterClause(AstNode *ast, const shared_ptr<LogicalQueryPlanNode> &input,
     const shared_ptr<Query> &query);
 
+static shared_ptr<LogicalQueryPlanNode> passOrderByClause(AstNode *ast, const shared_ptr<LogicalQueryPlanNode> &input,
+    const shared_ptr<Query> &query);
+
 static shared_ptr<LogicalQueryPlanNode> passIntoClause(AstNode *ast, shared_ptr<LogicalQueryPlanNode> &input,
         shared_ptr<Query> &query);
 
@@ -123,9 +128,15 @@ static shared_ptr<LogicalQueryPlanNode> passSaveStatement(AstNode *ast, shared_p
 
 static shared_ptr<LogicalQueryPlanNode> passDropArrayStatement(AstNode *ast);
 
+static shared_ptr<LogicalQueryPlanNode> passRenameArrayStatement(AstNode *ast);
+
+static shared_ptr<LogicalQueryPlanNode> passCancelQueryStatement(AstNode *ast);
+
 static shared_ptr<LogicalQueryPlanNode> passLoadLibrary(AstNode *ast);
 
 static shared_ptr<LogicalQueryPlanNode> passUnloadLibrary(AstNode *ast);
+
+static shared_ptr<LogicalQueryPlanNode> passInsertIntoStatement(AstNode *ast, shared_ptr<Query> query);
 
 static bool checkAttribute(const vector<ArrayDesc> &inputSchemas, const string &aliasName,
         const string &attributeName, const shared_ptr<ParsingContext> &ctxt);
@@ -142,13 +153,15 @@ static shared_ptr<LogicalQueryPlanNode> appendOperator(
     const LogicalOperator::Parameters &opParams,
     const shared_ptr<ParsingContext> &opParsingContext);
 
+static shared_ptr<LogicalQueryPlanNode> passThinClause(AstNode *ast, shared_ptr<Query> query);
+
 /**
  * Check if AST has reference or asterisk nodes
  *
  * @param ast input AST
  * @return true if reference or asterisk found
  */
-static bool astHasReferences(const AstNode *ast);
+static bool astHasUngroupedReferences(const AstNode *ast, const set<string> &groupedDimensions);
 
 /**
  * Check if AST has function node which is in aggregate library
@@ -180,8 +193,8 @@ static bool astHasAggregates(const AstNode *ast);
  * @param[out] internalNameCounter all evaluation results mapped to internal attribute names,
  *             this counter must tick each new name
  * @param[in] hasAggregates if true, references outside aggregate call not allowed
- * @param[in] partitionName fake nested array name produced by group-by-as/regrid-as/windows-as clause
  * @param[in] inputSchema initial input schema
+ * @param[in] we handling WINDOW or VARIABLE_WINDOW
  *
  * @return post-post aggregate expression AST
  *
@@ -193,8 +206,10 @@ static AstNode* decomposeExpression(
     AstNodes &aggregateFunctions,
     unsigned int &internalNameCounter,
     bool hasAggregates,
-    const string &partitionName,
-    const ArrayDesc &inputSchema);
+    const ArrayDesc &inputSchema,
+    const set<string> &groupedDimensions,
+    bool window,
+    bool &joinOrigin);
 
 /**
  * @brief Transform expressions SELECT list clause into apply/project operators and aggregates calls
@@ -227,6 +242,26 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(shared_ptr<LogicalQueryPl
 static string genUniqueObjectName(const string& prefix, unsigned int &initialCounter,
     const vector<ArrayDesc> &inputSchemas, bool internal, const AstNodes& namedExpressions = vector<AstNode*>());
 
+/**
+ * @brief Check if given plan node is DDL operator and throw exception if true.
+ *
+ * @param planNode Query plan node
+ */
+static void prohibitDdl(shared_ptr<LogicalQueryPlanNode> planNode);
+
+/**
+ * @brief Try to fit input into destination schema by inserting empty attribute, casting and reparting
+ *
+ * @param input Input logical plan
+ * @param destinationSchema Required schema
+ * @param query Query object
+ * @return Result logical plan
+ */
+static shared_ptr<LogicalQueryPlanNode> fitInput(
+    shared_ptr<LogicalQueryPlanNode> &input,
+    const ArrayDesc& requiredSchema,
+    shared_ptr<Query>& query);
+
 shared_ptr<LogicalQueryPlanNode> AstToLogicalPlan(AstNode *ast, const shared_ptr<Query> &query)
 {
     switch(ast->getType())
@@ -257,15 +292,28 @@ shared_ptr<LogicalQueryPlanNode> AstToLogicalPlan(AstNode *ast, const shared_ptr
         case dropArrayStatement:
             return passDropArrayStatement(ast);
 
+        case renameArrayStatement:
+            return passRenameArrayStatement(ast);
+
+        case cancelQueryStatement:
+            return passCancelQueryStatement(ast);
+
         case loadLibraryStatement:
             return passLoadLibrary(ast);
 
         case unloadLibraryStatement:
             return passUnloadLibrary(ast);
 
+        case insertIntoStatement:
+            return passInsertIntoStatement(ast, query);
+
         default:
             assert(0);
     }
+
+    assert(false);
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "AstToLogicalPlan";
+    return shared_ptr<LogicalQueryPlanNode>();
 }
 
 shared_ptr<LogicalExpression> AstToLogicalExpression(AstNode *ast)
@@ -284,7 +332,7 @@ shared_ptr<LogicalExpression> AstToLogicalExpression(AstNode *ast)
             return passConstant(ast);
 
         case reference:
-            return passReference(ast);
+            return passAttributeReference(ast);
 
         case selectStatement:
         {
@@ -296,9 +344,18 @@ shared_ptr<LogicalExpression> AstToLogicalExpression(AstNode *ast)
             throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_WRONG_ASTERISK_USAGE, ast->getParsingContext());
         }
 
+        case olapAggregate:
+        {
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_WRONG_OVER_USAGE, ast->getParsingContext());
+        }
+
         default:
             assert(0);
     }
+
+    assert(false);
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "AstToLogicalExpression";
+    return shared_ptr<LogicalExpression>();
 }
 
 static shared_ptr<LogicalQueryPlanNode> passCreateArray(AstNode *ast, const shared_ptr<Query> &query)
@@ -499,7 +556,7 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
             string serializedDefaultValueExpr = "";
             if (defaultValueNode != NULL)
             {
-                if (astHasReferences(defaultValueNode))
+                if (astHasUngroupedReferences(defaultValueNode, set<string>()))
                 {
                     throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_REFERENCE_NOT_ALLOWED_IN_DEFAULT,
                             defaultValueNode->getParsingContext());
@@ -520,7 +577,7 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
                 if (attTypeNullable) {
                     defaultValue.setNull();
                 } else {
-                    defaultValue.setZero();
+                    setDefaultValue(defaultValue, attType.typeId());
                 }
             }
 
@@ -584,7 +641,7 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
         flags |= ArrayDesc::IMMUTABLE;
     }
 
-    schema = ArrayDesc(0, arrayName, attributes, dimensions, flags, comment);
+    schema = ArrayDesc(0,0,0, arrayName, attributes, dimensions, flags, comment);
 }
 
 static shared_ptr<LogicalQueryPlanNode> passAFLOperator(AstNode *ast, const shared_ptr<Query> &query)
@@ -720,6 +777,12 @@ static shared_ptr<LogicalQueryPlanNode> passAFLOperator(AstNode *ast, const shar
 
             ++astParamNo;
         }
+    }
+
+    if (opInputs.size() && op->getProperties().ddl)
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_DDL_SHOULDNT_HAVE_INPUTS,
+            ast->getParsingContext());
     }
 
     shared_ptr<LogicalQueryPlanNode> result = make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), op, opInputs);
@@ -905,6 +968,12 @@ static bool matchOperatorParam(AstNode *ast, const OperatorParamPlaceholders &pl
                 //This input is implicit scan.
                 if (ast->getType() == reference)
                 {
+                    if (ast->getChild(referenceArgSortQuirk))
+                    {
+                        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SORTING_QUIRK_WRONG_USAGE,
+                            ast->getChild(referenceArgSortQuirk)->getParsingContext());
+                    }
+
                     input = passImplicitScan(ast, query);
                 }
                 //This input is result of other operator, so go deeper in tree and translate this operator.
@@ -912,6 +981,7 @@ static bool matchOperatorParam(AstNode *ast, const OperatorParamPlaceholders &pl
                         || ast->getType() == selectStatement)
                 {
                     input = AstToLogicalPlan(ast, query);
+                    prohibitDdl(input);
                 }
                 else
                 {
@@ -1385,41 +1455,59 @@ static bool resolveParamAttributeReference(const vector<ArrayDesc> &inputSchemas
     return found;
 }
 
-static bool resolveParamDimensionReference(const vector<ArrayDesc> &inputSchemas, shared_ptr<OperatorParamReference>& dimRef, bool throwException)
+static bool resolveDimension(const vector<ArrayDesc> &inputSchemas, const string &name, const string &alias,
+    size_t &inputNo, size_t &dimensionNo, const shared_ptr<ParsingContext> &parsingContext, bool throwException)
 {
-    const string fullName = str(format("%s%s") % (dimRef->getArrayName() != "" ? dimRef->getArrayName() + "." : "") % dimRef->getObjectName() );
+    const string fullName = str(format("%s%s") % (alias != "" ? alias + "." : "") % name );
     bool found = false;
 
-    size_t inputNo = 0;
+    size_t _inputNo = 0;
     BOOST_FOREACH(const ArrayDesc &schema, inputSchemas)
     {
-        size_t dimensionNo = 0;
+        size_t _dimensionNo = 0;
         BOOST_FOREACH(const DimensionDesc& dimension, schema.getDimensions())
         {
-            if (dimension.hasNameOrAlias(dimRef->getObjectName(), dimRef->getArrayName()))
+            if (dimension.hasNameAndAlias(name, alias))
             {
                 if (found)
                 {
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_AMBIGUOUS_DIMENSION, dimRef->getParsingContext())
+                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_AMBIGUOUS_DIMENSION, parsingContext)
                         << fullName;
                 }
                 found = true;
 
-                dimRef->setInputNo(inputNo);
-                dimRef->setObjectNo(dimensionNo);
+                inputNo = _inputNo;
+                dimensionNo = _dimensionNo;
             }
-            ++dimensionNo;
+            ++_dimensionNo;
         }
-        ++inputNo;
+        ++_inputNo;
     }
 
     if (!found && throwException)
     {
-        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSION_NOT_EXIST, dimRef->getParsingContext())
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSION_NOT_EXIST, parsingContext)
             << fullName;
     }
 
     return found;
+}
+
+static bool resolveParamDimensionReference(const vector<ArrayDesc> &inputSchemas, shared_ptr<OperatorParamReference>& dimRef, bool throwException)
+{
+
+    size_t inputNo = 0;
+    size_t dimensionNo = 0;
+
+    if (resolveDimension(inputSchemas, dimRef->getObjectName(), dimRef->getArrayName(), inputNo,
+        dimensionNo, dimRef->getParsingContext(), throwException))
+    {
+        dimRef->setInputNo(inputNo);
+        dimRef->setObjectNo(dimensionNo);
+        return true;
+    }
+
+    return false;
 }
 
 static shared_ptr<LogicalExpression> passScalarFunction(AstNode *ast)
@@ -1458,7 +1546,7 @@ static shared_ptr<OperatorParamAggregateCall> passAggregateCall(AstNode *ast, co
     if (args[0]->getType() == reference)
     {
         shared_ptr <AttributeReference> argument =
-                        static_pointer_cast<AttributeReference>(passReference(args[0]));
+                        static_pointer_cast<AttributeReference>(passAttributeReference(args[0]));
 
         opParam = make_shared<OperatorParamAttributeReference>( args[0]->getParsingContext(),
                                                                 argument->getArrayName(),
@@ -1534,10 +1622,13 @@ static shared_ptr<LogicalExpression> passConstant(AstNode *ast)
         c.setBool(ast->asNodeBool()->getVal());
         return make_shared<Constant>(ast->getParsingContext(), c, TID_BOOL);
     }
+
     assert(false);
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "passConstant";
+    return shared_ptr<LogicalExpression>();
 }
 
-static shared_ptr<LogicalExpression> passReference(AstNode *ast)
+static shared_ptr<LogicalExpression> passAttributeReference(AstNode *ast)
 {
     if (ast->getChild(referenceArgTimestamp))
     {
@@ -1571,105 +1662,6 @@ static bool placeholdersVectorContainType(const vector<shared_ptr<OperatorParamP
     return false;
 }
 
-static AstNode* passAggregateSelectClause(const AstNode *ast, const string &grwFakeArrayName = "")
-{
-    assert(selectStatement == ast->getType());
-
-    const AstNode *aggSelectList = ast->getChild(selectClauseArgSelectList);
-
-    const AstNode *aggFromList = ast->getChild(selectClauseArgFromClause);
-
-    if (aggSelectList->getChildsCount() > 1)
-    {
-        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SELECT_IN_AGGREGATE_WRONG_USAGE,
-            aggSelectList->getParsingContext());
-    }
-
-    BOOST_FOREACH(const AstNode *aggFromItem, aggFromList->getChilds())
-    {
-        switch(aggFromItem->getType())
-        {
-            case namedExpr:
-            {
-                const AstNode* expr = aggFromItem->getChild(namedExprArgExpr);
-
-                if (expr->getType() != reference)
-                {
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SELECT_IN_AGGREGATE_WRONG_USAGE,
-                        aggFromItem->getParsingContext());
-                }
-
-                if (expr->getChild(referenceArgTimestamp))
-                {
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_TIMESTAMP_IN_AGGREGATE_WRONG_USAGE,
-                        expr->getParsingContext());
-                }
-
-                if (grwFakeArrayName != "")
-                {
-                    const string &arrayName = expr->getChild(referenceArgObjectName)->asNodeString()->getVal();
-
-                    if (grwFakeArrayName != arrayName)
-                    {
-                        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_UNKNOWN_ARRAY_REFERENCE,
-                            expr->getParsingContext());
-                    }
-                }
-                else
-                {
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_UNKNOWN_ARRAY_REFERENCE,
-                        expr->getParsingContext());
-                }
-
-                break;
-            }
-
-            default:
-            {
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SELECT_IN_AGGREGATE_WRONG_USAGE,
-                    aggFromItem->getParsingContext());
-            }
-        }
-    }
-
-    BOOST_FOREACH(AstNode *aggSelectItem, aggSelectList->getChilds())
-    {
-        switch(aggSelectItem->getType())
-        {
-            case asterisk:
-                return aggSelectItem->clone();
-                break;
-
-            case namedExpr:
-            {
-                AstNode* expr = aggSelectItem->getChild(namedExprArgExpr);
-
-                if (expr->getType() != reference)
-                {
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SELECT_IN_AGGREGATE_WRONG_USAGE,
-                        aggSelectItem->getParsingContext());
-                }
-
-                if (expr->getChild(referenceArgTimestamp))
-                {
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_TIMESTAMP_IN_AGGREGATE_WRONG_USAGE,
-                        expr->getParsingContext());
-                }
-
-                return expr->clone();
-            }
-
-            default:
-            {
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SELECT_IN_AGGREGATE_WRONG_USAGE,
-                    aggSelectItem->getParsingContext());
-            }
-        }
-    }
-
-    return NULL;
-}
-
 static shared_ptr<LogicalQueryPlanNode> passSelectStatement(AstNode *ast, shared_ptr<Query> query)
 {
     shared_ptr<LogicalQueryPlanNode> result = shared_ptr<LogicalQueryPlanNode>();
@@ -1690,6 +1682,12 @@ static shared_ptr<LogicalQueryPlanNode> passSelectStatement(AstNode *ast, shared
         if (filterClause)
         {
             result = passFilterClause(filterClause, result, query);
+        }
+
+        AstNode *orderByClause = ast->getChild(selectClauseArgOrderByClause);
+        if (orderByClause)
+        {
+            result = passOrderByClause(orderByClause, result, query);
         }
 
         result = passSelectList(result, selectList, grwClause, query);
@@ -2073,6 +2071,7 @@ static shared_ptr<LogicalQueryPlanNode> passJoinItem(AstNode *ast, shared_ptr<Qu
             }
 
             result = AstToLogicalPlan(expr, query);
+            prohibitDdl(result);
 
             const string alias = ast->getChild(namedExprArgName) ? ast->getChild(namedExprArgName)->asNodeString()->getVal() : "";
             result->getLogicalOperator()->setAliasName(alias);
@@ -2088,6 +2087,10 @@ static shared_ptr<LogicalQueryPlanNode> passJoinItem(AstNode *ast, shared_ptr<Qu
             {
                 result = passCrossJoin(ast, query);
             }
+            break;
+
+        case thinClause:
+            result = passThinClause(ast, query);
             break;
 
         default:
@@ -2131,6 +2134,42 @@ static shared_ptr<LogicalQueryPlanNode> passFilterClause(AstNode *ast, const sha
     return result;
 }
 
+static shared_ptr<LogicalQueryPlanNode> passOrderByClause(AstNode *ast, const shared_ptr<LogicalQueryPlanNode> &input,
+    const shared_ptr<Query> &query)
+{
+    LogicalOperator::Parameters sortParams;
+    const ArrayDesc &inputSchema = input->inferTypes(query);
+
+    BOOST_FOREACH(AstNode* sortAttributeAst, ast->getChilds())
+    {
+        string alias = sortAttributeAst->getChild(referenceArgArrayName) != NULL
+                ? sortAttributeAst->getChild(referenceArgArrayName)->asNodeString()->getVal()
+                : "";
+
+        string name = sortAttributeAst->getChild(referenceArgObjectName)->asNodeString()->getVal();
+
+        bool asc = (sortAttributeAst->getChild(referenceArgSortQuirk) &&
+            sortAttributeAst->getChild(referenceArgSortQuirk)->asNodeInt64()->getVal() == SORT_DESC)
+            ? false : true;
+
+        boost::shared_ptr<OperatorParamAttributeReference> sortParam = make_shared<OperatorParamAttributeReference>(
+            sortAttributeAst->getParsingContext(),
+            alias,
+            name,
+            true);
+
+        sortParam->setSortAscent(asc);
+
+        resolveParamAttributeReference(vector<ArrayDesc>(1, inputSchema), (shared_ptr<OperatorParamReference>&) sortParam, true);
+
+        sortParams.push_back(sortParam);
+    }
+
+    shared_ptr<LogicalQueryPlanNode> result = appendOperator(input, "sort", sortParams, ast->getParsingContext());
+    result->inferTypes(query);
+    return result;
+}
+
 static shared_ptr<LogicalQueryPlanNode> passIntoClause(AstNode *ast, shared_ptr<LogicalQueryPlanNode> &input,
         shared_ptr<Query>& query)
 {
@@ -2163,132 +2202,22 @@ static shared_ptr<LogicalQueryPlanNode> passIntoClause(AstNode *ast, shared_ptr<
         ArrayDesc destinationSchema;
         SystemCatalog::getInstance()->getArrayDesc(targetName, destinationSchema);
 
-        shared_ptr<LogicalQueryPlanNode> fittedInput = input;
-
         /*
          * Let's check if input can fit somehow into destination array. If names differ we can insert
          * CAST. If array partitioning differ we can insert REPART. Also we can force input to be empty
          * array to fit empty destination. We can't change array size or dimensions/attributes types,
          * so if such difference found - we skipping casting/repartioning.
          */
-
-        if (!inputSchema.getEmptyBitmapAttribute() && destinationSchema.getEmptyBitmapAttribute())
-        {
-            shared_ptr<LogicalQueryPlanNode> filteredInput =
-                    make_shared<LogicalQueryPlanNode>(ast->getParsingContext(),
-                            OperatorLibrary::getInstance()->createLogicalOperator("filter"));
-            filteredInput->addChild(input);
-
-            Value bval(TypeLibrary::getType(TID_BOOL));
-            bval.setBool(true);
-
-            vector<shared_ptr<OperatorParam> > filterParams(1);
-            filterParams[0] = make_shared<OperatorParamLogicalExpression>(
-                                ast->getParsingContext(),
-                                make_shared<Constant>(ast->getParsingContext(), bval, TID_BOOL),
-                                TypeLibrary::getType(TID_BOOL), true);
-            filteredInput->getLogicalOperator()->setParameters(filterParams);
-
-            inputSchema = filteredInput->inferTypes(query);
-            fittedInput = filteredInput;
-        }
-
-        bool needCast = false;
-        bool needRepart = false;
-
-        //Give up on casting if schema objects count differ. Nothing to do here.
-        if (destinationSchema.getAttributes().size() == inputSchema.getAttributes().size()
-            && destinationSchema.getDimensions().size() == inputSchema.getDimensions().size())
-        {
-            for (size_t attrNo = 0; attrNo < inputSchema.getAttributes().size(); ++attrNo)
-            {
-                const AttributeDesc &inAttr = destinationSchema.getAttributes()[attrNo];
-                const AttributeDesc &destAttr = inputSchema.getAttributes()[attrNo];
-
-                //If attributes has differ names we need casting...
-                if (inAttr.getName() != destAttr.getName())
-                    needCast = true;
-
-                //... but if type and flags differ we can't cast
-                if (inAttr.getType() != destAttr.getType() || inAttr.getFlags() != destAttr.getFlags())
-                {
-                    needCast = false;
-                    goto noCastAndRepart;
-                }
-            }
-
-            for (size_t dimNo = 0; dimNo < inputSchema.getDimensions().size(); ++dimNo)
-            {
-                const DimensionDesc &destDim = destinationSchema.getDimensions()[dimNo];
-                const DimensionDesc &inDim = inputSchema.getDimensions()[dimNo];
-
-                //If dimension has differ names we need casting...
-                if (inDim.getBaseName() != destDim.getBaseName())
-                    needCast = true;
-
-                //If dimension has different chunk size we need repart..
-                if (inDim.getChunkOverlap() != destDim.getChunkOverlap()
-                    || inDim.getChunkInterval() != destDim.getChunkInterval())
-                    needRepart = true;
-
-                //... but if length or type of dimension differ we cant cast and repart
-                if (inDim.getStart() != destDim.getStart() || inDim.getType() != destDim.getType()
-                    || !(inDim.getEndMax() == destDim.getEndMax() 
-                         || (inDim.getEndMax() < destDim.getEndMax() 
-                             && ((inDim.getLength() % inDim.getChunkInterval()) == 0
-                                 || inputSchema.getEmptyBitmapAttribute() != NULL))))
-                {
-                    needCast = false;
-                    needRepart = false;
-                    goto noCastAndRepart;
-                }
-            }
-
-        }
-        noCastAndRepart:
-
+        shared_ptr<LogicalQueryPlanNode> fittedInput = fitInput(input, destinationSchema, query);
         bool tryFlip = false;
-
         try
         {
-            if (needRepart)
-            {
-                shared_ptr<LogicalOperator> repartOp;
-                LOG4CXX_TRACE(logger, "Inserting REPART operator");
-                repartOp = OperatorLibrary::getInstance()->createLogicalOperator("repart");
-
-                LogicalOperator::Parameters repartParams (1,
-                        make_shared<OperatorParamSchema>(parsingContext, destinationSchema));
-                repartOp->setParameters(repartParams);
-
-                shared_ptr<LogicalQueryPlanNode> tmpNode = make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), repartOp);
-                tmpNode->addChild(fittedInput);
-                tmpNode->inferTypes(query);
-                fittedInput = tmpNode;
-            }
-            if (needCast)
-            {
-                shared_ptr<LogicalOperator> castOp;
-                LOG4CXX_TRACE(logger, "Inserting CAST operator");
-                castOp = OperatorLibrary::getInstance()->createLogicalOperator("cast");
-
-                LogicalOperator::Parameters castParams (1,
-                        make_shared<OperatorParamSchema>(parsingContext, destinationSchema));
-                castOp->setParameters(castParams);
-
-                shared_ptr<LogicalQueryPlanNode>  tmpNode = make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), castOp);
-                tmpNode->addChild(fittedInput);
-                tmpNode->inferTypes(query);
-                fittedInput = tmpNode;
-            }
-
             LOG4CXX_TRACE(logger, "Trying to insert STORE");
             storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
             storeOp->setParameters(targetParams);
             result = make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), storeOp);
             result->addChild(fittedInput);
             result->inferTypes(query);
-
         }
         catch (const UserException& e)
         {
@@ -2350,6 +2279,7 @@ static shared_ptr<LogicalQueryPlanNode> passUpdateStatement(AstNode *ast, const 
 
     strStrMap substMap;
 
+    LogicalOperator::Parameters applyParams;
     unsigned int counter = 0;
     BOOST_FOREACH(const AstNode *updateItem, updateList->getChilds())
     {
@@ -2420,20 +2350,11 @@ static shared_ptr<LogicalQueryPlanNode> passUpdateStatement(AstNode *ast, const 
                     attExpr = ph.get();
                 }
 
-                //Wrap child nodes with apply operator created new attribute
-                LogicalOperator::Parameters applyParams;
                 applyParams.push_back(make_shared<OperatorParamAttributeReference>(updateItem->getParsingContext(),
                         "", newAttName, false));
 
                 applyParams.push_back(make_shared<OperatorParamLogicalExpression>(updateItem->getParsingContext(),
                         AstToLogicalExpression(attExpr), TypeLibrary::getType(att.getType()), false));
-
-                shared_ptr<LogicalOperator> applyOp = OperatorLibrary::getInstance()->createLogicalOperator("apply");
-                applyOp->setParameters(applyParams);
-
-                shared_ptr<LogicalQueryPlanNode> applyNode = make_shared<LogicalQueryPlanNode>(updateItem->getParsingContext(), applyOp);
-                applyNode->addChild(result);
-                result = applyNode;
 
                 break;
             }
@@ -2446,6 +2367,9 @@ static shared_ptr<LogicalQueryPlanNode> passUpdateStatement(AstNode *ast, const 
                     << attName;
         }
     }
+
+    //Wrap child nodes with apply operator created new attribute
+    result = appendOperator(result, "apply", applyParams, updateList->getParsingContext());
 
     //Projecting changed attributes along with unchanged to simulate real update
     vector<ArrayDesc> schemas;
@@ -2507,8 +2431,8 @@ static shared_ptr<LogicalQueryPlanNode> passLoadStatement(AstNode *ast, shared_p
     SystemCatalog::getInstance()->getArrayDesc(arrayName, inputArray);
 
     LogicalOperator::Parameters inputParams;
-    inputParams.push_back(make_shared<OperatorParamArrayReference>(
-            ast->getChild(loadStatementArgArrayName)->getParsingContext(), "", arrayName, true));
+    inputParams.push_back(make_shared<OperatorParamSchema>(
+            ast->getChild(loadStatementArgArrayName)->getParsingContext(), inputArray));
 
     //File name
     Value sval(TypeLibrary::getType(TID_STRING));
@@ -2525,6 +2449,40 @@ static shared_ptr<LogicalQueryPlanNode> passLoadStatement(AstNode *ast, shared_p
     inputParams.push_back(make_shared<OperatorParamLogicalExpression>(
             ast->getChild(loadStatementArgInstanceId)->getParsingContext(),
             expr, TypeLibrary::getType(TID_INT64), true));
+
+    //Format
+    if (ast->getChild(loadStatementArgFormat))
+    {
+        const string& loadFormat = ast->getChild(loadStatementArgFormat)->asNodeString()->getVal();
+        sval.setData(loadFormat.c_str(), loadFormat.length() + 1);
+        shared_ptr<LogicalExpression> expr = make_shared<Constant>(
+                    ast->getChild(loadStatementArgFormat)->getParsingContext(), sval, TID_STRING);
+        inputParams.push_back(make_shared<OperatorParamLogicalExpression>(
+                ast->getChild(loadStatementArgFormat)->getParsingContext(),
+                expr, TypeLibrary::getType(TID_STRING), true));
+    }
+
+    //Errors
+    if (ast->getChild(loadStatementArgErrors))
+    {
+        const int64_t maxErrors = ast->getChild(loadStatementArgErrors)->asNodeInt64()->getVal();
+        ival.setInt64(maxErrors);
+        shared_ptr<LogicalExpression> expr = make_shared<Constant>(
+                    ast->getChild(loadStatementArgErrors)->getParsingContext(), ival, TID_INT64);
+        inputParams.push_back(make_shared<OperatorParamLogicalExpression>(
+                ast->getChild(loadStatementArgErrors)->getParsingContext(),
+                expr, TypeLibrary::getType(TID_INT64), true));
+    }
+
+    //Shadow array
+    if (ast->getChild(loadStatementArgShadow))
+    {
+        inputParams.push_back(make_shared<OperatorParamArrayReference>(
+            ast->getChild(loadStatementArgShadow)->getParsingContext(),
+            "",
+            ast->getChild(loadStatementArgShadow)->asNodeString()->getVal(),
+            false));
+    }
 
     shared_ptr<LogicalOperator> inputOp = OperatorLibrary::getInstance()->createLogicalOperator("input");
     inputOp->setParameters(inputParams);
@@ -2578,28 +2536,9 @@ static shared_ptr<LogicalQueryPlanNode> passSaveStatement(AstNode *ast, shared_p
     // This is saving to current instance. Let's pickup right instance number instead -2
     instanceID = instanceID == -2 ? query->getInstanceID() : instanceID;
 
-    if (instanceID >= 0)
-    {
-        //We want save to some instance so redistribute date to specified node
-        LogicalOperator::Parameters sgParams(2);
-        Value ival(TypeLibrary::getType(TID_INT32));
-        ival.setInt32(psLocalInstance);
-        sgParams[0] = make_shared<OperatorParamLogicalExpression>(ast->getParsingContext(),
-                make_shared<Constant>(ast->getParsingContext(), ival, TID_INT32),
-                TypeLibrary::getType(TID_INT32), true);
-
-        Value ival2(TypeLibrary::getType(TID_INT64));
-        ival2.setInt64(instanceID);
-        sgParams[1] = make_shared<OperatorParamLogicalExpression>(ast->getChild(saveStatementArgInstanceId)->getParsingContext(),
-                make_shared<Constant>(ast->getChild(saveStatementArgInstanceId)->getParsingContext(), ival2, TID_INT64),
-                TypeLibrary::getType(TID_INT64), true);
-
-        //Insert SG
-        result = appendOperator(result, "sg", sgParams, ast->getParsingContext());
-    }
-
     LogicalOperator::Parameters saveParams;
 
+    //File name
     Value sval(TypeLibrary::getType(TID_STRING));
     sval.setData(fileName.c_str(), fileName.length() + 1);
     shared_ptr<LogicalExpression> expr = make_shared<Constant>(ast->getParsingContext(), sval,  TID_STRING);
@@ -2607,6 +2546,15 @@ static shared_ptr<LogicalQueryPlanNode> passSaveStatement(AstNode *ast, shared_p
             ast->getChild(saveStatementArgFileName)->getParsingContext(),
             expr, TypeLibrary::getType(TID_STRING), true));
 
+    //Instance ID
+    Value ival(TypeLibrary::getType(TID_INT64));
+    ival.setInt64(instanceID);
+    expr = make_shared<Constant>(ast->getChild(saveStatementArgInstanceId)->getParsingContext(), ival,  TID_INT64);
+    saveParams.push_back(make_shared<OperatorParamLogicalExpression>(
+            ast->getChild(saveStatementArgInstanceId)->getParsingContext(),
+            expr, TypeLibrary::getType(TID_INT64), true));
+
+    //Format
     if (ast->getChild(saveStatementArgFormat))
     {
         const string& saveFormat = ast->getChild(saveStatementArgFormat)->asNodeString()->getVal();
@@ -2639,6 +2587,49 @@ static shared_ptr<LogicalQueryPlanNode> passDropArrayStatement(AstNode *ast)
     removeOp->setParameters(removeParams);
 
     return make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), removeOp);
+}
+
+static shared_ptr<LogicalQueryPlanNode> passRenameArrayStatement(AstNode *ast)
+{
+    const string& oldName = ast->getChild(renameArrayStatementArgOldName)->asNodeString()->getVal();
+
+    const string& newName = ast->getChild(renameArrayStatementArgNewName)->asNodeString()->getVal();
+
+    if (!SystemCatalog::getInstance()->containsArray(oldName))
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ARRAY_DOESNT_EXIST,
+                    ast->getChild(renameArrayStatementArgOldName)->getParsingContext()) << oldName;
+    }
+
+    LogicalOperator::Parameters renameParams;
+    renameParams.push_back(make_shared<OperatorParamArrayReference>(
+            ast->getChild(renameArrayStatementArgOldName)->getParsingContext(), "", oldName, true));
+    renameParams.push_back(make_shared<OperatorParamArrayReference>(
+            ast->getChild(renameArrayStatementArgNewName)->getParsingContext(), "", newName, true));
+
+    shared_ptr<LogicalOperator> renameOp = OperatorLibrary::getInstance()->createLogicalOperator("rename");
+    renameOp->setParameters(renameParams);
+
+    return make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), renameOp);
+}
+
+static shared_ptr<LogicalQueryPlanNode> passCancelQueryStatement(AstNode *ast)
+{
+    const int64_t queryId = ast->getChild(cancelQueryStatementArgQueryId)->asNodeInt64()->getVal();
+
+    LogicalOperator::Parameters cancelParams;
+
+    Value ival(TypeLibrary::getType(TID_INT64));
+    ival.setInt64(queryId);
+    shared_ptr<LogicalExpression> expr = make_shared<Constant>(ast->getChild(cancelQueryStatementArgQueryId)->getParsingContext(), ival,  TID_INT64);
+    cancelParams.push_back(make_shared<OperatorParamLogicalExpression>(
+            expr->getParsingContext(),
+            expr, TypeLibrary::getType(TID_INT64), true));
+
+    shared_ptr<LogicalOperator> cancelOp = OperatorLibrary::getInstance()->createLogicalOperator("cancel");
+    cancelOp->setParameters(cancelParams);
+
+    return make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), cancelOp);
 }
 
 static shared_ptr<LogicalQueryPlanNode> passLoadLibrary(AstNode *ast)
@@ -2677,6 +2668,72 @@ static shared_ptr<LogicalQueryPlanNode> passUnloadLibrary(AstNode *ast)
     op->setParameters(parameters);
 
     return make_shared<LogicalQueryPlanNode>(ast->getParsingContext(), op);
+}
+
+static shared_ptr<LogicalQueryPlanNode> passInsertIntoStatement(AstNode *ast, shared_ptr<Query> query)
+{
+    assert(insertIntoStatement == ast->getType());
+    LOG4CXX_TRACE(logger, "Translating INSERT INTO");
+
+    AstNode* srcAst = ast->getChild(insertIntoStatementArgSource);
+    AstNode* dstAst = ast->getChild(insertIntoStatementArgDestination);
+
+    const string& dstName = ((AstNodeString*)dstAst)->getVal();
+    LogicalOperator::Parameters dstOpParams;
+    dstOpParams.push_back(make_shared<OperatorParamArrayReference>(dstAst->getParsingContext(), "", dstName, true));
+    if (!SystemCatalog::getInstance()->containsArray(dstName))
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_ARRAY_DOESNT_EXIST, dstAst->getParsingContext()) << dstName;
+    }
+
+    ArrayDesc dstSchema;
+    SystemCatalog::getInstance()->getArrayDesc(dstName, dstSchema);
+
+    shared_ptr<LogicalQueryPlanNode> srcNode;
+    if (selectStatement == srcAst->getType())
+    {
+        LOG4CXX_TRACE(logger, "Source of INSERT INTO is SELECT");
+        srcNode = passSelectStatement(srcAst, query);
+    }
+    else if (stringNode == srcAst->getType())
+    {
+        LOG4CXX_TRACE(logger, "Source of INSERT INTO is array literal");
+        LogicalOperator::Parameters buildParams;
+        buildParams.push_back(make_shared<OperatorParamSchema>(
+            dstAst->getParsingContext(),
+            dstSchema));
+
+        const string arrayLiteral = srcAst->asNodeString()->getVal();
+        Value sval(TypeLibrary::getType(TID_STRING));
+        sval.setData(arrayLiteral.c_str(), arrayLiteral.length() + 1);
+        shared_ptr<LogicalExpression> expr = make_shared<Constant>(ast->getParsingContext(), sval, TID_STRING);
+        buildParams.push_back(make_shared<OperatorParamLogicalExpression>(
+            srcAst->getParsingContext(),
+            expr, TypeLibrary::getType(TID_STRING), true));
+
+        Value bval(TypeLibrary::getType(TID_BOOL));
+        bval.setBool(true);
+        expr = make_shared<Constant>(ast->getParsingContext(), bval, TID_BOOL);
+        buildParams.push_back(make_shared<OperatorParamLogicalExpression>(
+            srcAst->getParsingContext(),
+            expr, TypeLibrary::getType(TID_BOOL), true));
+
+        srcNode = make_shared<LogicalQueryPlanNode>(
+                srcAst->getParsingContext(),
+                OperatorLibrary::getInstance()->createLogicalOperator("build"));
+        srcNode->getLogicalOperator()->setParameters(buildParams);
+    }
+    else
+    {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "passInsertIntoStatement";
+    }
+
+    LOG4CXX_TRACE(logger, "Checking source schema and trying to fit it to destination for inserting");
+    srcNode = fitInput(srcNode, dstSchema, query);
+
+    LOG4CXX_TRACE(logger, "Inserting INSERT operator");
+    return appendOperator(srcNode, "insert", dstOpParams, ast->getParsingContext());
 }
 
 static void checkLogicalExpression(const vector<ArrayDesc> &inputSchemas, const ArrayDesc &outputSchema,
@@ -2777,7 +2834,7 @@ static bool checkDimension(const vector<ArrayDesc> &inputSchemas, const string &
     {
         BOOST_FOREACH(const DimensionDesc& dim, schema.getDimensions())
         {
-            if (dim.hasNameOrAlias(dimensionName, aliasName))
+            if (dim.hasNameAndAlias(dimensionName, aliasName))
             {
                 if (found)
                 {
@@ -2806,7 +2863,7 @@ static shared_ptr<LogicalQueryPlanNode> appendOperator(
     return newNode;
 }
 
-static bool astHasReferences(const AstNode *ast)
+static bool astHasUngroupedReferences(const AstNode *ast, const set<string> &groupedDimensions)
 {
     switch(ast->getType())
     {
@@ -2814,7 +2871,7 @@ static bool astHasReferences(const AstNode *ast)
         {
             BOOST_FOREACH(AstNode *funcArg, ast->getChild(functionArgParameters)->getChilds())
             {
-                if (astHasReferences(funcArg))
+                if (astHasUngroupedReferences(funcArg, groupedDimensions))
                     return true;
             }
 
@@ -2822,8 +2879,15 @@ static bool astHasReferences(const AstNode *ast)
         }
 
         case asterisk:
-        case reference:
             return true;
+
+        case reference:
+        {
+            if (groupedDimensions.find(ast->getChild(referenceArgObjectName)->asNodeString()->getVal())
+                != groupedDimensions.end())
+                return false;
+            return true;
+        }
 
         default:
             return false;
@@ -2836,14 +2900,19 @@ static bool astHasAggregates(const AstNode *ast)
 {
     switch(ast->getType())
     {
+        case olapAggregate:
         case function:
         {
-            const string& funcName = ast->getChild(functionArgName)->asNodeString()->getVal();
+            const AstNode *funcNode = function == ast->getType()
+                ? ast
+                : ast->getChild(olapAggregateArgFunction);
+
+            const string& funcName = funcNode->getChild(functionArgName)->asNodeString()->getVal();
 
             if (AggregateLibrary::getInstance()->hasAggregate(funcName))
                 return true;
 
-            BOOST_FOREACH(AstNode *funcArg, ast->getChild(functionArgParameters)->getChilds())
+            BOOST_FOREACH(AstNode *funcArg, funcNode->getChild(functionArgParameters)->getChilds())
             {
                 if (astHasAggregates(funcArg))
                     return true;
@@ -2865,8 +2934,10 @@ static AstNode* decomposeExpression(
     AstNodes &aggregateFunctions,
     unsigned int &internalNameCounter,
     bool hasAggregates,
-    const string &partitionName,
-    const ArrayDesc &inputSchema)
+    const ArrayDesc &inputSchema,
+    const set<string> &groupedDimensions,
+    bool window,
+    bool &joinOrigin)
 {
     LOG4CXX_TRACE(logger, "Decomposing expression");
     vector<ArrayDesc> inputSchemas(1, inputSchema);
@@ -2874,10 +2945,16 @@ static AstNode* decomposeExpression(
     switch (ast->getType())
     {
         case function:
+        case olapAggregate:
         {
             LOG4CXX_TRACE(logger, "This is function");
-            const string& funcName = ast->getChild(functionArgName)->asNodeString()->getVal();
-            const AstNode* funcArgs = ast->getChild(functionArgParameters);
+
+            const AstNode* funcNode = function == ast->getType()
+                ? ast
+                : ast->getChild(olapAggregateArgFunction);
+
+            const string& funcName = funcNode->getChild(functionArgName)->asNodeString()->getVal();
+            const AstNode* funcArgs = funcNode->getChild(functionArgParameters);
             bool isAggregate = AggregateLibrary::getInstance()->hasAggregate(funcName);
 
             // We found aggregate and must care of it
@@ -2889,7 +2966,7 @@ static AstNode* decomposeExpression(
                 {
                     LOG4CXX_TRACE(logger, "Passed too many arguments to aggregate call");
                     throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_WRONG_AGGREGATE_ARGUMENTS_COUNT,
-                        ast->getParsingContext());
+                        funcNode->getParsingContext());
                 }
 
                 const AstNode* aggArg = funcArgs->getChild(0);
@@ -2899,63 +2976,56 @@ static AstNode* decomposeExpression(
                 {
                     LOG4CXX_TRACE(logger, "Nested aggregate");
                     throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_AGGREGATE_CANT_BE_NESTED,
-                        ast->getParsingContext());
+                        funcNode->getParsingContext());
                 }
 
-                // If partition name used as reference in aggregate, we must expand it into attribute
-                // name.
-                if (selectStatement == aggArg->getType()
-                    || (reference == aggArg->getType()
-                        && partitionName == aggArg->getChild(referenceArgObjectName)->asNodeString()->getVal()))
+                bool isDimension = false;
+                if (reference == aggArg->getType())
                 {
-                    LOG4CXX_TRACE(logger, "Aggregate's argument is partition name");
-                    if (reference == aggArg->getType() && inputSchema.getAttributes(true).size() > 1)
+                    string dimName;
+                    string dimAlias;
+                    passReference(aggArg, dimAlias, dimName);
+
+                    //If we found dimension inside aggregate we must convert into attribute value before aggregating
+                    BOOST_FOREACH(const DimensionDesc& dim, inputSchema.getDimensions())
                     {
-                        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SINGLE_ATTRIBUTE_IN_INPUT_EXPECTED,
-                            aggArg->getParsingContext());
+                        if (dim.hasNameAndAlias(dimName, dimAlias))
+                        {
+                            isDimension = true;
+                            break;
+                        }
                     }
-
-                    AstNode *aggAtt = (reference == aggArg->getType()
-                        ? new AstNode(reference,  ast->getChild(functionArgParameters)->getParsingContext(),
-                            referenceArgCount,
-                            NULL,
-                            new AstNodeString(stringNode, ast->getParsingContext(), inputSchema.getAttributes()[0].getName()),
-                            NULL,
-                            NULL,
-                            NULL)
-                        : passAggregateSelectClause(aggArg, partitionName));
-
-                    AstNode *postEvalAttName = new AstNodeString(
-                        stringNode, ast->getParsingContext(),
-                        genUniqueObjectName("expr", internalNameCounter, inputSchemas, true));
-
-                    AstNode *aggregateExpression = new AstNode(function, ast->getParsingContext(), functionArgCount,
-                        ast->getChild(functionArgName)->clone(),
-                        new AstNode(functionArguments, ast->getChild(functionArgParameters)->getParsingContext(), 1,
-                            aggAtt),
-                        postEvalAttName,
-                        new AstNodeBool(boolNode, ast->getParsingContext(), false));
-
-                    aggregateFunctions.push_back(aggregateExpression);
-
-                    return new AstNode(reference, ast->getChild(functionArgParameters)->getParsingContext(),
-                        referenceArgCount, NULL, postEvalAttName->clone(), NULL, NULL, NULL);
                 }
+
                 // If function argument is reference or asterisk, we can translate to aggregate call
                 // it as is but must assign alias to reference in post-eval expression
-                else if (reference == aggArg->getType()
+                if ((reference == aggArg->getType() && !isDimension)
                     || asterisk == aggArg->getType())
                 {
                     LOG4CXX_TRACE(logger, "Aggregate's argument is reference or asterisk");
-                    AstNode *aggFunc = ast->clone();
                     AstNode *alias = new AstNodeString(
-                        stringNode, ast->getParsingContext(),
+                        stringNode, funcNode->getParsingContext(),
                         genUniqueObjectName("expr", internalNameCounter, inputSchemas, true));
-                    aggFunc->setChild(functionArgAliasName, alias);
-                    aggregateFunctions.push_back(aggFunc);
+                    if (function == ast->getType())
+                    {
+                        AstNode* aggFunc = funcNode->clone();
+                        aggFunc->setChild(functionArgAliasName, alias);
+                        aggregateFunctions.push_back(aggFunc);
+                    }
+                    else if (olapAggregate == ast->getType())
+                    {
+                        AstNode* aggFunc = ast->clone();
+                        aggFunc->getChild(olapAggregateArgFunction)->setChild(functionArgAliasName, alias);
+                        aggregateFunctions.push_back(aggFunc);
+                    }
+                    else
+                    {
+                        assert(0);
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_UNREACHABLE_CODE) << "decomposeExpression";
+                    }
 
                     // Finally returning reference to aggregate result in overall expression
-                    return new AstNode(reference,  ast->getChild(functionArgParameters)->getParsingContext(),
+                    return new AstNode(reference,  funcNode->getChild(functionArgParameters)->getParsingContext(),
                         referenceArgCount, NULL, alias->clone(), NULL, NULL, NULL);
                 }
                 // Handle select statement
@@ -3003,7 +3073,7 @@ static AstNode* decomposeExpression(
                     aggregateFunctions.push_back(aggregateExpression);
 
                     // Finally returning reference to aggregate result in overall expression
-                    return new AstNode(reference,  ast->getChild(functionArgParameters)->getParsingContext(), referenceArgCount,
+                    return new AstNode(reference,  funcNode->getChild(functionArgParameters)->getParsingContext(), referenceArgCount,
                         NULL, postEvalAttName->clone(), NULL, NULL, NULL);
                 }
             }
@@ -3011,6 +3081,12 @@ static AstNode* decomposeExpression(
             // AST node for post-eval expression
             else
             {
+                if (olapAggregate == ast->getType())
+                {
+                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_WRONG_OVER_USAGE,
+                        ast->getParsingContext());
+                }
+
                 LOG4CXX_TRACE(logger, "This is scalar function");
                 AstNode *newFuncCallArgs = new AstNode(functionArguments,
                     ast->getChild(functionArgParameters)->getParsingContext(), 0);
@@ -3021,7 +3097,7 @@ static AstNode* decomposeExpression(
                         LOG4CXX_TRACE(logger, "Passing function argument");
                         newFuncCallArgs->addChild(decomposeExpression(funcArg, preAggregationEvals,
                             aggregateFunctions, internalNameCounter, hasAggregates,
-                            partitionName, inputSchema));
+                            inputSchema, groupedDimensions, window, joinOrigin));
                     }
                 }
                 catch (...)
@@ -3031,7 +3107,7 @@ static AstNode* decomposeExpression(
                 }
 
                 return new AstNode(function, ast->getParsingContext(), functionArgCount,
-                    ast->getChild(functionArgName)->clone(),
+                    funcNode->getChild(functionArgName)->clone(),
                     newFuncCallArgs,
                     NULL, // no alias
                     new AstNodeBool(boolNode, ast->getParsingContext(), false));
@@ -3043,11 +3119,30 @@ static AstNode* decomposeExpression(
         default:
         {
             LOG4CXX_TRACE(logger, "This is reference or constant");
-            if (reference == ast->getType() && hasAggregates)
+            if (reference == ast->getType())
             {
-                LOG4CXX_TRACE(logger, "We can not use references in expression with aggregate");
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ITEM_MUST_BE_INSIDE_AGGREGATE,
-                    ast->getParsingContext());
+                if (astHasUngroupedReferences(ast, groupedDimensions) && hasAggregates && !window)
+                {
+                    LOG4CXX_TRACE(logger, "We can not use references in expression with aggregate");
+                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ITEM_MUST_BE_INSIDE_AGGREGATE,
+                        ast->getParsingContext());
+                }
+
+                bool isDimension = false;
+                string dimName;
+                string dimAlias;
+                passReference(ast, dimAlias, dimName);
+
+                BOOST_FOREACH(const DimensionDesc& dim, inputSchema.getDimensions())
+                {
+                    if (dim.hasNameAndAlias(dimName, dimAlias))
+                    {
+                        isDimension = true;
+                        break;
+                    }
+                }
+                if (window && !isDimension)
+                    joinOrigin = true;
             }
 
             LOG4CXX_TRACE(logger, "Cloning node to post-evaluation expression");
@@ -3071,6 +3166,8 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
     const ArrayDesc& inputSchema = input->inferTypes(query);
     const vector<ArrayDesc> inputSchemas(1, inputSchema);
     LogicalOperator::Parameters projectParams;
+    bool joinOrigin = false;
+    const bool isWindowClause = grwAsClause && windowClauseList == grwAsClause->getType();
 
     bool selectListHasAggregates = false;
     BOOST_FOREACH(AstNode *selItem, selectList->getChilds())
@@ -3091,6 +3188,46 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                 " not contain aggregates");
         throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ITEM_MUST_BE_INSIDE_AGGREGATE,
             selectList->getChild(0)->getParsingContext());
+    }
+
+    //List of objects in GROUP BY or REDIMENSION list. We don't care about ambiguity now it will be done later.
+    //In case REGRID or WINDOW we just enumerate all dimensions from input schema
+    set<string> groupedDimensions;
+    if (grwAsClause)
+    {
+        switch (grwAsClause->getType())
+        {
+            case groupByClause:
+                BOOST_FOREACH (const AstNode *dimensionAST, grwAsClause->getChild(groupByClauseArgList)->getChilds())
+                {
+                    assert(reference == dimensionAST->getType());
+                    groupedDimensions.insert(dimensionAST->getChild(referenceArgObjectName)->asNodeString()->getVal());
+                }
+                break;
+            case redimensionClause:
+                BOOST_FOREACH (const AstNode *dimensionAST, grwAsClause->getChild(0)->getChilds())
+                {
+                    assert(dimension == dimensionAST->getType() || nonIntegerDimension == dimensionAST->getType());
+                    groupedDimensions.insert(
+                        dimensionAST->getChild(dimension == dimensionAST->getType()
+                            ? dimensionArgName : nIdimensionArgName )->asNodeString()->getVal());
+                }
+                break;
+            case regridClause:
+            case windowClauseList:
+                BOOST_FOREACH(const DimensionDesc& dim, inputSchema.getDimensions())
+                {
+                    groupedDimensions.insert(dim.getBaseName());
+                    BOOST_FOREACH(const DimensionDesc::NamesPairType &name, dim.getNamesAndAliases())
+                    {
+                        groupedDimensions.insert(name.first);
+                    }
+                }
+                break;
+            default:
+                assert(0);
+                break;
+        }
     }
 
     AstNodes preAggregationEvals;
@@ -3118,13 +3255,14 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                     // If reference is attribute, we must do PROJECT
                     bool doProject = false;
                     if (reference == selItem->getChild(namedExprArgExpr)->getType()
-                        && !selItem->getChild(namedExprArgName))
+                        && !selItem->getChild(namedExprArgName)
+                        && !(grwAsClause && grwAsClause->getType() == redimensionClause))
 
                     {
                         const AstNode *refNode = selItem->getChild(namedExprArgExpr);
                         const string &name = refNode->getChild(referenceArgObjectName)->asNodeString()->getVal();
                         const string &alias = refNode->getChild(referenceArgArrayName)
-                            ? refNode->getChild(referenceArgObjectName)->asNodeString()->getVal()
+                            ? refNode->getChild(referenceArgArrayName)->asNodeString()->getVal()
                             : "";
                         // Strange issue with BOOST_FOREACH infinity loop. Leaving for-loop instead.
                         for(vector<AttributeDesc>::const_iterator attIt = inputSchema.getAttributes().begin();
@@ -3143,16 +3281,22 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                     {
                         LOG4CXX_TRACE(logger, "Item is has no name so this is projection");
                         const AstNode *refNode = selItem->getChild(namedExprArgExpr);
-                        if (selectListHasAggregates)
+                        if (selectListHasAggregates && !isWindowClause)
                         {
                             LOG4CXX_TRACE(logger, "SELECT list contains aggregates so we can't do projection");
                             throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ITEM_MUST_BE_INSIDE_AGGREGATE2,
                                 refNode->getParsingContext());
                         }
+                        else if (isWindowClause)
+                        {
+                            joinOrigin = true;
+                        }
 
                         shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
                             selItem->getParsingContext(),
-                            "",
+                            refNode->getChild(referenceArgArrayName)
+                                ? refNode->getChild(referenceArgArrayName)->asNodeString()->getVal()
+                                : "",
                             refNode->getChild(referenceArgObjectName)->asNodeString()->getVal(),
                             true);
 
@@ -3170,39 +3314,16 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                         else
                         {
                             LOG4CXX_TRACE(logger, "This is will be expression evaluation");
-                            if (astHasReferences(selItem->getChild(namedExprArgExpr))
-                                && selectListHasAggregates)
+                            if (astHasUngroupedReferences(selItem->getChild(namedExprArgExpr), groupedDimensions)
+                                && selectListHasAggregates && !isWindowClause)
                             {
                                 LOG4CXX_TRACE(logger, "This expression has references we can't evaluate it because we has aggregates");
                                 throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ITEM_MUST_BE_INSIDE_AGGREGATE2,
                                     selItem->getParsingContext());
                             }
-                        }
-
-                        string partitionName = "";
-                        if (grwAsClause)
-                        {
-                            switch (grwAsClause->getType())
+                            else if (isWindowClause)
                             {
-                                case groupByClause:
-                                    partitionName = grwAsClause->getChild(groupByClauseArgAs)
-                                        ? grwAsClause->getChild(groupByClauseArgAs)->asNodeString()->getVal()
-                                        : "";
-                                    break;
-                                case windowClause:
-                                    partitionName = grwAsClause->getChild(windowClauseArgAs)
-                                        ? grwAsClause->getChild(windowClauseArgAs)->asNodeString()->getVal()
-                                        : "";
-                                    break;
-                                case regridClause:
-                                    partitionName = grwAsClause->getChild(regridClauseArgAs)
-                                        ? grwAsClause->getChild(regridClauseArgAs)->asNodeString()->getVal()
-                                        : "";
-                                    break;
-                                case redimensionClause:
-                                    break;
-                                default:
-                                    assert(0);
+                                joinOrigin = true;
                             }
                         }
 
@@ -3212,8 +3333,10 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                             aggregateFunctions,
                             internalNameCounter,
                             selectListHasAggregates,
-                            partitionName,
-                            inputSchema);
+                            inputSchema,
+                            groupedDimensions,
+                            isWindowClause,
+                            joinOrigin);
 
 
                         // Prepare name for SELECT item result. If AS was used by user, we just copy it
@@ -3235,6 +3358,17 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                                 outputNameNode = new AstNodeString(stringNode, selItem->getParsingContext(),
                                     genUniqueObjectName(
                                         selItem->getChild(namedExprArgExpr)->getChild(functionArgName)->asNodeString()->getVal(),
+                                        externalAggregateCounter, inputSchemas, false, selectList->getChilds()));
+                            }
+                            else if (olapAggregate == selItem->getChild(namedExprArgExpr)->getType()
+                                && AggregateLibrary::getInstance()->hasAggregate(
+                                    selItem->getChild(namedExprArgExpr)->getChild(olapAggregateArgFunction)
+                                        ->getChild(functionArgName)->asNodeString()->getVal()))
+                            {
+                                AstNode* funcNode = selItem->getChild(namedExprArgExpr)->getChild(olapAggregateArgFunction);
+                                outputNameNode = new AstNodeString(stringNode, funcNode->getParsingContext(),
+                                    genUniqueObjectName(
+                                        funcNode->getChild(functionArgName)->asNodeString()->getVal(),
                                         externalAggregateCounter, inputSchemas, false, selectList->getChilds()));
                             }
                             else
@@ -3300,29 +3434,32 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
             }
         }
 
-        // Pass list of pre-aggregate evaluations and translate it into APPLY operators
-        BOOST_FOREACH(const AstNode *namedExprNode, preAggregationEvals)
+        if (preAggregationEvals.size())
         {
-            assert(namedExpr == namedExprNode->getType());
-            LOG4CXX_TRACE(logger, "Translating preAggregateEval into logical operator APPLY");
-
-            // This is internal output reference which will be used for aggregation
-            shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamAttributeReference>(
-                namedExprNode->getChild(namedExprArgName)->getParsingContext(),
-                "", namedExprNode->getChild(namedExprArgName)->asNodeString()->getVal(), false);
-
-            // This is expression which will be used as APPLY expression
-            shared_ptr<LogicalExpression> lExpr = AstToLogicalExpression(namedExprNode->getChild(namedExprArgExpr));
-            checkLogicalExpression(inputSchemas, ArrayDesc(), lExpr);
-            shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
-                namedExprNode->getChild(namedExprArgExpr)->getParsingContext(),
-                lExpr, TypeLibrary::getType(TID_VOID));
-
             LogicalOperator::Parameters applyParams;
-            applyParams.push_back(refParam);
-            applyParams.push_back(exprParam);
+            // Pass list of pre-aggregate evaluations and translate it into APPLY operators
+            LOG4CXX_TRACE(logger, "Translating preAggregateEval into logical operator APPLY");
+            BOOST_FOREACH(const AstNode *namedExprNode, preAggregationEvals)
+            {
+                assert(namedExpr == namedExprNode->getType());
+
+                // This is internal output reference which will be used for aggregation
+                shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamAttributeReference>(
+                    namedExprNode->getChild(namedExprArgName)->getParsingContext(),
+                    "", namedExprNode->getChild(namedExprArgName)->asNodeString()->getVal(), false);
+
+                // This is expression which will be used as APPLY expression
+                shared_ptr<LogicalExpression> lExpr = AstToLogicalExpression(namedExprNode->getChild(namedExprArgExpr));
+                checkLogicalExpression(inputSchemas, ArrayDesc(), lExpr);
+                shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
+                    namedExprNode->getChild(namedExprArgExpr)->getParsingContext(),
+                    lExpr, TypeLibrary::getType(TID_VOID));
+
+                applyParams.push_back(refParam);
+                applyParams.push_back(exprParam);
+            }
             LOG4CXX_TRACE(logger, "APPLY node appended");
-            result = appendOperator(result, "apply", applyParams, namedExprNode->getParsingContext());
+            result = appendOperator(result, "apply", applyParams, selectList->getParsingContext());
         }
 
         const vector<ArrayDesc> preEvalInputSchemas(1, result->inferTypes(query));
@@ -3331,40 +3468,197 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
         if (aggregateFunctions.size() > 0)
         {
             LOG4CXX_TRACE(logger, "Translating aggregate into logical aggregate call");
-            LogicalOperator::Parameters aggregateParams;
+            //WINDOW can be used multiple times so we have array of parameters for each WINDOW
+            std::map<std::string, std::pair<std::string, LogicalOperator::Parameters> > aggregateParams;
 
-            string aggregateOperator = "aggregate";
             if (grwAsClause)
             {
                 switch(grwAsClause->getType())
                 {
-                    case windowClause:
+                    case windowClauseList:
+                    {
+                        LOG4CXX_TRACE(logger, "Translating windows list");
+                        BOOST_FOREACH(AstNode* windowClause, grwAsClause->getChilds())
+                        {
+                            LOG4CXX_TRACE(logger, "Translating window");
+                            const AstNode* ranges = windowClause->getChild(windowClauseArgRangesList);
+                            typedef pair<AstNode*, AstNode*> pairOfNodes; //BOOST_FOREACH macro don't like commas
+                            vector<pairOfNodes> windowSizes(inputSchema.getDimensions().size(),
+                                    make_pair<AstNode*, AstNode*>(NULL, NULL));
+
+                            size_t inputNo;
+                            size_t dimNo;
+
+                            LogicalOperator::Parameters windowParams;
+                            LOG4CXX_TRACE(logger, "Translating dimensions of window");
+                            bool variableWindow = false;
+                            BOOST_FOREACH(AstNode* dimensionRange, ranges->getChilds())
+                            {
+                                variableWindow = windowClause->getChild(windowClauseArgVariableWindowFlag)->asNodeBool()->getVal();
+                                AstNode* dimNameClause = dimensionRange->getChild(windowDimensionRangeArgName);
+                                const string& dimName = dimNameClause->getChild(referenceArgObjectName)
+                                        ->asNodeString()->getVal();
+                                const string& dimAlias = dimNameClause->getChild(referenceArgArrayName)
+                                    ? dimNameClause->getChild(referenceArgArrayName)->asNodeString()->getVal()
+                                    : "";
+
+                                resolveDimension(inputSchemas, dimName, dimAlias, inputNo, dimNo,
+                                    dimNameClause->getParsingContext(), true);
+
+                                if (variableWindow)
+                                {
+                                    LOG4CXX_TRACE(logger, "This is variable_window so append dimension name");
+                                    shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamDimensionReference>(
+                                                            dimNameClause->getParsingContext(),
+                                                            dimAlias,
+                                                            dimName,
+                                                            true);
+                                    resolveParamDimensionReference(preEvalInputSchemas, refParam);
+                                    windowParams.push_back(refParam);
+                                }
+
+
+                                if (windowSizes[dimNo].first != NULL)
+                                {
+                                    throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_MULTIPLE_DIMENSION_SPECIFICATION,
+                                        dimNameClause->getParsingContext());
+                                }
+                                else
+                                {
+                                    LOG4CXX_TRACE(logger, "Append window sizes");
+                                    windowSizes[dimNo].first = dimensionRange->getChild(windowDimensionRangeArgPreceding);
+                                    windowSizes[dimNo].second = dimensionRange->getChild(windowDimensionRangeArgFollowing);
+                                }
+                            }
+
+                            if (!variableWindow && ranges->getChildsCount() < inputSchema.getDimensions().size())
+                            {
+                                throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_NOT_ENOUGH_DIMENSIONS_IN_SPECIFICATION,
+                                    windowClause->getParsingContext());
+                            }
+
+                            dimNo = 0;
+                            AstNode* unboundSizeAst = NULL;
+                            BOOST_FOREACH(pairOfNodes &wsize, windowSizes)
+                            {
+                                //For variable_window we use single dimension so skip other
+                                if (!wsize.first)
+                                    continue;
+                                if (wsize.first->asNodeInt64()->getVal() < 0)
+                                {
+                                    unboundSizeAst = new AstNodeInt64(int64Node,
+                                        wsize.first->getParsingContext(),
+                                        inputSchema.getDimensions()[dimNo].getLength());
+                                }
+
+                                windowParams.push_back(
+                                        make_shared<OperatorParamLogicalExpression>(
+                                            wsize.first->getParsingContext(),
+                                            AstToLogicalExpression(unboundSizeAst ? unboundSizeAst : wsize.first),
+                                            TypeLibrary::getType(TID_VOID)));
+
+                                if (unboundSizeAst)
+                                {
+                                    delete unboundSizeAst;
+                                    unboundSizeAst = NULL;
+                                }
+
+                                if (wsize.second->asNodeInt64()->getVal() < 0)
+                                {
+                                    unboundSizeAst = new AstNodeInt64(int64Node,
+                                        wsize.second->getParsingContext(),
+                                        inputSchema.getDimensions()[dimNo].getLength());
+                                }
+
+                                windowParams.push_back(
+                                        make_shared<OperatorParamLogicalExpression>(
+                                            wsize.second->getParsingContext(),
+                                            AstToLogicalExpression(unboundSizeAst ? unboundSizeAst : wsize.second),
+                                            TypeLibrary::getType(TID_VOID)));
+
+                                if (unboundSizeAst)
+                                {
+                                    delete unboundSizeAst;
+                                    unboundSizeAst = NULL;
+                                }
+                            }
+
+                            const string& windowName = windowClause->getChild(windowClauseArgName)->asNodeString()->getVal();
+
+                            LOG4CXX_TRACE(logger, "Window name is: " << windowName);
+                            if (aggregateParams.find(windowName) != aggregateParams.end())
+                            {
+                                LOG4CXX_TRACE(logger, "Such name already used. Halt.");
+                                throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_PARTITION_NAME_NOT_UNIQUE,
+                                    windowClause->getChild(windowClauseArgName)->getParsingContext());
+                            }
+
+                            aggregateParams[windowName] = make_pair(
+                                variableWindow ? "variable_window" : "window", windowParams);
+                        }
+
+                        LOG4CXX_TRACE(logger, "Done with windows list");
+                        break;
+                    }
+
                     case regridClause:
                     {
-                        const AstNode* regridWindowSizesAst = grwAsClause->getChild(regridClauseArgSizesList);
+                        LOG4CXX_TRACE(logger, "Translating regrid");
+                        const AstNode* regridDimensionsAST = grwAsClause->getChild(regridClauseArgDimensionsList);
+                        vector<AstNode*> regridSizes(inputSchema.getDimensions().size(), NULL);
 
-                        if (regridWindowSizesAst->getChildsCount() != preEvalInputSchemas[0].getDimensions().size())
+                        size_t inputNo;
+                        size_t dimNo;
+
+                        LOG4CXX_TRACE(logger, "Translating dimensions of window");
+                        BOOST_FOREACH(AstNode* regridDimension, regridDimensionsAST->getChilds())
+                        {
+                            AstNode* dimNameClause = regridDimension->getChild(regridDimensionArgName);
+                            const string& dimName = dimNameClause->getChild(referenceArgObjectName)
+                                ->asNodeString()->getVal();
+                            const string& dimAlias = dimNameClause->getChild(referenceArgArrayName)
+                                ? dimNameClause->getChild(referenceArgArrayName)->asNodeString()->getVal()
+                                : "";
+
+                            resolveDimension(inputSchemas, dimName, dimAlias, inputNo, dimNo,
+                                dimNameClause->getParsingContext(), true);
+
+                            if (regridSizes[dimNo] != NULL)
+                            {
+                                throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_MULTIPLE_DIMENSION_SPECIFICATION,
+                                    regridDimension->getParsingContext());
+                            }
+                            else
+                            {
+                                regridSizes[dimNo] = regridDimension->getChild(regridDimensionArgStep);
+                            }
+                        }
+
+                        if (regridDimensionsAST->getChildsCount() != preEvalInputSchemas[0].getDimensions().size())
                         {
                             throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX,
                                 SCIDB_LE_WRONG_REGRID_REDIMENSION_SIZES_COUNT,
-                                regridWindowSizesAst->getParsingContext());
+                                regridDimensionsAST->getParsingContext());
                         }
 
-                        BOOST_FOREACH(AstNode* gridSize, regridWindowSizesAst->getChilds())
+                        LogicalOperator::Parameters regridParams;
+                        BOOST_FOREACH(AstNode *size, regridSizes)
                         {
-                            shared_ptr<LogicalExpression> sizeExpr = AstToLogicalExpression(gridSize);
-
-                            aggregateParams.push_back(
+                            regridParams.push_back(
                                     make_shared<OperatorParamLogicalExpression>(
-                                        gridSize->getParsingContext(),
-                                        sizeExpr, TypeLibrary::getType(TID_VOID)));
+                                        size->getParsingContext(),
+                                        AstToLogicalExpression(size),
+                                        TypeLibrary::getType(TID_VOID)));
                         }
 
-                        aggregateOperator = grwAsClause->getType() == windowClause ? "window" : "regrid";
+                        aggregateParams[""] = make_pair("regrid", regridParams);
                         break;
                     }
                     case groupByClause:
+                    {
+                        aggregateParams[""] = make_pair("aggregate", LogicalOperator::Parameters());
                         break;
+                    }
                     case redimensionClause:
                     {
                         LOG4CXX_TRACE(logger, "Adding schema to REDIMENSION parameters");
@@ -3427,23 +3721,52 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                         //Ok. Adding schema parameter
                         ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims, 0);
                         LOG4CXX_TRACE(logger, "Schema for redimension " <<  redimensionSchema);
-                        aggregateParams.push_back(
+                        aggregateParams[""] = make_pair("redimension",
+                            LogicalOperator::Parameters(1,
                                 make_shared<OperatorParamSchema>(grwAsClause->getParsingContext(),
-                                                                 redimensionSchema));
+                                                                 redimensionSchema)));
 
-                        aggregateOperator = "redimension";
                         break;
                     }
                     default:
                         assert(0);
                 }
             }
+            else
+            {
+                //No additional parameters to aggregating operators
+                aggregateParams[""] = make_pair("aggregate", LogicalOperator::Parameters());
+            }
 
             BOOST_FOREACH(AstNode *aggCallNode, aggregateFunctions)
             {
-                assert(function == aggCallNode->getType());
                 LOG4CXX_TRACE(logger, "Translating aggregate into logical aggregate call");
-                aggregateParams.push_back(passAggregateCall(aggCallNode, preEvalInputSchemas));
+                if (function == aggCallNode->getType())
+                {
+                    if (isWindowClause
+                        && grwAsClause->getChildsCount() > 1)
+                    {
+                        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_PARTITION_NAME_NOT_SPECIFIED,
+                            aggCallNode->getParsingContext());
+                    }
+
+                    aggregateParams.begin()->second.second.push_back(passAggregateCall(aggCallNode, preEvalInputSchemas));
+                }
+                else if (olapAggregate == aggCallNode->getType())
+                {
+                    const string& partitionName = aggCallNode->getChild(olapAggregateArgPartitionName)
+                        ->asNodeString()->getVal();
+                    if (aggregateParams.end() == aggregateParams.find(partitionName))
+                        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_UNKNOWN_PARTITION_NAME,
+                            aggCallNode->getChild(olapAggregateArgPartitionName)->getParsingContext());
+
+                    aggregateParams[partitionName].second.push_back(passAggregateCall(
+                        aggCallNode->getChild(olapAggregateArgFunction), preEvalInputSchemas));
+                }
+                else
+                {
+                    assert(0);
+                }
             }
 
             if (grwAsClause)
@@ -3451,6 +3774,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                 switch(grwAsClause->getType())
                 {
                     case groupByClause:
+                    {
                         BOOST_FOREACH(const AstNode *groupByItem, grwAsClause->getChild(groupByClauseArgList)->getChilds())
                         {
                             switch(groupByItem->getType())
@@ -3473,7 +3797,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                                                             groupByItem->getChild(referenceArgObjectName)->asNodeString()->getVal(),
                                                             true);
                                     resolveParamDimensionReference(preEvalInputSchemas, refParam);
-                                    aggregateParams.push_back(refParam);
+                                    aggregateParams[""].second.push_back(refParam);
                                     break;
                                 }
 
@@ -3482,8 +3806,9 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                             }
                         }
                         break;
+                    }
 
-                    case windowClause:
+                    case windowClauseList:
                     case regridClause:
                     case redimensionClause:
                         break;
@@ -3495,33 +3820,64 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
 
             LOG4CXX_TRACE(logger, "AGGREGATE/REGRID/WINDOW node appended");
 
-            result = appendOperator(result, aggregateOperator, aggregateParams, selectList->getParsingContext());
+            std::map<std::string, std::pair<std::string, LogicalOperator::Parameters> >::const_iterator it = aggregateParams.begin();
+
+            shared_ptr<LogicalQueryPlanNode> left = appendOperator(result, it->second.first,
+                it->second.second, selectList->getParsingContext());
+
+            ++it;
+
+            for (;it != aggregateParams.end(); ++it)
+            {
+                shared_ptr<LogicalQueryPlanNode> right = appendOperator(result, it->second.first,
+                    it->second.second, selectList->getParsingContext());
+
+                shared_ptr<LogicalQueryPlanNode> node = make_shared<LogicalQueryPlanNode>(
+                    selectList->getParsingContext(), OperatorLibrary::getInstance()->createLogicalOperator("join"));
+                node->addChild(left);
+                node->addChild(right);
+                left = node;
+            }
+
+            result = left;
+        }
+
+        if (joinOrigin)
+        {
+            shared_ptr<LogicalQueryPlanNode> node = make_shared<LogicalQueryPlanNode>(
+                selectList->getParsingContext(), OperatorLibrary::getInstance()->createLogicalOperator("join"));
+            node->addChild(result);
+            node->addChild(input);
+            result = node;
         }
 
         const vector<ArrayDesc> aggInputSchemas(1, result->inferTypes(query));
 
-        // Finally pass all post-aggregate evaluations and translate it into APPLY operators
-        BOOST_FOREACH(const AstNode *namedExprNode, postAggregationEvals)
+        if (postAggregationEvals.size())
         {
-            assert(namedExpr == namedExprNode->getType());
-            LOG4CXX_TRACE(logger, "Translating postAggregateEval into logical operator APPLY");
-
-            // This is user output. Final attribute name will be used from AS clause (it can be defined
-            // by user in query or generated by us above)
             LogicalOperator::Parameters applyParams;
-            applyParams.push_back(make_shared<OperatorParamAttributeReference>(
-                namedExprNode->getChild(namedExprArgName)->getParsingContext(),
-                "", namedExprNode->getChild(namedExprArgName)->asNodeString()->getVal(), false));
+            // Finally pass all post-aggregate evaluations and translate it into APPLY operators
+            LOG4CXX_TRACE(logger, "Translating postAggregateEval into logical operator APPLY");
+            BOOST_FOREACH(const AstNode *namedExprNode, postAggregationEvals)
+            {
+                assert(namedExpr == namedExprNode->getType());
 
-            // This is expression which will be used as APPLY expression
-            shared_ptr<LogicalExpression> lExpr = AstToLogicalExpression(namedExprNode->getChild(namedExprArgExpr));
-            checkLogicalExpression(aggInputSchemas, ArrayDesc(), lExpr);
-            shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
-                namedExprNode->getChild(namedExprArgExpr)->getParsingContext(),
-                lExpr, TypeLibrary::getType(TID_VOID));
+                // This is user output. Final attribute name will be used from AS clause (it can be defined
+                // by user in query or generated by us above)
+                applyParams.push_back(make_shared<OperatorParamAttributeReference>(
+                    namedExprNode->getChild(namedExprArgName)->getParsingContext(),
+                    "", namedExprNode->getChild(namedExprArgName)->asNodeString()->getVal(), false));
 
-            applyParams.push_back(exprParam);
-            result = appendOperator(result, "apply", applyParams, namedExprNode->getParsingContext());
+                // This is expression which will be used as APPLY expression
+                shared_ptr<LogicalExpression> lExpr = AstToLogicalExpression(namedExprNode->getChild(namedExprArgExpr));
+                checkLogicalExpression(aggInputSchemas, ArrayDesc(), lExpr);
+                shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
+                    namedExprNode->getChild(namedExprArgExpr)->getParsingContext(),
+                    lExpr, TypeLibrary::getType(TID_VOID));
+
+                applyParams.push_back(exprParam);
+            }
+            result = appendOperator(result, "apply", applyParams, selectList->getParsingContext());
         }
 
         const vector<ArrayDesc> postEvalInputSchemas(1, result->inferTypes(query));
@@ -3600,7 +3956,7 @@ static string genUniqueObjectName(const string& prefix, unsigned int &initialCou
 
             BOOST_FOREACH(const DimensionDesc dim, schema.getDimensions())
             {
-                if (dim.hasNameOrAlias(name, ""))
+                if (dim.hasNameAndAlias(name, ""))
                     goto nextName;
             }
 
@@ -3619,5 +3975,251 @@ static string genUniqueObjectName(const string& prefix, unsigned int &initialCou
     return name;
 }
 
+static shared_ptr<LogicalQueryPlanNode> passThinClause(AstNode *ast, shared_ptr<Query> query)
+{
+    LOG4CXX_TRACE(logger, "Translating THIN clause");
+    AstNode* arrayRef = ast->getChild(thinClauseArgArrayReference);
+
+    shared_ptr<LogicalQueryPlanNode> result = AstToLogicalPlan(arrayRef, query);
+    prohibitDdl(result);
+
+    const ArrayDesc& thinInputSchema = result->inferTypes(query);
+
+    vector<PairOfNodes> thinStartStepList(thinInputSchema.getDimensions().size());
+
+    size_t inputNo;
+    size_t dimNo;
+
+    BOOST_FOREACH(PairOfNodes &startStep, thinStartStepList)
+    {
+        startStep.first = startStep.second = NULL;
+    }
+
+    LOG4CXX_TRACE(logger, "Translating THIN start-step pairs");
+    BOOST_FOREACH(AstNode* thinDimension, ast->getChild(thinClauseArgDimensionsList)->getChilds())
+    {
+        AstNode* dimNameClause = thinDimension->getChild(thinDimensionClauseArgName);
+        const string& dimName = dimNameClause->getChild(referenceArgObjectName)
+            ->asNodeString()->getVal();
+        const string& dimAlias = dimNameClause->getChild(referenceArgArrayName)
+            ? dimNameClause->getChild(referenceArgArrayName)->asNodeString()->getVal()
+            : "";
+
+        resolveDimension(vector<ArrayDesc>(1, thinInputSchema), dimName, dimAlias, inputNo, dimNo,
+            dimNameClause->getParsingContext(), true);
+
+        if (thinStartStepList[dimNo].first != NULL)
+        {
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_MULTIPLE_DIMENSION_SPECIFICATION,
+                dimNameClause->getParsingContext());
+        }
+        else
+        {
+            thinStartStepList[dimNo].first = thinDimension->getChild(thinDimensionClauseArgStart);
+            thinStartStepList[dimNo].second = thinDimension->getChild(thinDimensionClauseArgStep);
+        }
+    }
+
+    if (ast->getChild(thinClauseArgDimensionsList)->getChildsCount() < thinInputSchema.getDimensions().size())
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_NOT_ENOUGH_DIMENSIONS_IN_SPECIFICATION,
+            ast->getChild(thinClauseArgDimensionsList)->getParsingContext());
+    }
+
+    LogicalOperator::Parameters thinParams;
+    BOOST_FOREACH(PairOfNodes &startStep, thinStartStepList)
+    {
+        thinParams.push_back(
+            make_shared<OperatorParamLogicalExpression>(
+                startStep.first->getParsingContext(),
+                AstToLogicalExpression(startStep.first),
+                TypeLibrary::getType(TID_VOID)));
+        thinParams.push_back(
+            make_shared<OperatorParamLogicalExpression>(
+                startStep.second->getParsingContext(),
+                AstToLogicalExpression(startStep.second),
+                TypeLibrary::getType(TID_VOID)));
+    }
+
+    result = appendOperator(result, "thin", thinParams, ast->getParsingContext());
+
+    return result;
+}
+
+static void prohibitDdl(shared_ptr<LogicalQueryPlanNode> planNode)
+{
+    if (planNode->isDdl())
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_DDL_CANT_BE_NESTED,
+            planNode->getParsingContext());
+    }
+}
+
+static void passReference(const AstNode* ast, std::string& alias, std::string& name)
+{
+    if (ast->getChild(referenceArgTimestamp))
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_REFERENCE_EXPECTED,
+            ast->getChild(referenceArgTimestamp)->getParsingContext());
+    }
+
+    if (ast->getChild(referenceArgSortQuirk))
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_SORTING_QUIRK_WRONG_USAGE,
+            ast->getChild(referenceArgSortQuirk)->getParsingContext());
+    }
+
+    alias = ast->getChild(referenceArgArrayName) != NULL
+            ? ast->getChild(referenceArgArrayName)->asNodeString()->getVal()
+            : "";
+
+    name = ast->getChild(referenceArgObjectName)->asNodeString()->getVal();
+}
+
+static shared_ptr<LogicalQueryPlanNode> fitInput(
+    shared_ptr<LogicalQueryPlanNode> &input,
+    const ArrayDesc& destinationSchema,
+    shared_ptr<Query>& query)
+{
+    ArrayDesc inputSchema = input->inferTypes(query);
+    shared_ptr<LogicalQueryPlanNode> fittedInput = input;
+
+    if (!inputSchema.getEmptyBitmapAttribute()
+        && destinationSchema.getEmptyBitmapAttribute())
+    {
+        vector<shared_ptr<OperatorParam> > betweenParams;
+        BOOST_FOREACH(const DimensionDesc& dim, destinationSchema.getDimensions())
+        {
+            TypeId dimType = dim.getType();
+            Value bval(TypeLibrary::getType(dimType));
+            bval.setNull();
+            shared_ptr<OperatorParamLogicalExpression> param = make_shared<OperatorParamLogicalExpression>(
+                input->getParsingContext(),
+                make_shared<Constant>(input->getParsingContext(), bval, dimType),
+                TypeLibrary::getType(dimType), true);
+            betweenParams.push_back(param);
+            betweenParams.push_back(param);
+        }
+
+        fittedInput = appendOperator(input, "between", betweenParams, input->getParsingContext());
+        inputSchema = fittedInput->inferTypes(query);
+    }
+
+    bool needCast = false;
+    bool needRepart = false;
+
+    //Give up on casting if schema objects count differ. Nothing to do here.
+    if (destinationSchema.getAttributes().size()
+        == inputSchema.getAttributes().size()
+        && destinationSchema.getDimensions().size()
+            == inputSchema.getDimensions().size())
+    {
+        for (size_t attrNo = 0; attrNo < inputSchema.getAttributes().size();
+            ++attrNo)
+        {
+            const AttributeDesc &inAttr =
+                destinationSchema.getAttributes()[attrNo];
+            const AttributeDesc &destAttr = inputSchema.getAttributes()[attrNo];
+
+            //If attributes has differ names we need casting...
+            if (inAttr.getName() != destAttr.getName())
+                needCast = true;
+
+            //... but if type and flags differ we can't cast
+            if (inAttr.getType() != destAttr.getType()
+                || inAttr.getFlags() != destAttr.getFlags())
+            {
+                needCast = false;
+                goto noCastAndRepart;
+            }
+        }
+
+        for (size_t dimNo = 0; dimNo < inputSchema.getDimensions().size();
+            ++dimNo)
+        {
+            const DimensionDesc &destDim =
+                destinationSchema.getDimensions()[dimNo];
+            const DimensionDesc &inDim = inputSchema.getDimensions()[dimNo];
+
+            //If dimension has differ names we need casting...
+            if (inDim.getBaseName() != destDim.getBaseName())
+                needCast = true;
+
+            //If dimension has different chunk size we need repart..
+            if (inDim.getChunkOverlap() != destDim.getChunkOverlap()
+                || inDim.getChunkInterval() != destDim.getChunkInterval())
+                needRepart = true;
+
+            //... but if length or type of dimension differ we cant cast and repart
+            if (inDim.getStart() != destDim.getStart()
+                || inDim.getType() != destDim.getType()
+                || !(inDim.getEndMax() == destDim.getEndMax()
+                    || (inDim.getEndMax() < destDim.getEndMax()
+                        && ((inDim.getLength() % inDim.getChunkInterval()) == 0
+                            || inputSchema.getEmptyBitmapAttribute() != NULL))))
+            {
+                needCast = false;
+                needRepart = false;
+                goto noCastAndRepart;
+            }
+        }
+
+    }
+    noCastAndRepart:
+
+    try
+    {
+        if (needRepart)
+        {
+            shared_ptr<LogicalOperator> repartOp;
+            LOG4CXX_TRACE(logger, "Inserting REPART operator");
+            repartOp = OperatorLibrary::getInstance()->createLogicalOperator(
+                "repart");
+
+            LogicalOperator::Parameters repartParams(1,
+                make_shared<OperatorParamSchema>(input->getParsingContext(),
+                    destinationSchema));
+            repartOp->setParameters(repartParams);
+
+            shared_ptr<LogicalQueryPlanNode> tmpNode = make_shared<
+                LogicalQueryPlanNode>(input->getParsingContext(), repartOp);
+            tmpNode->addChild(fittedInput);
+            tmpNode->inferTypes(query);
+            fittedInput = tmpNode;
+        }
+        if (needCast)
+        {
+            shared_ptr<LogicalOperator> castOp;
+            LOG4CXX_TRACE(logger, "Inserting CAST operator");
+            castOp = OperatorLibrary::getInstance()->createLogicalOperator(
+                "cast");
+
+            LogicalOperator::Parameters castParams(1,
+                make_shared<OperatorParamSchema>(input->getParsingContext(),
+                    destinationSchema));
+            castOp->setParameters(castParams);
+
+            shared_ptr<LogicalQueryPlanNode> tmpNode = make_shared<
+                LogicalQueryPlanNode>(input->getParsingContext(), castOp);
+            tmpNode->addChild(fittedInput);
+            tmpNode->inferTypes(query);
+            fittedInput = tmpNode;
+        }
+    }
+    catch (const UserException& e)
+    {
+        if (SCIDB_SE_INFER_SCHEMA == e.getShortErrorCode())
+        {
+            LOG4CXX_TRACE(logger, "Can not infer schema from REPART and/or CAST. Give up.");
+        }
+        else
+        {
+            LOG4CXX_TRACE(logger, "Something going wrong");
+            throw;
+        }
+    }
+
+    return fittedInput;
+}
 
 } // namespace scidb

@@ -21,7 +21,7 @@
 */
 
 /*
- * @file PhysicalExample.cpp
+ * @file PhysicalSave.cpp
  *
  * @author roman.simakov@gmail.com
  *
@@ -36,6 +36,8 @@
 #include "smgr/io/DBLoader.h"
 #include "array/DBArray.h"
 #include "query/QueryProcessor.h"
+#include "system/Config.h"
+#include "system/SciDBConfigOptions.h"
 
 using namespace std;
 using namespace boost;
@@ -57,6 +59,35 @@ public:
     {
         return inputBoundaries[0];
     }
+    
+    int64_t getSourceInstanceID() const
+    {
+        if (_parameters.size() >= 2)
+        {
+            assert(_parameters[1]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
+            boost::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1];
+            assert(paramExpr->isConstant());
+            return paramExpr->getExpression()->evaluate().getInt64();
+        }
+        // return ALL_INSTANCES_MASK; -- old behaviour
+        return COORDINATOR_INSTANCE_MASK; // new behaviour compatible with LOAD/INPUT
+    }
+
+    virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
+    {
+        InstanceID sourceInstanceID = getSourceInstanceID();
+        if (sourceInstanceID == ALL_INSTANCES_MASK)
+        {
+            return DistributionRequirement(DistributionRequirement::Any);
+        }
+        else
+        {
+            vector<ArrayDistribution> requiredDistribution(1);
+            requiredDistribution[0] = ArrayDistribution(psLocalInstance, boost::shared_ptr<DistributionMapper>(), sourceInstanceID);
+            return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
+        }
+    }
+
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
                                      boost::shared_ptr<Query> query)
@@ -66,12 +97,18 @@ public:
 
         assert(_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
         const string& fileName = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
-
-        if (_parameters.size() > 1) {
-            const string& format = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
-            DBLoader::save(*inputArrays[0], fileName, format);
-        } else {
-            DBLoader::save(*inputArrays[0], fileName, "store");
+        string format = "store";
+        if (_parameters.size() >= 3) {
+            format = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getString();
+        }
+        InstanceID sourceInstanceID = getSourceInstanceID();
+        if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) { 
+            sourceInstanceID = query->getCoordinatorInstanceID();
+        }
+        InstanceID myInstanceID = query->getInstanceID();
+        if (sourceInstanceID == ALL_INSTANCES_MASK || sourceInstanceID == myInstanceID) { 
+            DBLoader::defaultPrecision = Config::getInstance()->getOption<int>(CONFIG_PRECISION);
+            DBLoader::save(*inputArrays[0], fileName, query, format);
         }
         return inputArrays[0];
     }

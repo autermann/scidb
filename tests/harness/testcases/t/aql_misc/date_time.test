@@ -15,11 +15,11 @@ build(A,'2011-11-30 23:0')
 build(A,'2011-11-30 23:0:000020')
 build(A,'2011-10-10 12:5:0.2')
 
---sleep 2
+
 --aql update A set a='2015-05-15 05:05:05' where x=0
---sleep 2
+
 --aql update A set a='2020-10-20 20:20:20' where x=2
---sleep 2
+
 
 --echo comparisons
 --aql select * from A where a = datetime('2010-10-10 01:12:21')
@@ -44,9 +44,9 @@ build(A,'2011-10-10 12:5:0.2')
 
 --echo update
 --aql update A set a='2001-01-01 00:00:00' where x=0
---sleep 2
+
 --aql update A set a='0001-01-01 01:01:01' where x=1
---sleep 2
+
 
 --echo versions
 --aql select * from A@1

@@ -107,7 +107,6 @@ target_link_libraries(scalar_proc_lib network_lib util_lib)
 
 set (qproc_src
     optimizer/Optimizer.cpp
-    optimizer/L2POptimizer.cpp
     optimizer/HabilisOptimizer.cpp
     QueryPlan.cpp
     OperatorLibrary.cpp
@@ -119,6 +118,7 @@ set (qproc_src
     Operator.cpp
 )
 
+set_source_files_properties(${query_parser_src} ${aql_scanner_fixed_src} ${afl_scanner_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses")
 add_library(qproc_lib STATIC ${qproc_src} ${query_parser_src} ${aql_scanner_fixed_src} ${afl_scanner_fixed_src} ${qproc_include})
 target_link_libraries(qproc_lib ${Boost_LIBRARIES})
 target_link_libraries(qproc_lib scalar_proc_lib compression_lib array_lib ops_lib system_lib)

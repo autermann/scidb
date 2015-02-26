@@ -46,10 +46,10 @@ class PhysicalThin: public  PhysicalOperator
 	{
 	}
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(const std::vector<ArrayDesc>&) const
     {
         //TODO:OPTAPI testme
-        return true;
+        return false;
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,

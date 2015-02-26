@@ -32,7 +32,7 @@
 
 #include <cstdlib>
 #include <iostream>
-#include "na.h"
+#include "util/na.h"
 #include "require.h"
 
 //
@@ -90,7 +90,7 @@ namespace NA {
     }
 
 } // namespace R
-} // namespace p4
+} // namespace scidb
 
 }
 

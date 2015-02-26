@@ -24,7 +24,7 @@
 #
 
 if [ 4 != $# ]; then
-	echo "Usage: $0 owner_name database_name owner's_database_password metadata";
+	echo "Usage: $0 owner_name database_name owner's_database_password";
 	exit;
 fi
 
@@ -32,7 +32,7 @@ PD_DIR=$(dirname $(readlink -f $0))
 owner=$1
 database=$2
 password=$3
-metadata=$4
+pgPort=$4
 
 function die()
 {
@@ -57,7 +57,7 @@ function read_yn()
 
 function user_exists()
 {
-    for u in $(echo "select u.usename from pg_catalog.pg_user u" | psql -q postgres|tail -n+3|head -n-2); do
+    for u in $(echo "select u.usename from pg_catalog.pg_user u" | psql -p $pgPort -q postgres|tail -n+3|head -n-2); do
 	if [[ "$u" = "$1" ]]; then
 	    echo "$u"
 	fi 
@@ -66,7 +66,7 @@ function user_exists()
 
 function db_exists()
 {
-    for d in $(echo "select d.datname from pg_catalog.pg_database d" | psql -q postgres|tail -n+3|head -n-2); do
+    for d in $(echo "select d.datname from pg_catalog.pg_database d" | psql -p $pgPort -q postgres|tail -n+3|head -n-2); do
 	if [[ "$d" = "$1" ]]; then
 	    echo "$d"
 	fi 
@@ -75,12 +75,12 @@ function db_exists()
 
 function db_adduser()
 {
-    echo "create role $1 with login password '$2'" | psql postgres
+    echo "create role $1 with login password '$2'" | psql -p $pgPort postgres
 }
 
 function plpgsql_exists()
 {
-    if [ "`echo "select count(*) from pg_language where lanname = 'plpgsql'" | psql $1|tail -n+3|head -n-2`" -eq 1 ]; then
+    if [ "`echo "select count(*) from pg_language where lanname = 'plpgsql'" | psql -p $pgPort $1|tail -n+3|head -n-2`" -eq 1 ]; then
         echo 1
     else
         echo 0
@@ -92,15 +92,14 @@ function db_init()
     local owner=$1
     local database=$2
     local password=$3
-    local metadata=$4
 
     createdb --owner "$owner" "$database" || die
     if [ `plpgsql_exists $database` = "0" ]; then
         echo "Creating language plpgsql for database $catalog_name..."
         createlang plpgsql "$database" || die
     fi
-    echo "update pg_language set lanpltrusted = true where lanname = 'c'" | psql "$database" || die
-    echo "grant usage on language c to $owner;" | psql "$database" || die
+    echo "update pg_language set lanpltrusted = true where lanname = 'c'" | psql -p $pgPort "$database" || die
+    echo "grant usage on language c to $owner;" | psql -p $pgPort "$database" || die
     
 #    export PGPASSWORD=$password
 #    echo metadata $metadata
@@ -113,7 +112,7 @@ echo "$(db_exists $database) is the result"
 
 if [[ $(db_exists $database) = $database ]]; then
     echo "Deleting $database..."
-    psql postgres -c "drop database $database;" || die
+    psql -p $pgPort postgres -c "drop database $database;" || die
 fi
 
 if [[ $(user_exists $owner) != $owner ]]; then
@@ -121,8 +120,8 @@ if [[ $(user_exists $owner) != $owner ]]; then
     db_adduser $owner $password || die
 fi
 
-db_init $owner $database $password $metadata
+db_init $owner $database $password
 
 echo Sample of connection string:
-echo host=localhost port=5432 dbname="$database" user="$owner" password="$password"
+echo host=localhost port="$pgPort" dbname="$database" user="$owner" password="$password"
 

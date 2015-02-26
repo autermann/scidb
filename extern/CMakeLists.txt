@@ -22,3 +22,4 @@
 
 add_subdirectory("lib_json")
 add_subdirectory("bsdiff")
+add_subdirectory("MurmurHash")

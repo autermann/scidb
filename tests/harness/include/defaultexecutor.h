@@ -56,11 +56,13 @@ struct ShellCommandOptions
 	ShellCommandOptions (void)
 	{
 		_store = false;
+		_cwd = "";
 	}
 
 	std::string _command;
 	std::string _outputFile;
 	int _store;
+	std::string _cwd;
 };
 
 /* struct to store arguments for options of --igdata command */
@@ -144,8 +146,13 @@ class DefaultExecutor : public Executor
 			_caseexecTime.totalTime   = -1;
 			_loggerEnabled = false;
 			_queryLogging = false;
+                        _ignoreWarnings = false;
 			_timerfileOpened = false;
 			_timerEnabled = false;
+			_outputFormat = "dcsv";
+			_errorCodesDiffer = false;
+			_precisionSet = false;
+			_precisionDefaultValue = 6;
 		}
 
 		~DefaultExecutor () throw()
@@ -203,6 +210,11 @@ class DefaultExecutor : public Executor
 		 */
 		bool _queryLogging;
 
+                /**
+                 * flag specifying whether to ignore warnings
+                 */
+                bool _ignoreWarnings;
+
 		/**
 		 * file for storing timer values
 		 */
@@ -210,6 +222,10 @@ class DefaultExecutor : public Executor
 		bool _timerfileOpened;
 		std::vector<std::string> _timerTags;
 		bool _timerEnabled;
+		std::string _outputFormat;
+		bool _errorCodesDiffer;
+		bool _precisionSet;
+		int _precisionDefaultValue;
 		boost::posix_time::ptime _timerStarttime;
 
 		/**
@@ -254,6 +270,9 @@ class DefaultExecutor : public Executor
  		 * @return SUCCESS
  		 */
 		int startTimer (const std::string &args); 
+		int setOutputFormat (const std::string &args);
+		int endOutputFormat (void);
+		int setPrecision (const std::string &args);
 
 		int Shell (ShellCommandOptions *sco);
 

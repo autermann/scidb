@@ -7,6 +7,10 @@ create empty array C <a:double>[b(double)=3,3,0]
 store(join(build_sparse(T,x+1+0.05,1),build_sparse(T,x+5+0.08,1)),A)
 
 --test
+
+#workaround for p4 bug 564
+--set-format csv+
+
 redimension_store(A,B)
 redimension_store(B,C)
 unpack(B,row)
@@ -71,6 +75,8 @@ sum(C1)
 sort(C1,a)
 sort(C1,a desc)
 rename(C1,C)
+
+--reset-format
 
 --cleanup
 remove(A)

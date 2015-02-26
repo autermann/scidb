@@ -36,6 +36,36 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: deldim().
+ *
+ * @par Synopsis:
+ *   deldim( srcArray )
+ *
+ * @par Summary:
+ *   Produces a result array with one fewer dimension than the source array, by deleting the first dimension which must have size 1.
+ *
+ * @par Input:
+ *   - srcArray: a source array with dim1, dim2, ..., dim_kThe first dimension must have size 1.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attrs
+ *   <br> >
+ *   <br> [
+ *   <br>   dim2, ..., dim_k
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalDeldim: public LogicalOperator
 {
 public:

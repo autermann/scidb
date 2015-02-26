@@ -37,6 +37,41 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: merge().
+ *
+ * @par Synopsis:
+ *   merge( leftArray, rightArray )
+ *
+ * @par Summary:
+ *   Combines elements from the input arrays the following way:
+ *   for each cell in the two inputs, if the cell of leftArray is not empty, the attributes from that cell are selected and placed in the output array;
+ *   otherwise, the attributes from the corresponding cell in rightArray are taken.
+ *   The two arrays should have the same attribute list, number of dimensions, and dimension start index.
+ *   If the dimensions are not the same size, the output array uses the larger of the two.
+ *
+ * @par Input:
+ *   - leftArray: the left-hand-side array.
+ *   - rightArray: the right-hand-side array.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   leftAttrs: which is equivalent to rightAttrs.
+ *   <br> >
+ *   <br> [
+ *   <br>   max(leftDims, rightDims): for each dim, use the larger of leftDim and rightDim.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalMerge: public LogicalOperator
 {
 public:
@@ -83,6 +118,12 @@ public:
                 {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
                 }
+
+                if (leftDimensions[i].getType() != TID_INT64)
+                {
+                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_NOT_IMPLEMENTED) << "merging dimensions of type other than int64";
+                }
+
                 DimensionDesc& dim = newDims[i];
                 dim = DimensionDesc(dim.getBaseName(),
                                     dim.getNamesAndAliases(),

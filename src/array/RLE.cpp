@@ -25,6 +25,7 @@
 #include "query/TypeSystem.h"
 #include "system/Config.h"
 #include "system/SciDBConfigOptions.h"
+#include "system/Utils.h"
 
 using namespace boost;
 using namespace std;
@@ -48,70 +49,6 @@ namespace scidb
         return true;
     }
                    
-    RLEBitmap& RLEBitmap::operator=(RLEBitmap const& other) 
-    {
-        nSegments = other.nSegments;
-        if (other.occ == &other.container[0]) { 
-            container = other.container;
-            occ = &container[0];
-        } else { 
-            occ = other.occ;
-        }
-        return *this;
-    }
-
-    RLEBitmap::RLEBitmap(ValueMap& vm, uint64_t chunkSize, bool defaultVal) 
-    { 
-        bool currVal = false;
-        position_t currPos = -1;
-        for (ValueMap::const_iterator i = vm.begin(); i != vm.end(); ++i) { 
-            assert(i->first > currPos);
-            if (i->second.getBool() != currVal || (i->first != currPos+1 && currVal != defaultVal)) { 
-                if (i->first != currPos+1) { // hole
-                    if (currVal != defaultVal) { 
-                        container.push_back(currPos); // sequence of currVal (where currVal != defaultVal)
-                        if (i->second.getBool() != defaultVal) { 
-                            container.push_back(i->first-1); // sequence of defaultVal
-                        }                        
-                    } else { 
-                        container.push_back(i->first-1); // sequence of defaultVal (where defaultVal != i->second)
-                    }
-                } else { 
-                    container.push_back(currPos);
-                }
-            }
-            currVal = i->second.getBool();
-            currPos = i->first;
-        }
-        if (currVal == defaultVal) { 
-            container.push_back(chunkSize-1);
-        } else { 
-            container.push_back(currPos);
-            if (currPos != position_t(chunkSize-1)) { 
-                container.push_back(chunkSize-1);
-            }
-        }
-        nSegments = container.size();
-        occ = &container[0];
-    }
-    
-    RLEBitmap::RLEBitmap(char* data, size_t chunkSize)
-    {
-        bool currVal = false;
-        for (size_t i = 0; i < chunkSize; i++) { 
-            bool newVal = (data[i >> 3] & (1 << (i & 7))) != 0;
-            if (newVal != currVal)  {
-                container.push_back(i-1);
-                currVal = newVal;
-            }
-        }
-        if (container.back() != position_t(chunkSize-1)) { 
-            container.push_back(chunkSize-1);
-        } 
-        nSegments = container.size();
-        occ = &container[0];
-    }
-
     size_t ConstRLEEmptyBitmap::packedSize() const {
         return sizeof(Header) + nSegs*sizeof(Segment);
     }
@@ -395,21 +332,391 @@ namespace scidb
             ppos += len;
         }
         return ppos;
-    }            
-        
-    RLEEmptyBitmap::RLEEmptyBitmap(Coordinates const& chunkSize, Coordinates const& origin, Coordinates const& first, Coordinates const& last)
-    {
-        uint64_t nElems = 1;
-        size_t n = chunkSize.size();
-        for (size_t i = 0; i < n; i++) { 
-            nElems *= chunkSize[i];
-        }
-        reserve(size_t(nElems/chunkSize[n-1]));
-        nNonEmptyElements = addRange(0, 0, nElems, 0, chunkSize, origin, first, last);
-        nSegs = container.size();
-        seg = &container[0];
     }
-        
+
+    /** /brief BitmapReplicator managed copier of bitmap (replicator). */
+    class BitmapReplicator : boost::noncopyable
+    {
+      public:
+        typedef ConstRLEEmptyBitmap::Segment Segment;
+
+      private:
+        /** result bitmap */
+        boost::shared_ptr<RLEEmptyBitmap> _resultBitmap;
+        /** current result segment (not added to result yet) */
+        Segment                           _resultSegment;
+
+        /** array with source bitmap segments */
+        Segment const * _sourceArray;
+        size_t          _sourceCount;
+        size_t          _sourceIndex;
+        Segment         _sourceSegment;
+
+
+      private:
+        /** flush - add (if available) current result segment to result bitmap  */
+        void _flush()
+        {
+            if (_resultSegment.length > 0) {
+                SCIDB_ASSERT(_resultSegment.lPosition != static_cast<position_t>(-1));
+                SCIDB_ASSERT(_resultSegment.pPosition != static_cast<position_t>(-1));
+                _resultBitmap->addSegment(_resultSegment);
+                _resultSegment.length = 0;
+            }
+        }
+
+      public:
+        BitmapReplicator(Segment* sourceArray, size_t sourceCount) :
+            _resultBitmap(new RLEEmptyBitmap()),
+            _sourceArray(sourceArray),
+            _sourceCount(sourceCount),
+            _sourceIndex(0)
+        {
+            _resultSegment.lPosition = static_cast<position_t>(-1);
+            _resultSegment.pPosition = static_cast<position_t>(-1);
+            _resultSegment.length = 0;
+            if (!end()) {
+                _sourceSegment = _sourceArray[0];
+                _resultSegment.lPosition = _sourceSegment.lPosition;
+                _resultSegment.pPosition = _sourceSegment.pPosition;
+            }
+        }
+
+        /** logical position of current source segment. */
+        position_t position() const
+        {
+            SCIDB_ASSERT(!end());
+            return _sourceSegment.lPosition;
+        }
+
+        /** length of current source segment. */
+        position_t length() const
+        {
+            SCIDB_ASSERT(!end());
+            return _sourceSegment.length;
+        }
+
+        /** skip @param count positions from current source segment. */
+        void skip(position_t count)
+        {
+            SCIDB_ASSERT(!end());
+            SCIDB_ASSERT(count <= _sourceSegment.length);
+            _sourceSegment.lPosition += count;
+            _sourceSegment.pPosition += count;
+            _sourceSegment.length -= count;
+        }
+
+        /**
+          * copy @param count positions from current source segment
+          * to current result segment.
+          */
+        void copy(position_t count)
+        {
+            SCIDB_ASSERT(!end());
+            if (_resultSegment.length > 0) {
+                position_t source = _sourceSegment.lPosition;
+                position_t result = _resultSegment.lPosition + _resultSegment.length;
+                SCIDB_ASSERT(result <= source);
+                if (result < source) {
+                    _flush();
+                }
+            }
+            SCIDB_ASSERT(count <= _sourceSegment.length);
+            if (_resultSegment.length == 0) {
+                _resultSegment.lPosition = _sourceSegment.lPosition;
+                _resultSegment.pPosition = _sourceSegment.pPosition;
+            }
+            _resultSegment.length += count;
+            skip(count);
+        }
+
+        /** move to next source segment */
+        void next()
+        {
+            SCIDB_ASSERT(!end());
+            SCIDB_ASSERT(_sourceSegment.length == 0);
+            ++_sourceIndex;
+            if (!end()) {
+                _sourceSegment = _sourceArray[_sourceIndex];
+            }
+        }
+
+        /** source completed */
+        bool end() const
+        {
+            SCIDB_ASSERT(_sourceIndex <= _sourceCount);
+            return _sourceIndex == _sourceCount;
+        }
+
+        /** get result bitmap */
+        boost::shared_ptr<RLEEmptyBitmap> result()
+        {
+            _flush();
+            boost::shared_ptr<RLEEmptyBitmap> result = _resultBitmap;
+            _resultBitmap.reset();
+            return result;
+        }
+    };
+
+    /** /brief Cut manager of replicator which cut the area outbound subarray */
+    class Cut : boost::noncopyable
+    {
+      private:
+        position_t _prefix;
+        position_t _suffix;
+        position_t _interval;
+        position_t _main;
+        boost::shared_ptr<Cut> _nested;
+
+      private:
+        Cut()
+        {
+        }
+
+        position_t init(Coordinates const& lowerOrigin,
+                        Coordinates const& upperOrigin,
+                        Coordinates const& lowerResult,
+                        Coordinates const& upperResult,
+                        size_t index)
+        {
+            SCIDB_ASSERT(lowerOrigin[index] <= lowerResult[index]);
+            SCIDB_ASSERT(lowerResult[index] <= upperResult[index]);
+            SCIDB_ASSERT(upperResult[index] <= upperOrigin[index]);
+            _prefix = lowerResult[index] - lowerOrigin[index];
+            _suffix = upperOrigin[index] - upperResult[index];
+            _interval = upperOrigin[index] + 1 - lowerOrigin[index];
+            ++index;
+            position_t multiplier = 1;
+            if (index < lowerOrigin.size()) {
+                _nested = boost::shared_ptr<Cut>(new Cut());
+                multiplier = _nested->init(lowerOrigin, upperOrigin,
+                                           lowerResult, upperResult,
+                                           index);
+                if (_nested->_prefix == 0 && _nested->_suffix == 0 && !_nested->_nested) {
+                    _nested.reset();
+                }
+            }
+            _prefix *= multiplier;
+            _suffix *= multiplier;
+            _interval *= multiplier;
+            _main = _interval - _prefix - _suffix;
+            return _interval;
+        }
+
+      public:
+        /**
+         * Constructor for Cut algorithm
+         *
+         * @param lowerOrigin lower coordinates of original array.
+         * @param upperOrigin upper coordinates of original array.
+         * @param lowerResult lower coordinates of subarray.
+         * @param lowreResult lower coordinates of subarray.
+         *
+         */
+        Cut(Coordinates const& lowerOrigin,
+            Coordinates const& upperOrigin,
+            Coordinates const& lowerResult,
+            Coordinates const& upperResult)
+        {
+            size_t const n(lowerOrigin.size());
+            SCIDB_ASSERT(n > 0);
+            SCIDB_ASSERT(n == upperOrigin.size());
+            SCIDB_ASSERT(n == lowerResult.size());
+            SCIDB_ASSERT(n == upperResult.size());
+            init(lowerOrigin, upperOrigin, lowerResult, upperResult, 0);
+        }
+
+        /**
+          *  DataReplicator - class without following interface:
+          *    - position_t position() const - logical position where source starts.
+          *    - position_t length() const - length of source.
+          *    - void skip(position_t count) - skip the count positions from source.
+          *    - void copy(position_t count) - copy the count positions from source
+          *        to result.
+          *
+          *  @param replicator should provide four described method
+          */
+        template< typename DataReplicator >
+        void operator()(DataReplicator& replicator) const
+        {
+            process(replicator);
+        }
+
+      private:
+        template< typename DataReplicator >
+        position_t process(DataReplicator& replicator) const
+        {
+            position_t result = 0;
+
+            if (replicator.length() == 0) {
+                /* source segment completed */
+                return result;
+            }
+
+            /*
+             * Where source starts (relative to dimension begin)?
+             *
+             *                       source
+             *                        <==>
+             * PREFIX & MAIN & SUFFIX [__|__]
+             *                           ^
+             *                           |
+             *                         source segment logical position
+             */
+            position_t source = replicator.position() % _interval;
+
+            /*
+             * How many position absent in MAIN (not overlap) area?
+             *
+             *                          skipMain
+             *                          <==>
+             * PREFIX[___] MAIN & SUFFIX[__|__]
+             *                             ^
+             *                             |
+             *                         source segment logical position
+             */
+            position_t skipMain;
+
+            if (source < _prefix) {
+                /*
+                 * Source starts inside PREFIX.
+                 *
+                 * How many position absent in MAIN (not overlap) area?
+                 *          skipPrefix
+                 *          <==>
+                 * PREFIX[__|__] MAIN[___] SUFFIX [___]
+                 *          ^
+                 *          |
+                 *        source segment logical position
+                 */
+
+                position_t skipPrefix = min(_prefix - source, replicator.length());
+                result += skipPrefix;
+
+                /* skip tail of PREFIX */
+                replicator.skip(skipPrefix);
+
+                if (replicator.length() == 0) {
+                    /* source segment completed */
+                    return result;
+                }
+
+                /*
+                 * Now we exactly on begin of MAIN, and skipMain equal zero.
+                 *
+                 * PREFIX[___] MAIN[|__] SUFFIX[___]
+                 *                  ^
+                 *                  |
+                 *                source segment logical position
+                 */
+                skipMain = 0;
+            } else {
+                /*
+                 * Source starts in MAIN or SUFFIX.
+                 *
+                 * PREFIX[___] MAIN & SUFFIX [__|__]
+                 *                              ^
+                 *                              |
+                 *                            source
+                 */
+                skipMain = source - _prefix;
+            }
+
+            SCIDB_ASSERT(replicator.length() > 0);
+
+            if (skipMain < _main) {
+                /*
+                 * Source starts in MAIN area.
+                 *
+                 * How many position should we copy?
+                 *                       copy
+                 *                       <==>
+                 * PREFIX[___] MAIN[____|____] SUFFIX[___]
+                 *                      ^
+                 *                      |
+                 *                    source
+                 */
+                position_t copy = min(_main - skipMain, replicator.length());
+
+                if (_nested) {
+                    /* We have nested dimensions (not fully included) */
+                    while(copy > 0) {
+                        SCIDB_ASSERT(replicator.length() > 0);
+                        /* Process one line from nested dimension */
+                        position_t step = _nested->process(replicator);
+                        copy -= step;
+                        source += step;
+                        result += step;
+                    }
+                } else {
+                    /*
+                      We do not have nested dimensions
+                      (or their fully included).
+                    */
+                    position_t step = min(copy, replicator.length());
+                    replicator.copy(step);
+                    source += step;
+                    result += step;
+                }
+
+                /*
+                 * We are leaving MAIN area
+                 *
+                 *                      copy
+                 *                   <==========>
+                 * PREFIX[___] MAIN[_|_] SUFFIX[|__]
+                 *                   ^          ^
+                 *                   |          |
+                 *                 source      source+copy
+                 */
+            }
+
+            if (replicator.length() == 0) {
+                /* source segment completed */
+                return result;
+            }
+
+            /*
+             * Source now in SUFFIX.
+             *
+             * PREFIX[___] MAIN[___] SUFFIX[_|_]
+             *                               ^
+             *                               |
+             *                             source
+             */
+            position_t suffixLeft = min(_interval - source, replicator.length());
+            replicator.skip(suffixLeft);
+
+            result += suffixLeft;
+
+            return result;
+
+        }
+    };
+
+    boost::shared_ptr<RLEEmptyBitmap> ConstRLEEmptyBitmap::cut(
+            Coordinates const& lowerOrigin,
+            Coordinates const& upperOrigin,
+            Coordinates const& lowerResult,
+            Coordinates const& upperResult) const
+    {
+        BitmapReplicator replicator(seg, nSegs);
+
+        /* I prevent creation of "Cut" on empty bitmaps (for fast work) */
+        if (replicator.end()) {
+            return replicator.result();
+        }
+
+        Cut cut(lowerOrigin, upperOrigin, lowerResult, upperResult);
+
+        while(!replicator.end()) {
+            cut(replicator);
+            SCIDB_ASSERT(replicator.length() == 0);
+            replicator.next();
+        }
+
+        return replicator.result();
+    }
 
     RLEEmptyBitmap::RLEEmptyBitmap(ValueMap& vm, bool all)
     { 
@@ -565,33 +872,64 @@ namespace scidb
         size_t nDims = dims.size();
 
         RLEPayload::append_iterator appender(value.getTile(dims[dim].getType()));
-        if (array.getEmptyBitmapAttribute() != NULL) { 
-            Coordinates origin = chunkPos;
+        if (array.getEmptyBitmapAttribute() != NULL) {
+            Coordinates origin(nDims);
             Coordinates currPos(nDims);
             Coordinates chunkIntervals(nDims);
+            Coordinates overlapBegin(nDims);
+            Coordinates overlapEnd(nDims);
             position_t  startPos = 0;
-            
+
             for (size_t i = 0; i < nDims; i++) {             
-                origin[i] -= dims[i].getChunkOverlap();
-                chunkIntervals[i] = dims[i].getChunkOverlap()*2 + dims[i].getChunkInterval();
+                //Coordinate of first chunk element, including overlaps
+                origin[i] = max(dims[i].getStartMin(), chunkPos[i] - dims[i].getChunkOverlap());
+                //Coordinate of last chunk element, including overlaps
+                Coordinate terminus = min(dims[i].getEndMax(), chunkPos[i] + dims[i].getChunkInterval() + dims[i].getChunkOverlap() - 1);
+                chunkIntervals[i] = terminus - origin[i] + 1;
                 startPos *= chunkIntervals[i];
                 startPos += tilePos[i] - origin[i];
+                overlapBegin[i] = max(dims[i].getStartMin(), chunkPos[i]);
+                overlapEnd[i] = min(dims[i].getEndMax(), chunkPos[i] + dims[i].getChunkInterval() - 1);
             }
-            
+
+
             iterator it(this);
-            while (!it.end()) { 
-                position_t pPos = it.getPPos();
-                if (it.checkBit()) { 
-                    position_t pos = startPos + pPos;
-                    for (size_t i = nDims; i-- != 0;) { 
-                        currPos[i] = origin[i] + (pos % chunkIntervals[i]);
-                        pos /= chunkIntervals[i];
+            if (withOverlap) {
+                while (!it.end()) {
+                    position_t pPos = it.getPPos();
+                    if (it.checkBit()) {
+                        position_t pos = startPos + pPos;
+                        for (size_t i = nDims; i-- != dim;) {
+                            currPos[i] = origin[i] + (pos % chunkIntervals[i]);
+                            pos /= chunkIntervals[i];
+                        }
+                        appender.add(array.getOriginalCoordinate(dim, currPos[dim], query));
+                        ++it;
+                    } else {
+                        it += it.getRepeatCount();
                     }
-                    assert(pos == 0);
-                    appender.add(array.getOriginalCoordinate(dim, currPos[dim], query));
-                    ++it;
-                } else { 
-                    it += it.getRepeatCount();
+                }
+            } else {
+                while (!it.end()) {
+                    position_t pPos = it.getPPos();
+                    if (it.checkBit()) {
+                        bool skip = false;
+                        position_t pos = startPos + pPos;
+                        for (size_t i = nDims; i-- != dim;) {
+                            currPos[i] = origin[i] + (pos % chunkIntervals[i]);
+                            if ( ((currPos[i] < overlapBegin[i]) || (currPos[i] > overlapEnd[i])) ) {
+                                skip = true;
+                                break;
+                            }
+                            pos /= chunkIntervals[i];
+                        }
+                        if (!skip) {
+                            appender.add(array.getOriginalCoordinate(dim, currPos[dim], query));
+                        }
+                        ++it;
+                    } else {
+                        it += it.getRepeatCount();
+                    }
                 }
             }
         } else {
@@ -600,48 +938,48 @@ namespace scidb
             uint64_t interval = 1;
             uint64_t offset = 0;
             Coordinates pos = tilePos;
-            if (withOverlap) { 
+            if (withOverlap) {
                 start = max(dims[dim].getStart(), Coordinate(chunkPos[dim] - dims[dim].getChunkOverlap()));
                 end = min(dims[dim].getEndMax(), Coordinate(chunkPos[dim] + dims[dim].getChunkInterval() + dims[dim].getChunkOverlap() - 1));
-                for (size_t i = nDims; i-- != 0; ) { 
-                    if (pos[i] > dims[i].getEndMax()) { 
-                        for (size_t j = 0; j < nDims; j++) { 
+                for (size_t i = nDims; i-- != 0; ) {
+                    if (pos[i] > dims[i].getEndMax()) {
+                        for (size_t j = 0; j < nDims; j++) {
                             pos[j] = max(dims[j].getStart(), Coordinate(chunkPos[j] - dims[j].getChunkOverlap()));
                         }
-                        if (i != 0) { 
+                        if (i != 0) {
                             pos[i-1] += 1;
                         }
-                    } else if (pos[i] < dims[i].getStart()) { 
+                    } else if (pos[i] < dims[i].getStart()) {
                         pos[i] = dims[i].getStart();
                     }
                 }
-                for (size_t i = dim; ++i < nDims;) { 
+                for (size_t i = dim; ++i < nDims;) {
                     Coordinate rowStart = max(dims[i].getStart(), Coordinate(chunkPos[i] - dims[i].getChunkOverlap()));
-                    Coordinate rowEnd = min(dims[i].getEndMax(), Coordinate(chunkPos[i] + dims[i].getChunkInterval() + dims[i].getChunkOverlap() - 1));                    
+                    Coordinate rowEnd = min(dims[i].getEndMax(), Coordinate(chunkPos[i] + dims[i].getChunkInterval() + dims[i].getChunkOverlap() - 1));
                     uint64_t rowLen = rowEnd - rowStart + 1;
                     interval *= rowLen;
                     offset *= rowLen;
                     assert(pos[i] >= rowStart);
                     offset += pos[i] - rowStart;
                 }
-            } else { 
+            } else {
                 start = chunkPos[dim];
                 end = min(dims[dim].getEndMax(), Coordinate(chunkPos[dim] + dims[dim].getChunkInterval() - 1));
-                for (size_t i = nDims; i-- != 0; ) { 
-                    if (pos[i] > dims[i].getEndMax() || pos[i] >= chunkPos[i] + dims[i].getChunkInterval()) { 
-                        for (size_t j = 0; j < nDims; j++) { 
+                for (size_t i = nDims; i-- != 0; ) {
+                    if (pos[i] > dims[i].getEndMax() || pos[i] >= chunkPos[i] + dims[i].getChunkInterval()) {
+                        for (size_t j = 0; j < nDims; j++) {
                             pos[j] = chunkPos[j];
                         }
-                        if (i != 0) { 
+                        if (i != 0) {
                             pos[i-1] += 1;
                         }
-                    } else if (pos[i] < chunkPos[i]) { 
+                    } else if (pos[i] < chunkPos[i]) {
                         pos[i] = chunkPos[i];
                     }
                 }
-                for (size_t i = dim; ++i < nDims;) { 
+                for (size_t i = dim; ++i < nDims;) {
                     Coordinate rowStart = chunkPos[i];
-                    Coordinate rowEnd = min(dims[i].getEndMax(), Coordinate(chunkPos[i] + dims[i].getChunkInterval() - 1));                    
+                    Coordinate rowEnd = min(dims[i].getEndMax(), Coordinate(chunkPos[i] + dims[i].getChunkInterval() - 1));
                     uint64_t rowLen = rowEnd - rowStart + 1;
 
                     interval *= rowLen;
@@ -654,18 +992,18 @@ namespace scidb
             assert(curr >= start && curr <= end);
             assert(offset < interval);
             uint64_t len = interval - offset;
-            uint64_t n = count(); 
+            uint64_t n = count();
             if (n != 0) {
-                while (true) { 
+                while (true) {
                     appender.add(array.getOriginalCoordinate(dim, curr, query), len);
-                    if (n <= len)  { 
+                    if (n <= len)  {
                         break;
                     }
                     n -= len;
                     len = interval;
-                    if (++curr > end) { 
+                    if (++curr > end) {
                         curr = start;
-                    }                    
+                    }
                 }
             }
         }
@@ -707,7 +1045,7 @@ namespace scidb
         hdr->varOffs = varOffs;
         hdr->isBoolean = isBoolean;
         dst += sizeof(Header);
-        if (seg != NULL) { // in case of tile append payload may stay without terination element
+        if (seg != NULL) { // in case of tile append payload may stay without termination element
             memcpy(dst, seg, (nSegs+1)*sizeof(Segment));
         } else { 
             assert(nSegs == 0);
@@ -1019,6 +1357,48 @@ namespace scidb
         nSegs = container.size();
         currSeg.pPosition = nElems;
         container.push_back(currSeg); // terminating segment (needed to calculate size)
+
+        seg = &container[0];
+        data.resize(dataSize + varPart.size());
+        memcpy(&data[dataSize], &varPart[0], varPart.size());
+        payload = &data[0];
+        varOffs = dataSize;
+        dataSize += varPart.size();
+        _valuesCount = valueIndex;
+    }
+
+    RLEPayload::RLEPayload(Value const& defaultVal, size_t logicalSize, size_t elemSize, bool isBoolean)
+    {
+        Segment currSeg;
+        currSeg.same = true;
+        currSeg.pPosition = 0;
+
+        vector<char> varPart;
+        this->elemSize = elemSize;
+        this->isBoolean = isBoolean;
+
+        // write default value
+        dataSize = 0;
+        size_t valueIndex = 0;
+        if (!defaultVal.isNull()) {
+            appendValue(varPart, defaultVal, valueIndex);
+            valueIndex += 1;
+        }
+
+        // generate one segment of default values
+        if (defaultVal.isNull()) {
+            currSeg.null = true;
+            currSeg.valueIndex = defaultVal.getMissingReason();
+        } else {
+            currSeg.null = false;
+            currSeg.valueIndex = 0;
+        }
+        container.push_back(currSeg);
+
+        // generate the terminating segment
+        nSegs = container.size();
+        currSeg.pPosition = logicalSize;
+        container.push_back(currSeg);
 
         seg = &container[0];
         data.resize(dataSize + varPart.size());
@@ -1497,7 +1877,7 @@ namespace scidb
         result->flush(segm.pPosition + segLength);
     }
         
-    uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit) 
+uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool setupPrevVal) 
     { 
         uint64_t count = min(limit, ii.available());
         if (ii.isNull()) {                            
@@ -1518,7 +1898,7 @@ namespace scidb
                 segLength = 0;
             }
             if (segLength == 0) { 
-                segm.same = ii.isSame();
+                segm.same = (count == 1) || ii.isSame();
                 segm.valueIndex = valueIndex;
                 segm.null = false;
             } else { 
@@ -1537,7 +1917,15 @@ namespace scidb
                 result->data.resize(result->dataSize + size);
                 memcpy(& result->data[result->dataSize], ii.getFixedValues(), size);
                 result->dataSize += size;
-                ii += count;
+                if (setupPrevVal) {
+                    if (count > 1) {
+                        ii += count-1;
+                    }
+                    ii.getItem(*prevVal);
+                    ii += 1;
+                } else {
+                    ii += count;
+                }
             } else {
                 if (segm.same) {
                     ii.getItem(*prevVal);

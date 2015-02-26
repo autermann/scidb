@@ -31,6 +31,8 @@
 #include "query/Expression.h"
 #include "query/TileFunctions.h"
 
+#include "query/ops/analyze/AnalyzeAggregate.h"
+
 #include <math.h>
 #include <log4cxx/logger.h>
 
@@ -50,11 +52,11 @@ protected:
 
     string _accumulateOp;
     Expression _accumulateExpression;
-    shared_ptr<ExpressionContext> _accumulateContext;
+    boost::shared_ptr<ExpressionContext> _accumulateContext;
 
     string _mergeOp;
     Expression _mergeExpression;
-    shared_ptr<ExpressionContext> _mergeContext;
+    boost::shared_ptr<ExpressionContext> _mergeContext;
 
     bool _initByFirstValue;
 
@@ -70,11 +72,11 @@ public:
         types[0] = stateType.typeId();
         types[1] = aggregateType.typeId();
         _accumulateExpression.compile(accumulateOp, names, types, stateType.typeId());
-        _accumulateContext = shared_ptr<ExpressionContext>(new ExpressionContext(_accumulateExpression));
+        _accumulateContext = boost::shared_ptr<ExpressionContext>(new ExpressionContext(_accumulateExpression));
 
         types[1] = stateType.typeId();
         _mergeExpression.compile(mergeOp, names, types);
-        _mergeContext = shared_ptr<ExpressionContext>(new ExpressionContext(_mergeExpression));
+        _mergeContext = boost::shared_ptr<ExpressionContext>(new ExpressionContext(_mergeExpression));
     }
 
     virtual AggregatePtr clone() const
@@ -100,9 +102,10 @@ public:
     void initializeState(Value& state)
     {
         state = Value(getStateType());
-        state.setZero();
+        setDefaultValue(state, getStateType().typeId());
         if (_initByFirstValue) {
-            state.setNull();
+            //We use missing code 1 because missing code 0 has special meaning to the aggregate framework.
+            state.setNull(1);
         }
     }
 
@@ -186,7 +189,7 @@ public:
     void initializeState(Value& state)
     {
         state = Value(getStateType());
-        state.setZero();
+        setDefaultValue(state, getStateType().typeId());
     }
 
     bool ignoreNulls() const
@@ -240,7 +243,7 @@ public:
     {
         if (state.isNull())
         {
-            result.setZero();
+            setDefaultValue(result, getResultType().typeId());
             return;
         }
 
@@ -330,6 +333,9 @@ AggregateLibrary::AggregateLibrary()
     addAggregate(AggregatePtr(new BaseAggregate<AggStDev, uint64_t, double>("stdev", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE))));
     addAggregate(AggregatePtr(new BaseAggregate<AggStDev, float, double>("stdev", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE))));
     addAggregate(AggregatePtr(new BaseAggregate<AggStDev, double, double>("stdev", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+
+    /** ApproxDC (ANALYZE) **/
+    addAggregate(AggregatePtr(new AnalyzeAggregate()));
 }
 
 

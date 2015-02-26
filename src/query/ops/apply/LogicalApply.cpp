@@ -38,10 +38,55 @@ namespace scidb {
 
 using namespace std;
 
-class Apply: public  LogicalOperator
+/**
+ * @brief The operator: apply().
+ *
+ * @par Synopsis:
+ *   apply(srcArray {, newAttr, expression}+)
+ *
+ * @par Summary:
+ *   Produces a result array with new attributes and computes values for them.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 1 or more pairs of a new attribute and the expression to compute the values for the attribute.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br>   the list of newAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - apply(A, unitprice, sales/quantity) <quantity: uint64, sales: double, unitprice: double> [year, item] =
+ *     <br> year, item, quantity, sales, unitprice
+ *     <br> 2011,  2,      7,     31.64,   4.52
+ *     <br> 2011,  3,      6,     19.98,   3.33
+ *     <br> 2012,  1,      5,     41.65,   8.33
+ *     <br> 2012,  2,      9,     40.68,   4.52
+ *     <br> 2012,  3,      8,     26.64,   3.33
+ *
+ * @par Errors:
+ *   - SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DUPLICATE_ATTRIBUTE_NAME, if a new attribute has the same name as an existing attribute.
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
+class LogicalApply: public  LogicalOperator
 {
 public:
-    Apply(const std::string& logicalName, const std::string& alias):
+    LogicalApply(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
         _properties.tile = true;
@@ -105,6 +150,11 @@ public:
             const string &attributeName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[k])->getObjectName();
             Expression expr;
             expr.compile(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
+            if (_properties.tile && expr.isConstant()) {
+                // TODO: it's not good to switch off tiles if we have constant. See #1587 for more details.
+                _properties.tile = false;
+                expr.compile(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
+            }
             int flags = 0;
             if (expr.isNullable())
             {
@@ -155,7 +205,7 @@ public:
     }
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Apply, "apply")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalApply, "apply")
 
 
 }  // namespace scidb

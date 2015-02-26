@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- This document was created with Syntext Serna Free. --><!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" []>
+<refentry>
+  <refnamediv>
+    <refname>rank</refname>
+    <refpurpose>Rank array elements</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command>
+     rank(<replaceable>array</replaceable>, [<replaceable>attribute</replaceable> [, <replaceable>dimension1</replaceable> [, <replaceable>dimension2</replaceable>... ]]
+[<replaceable>attribute2</replaceable> [, <replaceable>dimension</replaceable>...]]])</synopsis>
+    <synopsis><command>SELECT</command> * <command>FROM</command> rank(<replaceable>array</replaceable><optional>,<replaceable>attribute1</replaceable>,<replaceable>attribute2,...</replaceable></optional>
+     <optional>,<replaceable>dimension1</replaceable>,<replaceable>dimension2</replaceable>,...</optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>Ranking array elements sorts them and assigns an ordinal rank.
+</para>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example ranks a 4<symbol role="symbolfont">&times;</symbol>4 by dimension.</para>
+      <procedure>
+        <step>
+          <para>Create a 4<symbol role="symbolfont">&times;</symbol>4 array called rank_array:<programlisting><command>CREATE ARRAY</command> rank_array &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];</programlisting></para>
+        </step>
+        <step>
+          <para>Put random values of 0&ndash;6 into rank:<programlisting><command>SELECT</command> * <command>FROM</command> store(build(rank_array,random()%7/1.0),rank_array);</programlisting><screen>[
+[(6),(2),(0),(4)],
+[(6),(5),(3),(5)],
+[(6),(6),(6),(4)],
+[(1),(4),(4),(1)]
+]</screen></para>
+        </step>
+        <step>
+          <para>Rank the elements in rank_array by dimension i:<programlisting><command>SELECT</command> * <command>FROM</command> rank(rank_array,val,i);</programlisting><screen>[
+[(6,4),(2,2),(0,1),(4,3)],
+[(6,4),(5,2),(3,1),(5,2)],
+[(6,2),(6,2),(6,2),(4,1)],
+[(1,1),(4,3),(4,3),(1,1)]
+]</screen></para>
+        </step>
+        <step>
+          <para>Rank the elements in rank_array by dimension j:<programlisting><command>SELECT</command> * <command>FROM</command> rank(rank_array,val,j);</programlisting><screen>[
+[(6,2),(2,1),(0,1),(4,2)],
+[(6,2),(5,3),(3,2),(5,4)],
+[(6,2),(6,4),(6,4),(4,2)],
+[(1,1),(4,2),(4,3),(1,1)]
+]</screen></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

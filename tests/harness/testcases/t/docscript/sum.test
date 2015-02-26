@@ -1,0 +1,18 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m3x3 <val:double>[i=0:2,3,0,j=0:2,3,0]  
+--stop-igdata
+store(build(m3x3,i*3+j),m3x3)  
+sum(m3x3,val,j)  
+sum(m3x3,val,i)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(m3x3)

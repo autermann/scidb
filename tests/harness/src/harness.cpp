@@ -259,6 +259,7 @@ void SciDBTestHarness :: printConf (void)
     LOG4CXX_INFO (_logger, "Name of the file containing disabled test ids = " << _c.skipTestfname);
     LOG4CXX_INFO (_logger, "Sleep Time =                                  " << _c.sleepTime);
     LOG4CXX_INFO (_logger, "Log queries =                                 " << _c.log_queries);
+    LOG4CXX_INFO (_logger, "Save Failures =                               " << _c.save_failures);
     LOG4CXX_INFO (_logger, "Log Directory =                               " << _c.logDir);
     LOG4CXX_INFO (_logger, "Log Destination =                             " << _c.logDestination);
     LOG4CXX_INFO (_logger, "Report File Name  =                           " << _c.reportFilename);
@@ -315,7 +316,7 @@ int SciDBTestHarness :: createLogger (void)
 	}
 
 	/* reading log4j.properties file */
-	PropertyConfigurator::configure (LOGGER_PROPERTIES_FILE);
+	PropertyConfigurator::configure (_c.log_prop_file);
 
 	log4cxx :: LoggerPtr scidbcapi_logger = log4cxx :: Logger :: getLogger ("root");
 	log4cxx :: FileAppenderPtr scidbcapi_currentappender = scidbcapi_logger->getRootLogger ()->getAppender (SCIDBCAPI_LOGGER_NAME);
@@ -481,12 +482,16 @@ int SciDBTestHarness :: validateParameters (void)
 	}
 
 	/* check if log4j.properties file exists */
-	if (!bfs :: exists (LOGGER_PROPERTIES_FILE))
+	string log4j_properties_file = LOGGER_PROPERTIES_FILE;
+	if (strcasecmp(_c.log_prop_file.c_str(),"none") != 0)
+		log4j_properties_file = _c.log_prop_file.c_str();
+	if (!bfs :: exists (log4j_properties_file))
 	{
 		stringstream ss;
-		ss << "File \"" << LOGGER_PROPERTIES_FILE << "\" must exist in the current directory.";
+		ss << "Specify valid path for log4j.properties file using --log-properties-file option of scidbtestharness.";
 		throw SystemError (FILE_LINE_FUNCTION, ss.str());
 	}
+	_c.log_prop_file = log4j_properties_file;
 
 	/* check if style file exists */
 	string stylefile = _c.rootDir + "/" + DEFAULT_STYLE_FILENAME;
@@ -529,8 +534,8 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			"[--test-id <value>] [--test-list <value>] [--test-name <value>] [--suite-id <value>] [--skip-tests <yes/no/value>] "
 			"[--include-regex-id <regex_expression>] [--exclude-regex-id <regex_expression>] "
 			"[--include-regex-name <regex_expression>] [--exclude-regex-name <regex_expression>] "
-			"[--sleep <value>] [--log-queries] [--log-dir <value>] [--log-destination <value>] [--report-file <value>] [--parallel <value>] "
-			"[--debug <value>] [--record] [--keep-previous-run] [--terminate-on-failure] [--cleanup] [--version]\n"
+			"[--sleep <value>] [--log-queries] [--log-dir <value>] [--log-destination <value>] [--log-properties-file <value>] [--report-file <value>] [--parallel <value>] "
+			"[--debug <value>] [--record] [--keep-previous-run] [--save-failures] [--terminate-on-failure] [--cleanup] [--version]\n"
 			);
 
 	desc.add_options()
@@ -550,11 +555,13 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 		("log-queries",                               "Log queries in the test case output.")
 		("log-dir",              po::value<string>(), "Path to the directory where log files are kept.")
 		("log-destination",      po::value<string>(), "Indicates where to log the messages. Valid values are \"console\" or \"file\". Default is \"file\".")
+		("log-properties-file",	 po::value<string>(), "Path of log4j.properties file.")
 		("report-file",          po::value<string>(), "Name of the file in which output report will be stored in an XML format under the root-dir. Default is \"Report.xml\".")
 		("parallel",             po::value<int>(),    "Number of test cases to be executed in parallel.")
 		("debug",                po::value<int>(),    "Log level can be in the range [0-5]. Level 0 only logs fatal errors while level 5 is most verbose. Default is 3.")
 		("record",                                    "Record test case output.")
 		("keep-previous-run",                         "Keeps the backup of output files produced by a previous run with the extension .bak. By default harness will clear all the previous log files, result files, output files etc.")
+		("save-failures",                             "Save output file, log file and diff file with timestamp")
 		("terminate-on-failure",                      "Stop running the harness when a test case fails. By default it will continue to run.")
 		("cleanup",                                   "Does a cleanup and exit. Removes Report.xml and also everything under r/ and log/ directories generated in previous run.")
 		("help,h", "View this text.")
@@ -595,6 +602,7 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 	}
 # endif
 
+	_c.log_prop_file = "none";
 	if (!vm.empty ())
 	{
 		if (vm.count ("help"))
@@ -696,11 +704,17 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 		if (vm.count ("log-queries"))
 					_c.log_queries = true;
 
+		if (vm.count ("save-failures"))
+					_c.save_failures = true;
+
 		if (vm.count ("log-dir"))
 			_c.logDir = vm["log-dir"].as<string>();
 
 		if (vm.count ("log-destination"))
 			_c.logDestination = vm["log-destination"].as<string>();
+
+		if (vm.count ("log-properties-file"))
+			_c.log_prop_file = vm["log-properties-file"].as<string>();
 
 		if (vm.count ("report-file"))
 			_c.reportFilename = vm["report-file"].as<string>();
@@ -774,6 +788,7 @@ void SciDBTestHarness :: initConfDefault (void)
 	_c.cleanupLog         = false;
 	_c.selfTesting        = false;
 	_c.log_queries        = false;
+	_c.save_failures      = false;
 }
 
 } //END namespace scidbtestharness

@@ -42,346 +42,556 @@ Query was executed successfully
 
 datatype = bool
 SCIDB QUERY : <load m_bool from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_bool,build(<a:bool>[x=0:4,2,0],true))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_bool from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],true))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_bool from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],iif(x%2=0,false,true)))>
-[(),(true),(),()]
+{x} a
+{1} true
 
 SCIDB QUERY : <load mn_bool from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],iif(x%2=0,false,true)))>
-[(true),(),(true),()]
+{x} a
+{0} true
+{2} true
 
 SCIDB QUERY : <load mn_bool from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],iif(x%2=0,false,true)))>
-[(),(false),(),(true)]
+{x} a
+{1} false
+{3} true
 
 SCIDB QUERY : <load mn_bool from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],iif(x%2=0,false,true)))>
-[(),(true),(false),()]
+{x} a
+{1} true
+{2} false
 
 SCIDB QUERY : <load mn_bool from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],iif(x%2=0,false,true)))>
-[(false),(true),(true),(false)]
+{x} a
+{0} false
+{1} true
+{2} true
+{3} false
 
 SCIDB QUERY : <store(substitute(mn_bool,build(<a:bool null>[x=0:4,2,0],null)),mn_bool)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_bool,build(<a:bool>[x=0:4,2,0],true))>
-[(true),(true),(true),(true)]
+{x} a
+{0} true
+{1} true
+{2} true
+{3} true
 
 datatype = string
 SCIDB QUERY : <load m_string from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_string from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_string from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[(),("null_1"),(),()]
+{x} a
+{1} "null_1"
 
 SCIDB QUERY : <load mn_string from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[("null_1"),(),("null_1"),()]
+{x} a
+{0} "null_1"
+{2} "null_1"
 
 SCIDB QUERY : <load mn_string from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[(),("null_0"),(),("null_1")]
+{x} a
+{1} "null_0"
+{3} "null_1"
 
 SCIDB QUERY : <load mn_string from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[(),("null_1"),("null_0"),()]
+{x} a
+{1} "null_1"
+{2} "null_0"
 
 SCIDB QUERY : <load mn_string from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null_'+string(x)))>
-[("null_0"),("null_1"),("null_1"),("null_0")]
+{x} a
+{0} "null_0"
+{1} "null_1"
+{2} "null_1"
+{3} "null_0"
 
 SCIDB QUERY : <store(substitute(mn_string,build(<a:string null>[x=0:4,2,0],null)),mn_string)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_string,build(<a:string>[x=0:4,2,0],'null*'))>
-[("null*"),("null*"),("null*"),("null*")]
+{x} a
+{0} "null*"
+{1} "null*"
+{2} "null*"
+{3} "null*"
 
 datatype = int32
 SCIDB QUERY : <load m_i32 from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_i32 from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_i32 from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(),(101),(),()]
+{x} a
+{1} 101
 
 SCIDB QUERY : <load mn_i32 from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(101),(),(101),()]
+{x} a
+{0} 101
+{2} 101
 
 SCIDB QUERY : <load mn_i32 from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(),(100),(),(101)]
+{x} a
+{1} 100
+{3} 101
 
 SCIDB QUERY : <load mn_i32 from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(),(101),(100),()]
+{x} a
+{1} 101
+{2} 100
 
 SCIDB QUERY : <load mn_i32 from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],x+100))>
-[(100),(101),(101),(100)]
+{x} a
+{0} 100
+{1} 101
+{2} 101
+{3} 100
 
 SCIDB QUERY : <store(substitute(mn_i32,build(<a:int32 null>[x=0:4,2,0],null)),mn_i32)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_i32,build(<a:int32>[x=0:4,2,0],9))>
-[(9),(9),(9),(9)]
+{x} a
+{0} 9
+{1} 9
+{2} 9
+{3} 9
 
 datatype = int8
 SCIDB QUERY : <load m_i8 from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_i8 from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_i8 from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(),(11),(),()]
+{x} a
+{1} 11
 
 SCIDB QUERY : <load mn_i8 from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(11),(),(11),()]
+{x} a
+{0} 11
+{2} 11
 
 SCIDB QUERY : <load mn_i8 from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(),(10),(),(11)]
+{x} a
+{1} 10
+{3} 11
 
 SCIDB QUERY : <load mn_i8 from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(),(11),(10),()]
+{x} a
+{1} 11
+{2} 10
 
 SCIDB QUERY : <load mn_i8 from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],x+10))>
-[(10),(11),(11),(10)]
+{x} a
+{0} 10
+{1} 11
+{2} 11
+{3} 10
 
 SCIDB QUERY : <store(substitute(mn_i8,build(<a:int8 null>[x=0:4,2,0],null)),mn_i8)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_i8,build(<a:int8>[x=0:4,2,0],9))>
-[(9),(9),(9),(9)]
+{x} a
+{0} 9
+{1} 9
+{2} 9
+{3} 9
 
 datatype = int16
 SCIDB QUERY : <load m_i16 from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_i16 from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_i16 from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(),(11),(),()]
+{x} a
+{1} 11
 
 SCIDB QUERY : <load mn_i16 from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(11),(),(11),()]
+{x} a
+{0} 11
+{2} 11
 
 SCIDB QUERY : <load mn_i16 from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(),(10),(),(11)]
+{x} a
+{1} 10
+{3} 11
 
 SCIDB QUERY : <load mn_i16 from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(),(11),(10),()]
+{x} a
+{1} 11
+{2} 10
 
 SCIDB QUERY : <load mn_i16 from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],x+10))>
-[(10),(11),(11),(10)]
+{x} a
+{0} 10
+{1} 11
+{2} 11
+{3} 10
 
 SCIDB QUERY : <store(substitute(mn_i16,build(<a:int16 null>[x=0:4,2,0],null)),mn_i16)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_i16,build(<a:int16>[x=0:4,2,0],9))>
-[(9),(9),(9),(9)]
+{x} a
+{0} 9
+{1} 9
+{2} 9
+{3} 9
 
 datatype = char
 SCIDB QUERY : <load m_char from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_char from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_char from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[(),('%'),(),()]
+{x} a
+{1} '%'
 
 SCIDB QUERY : <load mn_char from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[('%'),(),('%'),()]
+{x} a
+{0} '%'
+{2} '%'
 
 SCIDB QUERY : <load mn_char from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[(),('*'),(),('%')]
+{x} a
+{1} '*'
+{3} '%'
 
 SCIDB QUERY : <load mn_char from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[(),('%'),('*'),()]
+{x} a
+{1} '%'
+{2} '*'
 
 SCIDB QUERY : <load mn_char from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],iif(x%2=0,'*','%')))>
-[('*'),('%'),('%'),('*')]
+{x} a
+{0} '*'
+{1} '%'
+{2} '%'
+{3} '*'
 
 SCIDB QUERY : <store(substitute(mn_char,build(<a:char null>[x=0:4,2,0],null)),mn_char)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_char,build(<a:char>[x=0:4,2,0],'-'))>
-[('-'),('-'),('-'),('-')]
+{x} a
+{0} '-'
+{1} '-'
+{2} '-'
+{3} '-'
 
 datatype = datetime
 SCIDB QUERY : <load m_dt from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(m_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_dt from '../tests/harness/testcases/data/null_5.txt'>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[(),(),(),()]
+{x} a
 
 SCIDB QUERY : <load mn_dt from '../tests/harness/testcases/data/null_6.txt'>
-[(),(?1),(),()]
+{x} a
+{1} ?1
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[(),("2011-03-03 06:07:08"),(),()]
+{x} a
+{1} "2011-03-03 06:07:08"
 
 SCIDB QUERY : <load mn_dt from '../tests/harness/testcases/data/null_7.txt'>
-[(?1),(),(?1),()]
+{x} a
+{0} ?1
+{2} ?1
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[("2011-03-03 06:07:08"),(),("2011-03-03 06:07:08"),()]
+{x} a
+{0} "2011-03-03 06:07:08"
+{2} "2011-03-03 06:07:08"
 
 SCIDB QUERY : <load mn_dt from '../tests/harness/testcases/data/null_8.txt'>
-[(),(null),(),(?1)]
+{x} a
+{1} null
+{3} ?1
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[(),("2011-06-06 01:02:03"),(),("2011-03-03 06:07:08")]
+{x} a
+{1} "2011-06-06 01:02:03"
+{3} "2011-03-03 06:07:08"
 
 SCIDB QUERY : <load mn_dt from '../tests/harness/testcases/data/null_9.txt'>
-[(),(?1),(null),()]
+{x} a
+{1} ?1
+{2} null
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[(),("2011-03-03 06:07:08"),("2011-06-06 01:02:03"),()]
+{x} a
+{1} "2011-03-03 06:07:08"
+{2} "2011-06-06 01:02:03"
 
 SCIDB QUERY : <load mn_dt from '../tests/harness/testcases/data/null_10.txt'>
-[(null),(?1),(?1),(null)]
+{x} a
+{0} null
+{1} ?1
+{2} ?1
+{3} null
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],iif(x%2=0,'2011-06-06 01:02:03','2011-03-03 06:07:08')))>
-[("2011-06-06 01:02:03"),("2011-03-03 06:07:08"),("2011-03-03 06:07:08"),("2011-06-06 01:02:03")]
+{x} a
+{0} "2011-06-06 01:02:03"
+{1} "2011-03-03 06:07:08"
+{2} "2011-03-03 06:07:08"
+{3} "2011-06-06 01:02:03"
 
 SCIDB QUERY : <store(substitute(mn_dt,build(<a:datetime null>[x=0:4,2,0],null)),mn_dt)>
-[(null),(null),(null),(null)]
+{x} a
+{0} null
+{1} null
+{2} null
+{3} null
 
 SCIDB QUERY : <substitute(mn_dt,build(<a:datetime>[x=0:4,2,0],'2011-01-02 03:04:05'))>
-[("2011-01-02 03:04:05"),("2011-01-02 03:04:05"),("2011-01-02 03:04:05"),("2011-01-02 03:04:05")]
+{x} a
+{0} "2011-01-02 03:04:05"
+{1} "2011-01-02 03:04:05"
+{2} "2011-01-02 03:04:05"
+{3} "2011-01-02 03:04:05"
 
 SCIDB QUERY : <remove(m_bool)>
 Query was executed successfully

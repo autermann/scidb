@@ -5,10 +5,7 @@
 store(build(A,x+1),A)
 
 --test
---aql select sum(a) from A group by x as part
---aql select sum(part) from A group by x as part
---aql select sum(select a from part) from A group by x as part
-#--aql select sum(select * from part) from A group by x as part
+--aql select sum(a) from A group by x
 
 --cleanup
 --aql drop array A

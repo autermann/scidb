@@ -1,0 +1,9 @@
+--setup
+
+--test
+
+# doSvd.sh <order-min> [order-max-verbose [order-max [order-step-type [order-step]]]] (last is "+" or "x" for mult)
+--shell --store --command "SCRIPT_DIR='../../bin' ../../bin/doSvd.sh 1 10 20 + 1 "
+
+--cleanup
+

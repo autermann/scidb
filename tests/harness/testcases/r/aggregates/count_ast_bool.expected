@@ -1,10 +1,17 @@
 Query was executed successfully
 
-[(true),(true),(true)]
+{x} b
+{0} true
+{1} true
+{2} true
 
-[(null),(null),(null)]
+{x} b
+{0} null
+{1} null
+{2} null
 
-[(3)]
+{i} count
+{0} 3
 
 Query was executed successfully
 

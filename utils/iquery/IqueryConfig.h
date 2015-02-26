@@ -38,6 +38,7 @@ namespace iquery
 
 enum
 {
+    CONFIG_PRECISION,
     CONFIG_HOST,
     CONFIG_PORT,
     CONFIG_QUERY_STRING,

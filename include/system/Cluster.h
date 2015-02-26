@@ -33,6 +33,7 @@
 
 #include <vector>
 #include <set>
+#include <boost/shared_ptr.hpp>
 #include <util/Singleton.h>
 #include <array/Metadata.h>
 #include <util/Notification.h>
@@ -48,14 +49,23 @@ class InstanceMembership
 {
  public:
    InstanceMembership(ViewID viewId) : _viewId(viewId){}
-   InstanceMembership(ViewID viewId, std::vector<InstanceID>& instances) : _viewId(viewId)
+   InstanceMembership(ViewID viewId,
+                      boost::shared_ptr<const Instances>& instances)
+   : _viewId(viewId), _instanceConfigs(instances)
    {
-      _instances.insert(instances.begin(), instances.end());
+       assert(instances);
+       const Instances& ins = *instances;
+       for ( Instances::const_iterator i = ins.begin(); i != ins.end(); ++i) {
+           _instances.insert(i->getInstanceId());
+       }
    }
    virtual ~InstanceMembership() {}
    const std::set<InstanceID>& getInstances() const { return _instances; }
    ViewID getViewId() const { return _viewId; }
-   void addInstance(InstanceID instanceId) { _instances.insert(instanceId); }
+   /**
+    * Get configuration information for all registered instances
+    */
+   const Instances& getInstanceConfigs() const { return *_instanceConfigs; }
    
    bool isEqual(const InstanceMembership& other) const
    {
@@ -67,6 +77,7 @@ class InstanceMembership
    InstanceMembership& operator=(const InstanceMembership&);
    
    ViewID _viewId;
+   boost::shared_ptr<const scidb::Instances> _instanceConfigs;
    std::set<InstanceID> _instances;
 };
 
@@ -120,15 +131,12 @@ class InstanceMembership
 
 namespace boost
 {
-   template<>
    bool operator< (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
-   template<>
    bool operator== (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
                     boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
-   template<>
    bool operator!= (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
                     boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
@@ -252,9 +260,13 @@ public:
     */
    InstanceID getLocalInstanceId();
 
+   /// Get the (globally unique?) UUID of this cluster
+   const std::string& getUuid();
+
 private:
     friend class Singleton<Cluster>;
     boost::shared_ptr<const InstanceMembership> _lastMembership;
+    std::string _uuid;
     Mutex _mutex;
 };
 

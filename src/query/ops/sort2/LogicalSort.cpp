@@ -35,12 +35,43 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: sort2().
+ *
+ * @par Synopsis:
+ *   sort2( srcArray )
+ *
+ * @par Summary:
+ *   This internal operator is used by the second phase of sort to merge results from different instances.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDim.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - For internal use.
+ *
+ */
 class LogicalSort2 : public  LogicalOperator
 {
 public:
 	LogicalSort2(const std::string& logicalName, const std::string& alias):
 	    LogicalOperator(logicalName, alias)
 	{
+        _properties.secondPhase = true;
         ADD_PARAM_INPUT()
 	}
 

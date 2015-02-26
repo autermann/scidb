@@ -1,0 +1,29 @@
+--setup
+--start-query-logging
+
+create empty array ABR1 <a:float,b:float>[x=0:3000,3,0]
+create empty array ABR2 <a:float>[x=0:3000,3,0]
+create empty array ABR3 <b:float>[a(float)=4000,1,0]
+store(join(build_sparse(ABR2, x+1.321 ,1),build_sparse(ABR2, x+1.123, 1)),ABR1)
+
+--test 
+--echo "issuing redim"
+#redimension_store(ABR1,ABR3)
+--shell --command "../utils/killquery.sh -afl 2 2 'redimension_store(ABR1, ABR3)'" --store
+--shell --command "../utils/killquery.sh -afl 2 15 'redimension_store(ABR1, ABR3)'" --store
+--shell --command "../utils/killquery.sh -afl 2 9 'redimension_store(ABR1, ABR3)'" --store
+
+--echo "should be empty..."
+count(ABR3)
+versions(ABR3)
+--error "scan(ABR3:a)"
+
+--echo "should be no mapping arrays..."
+--sleep 12
+project(list('arrays'),name,schema)
+
+--cleanup
+--stop-query-logging
+remove(ABR1)
+remove(ABR2)
+remove(ABR3)

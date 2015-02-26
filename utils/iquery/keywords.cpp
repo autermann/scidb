@@ -47,6 +47,7 @@ const Keyword Keywords[] =
     KW("quit",      token::QUIT),
     KW("exit",      token::QUIT),
     KW("help",      token::HELP),
+    KW("format",    token::FORMAT),
     KW(NULL,    token::EOQ) //end of tokens
 };
 

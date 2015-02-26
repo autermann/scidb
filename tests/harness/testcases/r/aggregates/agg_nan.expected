@@ -1,0 +1,184 @@
+SCIDB QUERY : <create array foo<val:double> [x=0:4,5,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load (foo, '../tests/harness/testcases/data/nan.txt')>
+{x} val
+{0} nan
+{1} 1
+{2} 2
+{3} 3
+{4} 4
+
+SCIDB QUERY : <create array foo1<val:double> [x=0:4,5,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load (foo1, '../tests/harness/testcases/data/nan1.txt')>
+{x} val
+{0} 1
+{1} nan
+{2} 2
+{3} 3
+{4} 4
+
+SCIDB QUERY : <create array foo2<val:double> [x=0:4,5,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load (foo2, '../tests/harness/testcases/data/nan2.txt')>
+{x} val
+{0} nan
+{1} nan
+{2} nan
+{3} nan
+{4} nan
+
+SCIDB QUERY : <create array foo3<val:double null> [x=0:3,2,0 ,y=1:4,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load (foo3, '../tests/harness/testcases/data/nanull2d.txt')>
+{x,y} val
+{0,1} 0.2
+{0,2} 2.5
+{0,3} 1.2
+{1,1} NA
+{1,2} null
+{1,3} nan
+{0,4} inf
+{1,4} null
+{2,1} NA
+{2,2} inf
+{2,3} nan
+{3,1} 0
+{3,2} 0.05
+{3,3} 0
+{3,4} NA
+
+SCIDB QUERY : <min(foo)>
+{i} val_min
+{0} 1
+
+SCIDB QUERY : <max(foo)>
+{i} val_max
+{0} 4
+
+SCIDB QUERY : <min(foo1)>
+{i} val_min
+{0} 1
+
+SCIDB QUERY : <max(foo1)>
+{i} val_max
+{0} 4
+
+SCIDB QUERY : <aggregate(foo,min(val),max(val))>
+{i} val_min,val_max
+{0} 1,4
+
+SCIDB QUERY : <aggregate(foo1,min(val),max(val))>
+{i} val_min,val_max
+{0} 1,4
+
+SCIDB QUERY : <aggregate(foo2,min(val),max(val))>
+{i} val_min,val_max
+{0} null,null
+
+SCIDB QUERY : <aggregate(build(foo1,iif(x=0,na,x)), min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 1,4,2.5
+
+SCIDB QUERY : <aggregate(build(foo1,iif(x=2,na,x)), min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 0,4,2
+
+SCIDB QUERY : <aggregate(build(foo1,iif(x=1,na,x)), min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 0,4,2.25
+
+SCIDB QUERY : <update foo2 set val= 1 where x=0>
+{x} val
+{0} 1
+{1} nan
+{2} nan
+{3} nan
+{4} nan
+
+SCIDB QUERY : <aggregate(foo2, min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 1,1,1
+
+SCIDB QUERY : <load (foo2, '../tests/harness/testcases/data/nan2.txt')>
+{x} val
+{0} nan
+{1} nan
+{2} nan
+{3} nan
+{4} nan
+
+SCIDB QUERY : <update foo2 set val= 1 where x=3>
+{x} val
+{0} nan
+{1} nan
+{2} nan
+{3} 1
+{4} nan
+
+SCIDB QUERY : <aggregate(foo2, min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 1,1,1
+
+SCIDB QUERY : < update foo2 set val= 1/(1.0-1.0) where x=2>
+{x} val
+{0} nan
+{1} nan
+{2} inf
+{3} 1
+{4} nan
+
+SCIDB QUERY : <aggregate(foo2, min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 1,inf,inf
+
+SCIDB QUERY : <sort(foo3,10)>
+{n} val
+{0} null
+{1} null
+{2} NA
+{3} NA
+{4} NA
+{5} nan
+{6} nan
+{7} 0
+{8} 0
+{9} 0.05
+{10} 0.2
+{11} 1.2
+{12} 2.5
+{13} inf
+{14} inf
+
+SCIDB QUERY : <aggregate(foo3, min(val),max(val),avg(val))>
+{i} val_min,val_max,val_avg
+{0} 0,inf,inf
+
+SCIDB QUERY : <max(subarray(foo3,0,1,1,2))>
+{i} val_max
+{0} 2.5
+
+SCIDB QUERY : <min(subarray(foo3,0,1,1,2))>
+{i} val_min
+{0} 0.2
+
+SCIDB QUERY : <avg(subarray(foo3,0,1,1,2))>
+{i} val_avg
+{0} 1.35
+
+SCIDB QUERY : <remove(foo)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(foo1)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(foo2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(foo3)>
+Query was executed successfully
+

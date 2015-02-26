@@ -76,9 +76,9 @@ void exitOnNotEqual ( const Value** args, Value* res, void*)
 {
     long int i1 = args[0]->getInt64();
     long int i2 = args[1]->getInt64();
-	if ( i1 == i2 ) { 
+	if ( i1 == i2 ) {
         res->setInt64(i1);
-	} else { 
+	} else {
 		//
 		// Forve an exit
 		//
@@ -108,7 +108,23 @@ void netPauseOnNotEqual(const Value** args, Value* res, void*)
       timer->async_wait(boost::bind(&netPauseHandler, timer, duration, _1));
    }
 }
+void injectRemoteErrorForQuery(long int errCode, const boost::shared_ptr<scidb::Query>& q)
+{
+    scidb::QueryID queryID = q->getQueryID();
 
+    LOG4CXX_ERROR(log4cxx::Logger::getRootLogger(),
+                  "Injecting remote error=" << errCode <<" for query="<<queryID);
+
+    boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
+    boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
+    errorMessage->setQueryID(queryID);
+    errorRecord->set_type(1);
+    errorRecord->set_errors_namespace("scidb");
+    errorRecord->set_short_error_code(SCIDB_SE_INJECTED_ERROR);
+    errorRecord->set_long_error_code(SCIDB_LE_INJECTED_ERROR);
+    errorRecord->set_what_str("Injected error");
+    NetworkManager::getInstance()->broadcast(errorMessage);
+}
 void injectRemoteError(const Value** args, Value* res, void*)
 {
    InstanceID instanceID  = static_cast<InstanceID>(args[0]->getInt64());
@@ -119,25 +135,10 @@ void injectRemoteError(const Value** args, Value* res, void*)
       return;
    }
 
-   std::map<scidb::QueryID, boost::shared_ptr<scidb::Query> > queries = scidb::Query::getQueries();
-   for ( std::map<scidb::QueryID, boost::shared_ptr<scidb::Query> >::const_iterator iter = queries.begin();
-         iter != queries.end(); ++iter) {
+   boost::function<void (const boost::shared_ptr<scidb::Query>&)> f =
+       boost::bind(&injectRemoteErrorForQuery, errCode, _1);
+   scidb::Query::listQueries(f);
 
-      scidb::QueryID queryID = iter->first;
-      
-      LOG4CXX_ERROR(log4cxx::Logger::getRootLogger(),
-                    "Injecting remote error=" << errCode <<" for query="<<queryID);
-      
-      boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
-      boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
-      errorMessage->setQueryID(queryID);
-      errorRecord->set_type(1);
-      errorRecord->set_errors_namespace("scidb");
-      errorRecord->set_short_error_code(SCIDB_SE_INJECTED_ERROR);
-      errorRecord->set_long_error_code(SCIDB_LE_INJECTED_ERROR);
-      errorRecord->set_what_str("Injected error");
-      NetworkManager::getInstance()->broadcast(errorMessage);
-   }
    res->setInt64(instanceID);
 }
 

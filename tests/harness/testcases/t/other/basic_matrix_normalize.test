@@ -10,7 +10,7 @@ store(build(I3,x+5),I3)
 --test
 normalize(I2)
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2 "normalize(I1)"
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR3 "inverse(I3)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3 "inverse(I3)"
 
 --cleanup
 

@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string>
 #include <exception>
+#include <limits>
 
 #include <system/Cluster.h>
 #include "array/MemArray.h"
@@ -44,6 +45,126 @@ namespace scidb
 {
     using namespace std;
     using namespace boost;
+
+    /**
+     * An extension of Address that specifies the chunk of a persistent array.
+     *
+     * Note: we do not use virtual methods here so there is no polymorphism.
+     * We do not need virtual methods on these structures, so we opt for better performance.
+     * Inheritance is only used to factor out similarity between two structures.
+     *
+     * Storage addresses have an interesting ordering scheme. They are ordered by
+     * AttributeID, Coordinates, ArrayID (reverse). 
+     *
+     * Internally the storage manager keeps all chunks for a given array name in the same subtree.
+     * For a given array, you will see this kind of ordering:
+     *
+     * AttributeID = 0
+     *   Coordinates = {0,0}
+     *     ArrayID = 1 --> CHUNK (this chunk exists in all versions >= 1)
+     *     ArrayID = 0 --> CHUNK (this chunk exists only in version 0)
+     *   Coordinates = {0,10}
+     *     ArrayID = 2 --> NULL (tombstone)
+     *     ArrayID = 0 --> CHUNK (this chunk exists only in versions 0 and 1; there's a tombstone at 2)
+     * AttributeID = 1
+     *   ...
+     *
+     * The key methods that implement iteration over an array are findChunk and findNextChunk.
+     * For those methods, the address with zero-sized-list coordinates is considered to be the start of
+     * the array. In practice, to find the first chunk in the array - create an address with coordinates
+     * {} and then find the first chunk greater than it. This is why our comparison function cares about
+     * the size of the coordinate list.
+     */
+    struct StorageAddress: public Address
+    {
+        /**
+         * Array Identifier for the Versioned Array ID wherein this chunk first appeared.
+         */
+        ArrayID arrId;
+
+        /**
+         * Default constructor
+         */
+        StorageAddress():
+            arrId(0)
+        {}
+
+        /**
+         * Constructor
+         * @param arrId array identifier
+         * @param attId attribute identifier
+         * @param coords element coordinates
+         */
+        StorageAddress(ArrayID arrId, AttributeID attId, Coordinates const& coords):
+            Address(attId, coords), arrId(arrId)
+        {}
+
+        /**
+         * Copy constructor
+         * @param addr the object to copy from
+         */
+        StorageAddress(StorageAddress const& addr):
+            Address(addr.attId, addr.coords), arrId(addr.arrId)
+        {}
+
+        /**
+         * Partial comparison function, used to implement std::map
+         * @param other another aorgument of comparison
+         * @return true if "this" preceeds "other" in partial order
+         */
+        inline bool operator < (StorageAddress const& other) const
+        {
+            if(attId != other.attId)
+            {
+                return attId < other.attId;
+            }
+            if (coords.size() != other.coords.size())
+            {
+                return coords.size() < other.coords.size();
+            }
+            for (size_t i = 0, n = coords.size(); i < n; i++)
+            {
+                if (coords[i] != other.coords[i])
+                {
+                    return coords[i] < other.coords[i];
+                }
+            }
+            if (arrId != other.arrId)
+            {
+                //note: reverse ordering to keep most-recent versions at the front of the map
+                return arrId > other.arrId;
+            }
+            return false;
+        }
+
+        /**
+         * Equality comparison
+         * @param other another aorgument of comparison
+         * @return true if "this" equals to "other"
+         */
+        inline bool operator == (StorageAddress const& other) const
+        {
+            if (arrId != other.arrId)
+            {
+                return false;
+            }
+
+            return Address::operator ==( static_cast<Address const&>(other));
+        }
+
+        /**
+         * Inequality comparison
+         * @param other another argument of comparison
+         * @return true if "this" not equals to "other"
+         */
+        inline bool operator != (StorageAddress const& other) const
+        {
+            return !(*this == other);
+        }
+    };
+
+    class ListChunkDescriptorsArrayBuilder;
+    class ListChunkMapArrayBuilder;
 
     /**
      * Descriptor of database segment.
@@ -76,55 +197,6 @@ namespace scidb
     };
 
     /**
-     * Interface of chunks scatter - determine which chunks belongs to this instance.
-     * This interface is using in Storage.setScatter method and also can be used
-     * by scatter/gather component
-     */
-    class Scatter
-    {
-      public:
-        virtual ~Scatter() {}
-        /**
-         * Check if local instance contains chunk with specified address of first element
-         * @return true if chunk with specified address belongs to the current domain
-         */
-        virtual bool contains(const Address& addr) = 0;
-    };
-
-    /**
-     * Scatter implementation based on hash function
-     */
-    class HashScatter : public Scatter
-    {
-      public:
-        virtual ~HashScatter() {}
-        /**
-         * Return true if nDomains == 0 || chunk.getAddress().hash() % nDomains == domainId-1
-         */
-        virtual bool contains(const Address& addr);
-
-       /**
-         * Construct scatter with specified domainId.
-         * @param nDomains total number of domains (should be equal to the number of instances at which query is planed to be executed)
-         * @param domainId identifier of domain [1...nDomains]
-         */
-        HashScatter(size_t nDomains, size_t domainId);
-
-        /**
-         * Construct scatter with current instanceId used as domainId.
-         * Use instanceId assigned to this instance while instance registration as domainId and
-         * number of registed instances as number of domains.
-         * So this method is equivalent to HashScatter(SystemCatalog::getInstance()->getNumberOfInstances(),
-         *                                             (size_t))StorageManager::getInstance().getInstanceId());
-         */
-        HashScatter();
-      private:
-        size_t domainId;
-        size_t nDomains;
-    };
-
-
-    /**
      * Storage manager interface
      */
     class Storage
@@ -148,8 +220,12 @@ namespace scidb
         virtual void open(const string& url, size_t cacheSize) = 0;
 
         /**
-         * Get iterator through array chunks available in the storage.
-         * Order of iteration is not specified.
+         * Get write iterator through array chunks available in the storage.
+         * This iterator is used to create some new version K (=arrDesc.getId()).
+         * It will only return new chunks that have been created in version K.
+         * For chunks from versions (0...K-1) - use getConstArrayIterator. Furthermore, if
+         * this is the first call to getArrayIterator for K, the caller must ensure that
+         * a version of K exists in the system catalog first before calling this.
          * @param arrDesc array descriptor
          * @param attId attribute identifier
          * @param query in the context of which the iterator is requeted
@@ -158,6 +234,17 @@ namespace scidb
         virtual boost::shared_ptr<ArrayIterator> getArrayIterator(const ArrayDesc& arrDesc,
                                                                   AttributeID attId,
                                                                   boost::shared_ptr<Query>& query) = 0;
+
+        /**
+         * Get const array iterator through array chunks available in the storage.
+         * @param arrDesc array descriptor
+         * @param attId attribute identifier
+         * @param query in the context of which the iterator is requeted
+         * @return shared pointer to the array iterator
+         */
+        virtual boost::shared_ptr<ConstArrayIterator> getConstArrayIterator(const ArrayDesc& arrDesc,
+                                                                            AttributeID attId,
+                                                                            boost::shared_ptr<Query>& query) = 0;
 
         /**
          * Flush all changes to the physical device(s).
@@ -182,28 +269,13 @@ namespace scidb
         virtual InstanceID getInstanceId() const = 0;
 
         /**
-         * Check if storage is local: provide access to the chunks located only in the local file system
+         * Remove a persistent array from the system. Does nothing if the
+         * specified array is not present.
+         * @param uaId the Unversioned Array ID
+         * @param arrId the Versioned Array ID
+         * @param timestamp optional - if set, remove only chunks older than timestamp
          */
-        virtual bool isLocal() = 0;
-
-        /**
-         * This method allows to virtually partition data in case of DFS-based storage manager.
-         * By default DFS storage manager array iterator traverse all array chunks.
-         * But this method allows to restrict storage to visit only some fraction of chunks.
-         * Scatter.contains() methos is used to determine which chunks belongs to this instance.
-         * @param pointer to the scatter implementation, if NULL then virtual partitioning is disabled
-         */
-        virtual void setScatter(Scatter* scatter) = 0;
-
-        /**
-         * Remove data of the particular array
-         */
-        virtual void remove(ArrayID id, bool allVersions = false, uint64_t timestamp = 0) = 0;
-
-        /** 
-         * Create new clone of existed chunk
-         */
-        virtual void cloneChunk(Coordinates const& pos, AttributeID attrID, ArrayID originalArrayID, ArrayID cloneArrayID) = 0;
+        virtual void remove(ArrayUAID uaId, ArrayID arrId, uint64_t timestamp = 0) = 0;
 
         /**
          * Map value of this coordinate to the integer value
@@ -257,6 +329,182 @@ namespace scidb
         virtual uint64_t getCurrentTimestamp() const = 0;
         
         virtual void getDiskInfo(DiskInfo& info) = 0;
+
+        /**
+         * Method for creating a list of chunk descriptors. Implemented by LocalStorage.
+         * @param builder a class that creates a list array
+         */
+        virtual void listChunkDescriptors(ListChunkDescriptorsArrayBuilder& builder)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk header retrieval is not supported by this storage type.";
+        }
+
+        /**
+         * Method for creating a list of chunk map elements. Implemented by LocalStorage.
+         * @param builder a class that creates a list array
+         */
+        virtual void listChunkMap(ListChunkMapArrayBuilder& builder)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk map retrieval is not supported by this storage type.";
+        }
+
+        /**
+         * Decompress chunk from the specified buffer
+         * @param chunk destination chunk to receive decompressed data
+         * @param buf buffer containing compressed data.
+         */
+        virtual void decompressChunk(Chunk* chunk, CompressedBuffer const& buf) = 0;
+
+        /**
+         * Compress chunk to the specified buffer
+         * @param chunk chunk to be compressed
+         * @param buf buffer where compressed data will be placed. It is inteded to be initialized using default constructore and will be filled by this method.
+         */
+        virtual void compressChunk(Chunk const* chunk, CompressedBuffer& buf) = 0;
+
+        /**
+         * Pin chunk in memory: prevent cache replacement algorithm to throw away this chunk from memory
+         * @param chunk chunk to be pinned in memory
+         */
+        virtual void pinChunk(Chunk const* chunk) = 0;
+
+        /**
+         * Unpin chunk in memory: decrement access couter for this chunk
+         * @param chunk chunk to be unpinned
+         */
+        virtual void unpinChunk(Chunk const* chunk) = 0;
+
+        /**
+         * Write new chunk in the storage.
+         * @param chunk new chunk created by newChunk Method
+         */
+        virtual void writeChunk(Chunk* chunk, boost::shared_ptr<Query>& query) = 0;
+
+        /**
+         * Find and fetch a chunk from a particular array. Throws exception if chunk does not exist.
+         * @param desc the array descriptor
+         * @param addr the address of the chunk
+         * @return the pointer to the chunk.
+         */
+        virtual Chunk* readChunk(ArrayDesc const& desc, StorageAddress const& addr) = 0;
+
+        /**
+         * Load chunk body from the storage.
+         * @oaran desc the array descriptor
+         * @param chunk loaded chunk
+         */
+        virtual void loadChunk(ArrayDesc const& desc, Chunk* chunk) = 0;
+
+        /**
+         * Get latch for the specified chunk
+         * @param chunk chunk to be locked
+         */
+        virtual RWLock& getChunkLatch(DBChunk* chunk) = 0;
+
+        /**
+         * Create new chunk in the storage. There should be no chunk with such address in the storage.
+         * @param desc the array descriptor
+         * @param addr chunk address
+         * @param compressionMethod compression method for this chunk
+         * @throw SystemException if the chunk with such address already exists
+         */
+        virtual Chunk* createChunk(ArrayDesc const& desc, StorageAddress const& addr, int compressionMethod) = 0;
+
+	    /**
+         * Clone a persistent chunk; create a chunk in the target array which acts as a "pointer" to some chunk in the source array.
+         * Currently, this function has only one caller - the message handler, which receives a message sent by a private method of CachedStorage.
+         * This is only used when both arrays are immutable and (obviously) the chunk contains the exact same data.
+         * @param pos the coordinates of the chunk
+         * @param targetDesc the descriptor of the target array
+         * @param targetAttrID the attribute id of the chunk in the target array 
+         * @param sourceDesc the descriptor of the source array
+         * @param sourceAttrID the attribute id of the chunk in the source array
+         */
+        virtual void cloneChunk(Coordinates const& pos, ArrayDesc const& targetDesc, AttributeID targetAttrID, ArrayDesc const& sourceDesc, AttributeID sourceAttrID) = 0;
+
+        /**
+         * Delete chunk
+         * @param chunk chunk to be deleted
+         */
+        virtual void deleteChunk(Chunk& chunk) = 0;
+
+        virtual size_t getNumberOfInstances() const = 0;
+
+        /**
+         * Given an array descriptor and an address of a chunk - compute the InstanceID of the primary instance
+         * that shall be responsible for this chunk. Currently this uses our primitive round-robin hashing
+         * for all cases except replication. To be improved.
+         * Note the same replication scheme is used for both - regular chunks and tombstones.
+         * @param desc the array descriptor
+         * @param address the address of the chunk (or tombstone entry)
+         * @return the instance id responsible for this datum
+         */
+        virtual InstanceID getPrimaryInstanceId(ArrayDesc const& desc, StorageAddress const& address) const =0;
+
+        virtual Array const& getDBArray(ArrayID) = 0;
+  
+        /**
+         * Get a list of the chunk positions for a particular persistent array. If the array is not found, no fields
+         * shall be added to the chunks argument.
+         * @param[in] desc the array descriptor. Must be for a persistent stored array with proper identifiers.
+         * @param[in] query the query context. 
+         * @param[out] chunks the set of coordinates to which the chunk positions of the array shall be appended.
+         */       
+        virtual void getChunkPositions(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, CoordinateSet& chunks) = 0;
+
+         /**
+          * Given an array descriptor and a storage address for a chunk - find the storage address in the next chunk along the same attribute
+          * in stride major order. The Array UAID and ID is taken from desc. The current coordinates and Attribute ID are taken from address.
+          * The address whose coordinates are a zero-sized are considered to be the end of the array. If address.coords has size zero, then
+          * the method shall attempt to find the first chunk for this array. Similarly if there is no next chunk, the method shall set
+          * address.coords to a zero-sized list. Otherwise, the method shall set address.arrId and address.coords to the correct values
+          * by which the next chunk can be retrieved.
+          * @param desc the array descriptor for the desired array.
+          * @param query the query context
+          * @param address the address of the previous chunk
+          * @return true if the chunk was found, false otherwise
+          */
+         virtual bool findNextChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address) =0;
+
+         /**
+          * Given and array descriptor and a desired storage address for the chunk, determine if there is a chunk at
+          * address.attId, address.coords. If this version of this array (as described by desc) contains this chunk -
+          * then set address.arrId to the proper value. Otherwise, set address.coords to a zero-sized list.
+          * @param desc the array descriptor for the desired array
+          * @param query the query context
+          * @param address the address of the desired chunk
+          * @return true if the chunk was found, false otherwise
+          */
+         virtual bool findChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address) =0;
+
+         /**
+          * Remove a previously existing chunk from existence in the given version on this instance.
+          * This function alters the local storage only. This instance may or may not be responsible for this chunk and the caller bears
+          * the responsibility of determining that. Note this method removes all attributes at once.
+          * @param arrayDesc the array descriptor. The id field is used for version purposes.
+          * @param coords the coordinates of the removed chunk
+          */
+         virtual void removeLocalChunkVersion(ArrayDesc const& arrayDesc, Coordinates const& coords) =0;
+
+         /**
+          * Remove a previously existing chunk from existence in the given version in the system.
+          * Effectively this function sends the proper replica messages and then calls removeLocalChunkVersion on this instance.
+          * Note this method removes all attributes at once.
+          * @param arrayDesc the array descriptor 
+          * @param coords the coordinates of the tombstone
+          * @param query the query context
+          */
+         virtual void removeChunkVersion(ArrayDesc const& arrayDesc, Coordinates const& coords, boost::shared_ptr<Query>& query) =0;
+
+         /**
+          * Given an array descriptor desc and the coordinate set liveChunks - remove the chunk version for every
+          * chunk that is in the array and NOT in liveChunks. This is used by overriding-storing ops to ensure that
+          * new versions of arrays do not contain chunks from older versions unless explicitly added.
+          * @param arrayDesc the array descriptor
+          * @param liveChunks the set of chunks that should NOT be tombstoned
+          * @param query the query context
+          */
+         virtual void removeDeadChunks(ArrayDesc const& arrayDesc, set<Coordinates, CoordinatesLess> const& liveChunks, boost::shared_ptr<Query>& query) = 0;
     };
 
     /**

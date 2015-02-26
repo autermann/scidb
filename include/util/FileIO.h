@@ -36,7 +36,7 @@
 //
 #define __EXTENSIONS__
 #define _EXTENSIONS
-#define _FILE_OFFSET_BITS 64 
+#define _FILE_OFFSET_BITS 64
 #if ! defined(HPUX11_NOT_ITANIUM) && ! defined(L64)
 #define _LARGEFILE64_SOURCE 1 // access to files greater than 2Gb in Solaris
 #define _LARGE_FILE_API     1 // access to files greater than 2Gb in AIX
@@ -55,6 +55,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <set>
+#include <list>
+#include <sys/types.h>
+#include <dirent.h>
 
 #include "query/Statistics.h"
 
@@ -68,12 +71,63 @@ namespace scidb
 {
     class File
     {
-      public:
+      private:
+
+        /**
+         * Close directory
+         * @param dirName directory name
+         * @param dirp open directory handle
+         * @param raise exception on error (true by default)
+         * @return errno on error, 0 otherwise
+         * @throws SystemException if the underlying system call fails
+         */
+        static int closeDir(const char* dirName, DIR *dirp, bool raise=true);
+
+    public:
         static void writeAll(int fd, const void* data, size_t size, uint64_t offs);
         static void readAll(int fd, void* data, size_t size, uint64_t offs);
-        static int createTemporary(std::string const& arrName, char const* filePath = NULL);
-    };
 
+        static int createTemporary(std::string const& arrName, char const* filePath = NULL);
+        /**
+         * Remove (unlink) file
+         * @param file to remove
+         * @param raise exception on error (true by default)
+         * @return errno on error, 0 otherwise
+         * @throws SystemException if the underlying system call fails
+         */
+        static int remove(char const* filePath, bool raise=true);
+
+        /**
+         * Read the contents of a directory
+         * @param dirName directory name
+         * @param entries directory entries
+         * @return errno on error, 0 otherwise
+         * @throws SystemException if the underlying system call fails
+         */
+        static void readDir(const char* dirName, std::list<std::string>& entries);
+
+        /**
+         * Create a directory
+         * @return true if directory is created or has already existed
+         * @param dirPath directory path
+         */
+        static bool createDir(const std::string& dirPath);
+
+        /**
+         * Close file descriptor (restarting after signal interrupt if necessary)
+         * @return 0 on success, or -1 otherwise
+         */
+        static int closeFd(int fd);
+
+        /**
+         * Open a file (restarting after signal interrupt if necessary)
+         * @return file descriptor or -1
+         * @param filePath file path
+         * @param flags open mode flags to pass to ::open()
+         *        such as O_APPEND, O_CREAT, O_EXCL, etc.
+         */
+        static int openFile(const std::string& fileName, int flags);
+    };
 
 #ifndef SCIDB_CLIENT
     class BackgroundFileFlusher: public Singleton<BackgroundFileFlusher>

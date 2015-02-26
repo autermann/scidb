@@ -35,6 +35,7 @@
 #include "boost/make_shared.hpp"
 
 #include "query/RemoteArray.h"
+#include "network/proto/scidb_msg.pb.h"
 #include "network/NetworkManager.h"
 #include "query/QueryProcessor.h"
 #include "query/Statistics.h"
@@ -107,7 +108,6 @@ bool RemoteArray::proceedChunkMsg(AttributeID attId, MemChunk& chunk)
 
         Address firstElem;
         firstElem.attId = attId;
-        firstElem.arrId = getArrayDesc().getId();
         for (int i = 0; i < chunkMsg->coordinates_size(); i++) {
             firstElem.coords.push_back(chunkMsg->coordinates(i));
         }
@@ -219,7 +219,6 @@ bool RemoteMergedArray::proceedChunkMsg(size_t stream, AttributeID attId, MemChu
 
             Address firstElem;
             firstElem.attId = attId;
-            firstElem.arrId = getArrayDesc().getId();
             for (int i = 0; i < chunkMsg->coordinates_size(); i++) {
                 firstElem.coords.push_back(chunkMsg->coordinates(i));
             }
@@ -287,7 +286,6 @@ bool RemoteMergedArray::fetchChunk(size_t stream, AttributeID attId, MemChunk* c
                    PinBuffer buf(srcChunk);
                    Address firstElem;
                    firstElem.attId = attId;
-                   firstElem.arrId = getArrayDesc().getId();
                    firstElem.coords = srcChunk.getFirstPosition(false);
                    chunk->initialize(this, &desc, firstElem, srcChunk.getCompressionMethod());
                    chunk->setSparse(srcChunk.isSparse());

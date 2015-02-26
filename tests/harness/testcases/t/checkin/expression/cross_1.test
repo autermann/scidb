@@ -4,12 +4,27 @@ create immutable array C <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
 store(build(A,x+10),B)
 store(build(C,x+100),C)
+create empty array teeth_u <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
+load(teeth_u, '../tests/harness/testcases/data/teeth.txt')
 
 --test
 cross(A,B)
 cross(A,C)
+cross(teeth_u, A)
+store(cross(A, teeth_u), D)
+store(cross(teeth_u,teeth_u),E)
+count(D)
+count(E)
+count(cross(teeth_u,teeth_u))
+cross(sum(teeth_u), sum(teeth_u))
+cross(teeth_u, sum(teeth_u))
+cross(avg(teeth_u), teeth_u)
+cross(teeth_u, build(not empty <val:int64> [x=1:10,5,0], x))
 
 --cleanup
 remove(A)
 remove(B)
 remove(C)
+remove(teeth_u)
+remove(D)
+remove(E)

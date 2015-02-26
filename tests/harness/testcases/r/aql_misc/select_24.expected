@@ -5,112 +5,170 @@ SCIDB QUERY : <select * from show(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <select * from count(A)>
-[(0)]
+{i} count
+{0} 0
 
-SCIDB QUERY : <select * from list('arrays')>
-[("A")]
+SCIDB QUERY : <select name,schema from list('arrays')>
+{No} name,schema
+{0} "A","A<a:int32> [x=0:2,3,0]"
 
-SCIDB QUERY : <select * from rename(A,B)>
+SCIDB QUERY : <rename array A to B>
 Query was executed successfully
 
-SCIDB QUERY : <select * from list()>
-[("B")]
+SCIDB QUERY : <select name,schema from list()>
+{No} name,schema
+{0} "B","B<a:int32> [x=0:2,3,0]"
 
 SCIDB QUERY : <select * from build(B,x+10)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * from build_sparse(B,x+5,true)>
-[{0}(5),{1}(6),{2}(7)]
+{x} a
+{0} 5
+{1} 6
+{2} 7
 
 SCIDB QUERY : <select * into D from dimensions(B)>
-[("x",0,3,3,0,4611686018427387903,-4611686018427387903,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,3,3,0,4611686018427387903,-4611686018427387903,"int64"
 
 SCIDB QUERY : <select * from attributes(D)>
-[("name","string",false),("start","int64",false),("length","uint64",false),("chunk_interval","int32",false),("chunk_overlap","int32",false),("low","int64",false),("high","int64",false),("type","string",false)]
+{No} name,type_id,nullable
+{0} "name","string",false
+{1} "start","int64",false
+{2} "length","uint64",false
+{3} "chunk_interval","int32",false
+{4} "chunk_overlap","int32",false
+{5} "low","int64",false
+{6} "high","int64",false
+{7} "type","string",false
 
 SCIDB QUERY : <select name, start, length, chunk_interval, chunk_overlap, low, high, type from dimensions(B)>
-[("x",0,3,3,0,4611686018427387903,-4611686018427387903,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,3,3,0,4611686018427387903,-4611686018427387903,"int64"
 
 SCIDB QUERY : <select * into C from attributes(B)>
-[("a","int32",false)]
+{No} name,type_id,nullable
+{0} "a","int32",false
 
 SCIDB QUERY : <select * from attributes(C)>
-[("name","string",false),("type_id","string",false),("nullable","bool",false)]
+{No} name,type_id,nullable
+{0} "name","string",false
+{1} "type_id","string",false
+{2} "nullable","bool",false
 
 SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
-[("a","int32",false)]
+{No} name,type_id,nullable
+{0} "a","int32",false
 
 SCIDB QUERY : <select * from store(build(B,x+10),B)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * from unpack(B,row)>
-[(0,10),(1,11),(2,12)]
+{row} x,a
+{0} 0,10
+{1} 1,11
+{2} 2,12
 
 SCIDB QUERY : <select * from filter(B,x=0)>
-[(10),(),()]
+{x} a
+{0} 10
 
 SCIDB QUERY : <select * from apply(B,z,x)>
-[(10,0),(11,1),(12,2)]
+{x} a,z
+{0} 10,0
+{1} 11,1
+{2} 12,2
 
 SCIDB QUERY : <select * from attributes(B)>
-[("a","int32",false)]
+{No} name,type_id,nullable
+{0} "a","int32",false
 
 SCIDB QUERY : <select * from dimensions(B)>
-[("x",0,3,3,0,0,2,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,3,3,0,0,2,"int64"
 
 SCIDB QUERY : <select name, high('B'), low('B'), dim.high, dim.low from dimensions(B) as dim>
-[("x",2,0,2,0)]
+{No} name,expr,expr_1,high,low
+{0} "x",2,0,2,0
 
 SCIDB QUERY : <select name, start, length, chunk_interval, chunk_overlap, low, high, type from dimensions(B)>
-[("x",0,3,3,0,0,2,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,3,3,0,0,2,"int64"
 
 SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
-[("a","int32",false)]
+{No} name,type_id,nullable
+{0} "a","int32",false
 
 SCIDB QUERY : <select * from count(versions(B))>
-[(0)]
+{i} count
+{0} 0
 
 SCIDB QUERY : <select version_id from versions(B)>
-[]
+{VersionNo} version_id
 
 SCIDB QUERY : <select * from allversions(B)>
-[[]]
+{VersionNo,x} a
 
 SCIDB QUERY : <select * from help()>
-[("Use existing operator name as argument for help operator. You can see all operators by executing list('operators').")]
+{i} help
+{0} "Use existing operator name as argument for help operator. You can see all operators by executing list('operators')."
 
-SCIDB QUERY : <select * from rename(B,A)>
+SCIDB QUERY : <rename array B to A>
 Query was executed successfully
 
 SCIDB QUERY : <select * from dimensions(A)>
-[("x",0,3,3,0,0,2,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,3,3,0,0,2,"int64"
 
 SCIDB QUERY : <select * from scan(A)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * into A2 from adddim(A,b)>
-[[(10),(11),(12)]]
+{b,x} a
+{0,0} 10
+{0,1} 11
+{0,2} 12
 
 SCIDB QUERY : <select * from dimensions(A2)>
-[("b",0,1,1,0,0,0,"int64"),("x",0,3,3,0,0,2,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "b",0,1,1,0,0,0,"int64"
+{1} "x",0,3,3,0,0,2,"int64"
 
 SCIDB QUERY : <select * into A3 from deldim(A2)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * from dimensions(A3)>
-[("x",0,3,3,0,0,2,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,3,3,0,0,2,"int64"
 
 SCIDB QUERY : <select * from sum(A)>
-[(33)]
+{i} a_sum
+{0} 33
 
 SCIDB QUERY : <select * from avg(A)>
-[(11)]
+{i} a_avg
+{0} 11
 
 SCIDB QUERY : <select * from max(A)>
-[(12)]
+{i} a_max
+{0} 12
 
 SCIDB QUERY : <select * from min(A)>
-[(10)]
+{i} a_min
+{0} 10
 
 SCIDB QUERY : <select * from sample(A,1)>
 [Query was executed successfully, ignoring data output by this query.]
@@ -119,16 +177,32 @@ SCIDB QUERY : <select * from bernoulli(A,1)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <select * from A where x between 0 and 1>
-[(10),(11),()]
+{x} a
+{0} 10
+{1} 11
 
 SCIDB QUERY : <select * from subarray(A,1,2)>
-[(11),(12)]
+{x} a
+{0} 11
+{1} 12
 
 SCIDB QUERY : <select * from slice(A)>
-[(10),(11),(12)]
+{x} a
+{0} 10
+{1} 11
+{2} 12
 
 SCIDB QUERY : <select * from cross_join(A,A)>
-[[(10,10),(10,11),(10,12)],[(11,10),(11,11),(11,12)],[(12,10),(12,11),(12,12)]]
+{x,x} a,a
+{0,0} 10,10
+{0,1} 10,11
+{0,2} 10,12
+{1,0} 11,10
+{1,1} 11,11
+{1,2} 11,12
+{2,0} 12,10
+{2,1} 12,11
+{2,2} 12,12
 
 SCIDB QUERY : <drop array A>
 Query was executed successfully

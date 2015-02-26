@@ -76,6 +76,10 @@ Other .
     return token::NEQ;
 }
 
+"!=" {
+    return token::NEQ;
+}
+
 ">=" {
     return token::GTEQ;
 }
@@ -119,7 +123,8 @@ Other .
     }
     catch(boost::bad_lexical_cast &e)
     {
-        _glue.error2(*yylloc, boost::str(boost::format("Can not interpret '%s' as int64 value. Value too big.") % yytext));
+        _glue.error(*yylloc, boost::str(boost::format("Can not interpret '%s' as int64 value. Value too big.") % yytext));
+        return token::LEXER_ERROR;
     }
     return token::INTEGER;
 }
@@ -131,7 +136,8 @@ Other .
     }
     catch(boost::bad_lexical_cast &e)
     {
-        _glue.error2(*yylloc, boost::str(boost::format("Can not interpret '%s' as real value. Value too big.") % yytext));
+        _glue.error(*yylloc, boost::str(boost::format("Can not interpret '%s' as real value. Value too big.") % yytext));
+        return token::LEXER_ERROR;
     }
 
     return token::REAL;
@@ -144,7 +150,8 @@ Other .
     }
     catch(boost::bad_lexical_cast &e)
     {
-        _glue.error2(*yylloc, boost::str(boost::format("Can not interpret '%s' as decimal value. Value too big.") % yytext));
+        _glue.error(*yylloc, boost::str(boost::format("Can not interpret '%s' as decimal value. Value too big.") % yytext));
+        return token::LEXER_ERROR;
     }
 
     return token::REAL;

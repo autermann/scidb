@@ -30,25 +30,66 @@
 #include "query/Operator.h"
 #include "system/Exceptions.h"
 #include "system/SystemCatalog.h"
+#include "query/executor/SciDBExecutor.h"
 
 
 using namespace std;
 
 namespace scidb {
 
-class LogicalCancel: public LogicalOperator
+/**
+ * @brief The operator: cancel().
+ *
+ * @par Synopsis:
+ *   cancel( queryId )
+ *
+ * @par Summary:
+ *   Cancels a query by ID.
+ *
+ * @par Input:
+ *   - queryId: the query ID that can be obtained from the SciDB log or via the list() command.
+ *
+ * @par Output array:
+ *   n/a
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   - SCIDB_SE_QPROC::SCIDB_LE_QUERY_NOT_FOUND: if queryId does not exist.
+ *
+ * @par Notes:
+ *   - This operator is designed for internal use.
+ *
+ */class LogicalCancel: public LogicalOperator
 {
 public:
     LogicalCancel(const string& logicalName, const std::string& alias):
 	    LogicalOperator(logicalName, alias)
 	{
-        ADD_PARAM_CONSTANT("int64")
+        ADD_PARAM_CONSTANT(TID_INT64)
         _properties.ddl = true;
 	}
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
 	{
-        // This operator does not produce any array
+        int64_t queryID = evaluate(shared_dynamic_cast<OperatorParamLogicalExpression>(
+            _parameters[0])->getExpression(), query, TID_INT64).getInt64();
+        try
+        {
+            query->getQueryByID(queryID, false, true);
+        }
+        catch(const Exception& e)
+        {
+            if (SCIDB_LE_QUERY_NOT_FOUND == e.getLongErrorCode())
+            {
+                throw CONV_TO_USER_QUERY_EXCEPTION(e, _parameters[0]->getParsingContext());
+            }
+            else
+            {
+                throw;
+            }
+        }
         return ArrayDesc();
 	}
 };

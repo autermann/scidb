@@ -45,8 +45,7 @@ inline ArrayDesc createThinDesc(ArrayDesc const& desc, Coordinates const& from, 
     for (size_t i = 0, n = dims.size(); i < n; i++) {
         DimensionDesc const& srcDim = dims[i];
         Coordinate last = (srcDim.getCurrLength() - from[i] + srcDim.getStart() + step[i] - 1) / step[i] - 1;
-        string const& 
-mappingArrayName = srcDim.getMappingArrayName();
+        string const& mappingArrayName = srcDim.getMappingArrayName();
         if (mappingArrayName.empty() || srcDim.getType() == TID_INT64) { 
             newDims[i] = DimensionDesc(srcDim.getBaseName(),
                                        srcDim.getNamesAndAliases(),
@@ -85,6 +84,40 @@ mappingArrayName = srcDim.getMappingArrayName();
 }
 
 
+/**
+ * @brief The operator: thin().
+ *
+ * @par Synopsis:
+ *   thin( srcArray {, start, step}+ )
+ *
+ * @par Summary:
+ *   Selects regularly-spaced elements of the source array in each dimension.
+ *   A (start, step) pair must be provided for every dimension.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - start: the starting coordinate of a dimension.
+ *   - step: how many coordinates to advance to the next coordinate to select. A step of 1 means to select everything.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs.
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims where every dimension's start is changed to 0.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   - SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2: if not all dimensions have a pair of (start, step).
+ *   - SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_THIN_ERROR1: if a step is not a divier of chunk size.
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalThin: public  LogicalOperator
 {
   public:
@@ -95,15 +128,15 @@ class LogicalThin: public  LogicalOperator
         ADD_PARAM_VARIES()
         }
 
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
-        {
-                std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-                if (_parameters.size() == schemas[0].getDimensions().size()*2)
-                        res.push_back(END_OF_VARIES_PARAMS());
-                else
-                        res.push_back(PARAM_CONSTANT("int64"));
-                return res;
-        }
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(
+            const std::vector<ArrayDesc> &schemas) {
+        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        if (_parameters.size() == schemas[0].getDimensions().size() * 2)
+            res.push_back(END_OF_VARIES_PARAMS());
+        else
+            res.push_back(PARAM_CONSTANT("int64"));
+        return res;
+    }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {

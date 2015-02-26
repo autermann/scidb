@@ -23,8 +23,6 @@
 # One can create subdirectory here for every component
 set(ops_lib_src
     BuildInOps.inc
-    example/LogicalExample.cpp
-    example/PhysicalExample.cpp
     create_array/LogicalCreateArray.cpp
     create_array/PhysicalCreateArray.cpp
     project/LogicalProject.cpp
@@ -56,10 +54,11 @@ set(ops_lib_src
     sum/LogicalSum.cpp
     store/LogicalStore.cpp
     store/PhysicalStore.cpp
-    flip/LogicalFlip.cpp
-    flip/PhysicalFlip.cpp
-    flip_store/LogicalFlipStore.cpp
-    flip_store/PhysicalFlipStore.cpp
+    redimension/LogicalRedimension.cpp
+    redimension/PhysicalRedimension.cpp
+    redimension/LogicalRedimensionStore.cpp
+    redimension/PhysicalRedimensionStore.cpp
+    redimension/RedimensionCommon.cpp
     reshape/LogicalReshape.cpp
     reshape/PhysicalReshape.cpp
     reshape/ReshapeArray.cpp
@@ -104,6 +103,7 @@ set(ops_lib_src
     sort2/LogicalSort.cpp
     sort2/PhysicalSort.cpp
     sort2/MergeSortArray.cpp
+    list/ListArrayBuilder.cpp
     list/LogicalList.cpp
     list/PhysicalList.cpp
     attributes/LogicalAttributes.cpp
@@ -119,6 +119,8 @@ set(ops_lib_src
     unpack/PhysicalUnpack.cpp
     unpack/UnpackArray.cpp
     unpack/UnpackUnalignedArray.cpp
+    unpack/LogicalOldUnpack.cpp
+    unpack/PhysicalOldUnpack.cpp
     build/LogicalBuild.cpp
     build/PhysicalBuild.cpp
     build/BuildArray.cpp
@@ -172,10 +174,6 @@ set(ops_lib_src
     allversions/AllVersionsArray.cpp
     explainLogical/LogicalExplainLogical.cpp
     explainLogical/PhysicalExplainLogical.cpp
-    get_temp/LogicalGetTemp.cpp
-    get_temp/PhysicalGetTemp.cpp
-    set_temp/LogicalSetTemp.cpp
-    set_temp/PhysicalSetTemp.cpp
     unload_library/LogicalUnLoadLibrary.cpp
     unload_library/PhysicalUnLoadLibrary.cpp
     attribute_rename/LogicalAttributeRename.cpp
@@ -198,9 +196,24 @@ set(ops_lib_src
     materialize/PhysicalMaterialize.cpp
     analyze/LogicalAnalyze.cpp
     analyze/PhysicalAnalyze.cpp
+    analyze/AnalyzeAggregate.cpp
+    analyze/LogicalApproxDC.cpp
+    mstat/LogicalMStat.cpp
+    mstat/PhysicalMStat.cpp
+    rankquantile/LogicalRank.cpp
+    rankquantile/PhysicalRank.cpp
+    rankquantile/LogicalQuantile.cpp
+    rankquantile/PhysicalQuantile.cpp
+    rankquantile/LogicalAverageRank.cpp
+    rankquantile/PhysicalAverageRank.cpp
+    rankquantile/RankCommon.cpp
+    variable_window/LogicalVariableWindow.cpp
+    variable_window/PhysicalVariableWindow.cpp
+    insert/LogicalInsert.cpp
+    insert/PhysicalInsert.cpp
 )
 
 file(GLOB_RECURSE ops_lib_include "*.h")
 
 add_library(ops_lib STATIC ${ops_lib_src} ${ops_lib_include})
-target_link_libraries(ops_lib compression_lib network_lib)
+target_link_libraries(ops_lib compression_lib network_lib MurmurHash_lib)

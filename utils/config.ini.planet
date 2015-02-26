@@ -8,7 +8,6 @@ instance-4=instance4,1
 db_user=planet
 db_passwd=planet
 install_root=@CMAKE_INSTALL_PREFIX@
-metadata=@CMAKE_INSTALL_PREFIX@/share/scidb/meta.sql
 pluginsdir=@CMAKE_INSTALL_PREFIX@/lib/scidb/plugins
 logconf=@CMAKE_INSTALL_PREFIX@/share/scidb/log1.properties
 interface=eth1

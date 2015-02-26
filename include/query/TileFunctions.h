@@ -207,6 +207,25 @@ struct BinaryDiv
     }
 };
 
+// Specialization for double and float data type to avoid error and producing NaN values according to IEEE-754
+template<>
+struct BinaryDiv<double, double, double>
+{
+    static double func(double v1, double v2)
+    {
+        return v1 / v2;
+    }
+};
+
+template<>
+struct BinaryDiv<float, float, float>
+{
+    static float func(float v1, float v2)
+    {
+        return v1 / v2;
+    }
+};
+
 template<typename T1, typename T2, typename TR>
 struct BinaryMod
 {
@@ -439,6 +458,9 @@ void rle_binary_func(const Value** args, Value* result, void*)
         // Segment with less length will be iterated and with more length cut at the end of loop
         assert(ps1.pPosition == ps2.pPosition);
         const uint64_t length = std::min(ps1_length, ps2_length);
+        if (length == 0) {
+            break;
+        }
         RLEPayload::Segment rs;
 
         // Check NULL cases
@@ -561,7 +583,7 @@ public:
 
     static void init(State& state)
     {
-        state._sum = 0;
+        state._sum = TSR();
     }
 
     static void aggregate(State& state, const TS& value)
@@ -712,7 +734,7 @@ public:
 
     static void init(State& state)
     {
-        state._sum = 0;
+        state._sum = TSR();
         state._count = 0;
     }
 
@@ -755,8 +777,8 @@ public:
 
     static void init(State& state)
     {
-        state._m = 0;
-        state._m2 = 0;
+        state._m = TSR();
+        state._m2 = TSR();
         state._count = 0;
     }
 
@@ -804,8 +826,8 @@ public:
 
     static void init(State& state)
     {
-        state._m = 0;
-        state._m2 = 0;
+        state._m = TSR();
+        state._m2 = TSR();
         state._count = 0;
     }
 

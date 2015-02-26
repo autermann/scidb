@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>avg</refname>
+    <refpurpose>Average (mean) value</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <synopsis><command>SELECT</command> * <command>FROM</command> avg(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional><replaceable>,dimension1</replaceable>,<replaceable>dimension2</replaceable>,...</optional>);</synopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>Summary</title>
+    <para>The avg operator finds the average value of an array attribute.</para>
+    <note>
+      <para>The avg operator provides the same functionality as the  avg aggregate, but has a different syntax. See the avg aggregate reference page.</para>
+    </note>
+  </refsect1>
+  <refsect1>
+    <title>Example</title>
+    <informalexample>
+      <para>This example finds the average value along the second dimension of a 4<symbol role="symbolfont">&times;</symbol>4 matrix.</para>
+      <procedure>
+        <step>
+          <para>Create an array named avg_array:<para><programlisting>AQL% <command>CREATE ARRAY</command> avg_array&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];  </programlisting></para></para>
+        </step>
+        <step>
+          <para>Store values of  0&ndash;15 in avg_array:<para><programlisting>AFL% store(build(avg_array,i*4+j),avg_array);  </programlisting><screen>[
+[(0),(1),(2),(3)],
+[(4),(5),(6),(7)],
+[(8),(9),(10),(11)],
+[(12),(13),(14),(15)]
+]</screen></para></para>
+        </step>
+        <step>
+          <para>Find the average value along the dimension j:<para><programlisting>AFL% avg(avg_array,val,j);</programlisting><screen>{i} val_avg
+{0} 1.5
+{1} 5.5
+{2} 9.5
+{3} 13.5
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

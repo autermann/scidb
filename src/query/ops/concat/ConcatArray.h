@@ -139,7 +139,23 @@ class ConcatArray : public DelegateArray
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
-    virtual bool supportsRandomAccess() const;
+
+    /**
+     * Get the least restrictive access mode that the array supports.
+     * @return RANDOM in case of simpleAppend, NO_SET_POSITION otherwise
+     */
+    virtual Access getSupportedAccess() const
+    {
+        if(simpleAppend)
+        {
+            return RANDOM;
+        }
+        else
+        {
+            return MULTI_PASS;
+        }
+    }
+
     ConcatArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& left, boost::shared_ptr<Array> const& right);
 
   private:

@@ -39,6 +39,37 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: versions().
+ *
+ * @par Synopsis:
+ *   versions( srcArray )
+ *
+ * @par Summary:
+ *   Lists all versions of an array in the database.
+ *
+ * @par Input:
+ *   - srcArray: a source array.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   version_id
+ *   <br>   timestamp: a string describing the creation time of the version
+ *   <br> >
+ *   <br> [
+ *   <br>   VersionNo: start=1, end=#versions, chunk interval=#versions
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalVersions: public LogicalOperator
 {
 public:
@@ -46,7 +77,6 @@ public:
         LogicalOperator(logicalName, alias)
     {
     	ADD_PARAM_IN_ARRAY_NAME()
-        _properties.ddl = true;
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas, boost::shared_ptr<Query> query)

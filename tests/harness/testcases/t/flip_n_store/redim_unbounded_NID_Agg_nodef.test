@@ -8,10 +8,12 @@ load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data1_str.txt')
 
 CREATE ARRAY Data < AV : double NULL > [ I(int64)=*,10,0, J(int64)=*,10,0, W(string)=*,4,0 ]
 
+--set-format csv+
 redimension_store(Raw_Test_Data, Data, avg ( V ) as AV)
 
 scan (Raw_Test_Data)
 scan (Data)
+--reset-format
 
 --stop-query-logging
 --cleanup

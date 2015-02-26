@@ -35,6 +35,50 @@ namespace scidb {
 
 using namespace std;
 
+/**
+ * @brief The operator: attribute_rename().
+ *
+ * @par Synopsis:
+ *   attribute_rename( srcArray {, srcAttr, newAttr}+ )
+ *
+ * @par Summary:
+ *   Produces a result array the same as srcArray, but with at least one attribute renamed.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 1 or more pairs of a source attribute and the new attribute to rename to.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs, with the specified attributes renamed.
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - attribute_rename(A, sales, totalsales) <quantity: uint64, totalsales:double> [year, item] =
+ *     <br> year, item, quantity, totalsales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalAttributeRename: public  LogicalOperator
 {
 public:
@@ -80,7 +124,7 @@ public:
                                                  attr.getAliases(), &attr.getDefaultValue(), attr.getDefaultValueExpr());
 		}
 		
-        return ArrayDesc(desc.getId(), desc.getName(), newAttributes, desc.getDimensions());
+        return ArrayDesc(desc.getId(), desc.getUAId(), desc.getVersionId(), desc.getName(), newAttributes, desc.getDimensions());
 	}
 };
 

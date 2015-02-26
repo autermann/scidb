@@ -46,25 +46,58 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: explain_physical().
+ *
+ * @par Synopsis:
+ *   explain_physical( query , language = 'aql' )
+ *
+ * @par Summary:
+ *   Produces a single-element array containing the physical query plan.
+ *
+ * @par Input:
+ *   - query: a query string.
+ *   - language: the language string; either 'aql' or 'afl'; default is 'aql'
+ *
+ * @par Output array:
+ *        <
+ *   <br>   physical_plan: string
+ *   <br> >
+ *   <br> [
+ *   <br>   No: start=end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - For internal usage.
+ *
+ */
 class LogicalExplainPhysical: public LogicalOperator
 {
 public:
-        LogicalExplainPhysical(const std::string& logicalName, const std::string& alias):
-        LogicalOperator(logicalName, alias)
+    LogicalExplainPhysical(const std::string& logicalName, const std::string& alias):
+    LogicalOperator(logicalName, alias)
     {
+        ADD_PARAM_CONSTANT("string");
         ADD_PARAM_VARIES();
-        _properties.ddl = true;
         _usage = "explain_physical(<querystring> [,language]) language := 'afl'|'aql'";
     }
 
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    {
+        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        if (_parameters.size() == 1)
         {
-                std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-                res.push_back(PARAM_CONSTANT("string"));
-                res.push_back(END_OF_VARIES_PARAMS());
-
-                return res;
+            res.push_back(PARAM_CONSTANT("string"));
         }
+        res.push_back(END_OF_VARIES_PARAMS());
+        return res;
+    }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
     {

@@ -12,7 +12,7 @@ subarray(Foo_Copy, 11, 12)
 remove(Foo_Flipped)
 subarray(Foo_Copy, 11, 12)
 remove(Foo_Copy)
-list()
+--aql select name,schema from list('arrays')
 
 --cleanup
 remove(Foo)

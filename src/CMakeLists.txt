@@ -25,6 +25,8 @@ add_subdirectory("network")
 add_subdirectory("system")
 add_subdirectory("smgr")
 add_subdirectory("util")
+add_subdirectory("mpi")
+add_subdirectory("linear_algebra")
 
 if (NOT WITHOUT_SERVER)
     add_subdirectory("array")

@@ -7,6 +7,10 @@ create empty array C <a:string>[b(string)=3,3,0]
 store(join(build(T,'a_'+string(x+1)),build(T,'b_'+string(x+1))),A)
 
 --test
+
+#workaround for p4 bug 564
+--set-format csv+
+
 redimension_store(A,B)
 redimension_store(B,C)
 unpack(B,row)
@@ -59,6 +63,8 @@ sum(C1)
 sort(C1,a)
 sort(C1,a desc)
 rename(C1,C)
+
+--reset-format
 
 --cleanup
 remove(A)

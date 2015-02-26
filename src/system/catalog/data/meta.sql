@@ -38,6 +38,7 @@ drop sequence if exists "libraries_id_seq" cascade;
 
 drop function if exists uuid_generate_v1();
 drop function if exists get_cluster_uuid();
+drop function if exists get_metadata_version();
 
 --
 -- CREATE
@@ -49,7 +50,8 @@ create sequence "libraries_id_seq";
 
 create table "cluster"
 (
-  cluster_uuid uuid
+  cluster_uuid uuid,
+  metadata_version integer
 );
 --
 --  Table: "array"  (public.array) List of arrays in the SciDB installation.
@@ -162,7 +164,8 @@ create table "instance"
   instance_id bigint primary key default nextval('instance_id_seq'),
   host varchar,
   port integer,
-  online_since timestamp
+  online_since timestamp,
+  path varchar
 );
 --
 --  Table: public.array_partition 
@@ -393,7 +396,7 @@ returns uuid
 as '$libdir/uuid-ossp', 'uuid_generate_v1'
 volatile strict language C;
 
-insert into "cluster" values (uuid_generate_v1());
+insert into "cluster" values (uuid_generate_v1(), 1);
 
 create function get_cluster_uuid() returns uuid as $$
 declare t uuid;
@@ -403,5 +406,12 @@ begin
 end;
 $$ language plpgsql;
 
-commit;
+create function get_metadata_version() returns integer as $$
+declare v integer;
+begin
+  select into v metadata_version from "cluster" limit 1;
+  return v;
+end;
+$$ language plpgsql;
+
 

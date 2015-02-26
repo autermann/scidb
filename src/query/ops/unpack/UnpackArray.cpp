@@ -159,7 +159,7 @@ namespace scidb {
     void UnpackChunk::initialize(Coordinates const& pos)
     {
         ArrayDesc const& desc = array.getArrayDesc();
-        Address addr(desc.getId(), attrID, pos);
+        Address addr(attrID, pos);
         chunk.initialize(&array, &desc, addr, desc.getAttributes()[attrID].getDefaultCompressionMethod());
         inputChunk = &iterator.getInputIterator()->getChunk();
         setInputChunk(chunk);

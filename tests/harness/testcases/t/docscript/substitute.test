@@ -1,0 +1,22 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+CREATE ARRAY m4x4_null <val:double null>[i=0:3,4,0,j=0:3,4,0]  
+--stop-igdata
+store(build(m4x4_null,iif(i=1,null,100)),m4x4_null)  
+--start-igdata
+CREATE ARRAY substitute_array <missing:double>[i=0:0,1,0]  
+--stop-igdata
+store(build(substitute_array,0),substitute_array)  
+substitute(m4x4_null,substitute_array)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(m4x4_null)
+remove(substitute_array)

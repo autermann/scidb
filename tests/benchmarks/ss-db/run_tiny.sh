@@ -5,7 +5,7 @@ XSTARTS=(503000 504000 500000 504000 504000)
 YSTARTS=(503000 491000 504000 501000 493000)
 U1=9
 U2=50
-window=25
+window="12,12"
 count=1
 
 ### SSDB directory
@@ -37,13 +37,14 @@ init(){
  echo "Create Tiny Array"
  iquery -aq "remove (tiny)"
  iquery -aq "remove (tiny_space)"
- iquery -r /dev/null -aq "CREATE IMMUTABLE ARRAY tiny <a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32, j:int32, k:int32>[Z=0:19,20,0 ,J=0:9,10,0, I=0:9,10,0]"
+ iquery -r /dev/null -aq "CREATE IMMUTABLE ARRAY tiny <a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32, j:int32, k:int32>[Z=0:19,1,0 ,J=0:9,10,0, I=0:9,10,0]"
  iquery -r /dev/null -aq "CREATE IMMUTABLE ARRAY tiny_space <I:int32, J:int32, index:int32>[id=0:19,20,0]"
  
  # Load Data tiny
  echo "Loading Tiny data .."
  START=$(date +%s)
  iquery -r /dev/null -aq "load(tiny, '$SSDB/data/tiny/bench')"
+ iquery -r /dev/null -aq "load(tiny_space, '$SSDB/data/tiny/bench.pos')"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Loading Time: $DIFF seconds"
@@ -59,19 +60,21 @@ init(){
  # Group Data Normal 
  echo "Grouping Tiny observations into tiny_groups array .."
  START=$(date +%s)
- iquery -naq "store(groupstars(filter(tiny_obs,oid is not null and center is not null),tiny_space,10,20),tiny_groups)"
+ iquery -naq "store(groupstars(filter(tiny_obs,oid is not null and center is not null),tiny_space,0.1,20),tiny_groups)"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Grouping Time: $DIFF seconds"
  
-
- #  Pre-Reparting the array
- echo "Pre-Reparting the Array"
- iquery -r /dev/null -aq "store(repart(tiny,<a:int32, b:int32, c:int32, d:int32, e:int32,f:int32,g:int32,h:int32, i:int32, j:int32, k:int32>[Z=0:19,20,0 ,J=0:9,12,0, I=0:9,12,0]),tiny_reparted)"
- 
  # Split the observation
  echo "Pre-Observation spliting"
  python scripts/split_tiny.py
+
+ # Redimension the Group array and precompute the groups centers
+ iquery -naq "remove (tiny_groups_dim)"
+ iquery -naq "remove (tiny_groups_centers)"
+ iquery -naq "create array tiny_groups_dim<x:int64 NULL,y:int64 NULL> [group=0:*,1000,0,oid=0:*,1000,0,observation=0:*,20,0]"
+ iquery -naq "redimension_store(tiny_groups,tiny_groups_dim)"
+ iquery -naq "store(aggregate(tiny_groups,avg(x),avg(y),group),tiny_groups_centers)"
 }
 
 q1(){
@@ -92,7 +95,8 @@ q2(){
 
 q3(){
  START=$(date +%s)
- iquery -r /dev/null -aq "thin(window(subarray(tiny_reparted,0,0,0,19,$U1,$U1),1,4,4,avg(a)),0,1,2,3,2,3)"
+ ##iquery -r /dev/null -aq "thin(window(subarray(tiny_reparted,0,0,0,19,$U1,$U1),1,4,4,avg(a)),0,1,2,3,2,3)"
+ iquery -r /dev/null -aq "avg(thin(window(repart(subarray(project(tiny,a),0,0,0,19,$U1,$U1),<a:int32>[Z=0:19,1,0,J=0:9,12,0,I=0:9,12,0]),1,4,4,avg(a)),0,1,2,3,2,3))"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Q3: $DIFF seconds"
@@ -101,7 +105,7 @@ q3(){
 q4(){
  START=$(date +%s)
  for (( i=0; i < 20 ; i++ )) do
-   iquery -r /dev/null -aq  "avg(filter(subarray(tiny_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),sumPixel)" &
+   iquery -r /dev/null -aq  "avg(filter(subarray(tiny_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),sumPixel)" 
  done
  wait
  END=$(date +%s)
@@ -112,7 +116,7 @@ q4(){
 q5(){
   START=$(date +%s)
   for (( i=0; i < 20 ; i++ )) do
-    iquery -r /dev/null -aq  "filter(subarray(tiny_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),polygon is not null)" &
+    iquery -r /dev/null -aq  "filter(subarray(tiny_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),polygon is not null)" 
   done
   wait
   END=$(date +%s)
@@ -147,9 +151,9 @@ q8(){
 (2,$[${XSTARTS[$ind]}+$U2],$[${YSTARTS[$ind]}+$U2]),
 (3,${XSTARTS[$ind]},$[${YSTARTS[$ind]}+$U2])
 ]" > /tmp/Points.dat
-  iquery -naq "remove(Points)"
-  iquery -naq "create empty array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]"
-  iquery -naq "load(Points,'/tmp/Points.dat')"
+  iquery -naq "remove(Points)" > /dev/null
+  iquery -naq "create empty array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]" > /dev/null
+  iquery -naq "load(Points,'/tmp/Points.dat')" > /dev/null
 
 
   START=$(date +%s)
@@ -187,7 +191,9 @@ q8(){
 
 q9(){
   START=$(date +%s)
-  iquery -r /dev/null -o csv+ -aq  "Aggregate(filter(filter(cross(subarray(tiny_obs_0,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2) as A, tiny_groups),A.polygon is not null), A.oid=tiny_groups.oid),avg(tiny_groups.x),avg(tiny_groups.y),tiny_groups.group)"
+  for (( i=0; i < 20 ; i++ )) do
+   iquery -r /dev/null -o csv+ -aq  "cross_join(cross_join(tiny_groups_dim, redimension_store(project(apply(filter(between(tiny_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),polygon is not null),check,true),oid,check), b) as b, tiny_groups_dim.oid,b.oid) as A,tiny_groups_centers as C,A.group,C.group)"
+  done
   END=$(date +%s)
   DIFF=$(( $END - $START ))
   echo "Q9: $DIFF seconds"
@@ -219,8 +225,9 @@ do
   q5
   q6
   q7
-  q8
-  q9
+  # TODO: This part should be done in Python
+  #q8
+  #q9
  done
 done
 

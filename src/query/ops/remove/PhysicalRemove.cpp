@@ -58,7 +58,8 @@ public:
             (membership->getInstances().size() != query->getInstancesCount()))) {
            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
        }
-       _lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(_schema.getName(),
+       const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+       _lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(arrayName,
                                                                                       query->getQueryID(),
                                                                                       Cluster::getInstance()->getLocalInstanceId(),
                                                                                       SystemCatalog::LockDesc::COORD,
@@ -72,31 +73,32 @@ public:
         getInjectedErrorListener().check();
 
         //First remove array and its versions data from storage on each instance. Also on coordinator
-        //we collecting all arrays IDs for deleting this arrays later from catalog. 
+        //we collecting all arrays IDs for deleting this arrays later from catalog.
         ArrayDesc arrayDesc;
         vector<VersionDesc> versions;
 
-        query->exclusiveLock(_schema.getName());
+        const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        query->exclusiveLock(arrayName);
 
-        if (SystemCatalog::getInstance()->getArrayDesc(_schema.getName(), arrayDesc, true))
+        if (SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc, true))
         {
             if (!arrayDesc.isImmutable())
             {
                 BOOST_FOREACH(const VersionDesc &ver, SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId()))
                 {
                     std::stringstream versionName;
-                    versionName << _schema.getName() << "@" << ver.getVersionID();
+                    versionName << arrayName << "@" << ver.getVersionID();
 
                     ArrayDesc versionArrayDesc;
                     if (SystemCatalog::getInstance()->getArrayDesc(versionName.str(), versionArrayDesc, false))
                     {
-                        StorageManager::getInstance().remove(versionArrayDesc.getId(), true);
+                        StorageManager::getInstance().remove(versionArrayDesc.getUAId(), versionArrayDesc.getId());
                         SystemCatalog::getInstance()->deleteArrayCache(versionArrayDesc.getId());
                         removeCoordinateIndices(versionArrayDesc, query);
                     }
                 }
-            }                        
-            StorageManager::getInstance().remove(arrayDesc.getId(), true);
+            }
+            StorageManager::getInstance().remove(arrayDesc.getUAId(), arrayDesc.getId());
             removeCoordinateIndices(arrayDesc, query);
             SystemCatalog::getInstance()->deleteArrayCache(arrayDesc.getId());
         }
@@ -106,10 +108,10 @@ public:
     void postSingleExecute(shared_ptr<Query> query)
     {
         bool rc = RemoveErrorHandler::handleRemoveLock(_lock, true);
-        assert(rc);
+        if (!rc) assert(false);
     }
 
-   private:
+private:
     void removeCoordinateIndices(ArrayDesc const& desc, shared_ptr<Query> query)
     {        
         Dimensions const& dims = desc.getDimensions();
@@ -121,7 +123,7 @@ public:
                     && SystemCatalog::getInstance()->countReferences(indexName) <= 1)
                 {
                     StorageManager::getInstance().removeCoordinateMap(indexName);
-                    StorageManager::getInstance().remove(indexDesc.getId(), true);
+                    StorageManager::getInstance().remove(indexDesc.getUAId(), indexDesc.getId());
                     SystemCatalog::getInstance()->deleteArray(indexDesc.getId());
                 }
             }

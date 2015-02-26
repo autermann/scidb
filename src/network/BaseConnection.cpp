@@ -27,24 +27,19 @@
  *      Author: roman.simakov@gmail.com
  */
 
-#include <log4cxx/logger.h>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
-
+#include "network/proto/scidb_msg.pb.h"
 #include "BaseConnection.h"
 #include "system/Exceptions.h"
-
 
 using namespace std;
 using namespace boost;
 
 namespace scidb
 {
-
-
 // Logger for network subsystem. static to prevent visibility of variable outside of file
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.network"));
-
+log4cxx::LoggerPtr BaseConnection::logger(log4cxx::Logger::getLogger("scidb.services.network"));
 
 /**
  * Message descriptor
@@ -52,7 +47,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.netw
  * @param binary a pointer to buffer that will be used for reading or writing
  * binary data. Can be ommited when the message has no binary data
  */
-MessageDesc::MessageDesc(MessageType messageType, boost::shared_ptr<SharedBuffer> binary)
+MessageDesc::MessageDesc(MessageID messageType, boost::shared_ptr<SharedBuffer> binary)
 : _binary(binary)
 {
    init(messageType);
@@ -61,7 +56,7 @@ MessageDesc::MessageDesc()
 {
   init(mtNone);
 }
-MessageDesc::MessageDesc(MessageType messageType)
+MessageDesc::MessageDesc(MessageID messageType)
 {
    init(messageType);
 }
@@ -71,7 +66,7 @@ MessageDesc::MessageDesc(boost::shared_ptr<SharedBuffer> binary)
    init(mtNone);
 }
 void
-MessageDesc::init(MessageType messageType)
+MessageDesc::init(MessageID messageType)
 {
     _messageHeader.netProtocolVersion = NET_PROTOCOL_CURRENT_VER;
     _messageHeader.sourceInstanceID = CLIENT_INSTANCE;
@@ -101,7 +96,7 @@ void MessageDesc::writeConstBuffers(std::vector<asio::const_buffer>& constBuffer
         constBuffers.push_back(asio::buffer(_binary->getData(), _binary->getSize()));
     }
 
-    LOG4CXX_TRACE(logger, "writeConstBuffers: messageType=" << _messageHeader.messageType <<
+    LOG4CXX_TRACE(BaseConnection::logger, "writeConstBuffers: messageType=" << _messageHeader.messageType <<
             " ; headerSize=" << sizeof(_messageHeader) <<
             " ; recordSize=" << _messageHeader.recordSize <<
             " ; binarySize=" << _messageHeader.binarySize);
@@ -136,7 +131,7 @@ void MessageDesc::prepareBinaryBuffer()
 }
 
 
-MessagePtr MessageDesc::createRecordByType(MessageType messageType)
+MessagePtr MessageDesc::createRecordByType(MessageID messageType)
 {
     switch (messageType)
     {
@@ -180,9 +175,8 @@ MessagePtr MessageDesc::createRecordByType(MessageType messageType)
         return MessagePtr(new scidb_msg::ResourcesFileExistsResponse());
     case mtControl:
         return MessagePtr(new scidb_msg::Control());
-
     default:
-        LOG4CXX_ERROR(logger, "Unknown message type " << messageType);
+        LOG4CXX_ERROR(BaseConnection::logger, "Unknown message type " << messageType);
         throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_UNKNOWN_MESSAGE_TYPE) << messageType;
     }
 }
@@ -190,7 +184,7 @@ MessagePtr MessageDesc::createRecordByType(MessageType messageType)
 bool MessageDesc::validate()
 {
     if (_messageHeader.netProtocolVersion != NET_PROTOCOL_CURRENT_VER) {
-        LOG4CXX_ERROR(logger, "Invalid protocol version: " << _messageHeader.netProtocolVersion);
+        LOG4CXX_ERROR(BaseConnection::logger, "Invalid protocol version: " << _messageHeader.netProtocolVersion);
         return false;
     }
     switch (_messageHeader.messageType)
@@ -236,6 +230,7 @@ bool MessageDesc::validate()
  */
 BaseConnection::BaseConnection(boost::asio::io_service& ioService): _socket(ioService)
 {
+    assert(mtSystemMax == SYSTEM_MAX_MSG_ID);
 }
 
 BaseConnection::~BaseConnection()
@@ -316,57 +311,22 @@ void BaseConnection::disconnect()
     LOG4CXX_DEBUG(logger, "Disconnected")
 }
 
-boost::shared_ptr<MessageDesc> BaseConnection::sendAndReadMessage(boost::shared_ptr<MessageDesc>& messageDesc)
+void BaseConnection::send(boost::shared_ptr<MessageDesc>& messageDesc)
 {
-   LOG4CXX_TRACE(logger, "The sendAndReadMessage begin");
-   try
-   {
-       { // scope for sending
-          vector<asio::const_buffer> constBuffers;
-          messageDesc->_messageHeader.sourceInstanceID = CLIENT_INSTANCE;
-          messageDesc->writeConstBuffers(constBuffers);
+    LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::send begin");
+    try
+    {
+        std::vector<boost::asio::const_buffer> constBuffers;
+        messageDesc->_messageHeader.sourceInstanceID = CLIENT_INSTANCE;
+        messageDesc->writeConstBuffers(constBuffers);
+        boost::asio::write(_socket, constBuffers);
 
-          asio::write(_socket, constBuffers);
-       }
-
-       LOG4CXX_TRACE(logger, "Message was sent. Reading...");
-
-       boost::shared_ptr<MessageDesc> _resultDesc = boost::shared_ptr<MessageDesc>(new MessageDesc());
-
-       // Reading message description
-       size_t readBytes = read(_socket, asio::buffer(&_resultDesc->_messageHeader, sizeof(_resultDesc->_messageHeader)));
-       assert(readBytes == sizeof(_resultDesc->_messageHeader));
-       assert(_resultDesc->validate());
-       // TODO: This must not be an assert but exception of correct handled backward compatibility
-       assert(_resultDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER);
-
-       // Reading serialized structured part
-       readBytes = read(_socket, _resultDesc->_recordStream.prepare(_resultDesc->_messageHeader.recordSize));
-       assert(readBytes == _resultDesc->_messageHeader.recordSize);
-       LOG4CXX_TRACE(logger, "ReadMessage: recordSize=" << _resultDesc->_messageHeader.recordSize);
-
-       bool rc = _resultDesc->parseRecord(readBytes);
-       assert(rc);
-       _resultDesc->prepareBinaryBuffer();
-
-       if (_resultDesc->_messageHeader.binarySize > 0)
-       {
-          readBytes = read(_socket, asio::buffer(_resultDesc->_binary->getData(), _resultDesc->_binary->getSize()));
-          assert(readBytes == _resultDesc->_binary->getSize());
-       }
-
-       LOG4CXX_TRACE(logger, "read message: messageType=" << _resultDesc->_messageHeader.messageType <<
-                     " ; binarySize=" << _resultDesc->_messageHeader.binarySize);
-
-       LOG4CXX_TRACE(logger, "The sendAndReadMessage end");
-
-       return _resultDesc;
-   }
-   catch (const boost::exception &e)
-   {
-       throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_CANT_SEND_RECEIVE);
-   }
+        LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::send end");
+    }
+    catch (const boost::exception &e)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_CANT_SEND_RECEIVE);
+    }
 }
-
 
 } // namespace

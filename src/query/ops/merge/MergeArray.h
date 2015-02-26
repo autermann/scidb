@@ -100,7 +100,25 @@ class MergeArray : public DelegateArray
   public:
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
-    virtual bool supportsRandomAccess() const;
+
+    /**
+     * Get the least restrictive access mode that the array supports. This iterates over all of the input
+     * arrays and returns the access mode of the most restrictive input.
+     * @return the most restrictive access mode taken across all of the input arrays
+     */
+    virtual Access getSupportedAccess() const
+    {
+        Access minimum = RANDOM;
+        for(size_t i=0; i<inputArrays.size(); i++)
+        {
+            Access arrayAccess = inputArrays[i]->getSupportedAccess();
+            if (arrayAccess < minimum)
+            {
+                minimum = arrayAccess;
+            }
+        }
+        return minimum;
+    }
 
     MergeArray(ArrayDesc const& desc, vector< boost::shared_ptr<Array> > const& inputArrays);
 

@@ -1,0 +1,21 @@
+#Testing csv2scidb:
+# Case 1:   With values for the optional parameters set to 0 for instance ID and 1 for number of instances
+
+
+ --setup
+ --start-query-logging
+
+  CREATE EMPTY ARRAY Raw_CSVLoad_1 < symbl : string, time : string, price : double, qty : int64 > [ Offset=0:*,10,0 ]
+
+ --test
+ --start-igdata
+ --shell --command " cat ./testcases/data/csv2scidb_1.csv |csv2scidb -c 100 -s 1 -n 1 > /tmp/csv2scidb_test_1.txt  " 
+  load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.txt' )
+ --stop-igdata
+ scan( Raw_CSVLoad_1 )
+ --cleanup
+remove ( Raw_CSVLoad_1 )
+
+#--shell --command " rm -rf /tmp/csv2scidb_test_1.load " --store
+
+ --stop-query-logging

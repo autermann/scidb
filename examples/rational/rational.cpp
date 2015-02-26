@@ -120,6 +120,7 @@ public:
 		//     for the function's return type. 
 		//  d) The fourth and final argument is a function pointer to the 
 		//     code that implements the function. 
+        _functionDescs.push_back(FunctionDescription("rational", ArgTypes(), TypeId("rational"), &construct_rational));
         _functionDescs.push_back(FunctionDescription("rational", list_of(TID_STRING), TypeId("rational"), &str2Rational));
         _functionDescs.push_back(FunctionDescription("rational", list_of(TID_INT64), TypeId("rational"), &int2Rational));
         _functionDescs.push_back(FunctionDescription("rational", list_of(TID_INT64)(TID_INT64), TypeId("rational"), &ints2Rational));

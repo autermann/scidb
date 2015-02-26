@@ -48,13 +48,14 @@ public:
 	{
 	}
 
-    virtual bool isDistributionPreserving(const std::vector<ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(const std::vector<ArrayDesc>&) const
     {
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector<ArrayDesc> const&) const
     {
         return ArrayDistribution(psLocalInstance);
     }
@@ -67,6 +68,13 @@ public:
     {
 		assert(inputArrays.size() == 2);
 		assert(_parameters.size() == 0);
+
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM ||
+            inputArrays[1]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
         if ( query->getInstancesCount() > 1) { 

@@ -36,6 +36,50 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: build_sparse().
+ *
+ * @par Synopsis:
+ *   build_sparse( srcArray | schema, expression, expressionIsNonEmpty )
+ *
+ * @par Summary:
+ *   Produces a sparse array and assigns values to its non-empty cells. The schema must have a single attribute.
+ *
+ * @par Input:
+ *   - schemaArray | schema: an array or a schema, from which attrs and dims will be used by the output array.
+ *   - expression: the expression which is used to compute values for the non-empty cells.
+ *   - expressionIsNonEmpty: the expression which is used to compute whether a cell is not empty.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attrs
+ *   <br> >
+ *   <br> [
+ *   <br>   dims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64> [year, item] =
+ *     <br> year, item, quantity
+ *     <br> 2011,  2,      7
+ *     <br> 2011,  3,      6
+ *     <br> 2012,  1,      5
+ *     <br> 2012,  2,      9
+ *     <br> 2012,  3,      8
+ *   - build_sparse(A, 0, item!=2) <quantity: uint64> [year, item] =
+ *     <br> year, item, quantity
+ *     <br> 2011,  1,      0
+ *     <br> 2011,  3,      0
+ *     <br> 2012,  1,      0
+ *     <br> 2012,  3,      0
+ *
+ * @par Errors:
+ *   - SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_BUILD_SPARSE_ERROR3, if the source array has more than one attribute.
+ *
+ * @par Notes:
+ *   - The build_sparse operator can only take as input bounded dimensions.
+ *
+ */
 class LogicalBuildSparse: public LogicalOperator
 {
 public:

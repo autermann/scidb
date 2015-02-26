@@ -46,19 +46,20 @@ public:
 	{
 	}
 
-	virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
-	{
-	    return false;
-	}
+    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
+    {
+        return true;
+    }
 
-	virtual bool isChunkPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
 	{
 	    DimensionDesc const& dim = inputSchemas[0].getDimensions()[0];
 	    return dim.getLength() % dim.getChunkInterval() == 0;
 	}
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+            std::vector<PhysicalBoundaries> const& inputBoundaries,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
         if ( inputBoundaries[0].isEmpty() && inputBoundaries[1].isEmpty())
         {
@@ -112,24 +113,14 @@ public:
                     return inputDistributions[0];
 
                 case psRoundRobin:
-                {
-                    uint64_t numChunks = inputSchemas[0].getNumberOfChunks();
-                    if (numChunks != INFINITE_LENGTH)
-                    {
-                        numChunks = numChunks/inputSchemas[0].getAttributes().size();
-                        boost::shared_ptr<Query> query(_query);
-                        size_t numInstances = query->getInstancesCount();
-                        if (numChunks % numInstances == 0)
-                        {
-                            return inputDistributions[0];
-                        }
-                    }
-                    return ArrayDistribution(psUndefined);
-                }
-
                 case psByCol:
                 case psUndefined:
+                case psGroupby:
                     return ArrayDistribution(psUndefined);
+
+                default:
+                    assert(false);
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "getOutputDistribution)";
             }
         }
 
@@ -143,6 +134,13 @@ public:
 	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 2);
+
+        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM ||
+            inputArrays[1]->getSupportedAccess() != Array::RANDOM)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        }
+
 		boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new ConcatArray(_schema, inputArrays[0], inputArrays[1]));
 		return result;
 	 }

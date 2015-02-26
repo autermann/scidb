@@ -117,7 +117,10 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 
 		os << "<Results>" << endl;
 		os << "<NamedMeasurement type=\"numeric/double\" name=\"Execution Time\"><Value>" << tr.v_IndividualTestResult[i].TestTotalExeTime << "</Value></NamedMeasurement>" << endl;
-		os << "<NamedMeasurement type=\"text/string\" name=\"Completion Status\"><Value>Completed</Value></NamedMeasurement>" << endl;
+		string cstatus_str="Completed";
+		if (strcasecmp (tr.v_IndividualTestResult[i].TestcaseResult.c_str(), "ERROR_CODES_DIFFER") == 0)
+			cstatus_str="ERROR_CODES_DIFFER";
+		os << "<NamedMeasurement type=\"text/string\" name=\"Completion Status\"><Value>" << cstatus_str << "</Value></NamedMeasurement>" << endl;
 
 		/* test case file name */
 		string tmp = tr.v_IndividualTestResult[i].TestcaseFile;

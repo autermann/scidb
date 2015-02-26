@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>cross</refname>
+
+    <refpurpose>Produces a result array whose set of cells consists of every
+    possible combination of a cell from one source array and a cell from
+    another source array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>cross(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The cross operator calculates the full cross product of two arrays.
+    If the left array has m dimensions and the right array has n dimensions,
+    the result array will have m + n dimensions. If the left array has x
+    non-empty cells and the right array has y non-empty cells, the result
+    array will have x <symbol role="symbolfont">×</symbol> y non-empty
+    cells.</para>
+
+    <para>For example, consider a 2-dimensional array A with dimensions i, j,
+    and a 1-dimensional array B with dimension k. Within the result array
+    produced by cross(A,B), the cell at coordinate position {i, j, k} is the
+    concatenation of cell {i, j} of A with cell {k} of B.</para>
+
+    <para>If the two source arrays have a pair of like-named variables (i.e.,
+    attributes or dimensions), the result array will include one variable with
+    that name and another variable with that name plus the suffix "_2."</para>
+
+    <para>If a cell of one source array is empty, all associated cells in the
+    result array will be empty.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Examples</title>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, each of which includes only one attribute.</para>
+
+      <procedure>
+        <step>
+          <para>Show the first array:<programlisting language='test'>
+--afl create array letters &lt;letter:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p S &lt; ../examples/letters.csv &gt; ../examples/letters.scidb --show-query=no --show-output=no
+--aql load letters from '../examples/letters.scidb' --show-query=no --show-output=no 
+--afl scan(letters);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Show the second array:<programlisting language='test'>
+--afl store(build(&lt;number:int64 null&gt;[i=0:4,5,0],i),numbers) --show-query=no --show-output=no
+--afl scan(numbers);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product:<programlisting language='test'>--afl cross(numbers,letters); --output-format=auto --chunkify=yes</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, one of which has multiple attributes.</para>
+
+      <procedure>
+        <step>
+          <para>Show the first array:<programlisting language='test'>
+--afl create array lettersPlus &lt;letter:string, type:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p S &lt; ../examples/lettersPlus.csv &gt; ../examples/lettersPlus.scidb --show-query=no --show-output=no
+--aql load lettersPlus from '../examples/lettersPlus.scidb' --show-query=no --show-output=no
+--afl scan(lettersPlus);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product with the array called
+          "numbers":<programlisting language='test'>--afl cross(numbers,lettersPlus); --output-format=auto --chunkify=yes</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, one of which includes some null-valued attributes.</para>
+
+      <procedure>
+        <step>
+          <para>Show the array containing some null values (where the even
+          numbers would be):<programlisting language='test'>
+--afl create array oddNumbers &lt;number:int64 null&gt; [i=0:4,5,0] --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p N &lt; ../examples/oddNumbers.csv &gt; ../examples/oddNumbers.scidb --show-query=no --show-output=no
+--aql load oddNumbers from '../examples/oddNumbers.scidb' --show-query=no --show-output=no
+--afl scan(oddNumbers);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product with the letters
+          array:<programlisting language='test'>--afl cross(oddNumbers,letters); --output-format=auto --chunkify=yes</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example returns the cross product of two 1-dimensional
+      arrays, one of which includes some empty cells.</para>
+
+      <procedure>
+        <step>
+          <para>Show the array containing some empty cells (where the odd
+          numbers would be):<programlisting  language='test'>
+--afl store(build_sparse(&lt;number:int64&gt;[i=0:4,5,0],i,((i%2)=0)),evenNumbers) --show-query=no --show-output=no
+--afl scan(evenNumbers);</programlisting></para>
+        </step>
+
+        <step>
+          <para>Generate the cross product with the letters
+          array:<programlisting language='test'>--afl cross(evenNumbers,letters); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

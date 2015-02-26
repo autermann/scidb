@@ -36,6 +36,40 @@ namespace scidb
 
 using namespace std;
 
+/**
+ * @brief The operator: min().
+ *
+ * @par Synopsis:
+ *   min( srcArray [, attr {, groupbyDim}*] )
+ *
+ * @par Summary:
+ *   Produces a result array containing the min value among the values of an attribute.
+ *   If a list of groupbyDims is provided, one min value is calculated for every distinct group.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - 0 or 1 attributes from srcAttrs. If no attribute is provided, the first attribute is used.
+ *   - an optional list of groupbyDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attr_min: the source attribute name, followed by '_min'.
+ *   <br> >
+ *   <br> [
+ *   <br>   groupbyDims (if a list of groupbyDims is provided); or
+ *   <br>   i: start=0, end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - same as aggregate(srcArray, min(attr), groupbyDims).
+ *
+ */
 class LogicalMin : public  LogicalOperator
 {
 public:

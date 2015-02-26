@@ -36,12 +36,43 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
+/**
+ * @brief The operator: reduce_distro().
+ *
+ * @par Synopsis:
+ *   reduce_distro( replicatedArray, partitioningSchema )
+ *
+ * @par Summary:
+ *   Makes a replicated array appear as if it has the required partitioningSchema.
+ *
+ * @par Input:
+ *   - replicatedArray: an source array which is replicated across all the instances.
+ *   - partitioningSchema: the desired partitioning schema.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   same attributes as in replicatedArray
+ *   <br> >
+ *   <br> [
+ *   <br>   same dimensions as in replicatedArray
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *
+ */
 class LogicalReduceDistro: public  LogicalOperator
 {
 public:
     LogicalReduceDistro(string const& logicalName, string const& alias):
         LogicalOperator(logicalName, alias)
     {
+        _properties.tile = true;
         ADD_PARAM_INPUT();
         ADD_PARAM_CONSTANT("int32");
     }

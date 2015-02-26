@@ -26,4 +26,6 @@
 #add_executable(gen ${generator_src})
 #set_target_properties(gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SSDB_OUTPUT_DIRECTORY})
 add_executable(ssdbgen benchGen.cpp)
+extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "ssdbgen" ssdbgen)
 set_target_properties(ssdbgen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
+

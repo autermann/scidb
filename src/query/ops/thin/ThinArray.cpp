@@ -94,7 +94,7 @@ namespace scidb {
         while (true) { 
             size_t i = nDims-1;
             while (++outPos[i] > last[i]) { 
-                if (i == 0) { 
+                if (i == 0) {
                     hasCurrent = false;
                     return;
                 }
@@ -102,7 +102,7 @@ namespace scidb {
                 i -= 1;
             }
             array.out2in(outPos, inPos);            
-            if (inputIterator->setPosition(inPos)) { 
+            if (inputIterator && inputIterator->setPosition(inPos)) {
                 hasCurrent = true;
                 return;
             }
@@ -113,7 +113,7 @@ namespace scidb {
     {
         array.out2in(newPos, inPos);
         outPos = newPos;
-        if (inputIterator->setPosition(inPos)) { 
+        if (inputIterator && inputIterator->setPosition(inPos)) {
             return hasCurrent = true;
         }
         return hasCurrent = false;
@@ -157,9 +157,10 @@ namespace scidb {
       inPos(outPos.size()),
       first(chunk.getFirstPosition(!(iterationMode & IGNORE_OVERLAPS))),
       last(chunk.getLastPosition(!(iterationMode & IGNORE_OVERLAPS))),
-      inputIterator(chunk.getArrayIterator().getInputIterator()->getChunk().getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
       mode(iterationMode)
     {
+        
+        inputIterator = chk.srcChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE);
         reset();
     }
 
@@ -179,9 +180,10 @@ namespace scidb {
     void ThinChunk::initialize(Coordinates const& pos)
     {
         ArrayDesc const& desc = array.getArrayDesc();
-        Address addr(desc.getId(), attrID, pos);
+        Address addr(attrID, pos);
         chunk.initialize(&array, &desc, addr, desc.getAttributes()[attrID].getDefaultCompressionMethod());
-        sparse = iterator.getInputIterator()->getChunk().isSparse();
+        srcChunk = &iterator.getInputIterator()->getChunk();
+        sparse = srcChunk->isSparse();
         setInputChunk(chunk);
     }
 
@@ -197,7 +199,8 @@ namespace scidb {
     //
     ConstChunk const& ThinArrayIterator::getChunk()
     {
-        if (!chunkInitialized) { 
+        if (!chunkInitialized) 
+        { 
             ((ThinChunk&)*chunk).initialize(getPosition());
             chunkInitialized = true;
         }

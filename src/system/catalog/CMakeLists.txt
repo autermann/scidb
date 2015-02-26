@@ -34,3 +34,7 @@ target_link_libraries(catalog_lib util_lib)
 target_link_libraries(catalog_lib ${LIBPQ_LIBRARIES})
 
 configure_file(data/meta.sql "${GENERAL_OUTPUT_DIRECTORY}/data/meta.sql" COPYONLY)
+
+add_subdirectory(data)
+
+add_dependencies(catalog_lib genmeta)

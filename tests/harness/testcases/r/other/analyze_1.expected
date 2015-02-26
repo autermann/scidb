@@ -2,67 +2,186 @@ SCIDB QUERY : <create array a1 <val1:double> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(a1,x+y+2.5),a1)>
-[[(2.5),(3.5)],[(3.5),(4.5)]];[[(4.5),(5.5)],[(5.5),(6.5)]];[[(4.5),(5.5)],[(5.5),(6.5)]];[[(6.5),(7.5)],[(7.5),(8.5)]]
+{x,y} val1
+{0,0} 2.5
+{0,1} 3.5
+{1,0} 3.5
+{1,1} 4.5
+{0,2} 4.5
+{0,3} 5.5
+{1,2} 5.5
+{1,3} 6.5
+{2,0} 4.5
+{2,1} 5.5
+{3,0} 5.5
+{3,1} 6.5
+{2,2} 6.5
+{2,3} 7.5
+{3,2} 7.5
+{3,3} 8.5
 
 SCIDB QUERY : <create array a2 <val1:double> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(a2,'../tests/harness/testcases/data/analyze1.txt')>
-[[(1),(2)],[(2),(9)]];[[(3),(4)],[(4),(100)]];[[(3),(4)],[(4),(5)]];[[(5),(6)],[(6),(82)]]
+{x,y} val1
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 9
+{0,2} 3
+{0,3} 4
+{1,2} 4
+{1,3} 100
+{2,0} 3
+{2,1} 4
+{3,0} 4
+{3,1} 5
+{2,2} 5
+{2,3} 6
+{3,2} 6
+{3,3} 82
 
 SCIDB QUERY : <create array a3 <val1:int32> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(a3,x+y+1),a3)>
-[[(1),(2)],[(2),(3)]];[[(3),(4)],[(4),(5)]];[[(3),(4)],[(4),(5)]];[[(5),(6)],[(6),(7)]]
+{x,y} val1
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 3
+{0,2} 3
+{0,3} 4
+{1,2} 4
+{1,3} 5
+{2,0} 3
+{2,1} 4
+{3,0} 4
+{3,1} 5
+{2,2} 5
+{2,3} 6
+{3,2} 6
+{3,3} 7
 
 SCIDB QUERY : <create array a4 <val1:int64> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(a4,x+y+1),a4)>
-[[(1),(2)],[(2),(3)]];[[(3),(4)],[(4),(5)]];[[(3),(4)],[(4),(5)]];[[(5),(6)],[(6),(7)]]
+{x,y} val1
+{0,0} 1
+{0,1} 2
+{1,0} 2
+{1,1} 3
+{0,2} 3
+{0,3} 4
+{1,2} 4
+{1,3} 5
+{2,0} 3
+{2,1} 4
+{3,0} 4
+{3,1} 5
+{2,2} 5
+{2,3} 6
+{3,2} 6
+{3,3} 7
 
 SCIDB QUERY : <create array a5 <val1:string> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(a5,'a'+string(x)+string(y)),a5)>
-[[("a00"),("a01")],[("a10"),("a11")]];[[("a02"),("a03")],[("a12"),("a13")]];[[("a20"),("a21")],[("a30"),("a31")]];[[("a22"),("a23")],[("a32"),("a33")]]
+{x,y} val1
+{0,0} "a00"
+{0,1} "a01"
+{1,0} "a10"
+{1,1} "a11"
+{0,2} "a02"
+{0,3} "a03"
+{1,2} "a12"
+{1,3} "a13"
+{2,0} "a20"
+{2,1} "a21"
+{3,0} "a30"
+{3,1} "a31"
+{2,2} "a22"
+{2,3} "a23"
+{3,2} "a32"
+{3,3} "a33"
 
 SCIDB QUERY : <create array a6 <val1:float> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(a6,x+y+1.5),a6)>
-[[(1.5),(2.5)],[(2.5),(3.5)]];[[(3.5),(4.5)],[(4.5),(5.5)]];[[(3.5),(4.5)],[(4.5),(5.5)]];[[(5.5),(6.5)],[(6.5),(7.5)]]
+{x,y} val1
+{0,0} 1.5
+{0,1} 2.5
+{1,0} 2.5
+{1,1} 3.5
+{0,2} 3.5
+{0,3} 4.5
+{1,2} 4.5
+{1,3} 5.5
+{2,0} 3.5
+{2,1} 4.5
+{3,0} 4.5
+{3,1} 5.5
+{2,2} 5.5
+{2,3} 6.5
+{3,2} 6.5
+{3,3} 7.5
 
-SCIDB QUERY : <load_library ( 'librational.so' )>
+SCIDB QUERY : <load_library ('rational')>
 Query was executed successfully
 
 SCIDB QUERY : <create array a7 <val1:rational> [x=0:3,2,0,y=0:3,2,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(a7,'../tests/harness/testcases/data/analyze2.txt')>
-[[("(3/4)"),("(9/7)")],[("(1/2)"),("(3/5)")]];[[("(3/7)"),("(3/4)")],[("(4/7)"),("(50/3)")]];[[("(1/3)"),("(4/3)")],[("(4/5)"),("(5/3)")]];[[("(5/9)"),("(6/7)")],[("(3/2)"),("(82/5)")]]
+{x,y} val1
+{0,0} "(3/4)"
+{0,1} "(9/7)"
+{1,0} "(1/2)"
+{1,1} "(3/5)"
+{0,2} "(3/7)"
+{0,3} "(3/4)"
+{1,2} "(4/7)"
+{1,3} "(50/3)"
+{2,0} "(1/3)"
+{2,1} "(4/3)"
+{3,0} "(4/5)"
+{3,1} "(5/3)"
+{2,2} "(5/9)"
+{2,3} "(6/7)"
+{3,2} "(3/2)"
+{3,3} "(82/5)"
 
 SCIDB QUERY : <analyze(a1)>
-[("val1","2.5","8.5",7,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","2.5","8.5",7,16
 
 SCIDB QUERY : <analyze(a2)>
-[("val1","1","100",9,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","1","100",9,16
 
 SCIDB QUERY : <analyze(a3)>
-[("val1","1","7",7,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","1","7",7,16
 
 SCIDB QUERY : <analyze(a4)>
-[("val1","1","7",7,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","1","7",7,16
 
 SCIDB QUERY : <analyze(a5)>
-[("val1","a00","a33",16,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","a00","a33",16,16
 
 SCIDB QUERY : <analyze(a6)>
-[("val1","1.5","7.5",7,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","1.5","7.5",7,16
 
 SCIDB QUERY : <analyze(a7)>
-[("val1","(1/3)","(50/3)",15,16)]
+{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+{0} "val1","(1/3)","(50/3)",15,16
 
 SCIDB QUERY : <remove(a1)>
 Query was executed successfully

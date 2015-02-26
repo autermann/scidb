@@ -131,23 +131,26 @@ class NewBitmapBetweenChunkIterator : public BetweenChunkIterator
 class EmptyBitmapBetweenChunkIterator : public NewBitmapBetweenChunkIterator
 {
   public:
-    virtual  Value& getItem();
+    virtual Value& getItem();
     virtual bool isEmpty();
 
     EmptyBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode);
 };
 
-
 class BetweenArrayIterator : public DelegateArrayIterator
 {
     friend class BetweenChunkIterator;
   public:
+
 	/***
 	 * Constructor for the between iterator
 	 * Here we initialize the current position vector to all zeros, and obtain an iterator for the appropriate
 	 * attribute in the input array.
 	 */
-	BetweenArrayIterator(BetweenArray const& between, AttributeID attrID, AttributeID inputAttrID);
+	BetweenArrayIterator(BetweenArray const& between, AttributeID attrID, AttributeID inputAttrID, bool doReset = true);
+
+	virtual ~BetweenArrayIterator()
+	{}
 
 	/***
 	 * The end call checks whether we're operating with the last chunk of the between
@@ -177,7 +180,13 @@ class BetweenArrayIterator : public DelegateArrayIterator
 	 */
 	virtual void reset();
 
-  private:
+	/**
+	 * Determine if the given coordinates belong to the selection
+	 * @return true if coords is inside the between area. False otherwise.
+	 */
+	bool insideBox(Coordinates const& coords) const;
+
+  protected:
     BetweenArray const& array;	
     Coordinates lowPos;
     Coordinates highPos;
@@ -185,14 +194,48 @@ class BetweenArrayIterator : public DelegateArrayIterator
     bool hasCurrent;
 };
 
+class BetweenArraySequentialIterator : public BetweenArrayIterator
+{
+public:
+    BetweenArraySequentialIterator(BetweenArray const& between, AttributeID attrID, AttributeID inputAttrID);
+
+    virtual ~BetweenArraySequentialIterator()
+    {}
+
+    virtual void operator ++();
+
+    virtual void reset();
+};
+
 class BetweenArray : public DelegateArray
 {
     friend class BetweenChunk;
     friend class BetweenChunkIterator;
     friend class BetweenArrayIterator;
+    friend class BetweenArraySequentialIterator;
 
   public:
-	BetweenArray(ArrayDesc& desc, Coordinates const& lowPos, Coordinates const& highPos, boost::shared_ptr<Array> input, bool tileMode);
+    /**
+     * Between Array has two ArrayIterator types:
+     * 1. BetweenArrayIterator advances chunks (operator++) by finding the next chunk inside the between box
+     *    and probing input to see if that chunk exists. Assume the between box describes b logical chunks,
+     *    and the underlying input array has n chunks - the iteration using this iterator will run in O( b * lg(n))
+     *
+     * 2. BetweenArraySequentialIterator advances chunks by asking input for its next chunk, and, if that chunk does
+     *    not overlap with the between box, continuing to ask for the next input chunk until we either find a chunk
+     *    that fits or we run out of chunks. If the input has n chunks present, this iteration will run in O(n).
+     *
+     * Sometimes b is small (selecting just a few cells) and sometimes b is large (selecting a 10-20 chunks
+     * from a very sparse array). The number n is a count of actual (not logical) chunks and we don't know how big
+     * that is, but assuming about 1TB storage per SciDB instance and 10MB per chunk, we can expect upper bound on
+     * n to be about 100,000. I've never seen real arrays from customers above 5,000 chunks.
+     *
+     * 100,000 / lg(100,000) ~= 6,000. So if b is below that number, use BetweenArrayIterator. Otherwise, use
+     * BetweenArraySequentialIterator. [poliocough, 4/14/12]
+     */
+    static const size_t BETWEEN_SEQUENTIAL_ITERATOR_THRESHOLD = 6000;
+
+    BetweenArray(ArrayDesc& desc, Coordinates const& lowPos, Coordinates const& highPos, boost::shared_ptr<Array> input, bool tileMode);
 
     DelegateArrayIterator* createArrayIterator(AttributeID attrID) const;
     DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID attrID) const;
@@ -202,6 +245,7 @@ class BetweenArray : public DelegateArray
 	Coordinates highPos;
     Dimensions const& dims;
     bool tileMode;
+    bool useSequentialIterator;
 };
 
 

@@ -24,7 +24,7 @@ The filter operator returns an array the with the same schema as the input array
           <para>Create an array m4x4:<programlisting>CREATE ARRAY m4x4&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];</programlisting></para>
         </step>
         <step>
-          <para>Put values between 0 and 15 into the nondiagonal elements of m4x4 and values greater than 100 into the diagonal elements:<programlisting>store(build(m4x4,iif(i=j,100+i,i*4+j),m4x4);</programlisting><screen>[
+          <para>Put values between 0 and 15 into the nondiagonal elements of m4x4 and values greater than 100 into the diagonal elements:<programlisting>store(build(m4x4,iif(i=j,100+i,i*4+j)),m4x4);</programlisting><screen>[
 [(100),(1),(2),(3)],
 [(4),(101),(6),(7)],
 [(8),(9),(102),(11)],

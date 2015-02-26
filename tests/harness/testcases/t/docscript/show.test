@@ -1,0 +1,24 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
+--shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winners2.csv > ../examples/winners2.scidb "
+--aql load winnersFlat from '../examples/winners2.scidb'  
+CREATE ARRAY champions<person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]  
+redimension_store(winnersFlat,champions)  
+--stop-igdata
+--aql select * from show(champions)  
+--aql select * into championsAbridged from project(champions,person)  
+--aql select * from show(championsAbridged)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(winnersFlat)
+remove(champions)
+remove(championsAbridged)

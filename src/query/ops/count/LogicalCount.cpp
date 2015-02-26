@@ -36,10 +36,52 @@ using namespace boost;
 namespace scidb
 {
 
-class Count : public  LogicalOperator
+/**
+ * @brief The operator: count().
+ *
+ * @par Synopsis:
+ *   count( srcArray, {, groupbyDim}* )
+ *
+ * @par Summary:
+ *   Computes the number of elements in an array. If a list of groupbyDims are given, compute one count per distinct group.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   count: uint64
+ *   <br> >
+ *   <br> [
+ *   <br>   groupbyDims (if provided); or
+ *   <br>   'i' (if no groupbyDim is given): start=end=0, chunk interval=1.
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - count(A, year) <count:uint64> [year] =
+ *     <br> year, count
+ *     <br> 2011,   2
+ *     <br> 2012,   3
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - same as aggregate(srcArray, count(*), groupbyDims)
+ *
+ */
+
+class LogicalCount : public  LogicalOperator
 {
 public:
-	Count(const std::string& logicalName, const std::string& alias):
+	LogicalCount(const std::string& logicalName, const std::string& alias):
 			LogicalOperator(logicalName, alias)
 	{
 		ADD_PARAM_INPUT()
@@ -81,7 +123,7 @@ public:
                 const string& dimName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
                 const string& aliasName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getArrayName();
                 for (j = 0; j < dims.size(); j++) { 
-                    if (dims[j].hasNameOrAlias(dimName, aliasName)) { 
+                    if (dims[j].hasNameAndAlias(dimName, aliasName)) {
                         groupBy[i] = j;
                         break;
                     }
@@ -117,6 +159,6 @@ public:
 
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(Count, "count")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalCount, "count")
 
 } //namespace scidb

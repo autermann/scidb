@@ -30,7 +30,7 @@
  * @author James McQueston <jmcqueston@paradigm4.com>
  */
 
-#include "na.h"
+#include "util/na.h"
 
 namespace scidb {
 

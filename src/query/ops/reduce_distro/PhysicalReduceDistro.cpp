@@ -158,13 +158,14 @@ public:
         return inputBoundaries[0];
     }
 
-    virtual bool isDistributionPreserving(const std::vector< ArrayDesc> & inputSchemas) const
+    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
     {
-        return false;
+        return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                    const std::vector<ArrayDesc> & inputSchemas) const
+    virtual ArrayDistribution getOutputDistribution(
+            std::vector<ArrayDistribution> const&,
+            std::vector<ArrayDesc> const&) const
     {
         PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
         return ArrayDistribution(ps);

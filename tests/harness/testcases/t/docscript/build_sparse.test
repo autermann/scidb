@@ -1,0 +1,12 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+build_sparse(<val:double>[i=0:3,4,0,j=0:3,4,0],1,i=j)  
+
+--stop-query-logging
+
+
+--cleanup
+

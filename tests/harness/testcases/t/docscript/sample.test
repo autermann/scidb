@@ -1,0 +1,19 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+CREATE ARRAY vector1<val:double>[i=0:5,2,0]  
+--stop-igdata
+store(build(vector1,i),vector1)  
+--start-igdata
+sample(vector1,.3)  
+--stop-igdata
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(vector1)

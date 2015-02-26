@@ -1,0 +1,57 @@
+--setup
+
+#minimal matrix
+create array A_1c1 <x:double>[r=0:0,1,0, c=0:0,1,0]
+store(build(A_1c1, 1), A_1c1)
+
+--test
+# make it easier for a human to see the matrix location of differing values
+--set-format csv+
+
+load_library('dense_linear_algebra')
+
+# three output choices, deprecated names
+gesvd(A_1c1, 'left')
+gesvd(A_1c1, 'values')
+gesvd(A_1c1, 'right')
+
+# three output choices
+gesvd(A_1c1, 'U')
+gesvd(A_1c1, 'S')
+gesvd(A_1c1, 'VT')
+
+# other names for S
+gesvd(A_1c1, 'SIGMA')
+
+# invalid parameter 'foo'
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33 "gesvd(A_1c1, 'foo')"
+
+store(gesvd(A_1c1, 'U'),  tmp)
+remove(tmp)
+store(gesvd(A_1c1, 'S'),  tmp)
+remove(tmp)
+store(gesvd(A_1c1, 'VT'), tmp)
+remove(tmp)
+
+# if firt axis name of M is 'i', it will collide with gesvd(M,'U')
+# which inherits first axis of output from M, and wants 'i' for second output axis name
+# _1 & _2 should be appended in this case
+
+create array M_first_i <x:double>[i=0:0,1,0, j=0:0,1,0]
+store(build(M_first_i, 1), M_first_i)
+
+store(gesvd(M_first_i, 'U'), tmp)
+remove(M_first_i)
+
+create array M_second_i <x:double>[h=0:0,1,0, i=0:0,1,0]
+store(build(M_second_i, 1), M_second_i)
+
+store(gesvd(M_second_i, 'VT'), tmp)
+remove(tmp)
+remove(M_second_i)
+
+--cleanup
+
+# inputs
+remove(A_1c1)
+

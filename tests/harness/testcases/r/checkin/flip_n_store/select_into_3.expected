@@ -2,25 +2,41 @@ SCIDB QUERY : <create immutable array A <a:int64> [x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <select * from build(A,x)>
-[(0),(1),(2)]
+{x} a
+{0} 0
+{1} 1
+{2} 2
 
 SCIDB QUERY : <select * into A from build(A,x+1)>
-[(1),(2),(3)]
+{x} a
+{0} 1
+{1} 2
+{2} 3
 
 SCIDB QUERY : <select * into B from build(A,x+1) where x<>1>
-[(1),(),(3)]
+{x} a
+{0} 1
+{2} 3
 
 SCIDB QUERY : <select * from attributes(B)>
-[("a","int64",false)]
+{No} name,type_id,nullable
+{0} "a","int64",false
 
 SCIDB QUERY : <select * into C from build(A,x+1)>
-[(1),(2),(3)]
+{x} a
+{0} 1
+{1} 2
+{2} 3
 
 SCIDB QUERY : <select * from attributes(C)>
-[("a","int64",false)]
+{No} name,type_id,nullable
+{0} "a","int64",false
 
 SCIDB QUERY : <select x into D from build(A,x+10)>
-[(0),(1),(2)]
+{x} expr
+{0} 0
+{1} 1
+{2} 2
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

@@ -2,13 +2,17 @@ SCIDB QUERY : <create immutable empty array imtest <a:int64>[x=0:*,10,0, y=0:*,1
 Query was executed successfully
 
 SCIDB QUERY : <count(imtest)>
-[(0)]
+{i} count
+{0} 0
 
 SCIDB QUERY : <dimensions(imtest)>
-[("x",0,4611686018427387903,10,0,4611686018427387903,-4611686018427387903,"int64"),("y",0,4611686018427387903,10,0,4611686018427387903,-4611686018427387903,"int64")]
+{No} name,start,length,chunk_interval,chunk_overlap,low,high,type
+{0} "x",0,4611686018427387903,10,0,4611686018427387903,-4611686018427387903,"int64"
+{1} "y",0,4611686018427387903,10,0,4611686018427387903,-4611686018427387903,"int64"
 
 SCIDB QUERY : <attributes(imtest)>
-[("a","int64",false)]
+{No} name,type_id,nullable
+{0} "a","int64",false
 
 Query was executed successfully
 

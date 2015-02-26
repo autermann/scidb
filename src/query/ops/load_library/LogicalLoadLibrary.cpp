@@ -35,6 +35,31 @@
 namespace scidb
 {
 
+/**
+ * @brief The operator: load_library().
+ *
+ * @par Synopsis:
+ *   load_library( library )
+ *
+ * @par Summary:
+ *   Loads a SciDB plugin.
+ *
+ * @par Input:
+ *   - library: the name of the library to load.
+ *
+ * @par Output array:
+ *   - NULL
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   - A library may be unloaded using unload_library()
+ *
+ */
 class LogicalLoadLibrary: public LogicalOperator
 {
 public:

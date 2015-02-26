@@ -34,9 +34,8 @@
 %union {
     int64_t int64Val;
     double realVal;    
-    std::string* stringVal;
-    std::string* keyword;
-    //std::string* keyword;
+    char* stringVal;
+    char* keyword;
     class AstNode* node;
     bool boolean;
 }
@@ -59,24 +58,38 @@
     default default_value compression reserve schema 
     select_statement select_list into_clause path_expression
     identifier_clause expr filter_clause atom constant constant_string constant_int64
-    constant_real null_value function function_argument_list path_expression_list grw_as_clause as_clause
+    constant_real null_value function function_argument_list path_expression_list grw_as_clause
     from_list reference_input joined_input case_expr case_arg case_when_clause_list case_when_clause case_default
     beetween_expr reduced_expr named_expr load_statement timestamp_clause array_access
     expr_list update_statement update_list
     update_list_item where_clause common_expr load_library_statement unload_library_statement constant_bool
-    drop_array_statement function_argument int64_list sort_quirk select_list_item index_clause
-    load_save_instance_id save_statement save_format
+    drop_array_statement function_argument sort_quirk select_list_item index_clause
+    load_save_instance_id save_statement save_format as_format
+    array_literal array_literal_schema array_literal_input array_literal_alias anonymous_schema
+    format_error_shadow error_shadow shadow
+    window_clause window_dimensions_ranges_list window_dimension_range window_range_value
+    olap_aggregate window_clause_list fixed_window_clause variable_window_clause regrid_clause regrid_dimensions_list regrid_dimension
+    thin_clause thin_dimension thin_dimensions_list named_array_source array_source
+    group_by_clause redimension_clause fixed_window_sole_clause variable_window_sole_clause
+    rename_array_statement cancel_query_statement order_by_clause order_by_list
+    insert_into_statement insert_into_source
 
 %type <boolean> negative_index
 
 %type <keyword> non_reserved_keywords
 
-%destructor { delete $$; $$ = NULL; } IDENTIFIER STRING_LITERAL <node>
+%destructor { if ($$) delete $$; $$ = NULL; } <node>
 
 %token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END
     SELECT WHERE GROUP BY JOIN ON REGRID LOAD INTO INDEX
     VALUES UPDATE SET LIBRARY UNLOAD TRUE FALSE DROP IS RESERVE CROSS WINDOW ASC DESC REDIMENSION ALL DISTINCT
-    CURRENT INSTANCE INSTANCES SAVE BETWEEN
+    CURRENT INSTANCE INSTANCES SAVE BETWEEN ERRORS SHADOW
+    PARTITION PRECEDING FOLLOWING UNBOUND STEP OVER
+    START THIN
+    RENAME TO CANCEL QUERY
+    VARIABLE FIXED
+    ORDER
+    INSERT
 
 %token EOQ         0              "end of query"
 %token EOL                        "end of line"
@@ -84,6 +97,7 @@
 %token <int64Val>  INTEGER        "integer"
 %token <realVal>   REAL           "real"
 %token <stringVal> STRING_LITERAL "string"
+%token LEXER_ERROR
 
 %{
 #include "query/parser/QueryParser.h"
@@ -113,6 +127,9 @@ statement:
     | drop_array_statement
     | load_library_statement
     | unload_library_statement
+    | rename_array_statement
+    | cancel_query_statement
+    | insert_into_statement
     ;
           
 create_array_statement:
@@ -264,12 +281,18 @@ array_dimension:
     {
         if ($5 <= 0 || $5 > std::numeric_limits<uint32_t>::max())
         {
-            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $1;
+            delete $3;
+            YYABORT;
         }
 
         if ($7 < 0 || $7 > std::numeric_limits<uint32_t>::max())
         {
-            glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $1;
+            delete $3;
+            YYABORT;
         }
     
         $$ = new AstNode(dimension, CONTEXT(@1),
@@ -300,12 +323,22 @@ array_dimension:
     {
         if ($9 <= 0 || $9 > std::numeric_limits<uint32_t>::max())
         {
-            glue.error2(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error(@2, boost::str(boost::format("Chunk size must be between 1 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $1;
+            delete $3;
+            delete $4;
+            delete $7;
+            YYABORT;
         }
 
         if ($11 < 0 || $11 > std::numeric_limits<uint32_t>::max())
         {
-            glue.error2(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
+            glue.error(@2, boost::str(boost::format("Overlap length must be between 0 and %d") % std::numeric_limits<uint32_t>::max()));
+            delete $1;
+            delete $3;
+            delete $4;
+            delete $7;
+            YYABORT;
         }
 
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
@@ -347,7 +380,10 @@ dimension_boundary:
     negative_index INTEGER
     {
         if ($2 <= MIN_COORDINATE || $2 >= MAX_COORDINATE)
-            glue.error2(@2, "Dimension boundaries must be between -4611686018427387903 and 4611686018427387903");
+        {
+            glue.error(@2, "Dimension boundaries must be between -4611686018427387903 and 4611686018427387903");
+            YYABORT;
+        }
         $$ = new AstNodeInt64(dimensionBoundary, CONTEXT(@1), $1 ? -$2 : $2);
     }
     | '*'
@@ -413,20 +449,22 @@ dummy:
     ;
 
 select_statement:
-    SELECT select_list into_clause FROM from_list filter_clause grw_as_clause
+    SELECT select_list into_clause FROM from_list filter_clause grw_as_clause order_by_clause
     {
         $$ = new AstNode(selectStatement, CONTEXT(@1), selectClauseArgCount,
             $2,
             $3,
             $5,
             $6,
-            $7);
+            $7,
+            $8);
     }
     | SELECT select_list into_clause
     {
         $$ = new AstNode(selectStatement, CONTEXT(@1), selectClauseArgCount,
             $2,
             $3,
+            NULL,
             NULL,
             NULL,
             NULL);
@@ -487,48 +525,186 @@ filter_clause:
     ;
 
 grw_as_clause:
-    GROUP BY path_expression_list as_clause
+    group_by_clause
+    | window_clause_list
+    | redimension_clause
+    | regrid_clause
+    |
     {
-        $$ = new AstNode(groupByClause, CONTEXT(@1), groupByClauseArgCount, $3, $4);
+        $$ = NULL;
     }
-    | REGRID int64_list as_clause
+    ;
+
+group_by_clause:
+    GROUP BY path_expression_list
     {
-        $$ = new AstNode(regridClause, CONTEXT(@1), regridClauseArgCount, $2, $3);
+        $$ = new AstNode(groupByClause, CONTEXT(@1), groupByClauseArgCount, $3);
     }
-    | WINDOW int64_list as_clause
-    {
-        $$ = new AstNode(windowClause, CONTEXT(@1), windowClauseArgCount, $2, $3);
-    }
-    | REDIMENSION BY '[' array_dimension_list ']'
+    ;
+
+redimension_clause:
+    REDIMENSION BY '[' array_dimension_list ']'
     {
         $$ = new AstNode(redimensionClause, CONTEXT(@1), 1, $4);
     }
-    |
+    ;
+
+regrid_clause:
+    REGRID AS '(' PARTITION BY regrid_dimensions_list ')'
     {
-        $$ = NULL;
+        $$ = new AstNode(regridClause, CONTEXT(@1), regridClauseArgCount, $6);
     }
     ;
 
-as_clause:
-    AS identifier_clause
-    {
-        $$ = $2;
-    }
-    |
-    {
-        $$ = NULL;
-    }
-    ;
-
-int64_list:
-    int64_list ',' constant_int64
+regrid_dimensions_list:
+    regrid_dimensions_list ',' regrid_dimension
     {
         $1->addChild($3);
         $$ = $1;
     }
-    | constant_int64
+    | regrid_dimension
     {
-        $$ = new AstNode(int64List, CONTEXT(@1), 1, $1);
+        $$ = new AstNode(regridDimensionsList, CONTEXT(@1), 1, $1);
+    }
+    ;
+
+regrid_dimension:
+    path_expression constant_int64
+    {
+        $$ = new AstNode(regridDimension, CONTEXT(@$), regridDimensionArgCount, $1, $2);
+    }
+    | path_expression CURRENT
+    {
+        $$ = new AstNode(regridDimension, CONTEXT(@$), regridDimensionArgCount, $1,
+            new AstNodeInt64(int64Node, CONTEXT(@1), 1));
+    }
+    ;
+
+window_clause_list:
+    window_clause_list ',' window_clause
+    {
+        $1->addChild($3);
+        $$ = $1;
+    }
+    | window_clause
+    {
+        $$ = new AstNode(windowClauseList, CONTEXT(@1), 1, $1);
+    }
+    | fixed_window_sole_clause
+    {
+        $$ = new AstNode(windowClauseList, CONTEXT(@1), 1, $1);
+    }
+    | variable_window_sole_clause
+    {
+        $$ = new AstNode(windowClauseList, CONTEXT(@1), 1, $1);
+    }
+    ;
+    
+
+window_clause:
+    fixed_window_clause
+    | variable_window_clause
+    ;
+
+variable_window_clause:
+    VARIABLE WINDOW identifier_clause AS '(' PARTITION BY window_dimension_range ')'
+    {
+        $$ = new AstNode(windowClause, CONTEXT(@$), windowClauseArgCount,
+            $3,
+            new AstNode(windowRangesList, CONTEXT(@8), 1, $8),
+            new AstNodeBool(boolNode, CONTEXT(@1), true));
+    }
+    ;
+
+fixed_window_clause:
+    fixed_window_noise WINDOW identifier_clause AS '(' PARTITION BY window_dimensions_ranges_list ')'
+    {
+        $$ = new AstNode(windowClause, CONTEXT(@$), windowClauseArgCount,
+            $3,
+            $8,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+
+variable_window_sole_clause:
+    VARIABLE WINDOW AS '(' PARTITION BY window_dimension_range ')'
+    {
+        $$ = new AstNode(windowClause, CONTEXT(@1), windowClauseArgCount,
+            new AstNodeString(identifierClause, CONTEXT(@1), ""),
+            new AstNode(windowRangesList, CONTEXT(@7), 1, $7),
+            new AstNodeBool(boolNode, CONTEXT(@1), true));
+    }
+
+fixed_window_sole_clause:
+    fixed_window_noise WINDOW AS '(' PARTITION BY window_dimensions_ranges_list ')'
+    {
+        $$ = new AstNode(windowClause, CONTEXT(@$), windowClauseArgCount,
+            new AstNodeString(identifierClause, CONTEXT(@1), ""),
+            $7,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+    ;
+
+fixed_window_noise:
+    FIXED
+    |
+    ;
+
+window_dimensions_ranges_list:
+    window_dimensions_ranges_list ',' window_dimension_range
+    {
+        $1->addChild($3);
+        $$ = $1;
+    }
+    | window_dimension_range
+    {
+        $$ = new AstNode(windowRangesList, CONTEXT(@1), 1, $1);
+    }
+    ;
+
+window_dimension_range:
+    path_expression window_range_value PRECEDING AND window_range_value FOLLOWING
+    {
+        $$ = new AstNode(windowDimensionRange, CONTEXT(@1), windowDimensionRangeArgCount, $1, $2, $5);
+    }
+    | path_expression CURRENT
+    {
+        $$ = new AstNode(windowDimensionRange, CONTEXT(@1), windowDimensionRangeArgCount, $1,
+            new AstNodeInt64(int64Node, CONTEXT(@1), 0),
+            new AstNodeInt64(int64Node, CONTEXT(@1), 0));
+    }
+    ;
+
+window_range_value:
+    constant_int64
+    {
+        $$ = $1;
+    }
+    | UNBOUND
+    {
+        $$ = new AstNodeInt64(int64Node, CONTEXT(@1), -1);
+    }
+    ;
+
+order_by_clause:
+    ORDER BY order_by_list
+    {
+        $$ = $3;
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
+order_by_list:
+    order_by_list ',' path_expression
+    {
+        $1->addChild($3);
+        $$ = $1;
+    }
+    | path_expression
+    {
+        $$ = new AstNode(orderByList, CONTEXT(@1), 1, $1);
     }
     ;
 
@@ -617,24 +793,55 @@ path_expression_list:
 identifier_clause:
     IDENTIFIER
     {
-        $$ = new AstNodeString(identifierClause, CONTEXT(@1), *$1);
+        $$ = new AstNodeString(identifierClause, CONTEXT(@1), $1);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
     | non_reserved_keywords
     {
-        $$ = new AstNodeString(identifierClause, CONTEXT(@1), *$1);
+        $$ = new AstNodeString(identifierClause, CONTEXT(@1), $1);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-        delete $1;
     }
     ;
 
 reference_input:
-    named_expr
+    named_array_source
     | joined_input
+    | array_literal
+    | thin_clause
     ;
+
+
+named_array_source:
+    array_source
+    {
+        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+            $1,
+            NULL);
+    }
+    | array_source AS identifier_clause
+    {
+        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+            $1,
+            $3);
+    }
+    | array_source identifier_clause
+    {
+        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+            $1,
+            $2);
+    }
+    ;
+
+array_source:
+    array_access    
+    | path_expression %prec '@'
+    | function
+    | '(' select_statement ')' %prec UNARY_MINUS
+    {
+        $$ = $2;
+    }
 
 joined_input:
     reference_input JOIN reference_input ON expr
@@ -652,6 +859,73 @@ joined_input:
             $1,
             $4,
             NULL);
+    }
+    ;
+
+//This is alias for BUILD(<schema>, '<data>', true)
+array_literal:
+    ARRAY '(' array_literal_schema ',' array_literal_input ')' array_literal_alias
+    {
+        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+            new AstNode(function, CONTEXT(@1),
+                functionArgCount,
+                new AstNodeString(identifierClause, CONTEXT(@1), "build"),
+                new AstNode(functionArguments, CONTEXT(@3), 3,
+                    $3,
+                    $5,
+                    new AstNodeBool(boolNode, CONTEXT(@1), true)),
+                NULL,
+                new AstNodeBool(boolNode, CONTEXT(@1), false)
+            ),
+            $7);
+    }
+    ;
+
+array_literal_schema:
+    path_expression
+    | anonymous_schema
+    ;
+
+array_literal_input:
+    constant_string
+    ;
+
+array_literal_alias:
+    identifier_clause
+    | AS identifier_clause
+    {
+        $$ = $2;
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
+thin_clause:
+    THIN array_source BY '(' thin_dimensions_list ')'
+    {
+        $$ = new AstNode(thinClause, CONTEXT(@1), thinClauseArgCount, $2, $5);
+    }
+    ;
+    
+thin_dimensions_list:
+    thin_dimensions_list ',' thin_dimension
+    {
+        $1->addChild($3);
+        $$ = $1;
+    }
+    | thin_dimension
+    {
+        $$ = new AstNode(thinDimensionsList, CONTEXT(@1), 1, $1);
+    }
+    ;
+
+thin_dimension:
+    path_expression START constant_int64 STEP constant_int64
+    {
+        $$ = new AstNode(thinDimension, CONTEXT(@1), thinDimensionClauseArgCount,
+            $1, $3, $5);
     }
     ;
 
@@ -837,19 +1111,13 @@ reduced_expr:
 // Common part for expr and reduced_expr. 
 common_expr:
     atom
-    | array_access    
-    //FIXME: Additional parentheses looks stupid in aggregates, but this is only way to remove shift/reduce
-    //FIXME: conflicts. But may be handle select clause inside functions other way? 
-    | '(' select_statement ')' %prec UNARY_MINUS
-    {
-        $$ = $2;
-    }
     ;
 
 atom:
     path_expression %prec '@'
     | constant
     | function
+    | olap_aggregate
     | case_expr
     | '(' expr ')'
     {
@@ -868,8 +1136,7 @@ constant:
 constant_string:
     STRING_LITERAL
     {
-        $$ = new AstNodeString(stringNode, CONTEXT(@1), *$1);
-        delete $1;
+        $$ = new AstNodeString(stringNode, CONTEXT(@1), $1);
     }
     ;
     
@@ -936,6 +1203,15 @@ function:
     }
     ;
 
+olap_aggregate:
+    function OVER identifier_clause
+    {
+        $$ = new AstNode(olapAggregate, CONTEXT(@1), olapAggregateArgCount,
+            $1,
+            $3);
+    }
+    ;
+
 function_argument_list:
     function_argument_list ',' function_argument
     {
@@ -950,8 +1226,15 @@ function_argument_list:
 
 function_argument:
     expr
-    | select_statement
-    | empty_modifier schema
+    | anonymous_schema
+    | '(' select_statement ')'
+    {
+        $$ = $2;
+    }
+    ;
+
+anonymous_schema:
+    empty_modifier schema
     {
         $$ = new AstNode(anonymousSchema, CONTEXT(@1), anonymousSchemaArgCount, $1, $2);
     }
@@ -1017,14 +1300,69 @@ beetween_expr:
     ;
 
 load_statement:
-    LOAD identifier_clause FROM load_save_instance_id constant_string
+    LOAD identifier_clause FROM load_save_instance_id constant_string format_error_shadow
     {
+        AstNode* format = NULL;
+        AstNode* error = NULL;
+        AstNode* shadow = NULL;
+        if ($6)
+        {
+            format = $6->getChild(0)->clone();
+            if ($6->getChild(1))
+            {
+                error = $6->getChild(1)->getChild(0)->clone();
+                if ($6->getChild(1)->getChild(1))
+                {
+                    shadow = $6->getChild(1)->getChild(1)->getChild(0)->clone();
+                }
+            }
+        }
+
         $$ = new AstNode(loadStatement, CONTEXT(@1), loadStatementArgCount,
             $2,
             $4,
-            $5);
+            $5,
+            format,
+            error,
+            shadow);
+
+        delete $6;
     }
     ;
+
+format_error_shadow:
+    as_format error_shadow
+    {
+        $$ = new AstNode(unknownNode, CONTEXT(@1), 2, $1, $2);
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
+error_shadow:
+    ERRORS constant_int64 shadow
+    {
+        $$ = new AstNode(unknownNode, CONTEXT(@2), 2, $2, $3);
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
+shadow:
+    SHADOW ARRAY identifier_clause
+    {
+        $$ = new AstNode(unknownNode, CONTEXT(@3), 1, $3);
+    }
+    |
+    {
+        $$ = NULL;
+    }
+    ;
+
 
 save_statement:
     SAVE path_expression INTO load_save_instance_id constant_string save_format
@@ -1037,11 +1375,15 @@ save_statement:
     }
     ;
 
-save_format:
+as_format:
     AS constant_string
     {
         $$ = $2;
     }
+    ;
+
+save_format:
+    as_format
     |
     {
         $$ = NULL;
@@ -1141,6 +1483,35 @@ unload_library_statement:
     }
     ;
 
+rename_array_statement:
+    RENAME ARRAY identifier_clause TO identifier_clause
+    {
+        $$ = new AstNode(renameArrayStatement, CONTEXT(@$), renameArrayStatementArgCount,
+            $3,
+            $5);
+    }
+    ;
+
+cancel_query_statement:
+    CANCEL QUERY constant_int64
+    {
+        $$ = new AstNode(cancelQueryStatement, CONTEXT(@$), cancelQueryStatementArgCount,
+            $3);
+    }
+    ;
+
+insert_into_statement:
+    INSERT INTO identifier_clause insert_into_source
+    {
+        $$ = new AstNode(insertIntoStatement, CONTEXT(@$), insertIntoStatementArgCount, $3, $4);
+    }
+    ;
+
+insert_into_source:
+    select_statement
+    | constant_string
+    ;
+
 sort_quirk:
     ASC
     {
@@ -1180,6 +1551,18 @@ non_reserved_keywords:
     | RESERVE
     | SAVE
     | VALUES
+    | ERRORS
+    | SHADOW
+    | STEP
+    | PARTITION
+    | PRECEDING
+    | FOLLOWING
+    | UNBOUND
+    | OVER
+    | START
+    | THIN
+    | TO
+    | QUERY
     ;
 
 %%

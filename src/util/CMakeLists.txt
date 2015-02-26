@@ -38,6 +38,8 @@ set (util_src
     naInternal.cpp
     require.cpp
     InjectedError.cpp
+    BufferedFileInput.cpp
+    shm/SharedMemoryIpc.cpp
 )
 
 file(GLOB util_include "*.h")
@@ -45,4 +47,4 @@ file(GLOB util_include "*.h")
 configure_file(log4cxx.properties "${GENERAL_OUTPUT_DIRECTORY}/log4cxx.properties" COPYONLY)
 
 add_library(util_lib STATIC ${util_src} ${util_include})
-target_link_libraries(util_lib json_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES})
+target_link_libraries(util_lib json_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES} ${LIBRT_LIBRARIES})

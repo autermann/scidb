@@ -36,6 +36,54 @@ using namespace std;
 namespace scidb
 {
 
+/**
+ * @brief The operator: cast().
+ *
+ * @par Synopsis:
+ *   cast( srcArray, schemaArray | schema )
+ *
+ * @par Summary:
+ *   Produces a result array with data from srcArray but with the provided schema.
+ *   There are three primary purposes:
+ *   - To change names of attributes or dimensions.
+ *   - To change a non-integer dimesion to an integer dimension.
+ *   - To change a nulls-disallowed attribute to a nulls-allowed attribute.
+ *
+ * @par Input:
+ *   - srcArray: a source array.
+ *   - schemaArray | schema: an array or a schema, from which attrs and dims will be used by the output array.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   attrs
+ *   <br> >
+ *   <br> [
+ *   <br>   dims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - cast(A, <q:uint64, s:double>[y=2011:2012,2,0, i=1:3,3,0]) <q:uint64, s:double> [y, i] =
+ *     <br>  y,    i,      q,       s
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalCast: public LogicalOperator
 {
 public:
@@ -99,12 +147,16 @@ public:
             if (!srcDim.getEndMax() != dstDim.getEndMax()) {
                 _properties.tile = false;
             }
+
+            //If input is bounded and cast is unbounded -- don't change the bounds of input.
+            //Changing bounds is not cheap, especially the lower bound.
+            //If you want to change the bounds, properly, use subarray.
             dstDimensions[i] = DimensionDesc(dstDim.getBaseName(),
                                              dstDim.getNamesAndAliases(),
-                                             dstDim.getStartMin() == MIN_COORDINATE && srcDim.getCurrStart() != MAX_COORDINATE ? srcDim.getCurrStart() : dstDim.getStartMin(), 
+                                             dstDim.getStartMin() == MIN_COORDINATE && srcDim.getCurrStart() != MAX_COORDINATE ? srcDim.getStartMin() : dstDim.getStartMin(),
                                              srcDim.getCurrStart(), 
                                              srcDim.getCurrEnd(), 
-                                             dstDim.getEndMax() == MAX_COORDINATE && srcDim.getCurrEnd() != MIN_COORDINATE ? srcDim.getCurrEnd() : dstDim.getEndMax(), 
+                                             dstDim.getEndMax() == MAX_COORDINATE && srcDim.getCurrEnd() != MIN_COORDINATE ? srcDim.getEndMax() : dstDim.getEndMax(),
                                              dstDim.getChunkInterval(), 
                                              dstDim.getChunkOverlap(), 
                                              dstDim.getType(), 

@@ -33,6 +33,36 @@
 
 namespace scidb {
 
+/**
+ * @brief The operator: reverse().
+ *
+ * @par Synopsis:
+ *   reverse( srcArray )
+ *
+ * @par Summary:
+ *   Produces a result array, where the values of every dimension is reversed.
+ *
+ * @par Input:
+ *   - srcArray: the source array with srcAttrs and srcDims.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   n/a
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalReverse: public  LogicalOperator
 {
 public:

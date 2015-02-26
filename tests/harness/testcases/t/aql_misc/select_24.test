@@ -6,9 +6,9 @@
 
 --igdata --aql="select * from show(A)"
 --aql select * from count(A)
---aql select * from list('arrays')
---aql select * from rename(A,B)
---aql select * from list()
+--aql select name,schema from list('arrays')
+--aql rename array A to B
+--aql select name,schema from list()
 --aql select * from build(B,x+10)
 --aql select * from build_sparse(B,x+5,true)
 --aql select * into D from dimensions(B)
@@ -30,7 +30,7 @@
 --aql select version_id from versions(B)
 --aql select * from allversions(B)
 --aql select * from help()
---aql select * from rename(B,A)
+--aql rename array B to A
 --aql select * from dimensions(A)
 --aql select * from scan(A)
 --aql select * into A2 from adddim(A,b)

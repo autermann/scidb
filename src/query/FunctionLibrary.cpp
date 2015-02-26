@@ -94,15 +94,31 @@ namespace scidb
     addConverter(TID_STRING, T, &CONV##_##T##_##FROM_String, EXPLICIT_CONVERSION_COST);
 
 // FunctionLibrary implementation
-FunctionLibrary::FunctionLibrary()
+FunctionLibrary::FunctionLibrary(): _registeringBuiltInObjects(false)
 {
 #ifdef SCIDB_CLIENT
     registerBuiltInFunctions();
 #endif
 }
 
+template<typename T>
+class ValueKeeper
+{
+private:
+    T& _valueRef;
+    T _value;
+public:
+        ValueKeeper(T& value): _valueRef(value), _value(value) {
+    }
+    ~ValueKeeper() {
+        _valueRef = _value;
+    }
+};
+
 void FunctionLibrary::registerBuiltInFunctions()
 {
+    ValueKeeper<bool> valueKeeper(_registeringBuiltInObjects);
+    _registeringBuiltInObjects = true;
 // Adding built-in functions and converters
 #include "query/BuiltInFunctions.inc"
     addConverter(TID_CHAR, TypeId(TID_STRING), &convChar2Str, TRANSFORM_CONVERSION_COST);
@@ -122,6 +138,7 @@ void FunctionLibrary::registerBuiltInFunctions()
     addFunction(FunctionDescription("high", list_of(TID_STRING), TypeId(TID_INT64), &high1, (size_t)0));
     addFunction(FunctionDescription("instanceid", vector<TypeId>(), TypeId(TID_INT64), &instanceId, (size_t)0));
 #endif
+    addFunction(FunctionDescription("missing", list_of(TID_INT32), TID_VOID, &missing, 0));
     addFunction(FunctionDescription("is_null", list_of(TID_VOID), TID_VOID, &isNull, 0, false, false, &inferIsNullArgTypes));
     addFunction(FunctionDescription("is_nan", list_of(TID_DOUBLE), TID_BOOL, &isNan, 0));
     addFunction(FunctionDescription("strchar", list_of(TID_STRING), TID_CHAR, &strchar, (size_t)0));
@@ -888,7 +905,7 @@ void FunctionLibrary::addConverter( TypeId srcType,
     // TODO: implement the check of ability to add converter
     Converter& cnv = _sConverterMap[srcType][destType];
     cnv.func = func;
-    cnv.cost = cost;
+    cnv.cost = _registeringBuiltInObjects ? cost : EXPLICIT_CONVERSION_COST;
     cnv.supportsVectorMode = supportsVectorMode;
 }
 
@@ -900,7 +917,7 @@ void FunctionLibrary::addVConverter( TypeId srcType,
     // TODO: implement the check of ability to add converter
     Converter& cnv = _vConverterMap[srcType][destType];
     cnv.func = func;
-    cnv.cost = cost;
+    cnv.cost = _registeringBuiltInObjects ? cost : EXPLICIT_CONVERSION_COST;
 }
 
 

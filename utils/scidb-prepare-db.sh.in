@@ -30,27 +30,7 @@
 
 PD_DIR=$(dirname $(readlink -f $0))
 
-METADATA_FILE_GLOBAL="@CMAKE_INSTALL_PREFIX@/share/scidb/meta.sql"
-METADATA_FILE_LOCAL="./data/meta.sql"
-
-# So that this script can be run from a build tree if not installed
-if [ -f "$METADATA_FILE_LOCAL" ]; then
-    METADATA_FILE="$METADATA_FILE_LOCAL"
-fi 
-
-if [[ $PD_DIR == "@CMAKE_INSTALL_PREFIX@/bin" ]]; then
-    METADATA_FILE="$METADATA_FILE_GLOBAL"
-fi
-
 echo "This script guide you through several steps and prepare clean database for SciDB system catalog"
-
-if [[ $METADATA_FILE == "" ]]; then
-    echo "No metadata initialization file found."
-    echo "Please run from $PD_DIR."
-    exit
-else
-    echo "File '$METADATA_FILE' will be used for creating catalog"
-fi
 
 function die()
 {
@@ -171,9 +151,6 @@ echo "Adding language C to trusted for database $catalog_name..."
 
 echo "Granting user $owner_login usage for language C..."
 (echo "grant usage on language c to $owner_login;" | runpsql "$catalog_name" > /dev/null) || die
-
-#echo "Populating database $catalog_name with metadata..."
-#(cat "$METADATA_FILE" | runpsql "$catalog_name" > /dev/null) || die
 
 echo "Done! Now connect to catalog with SciDB initialize and register cluster instance."
 echo "Sample connection string for connecting to catalog:"

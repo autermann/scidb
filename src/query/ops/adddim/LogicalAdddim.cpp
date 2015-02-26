@@ -34,9 +34,52 @@
 using namespace std;
 
 namespace scidb {
-
     
-
+/**
+ * @brief The operator: adddim().
+ *
+ * @par Synopsis:
+ *   adddim( srcArray, newDimName )
+ *
+ * @par Summary:
+ *   Produces a result array with one more dimension than the source array.
+ *
+ * @par Input:
+ *   - srcArray: a source array with srcAttrs and srcDims.
+ *   - newDimName: the name of a new dimension.
+ *
+ * @par Output array:
+ *        <
+ *   <br>   srcAttrs
+ *   <br> >
+ *   <br> [
+ *   <br>   newDimName: type=int64, start=0, end=0, chunk interval=1
+ *   <br>   srcDims
+ *   <br> ]
+ *
+ * @par Examples:
+ *   - Given array A <quantity: uint64, sales:double> [year, item] =
+ *     <br> year, item, quantity, sales
+ *     <br> 2011,  2,      7,     31.64
+ *     <br> 2011,  3,      6,     19.98
+ *     <br> 2012,  1,      5,     41.65
+ *     <br> 2012,  2,      9,     40.68
+ *     <br> 2012,  3,      8,     26.64
+ *   - adddim(A, loc) <quantity: uint64, sales: double> [loc, year, item] =
+ *     <br> loc, year, item, quantity, sales
+ *     <br>  0,  2011,  2,      7,     31.64
+ *     <br>  0,  2011,  3,      6,     19.98
+ *     <br>  0,  2012,  1,      5,     41.65
+ *     <br>  0,  2012,  2,      9,     40.68
+ *     <br>  0,  2012,  3,      8,     26.64
+ *
+ * @par Errors:
+ *   n/a
+ *
+ * @par Notes:
+ *   n/a
+ *
+ */
 class LogicalAdddim: public LogicalOperator
 {
 public:

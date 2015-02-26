@@ -37,7 +37,7 @@ InjectedErrorLibrary::~InjectedErrorLibrary()
 
 bool InjectedErrorLibrary::registerError(long int id, const boost::shared_ptr<const InjectedError>& err)
 {
-#ifdef DEBUG
+#ifndef NDEBUG
     ScopedMutexLock lock(_mutex);
     return _registeredErrors.insert(std::make_pair(id, err)).second;
 #endif
@@ -46,7 +46,7 @@ bool InjectedErrorLibrary::registerError(long int id, const boost::shared_ptr<co
 
 boost::shared_ptr<const InjectedError> InjectedErrorLibrary::getError(long int id)
 {
-#ifdef DEBUG
+#ifndef NDEBUG
     ScopedMutexLock lock(_mutex);
     IdToErrorMap::const_iterator iter = _registeredErrors.find(id);
     if (iter == _registeredErrors.end()) {
@@ -59,7 +59,7 @@ boost::shared_ptr<const InjectedError> InjectedErrorLibrary::getError(long int i
 
 InjectedErrorLibrary::InjectedErrorLibrary()
 {
-#ifdef DEBUG
+#ifndef NDEBUG
     bool rc = registerError(WriteChunkInjectedError::ID,
                             boost::shared_ptr<InjectedError>(new WriteChunkInjectedError()));
     assert(rc);
