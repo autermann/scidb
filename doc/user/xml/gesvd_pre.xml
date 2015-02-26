@@ -10,6 +10,10 @@
         <primary>gesvd</primary>
       </indexterm><indexterm>
         <primary>singular value decomposition</primary>
+      </indexterm><indexterm>
+        <primary>svd</primary>
+
+        <see>gesvd</see>
       </indexterm>Produces a result matrix containing any one of the three
     components of the singular value decomposition of a general
     matrix.</refpurpose>
@@ -22,9 +26,18 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>Produces a singular value decomposition (SVD) of the input matrix
-    and returns one of the three factors. For a definition of the SVD, see
-    <ulink
+    <para>For a matrix <emphasis>M</emphasis>, GESVD returns the matrix
+    factorization:<informalequation>
+        <alt>M = U\Sigma V^*</alt>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata fileref="../equations/svd.png" scale="60"/>
+          </imageobject>
+        </mediaobject>
+      </informalequation>The <literal>gesvd </literal>operator produces a
+    singular value decomposition (SVD) of the input matrix and returns one of
+    the three factors. For more details of the SVD, see <ulink
     url="http://en.wikipedia.org/wiki/Singular_value_decomposition">http://en.wikipedia.org/wiki/Singular_value_decomposition</ulink>.</para>
 
     <para>The <replaceable>factor </replaceable>must be one of the following

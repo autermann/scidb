@@ -1123,10 +1123,10 @@ void CachedStorage::removeMutableArray(ArrayUAID uaId, ArrayID arrId)
     {
        _chunkMap.erase(uaId);
     }
-    deleteDescriptorsFor(arrId);
+    deleteDescriptorsFor(uaId, arrId);
 }
 
-void CachedStorage::deleteDescriptorsFor(ArrayID arrId)
+void CachedStorage::deleteDescriptorsFor(ArrayUAID uaId, ArrayID arrId)
 {
     //we estimate that 1TB hard drive at 5MB per chunk contains about 200K chunks, which is 200K ChunkDescriptors * 852 bytes per descriptor = 170MB
     //Ideally that's how big the header file can get.
@@ -1164,7 +1164,13 @@ void CachedStorage::deleteDescriptorsFor(ArrayID arrId)
                     if (--nChunks == 0)
                     {
                         freeCluster(cluId);
-                        _clusters.erase(arrId);
+                        //Note: if this code ever executes on a version of an array that's not the last version (no one does this at the moment)
+                        //then we could be in a situation where _clusters[uaID] does not point to the same cluster as cluID. In that case,
+                        //we could unlink a different partially-filled cluster _clusers[uaID] from clusters. That won't stop the world from
+                        //turning but it will mean that the next time we go in to writeChunk, _clusters[uaID] will be empty and we will pick
+                        //a brand new cluster for the new chunk - leaving one cluster partially-filled. Meaning, we will use more space than we
+                        //need to. Once again, no one does this at the moment.
+                        _clusters.erase(uaId);
                     }
                 }
             }
@@ -1666,7 +1672,7 @@ void CachedStorage::writeChunk(Chunk* newChunk, boost::shared_ptr<Query>& query)
                 throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_SIZE_TOO_LARGE) << chunk._hdr.allocatedSize << _hdr.clusterSize;
             }
             // Choose location of the chunk
-            Cluster& cluster = _clusters[chunk._addr.arrId];
+            Cluster& cluster = _clusters[desc.getUAId()];
             if (cluster.used == 0 || cluster.used + chunk._hdr.allocatedSize > _hdr.clusterSize)
             {
                 cluster.pos.segmentNo = getRandomSegment();

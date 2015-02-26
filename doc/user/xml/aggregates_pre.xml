@@ -19,13 +19,11 @@
   <emphasis>sort</emphasis> which rearranges array data and returns a vector
   of sorted items.</para>
 
-  <sect1>
+  <section>
     <title>Aggregates</title>
 
     <para><indexterm>
         <primary>aggregates</primary>
-
-        <secondary>list of</secondary>
       </indexterm>SciDB offers the following aggregate methods that calculate
     summaries over groups of values in an array.</para>
 
@@ -152,7 +150,7 @@
 --afl scan(m4x4_2attr); --show-query=yes --show-output=yes --output-format=auto --chunkify=yes
 </programlisting></para>
 
-    <sect2>
+    <section>
       <title>Grand Aggregates</title>
 
       <para><indexterm>
@@ -229,9 +227,9 @@
       null values, while the second does not: <programlisting language="test">
 --aql SELECT count(attr1) AS a, count(*) AS b FROM m4x4_null; 
 </programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Group-By Aggregates</title>
 
       <para><indexterm>
@@ -290,9 +288,9 @@
       AFL: <programlisting language="test">
 --afl aggregate(m4x4, max(attr1), y); 
 </programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Grid Aggregates</title>
 
       <para><indexterm>
@@ -344,9 +342,9 @@ REGRID AS (PARTITION BY x 2, y 2); --show-output=no --show-query=no
       same result: <programlisting language="test">
 --afl regrid(m4x4, 2, 2, max(attr1), min(attr1)); --show-output=yes --show-query=no  --output-format=auto --chunkify=yes
 </programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Window Aggregates</title>
 
       <para><indexterm>
@@ -390,7 +388,9 @@ AQL% <command>SELECT</command> <replaceable>aggregate</replaceable> <replaceable
       <para><indexterm>
           <primary>aggregates</primary>
 
-          <secondary>window, fixed</secondary>
+          <secondary>window</secondary>
+
+          <tertiary>fixed</tertiary>
         </indexterm>For example, you can use fixed window to calculate a
       running sum for a 3x3 window on array <code>m4x4</code>.</para>
 
@@ -435,7 +435,9 @@ AQL% <command>SELECT</command> <replaceable>aggregate</replaceable> <replaceable
       <para><indexterm>
           <primary>aggregates</primary>
 
-          <secondary>window, variable</secondary>
+          <secondary>window</secondary>
+
+          <tertiary>variable</tertiary>
         </indexterm>In contrast, the boundary of a variable window can vary
       since the window size includes only nonempty values. Both the number of
       preceding (nonempty) values and following (nonempty) values relative to
@@ -476,9 +478,9 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
       <programlisting language="test">
 --afl variable_window(m4x4_empty, i, 1, 1, sum(val)); --show-output=yes --show-query=yes --output-format=auto --chunkify=yes
 </programlisting>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Aggregation During Redimension</title>
 
       <para><indexterm>
@@ -544,10 +546,10 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
 
       <para>Notice that the sum of the counts is 12—the number of nonempty
       cells in the "winners" array.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Order Statistics</title>
 
     <para>SciDB offers the following ordering and ranking capabilities.</para>
@@ -570,7 +572,7 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
       </listitem>
     </itemizedlist>
 
-    <sect2 remap="h3">
+    <section remap="h3">
       <title>Sort</title>
 
       <para><indexterm>
@@ -618,9 +620,9 @@ FROM sort(m4x4_empty, label);
 SELECT * 
 FROM sort(m4x4_empty, label desc); 
 </programlisting>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3">
+    <section remap="h3">
       <title>Ranking Methods</title>
 
       <para><indexterm>
@@ -677,9 +679,9 @@ FROM rank(m4x4_floor,expr,j); --output-format=auto --chunkify=yes
 SELECT *
 FROM avg_rank(m4x4_floor,expr,j); --output-format=auto --chunkify=yes 
 </programlisting>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Calculating Quantiles</title>
 
       <para><indexterm>
@@ -706,6 +708,6 @@ FROM quantile(m4x4_floor,2);
 SELECT * 
 FROM quantile(m4x4_floor,8); 
 </programlisting></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 </chapter>

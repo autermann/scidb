@@ -29,6 +29,7 @@
 #include "array/Metadata.h"
 #include "array/MemArray.h"
 #include "query/ops/multiply/MultiplyArray.h"
+#include <array/DelegateArray.h>
 
 namespace scidb
 {
@@ -64,20 +65,27 @@ public:
 	boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
             boost::shared_ptr<Query> query)
 	{
-        MultiplyArray::Algorithm algorithm = MultiplyArray::Auto;
-        if (_parameters.size() > 0) { 
-            string a = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
-            if (a == "iterative") { 
-                algorithm = MultiplyArray::Iterative;
-            } else if (a == "dense") { 
-                algorithm = MultiplyArray::Dense;
-            } else if (a == "sparse") { 
-                algorithm = MultiplyArray::Sparse;
-            } else if (a == "auto") { 
-                algorithm = MultiplyArray::Auto;
+            MultiplyArray::Algorithm algorithm = MultiplyArray::Auto;
+            if (_parameters.size() > 0) { 
+                string a = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+                if (a == "iterative") { 
+                    algorithm = MultiplyArray::Iterative;
+                } else if (a == "dense") { 
+                    algorithm = MultiplyArray::Dense;
+                } else if (a == "sparse") { 
+                    algorithm = MultiplyArray::Sparse;
+                } else if (a == "auto") { 
+                    algorithm = MultiplyArray::Auto;
+                }
             }
-        }
-        return boost::shared_ptr<Array>(new MultiplyArray(_schema, inputArrays[0], inputArrays[1], query, algorithm));
+            boost::shared_ptr<Array> multArr(new MultiplyArray(_schema,
+                                                               inputArrays[0],
+                                                               inputArrays[1],
+                                                               query,
+                                                               algorithm));
+            // Converting the result of multiplication into the RLE format
+            // because that is the expected materialized format
+            return  boost::shared_ptr<Array>(new MaterializedArray(multArr, MaterializedArray::RLEFormat));
 	}
 };
 

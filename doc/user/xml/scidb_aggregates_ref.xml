@@ -77,7 +77,7 @@ AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<
 
   <xi:include href="avg_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="count_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="count_agg_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="max_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 

@@ -5,6 +5,18 @@ Query was executed successfully
 
 Query was executed successfully
 
+{r,c} x
+{0,0} 1
+{0,1} 2
+
+Query was executed successfully
+
+{r,c} x
+{0,0} 1
+{1,0} 3
+
+Query was executed successfully
+
 r,i,u
 0,0,1
 
@@ -60,6 +72,10 @@ h,i,x
 
 i_1,i_2,u
 0,0,1
+
+Query was executed successfully
+
+Query was executed successfully
 
 Query was executed successfully
 

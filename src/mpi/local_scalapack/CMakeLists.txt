@@ -37,28 +37,23 @@ if(BLAS_FOUND AND LAPACK_FOUND AND MPICH_FOUND)
     #       WARNING: this is not a good fix, because it does not receive 5 cmake-determined
     #                configuration parameters, but since cmake doesn't like passing arguments to such programs...
     #
-    # This is the way the command string should be built up, instead of with the workaround.
-    #set(CMD_ARGS " --verbose")
-    #set(CMD_ARGS "${CMD_ARGS} --mpibindir=/usr/bin")
-    #set(CMD_ARGS "${CMD_ARGS} --mpirun=mpiexec.mpich2")
-    #set(CMD_ARGS "${CMD_ARGS} --mpif90=${MPI_Fortran_COMPILER}")
-    #set(CMD_ARGS "${CMD_ARGS} --mpicc=${MPI_CC_COMPILER}")
-    #set(CMD_ARGS "${CMD_ARGS} --mpiincdir='${MPI_INCLUDE}'")
-    #set(CMD_ARGS "${CMD_ARGS} --lapacklib='/usr/lib/liblapack.so ${BLAS_LIBRARIES}'") # ${LAPACK_LIBRARIES} breaks it, has an embedded ;
-    #set(CMD_ARGS "${CMD_ARGS} --blaslib='${BLAS_LIBRARIES}'")
-    #set(CMD_ARGS "${CMD_ARGS} --noopt='-fPIC -g -O0'")
-    #set(CMD_ARGS "${CMD_ARGS} --ccflags='-fPIC -g -O0'") # to debug
-    #set(CMD_ARGS "${CMD_ARGS} --fcflags='-fPIC -g -O0'") # to debug
-    #message(STATUS "DEBUG-- CMD_ARGS=${CMD_ARGS}")
 
+    string(REPLACE ";" " "  LOCAL_LAPACK_LIBRARIES "${LAPACK_LIBRARIES}")    # ${LAPACK_LIBRARIES} has an embedded ;
     set(UNTAR_DIR "${CMAKE_CURRENT_BINARY_DIR}/container/src/scalapackForMPICH2")
-    message(STATUS "DEBUG: UNTAR_DIR=${UNTAR_DIR}")
+
+    message(STATUS "DEBUG-- UNTAR_DIR=${UNTAR_DIR}")
+    message(STATUS "DEBUG-- MPICH2_SUFFIX=${MPICH2_SUFFIX}")
+    message(STATUS "DEBUG-- MPI_INCLUDE=${MPI_INCLUDE}")
+    message(STATUS "DEBUG-- BLAS_LIBRARIES=${BLAS_LIBRARIES}")
+    message(STATUS "DEBUG-- LOCAL_LAPACK_LIBRARIES=${LOCAL_LAPACK_LIBRARIES}")
+    message(STATUS "DEBUG-- LOCAL_MPI_PATH=${LOCAL_MPI_PATH}")
+
     ExternalProject_Add(scalapackForMPICH2
                         PREFIX container
                         URL http://www.netlib.org/scalapack/scalapack_installer.tgz
                         TIMEOUT 120
                         CONFIGURE_COMMAND ""
-                        BUILD_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external_project_build_cmd_workaround.cmake.sh ${UNTAR_DIR}
+                        BUILD_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external_project_build_cmd_workaround.cmake.sh ${UNTAR_DIR} ${MPI_INCLUDE} ${LOCAL_MPI_PATH}/bin ${LOCAL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MPICH2_SUFFIX}
                         INSTALL_COMMAND "")
                         #      but that didn't work, so had to define it
 endif()

@@ -30,6 +30,7 @@
 # define DEFAULTEXECUTOR_h
 
 #include <vector>
+#include <set>
 #include <list>
 #include <fstream>
 #include <sstream>
@@ -98,8 +99,7 @@ struct ErrorCommandOptions
 	    _expected_errorcode(""),
         _expected_errorcode2(""),
 	    _expected_errns(""),
-	    _expected_errshort(~0),
-	    _expected_errlong(~0)
+	    _expected_errshort(~0)
 	{
 		_afl = true;
 		_igdata = false;
@@ -110,7 +110,7 @@ struct ErrorCommandOptions
 
 	std::string _expected_errns; //error namespace
     int32_t _expected_errshort;  //short error code
-	int32_t _expected_errlong;   //long error code
+    std::set<int32_t> _expected_errlong;   //long error code
 
 	bool _afl;
 	bool _igdata;
@@ -249,8 +249,8 @@ class DefaultExecutor : public Executor
 		 * Reads the result of the query and stores it into the .out file
 		 *
 		 * @param query Specifies the actual SciDB query string
-		 * @param error_code Specifies the expected error code if the query is expected to fail
-		 * @return FAILURE if expected_error_code is given but exception does not occur
+		 * @param errorInfo Specifies the expected error code if the query is expected to fail
+		 * @return FAILURE if errorInfo is given but exception does not occur
 		 * @return SUCCESS otherwise
 		 */
 		int runSciDBquery (const std::string &query, const ErrorCommandOptions* errorInfo = NULL);

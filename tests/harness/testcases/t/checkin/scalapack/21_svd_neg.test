@@ -41,6 +41,30 @@ create array ColInf<a: double>  [r=0:1,2,0, c=0:*,2,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(ColInf, 'S')"
 remove(ColInf)
 
+# matrix must be square, temporarily
+create array NonSquare<a: double>  [r=0:0,2,0, c=0:1,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(NonSquare, 'S')"
+remove(NonSquare)
+
+# dimensions must start at 0, temporarily
+create array StartOne<a: double>  [r=1:1,2,0, c=1:1,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44 "gesvd(StartOne, 'S')"
+remove(StartOne)
+
+# dimensions must be int or uint types, temporarily
+create array NonInt<a: double>  [r(float)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gesvd(NonInt, 'S')"
+remove(NonInt)
+create array NonInt<a: double>  [r(double)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gesvd(NonInt, 'S')"
+remove(NonInt)
+create array NonInt<a: double>  [r(char)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gesvd(NonInt, 'S')"
+remove(NonInt)
+create array NonInt<a: double>  [r(string)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gesvd(NonInt, 'S')"
+remove(NonInt)
+
 # chunksize too small
 create array chunkTooSmall  <a: double> [r=0:1,31,0, c=0:1,31,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(chunkTooSmall, 'S')"

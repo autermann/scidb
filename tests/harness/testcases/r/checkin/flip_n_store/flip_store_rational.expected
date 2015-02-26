@@ -19,13 +19,25 @@ SCIDB QUERY : <project(apply(store(join(build(T,rational(x+1,x+2)),build(T,ratio
 {1} "(2/3) - (11/12)"
 {2} "(3/4) - (12/13)"
 
-SCIDB QUERY : <project(apply(redimension_store(A,B),c,str(b)),c)>
+SCIDB QUERY : <redimension_store(A,B)>
+a,b
+0,"(10/11)"
+1,"(11/12)"
+2,"(12/13)"
+
+SCIDB QUERY : <project(apply(B,c,str(b)),c)>
 a,c
 0,"(10/11)"
 1,"(11/12)"
 2,"(12/13)"
 
-SCIDB QUERY : <project(apply(redimension_store(B,C),c,str(a)),c)>
+SCIDB QUERY : <redimension_store(B,C)>
+b,a
+0,"(1/2)"
+1,"(2/3)"
+2,"(3/4)"
+
+SCIDB QUERY : <project(apply(C,c,str(a)),c)>
 b,c
 0,"(1/2)"
 1,"(2/3)"

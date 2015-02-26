@@ -103,6 +103,96 @@ SCIDB QUERY : <gemm(ColInf, Valid, Valid)>
 SCIDB QUERY : <remove(ColInf)>
 Query was executed successfully
 
+SCIDB QUERY : <create array NonSquare<a: double>  [r=0:0,2,0, c=0:1,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(Valid, Valid, NonSquare)>
+[An error expected at this place for the query "gemm(Valid, Valid, NonSquare)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43.]
+
+SCIDB QUERY : <gemm(Valid, NonSquare, Valid)>
+[An error expected at this place for the query "gemm(Valid, NonSquare, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43.]
+
+SCIDB QUERY : <gemm(NonSquare, Valid, Valid)>
+[An error expected at this place for the query "gemm(NonSquare, Valid, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43.]
+
+SCIDB QUERY : <remove(NonSquare)>
+Query was executed successfully
+
+SCIDB QUERY : <create array StartOne<a: double>  [r=1:1,2,0, c=1:1,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(Valid, Valid, StartOne)>
+[An error expected at this place for the query "gemm(Valid, Valid, StartOne)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44.]
+
+SCIDB QUERY : <gemm(Valid, StartOne, Valid)>
+[An error expected at this place for the query "gemm(Valid, StartOne, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44.]
+
+SCIDB QUERY : <gemm(StartOne, Valid, Valid)>
+[An error expected at this place for the query "gemm(StartOne, Valid, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44.]
+
+SCIDB QUERY : <remove(StartOne)>
+Query was executed successfully
+
+SCIDB QUERY : <create array NonInt<a: double>  [r(float)=1,2,0, c=0:0,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(Valid, Valid, NonInt)>
+[An error expected at this place for the query "gemm(Valid, Valid, NonInt)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(Valid, NonInt, Valid)>
+[An error expected at this place for the query "gemm(Valid, NonInt, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(NonInt, Valid, Valid)>
+[An error expected at this place for the query "gemm(NonInt, Valid, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <remove(NonInt)>
+Query was executed successfully
+
+SCIDB QUERY : <create array NonInt<a: double>  [r(double)=1,2,0, c=0:0,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(Valid, Valid, NonInt)>
+[An error expected at this place for the query "gemm(Valid, Valid, NonInt)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(Valid, NonInt, Valid)>
+[An error expected at this place for the query "gemm(Valid, NonInt, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(NonInt, Valid, Valid)>
+[An error expected at this place for the query "gemm(NonInt, Valid, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <remove(NonInt)>
+Query was executed successfully
+
+SCIDB QUERY : <create array NonInt<a: double>  [r(char)=1,2,0, c=0:0,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(Valid, Valid, NonInt)>
+[An error expected at this place for the query "gemm(Valid, Valid, NonInt)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(Valid, NonInt, Valid)>
+[An error expected at this place for the query "gemm(Valid, NonInt, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(NonInt, Valid, Valid)>
+[An error expected at this place for the query "gemm(NonInt, Valid, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <remove(NonInt)>
+Query was executed successfully
+
+SCIDB QUERY : <create array NonInt<a: double>  [r(string)=1,2,0, c=0:0,2,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gemm(Valid, Valid, NonInt)>
+[An error expected at this place for the query "gemm(Valid, Valid, NonInt)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(Valid, NonInt, Valid)>
+[An error expected at this place for the query "gemm(Valid, NonInt, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <gemm(NonInt, Valid, Valid)>
+[An error expected at this place for the query "gemm(NonInt, Valid, Valid)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45.]
+
+SCIDB QUERY : <remove(NonInt)>
+Query was executed successfully
+
 SCIDB QUERY : <create array chunkTooSmall <a: double> [r=0:1,31,0, c=0:1,31,0]>
 Query was executed successfully
 
@@ -161,33 +251,6 @@ SCIDB QUERY : <gemm(Valid, Valid, ColOverlap)>
 [An error expected at this place for the query "gemm(Valid, Valid, ColOverlap)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40.]
 
 SCIDB QUERY : <remove(ColOverlap)>
-Query was executed successfully
-
-SCIDB QUERY : <create array Square<a: double> [r=0:1, 32,0, c=0:1, 32,0]>
-Query was executed successfully
-
-SCIDB QUERY : <create array Wide<a: double>   [r=0:1, 32,0, c=0:10,32,0]>
-Query was executed successfully
-
-SCIDB QUERY : <create array Tall<a: double>   [r=0:10,32,0, c=0:1, 32,0]>
-Query was executed successfully
-
-SCIDB QUERY : <gemm(Wide, Square, Square)>
-[An error expected at this place for the query "gemm(Wide, Square, Square)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4.]
-
-SCIDB QUERY : <gemm(Tall, Square, Square)>
-[An error expected at this place for the query "gemm(Tall, Square, Square)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4.]
-
-SCIDB QUERY : <gemm(Square, Wide, Square)>
-[An error expected at this place for the query "gemm(Square, Wide, Square)". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4.]
-
-SCIDB QUERY : <remove(Square)>
-Query was executed successfully
-
-SCIDB QUERY : <remove(Wide)>
-Query was executed successfully
-
-SCIDB QUERY : <remove(Tall)>
 Query was executed successfully
 
 Query was executed successfully

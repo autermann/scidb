@@ -958,7 +958,8 @@ public:
         bool exclusive;
         bool tile;
         bool secondPhase;
-        Properties(): ddl(false), exclusive(false), tile(false), secondPhase(false)
+        bool noNesting;
+        Properties(): ddl(false), exclusive(false), tile(false), secondPhase(false), noNesting(false)
         {
         }
     };
@@ -1003,7 +1004,10 @@ public:
     {
         _parameters.push_back(parameter);
     }
-
+ 
+    /**
+     *  @return vector containing a list of the parameters types that can be "next" in a variadic operator
+     */
     virtual std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_UNHANDLED_VAR_PARAMETER) << _logicalName;

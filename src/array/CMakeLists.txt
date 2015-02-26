@@ -33,6 +33,7 @@ set (array_src
     DBArray.cpp
     ParallelAccumulatorArray.cpp
     RLE.cpp
+    DeepChunkMerger.cpp
 )
 
 file(GLOB array_include "*.h")

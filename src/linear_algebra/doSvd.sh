@@ -10,13 +10,21 @@
 # can use a variable to represent "| tee /dev/stderr"  perhaps
 #
 
+# Prior versions of this script used variables named SIZE[_xxx] to control the
+# size of the problem matrix, which was always square.
+# For #2200 we are allowing recrtangular matrices.
+# Here, we generally changing SIZE[_XXX] to ORD[_XXX] which
+# represents the ORDER of the matrix, and we add variabs ROW[_XXX] and COL_[XXX]
+# which will be used to control the aspect ratio of a matrix at a given order
+# [Note that the order of a matrix is the maximum of its rows and columns]
+# [Note also that we do not change CSIZE, which is the chunkSize, which does remain square at this time]
 
 # defaults if not given on command line
-SIZE_MIN=2
-SIZE_MAX_VERBOSE=8
-SIZE_MAX=8
-SIZE_STEP_TYPE="x" # or "+"
-SIZE_STEP=2
+ORD_MIN=2
+ORD_MAX_VERBOSE=8
+ORD_MAX=8
+ORD_STEP_TYPE="x" # or "+"
+ORD_STEP=2
 
 
 if [ -z "$SCRIPT_DIR" ] ; then
@@ -24,32 +32,31 @@ if [ -z "$SCRIPT_DIR" ] ; then
 fi
 
 if [ "$1" != "" ] ; then
-    SIZE_MIN=$1  # TODO: replace this with getopt
-    SIZE_MAX_VERBOSE=$1
-    SIZE_MAX=$1
+    ORD_MIN=$1  # TODO: replace this with getopt
+    ORD_MAX_VERBOSE=$1
+    ORD_MAX=$1
 fi
 
 if [ "$2" != "" ] ; then
-    SIZE_MAX_VERBOSE=$2
-    SIZE_MAX=$2
+    ORD_MAX_VERBOSE=$2
+    ORD_MAX=$2
 fi
 
 if [ "$3" != "" ] ; then
-    SIZE_MAX=$3
+    ORD_MAX=$3
 fi
 
 if [ "$4" != "" ] ; then
-    SIZE_STEP_TYPE=$4
+    ORD_STEP_TYPE=$4
 fi
 
 if [ "$5" != "" ] ; then
-    SIZE_STEP=$5
+    ORD_STEP=$5
 fi
 
 
-
 echo "$0: ====================================="
-echo "$0: $0 $SIZE_MIN,$SIZE_MAX_VERBOSE,$SIZE_MAX begin"
+echo "$0: $0 $ORD_MIN,$ORD_MAX_VERBOSE,$ORD_MAX begin"
 
 sleep 2 # if we get here too soon after runN.py 4 mydb --istart , then there's a connection error on this command
 iquery -aq "load_library('dense_linear_algebra')"
@@ -59,36 +66,31 @@ iquery -aq "load_library('dense_linear_algebra')"
 #
 echo "$0: **********************************************************************" 
 echo "$0: ****** verbose, remultiplied svd('U'), svd('VT'), svd('values') "
-echo "$0: ****** from $SIZE_MIN to $SIZE_MAX_VERBOSE (if any)"
+echo "$0: ****** from $ORD_MIN to $ORD_MAX_VERBOSE (if any)"
 
 PI="3.14159265359"
 NAMES_USED="IN LEFT RIGHT VALS VALSmat PRODUCT DIAG_VEC_1 DIAG_OUTER_PRODUCT"
 PFX="TEST_DOSVD_"   # array name prefix
 
-SIZE=$SIZE_MIN
-while [ "$SIZE" -le "$SIZE_MAX_VERBOSE" ] ; do
-    SIZE_M1=`expr "$SIZE" - 1`
-    CSIZE=$SIZE_M1 # just to be annoying and test at least one edge condition
-    if [ "$CSIZE" -le "1" ] ; then
-        CSIZE=1
-    fi
-    # NOPE, the release is too close.  we will just use csize 32 and generalize later.
-    CSIZE=32
-    
-    echo "$0: verbose svd test @ ${SIZE} x ${SIZE} csize ${CSIZE} x ${CSIZE}"  | tee /dev/stderr
+ORD=$ORD_MIN
+while [ "$ORD" -le "$ORD_MAX_VERBOSE" ] ; do
+    ORD_M1=`expr "$ORD" - 1`
+    CSIZE=32     # Only CSIZE 32 is accepted at the moment, using variable to allow later generalization (#2200)
+
+    echo "$0: verbose svd test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"  | tee /dev/stderr
 
     for NAME in $NAMES_USED ; do
         iquery -aq "remove(${PFX}${NAME})"   > /dev/null 2>&1 # completely silently
     done
 
-    iquery -naq "create array ${PFX}IN <v:double>[r=0:${SIZE_M1},${CSIZE},0 , c=0:${SIZE_M1},${CSIZE},0]" #> /dev/null
+    iquery -naq "create array ${PFX}IN <v:double>[r=0:${ORD_M1},${CSIZE},0 , c=0:${ORD_M1},${CSIZE},0]" #> /dev/null
 
     # test matrix is designed to
     # 1. be integers
     # 2. have no zeros (allows least-significant errors to "disappear")
     # 3. have a condition number better than O^2
     #
-    BUILD="build(${PFX}IN, 1+c+r*${SIZE})" # numbered by columns
+    BUILD="build(${PFX}IN, 1+c+r*${ORD})" # numbered by columns
     #iquery -ocsv+ -aq "$BUILD"  | sort       | tee /dev/stderr
     #echo
 
@@ -99,13 +101,13 @@ while [ "$SIZE" -le "$SIZE_MAX_VERBOSE" ] ; do
     #
     # remove the n in -naq to see the matrix for debugging
     #
-    echo "$0: verbose U test @ ${SIZE} x ${SIZE} csize ${CSIZE} x ${CSIZE}"   | tee /dev/stderr
+    echo "$0: verbose U test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"   | tee /dev/stderr
     iquery -ocsv+ -naq "store(gesvd(${BUILD}, 'U'),${PFX}LEFT)"  | sort       #| tee /dev/stderr
     echo                                                                     #| tee /dev/stderr
-    echo "$0: verbose VT test @ ${SIZE} x ${SIZE} csize ${CSIZE} x ${CSIZE}"  | tee /dev/stderr
+    echo "$0: verbose VT test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"  | tee /dev/stderr
     iquery -ocsv+ -naq "store(gesvd(${BUILD}, 'VT'),${PFX}RIGHT)" | sort      #| tee /dev/stderr
     echo                                                                     #| tee /dev/stderr
-    echo "$0: verbose S test @ ${SIZE} x ${SIZE} csize ${CSIZE} x ${CSIZE}"   | tee /dev/stderr
+    echo "$0: verbose S test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"   | tee /dev/stderr
     iquery -ocsv+ -naq "store(gesvd(${BUILD}, 'S'),${PFX}VALS)"   | sort      #| tee /dev/stderr
     echo                                                                     #| tee /dev/stderr
 
@@ -119,12 +121,12 @@ while [ "$SIZE" -le "$SIZE_MAX_VERBOSE" ] ; do
     echo
 
     # at small sizes, increment (to catch bugs), at larger sizes, double the size (to scale up faster)
-    if [ "${SIZE_STEP_TYPE}" = "+" ] ; then
-        SIZE=`expr "$SIZE" '+' "$SIZE_STEP"`
-    elif [ "${SIZE_STEP_TYPE}" = "x" ] ; then
-        SIZE=`expr "$SIZE" '*' "$SIZE_STEP"`
+    if [ "${ORD_STEP_TYPE}" = "+" ] ; then
+        ORD=`expr "$ORD" '+' "$ORD_STEP"`
+    elif [ "${ORD_STEP_TYPE}" = "x" ] ; then
+        ORD=`expr "$ORD" '*' "$ORD_STEP"`
     else
-        echo "$0: illegal value for SIZE_STEP_TYPE, = ${SIZE_STEP_TYPE}"
+        echo "$0: illegal value for ORD_STEP_TYPE, = ${ORD_STEP_TYPE}"
         exit 5
     fi
 done
@@ -136,23 +138,23 @@ done
 #
 echo "$0: *****************************************************************************" 
 echo "$0: ****** quick test, svd('U') only"
-echo "$0: ****** from $SIZE to $SIZE_MAX (if any)"
+echo "$0: ****** from $ORD to $ORD_MAX (if any)"
 
-while [ "$SIZE" -le "$SIZE_MAX" ] ; do
-    SIZE_M1=`expr "$SIZE" - 1`
+while [ "$ORD" -le "$ORD_MAX" ] ; do
+    ORD_M1=`expr "$ORD" - 1`
     # NOPE, the release is too close.  we will just use csize 32 and generalize later.
     CSIZE=32
 
-    echo "$0: U-only test @ ${SIZE} x ${SIZE} csize ${CSIZE} x ${CSIZE}" | tee /dev/stderr
+    echo "$0: U-only test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}" | tee /dev/stderr
 
     iquery -aq "remove(${PFX}IN)"   > /dev/null 2>&1 # completely silently
-    iquery -naq "create array ${PFX}IN <v:double>[r=0:${SIZE_M1},${CSIZE},0 , c=0:${SIZE_M1},${CSIZE},0]" 
+    iquery -naq "create array ${PFX}IN <v:double>[r=0:${ORD_M1},${CSIZE},0 , c=0:${ORD_M1},${CSIZE},0]" 
     #
     # see explanation in previous loop
     #
-    BUILD="build(${PFX}IN, 1+c+r*${SIZE})"
+    BUILD="build(${PFX}IN, 1+c+r*${ORD})"
 
-    if [ "$SIZE" -ge 16384 ] ; then
+    if [ "$ORD" -ge 16384 ] ; then
         echo "${0}: warning, a 32-bit ScaLAPACK/LAPACK will fail at this size"
         echo "${0}: with error 'xxmr2d: out of memory'"
         # NOTE LWORK is 532 MB still 4x short of the 2G barrier, fails earlier than i expect
@@ -163,12 +165,12 @@ while [ "$SIZE" -le "$SIZE_MAX" ] ; do
     /usr/bin/time -f'%E s' iquery -ocsv+ -aq "count(gesvd(${BUILD}, 'U'))"    | tee /dev/stderr
     echo                                                      #| tee /dev/stderr
 
-    if [ "${SIZE_STEP_TYPE}" = "+" ] ; then
-        SIZE=`expr "$SIZE" '+' "$SIZE_STEP"`
-    elif [ "${SIZE_STEP_TYPE}" = "x" ] ; then
-        SIZE=`expr "$SIZE" '*' "$SIZE_STEP"`
+    if [ "${ORD_STEP_TYPE}" = "+" ] ; then
+        ORD=`expr "$ORD" '+' "$ORD_STEP"`
+    elif [ "${ORD_STEP_TYPE}" = "x" ] ; then
+        ORD=`expr "$ORD" '*' "$ORD_STEP"`
     else
-        echo "$0: illegal value for SIZE_STEP_TYPE, = ${SIZE_STEP_TYPE}"
+        echo "$0: illegal value for ORD_STEP_TYPE, = ${ORD_STEP_TYPE}"
         exit 5
     fi
 done
@@ -177,6 +179,6 @@ for NAME in $NAMES_USED ; do
     iquery -aq "remove(${PFX}${NAME})"   > /dev/null 2>&1 # completely silently
 done
 
-echo "$0: $0 $SIZE_MIN,$SIZE_MAX_VERBOSE,$SIZE_MAX end"
+echo "$0: $0 $ORD_MIN,$ORD_MAX_VERBOSE,$ORD_MAX end"
 echo 
 

@@ -401,6 +401,14 @@ namespace scidb
             return addr;
         }
 
+        /**
+         * @see ConstChunk::isMemChunk
+         */
+        virtual bool isMemChunk() const
+        {
+            return true;
+        }
+
         size_t count() const;
         bool   isCountKnown() const;
         void setCount(size_t count);
@@ -450,7 +458,7 @@ namespace scidb
     typedef LRUSecondary<LruMemChunk*>::ListIterator MemChunkLruIterator;
 
     /**
-     * Chunk of temporary array which body can be located either in memory either on disk
+     * Chunk of a temporary array whose body can be located either in memory either on disk.
      */
     class LruMemChunk : public MemChunk
     {
@@ -459,18 +467,59 @@ namespace scidb
         friend class SharedMemCache;
 
     private:
+        /**
+         * Iterator indicating the position of the chunk in the LRU cache.
+         */
         MemChunkLruIterator _whereInLru;
 
-        int64_t      swapFileOffset;
-        size_t       accessCount;
-        size_t       swapFileSize;
+        /**
+         * The offset into the array swap file where the chunk has been written to.
+         */
+        int64_t      _swapFileOffset;
+
+        /**
+         * The difference between the number of times pin was called, minus the number of times unPin was called.
+         */
+        size_t       _accessCount;
+
+        /**
+         * The size of the chunk in the swap file.
+         */
+        size_t       _swapFileSize;
+
+        /**
+         * The size of the chunk the last time we pinned or unPinned it. If you follow proper prodecure, the chunk size should
+         * only change at unPin time; hence the name.
+         */
+        size_t       _sizeAtLastUnPin;
 
       public:
+        /**
+         * Create a new chunk, not in LRU with size 0.
+         */
+        LruMemChunk();
+
+        ~LruMemChunk();
+
+        /**
+         * @see: MemChunk::pin
+         */
         bool pin() const;
+
+        /**
+         * @see: MemChunk::unPin
+         */
         void unPin() const;
 
+        /**
+         * @see: MemChunk::isTemporary
+         */
         bool isTemporary() const;
 
+        /**
+         * Determine if the chunk is in the LRU.
+         * @return true if the chunk is not in the LRU. False otherwise.
+         */
         bool isEmpty() const;
 
         /**
@@ -478,14 +527,20 @@ namespace scidb
          */
         void prune();
 
+        /**
+         * Remove the chunk from the LRU.
+         */
         void removeFromLru();
 
+        /**
+         * Add the chunk to the LRU.
+         */
         void pushToLru();
 
+        /**
+         * @see Chunk::write
+         */
         virtual void write(boost::shared_ptr<Query>& query);
-
-        LruMemChunk();
-        ~LruMemChunk();
     };
     
 
@@ -540,6 +595,28 @@ namespace scidb
         void setMemThreshold(uint64_t memThreshold) {
             _usedMemThreshold = memThreshold;
         }
+
+        /**
+         * Retrieve the current memory threhsold.
+         * @return the mem threshold.
+         */
+        uint64_t getMemThreshold() const
+        {
+            return _usedMemThreshold;
+        }
+
+        /**
+         * Debugging aid: compute the size of the chunks on the LRU list.
+         * @return the sum of the sizes of the chunks in the LRU. Note: chunks that are currently pinned are not accounted for here.
+         */
+        uint64_t computeSizeOfLRU();
+
+        /**
+         * Debugging aid: compare computeSizeOfLRU with getUsedMemSize
+         * @return true if computeSizeOfLRU is <= getUsedMemSize. This is an invariant that must always be true. False otherwise.
+         */
+        bool sizeCoherent();
+
     };
 
     /**
@@ -929,7 +1006,6 @@ namespace scidb
         RLEPayload::append_iterator appender;
         position_t prevPos;
     };
-
 }
 
 #endif

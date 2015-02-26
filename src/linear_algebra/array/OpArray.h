@@ -113,10 +113,9 @@ OpArray<Op_tt>::OpArray(ArrayDesc const& desc,
                         Coordinates const& from, Coordinates const& till, Coordinates const& delta,
                         const boost::shared_ptr<scidb::Query>& query)
 :
-    SplitArray(desc, dummy, from, till),
+    SplitArray(desc, dummy, from, till, query),
     _op(op),
-    _delta(delta),
-    _query(query)
+    _delta(delta)
 {
 }
 

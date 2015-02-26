@@ -37,7 +37,7 @@ echo "Prepare CentOS 6.3 for build SciDB"
 
 # Build dependencies:
 yum remove -y boost*
-yum install -y gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make boost-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect
+yum install -y gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make boost-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel
 
 yum install -y git git-svn
 # Reduce build time

@@ -38,7 +38,7 @@
     </listitem>
   </itemizedlist>
 
-  <sect1 id="CreateArray">
+  <section id="CreateArray">
     <title>Create an Array</title>
 
     <para><indexterm>
@@ -136,7 +136,7 @@
                   In this case, you will need to specify the dimension data
                   type in the name argument like this:
                   <replaceable>dimension_name</replaceable>(<replaceable>dimension_dataype</replaceable>).
-                  Note that version 12.12 of SciDB and Paradigm4 support
+                  Note that version 13.1 of SciDB and Paradigm4 support
                   non-integer dimensions only partially. Dimension names may
                   only contain alphanumeric characters and underscores
                   (_).</para>
@@ -216,9 +216,9 @@
         <secondary>drop array</secondary>
       </indexterm>To delete an array with AQL, use the <code><command>DROP
     ARRAY</command></code> statement: <para><programlisting>AQL% <command>DROP ARRAY</command> A;  </programlisting></para></para>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Attributes</title>
 
     <para><indexterm>
@@ -235,23 +235,36 @@
     1-dimensional array can represent a simple product database where each
     cell has a string attribute called <code>name</code>, a numerical
     attribute called <code>price</code>, and a date-time attribute called
-    <code>sold</code>: <para><programlisting>AQL% <command>CREATE ARRAY</command> products &lt;name:string,price:float default float(100.0),sold:datetime&gt; [i=0:*,10,0];  </programlisting> Attributes are by default set to not null. To allow an
+    <code>sold</code>: <para><programlisting>AQL% <command>CREATE ARRAY</command> products &lt;name:string,price:float default float(100.0),sold:datetime&gt; [i=0:*,10,0];  </programlisting></para></para>
+
+    <para><indexterm>
+        <primary>nulls</primary>
+
+        <secondary>allowing in attributes</secondary>
+      </indexterm>Attributes are by default set to not null. To allow an
     attribute to have value NULL, add NULL to the attribute data type
-    declaration: <para><programlisting>AQL% 
+    declaration:<para><programlisting>AQL% 
 <command>CREATE ARRAY</command> product_null &lt;name:string NULL,price:float NULL,sold:datetime NULL&gt;
-[i=0:*,10,0];  </programlisting> This allows the attribute to store NULL values at data
-    load.</para></para></para>
+[i=0:*,10,0];  </programlisting></para></para>
+
+    <para>This allows the attribute to store NULL values at data load.</para>
 
     <para>An attribute takes on a default value of 0 when no other value is
     provided. To set a default value other than 0, set the DEFAULT value of
     the attribute. For example, this code will set the default value of
     <code>price</code> to 100 if no value is provided: <para><programlisting>AQL% <command>CREATE ARRAY</command> product_dflt &lt;name:string, price:float default float(100.0), sold:datetime&gt; [i=0:*,10,0];  </programlisting></para></para>
 
-    <sect2>
+    <section>
       <title>NULL and Default Attribute Values</title>
 
-      <para>SciDB offers functionality to work with missing data. This chapter
-      uses the data set m4x4_missing.txt, shown here: <para><screen>[
+      <para><indexterm>
+          <primary>attributes</primary>
+
+          <secondary>default values</secondary>
+        </indexterm><indexterm>
+          <primary>default attribute values</primary>
+        </indexterm>SciDB offers functionality to work with missing data.
+      Consider the data set m4x4_missing.txt, shown here: <para><screen>[
 [(0,100),(1,99),(2,98),(3,97)],
 [(4),(5,95),(6,94),(7,93)],
 [(8,92),(9,91),(),(11,89)],
@@ -274,7 +287,13 @@
 [(12,88),(13,0),(14,86),(15,85)]
 ]</screen></para></para>
 
-      <para>To change the default value, that is, the value the SciDB
+      <para><indexterm>
+          <primary>empty cells</primary>
+        </indexterm><indexterm>
+          <primary>arrays</primary>
+
+          <secondary>empty cells</secondary>
+        </indexterm>To change the default value, that is, the value the SciDB
       substitutes for the missing data, set the default clause of the
       attribute option: <para><programlisting>AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32 default 5468&gt;[x=0:3,4,0,y=0:3,4,0];  </programlisting><programlisting>AFL% load(m4x4_missing, '../examples/m4x4_missing.txt');  </programlisting><screen>[
 [(0,100),(1,99),(2,98),(3,97)],
@@ -282,9 +301,9 @@
 [(8,92),(9,91),(),(11,89)],
 [(12,88),(13,5468),(14,86),(15,85)]
 ]</screen></para></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Codes for Missing Data</title>
 
       <para><indexterm>
@@ -297,6 +316,8 @@
           <primary>loading data</primary>
 
           <secondary>missing values</secondary>
+        </indexterm><indexterm>
+          <primary>missing reason code</primary>
         </indexterm>In addition to simple single-valued NULL substitution
       described in the previous section, SciDB also supports multi-valued
       NULLs using the notion of <emphasis>missing reason codes</emphasis>.
@@ -317,9 +338,13 @@
       of financial market data, data may be missing because "market closed",
       "trading halted", or "data feed down".</para>
 
-      <para>The examples below show how to represent missing data in the load
-      file. ? or null represent null values, and ?2 represents null value with
-      a reason code of 2. <programlisting>[[ ( 10, 4.5, "My String", 'C'), (10, 5.1, ?1, 'D'), 
+      <para><indexterm>
+          <primary>?</primary>
+
+          <see>nulls</see>
+        </indexterm>The examples below show how to represent missing data in
+      the load file. A question mark (?) or null represent null values, and ?2
+      represents null value with a reason code of 2.<programlisting>[[ ( 10, 4.5, "My String", 'C'), (10, 5.1, ?1, 'D'), 
 (?2, 5.1, "Another String", ?) ...
 
 or
@@ -329,12 +354,91 @@ or
 </programlisting></para>
 
       <para>Use the substitute operator to substitute different values for
-      each type of NULL. For more information on NULL substitution see the
-      SciDB Operator Reference entry for substitute.</para>
-    </sect2>
-  </sect1>
+      each type of NULL. For more information on NULL substitution, see the
+      <link linkend="substituteOperator">substitute</link> operator
+      reference.</para>
+    </section>
 
-  <sect1 id="array_dimensions">
+    <section>
+      <title>Functions for Missing Values</title>
+
+      <para><indexterm>
+          <primary>missing_reason function</primary>
+        </indexterm><indexterm>
+          <primary>functions</primary>
+
+          <secondary>missing_reason</secondary>
+        </indexterm>There is a function, <literal>missing_reason</literal>,
+      that returns the missing reason code for array data. For example,
+      consider an array with the following data:<para><screen>[(47),(null),(-21.1),(?100),(?50)]
+</screen>Run
+      <literal>missing_reason</literal> against the values in the array, and
+      compare against the original values:<para><programlisting>AFL% apply(A,MRcode, missing_reason(val));  </programlisting><screen>{i} val,MRcode
+{0} 47,-1
+{1} null,0
+{2} -21.1,-1
+{3} ?100,100
+{4} ?50,50
+</screen></para></para></para>
+
+      <para>As illustrated by this example, we can see that
+      <literal>missing_reason</literal> returns integer values as
+      follows:<itemizedlist>
+          <listitem>
+            <para>For ordinary attribute values, it returns -1.</para>
+          </listitem>
+        </itemizedlist><itemizedlist>
+          <listitem>
+            <para>For the standard null value, it returns 0.</para>
+          </listitem>
+
+          <listitem>
+            <para>For null values that contain a missing reason code, it
+            returns the code.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para><indexterm>
+          <primary>missing function</primary>
+        </indexterm><indexterm>
+          <primary>functions</primary>
+
+          <secondary>missing</secondary>
+        </indexterm>There is another function, <literal>missing</literal>,
+      that returns the missing reason code from an integer array. Suppose, for
+      example, that you have an array that contains integers where the values
+      represent missing reason codes:<para><screen>[(-1),(47),(23),(0),(127),(-1)]
+</screen>Now
+      run <literal>missing</literal> against the values in the
+      array:<para><programlisting>AFL% apply(arrayB,MRcode, missing(val));  </programlisting><screen>{i} val,MRcode
+{0} -1,&lt;void&gt;
+{1} 47,?47
+{2} 23,?23
+{3} 0,null
+{4} 127,?127
+{5} -1,&lt;void&gt;
+</screen></para></para></para>
+
+      <para>We can see that the function,
+      <literal>missing</literal>(<replaceable>x</replaceable>), returns values
+      as follows:<itemizedlist>
+          <listitem>
+            <para>If x= -1, it returns &lt;void&gt;.</para>
+          </listitem>
+        </itemizedlist><itemizedlist>
+          <listitem>
+            <para>If x= 0, it returns null.</para>
+          </listitem>
+
+          <listitem>
+            <para>If x is an integer, it returns the missing reason code that
+            corresponds to x.</para>
+          </listitem>
+        </itemizedlist></para>
+    </section>
+  </section>
+
+  <section id="array_dimensions">
     <title>Array Dimensions</title>
 
     <para>A SciDB array must have at least one dimension. Dimensions form the
@@ -348,7 +452,7 @@ or
       size.</para>
     </note>
 
-    <sect2 remap="h3" xml:id="ChunkOverlap">
+    <section xml:id="ChunkOverlap">
       <title>Chunk Overlap</title>
 
       <para><indexterm>
@@ -380,9 +484,9 @@ or
           than one chunk.</para>
         </listitem>
       </itemizedlist>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="Unboundeddimensions">
+    <section xml:id="Unboundeddimensions">
       <title>Unbounded Dimensions</title>
 
       <para><indexterm>
@@ -409,13 +513,13 @@ or
             and chunk overlap 0.</para>
           </listitem>
         </itemizedlist><para><programlisting>AQL% <command>CREATE ARRAY</command> open &lt;val:double&gt;[I=0:9,10,0,J=0:*,10,0];  </programlisting></para></para>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="Non-integerdimensionsandMappingarrays">
+    <section xml:id="Non-integerdimensionsandMappingarrays">
       <title>Non-integer Dimensions and Mapping Arrays</title>
 
       <note>
-        <para>Version 12.12 of SciDB only partially supports non-integer
+        <para>Version 13.1 of SciDB only partially supports non-integer
         dimensions.</para>
       </note>
 
@@ -470,10 +574,10 @@ event(string)=3,1000,0]</screen><indexterm>
 {2008,"marathon"} "Wanjiru",7596
 {2008,"steeplechase"} "Kipruto",490.34
 </screen></para></para></para></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Changing Array Names</title>
 
     <para><indexterm>
@@ -526,12 +630,12 @@ elapsedTime:double &gt;
 
 [x=1996:2008,1000,0,
 y=0:2,1000,0]</screen></para></para></para>
-  </sect1>
+  </section>
 
-  <sect1 id="array_dimensions_1">
+  <section id="array_dimensions_1">
     <title>Database Design</title>
 
-    <sect2>
+    <section>
       <title>Selecting Dimensions and Attributes</title>
 
       <para><indexterm>
@@ -586,9 +690,9 @@ y=0:2,1000,0]</screen></para></para></para>
       different types of analytic queries. Redimensioning is used to transform
       attributes to dimensions and vice-versa. Redimensioning an array is
       explained in <xref linkend="ChangingArraySchemas"/>.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Chunk Size Selection</title>
 
       <para><indexterm>
@@ -622,6 +726,6 @@ y=0:2,1000,0]</screen></para></para></para>
       skewed the data is. In this case, you may want to use the <link linkend="repartOperator"><emphasis>repartitioning</emphasis>
       functionality</link> of SciDB to change the chunk size as necessary.
       Repartitioning an array is explained in <xref linkend="ChangingArraySchemas"/>.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 </chapter>

@@ -439,18 +439,32 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
     if(DBG) std::cerr << "--> LD_IN = " << LD_IN << std::endl;
 
+    slpp::int_t LD_OUT = LD_IN; // because its a copy operation
+
     slpp::int_t TD_IN = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
     if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->TD_IN = " << TD_IN << std::endl;
 
     // create ScaLAPACK array descriptors
-    std::cerr << "descinit_ DESC_IN" << std::endl;
-    slpp::desc_t DESC_IN;
-    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN, *INFO);
+    slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
 
-    std::cerr << "descinit_ DESC_OUT" << std::endl;
+    slpp::desc_t DESC_IN;
+    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN,  *INFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: descinit(DESC_IN) failed, INFO " << descinitINFO
+                                                                                 << " DESC_IN " << DESC_IN);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPIRankPhysical::invokeMPIRank: descinit(DESC_IN) failed");
+    }
+    LOG4CXX_DEBUG(logger, "MPIRankPhysical::invokeMPIRank(): DESC_IN " << DESC_IN);
+
     slpp::desc_t DESC_OUT;
-    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_IN, *INFO);
+    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_OUT, *INFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: descinit(DESC_OUT) failed, INFO " << descinitINFO
+                                                                                 << " DESC_OUT " << DESC_OUT);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPIRankPhysical::invokeMPIRank: descinit(DESC_OUT) failed");
+    }
+    LOG4CXX_DEBUG(logger, "MPIRankPhysical::invokeMPIRank(): DESC_OUT " << DESC_OUT);
 
     slpp::int_t MP = LD_IN;
     slpp::int_t NQ = TD_IN;

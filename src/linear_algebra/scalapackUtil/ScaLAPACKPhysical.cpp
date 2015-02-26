@@ -9,6 +9,7 @@
 // std C
 
 // de-facto standards
+#include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_array.hpp>
@@ -22,6 +23,7 @@
 // more SciDB
 #include <array/ArrayExtractOp.hpp>
 #include <array/OpArray.h>
+#include <DLAErrors.h>
 #include <mpi/MPIPhysical.hpp>
 #include <scalapackUtil/reformat.hpp>
 #include <scalapackUtil/scalapackFromCpp.hpp>
@@ -37,7 +39,12 @@
 
 namespace scidb {
 static const bool DBG = false;
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.scalapack"));
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.scalapack.physicalOp"));
+
+
+// TODO: REFACTORING: continue use of matSize_t in more places
+// TODO: REFACTORING: make a "super array" that encapsulates the SciDB::Array and the ScaLAPACK DESC
+//                    so we can pass fewer arguments
 
 
 void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPROW, slpp::int_t NPCOL, slpp::int_t MYPROW, slpp::int_t MYPCOL)
@@ -45,29 +52,28 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
     size_t nInstances = query->getInstancesCount();
     slpp::int_t instanceID = query->getInstanceID();
 
-    if(DBG) {
-        std::cerr << "(invoke) blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
-        std::cerr << "-> NPROW: " << NPROW  << ", NPCOL: " << NPCOL << std::endl;
-        std::cerr << "-> MYPROW:" << MYPROW << ", MYPCOL:" << MYPCOL << std::endl;
-    }
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): checkBlacsInfo "
+                           << "(invoke) blacs_gridinfo_(ctx " << ICTXT << ")"
+                           << " = NPROC (" << NPROW  << ", " << NPCOL << ")"
+                           << " ; MYPROC (" << MYPROW << ", " << MYPCOL << ")");
 
     // REFACTOR these checks
     if(MYPROW < 0 || MYPCOL < 0) {
-        std::cerr << "MPISVD operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL << std::endl ;
+        LOG4CXX_ERROR(logger, "ScaLAPACKPhysical::checkBlacsInfo(): zero size mpi process grid: MYPROW " << MYPROW << " MYPCOL " << MYPCOL);
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL);
+               << "ScaLAPACKPhysical::checkBlacsInfo(): zero size mpi process grid");
     }
 
     if(MYPROW >= NPROW) {
-        std::cerr << "MPISVD operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW << std::endl ;
+        LOG4CXX_ERROR(logger, "ScaLAPACKPhysical::checkBlacsInfo(): MYPROW " << MYPROW << " >= NPROW " << NPROW);
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW);
+               << "ScaLAPACKPhysical::checkBlacsInfo(): illegal position in mpi process grid");
     }
 
     if(MYPCOL >= NPCOL) {
-        std::cerr << "MPISVD operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL << std::endl ;
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-                   << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL);
+        LOG4CXX_ERROR(logger, "ScaLAPACKPhysical::checkBlacsInfo(): MYPCOL " << MYPCOL << " >= NPCOL " << NPCOL);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "ScaLAPACKPhysical::checkBlacsInfo(): illegal position in mpi process grid");
     }
 
     // check that mpi_commsize(NPE, MYPE) values
@@ -82,22 +88,20 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
     // NPE <= instanceCount
     size_t NPE = NPROW*NPCOL; // from blacs
     if(NPE > nInstances) {
-        std::stringstream msg; msg << "MPISVD operator error: NPE:"<<NPE<< " nInstances:"<< nInstances;
-        std::cerr << msg.str() << std::endl;
+        std::stringstream msg; msg << "Scalapack operator error: NPE "<<NPE<< " nInstances "<< nInstances;
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
     }
 
     // MYPE == instanceID
     slpp::int_t MYPE = MYPROW*NPCOL + MYPCOL ; // row-major
     if(MYPE != instanceID) {
-        std::stringstream msg; msg << "MPISVD operator error: MYPE:"<<MYPE<< " instanceID:"<< instanceID;
-        std::cerr << msg.str() << std::endl;
+        std::stringstream msg; msg << "Scalapack operator error: MYPE "<<MYPE<< " instanceID "<< instanceID;
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
     }
 
-    if(DBG) std::cerr << "NPE/nInstances: " << NPE << std::endl;
-    if(DBG) std::cerr << "MYPE/instanceID: " << MYPE << std::endl;
-
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): checkBlacsInfo"
+                           << " NPE/nInstances " << NPE
+                           << " MYPE/instanceID " << MYPE);
 }
 
 ///
@@ -106,7 +110,7 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
 /// square block sizes.  Check these constraints
 ///
 // TODO JHM : rename Ain -> array
-void checkInputArray(Array* Ain)
+void ScaLAPACKPhysical::checkInputArray(boost::shared_ptr<Array>& Ain) const
 {
     // chunksize was already checked in ScaLAPACKLogical.cpp, but since this code
     // was already here, we'll just fix it to check the same limit, rather than
@@ -114,22 +118,26 @@ void checkInputArray(Array* Ain)
     // TODO: resolve better
 
 
-    const slpp::int_t MB= brow(Ain);
-    const slpp::int_t NB= bcol(Ain);
+    const slpp::int_t MB= chunkRow(Ain);
+    const slpp::int_t NB= chunkCol(Ain);
 
     // TODO JHM: add test case for illegitimate block size
     // TODO JHM test early, add separate auto repart in execute if not efficient size, then retest
     if (MB > slpp::SCALAPACK_MAX_BLOCK_SIZE ||
         NB > slpp::SCALAPACK_MAX_BLOCK_SIZE) {
-        std::stringstream ss; ss << "SVD operator error: chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large, 64 to 128 is recommended" ;
-        if(DBG) std::cerr << ss << std::endl;
+        std::stringstream ss; ss << "ScaLAPACK operator error:"
+                                 << " chunksize "    << chunkRow(Ain)
+                                 << " or chunksize " << chunkCol(Ain)
+                                 << " is too large."
+                                 << " Must be " << slpp::SCALAPACK_MIN_BLOCK_SIZE
+                                 << " to "      << slpp::SCALAPACK_MAX_BLOCK_SIZE ;
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << ss.str());
     }
 
     if (MB != NB) {
-        std::stringstream ss; ss << "SVD operator error: chunksizes " << brow(Ain) << " x "<< bcol(Ain)
-                                 << " are not the same, which is a current restriction for SVD." ;
-        if(DBG) std::cerr << ss << std::endl;
+        std::stringstream ss; ss << "ScaLAPACK operator error: row chunksize " << chunkRow(Ain)
+                                                    << " != column chunksize "<< chunkCol(Ain)
+                                                    << " which is required." ;
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << ss.str());
     }
 }
@@ -145,7 +153,9 @@ void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp:
 
     Timing reformatTimer;
     LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK start");
+
         extractDataToOp(array, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
+
     LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK end");
     if(doCerrTiming()) std::cerr << "extractArrayToScaLAPACK took " << reformatTimer.stop() << std::endl;
 }
@@ -210,9 +220,7 @@ ArrayDesc ScaLAPACKPhysical::getRepartSchema(ArrayDesc const& inputSchema) const
 /// + converts inputArrays to psScaLAPACK distribution
 std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
 {
-    const bool DBG = false ;
-
-    if(DBG) std::cerr << "ScaLAPACKPhysical::redistributeInputArrays() begin ---------------------------------------" << std::endl;
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): begin");
     //
     // repartition and redistribution from SciDB chunks and arbitrary distribution
     // to
@@ -242,14 +250,31 @@ std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::
                 Timing redistTime;
                 redistInputs[ii]=redistribute(inputArrays[ii], query, psScaLAPACK);
                 if(doCerrTiming()) std::cerr << "ScaLAPACKPhysical: redist["<<ii<<"] took " << redistTime.stop() << std::endl;
+                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays():"
+                                       << " redistributed input " << ii
+                                       << " chunksize (" << redistInputs[ii]->getArrayDesc().getDimensions()[0].getChunkInterval()
+                                       << ", "           << redistInputs[ii]->getArrayDesc().getDimensions()[1].getChunkInterval()
+                                       << ")");
+            } else {
+                LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays():"
+                                       << " keeping input " << ii
+                                       << " chunksize (" << inputArrays[ii]->getArrayDesc().getDimensions()[0].getChunkInterval()
+                                       << ", "           << inputArrays[ii]->getArrayDesc().getDimensions()[1].getChunkInterval()
+                                       << ")");
             }
         }
     } else {
-        if(DBG) std::cerr << "single instance, no redistribution." << std::endl;
+        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): single instance, no redistribution.");
     }
+
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): end");
     return redistInputs;
 }
 
+///
+///.... Initialize the (imitation)BLACS used by the instances to calculate sizes
+///     AS IF they are MPI processes (which they are not)
+///
 /// + intersects the array chunkGrid with the maximum process grid
 /// + sets up the ScaLAPACK grid accordingly and if not participating, return early
 /// + calls invokeMPISvd()
@@ -257,34 +282,37 @@ std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::
 ///
 bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query> query)
 {
-    //!
-    //!.... Initialize the (imitation)BLACS used by the instances to calculate sizes
-    //!     AS IF they are MPI processes (which they are not)
-    //!
-    shared_ptr<Array> input = redistInputs[0];
-    Dimensions const& dims = input->getArrayDesc().getDimensions();
-    size_t nRows = dims[0].getLength();
-    size_t nCols = dims[1].getLength();
-    if (!nRows || !nCols ) {
-        return false; // don't try to handle this case
+
+    // find max (union) size of all array/matrices.
+    size_t maxSize[2];
+    maxSize[0] = 0;
+    maxSize[1] = 0;
+    BOOST_FOREACH( shared_ptr<Array> input, redistInputs ) {
+        matSize_t inputSize = getMatSize(input);
+        maxSize[0] = std::max(maxSize[0], inputSize[0]);
+        maxSize[1] = std::max(maxSize[1], inputSize[1]);
+    }
+    if (!maxSize[0] || !maxSize[1] ) {
+        throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_OPERATOR, DLA_ERROR7);
     }
 
     slpp::int_t instanceID = query->getInstanceID();
     const ProcGrid* procGrid = query->getProcGrid();
 
-    procRowCol_t MN = { nRows, nCols};
-    procRowCol_t MNB = { procNum_t(dims[0].getChunkInterval()),
-                         procNum_t(dims[1].getChunkInterval()) };
+    procRowCol_t MN = { maxSize[0], maxSize[1]};
+    procRowCol_t MNB = { chunkRow(redistInputs[0]), chunkCol(redistInputs[0]) };
 
     procRowCol_t blacsGridSize = procGrid->useableGridSize(MN, MNB);
     procRowCol_t myGridPos = procGrid->gridPos(instanceID, blacsGridSize);
 
-    if(DBG) std::cerr << "ScaLAPACKPhysical::doBlacsInit: gridPos: "  << myGridPos.row <<     " x " << myGridPos.col     << std::endl;
-    if(DBG) std::cerr << "ScaLAPACKPhysical::doBlacsInit: gridSize: " << blacsGridSize.row << " x " << blacsGridSize.col << std::endl;
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
+                              << " gridPos (" << myGridPos.row << ", " << myGridPos.col << ")"
+                              << " gridSize (" << blacsGridSize.row << ", " << blacsGridSize.col << ")");
+
     if (myGridPos.row >= blacsGridSize.row || myGridPos.col >= blacsGridSize.col) {
-        if(DBG) {
-            std::cerr << "ScaLAPACKPhysical::doBlacsInit: instID:" << instanceID << " NOT in grid" << std::endl;
-        }
+        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): instance " << instanceID << " NOT in grid"
+                                  << " gridPos (" << myGridPos.row << ", " << myGridPos.col << ")"
+                                  << " gridSize (" << blacsGridSize.row << ", " << blacsGridSize.col << ")");
         //
         // We are an "extra" instance that must return an empty array
         // we won't start mpi slaves for such instances
@@ -297,36 +325,26 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
         assert(query->getCoordinatorID() != COORDINATOR_INSTANCE);
         return false ;
     } else {
-        if(DBG) {
-            std::cerr << "ScaLAPACKPhysical::doBlacsInit: instID:" << instanceID << " in grid: " << std::endl;
-        }
+        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): instID " << instanceID << "is in grid.");
     }
 
     slpp::int_t ICTXT=-1;
-    slpp::int_t IC = query->getInstancesCount();
-    slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
 
-    if(DBG) {
-        std::cerr << "ScaLAPACKPhysical::doBlacsInit:  NP:"<<NP << " IC:" <<IC << std::endl;
-        std::cerr << "ScaLAPACKPhysical::doBlacsInit:  set_fake_blacs_gridinfo_(ctx:"<< ICTXT
-                                   << ", nprow:"<<blacsGridSize.row
-                                   << ", npcol:"<<blacsGridSize.col << "," << std::endl;
-        std::cerr << "ScaLAPACKPhysical::doBlacsInit:  myRow:" << myGridPos.row
-                                   << ", myCol:" << myGridPos.col << ")" << std::endl;
-    }
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
+                              << " calling set_fake_blacs_gridinfo_(ctx " << ICTXT
+                              << ", nProw " << blacsGridSize.row << ", nPcol "<< blacsGridSize.col
+                              << ", myPRow " << myGridPos.row << ", myPCol " << myGridPos.col << ")");
     set_fake_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
     blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
-    if(DBG) {
-        std::cerr << "ScaLAPACKPhysical::doBlacsInit: blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
-        std::cerr << "ScaLAPACKPhysical::doBlacsInit:    -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
-        std::cerr << "ScaLAPACKPhysical::doBlacsInit:    -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
-    }
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): blacs_gridinfo(" << ICTXT << ") returns "
+                              << " gridsiz (" << NPROW  << ", " << NPCOL << ")"
+                              << " gridPos (" << MYPROW << ", " << MYPCOL << ")");
+
     return true;
 }
-
 
 } // namespace
 

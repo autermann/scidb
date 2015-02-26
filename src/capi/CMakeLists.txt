@@ -46,6 +46,7 @@ set(scidbclient_src
     ../network/MessageUtils.cpp
     ../system/Warnings.cpp
     ../query/TileFunctions.cpp
+    ../array/DeepChunkMerger.cpp
 )
 
 file(GLOB scidbclient_include "include/*.h")

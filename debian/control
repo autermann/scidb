@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: SciDB support list <support@lists.scidb.org>
 Build-Depends: debhelper (>= 8.0.0), cmake, bison, flex, libcppunit-dev, libbz2-dev, libpqxx3-dev,
                libprotobuf-dev, protobuf-compiler, zlib1g-dev, liblog4cxx10-dev,
-               libboost1.46-all-dev, libreadline-dev, fop, xsltproc, doxygen, python, subversion,
+               libboost1.46-all-dev, libreadline6-dev, fop, xsltproc, doxygen, python, subversion,
                swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev, libmpich2-dev,
                mpich2 (>=1.4.1), mpich2 (<<1.4.2), openssh-client
 Standards-Version: 3.9.2

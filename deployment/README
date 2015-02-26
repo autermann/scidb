@@ -30,7 +30,9 @@ Use "localhost" as <hostname> for prepare your current machine
 ./deploy.sh build <packages_path>
 
 # Fast (dirty) build (from already compiled sources)
-./deploy.sh build <packages_path>
+cmake <cmake_args>
+make  <make_args>
+utils/make_packages.sh <deb|rpm> insource <packages_path>
 
 5) Install dependencies on [host_list] for running SciDB as <user>. 
 Required for installation SciDB from files.

@@ -11,7 +11,9 @@
       </indexterm><indexterm>
         <primary>aggregates</primary>
 
-        <secondary>window, variable</secondary>
+        <secondary>window</secondary>
+
+        <tertiary>variable</tertiary>
       </indexterm><indexterm>
         <primary>data windows</primary>
       </indexterm>Select nonempty cells from a variable size 1-dimensional

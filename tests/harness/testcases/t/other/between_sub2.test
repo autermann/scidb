@@ -22,8 +22,10 @@ count(join(subarray(A,0,0,2500,2500),subarray(A,0,1,2500,2500)))
 store(join(subarray(A,0,0,2500,2500),subarray(A,0,1,2500,2500)),AAA)
 slice(A,x,0)
 slice(A,x,5000)
-concat(subarray(A,0,0,5,5),subarray(B,0,0,5,5))
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "concat(between(A,0,0,5,5),between(B,0,0,5,5))"
+store(subarray(B,0,0,5,5),Bsub)
+concat(subarray(A,0,0,5,5),Bsub)
+store(between(B,0,0,5,5),Bbetw)
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "concat(between(A,0,0,5,5),Bbetw)"
 count(join(C,C))
 subarray(C,1,1,1,10000,10000,10000)
 subarray(C,1,1,1,1,1,2)
@@ -35,5 +37,7 @@ remove(A)
 remove(B)
 remove(C)
 remove(AAA)
+remove(Bsub)
+remove(Bbetw)
 
 --stop-query-logging

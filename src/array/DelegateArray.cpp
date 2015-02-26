@@ -35,6 +35,7 @@
 #include "system/Config.h"
 #endif
 #include "system/SciDBConfigOptions.h"
+#include "util/RegionCoordinatesIterator.h"
 
 //#define NO_MATERIALIZE_CACHE 1
 
@@ -423,14 +424,21 @@ namespace scidb
     // Split array
     //
 
-SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& src, Coordinates const& from, Coordinates const& till)
+    SplitArray::SplitArray(ArrayDesc const& desc,
+                           const boost::shared_array<char>& src,
+                           Coordinates const& from,
+                           Coordinates const& till,
+                           shared_ptr<Query>const& query)
     : DelegateArray(desc, shared_ptr<Array>(), true),
+      _startingChunk(from),
       _from(from),
       _till(till),
       _size(from.size()),
       _src(src),
-      _empty(false)
+      _empty(false),
+      _query(query)
     {
+        desc.getChunkPositionFor(_startingChunk);
         Dimensions const& dims = desc.getDimensions();
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
             _size[i] = _till[i] - _from[i] + 1;
@@ -456,45 +464,46 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        if (!chunkInitialized) { 
-            chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
-            chunk.setRLE(false);
-            char* dst = (char*)chunk.getData();
-            char* src = (char*)array._src.get();
-            Coordinates const& first = chunk.getFirstPosition(false);
-            Coordinates pos = first;
-            const size_t nDims = dims.size();
-            const size_t dstStrideSize = dims[nDims-1].getChunkInterval()*attrBitSize >> 3;
-            while (true) { 
-                size_t offs = 0;
-                bool oob = false;
-                for (size_t i = 0; i < nDims; i++) { 
-                    offs *= array._size[i];
-                    offs += pos[i] - array._from[i];
-                    oob |= pos[i] > array._till[i];
-                }
-                if (!oob) { 
-                    memcpy(dst, src + (offs*attrBitSize >> 3), 
-                           min(size_t(array._till[nDims-1] - pos[nDims-1] + 1), size_t(dims[nDims-1].getChunkInterval()))*attrBitSize >> 3);
-                }
-                dst += dstStrideSize;
-                size_t j = nDims-1; 
-                while (true) { 
-                    if (j == 0) { 
-                        goto Done;
-                    }
-                    j -= 1;
-                    if (++pos[j] >= first[j] + dims[j].getChunkInterval()) { 
-                        pos[j] = first[j];
-                    } else { 
-                        break;
-                    }
-                }
-            }
-          Done:
-            chunkInitialized = true;
+
+        if (chunkInitialized)
+        {
+            return chunk;
         }
-        return chunk;
+        else
+        {
+            chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
+            const size_t nDims = dims.size();
+            Coordinates const& firstChunkPosition = chunk.getFirstPosition(false);
+            Coordinates const& firstArrayPosition = array.from();
+            Coordinates const& lastChunkPosition = chunk.getLastPosition(false);
+            Coordinates const& lastArrayPosition = array.till();
+            Coordinates first(nDims);
+            Coordinates last(nDims);
+            for(size_t i = 0; i < nDims; ++i)
+            {
+                first[i] = max(firstChunkPosition[i], firstArrayPosition[i]);
+                last[i] = min(lastChunkPosition[i], lastArrayPosition[i]);
+            }
+            Value value;
+            const boost::shared_ptr<scidb::Query> localQueryPtr(array._query.lock());  // duration of getChunk() short enough
+            Query::validateQueryPtr(localQueryPtr);
+            boost::shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(localQueryPtr, nDims <= 2 ? ChunkIterator::SEQUENTIAL_WRITE : 0);
+            double* src = reinterpret_cast<double*>(array._src.get());
+            CoordinatesMapper bufMapper( array.from(), array.till());
+            RegionCoordinatesIterator coordinatesIter(first, last);
+            while(!coordinatesIter.end())
+            {
+                Coordinates const& coord = coordinatesIter.getPosition();
+                chunkIter->setPosition(coord);
+                position_t pos = bufMapper.coord2pos(coord);
+                value.setDouble(src[pos]);
+                chunkIter->writeItem(value);
+                ++coordinatesIter;
+            }
+            chunkIter->flush();
+            chunkInitialized = true;
+            return chunk;
+        }
     }
 
     bool SplitArray::ArrayIterator::end()
@@ -512,7 +521,7 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
                 hasCurrent = false;
                 return;
             }
-            addr.coords[i] = array._from[i];
+            addr.coords[i] = array.startingChunk()[i];
             i -= 1;
         } 
         chunkInitialized = false;
@@ -526,7 +535,7 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
     bool SplitArray::ArrayIterator::setPosition(Coordinates const& pos)
     {
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
-            if (pos[i] < array._from[i] || pos[i] > array._till[i]) { 
+            if (pos[i] < array.startingChunk()[i] || pos[i] > array._till[i]) {
                 return false;
             }
         }
@@ -538,7 +547,7 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
 
     void SplitArray::ArrayIterator::reset()
     {
-        addr.coords = array._from;
+        addr.coords = array.startingChunk();
         chunkInitialized = false;
         hasCurrent = !array._empty;
     }
@@ -549,14 +558,12 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
       array(arr),
       attrBitSize(TypeLibrary::getType(arr.getArrayDesc().getAttributes()[attrID].getType()).bitSize())
     {
-        uint64_t chunkBitSize = attrBitSize;
-        size_t nDims = dims.size();
-        for (size_t i = 0; i < nDims; i++) { 
-            chunkBitSize *= dims[i].getChunkInterval();
+        //You can add support for non-doubles, but then you have to deal with some uglier math in ArrayIterator::getChunk
+        //no one uses this for non-doubles at the moment.
+        if(arr.getArrayDesc().getAttributes()[attrID].getType() != TID_DOUBLE)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "SplitArray does not support non-double attributes.";
         }
-        if ((dims[nDims-1].getChunkInterval()*attrBitSize & 7) != 0)
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_STRIDE_SHOULD_BE_BYTE_ALIGNED);
-        chunk.allocate(size_t((chunkBitSize + 7) >> 3));
         addr.attId = attrID;
         reset();
     }
@@ -668,7 +675,7 @@ SplitArray::SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& s
 #endif
     }
 
-size_t nMaterializedChunks = 0;
+    size_t nMaterializedChunks = 0;
 
     void MaterializedArray::materialize(MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format)
     {

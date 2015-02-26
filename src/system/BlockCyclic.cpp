@@ -39,6 +39,9 @@
 
 namespace scidb
 {
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.system.blockcyclic"));
+
 // this holds some functions that are needed to support
 // executing some operators via ScaLAPACK, which has particular
 // requirements on data distribution
@@ -312,15 +315,11 @@ InstanceID iidForScaLAPACK(const Coordinates& chunkPos, const Dimensions& dims, 
 
     procNum_t mpiRank = procGrid->procNum(gridPos, useGridSize);
 
-#ifndef NDEBUG
-    if(false) { // JHM: please leave until the end of Cheshire
-        std::cerr << "iidForScalapack(pos:("<< chunkPos[0]<<","<<chunkPos[1]<< ")"
-                  << ", chunkSz:"<< "("<<chunkSize.row<<","<<chunkSize.col<<"))"
-                  << "-> useableSiz:("<<useGridSize.row<<","<<useGridSize.col<<")"
-                  << " gridPos:(" << gridPos.row<<","<< gridPos.col<<")"
-                  << " rank:" << mpiRank << std::endl; 
-    }
-#endif
+    LOG4CXX_DEBUG(logger, "iidForScaLAPACK(chunkPos=(" << chunkPos[0] << ", " <<chunkPos[1] << ")"
+                          << ", chunkSz (" << chunkSize.row << "," << chunkSize.col << ")"
+                          << ", useGridSize (" << useGridSize.row << "," << useGridSize.col << ")"
+                          << "-> gridPos (" << gridPos.row << "," << gridPos.col << ")"
+                          << "-> rank " << mpiRank);
     return mpiRank;
 }
 

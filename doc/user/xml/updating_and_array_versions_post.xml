@@ -72,7 +72,7 @@
       </listitem>
     </itemizedlist></para>
 
-  <sect1>
+  <section>
     <title>The INSERT INTO statement</title>
 
     <para><indexterm>
@@ -262,9 +262,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
 [(),("555555555"),("b6")],
 [("777777777"),(null),("b9")]
 ]</screen></para></para>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>The UPDATE ... SET statement</title>
 
     <para><indexterm>
@@ -298,9 +298,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
 [(0.125),(0.111111),(0.1),(0.0909091)],
 [(0.0833333),(0.0769231),(0.0714286),(0.0666667)]
 ]</screen></para></para></para></para>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Versions</title>
 
     <para><indexterm>
@@ -318,9 +318,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
     SciDB stored every version of m4x4 created by the <code>
     <command>UPDATE</command> </code> command. You can see these versions with
     <code>versions</code>:<para><programlisting>AFL% versions(m4x4);  </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2012-12-18 21:43:48"
-{2} 2,"2012-12-18 21:43:48"
-{3} 3,"2012-12-18 21:43:48"
+{1} 1,"2013-02-05 16:18:53"
+{2} 2,"2013-02-05 16:18:53"
+{3} 3,"2013-02-05 16:18:53"
 </screen>You
     can see the contents of any previous version of the array by using the
     version number:<para><programlisting>AFL% scan(m4x4@1);  </programlisting><screen>[
@@ -339,5 +339,5 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
     <para>You can use the array version name in any query. The unqualified
     name of the array always refers to the most recent version as of the start
     of the query.</para>
-  </sect1>
+  </section>
 </chapter>

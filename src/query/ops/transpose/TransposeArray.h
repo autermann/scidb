@@ -26,6 +26,7 @@
  * @brief Transpose array implementation
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
+ * @author poliocough@gmail.com
  */
 
 #ifndef TRANSPOSE_ARRAY_H
@@ -39,117 +40,156 @@ namespace scidb {
 using namespace boost;
 using namespace std;
 
-class UnorderedTransposeArray;
-class UnorderedTransposeArrayIterator;
-class UnorderedTransposeChunk;
-class UnorderedTransposeChunkIterator;
-
-//
-// Unordered transpose array implementation
-//
-
-class UnorderedTransposeChunkIterator : public DelegateChunkIterator
-{  
-    Coordinates inPos;
-    Coordinates outPos;
-
-  public:
-    virtual Coordinates const& getPosition();
-    virtual bool setPosition(Coordinates const& pos); 
-
-    UnorderedTransposeChunkIterator(DelegateChunk const* chunk, int iterationMode);
-};
-
-class UnorderedTransposeChunk : public DelegateChunk
+/**
+ * Internal structure used by operator transpose. Not documented.
+ */
+class TransposeArray: public Array
 {
-    Coordinates outPos;
+public:
+    TransposeArray(ArrayDesc const& arrayDesc, shared_ptr<Array>& input, shared_ptr<CoordinateSet>& inputChunkPositions, shared_ptr<Query>& query):
+        _arrayDesc(arrayDesc),
+        _inputArray(input),
+        _nDimensions(input->getArrayDesc().getDimensions().size()),
+        _outputChunkPositions(new CoordinateSet()),
+        _query(query)
+    {
+        Coordinates outCoords(_nDimensions);
+        for (CoordinateSet::const_iterator iter = inputChunkPositions->begin(); iter != inputChunkPositions->end(); ++iter)
+        {
+            transposeCoordinates(*iter, outCoords);
+            _outputChunkPositions->insert( outCoords );
+        }
+    }
 
-  public:
-	virtual Coordinates const& getFirstPosition(bool withOverlap) const;
-	virtual Coordinates const& getLastPosition(bool withOverlap) const;
+    virtual ~TransposeArray()
+    {}
 
-    UnorderedTransposeChunk(UnorderedTransposeArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID, bool isClone);
-};
+    virtual ArrayDesc const& getArrayDesc() const
+    {
+        return _arrayDesc;
+    }
 
-class UnorderedTransposeArrayIterator : public DelegateArrayIterator
-{
-  protected:
-    Coordinates inPos;
-    Coordinates outPos;
+    virtual Access getSupportedAccess() const
+    {
+        return Array::RANDOM;
+    }
 
-  public:
-    virtual Coordinates const& getPosition();
-    virtual bool setPosition(Coordinates const& pos);
+    virtual bool hasChunkPositions() const
+    {
+        return true;
+    }
 
-	UnorderedTransposeArrayIterator(UnorderedTransposeArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
-};
+    virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const
+    {
+        return boost::shared_ptr<CoordinateSet> (new CoordinateSet( *_outputChunkPositions ));
+    }
 
-class UnorderedTransposeArray : public DelegateArray
-{
-    friend class UnorderedTransposeChunk;
-    friend class UnorderedTransposeChunkIterator;
-    friend class UnorderedTransposeArrayIterator;
+    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attrID) const
+    {
+        //The TransposeArrayIterator will only fill in the extra empty bitmask if emptyTagID is not the same as attrID.
+        //If the array is not emptyable, or if attrID is already the empty bitmask - don't bother.
+        AttributeID emptyTagID = attrID;
+        if (_arrayDesc.getEmptyBitmapAttribute())
+        {
+            emptyTagID = _arrayDesc.getEmptyBitmapAttribute()->getId();
+        }
 
-  public:
-    virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
-    virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
-    virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
+        return boost::shared_ptr<ConstArrayIterator>( new TransposeArrayIterator(_outputChunkPositions,
+                                                                                 _inputArray->getConstIterator(attrID),
+                                                                                 _query,
+                                                                                 this,
+                                                                                 attrID,
+                                                                                 emptyTagID));
+    }
 
-    UnorderedTransposeArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array);
-};
+    void transposeCoordinates(Coordinates const& in, Coordinates& out) const
+    {
+        assert(in.size() == _nDimensions && out.size() == _nDimensions);
+        for (size_t i = 0; i < _nDimensions; ++i)
+        {
+            out[_nDimensions-i-1] = in[i];
+        }
+    }
 
-//
-// Ordered transpose array implementation
-//
+private:
+    ArrayDesc _arrayDesc;
+    boost::shared_ptr<Array> _inputArray;
+    size_t const _nDimensions;
+    boost::shared_ptr<CoordinateSet> _outputChunkPositions;
+    boost::weak_ptr<Query> _query;
 
-class OrderedTransposeArray;
+    class TransposeArrayIterator: public ConstArrayIterator
+    {
+    public:
+        TransposeArrayIterator(boost::shared_ptr<CoordinateSet> const& outputChunkPositions,
+                               boost::shared_ptr<ConstArrayIterator> inputArrayIterator,
+                               boost::weak_ptr<Query> const& query,
+                               TransposeArray const* transposeArray,
+                               AttributeID const attributeID,
+                               AttributeID const emptyTagID):
+            _outputChunkPositions(outputChunkPositions),
+            _outputChunkPositionsIterator(_outputChunkPositions->begin()),
+            _inputArrayIterator(inputArrayIterator),
+            _query(query),
+            _transposeArray(transposeArray),
+            _attributeID(attributeID),
+            _emptyTagID(emptyTagID),
+            _chunkInitialized(false)
+        {}
 
-class OrderedTransposeChunkIterator : public UnorderedTransposeChunkIterator
-{  
-    Coordinates pos;
-    bool hasCurrent;
-    void moveNext();
+        virtual bool end()
+        {
+            return _outputChunkPositionsIterator == _outputChunkPositions->end();
+        }
 
-  public:
-    virtual void operator ++();
-    virtual bool end();
-    virtual void reset();
+        virtual void operator ++()
+        {
+            if( end() )
+            {
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+            }
+            _chunkInitialized = false;
+            ++_outputChunkPositionsIterator;
+        }
 
-    OrderedTransposeChunkIterator(DelegateChunk const* chunk, int iterationMode);
-};
+        virtual void reset()
+        {
+            _chunkInitialized = false;
+            _outputChunkPositionsIterator == _outputChunkPositions->begin();
+        }
 
-class OrderedTransposeArrayIterator : public UnorderedTransposeArrayIterator
-{
-    Coordinates pos;
-    bool hasCurrent;
-    bool setConstructed;
-    set<Coordinates, CoordinatesLess> chunks;
-    set<Coordinates, CoordinatesLess>::const_iterator currPos;
+        virtual Coordinates const& getPosition()
+        {
+            if( end() )
+            {
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
+            }
+            return (*_outputChunkPositionsIterator);
+        }
 
-    bool buildSetOfChunks();
-    void setFirst();
+        virtual bool setPosition(Coordinates const& pos)
+        {
+            _chunkInitialized = false;
+            Coordinates chunkPosition = pos;
+            _transposeArray->getArrayDesc().getChunkPositionFor(chunkPosition);
+            _outputChunkPositionsIterator = _outputChunkPositions->find(chunkPosition);
+            return !end();
+        }
 
-  public:
-    virtual void operator ++();
-    virtual bool end();
-    virtual void reset();
-    virtual Coordinates const& getPosition();
-    virtual bool setPosition(Coordinates const& pos);
+        virtual ConstChunk const& getChunk();
 
-	OrderedTransposeArrayIterator(OrderedTransposeArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
-};
-
-class OrderedTransposeArray : public UnorderedTransposeArray
-{
-    friend class OrderedTransposeChunk;
-    friend class OrderedTransposeChunkIterator;
-    friend class OrderedTransposeArrayIterator;
-
-  public:
-    virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
-    virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
-
-    OrderedTransposeArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array);
+    private:
+        boost::shared_ptr<CoordinateSet> _outputChunkPositions;
+        CoordinateSet::const_iterator _outputChunkPositionsIterator;
+        boost::shared_ptr<ConstArrayIterator> _inputArrayIterator;
+        boost::weak_ptr<Query> _query;
+        TransposeArray const* _transposeArray;
+        AttributeID const _attributeID;
+        AttributeID const _emptyTagID;
+        bool _chunkInitialized;
+        MemChunk _outputChunk;
+        MemChunk _emptyTagChunk;
+    };
 };
 
 

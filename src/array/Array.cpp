@@ -47,6 +47,7 @@
 #include <log4cxx/logger.h>
 #include <query/ops/redimension/SyntheticDimHelper.h>
 #include <query/Operator.h>
+#include <array/DeepChunkMerger.h>
 
 using namespace boost::assign;
 
@@ -318,9 +319,7 @@ namespace scidb
         if (getDiskChunk() != NULL)
             throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CHUNK_ALREADY_EXISTS);
         setCount(0); // unknown
-        AttributeDesc const& attr = getAttributeDesc();
         char* dst = (char*)getData();
-        Value const& defaultValue = attr.getDefaultValue();
 
         // If it is in the middle of a redimension, and if there is a synthetic dimension, use the following algorithm:
         // (a) Build an auxiliary structure describing #elements in each cell, not including the synthetic dim.
@@ -370,7 +369,7 @@ namespace scidb
         //   (b) can't merge by bitwise-or.
         // Then we have to iterate through the items.
         //
-        // If there is a redimInfo (although no synthetic dim), we have to iterate through the items for the following reason:
+        // If there is a redimInfo (although no synthetic dim), we have to perform deep merge (i.e. we can't bitwise-or) for the following reason:
         // A conflict (i.e. two items falling into the same cell) should be resolved by choosing one of them, not bitwise-or them.
         if ( (dst != NULL) &&
                 (
@@ -382,29 +381,11 @@ namespace scidb
                 )
         )
         {
-            int sparseMode = isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
-            boost::shared_ptr<ChunkIterator> dstIterator = getIterator(query, sparseMode|ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
-            boost::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_DEFAULT_VALUES);
-            if (getArrayDesc().getEmptyBitmapAttribute() != NULL) { 
-                while (!srcIterator->end()) {
-                    if (!dstIterator->setPosition(srcIterator->getPosition()))
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-                    Value const& value = srcIterator->getItem();
-                    dstIterator->writeItem(value);
-                    ++(*srcIterator);
-                }
-            } else { // ignore default values
-                while (!srcIterator->end()) {
-                    Value const& value = srcIterator->getItem();
-                    if (value != defaultValue) {
-                        if (!dstIterator->setPosition(srcIterator->getPosition()))
-                            throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-                        dstIterator->writeItem(value);
-                    }
-                    ++(*srcIterator);
-                }            
+            if (isMemChunk() && with.isMemChunk() && isRLE() && with.isRLE()) {
+                deepMerge(with, query);
+            } else {
+                shallowMerge(with, query);
             }
-            dstIterator->flush();
         }
 
         // Otherwise, we can merge faster.
@@ -417,6 +398,42 @@ namespace scidb
                 mergeByBitwiseOr(src, with.getSize(), query);
             }
         }
+    }
+
+    void Chunk::deepMerge(ConstChunk const& with, boost::shared_ptr<Query>& query)
+    {
+        assert(isRLE() && with.isRLE());
+        assert(isMemChunk() && with.isMemChunk());
+        DeepChunkMerger deepChunkMerger((MemChunk&)*this, (MemChunk const&)with, query);
+        deepChunkMerger.merge();
+    }
+
+    void Chunk::shallowMerge(ConstChunk const& with, boost::shared_ptr<Query>& query)
+    {
+        int sparseMode = isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
+        boost::shared_ptr<ChunkIterator> dstIterator = getIterator(query, sparseMode|ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
+        boost::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_DEFAULT_VALUES);
+        if (getArrayDesc().getEmptyBitmapAttribute() != NULL) {
+            while (!srcIterator->end()) {
+                if (!dstIterator->setPosition(srcIterator->getPosition()))
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                Value const& value = srcIterator->getItem();
+                dstIterator->writeItem(value);
+                ++(*srcIterator);
+            }
+        } else { // ignore default values
+            Value const& defaultValue = getAttributeDesc().getDefaultValue();
+            while (!srcIterator->end()) {
+                Value const& value = srcIterator->getItem();
+                if (value != defaultValue) {
+                    if (!dstIterator->setPosition(srcIterator->getPosition()))
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                    dstIterator->writeItem(value);
+                }
+                ++(*srcIterator);
+            }
+        }
+        dstIterator->flush();
     }
 
     void Chunk::aggregateMerge(ConstChunk const& with, AggregatePtr const& aggregate, boost::shared_ptr<Query>& query)
@@ -812,6 +829,49 @@ namespace scidb
     boost::shared_ptr<CoordinateSet> Array::getChunkPositions() const
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << "calling getChunkPositions on an invalid array";
+    }
+
+    shared_ptr<CoordinateSet> Array::findChunkPositions() const
+    {
+        if (hasChunkPositions())
+        {
+            return getChunkPositions();
+        }
+        if (getSupportedAccess() == SINGLE_PASS)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << "findChunkPositions";
+        }
+        //Heuristic: make an effort to scan the empty tag. If there is no empty tag - scan the smallest fixed-sized attribute.
+        //If an attribute is small in size (bool or uint8), chances are it takes less disk scan time and/or less compute time to pass over it.
+        ArrayDesc const& schema = getArrayDesc();
+        AttributeDesc const* attributeToScan = schema.getEmptyBitmapAttribute();
+        if (attributeToScan == NULL)
+        {
+            //The array doesn't have an empty tag. Let's pick the smallest fixed-size attribute.
+            attributeToScan = &schema.getAttributes()[0];
+            size_t scannedAttributeSize = attributeToScan->getSize();
+            for(size_t i = 1, n = schema.getAttributes().size(); i < n; i++)
+            {
+                AttributeDesc const& candidate = schema.getAttributes()[i];
+                size_t candidateSize = candidate.getSize();
+                if ( candidateSize != 0 && (candidateSize < scannedAttributeSize || scannedAttributeSize == 0))
+                {
+                    attributeToScan = &candidate;
+                    scannedAttributeSize = candidateSize;
+                }
+            }
+        }
+        assert(attributeToScan != NULL);
+        AttributeID victimId = attributeToScan->getId();
+        boost::shared_ptr<CoordinateSet> result(new CoordinateSet());
+        //Iterate over the target attribute, find the position of each chunk, add all chunk positions to result
+        boost::shared_ptr<ConstArrayIterator> iter = getConstIterator(victimId);
+        while( ! iter->end() )
+        {
+            result->insert(iter->getPosition());
+            ++(*iter);
+        }
+        return result;
     }
 
     static char* copyStride(char* dst, char* src, Coordinates const& first, Coordinates const& last, Dimensions const& dims, size_t step, size_t attrSize, size_t c)

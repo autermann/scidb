@@ -4,7 +4,9 @@ load(xyz,'../tests/harness/testcases/data/xyz_small.txt')
 
 --test
 transpose(xyz)
+join(build(<v:double>[r=0:64,32,0, c=0:64,32,0], 100*r+c), transpose(build( <v:double>[r=0:64,32,0, c=0:64,32,0], r+100*c)))
+filter(join(build(<v:double>[r=0:64,32,0,c=0:64,32,0],100*r+c) as L, transpose(build(<v:double>[r=0:64,32,0,c=0:64,32,0],r+100*c)) as R), L.v != R.v)
+
 
 --cleanup
 remove (xyz)
-

@@ -170,11 +170,11 @@ public:
         return ArrayDistribution(psLocalInstance);
     }
 
-	/***
-	 */
-	boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
+    /***
+     */
+    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
             boost::shared_ptr<Query> query)
-	{
+    {
         boost::shared_ptr<Array> input = inputArrays[0];
         if ( query->getInstancesCount() > 1) {
            uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ? query->getInstanceID() : query->getCoordinatorID();
@@ -192,17 +192,17 @@ public:
         last[0] = dims[0].getEndMax();
         last[1] = dims[1].getEndMax();
         double* matrix = new double[length*length];
+        shared_array<char> buf(reinterpret_cast<char*>(matrix));
         input->extractData(0, matrix, first, last);
         inverse(matrix, length);
-        shared_array<char> buf(reinterpret_cast<char*>(matrix));
-		return boost::shared_ptr<Array>(new SplitArray(_schema, buf, first, last));
-	}
+        return boost::shared_ptr<Array>(new SplitArray(_schema, buf, first, last, query));
+    }
 
 private:
-	ArrayDesc _schema;
+    ArrayDesc _schema;
 };
 
-// #2194: inverse disabled until (#2182) SplitArray is fixed
+// Inverse is disabled. We plan to remove it in 13.3
 // DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalInverse, "inverse", "PhysicalInverse")
 
 } //namespace scidb

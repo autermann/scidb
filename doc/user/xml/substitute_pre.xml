@@ -9,27 +9,33 @@
     <refpurpose><indexterm>
         <primary>substitute</primary>
       </indexterm><indexterm>
-        <primary>nulls, replacing</primary>
+        <primary>nulls</primary>
+
+        <secondary>replacing</secondary>
       </indexterm><indexterm>
         <primary>replacing nulls</primary>
-      </indexterm>Substitute new value for null values in an
-    array</refpurpose>
+      </indexterm>Returns a result array with a specified value substituted
+    for null values in an array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>substitute(<replaceable>null_array</replaceable>,<replaceable>substitute_array</replaceable><optional>,<replaceable>attribute_1</replaceable>,<replaceable>attribute_2</replaceable>,...</optional>);</synopsis>
+    <synopsis>substitute(<replaceable>nullable_array</replaceable>,<replaceable>substitute_array
+    </replaceable><optional>,<replaceable>attribute_1</replaceable>,<replaceable>attribute_2</replaceable>,...</optional>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
     <para>Substitute null values in one array with non-null values from
-    another array.</para>
+    another array. By default, all nullable attributes have their null values
+    substituted. Optionally, you can list specific attributes to participate
+    in the substitution.</para>
 
     <para>The substitute operator renders attributes in
-    <replaceable>null_array</replaceable> non-nullable. If an attribute has
-    null values, you can use this operator to substitute null values in the
-    array and change the nullability of the attribute in the schema.</para>
+    <replaceable>nullable_array</replaceable> non-nullable. If an attribute
+    has null values, you can use this operator to substitute null values in
+    the array and change the nullability of the attribute in the
+    schema.</para>
 
     <para>Note the following limitations:</para>
 
@@ -48,38 +54,43 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example replaces all null values in an array with
-      zero.</para>
+      <para>This example replaces all null values in an array with zero, first
+      for one attribute, and then for all attributes.</para>
 
       <procedure>
         <step>
-          <para>Create an array m4x4_null with a nullable attribute:
-          <programlisting language="test">--afl CREATE ARRAY m4x4_null &lt;val:double null&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no --show-query=yes
+          <para>Create an array
+          <literal><literal>m4x4_null</literal></literal> with two nullable
+          attributes.<programlisting language="test">--afl create array m4x4_null &lt;val1:double null, val2:double null&gt;[i=0:3,4,0, j=0:3,4,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>We have a 2-attribute, 4x4 array,
+          <literal>substitute_example</literal> that we load into
+          <literal>m4x4_null</literal>. Note that some values for each
+          attribute are null.<programlisting language="test">--aql LOAD m4x4_null FROM '../examples/substitute_example.scidb'
+      --show-query=yes --output-format=dense --chunkify=yes
 </programlisting></para>
         </step>
 
         <step>
-          <para>Store null in the second row of m4x4_null and 100 in all the
-          other cells: <programlisting language="test">--afl store(build(m4x4_null,iif(i=1,null,100)),m4x4_null); --show-query=yes --show-output=yes
-</programlisting></para>
-        </step>
-
-        <step>
-          <para>Create a single-cell array called substitute_array
-          <programlisting language="test">--afl CREATE ARRAY substitute_array &lt;missing:double&gt;[i=0:0,1,0]; --show-output=no
-</programlisting></para>
-        </step>
-
-        <step>
-          <para>Put value 0 into substitute_array: <programlisting
-          language="test">--afl store(build(substitute_array,0),substitute_array); --show-query=yes --show-output=yes
-</programlisting></para>
+          <para>Create a single-cell array called <literal>zeros</literal>,
+          and load it with the value 0.<programlisting language="test">--afl store(build(&lt;subVal:double&gt;[i=0:0,1,0],0),zeros) --output-format=dense</programlisting></para>
         </step>
 
         <step>
           <para>Use the substitute operator to replace the null-valued cells
-          in m4x4_null with 0-valued cells: <programlisting language="test">--afl substitute(m4x4_null,substitute_array); --show-query=yes --show-output=yes
+          first in <literal>val1</literal> and then in <literal>val2</literal>
+          with zeros.<programlisting language="test">--afl substitute(m4x4_null,zeros, val1); --show-query=yes --output-format=dense --chunkify=yes
+--afl substitute(m4x4_null,zeros, val2); --show-query=yes --output-format=dense --chunkify=yes
 </programlisting></para>
+        </step>
+
+        <step>
+          <para>Now substitute all nulls in both attributes with
+          zeros:<programlisting language="test">--afl substitute(m4x4_null,zeros); --show-query=yes --output-format=dense --chunkify=yes
+</programlisting>Note that only null values get substituted. Empty cells
+          remain empty, and all other values remain the same.</para>
         </step>
       </procedure>
     </informalexample>

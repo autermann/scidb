@@ -5,7 +5,7 @@
 <chapter remap="h1" xml:id="iqueryClient">
   <title>Getting Started with SciDB Development</title>
 
-  <sect1 remap="h2" xml:id="UsingtheiqueryClient">
+  <section xml:id="UsingtheiqueryClient">
     <title>Using the iquery Client</title>
 
     <para><indexterm>
@@ -297,9 +297,9 @@ quit or exit   - End iquery session</programlisting></para>
       </informaltable></para>
 
     <para>The <literal>iquery</literal> interface is case sensitive.</para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h2" xml:id="iqueryConfiguration">
+  <section xml:id="iqueryConfiguration">
     <title>iquery Configuration</title>
 
     <para><indexterm>
@@ -411,9 +411,9 @@ quit or exit   - End iquery session</programlisting></para>
     <para>The opening and closing braces at the beginning and end of the file
     must be present and each entry (except the last one) should be followed by
     a comma.</para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h2" xml:id="Exampleiquerysession">
+  <section xml:id="Exampleiquerysession">
     <title>Example iquery session</title>
 
     <para><indexterm>
@@ -449,9 +449,11 @@ quit or exit   - End iquery session</programlisting></para>
     <para>The are more detailed examples on creating a SciDB array in the
     chapter "Creating and Removing SciDB Arrays."</para>
 
-    <para>The following example creates an array, generates random numbers and
-    stores them in the array, and saves the array data into a csv-formatted
-    file.</para>
+    <para><indexterm>
+        <primary>random</primary>
+      </indexterm>The following example creates an array, generates random
+    numbers and stores them in the array, and saves the array data into a
+    csv-formatted file.</para>
 
     <orderedlist>
       <listitem>
@@ -590,5 +592,5 @@ make,type,price,mpg,kpl
 </programlisting></para>
       </step>
     </procedure>
-  </sect1>
+  </section>
 </chapter>

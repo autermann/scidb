@@ -6,6 +6,12 @@
 
     <refpurpose><indexterm>
         <primary>xgrid</primary>
+      </indexterm><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>increasing size</secondary>
+      </indexterm><indexterm>
+        <primary>scaling dimension size</primary>
       </indexterm>Produces a result array with the same dimensions and
     attributes as a source array, but with the size of each dimension
     multiplied by an integer scale you supply.</refpurpose>

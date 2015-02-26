@@ -549,7 +549,7 @@ namespace scidb
 
         RWLock _latches[N_LATCHES];
         set<uint64_t> _freeHeaders;
-        map<ArrayID, Cluster> _clusters;
+        map<ArrayUAID, Cluster> _clusters;
         map<ClusterID, size_t> _liveChunksInCluster;
         vector< set<uint64_t> > _freeClusters;
 
@@ -708,9 +708,10 @@ namespace scidb
 
         /**
          * Delete all descriptors that are associated with a given array ID from the header file.
-         * @param arrId the array ID to be removed.
+         * @param uaId the unversioned array ID to be removed
+         * @param arrId the versioned array ID to be removed.
          */
-        void deleteDescriptorsFor(ArrayID arrId);
+        void deleteDescriptorsFor(ArrayUAID uaId, ArrayID arrId);
 
         /**
          * Helper: remove an immutable array from the storage

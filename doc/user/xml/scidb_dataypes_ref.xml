@@ -2,7 +2,7 @@
 <!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<chapter>
+<chapter id="dataTypes">
   <title>SciDB Data Types and Casting</title>
 
   <para><indexterm>

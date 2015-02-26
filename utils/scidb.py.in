@@ -950,6 +950,12 @@ def start(srv, liid):
 	  mpiClause = ''
    # end if
 
+   if d.get('mpi-type'):
+	  mpiTypeClause = "--mpi-type=%s" % d.get('mpi-type')
+   else:
+	  mpiTypeClause = ''
+   # end if
+
    relink_binary(srv, liid)
    print "Starting SciDB server."
    cmdList = [ "LD_LIBRARY_PATH="+"@CMAKE_INSTALL_PREFIX@/lib:@CMAKE_INSTALL_PREFIX@/lib/scidb/plugins"+":${LD_LIBRARY_PATH} ",
@@ -960,7 +966,7 @@ def start(srv, liid):
 			  saveRamClause,  "--merge-sort-buffer", mergeSortClause,
 						  "--cache", smgrCacheSize, noWatchDogClause,
 			  "-k", "-l", logconf, sitClause, wrtClause,
-			  "--plugins", pluginsdir, repl, tmpPathClause, mpiClause,
+			  "--plugins", pluginsdir, repl, tmpPathClause, mpiClause, mpiTypeClause,
 			  memArrayClause] + threadsClause.split() + [netbuffClause, plsortClause,
               rlechunkClause, clusterClause, reserveClause, liveness, repartAlgo, repartDenseOpenOnce, repartDisableTileMode, memLimit,
 			  repSendQSize, repRecvQSize, malloc_mmap_threshold, mmap_count_limit, deltaClause,

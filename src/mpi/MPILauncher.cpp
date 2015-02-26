@@ -178,7 +178,8 @@ void MpiLauncher::launch(const vector<string>& slaveArgs,
         perror("LAUNCHER execve");
         _exit(1);
     }
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE);
+    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+	   << "MpiLauncher::launch");
 }
 
 bool MpiLauncher::isRunning()
@@ -294,7 +295,8 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
             return;
         }
     }
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE);
+    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+            	 << "MpiLauncher::completeLaunch");
 }
 
  void MpiLauncher::handleKillTimeout(boost::shared_ptr<boost::asio::deadline_timer>& killTimer,
@@ -363,7 +365,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
     const string launchId = buf.str();
 
     // preallocate memory
-    const size_t ARGS_PER_INSTANCE = 16;
+    const size_t ARGS_PER_INSTANCE = 13;
     const size_t ARGS_PER_LAUNCH = 4;
     const size_t MPI_PREFIX_CORRECTION = 2;
     size_t totalArgsNum = ARGS_PER_LAUNCH +
@@ -394,7 +396,8 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
         assert(args[0].empty());
         const string& installPath = desc->getPath();
         setInstallPath(installPath);
-        args[0] = MpiManager::getLauncherBinFile(installPath);
+        args[0] = MpiManager::getInstance()->getLauncherBinFile(installPath);
+	validateLauncherArg(args[0]);
 
         //XXX HACK: this will place the coordinator first on the list and thus give it rank=0
         //XXX this works only if the coordinator is the zeroth instance.
@@ -431,6 +434,8 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
     }
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments size = " << shmSize);
+
+    envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
 
     // Create shared memory to pass the arguments to the launcher
     string ipcName = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_args";
@@ -482,6 +487,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
     args.resize(ARGS_PER_LAUNCH+2);
     args[ARGS_PER_LAUNCH+0] = "--app";
     args[ARGS_PER_LAUNCH+1] = mpi::getIpcFile(getInstallPath(),ipcName);
+    validateLauncherArg(args[ARGS_PER_LAUNCH+1]);
 }
 
 void MpiLauncherOMPI::addPerInstanceArgsOMPI(const InstanceID myId, const InstanceDesc* desc,
@@ -513,7 +519,7 @@ void MpiLauncherOMPI::addPerInstanceArgsOMPI(const InstanceID myId, const Instan
 
     validateLauncherArg(installPath);
     args.push_back("-wd");
-    args.push_back(installPath);
+    args.push_back(installPath); 
 
     if (currId != myId) {
         // XXX NOTE: --prefix is not appended for this instance (the coordinator)
@@ -532,10 +538,7 @@ void MpiLauncherOMPI::addPerInstanceArgsOMPI(const InstanceID myId, const Instan
     args.push_back(slaveBinFile);
 
     // slave args
-    args.push_back(clusterUuid);
-    args.push_back(queryId);
     args.push_back(instanceIdStr.str());
-    args.push_back(launchId);
     args.push_back(portStr.str());
 
     args.insert(args.end(), slaveArgs.begin(), slaveArgs.end());
@@ -653,7 +656,8 @@ bool MpiLauncher::waitForExit(pid_t pid, int *status, bool noWait)
         }
         return true;
     }
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE);
+    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+           << "MpiLauncher::waitForExit");
     return false;
 }
 
@@ -683,7 +687,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     const string launchId = buf.str();
 
     // preallocate memory
-    const size_t ARGS_PER_INSTANCE = 11;
+    const size_t ARGS_PER_INSTANCE = 8;
     size_t ARGS_PER_LAUNCH = 3;
     size_t totalArgsNum = ARGS_PER_LAUNCH +
                          (ARGS_PER_INSTANCE+slaveArgs.size()) *
@@ -696,12 +700,14 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
 
     args.push_back(string("")); //place holder for the binary
+    const size_t SLAVE_BIN_INDX = args.size()-1;
     args.push_back(string("-verbose"));
     args.push_back(string("-prepend-rank"));
 
     string nic = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_IF);
     if (!nic.empty()) {
         args.push_back(string("-iface"));
+	validateLauncherArg(nic);
         args.push_back(nic);
         ARGS_PER_LAUNCH +=2;
         totalArgsNum +=2;
@@ -724,9 +730,10 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
         InstanceID currId = desc->getInstanceId();
 
         if (currId == myId) {
-            assert(args[0].empty());
+            assert(args[SLAVE_BIN_INDX].empty());
             setInstallPath(desc->getPath());
-            args[0] = MpiManager::getLauncherBinFile(getInstallPath());
+            args[SLAVE_BIN_INDX] = MpiManager::getInstance()->getLauncherBinFile(getInstallPath());
+            validateLauncherArg(args[SLAVE_BIN_INDX]);
         }
         addPerInstanceArgsMPICH(myId, desc, clusterUuid, queryId,
                                 launchId, slaveArgs, args, *hosts);
@@ -754,14 +761,14 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     LOG4CXX_TRACE(logger, "MPI launcher arguments size = " << shmSizeArgs << ", hosts size = " << shmSizeHosts);
 
     // Create shared memory to pass the arguments to the launcher
-    assert(!args[0].empty());
+    assert(!args[SLAVE_BIN_INDX].empty());
     assert(!getInstallPath().empty());
     string ipcNameArgs  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_args";
     string ipcNameHosts = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_hosts";
     string ipcNameExec  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_exec";
 
     string execContents = getLauncherSSHExecContent(clusterUuid, queryId, launchId,
-                                                    MpiManager::getDaemonBinFile(getInstallPath()));
+                                                    MpiManager::getInstance()->getDaemonBinFile(getInstallPath()));
     
     bool rc = addIpcName(ipcNameArgs);
     assert(rc);
@@ -771,7 +778,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     assert(rc); rc=rc;
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipcArgs = " << ipcNameArgs <<
-                  ", ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
+	  ", ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
 
     boost::scoped_ptr<SharedMemoryIpc> shmIpcArgs (mpi::newSharedMemoryIpc(ipcNameArgs));
     boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts));
@@ -837,6 +844,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     args.resize(ARGS_PER_LAUNCH+6);
     args[ARGS_PER_LAUNCH+0] = "-launcher-exec";
     args[ARGS_PER_LAUNCH+1] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
+    validateLauncherArg(args[ARGS_PER_LAUNCH+1]);
 
     if (int rc = ::chmod(args[ARGS_PER_LAUNCH+1].c_str(), S_IRUSR|S_IXUSR) != 0) {
         //make it executable
@@ -846,9 +854,10 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     }
     args[ARGS_PER_LAUNCH+2] = "-f";
     args[ARGS_PER_LAUNCH+3] = mpi::getIpcFile(getInstallPath(),ipcNameHosts);
+    validateLauncherArg(args[ARGS_PER_LAUNCH+3]);
     args[ARGS_PER_LAUNCH+4] = "-configfile";
     args[ARGS_PER_LAUNCH+5] = mpi::getIpcFile(getInstallPath(),ipcNameArgs);
-
+    validateLauncherArg(args[ARGS_PER_LAUNCH+5]);
     envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
 }
 
@@ -927,13 +936,15 @@ void MpiLauncher::processHostNameResolve(shared_ptr<vector<string> >& hosts,
     (*hosts)[indx] = (*results.begin()).address().to_string();
 }
 
-void MpiLauncherMPICH::addPerInstanceArgsMPICH(const InstanceID myId, const InstanceDesc* desc,
+void MpiLauncherMPICH::addPerInstanceArgsMPICH(const InstanceID myId,
+                                               const InstanceDesc* desc,
                                                const string& clusterUuid,
                                                const string& queryId,
                                                const string& launchId,
                                                const vector<string>& slaveArgs,
                                                vector<string>& args,
-                                               vector<string>& hosts)
+                                               vector<string>& hosts,
+                                               const bool addWdir)
 {
     InstanceID currId = desc->getInstanceId();
 
@@ -955,21 +966,21 @@ void MpiLauncherMPICH::addPerInstanceArgsMPICH(const InstanceID myId, const Inst
     args.push_back("-n");
     args.push_back("1");
 
-    validateLauncherArg(installPath);
-    args.push_back("-wdir");
-    args.push_back(installPath);
-
+    if (addWdir) {
+        validateLauncherArg(installPath);
+        args.push_back("-wdir");
+        args.push_back(installPath);
+    }
     const string slaveBinFile = mpi::getSlaveBinFile(installPath);
     validateLauncherArg(slaveBinFile);
     args.push_back(slaveBinFile);
 
-    // slave args
-    args.push_back(clusterUuid);
-    args.push_back(queryId);
+    // required slave args
     args.push_back(instanceIdStr.str());
-    args.push_back(launchId);
     args.push_back(portStr.str());
 
+    // optional slave args
+    // XXX TODO: move them into an environment variable
     args.insert(args.end(), slaveArgs.begin(), slaveArgs.end());
     args.push_back(":");
 }
@@ -1014,27 +1025,153 @@ char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize)
     return ptr;
 }
 
-
-MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q)
+void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
+                                 vector<string>& args,
+                                 const vector<string>& slaveArgs,
+                                 const boost::shared_ptr<const InstanceMembership>& membership,
+                                 const boost::shared_ptr<Query>& query,
+                                 const size_t maxSlaves)
 {
-    if ( scidb::MpiLauncher::getMPIType() == scidb::MpiLauncher::MPICH ) {
-        return new MpiLauncherMPICH(launchId, q);
-    } else if ( scidb::MpiLauncher::getMPIType() == scidb::MpiLauncher::OMPI ) {
-        return new MpiLauncherOMPI(launchId, q);
+    for (vector<string>::const_iterator iter=slaveArgs.begin();
+         iter!=slaveArgs.end(); ++iter) {
+        validateLauncherArg(*iter);
     }
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE);
-    return NULL;
-}
 
-MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout)
-{
-    if ( scidb::MpiLauncher::getMPIType() == scidb::MpiLauncher::MPICH ) {
-       return new MpiLauncherMPICH(launchId, q, timeout);
-    } else if ( scidb::MpiLauncher::getMPIType() == scidb::MpiLauncher::OMPI ) {
-       return new MpiLauncherOMPI(launchId, q, timeout);
+    const Instances& instances = membership->getInstanceConfigs();
+
+    map<InstanceID,const InstanceDesc*> sortedInstances;
+    getSortedInstances(sortedInstances, instances, query);
+
+    ostringstream buf;
+    const string clusterUuid = Cluster::getInstance()->getUuid();
+    buf << query->getQueryID();
+    const string queryId  = buf.str();
+    buf.str("");
+    buf << getLaunchId();
+    const string launchId = buf.str();
+
+    // preallocate memory
+    const size_t ARGS_PER_INSTANCE = 6;
+    size_t ARGS_PER_LAUNCH = 7;
+    size_t totalArgsNum = ARGS_PER_LAUNCH +
+                         (ARGS_PER_INSTANCE+slaveArgs.size()) *
+                          std::min(maxSlaves, sortedInstances.size()) ;
+    args.clear();
+    args.reserve(totalArgsNum);
+    shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
+    hosts->reserve(std::min(maxSlaves, sortedInstances.size()));
+
+    InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
+
+    args.push_back(string("")); //place holder for the binary
+
+    string ipcNameHosts = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_hosts";
+    string ipcNameExec  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_exec";
+
+    args.push_back("-bootstrap-exec");
+    args.push_back("");
+    const size_t EXEC_INDX=2;
+    args.push_back("-f");
+    args.push_back("");
+    const size_t HOST_INDX=4;
+    args.push_back("-wdir");
+    args.push_back("/tmp");
+
+    envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
+
+    // loop over all the instances
+    size_t count = 0;
+    for (map<InstanceID,const InstanceDesc*>::const_iterator i = sortedInstances.begin();
+         i !=  sortedInstances.end() && count<maxSlaves; ++i,++count) {
+
+        const InstanceDesc* desc = i->second;
+        InstanceID currId = desc->getInstanceId();
+
+        if (currId == myId) {
+            assert(args[0].empty());
+            setInstallPath(desc->getPath());
+            args[0] = MpiManager::getInstance()->getLauncherBinFile(getInstallPath());
+	    validateLauncherArg(args[0]);
+	    args[EXEC_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
+	    validateLauncherArg(args[EXEC_INDX]);
+	    args[HOST_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameHosts);
+	    validateLauncherArg(args[HOST_INDX]);
+        }
+        addPerInstanceArgsMPICH(myId, desc, clusterUuid, queryId,
+                                launchId, slaveArgs, args, *hosts, false);
     }
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE);
-    return NULL;
+
+    const size_t DELIM_SIZE=sizeof('\n');
+
+    resolveHostNames(hosts);
+
+    // compute hostfile size
+    int64_t shmSizeHosts(0);
+    for (vector<string>::iterator iter=hosts->begin(); iter!=hosts->end(); ++iter) {
+        string& host = (*iter);
+        shmSizeHosts += (host.size()+DELIM_SIZE);
+    }
+
+    LOG4CXX_TRACE(logger, "MPI launcher hosts shm size = " << shmSizeHosts);
+
+    // Create shared memory to pass the arguments to the launcher
+    assert(!args[0].empty());
+    assert(!getInstallPath().empty());
+
+    string execContents = getLauncherSSHExecContent(clusterUuid, queryId, launchId,
+                                                    MpiManager::getInstance()->getDaemonBinFile(getInstallPath()));
+    bool rc = addIpcName(ipcNameHosts);
+    assert(rc);
+    rc = addIpcName(ipcNameExec);
+    assert(rc); rc=rc;
+
+    LOG4CXX_TRACE(logger, "MPI launcher arguments ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
+
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts));
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec));
+
+    char* ptrHosts(MpiLauncher::initIpcForWrite(shmIpcHosts.get(), shmSizeHosts));
+    char* ptrExec (MpiLauncher::initIpcForWrite(shmIpcExec.get(),  execContents.size()));
+
+    size_t off = 0;
+    for (vector<string>::iterator iter=hosts->begin(); iter!=hosts->end(); ++iter) {
+        string& host = (*iter);
+
+        memcpy((ptrHosts+off), host.data(), host.size());
+        off += host.size();
+
+        char del = '\n';
+
+        *(ptrHosts+off) = del;
+        ++off;
+        host.clear();
+    }
+    shmIpcHosts->close();
+    shmIpcHosts->flush();
+
+    memcpy(ptrExec, execContents.data(), execContents.size());
+    shmIpcExec->close();
+    shmIpcExec->flush();
+
+    if (int rc = ::chmod(args[EXEC_INDX].c_str(), S_IRUSR|S_IXUSR) != 0) {
+      //make exec shm/file executable
+      int err=errno;
+      throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
+	     << "chmod" << rc << err << args[EXEC_INDX]+" S_IRUSR|S_IXUSR");
+    }
+    // trim the last ':'
+    assert(args[args.size()-1]==string(":"));
+    args.resize(args.size()-1);
+
+    if (logger->isTraceEnabled()) {
+      size_t sizeArgs = 0;
+      for (vector<string>::iterator iter=args.begin();
+	   iter!=args.end(); ++iter) {
+        string& arg = (*iter);
+        sizeArgs += arg.size();
+      }
+      LOG4CXX_TRACE(logger, "MPI launcher arguments size = " << sizeArgs);
+    }
 }
 
 } //namespace

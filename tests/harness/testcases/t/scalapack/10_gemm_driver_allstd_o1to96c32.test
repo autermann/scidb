@@ -1,0 +1,20 @@
+--setup
+
+--shell --command "echo [dense_linear_algebra]                > /tmp/$PPID.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$PPID.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/$PPID.cfg"
+--shell --command "echo tests=GEMM                             >> /tmp/$PPID.cfg"
+--shell --command "echo error-limit=20                        >> /tmp/$PPID.cfg"
+
+--test
+
+--shell --command "echo size-list=+:1:96:7                 >> /tmp/$PPID.cfg"
+
+--shell --command "python ../../bin/dla_driver.py /tmp/$PPID.cfg 1> /tmp/$PPID.stdout 2> /tmp/$PPID.stderr"
+--shell --command "cat /tmp/$PPID.stderr"
+--shell --command "cat /tmp/$PPID.stdout" --store
+
+--cleanup
+--shell --command "rm /tmp/$PPID.cfg"
+--shell --command "rm /tmp/$PPID.stdout"
+--shell --command "rm /tmp/$PPID.stderr" 

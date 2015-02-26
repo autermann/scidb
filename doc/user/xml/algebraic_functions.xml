@@ -129,7 +129,9 @@
           </row>
 
           <row>
-            <entry>random()</entry>
+            <entry><indexterm>
+                <primary>random</primary>
+              </indexterm>random()</entry>
 
             <entry>Generate random positive integer</entry>
 

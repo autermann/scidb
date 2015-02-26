@@ -164,6 +164,9 @@ namespace scidb
                                                                                    attRef,
                                                                                    ""));
                aggOperator->addParameter(aggCall);
+           }  
+           if (oldStyleParams.size() != 0) { 
+               ((LogicalOperator::Properties&)aggOperator->getProperties()).tile = false;
            }
 
            for (size_t i =0; i<oldStyleParams.size(); i++)

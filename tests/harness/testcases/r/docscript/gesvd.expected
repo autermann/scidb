@@ -13,6 +13,9 @@ SCIDB QUERY : <create array product<val:double>[i=0:1,32,0,j=0:1,32,0]>
 SCIDB QUERY : <store(multiply(multiply(A,B),C),product)>
 [[(1.75),(0.433013)],[(0.433013),(1.25)]]
 
+SCIDB QUERY : <load_library('dense_linear_algebra')>
+Query was executed successfully
+
 SCIDB QUERY : <gesvd(product,'U')>
 [[(-0.866025),(-0.5)],[(-0.5),(0.866025)]]
 

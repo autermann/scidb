@@ -10,17 +10,28 @@ store(build(<val:int64> [x=0:*,32,0,y=0:*,32,0],'[[{0,0}(5),{1,1}(3),{2,2}(1),{3
 
 store(build(NOT EMPTY<val:double default 3.142 > [x=0:*,32,0,y=0:*,32,0],'[[{0,0}(5),{1,1}(3),{2,2}(1),{3,3}(-1),{4,4}(-3)]];[[{5,5}(-5),{6,6}(-7),{7,7}(-9)]]',true),M8x8_default)
 
-create array M4x24 <a:double> [x=0:3,32,0, y=0:23,16,0]
-store(build(M4x24, 0.25*x+y),M4x24)
+# TEMPORARY all non-square and non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+#           will be fixed by #2200 and/or #2202
+#
+#create array M4x24 <a:double> [x=0:3,32,0, y=0:23,16,0]
+#store(build(M4x24, 0.25*x+y),M4x24)
 
-create array M4x24_UB <a:double> [x=0:*,32,0, y=0:*,16,0]
-store(M4x24, M4x24_UB)
+#create array M4x24_UB <a:double> [x=0:*,32,0, y=0:*,16,0]
+#store(M4x24, M4x24_UB)
+#
+# TEMPORARY, continued, so use the following instead
+create array M3x3c32x16 <val:double> [x=0:2,32,0 , y=0:2,16,0]
+store(build(M3x3c32x16, abs(x-y)), M3x3c32x16)
+create array Mc32x16_UB <a:double> [x=0:*,32,0, y=0:*,16,0]
+store(M3x3c32x16, Mc32x16_UB)
 
 create array M3x3 <val:double> [x=0:2,32,0 , y=0:2,32,0]
 store(build(M3x3, abs(x-y)), M3x3)
 
 create array M3x3_UB <val:double> [x=0:*,32,0 , y=0:*,32,0]
 store(M3x3, M3x3_UB)
+
 
 
 --test
@@ -39,39 +50,48 @@ count(gesvd(M8x8_default, 'left'))
 count(gesvd(M8x8_default, 'right'))
 
 --echo gesvd negative tests : array should have samilar chunking on both the dimensions
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24, 'values')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24, 'left')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24, 'right')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24_UB, 'values')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24_UB, 'left')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24_UB, 'right')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M3x3c32x16, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M3x3c32x16, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M3x3c32x16, 'right')"
+# TEMPORARY all non-square and non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+#           will be fixed by #2200 and/or #2202
+# unbounded dimensions behave as non-square so have to change the error code from 41 (for unbounded)
+#   to 43 (for not square, because it is actually unbounded, even though it used to say M3x3...UB, that was quite misleading)
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(Mc32x16_UB, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(Mc32x16_UB, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gesvd(Mc32x16_UB, 'right')"
 
 --echo using repart to make it work
-gesvd(repart(M4x24, <a:double> [x=0:3,32,0, y=0:23,32,0]), 'values')
-gesvd(repart(M4x24, <a:double> [x=0:3,32,0, y=0:23,32,0]), 'left')
-gesvd(repart(M4x24, <a:double> [x=0:3,32,0, y=0:23,32,0]), 'right')
+gesvd(repart(M3x3c32x16, <a:double> [x=0:2,32,0, y=0:2,32,0]), 'values')
+gesvd(repart(M3x3c32x16, <a:double> [x=0:2,32,0, y=0:2,32,0]), 'left')
+gesvd(repart(M3x3c32x16, <a:double> [x=0:2,32,0, y=0:2,32,0]), 'right')
 
 
 ## Strange ! It does not support unbounded arrays in nest but it supports it without nesting.
-
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(M4x24_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'values')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(M4x24_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'left')"
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(M4x24_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'right')"
+# TEMPORARY all non-square and non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+#           will be fixed by #2200 and/or #2202
+# unbounded dimensions behave as non-square so have to change the error code from 41 (for unbounded)
+#   to 43 (for not square, because it is actually unbounded, even though it says M3x3)
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(Mc32x16_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(Mc32x16_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(Mc32x16_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'right')"
 
 --echo changing the chunk size of the unbounded array to be 32 on both the dimensions
-store(repart(M4x24_UB, <a:double>  [x=0:*,32,0, y=0:*,32,0]), M4x24_repart)
+store(repart(Mc32x16_UB, <a:double>  [x=0:*,32,0, y=0:*,32,0]), M3x3c32x16_repart)
 
-gesvd(M4x24_repart, 'values')
-gesvd(M4x24_repart, 'left')
-gesvd(M4x24_repart, 'right')
+gesvd(M3x3c32x16_repart, 'values')
+gesvd(M3x3c32x16_repart, 'left')
+gesvd(M3x3c32x16_repart, 'right')
 
-count(gesvd(M4x24_repart, 'values'))
-count(gesvd(M4x24_repart, 'left'))
-count(gesvd(M4x24_repart, 'right'))
+count(gesvd(M3x3c32x16_repart, 'values'))
+count(gesvd(M3x3c32x16_repart, 'left'))
+count(gesvd(M3x3c32x16_repart, 'right'))
 
-aggregate(gesvd(M4x24_repart, 'left'), max(u), min(u))
-aggregate(gesvd(M4x24_repart, 'right'), max(v), min(v), avg(v))
-aggregate(gesvd(M4x24_repart, 'values'), max(sigma), min(sigma), avg(sigma))
+aggregate(gesvd(M3x3c32x16_repart, 'left'), max(u), min(u))
+aggregate(gesvd(M3x3c32x16_repart, 'right'), max(v), min(v), avg(v))
+aggregate(gesvd(M3x3c32x16_repart, 'values'), max(sigma), min(sigma), avg(sigma))
 
 
 --echo output comparison between M3x3 and M3x3_UB
@@ -90,9 +110,9 @@ gesvd(M3x3_UB, 'right')
 --cleanup
 remove(M8x8)
 remove(M8x8_default)
-remove(M4x24)
-remove(M4x24_UB)
-remove(M4x24_repart)
+remove(M3x3c32x16)
+remove(Mc32x16_UB)
+remove(M3x3c32x16_repart)
 remove(M3x3)
 remove(M3x3_UB)
 

@@ -26,6 +26,7 @@
 
 // std C
 #include <stdlib.h>
+#include <unistd.h>
 
 // de-facto standards
 #include <mpi.h>
@@ -106,7 +107,7 @@ MpiMessageDesc::createRecord(scidb::MessageID messageType)
         return scidb::MessagePtr(new scidb_msg::MpiSlaveCommand());
     }
     cerr <<  "SLAVE: unknown message type " << messageType << std::endl;
-    MPI_Abort(MPI_COMM_WORLD, 906);
+    MPI_Abort(MPI_COMM_WORLD, 910);
     return scidb::MessagePtr();
 }
 
@@ -176,7 +177,7 @@ class MpiMasterProxy
         _connection = reinterpret_cast<scidb::BaseConnection*>(sciDB.connect("localhost", _port));
         if (!_connection) {
             cerr << "SLAVE: cannot connect to SciDB "<<std::endl;
-            MPI_Abort(MPI_COMM_WORLD, 907);
+            MPI_Abort(MPI_COMM_WORLD, 911);
         }
         boost::shared_ptr<scidb::MessageDesc> handshakeMessage(new MpiMessageDesc());
         handshakeMessage->initRecord(scidb::mtMpiSlaveHandshake);
@@ -291,11 +292,24 @@ void handleBadStatus(QueryID queryId,
 void handleAbnormalExit(const std::vector<std::string>& args);
 
 void setupLogging(const std::string& installPath,
-                  const char *queryId, const char *launchId)
+                  uint64_t queryId, uint64_t launchId)
 {
     std::string logFile = scidb::mpi::getSlaveLogFile(installPath, queryId, launchId);
     scidb::mpi::connectStdIoToLog(logFile);
 }
+
+std::string getDir(const std::string& filePath)
+{
+    size_t found = filePath.find_last_of("/");
+    if (found==std::string::npos) {
+        return ".";
+    }
+    if (found==0) {
+        return "/";
+    }
+    return filePath.substr(0,found);
+}
+
 
 /**
  * DLA (MPI) Slave process entry
@@ -323,22 +337,45 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (argc < 6) {
+    const int MIN_ARGC = 3;
+
+    if (argc < MIN_ARGC) {
         cerr << "SLAVE: Invalid args" << std::endl;
         exit(901); // MPI is not initialized yet, so no MPI_Abort()
     }
-    const string installPath(".");
-    const char* clusterUuid   = argv[1];
-    const char* queryIdStr    = argv[2];
-    const char* instanceIdStr = argv[3];
-    const char* launchIdStr   = argv[4];
-    const char* portStr       = argv[5];
 
+    // Find out my data directory (aka installPath), and chdir there
+    const string installPath = getDir(argv[0]);
+    if (::chdir(installPath.c_str()) != 0) {
+      cerr << "SLAVE: Unable to chdir to " << installPath << std::endl;
+      exit(902); // MPI is not initialized yet, so no MPI_Abort()
+    }
+
+    // Get common runtime values from the environment
+    std::string procEnvVar;
+    if (!scidb::mpi::readProcEnvVar(string("self"), scidb::mpi::SCIDBMPI_ENV_VAR, procEnvVar)) {
+      cerr << "SLAVE: Unable to read /proc/self (pid="<< ::getpid() <<")" << std::endl;
+      exit(903); // MPI is not initialized yet, so no MPI_Abort()
+    }
+    uint64_t queryId(0);
+    uint64_t launchId(0);
+    string clusterUuidStr;
+    if (!scidb::mpi::parseScidbMPIEnvVar(procEnvVar, queryId, launchId, clusterUuidStr)) {
+      cerr << "SLAVE: Unable to parse env variable: "
+	   << scidb::mpi::SCIDBMPI_ENV_VAR << "=" << procEnvVar << std::endl;
+      exit(904); // MPI is not initialized yet, so no MPI_Abort()
+    }
+
+    // Get instance specific runtime values from the arguments
+    const char* instanceIdStr = argv[1];
+    const char* portStr = argv[2];
+
+    // Record my existence
     string path =
-        scidb::mpi::getSlavePidFile(installPath, queryIdStr, launchIdStr);
+      scidb::mpi::getSlavePidFile(installPath, queryId, launchId);
     scidb::mpi::recordPids(path);
 
-    setupLogging(installPath, queryIdStr, launchIdStr);
+    setupLogging(installPath, queryId, launchId);
 
     // TODO:
     // doing the MPI_Init() early is a change from what we were doing earlier.
@@ -356,27 +393,33 @@ int main(int argc, char* argv[])
     int rank = setupMpi(); // post log set-up
     srand(rank); // each process needs a unique sequence of random numbers
 
+    // Log my runtime information
     std::cerr << "SLAVE pid="<< ::getpid() <<":" << std::endl;
     for (int i=0; i < argc; ++i) {
-        std::cerr << "arg["<<i<<"]="<<argv[i] << std::endl;
+        std::cerr << "ARG["<<i<<"]="<<argv[i] << std::endl;
     }
+
+    std::cerr << "CLUSTER UUID="<<clusterUuidStr << std::endl;
+    std::cerr << "QUERY ID=" << queryId << std::endl;
+    std::cerr << "LAUNCH ID="<< launchId << std::endl;
 
     uint32_t port = str2uint32(portStr);
     if (port == 0) {
         cerr << "SLAVE: Invalid port arg: " << portStr << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, 903);
+        MPI_Abort(MPI_COMM_WORLD, 905);
     }
-    QueryID queryId = str2uint64(queryIdStr);
     InstanceID instanceId = str2uint64(instanceIdStr);
 
-    const int START_DELAY_INDEX = 6;
-    if (argc>START_DELAY_INDEX) {
-        handleSlowStart(argv[START_DELAY_INDEX]);
+    if (argc>MIN_ARGC) {
+      // For debugging only
+      const int START_DELAY_INDEX = MIN_ARGC;
+      handleSlowStart(argv[START_DELAY_INDEX]);
     }
+
     try {
-        runScidbCommands(port, clusterUuid, queryId,
-                         instanceId, static_cast<uint64_t>(rank),
-                         str2uint64(launchIdStr), argc, argv);
+      runScidbCommands(port, clusterUuidStr, queryId,
+		       instanceId, static_cast<uint64_t>(rank),
+		       launchId, argc, argv);
     }
     catch (const scidb::SystemException &e)
     {
@@ -399,7 +442,7 @@ uint64_t str2uint64(const char *str)
     int64_t num = strtoll(str,&ptr,10);
     if (errno !=0 || str == 0 || (*str) == 0 || (*ptr) != 0 || num<0) {
         cerr << "SLAVE: Invalid numeric string for uint64_t: " << str << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, 908);
+        MPI_Abort(MPI_COMM_WORLD, 906);
     }
     return num;
 }
@@ -412,7 +455,7 @@ uint32_t str2uint32(const char *str)
     int32_t num = strtol(str,&ptr,10);
     if (errno !=0 || str == 0 || (*str) == 0 || (*ptr) != 0 || num<0) {
         cerr << "SLAVE: Invalid numeric string for uint32_t: " << str << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, 909);
+        MPI_Abort(MPI_COMM_WORLD, 907);
     }
     return num;
 }
@@ -522,10 +565,10 @@ int runScidbCommands(uint32_t port,
                     sizes[i] = static_cast<uint64_t>(shMems[i]->getSize());
                 } catch(scidb::SharedMemoryIpc::SystemErrorException& e) {
                     cerr << "SLAVE: Cannot map shared memory: " << e.what() << std::endl;
-                    MPI_Abort(MPI_COMM_WORLD, 904);
+                    MPI_Abort(MPI_COMM_WORLD, 908);
                 } catch(scidb::SharedMemoryIpc::InvalidStateException& e) {
                     cerr << "SLAVE: Bug in mapping shared memory: " << e.what() << std::endl;
-                    MPI_Abort(MPI_COMM_WORLD, 905);
+                    MPI_Abort(MPI_COMM_WORLD, 909);
                 }
                 assert(bufs[i]);
 
@@ -702,7 +745,7 @@ void handleBadStatus(QueryID queryId,
                      MpiMasterProxy& scidbProxy)
 {
     cerr << "SLAVE: sending malformed status from BAD_MSG" << std::endl;
-    char buf[1];
+    char buf[1]; buf[0]='\0';
     boost::shared_ptr<scidb::SharedBuffer> binary(new scidb::MemoryBuffer(buf, 1));
 
     boost::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc(binary));

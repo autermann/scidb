@@ -146,6 +146,10 @@ Query was executed successfully
 SCIDB QUERY : <load_library('dense_linear_algebra')>
 Query was executed successfully
 
+SCIDB QUERY : <gemm(ident11c32,   ident11c32, build(ident11c32,0))>
+{r,c} gemm
+{0,0} 1
+
 SCIDB QUERY : <store(gemm(ident11c32,   ident11c32, build(ident11c32,0)), tmp)>
 {r,c} gemm
 {0,0} 1
@@ -162,18 +166,6 @@ SCIDB QUERY : <gemm(ident11c32,   intRows11c32, build(ident11c32,0))>
 {0,0} 1
 
 SCIDB QUERY : <gemm(intRows11c32, intRows11c32, build(ident11c32,0))>
-{r,c} gemm
-{0,0} 1
-
-SCIDB QUERY : <gemm(intRows11nzc32,   ident11nzc32, build(ident11c32,0))>
-{r,c} gemm
-{0,0} 1
-
-SCIDB QUERY : <gemm(ident11nzc32,   intRows11nzc32, build(ident11c32,0))>
-{r,c} gemm
-{0,0} 1
-
-SCIDB QUERY : <gemm(intRows11nzc32, intRows11nzc32, build(ident11c32,0))>
 {r,c} gemm
 {0,0} 1
 
@@ -197,39 +189,6 @@ SCIDB QUERY : <gemm(intRows22c32, intRows22c32, build(ident22c32,0))>
 {0,1} 10
 {1,0} 15
 {1,1} 22
-
-next three should have same answers as prior 3
-SCIDB QUERY : <gemm(intRows22nzc32,   ident22nzc32, build(ident22c32,0))>
-{r,c} gemm
-{0,0} 1
-{0,1} 2
-{1,0} 3
-{1,1} 4
-
-SCIDB QUERY : <gemm(ident22nzc32,   intRows22nzc32, build(ident22c32,0))>
-{r,c} gemm
-{0,0} 1
-{0,1} 2
-{1,0} 3
-{1,1} 4
-
-SCIDB QUERY : <gemm(intRows22nzc32, intRows22nzc32, build(ident22c32,0))>
-{r,c} gemm
-{0,0} 7
-{0,1} 10
-{1,0} 15
-{1,1} 22
-
-SCIDB QUERY : <gemm(intRows12c32, intRows21c32, build(ident11c32,0))>
-{r,c} gemm
-{0,0} 5
-
-SCIDB QUERY : <gemm(intRows21c32, intRows12c32, build(ident22c32,0))>
-{r,c} gemm
-{0,0} 1
-{0,1} 2
-{1,0} 2
-{1,1} 4
 
 next output (by rows) should be 7, 15, 10, 22
 SCIDB QUERY : <transpose(gemm(intRows22c32, intRows22c32, build(ident22c32,0)))>

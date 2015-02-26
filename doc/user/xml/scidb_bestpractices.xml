@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<section>
+  <title>Tuning your SciDB Installation</title>
+
+  <para><indexterm>
+      <primary>configuration</primary>
+
+      <secondary>tuning</secondary>
+    </indexterm><indexterm>
+      <primary>performance tuning</primary>
+    </indexterm><indexterm>
+      <primary>improving performance</primary>
+    </indexterm>This section provides general guidelines about maximizing the
+  performance of SciDB on your system. Below are suggestions meant to guide
+  you in choosing the right combination of settings for SciDB configuration
+  parameters for your SciDB installation.</para>
+
+  <para>For the default values of the configuration parameters described in
+  this section, see <xref linkend="configParameters"/>.</para>
+
+  <section>
+    <title>Configuring Memory Usage</title>
+
+    <para>SciDB provides the following parameters for configuring the usage of
+    RAM:<itemizedlist>
+        <listitem>
+          <para><parameter>merge-sort-buffer </parameter>(megabytes). The
+          maximum amount of memory that the <command>sort() </command>operator
+          can consume, per thread. Note that each thread of the operator will
+          consume up to this amount. The number of threads in <command>sort()
+          </command> is controlled by the <literal>parallel-sort
+          </literal>and<parameter> result-prefetch-queue-size
+          parameters.</parameter></para>
+        </listitem>
+
+        <listitem>
+          <para><parameter role="bold">smgr-cache-size
+          </parameter>(megabytes). The amount of memory that the storage
+          manager cache may use. This is a global cache that is used by all
+          queries and stays occupied when the system is quiescent. This cache
+          is populated with chunks of persistent arrays that were recently
+          read or recorded. On systems with a very large amount of memory,
+          setting this parameter to a large value will allow one to
+          essentially run SciDB read queries "out of memory."</para>
+        </listitem>
+
+        <listitem>
+          <para><parameter role="bold">mem-array-threshold
+          </parameter>(megabytes). The amount of memory that the temporary
+          array cache may use. This applies to operators that work by creating
+          temporary materialized arrays (aggregates, some repartitions,
+          variable_window, redimension, others). If the cache is too small to
+          hold all temporary materialized data, some of these temporary
+          results are flushed to temporary files on disk.</para>
+
+          <para>All running queries with materialized temporary arrays share
+          this cache. Notice that the <parameter>tmp-path </parameter>
+          configuration parameter controls the location of the temporary disk
+          storage. It is important to make sure that this location is not
+          mapped into memory (for example via RAM disk or the
+          <command>tmpfs</command> utility).</para>
+        </listitem>
+
+        <listitem>
+          <para><parameter role="bold">network-buffer </parameter>(megabytes):
+          Roughly, the amount of memory that the SciDB instance may use to
+          receive data from other instances via the network. To be precise,
+          the sender instance send out this much data prior to pausing and
+          waiting for the receiver instances to consume the data and
+          respond.</para>
+        </listitem>
+
+        <listitem>
+          <para><parameter role="bold">max-memory-limit
+          </parameter>(megabytes): The hard-limit maximum amount of memory
+          that the SciDB instance is allowed to consume. If the instance
+          requests more memory from the operating system—this can happen for
+          several reasons—the allocation will fail with an exception.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>When setting values for these parameters, keep in mind the following
+    guidelines:<screen>(MAX_NUMBER_OF_QUERIES * network-buffer +
+  MAX_NUMBER_OF_QUERIES * merge-sort-buffer * parallel-sort +
+  mem-array-threshold + smgr-cache-size ) &lt; max-memory-limit</screen></para>
+
+    <para>and<screen>(MAX_NUMBER_OF_QUERIES * network-buffer +
+  MAX_NUMBER_OF_QUERIES * merge-sort-buffer * parallel-sort +
+  mem-array-threshold + smgr-cache-size) *
+ (number of instances on host ) &lt;= 75% of RAM</screen></para>
+
+    <para>where MAX_NUMBER_OF_QUERIES is the maximum number of concurrent
+    queries allowed in the system. See more on MAX_NUMBER_OF_QUERIES
+    below.</para>
+  </section>
+
+  <section>
+    <title>Configuring CPU Usage</title>
+
+    <para>SciDB provides the following parameters for configuring the usage of
+    your CPUs (aka "cores"):<itemizedlist>
+        <listitem>
+          <para><parameter role="bold">execution-threads </parameter>(number
+          of threads): Controls the number of threads allocated to handling
+          client requests. This number is closely related to the maximum
+          number of queries that SciDB can run concurrently. In fact, note the
+          following relationship:<screen>execution-threads = MAX_NUMBER_OF_QUERIES + 2</screen>Usually,
+          each running query uses one of these threads for execution.</para>
+        </listitem>
+
+        <listitem>
+          <para><parameter role="bold">result-prefetch-threads
+          </parameter>(number of threads): Controls the total number of
+          threads available to all queries together. This parameter can be
+          used to adjust the level of parallelism within a query (in addition
+          to the main execution thread). Any given query is not guaranteed to
+          have access to all of the threads because it may be competing with
+          other running queries.</para>
+        </listitem>
+
+        <listitem>
+          <para><parameter role="bold">result-prefetch-queue-size</parameter>
+          (number of threads): The maximum number of threads that a given
+          query can attempt to use.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>When setting values for these parameters, keep in mind the following
+    guidelines:<screen>result-prefetch-queue-size * MAX_NUMBER_OF_QUERIES =
+  result-prefetch-threads</screen></para>
+
+    <para>and<screen>(execution-threads + result-prefetch-threads) * (number of instances 
+on host ) ~= (number of CPU cores on host) + 2</screen></para>
+
+    <para>The last relationship may not be true in some cases, depending on
+    the work load. For example, if the work load is very CPU-intensive and not
+    much IO is involved, the number of threads should be slightly larger than
+    the number of cores. However, if there is a mix of CPU and IO in the work
+    load, increasing <parameter>result-prefetch-threads </parameter>may be
+    beneficial.</para>
+
+    <para>The best values for <parameter>execution-threads
+    </parameter>and<parameter> result-prefetch-threads </parameter>should be
+    determined empirically.</para>
+  </section>
+
+  <section>
+    <title>Configuring Disk Usage</title>
+
+    <para>SciDB provides the following <parameter
+    role="bold">chunk-segment-size</parameter> (megabytes) parameter for
+    configuring the usage of your disks.</para>
+
+    <para>If this is 0, then chunks are stored contiguously and densely in the
+    storage file. In this mode, storage is not reclaimed. In this case, the
+    <literal>remove()</literal> operator does not have any effect on disk
+    usage.</para>
+
+    <para>If this is set to a non-zero value, the storage file is split evenly
+    into segments of the specified size. In this mode, when an array is
+    removed, all segments that belong to this array are marked available for
+    reuse—and can be reused by other arrays in the future. In this mode, a
+    segment may only contain data from exactly one array, which means that
+    each array will occupy at least one full segment on disk.</para>
+
+    <para>Currently, an array chunk size may not exceed the segment size. We
+    recommend a value of between 64 and 128 MB, subject to the above
+    restriction.</para>
+
+    <para>The general guideline: In a multi-disk host system, all SciDB
+    instances on the host should be equally spread across all available disks.
+    When selecting the number of SciDB instances per host, having several
+    instances per disk may be useful in increasing the disk
+    utilization.</para>
+  </section>
+
+  <section>
+    <title>Configuration Example</title>
+
+    <para>This section suggests configuration settings for a small, multi-disk
+    SciDB installation.</para>
+
+    <note>
+      <para>Some of the parameters mentioned in this example are not discussed
+      in the preceding sections. For details, see <xref
+      linkend="configParameters"/>.</para>
+    </note>
+
+    <para>Suppose that we have a cluster with homogeneous motherboards, each
+    motherboard has 16GB RAM and 3 disks. In this case, it is natural to use 3
+    SciDB instances per motherboard.</para>
+
+    <para>We will leave 1GB of RAM for the OS. We use the following
+    settings:</para>
+
+    <para><itemizedlist>
+        <listitem>
+          <para>smgr-cache-size = 1024</para>
+        </listitem>
+
+        <listitem>
+          <para>mem-array-threshold = 1024</para>
+        </listitem>
+
+        <listitem>
+          <para>merge-sort-buffer = 128</para>
+        </listitem>
+
+        <listitem>
+          <para>network-buffer = 512</para>
+        </listitem>
+
+        <listitem>
+          <para>replication-send-queue-size = 500</para>
+        </listitem>
+
+        <listitem>
+          <para>replication-receive-queue-size = 500</para>
+        </listitem>
+
+        <listitem>
+          <para>max-memory-limit = 5000</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>In this case, we use 1GB for the SMGR cache. We also use 1GB for the
+    memory array cache.</para>
+
+    <para>For the send and receive queue sizes, we assume that the average
+    message size is about 1MB, and allocate 1GB total to the replication
+    queue—which is only used when executing stored queries.</para>
+
+    <para>We allocate 512MB for other network usage.</para>
+
+    <para>With these settings, the system uses about 1GB of RAM when it is at
+    rest, and somewhere between 3-3.5GB footprint while running
+    queries.</para>
+
+    <para>The other 2-1.5GB is "breathing room" for various temporary results,
+    operator and user code overhead, and so on.</para>
+
+    <para>By setting the max-memory-limit to 5000, SciDB does not allow this
+    system to use more than 5000MB of memory per instance. Note that when the
+    system is running a query using multiple threads, it is fair to expect
+    that each thread has one or several array chunks in memory, which adds to
+    the memory footprint.</para>
+
+    <para>Now suppose further that our motherboard with 3 instances has 24CPU
+    cores. We want each instance to use 8 cores. CPU resources are more
+    elastic, so we do not need to leave a core "for the operating
+    system."</para>
+
+    <para>Suppose we want to support up to 2 concurrent queries, up to 4
+    threads per query. Our parameters look like this:</para>
+
+    <para><itemizedlist>
+        <listitem>
+          <para>execution-threads = 4</para>
+        </listitem>
+
+        <listitem>
+          <para>operator-threads = 4</para>
+        </listitem>
+
+        <listitem>
+          <para>result-prefetch-threads = 8</para>
+        </listitem>
+
+        <listitem>
+          <para>result-prefetch-queue-size = 4</para>
+        </listitem>
+      </itemizedlist>In this case, when more than 2 queries are submitted to
+    SciDB, the system begins to execute the first two, and places the rest on
+    the queue. In general, the value of<parameter role="bold">
+    operator-threads </parameter>should always equal the value of <parameter
+    role="bold">result-prefetch-queue-size</parameter>.</para>
+  </section>
+</section>

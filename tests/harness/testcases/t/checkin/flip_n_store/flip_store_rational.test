@@ -11,9 +11,10 @@ project(apply(store(join(build(T,rational(x+1,x+2)),build(T,rational(x+10,x+11))
 
 #workaround for p4 bug 564
 --set-format csv+
-
-project(apply(redimension_store(A,B),c,str(b)),c)
-project(apply(redimension_store(B,C),c,str(a)),c)
+redimension_store(A,B)
+project(apply(B,c,str(b)),c)
+redimension_store(B,C)
+project(apply(C,c,str(a)),c)
 project(apply(unpack(B,row),c,str(a)+' - '+str(b)),c)
 project(apply(unpack(C,row),c,str(b)+' - '+str(a)),c)
 

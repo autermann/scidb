@@ -2,7 +2,7 @@
 <!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<chapter id="ch01" remap="h1">
+<chapter id="ch01">
   <title>Introduction to SciDB</title>
 
   <para>SciDB is an all-in-one data management and advanced analytics
@@ -33,7 +33,7 @@
   Language (AQL) and Array Functional Language (AFL)—and an overview of
   transactions in SciDB.</para>
 
-  <sect1 remap="h2" xreflabel="array_data_model" xml:id="ArrayDataModel">
+  <section xreflabel="array_data_model" xml:id="ArrayDataModel">
     <title>Array Data Model</title>
 
     <para><indexterm>
@@ -62,7 +62,7 @@
     arrays with one or more non-integer dimensions, such as variable-length
     strings (<emphasis>alpha</emphasis>,<emphasis> beta</emphasis>,<emphasis>
     gamma</emphasis>, ...) or floating-point values (1.2, 2.76, 4.3, ...).
-    Version 12.12 of SciDB and Paradigm4 support non-int64 dimensions only
+    Version 13.1 of SciDB and Paradigm4 support non-int64 dimensions only
     partially.</para>
 
     <para>When the total number of values or cardinality of a dimension is
@@ -104,9 +104,9 @@
     <para>Once you have created a SciDB database and defined the arrays, you
     must prepare and load data into it. Loaded data is then available to be
     accessed and queried using SciDB's built-in analytics capabilities.</para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h2" xml:id="BasicArchitecture">
+  <section xml:id="BasicArchitecture">
     <title>Basic Architecture</title>
 
     <para>SciDB uses a <emphasis> shared-nothing</emphasis> architecture which
@@ -143,7 +143,7 @@
     as well as clouds, where additional severs may be added to scale the total
     capacity.</para>
 
-    <sect2 remap="h3" xml:id="ChunkingandScalability">
+    <section xml:id="ChunkingandScalability">
       <title>Chunking and Scalability</title>
 
       <para><indexterm>
@@ -185,9 +185,9 @@
 
       <para>Chunks are stored allocated to instances of the SciDB cluster
       according to a hash-based scheme.</para>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="ChunkAdjacency">
+    <section xml:id="ChunkAdjacency">
       <title>Chunk Overlap</title>
 
       <para>It is sometimes advantageous to have neighboring chunks of an
@@ -218,10 +218,10 @@
 
       <para>SciDB supports operators that can be used to add or change the
       chunk overlap within an existing array.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1 remap="h2" xml:id="SciDBstoragemanagement">
+  <section xml:id="SciDBstoragemanagement">
     <title>SciDB Array Storage</title>
 
     <para>SciDB arrays consist of array chunk storage and array metadata
@@ -233,7 +233,7 @@
     <para>The following sections describe SciDB's instance storage, system
     catalog, and transaction model.</para>
 
-    <sect2 remap="h3" xml:id="StorageManagement">
+    <section xml:id="StorageManagement">
       <title>Instance Storage</title>
 
       <variablelist>
@@ -322,9 +322,9 @@
           </listitem>
         </varlistentry>
       </variablelist>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="LocalStorage">
+    <section xml:id="LocalStorage">
       <title>SciDB System Catalog</title>
 
       <para>SciDB relies on a system catalog that is a repository of the
@@ -354,9 +354,9 @@
         </indexterm>The system catalog in current versions of SciDB is
       implemented as PostgreSQL tables. The tables are shared between all
       SciDB instances within the cluster.</para>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="transactions">
+    <section xml:id="transactions">
       <title>Transaction Model</title>
 
       <para><indexterm>
@@ -376,16 +376,16 @@
       aborts, pending changes are undone at all instances in the system
       catalog, and the database is returned to a prior consistent
       state.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1 remap="h2" xml:id="DatabaseConcepts">
+  <section xml:id="DatabaseConcepts">
     <title>Array Processing</title>
 
     <para>SciDB's query languages provide the basic framework for scalable
     array processing.</para>
 
-    <sect2 remap="h3" xml:id="ArrayLanguages">
+    <section xml:id="ArrayLanguages">
       <title>Array Languages</title>
 
       <para><indexterm>
@@ -440,9 +440,9 @@
       language for working with SciDB arrays. AFL
       <emphasis>operators</emphasis> are used to compose queries or
       statements.</para>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="BuildingBlocks">
+    <section xml:id="BuildingBlocks">
       <title>Query Building Blocks</title>
 
       <para>There are four building blocks that you use to control and access
@@ -502,9 +502,9 @@
 
       <para>Any of these building blocks can be user-defined, that is, users
       can write new operators, data types, functions, and aggregates.</para>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="ACIDandTransactions">
+    <section xml:id="ACIDandTransactions">
       <title>Pipelined Array Processing</title>
 
       <para><indexterm>
@@ -526,10 +526,10 @@
       the entire array to be materialized in memory at all instances at once.
       These are referred to as <emphasis>materializing</emphasis>
       operators.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1 remap="h2" xml:id="Clientsandconnectors">
+  <section xml:id="Clientsandconnectors">
     <title>Clients and Connectors</title>
 
     <para><indexterm>
@@ -546,9 +546,9 @@
     protocol. Once connected via the connector, the user may issue queries
     written in either AFL or AQL, and fetch the result of a query using an
     iterator interface.</para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h2" xml:id="ConventionsUsedinthisDocument">
+  <section xml:id="ConventionsUsedinthisDocument">
     <title>Conventions Used in This Document</title>
 
     <para><indexterm>
@@ -565,5 +565,5 @@
       </command>. When necessary, a line of code may be preceded by the
     <code>AQL%</code> or <code>AFL%</code> prompt to show which language the
     query is issued from.</para>
-  </sect1>
+  </section>
 </chapter>

@@ -76,12 +76,12 @@ void rle_unary_bool_is_null(const Value** args, Value* result, void*)
     {
         v = &vTile->getSegment(i);
         RLEPayload::Segment r;
-        r.null = false;
-        r.pPosition = v->pPosition;
-        r.same = v->length() > 1;
-        r.valueIndex = v->null ? 1 : 0;
+        r._null = false;
+        r._pPosition = v->_pPosition;
+        r._same = v->length() > 1;
+        r._valueIndex = v->_null ? 1 : 0;
         rTile->addSegment(r);
-        tail = v->pPosition + v->length();
+        tail = v->_pPosition + v->length();
     }
     rTile->flush(tail);
 }

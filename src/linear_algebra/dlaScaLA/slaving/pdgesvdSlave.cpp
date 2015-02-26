@@ -358,13 +358,20 @@ scidb::PdgesvdArgs pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t N
 
     slpp::desc_t DESC_A;
     descinit_(DESC_A, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_A, INFO);
+    if (INFO != 0) throw("pdgesvdGenTestArgs: unexpected runtime error");
+
     slpp::desc_t DESC_U;
     descinit_(DESC_U, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_A, INFO);
+    if (INFO != 0) throw("pdgesvdGenTestArgs: unexpected runtime error");
+
     slpp::desc_t DESC_VT;
     descinit_(DESC_VT, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_VT, INFO);
+    if (INFO != 0) throw("pdgesvdGenTestArgs: unexpected runtime error");
+
     // S is different: global, not distributed, so its LLD(S) == LEN(S)
     slpp::desc_t DESC_S;
     descinit_(DESC_S, MIN_MN, 1, BLKSZ, BLKSZ, 0, 0, ICTXT, MIN_MN, INFO);
+    if (INFO != 0) throw("pdgesvdGenTestArgs: unexpected runtime error");
 
     pdgesvdMarshallArgs(&result, NPROW,  NPCOL, MYPROW, MYPCOL, MYPNUM,
                            jobU, jobVT, M, N,

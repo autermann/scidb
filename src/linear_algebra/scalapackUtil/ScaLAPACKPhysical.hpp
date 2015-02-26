@@ -7,6 +7,7 @@
 #define SCALAPACKPHYSICAL_HPP_
 
 // std C++
+#include <tr1/array>
 
 // std C
 
@@ -74,7 +75,6 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
 /// range of sizes and are generally only implemented for
 /// square block sizes.  Check these constraints
 ///
-void checkInputArray(Array* Ain);
 void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc);
 
 class ScaLAPACKPhysical : public MPIPhysical
@@ -104,7 +104,71 @@ ScaLAPACKPhysical(const std::string& logicalName, const std::string& physicalNam
     std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
     bool                            doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query> query);
 
+protected:
+    /// routines that make dealing with matrix parameters
+    /// more readable and less error prone
+
+    size_t nRow(boost::shared_ptr<Array>& array) const;
+    size_t nCol(boost::shared_ptr<Array>& array) const;
+    size_t chunkRow(boost::shared_ptr<Array>& array) const;
+    size_t chunkCol(boost::shared_ptr<Array>& array) const;
+
+    /// a structure to retrieve matrix parameters as a short vector -> 1/2 as many LOC as above
+    /// very handy for the operators
+    typedef std::tr1::array<size_t, 2 > matSize_t;
+    /// get matrix size as vector
+    matSize_t getMatSize(boost::shared_ptr<Array>& array) const;
+    /// get matrix chunk size as vector
+    matSize_t getMatChunkSize(boost::shared_ptr<Array>& array) const;
+
+    void checkInputArray(boost::shared_ptr<Array>& Ain) const ;
 };
+
+inline size_t ScaLAPACKPhysical::nRow(boost::shared_ptr<Array>& array) const
+{
+    assert(array->getArrayDesc().getDimensions().size() >= 1);
+    return array->getArrayDesc().getDimensions()[0].getLength();
+}
+
+inline size_t ScaLAPACKPhysical::nCol(boost::shared_ptr<Array>& array) const
+{
+    assert(array->getArrayDesc().getDimensions().size() >= 2);
+    return array->getArrayDesc().getDimensions()[1].getLength();
+}
+
+inline size_t ScaLAPACKPhysical::chunkRow(boost::shared_ptr<Array>& array) const
+{
+    assert(array->getArrayDesc().getDimensions().size() >= 1);
+    return array->getArrayDesc().getDimensions()[0].getChunkInterval();
+}
+
+inline size_t ScaLAPACKPhysical::chunkCol(boost::shared_ptr<Array>& array) const
+{
+    assert(array->getArrayDesc().getDimensions().size() >= 2);
+    return array->getArrayDesc().getDimensions()[1].getChunkInterval();
+}
+
+inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(boost::shared_ptr<Array>& array) const
+{
+    assert(array->getArrayDesc().getDimensions().size() == 2);
+
+    matSize_t result;
+    result.at(0) = array->getArrayDesc().getDimensions()[0].getLength();
+    result.at(1) = array->getArrayDesc().getDimensions()[1].getLength();
+    return result;
+}
+
+
+inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatChunkSize(boost::shared_ptr<Array>& array) const
+{
+    assert(array->getArrayDesc().getDimensions().size() == 2);
+
+    matSize_t result;
+    result.at(0) = array->getArrayDesc().getDimensions()[0].getChunkInterval();
+    result.at(1) = array->getArrayDesc().getDimensions()[1].getChunkInterval();
+    return result;
+}
+
 
 } // namespace
 

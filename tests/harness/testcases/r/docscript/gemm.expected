@@ -13,6 +13,9 @@ SCIDB QUERY : <CREATE ARRAY C <val:double> [i=0:1,32,0,j=0:1,32,0]>
 SCIDB QUERY : <store(build (C, 1), C)>
 [[(1),(1)],[(1),(1)]]
 
+SCIDB QUERY : <load_library('dense_linear_algebra')>
+Query was executed successfully
+
 SCIDB QUERY : <gemm(A,B,C)>
 [[(2),(3)],[(4),(5)]]
 

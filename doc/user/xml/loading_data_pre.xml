@@ -19,7 +19,7 @@
   some detailed information (such as handling errors during load) that applies
   to all the techniques.</para>
 
-  <sect1>
+  <section>
     <title>Overview of Moving Data Into SciDB</title>
 
     <para>You typically load data into SciDB one array at a time. In most
@@ -72,9 +72,9 @@
         parallel load technique, can perform this step for you.</para>
       </listitem>
     </orderedlist>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>Loading CSV Data</title>
 
     <para><indexterm>
@@ -123,7 +123,7 @@
       </listitem>
     </itemizedlist>
 
-    <sect2>
+    <section>
       <title>Visualize the Target Array</title>
 
       <para>When using the CSV loading technique, visualizing the desired
@@ -170,9 +170,9 @@
 
       <para>This simple, 12-cell array will be the target array used to
       illustrate steps of the CSV load technique.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Prepare the Load File</title>
 
       <para>The CSV loading technique starts with a comma-separated-value
@@ -202,14 +202,13 @@
         </listitem>
 
         <listitem>
-          <para>Use a question mark immediately followed by an integer between
-          0 and 127 (inclusive). The integer you use is the "missing reason
-          code" for the null value.</para>
+          <para><indexterm>
+              <primary>missing reason code</primary>
+            </indexterm>Use a question mark immediately followed by an integer
+          between 0 and 127 (inclusive). The integer you use is the "missing
+          reason code" for the null value.</para>
         </listitem>
       </itemizedlist>
-
-      <para>For more information about null processing, see the section on
-      Basic Architecture in Introduction to SciDB.</para>
 
       <para>After you create the CSV file, you must convert it to the SciDB
       dense load format. For that, use the <code>csv2scidb</code> shell
@@ -244,9 +243,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       dimension. The parentheses enclose the individual cells of the array.
       There are commas between attributes in cells and between cells in the
       array.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Load the Data</title>
 
       <para>After you prepare the file in the SciDB dense-load format, you are
@@ -320,9 +319,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       language="test">--aql LOAD winnersFlat FROM '../examples/olympic_data.scidb'; --show-output=no
 </programlisting>The data file paths in the AFL and AQL commands are relative
       to the working directory of the server.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Rearrange As Necessary</title>
 
       <para>After you establish the load array, you can use SciDB features to
@@ -348,10 +347,12 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <para>For the simple example presented here, the simple statistics
       reveal little of interest. For large arrays however, the data can be
       illuminating and can influence your decisions about chunk size and chunk
-      overlap. For more information about chunk size and overlap, see the
-      section on Basic Architecture in Introduction to SciDB. For more
-      information about the analyze operator, see <xref linkend="analyze"/>
-      Analyze section in SciDB Operator Reference.</para>
+      overlap.</para>
+
+      <para>For more information about chunk size and overlap, see the <link
+      linkend="BasicArchitecture">Basic Architecture</link> section. For more
+      information about the analyze operator, see <link
+      linkend="analyze">analyze</link> in the AFL Operator Reference.</para>
 
       <para><indexterm>
           <primary>AQL</primary>
@@ -359,8 +360,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
           <secondary>create array</secondary>
         </indexterm>The following command creates the target array:</para>
 
-      <programlisting language="test">
---aql CREATE ARRAY winners &lt;person:string, time:double&gt; 
+      <programlisting language="test">--aql CREATE ARRAY winners &lt;person:string, time:double&gt; 
 [year=1996:2008,1000,0, event(string)=3,1000,0] --show-output=no 
 </programlisting>
 
@@ -368,16 +368,15 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       data about olympic winners. To populate this array with the data, use
       the following command:</para>
 
-      <programlisting language="test">
---aql SELECT * FROM redimension_store(winnersFlat,winners); --show-output=no 
+      <programlisting language="test">--afl redimension_store(winnersFlat,winners); --show-output=no 
 </programlisting>
 
       <para>The result of this command is the desired array; you have
       completed the CSV load procedure.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Parallel Load</title>
 
     <para><indexterm>
@@ -454,7 +453,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     <para>The parallel loading technique is recommended for situations in
     which your external application produces a very large CSV file.</para>
 
-    <sect2>
+    <section>
       <title>Visualize the Target Array</title>
 
       <para>When using the parallel loading technique, visualizing the target
@@ -479,9 +478,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       that array to learn some simple statistics about the loaded data that
       can help you choose chunk sizes and chunk overlaps for each dimension of
       the multi-dimensional array you desire.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Load the Data</title>
 
       <para><indexterm>
@@ -509,6 +508,17 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         run loadcsv.py from the SciDB administrator account.</para>
       </note>
 
+      <para><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>binary</secondary>
+        </indexterm>Note that you can also load binary data in parallel.
+      Currently, there is no binary analogue for the loadcsv.py program. You
+      must use the load operator directly, and specify a parameter that
+      instructs SciDB to perform the load in parallel. For details, see the
+      <link linkend="loadOperator">load operator</link> reference
+      topic.</para>
+
       <para>To see the options for <code>loadcsv.py</code>, type
       <code>loadcsv.py --help</code> at the command line. The options for
       loadcsv.py are:</para>
@@ -535,7 +545,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
             <row>
               <entry><literal>-d DB_ADDRESS</literal></entry>
 
-              <entry>SciDB coordinator hostname or IP address</entry>
+              <entry>SciDB coordinator host name or IP address</entry>
             </row>
 
             <row>
@@ -893,9 +903,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
            -e 10 
            -w 'aFlatshadow'
 </programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Rearrange As Necessary</title>
 
       <para>After you establish the 1-dimensional load array in SciDB, you can
@@ -948,10 +958,10 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         <para>The shadow array corresponds to the 1-dimensional load array,
         not the multidimensional target array.</para>
       </note>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Loading Binary Data</title>
 
     <para><indexterm>
@@ -986,7 +996,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     text files. For example, avoiding this overhead is especially desirable if
     your data includes many variables whose data type is double.</para>
 
-    <sect2>
+    <section>
       <title>Visualize the Target Array</title>
 
       <para>When using the binary loading technique, visualizing the desired
@@ -1036,9 +1046,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para>This simple, 24-cell array will be the target array used to
       illustrate steps of the binary load technique.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Prepare the Binary Load File</title>
 
       <para>A SciDB binary load file represents a 1-dimensional SciDB array.
@@ -1092,7 +1102,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         </listitem>
 
         <listitem>
-          <para>There are no end of cell delimiters. The first byte of the
+          <para>There are no end-of-cell delimiters. The first byte of the
           representation of the first attribute value of cell N begins
           immediately after the the last byte of the last attribute of cell
           N-1.</para>
@@ -1101,16 +1111,16 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         <listitem>
           <para>A fixed-length data type that allows null values will always
           consume one more byte than the datatype requires, regardless of
-          whether the actual value is null or non-null. E.g., an int8 will
-          require 2 bytes and an int64 will require 9 bytes. (In the figure,
-          see bytes 2-4 or 17-19.)</para>
+          whether the actual value is null or non-null. For example, an int8
+          will require 2 bytes and an int64 will require 9 bytes. (In the
+          figure, see bytes 2-4 or 17-19.)</para>
         </listitem>
 
         <listitem>
           <para>A fixed-length data type that disallows null values will
-          always consume exactly as many bytes as that datatype requires.
-          E.g., an int8 will consume 1 byte and an int64 will consume 8 bytes.
-          (See byte 1 or 16.)</para>
+          always consume exactly as many bytes as that datatype requires. For
+          example, an int8 will consume 1 byte and an int64 will consume 8
+          bytes. (See byte 1 or 16.)</para>
         </listitem>
 
         <listitem>
@@ -1166,14 +1176,10 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <programlisting language="test">
 --aql SELECT * FROM list('types'); --show-output=no 
 </programlisting>
-    </sect2>
+    </section>
 
-    <sect2>
-       
-
+    <section>
       <title>Load the Data</title>
-
-       
 
       <para>After you prepare the file in the SciDB-recognized binary format,
       you are almost ready to load the data into SciDB. But first you must
@@ -1183,47 +1189,39 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       intensity after exposure, the array you create must have three
       attributes, like this:</para>
 
-       
-
-      <para>
-        <programlisting language="test">
+      <programlisting language="test">
 --aql CREATE ARRAY intensityFlat 
  &lt; exposure:string, elapsedTime:int64, measuredIntensity:int64 null &gt; 
  [i=0:*,1000000,0]; --show-output=no --show-query=yes 
 </programlisting>
-      </para>
-
-       
 
       <para>Within the preceding CREATE ARRAY statement, notice the
       following:</para>
 
-       
-
       <itemizedlist>
         <listitem>
-          <para>The attribute names -- Although the array intensityFlat is
-          merely the load array—one that you might even delete after you
-          create and populate the target 2-dimensional, 1-attribute array—the
-          attribute names matter. You should name the attributes as you expect
-          to name the corresponding attribute and dimensions in the array you
-          will ultimately create to support your analytics.</para>
+          <para>The attribute names—Although the array intensityFlat is merely
+          the load array—one that you might even delete after you create and
+          populate the target 2-dimensional, 1-attribute array—the attribute
+          names matter. You should name the attributes as you expect to name
+          the corresponding attribute and dimensions in the array you will
+          ultimately create to support your analytics.</para>
         </listitem>
 
         <listitem>
-          <para>The order of attributes -- You should declare the attributes
+          <para>The order of the attributes—You should declare the attributes
           in the same left-to-right order as the values that appear in each
           record of the binary file.</para>
         </listitem>
 
         <listitem>
-          <para>The null declaration for the measuredIntensity attribute. This
+          <para>The null declaration for the measuredIntensity attribute—This
           is needed because the data includes some null values for that
           attribute.</para>
         </listitem>
 
         <listitem>
-          <para>The dimension name -- The dimension name ("i" in this case) is
+          <para>The dimension name—The dimension name ("i" in this case) is
           uninteresting. You can use any name, because that dimension does not
           correspond to any variable from your data set and that dimension
           will not appear in any form in the final array you eventually
@@ -1234,30 +1232,27 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         </listitem>
 
         <listitem>
-          <para>The chunk size (in this case, 1000000) for the dimension --
-          Even though you might use the intensityFlat array only briefly and
-          delete it after you establish and populate the target array, the
-          chunk size of the load array matters because it can affect
-          performance of the load and of the next step: the redimension_store.
-          The chunk size you choose for the load array has no effect on the
-          chunk sizes you will eventually choose for the exposure and
-          elapsedTime dimensions of the target array.</para>
+          <para>The chunk size (in this case, 1000000) for the dimension—Even
+          though you might use the intensityFlat array only briefly and delete
+          it after you establish and populate the target array, the chunk size
+          of the load array matters because it can affect performance of the
+          load and of the next step: the redimension_store. The chunk size you
+          choose for the load array has no effect on the chunk sizes you will
+          eventually choose for the exposure and elapsedTime dimensions of the
+          target array.</para>
         </listitem>
 
         <listitem>
-          <para>The chunk overlap (in this case, 0) for the dimension. For the
+          <para>The chunk overlap (in this case, 0) for the dimension—For the
           intermediate array that exists only as the target of a load and as
           the source of a subsequent redimension_store, there is no need for
           chunks to overlap at all.</para>
+
+          <para>For more information about chunk size and overlap, see the
+          <link linkend="BasicArchitecture">Basic Architecture</link>
+          section.</para>
         </listitem>
       </itemizedlist>
-
-       
-
-      <para>For more information about chunk size and overlap, see the section
-      on Basic Architecture in Introduction to SciDB.</para>
-
-       
 
       <para><indexterm>
           <primary>AQL</primary>
@@ -1272,22 +1267,42 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
            int64 null)';  --show-output=no 
 </programlisting></para>
 
-       The file path of 
-
-      <replaceable>intensity_data.bin</replaceable>
-
-       is relative to the SciDB server's working directory on the coordinator instance. 
+      <para>The file path of <literal>intensity_data.bin</literal> is relative
+      to the SciDB server's working directory on the coordinator
+      instance.</para>
 
       <para>Notice the format string—the quoted text following the AS keyword.
       The LOAD command uses the format string as a guide for interpreting the
-      contents of the binary file. For more information about the syntax of
-      the format string, see the Load section in SciDB Operator
-      Reference.</para>
+      contents of the binary file.</para>
+    </section>
 
-       
-    </sect2>
+    <section>
+      <title>Loading Binary String Data</title>
 
-    <sect2>
+      <para><indexterm>
+          <primary>strings, binary loading</primary>
+        </indexterm><indexterm>
+          <primary>binary data</primary>
+        </indexterm>You must null-terminate strings when loading binary data.
+      Also, count the terminating null character as part of the length of the
+      string. For example, consider the following partial data file for a
+      string attribute that does not allow nulls:<screen>05 00 00 00 48 69 67 68 00 ...
+07 00 00 00 4d 65 64 69 75 6D 00 ...
+</screen></para>
+
+      <para>The first four bytes for each record contain the size of the
+      string—5 bytes and 7 bytes respectively. The next bytes contain the
+      string data:<screen>05 00 00 00 48 69 67 68 00 ...
+            H  i  g  h  \0
+07 00 00 00 4d 65 64 69 75 6D 00 ...
+            M  e  d  i  u  m  \0
+</screen></para>
+
+      <para>The following example shows the string lengths for strings in the
+      intensityFlat array:<programlisting language="test">--aql SELECT exposure, strlen(exposure) FROM intensityFlat</programlisting></para>
+    </section>
+
+    <section>
       <title>Rearrange As Necessary</title>
 
       <para>After you populate the load array, you can use SciDB features to
@@ -1328,12 +1343,12 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       with the data, use the following command:</para>
 
       <para><programlisting language="test">
---aql SELECT * FROM redimension_store(intensityFlat,intensity); --show-output=no
+--afl redimension_store(intensityFlat,intensity); --show-output=no
 </programlisting> The result of this command is the desired array; you have
       completed the binary load procedure.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Skipping Fields and Field Padding During Binary Load</title>
 
       <para><indexterm>
@@ -1425,10 +1440,10 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
           languages will always align field values to start on 32-bit word
           boundaries.</para>
         </note></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Transferring Data From One SciDB Installation to Another</title>
 
     <para><indexterm>
@@ -1490,7 +1505,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       </listitem>
     </itemizedlist>
 
-    <sect2>
+    <section>
       <title>Visualize the Desired Array</title>
 
       <para>When using the opaque loading technique, visualizing the SciDB
@@ -1528,9 +1543,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       destination installation when you create the array that will contain the
       data loaded from the file. The next two sections elaborate on these
       cases.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section id="opaqueSave">
       <title>Prepare the File for Opaque Loading</title>
 
       <para><indexterm>
@@ -1553,24 +1568,40 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       the current version of any SciDB array. The following command
       accomplishes that for the array called "intensity."</para>
 
-      <para><programlisting language="test">SAVE 
+      <para><programlisting><command>SAVE</command> 
           intensity
-     INTO CURRENT INSTANCE 
-          '../examples/intensity_data.opaque'
-     AS   'OPAQUE';</programlisting>The keywords <code>CURRENT INSTANCE</code>
-      instruct SciDB to create the file in the SciDB working directory on the
-      coordinator node. The preceding SAVE statement writes the
-      opaque-formatted file in this location on the coordinator instance of
-      the source installation:</para>
+     <command>INTO CURRENT INSTANCE</command> 
+          'intensity_data.opaque'
+     <command>AS</command>   'OPAQUE';</programlisting>The keywords
+      <code>CURRENT INSTANCE</code> instruct SciDB to create the file in the
+      SciDB working directory on the coordinator node. The keyword
+      <code>OPAQUE</code> instructs SciDB to create the file in opaque format.
+      The preceding SAVE statement writes the opaque-formatted file in this
+      location on the coordinator instance of the source installation:</para>
 
-      <para><replaceable>base-path</replaceable>../examples/intensity_data.bin</para>
+      <screen><replaceable> base-path</replaceable>/<replaceable>instance-folder</replaceable>/intensity_data.opaque</screen>
 
       <para>where <replaceable>base-path</replaceable> is the location of your
-      SciDB working directory (as defined in the SciDB config.ini
-      file).</para>
+      SciDB working directory (as defined in the SciDB config.ini file), and
+      the <replaceable>instance-folder</replaceable> is folder for the
+      instance, in this case the coordinator, where the query is being run.
+      For example, if the <replaceable>base-path</replaceable> is
+      <literal>/home/scidb/scidb-data/</literal>, then the file will be saved
+      as follows:<programlisting> /home/scidb/scidb-data/000/0/intensity_data.opaque</programlisting></para>
 
-      <para>The keyword <code>OPAQUE</code> instructs SciDB to create the file
-      in opaque format.</para>
+      <para>You could also save to a different instance, rather than the
+      current one:<programlisting><command>SAVE</command> 
+          intensity
+     <command>INTO INSTANCE 2</command>
+          'intensity_data.opaque'
+     <command>AS</command>   'OPAQUE';</programlisting></para>
+
+      <para>Assuming <replaceable>base-path</replaceable> is the same as in
+      the previous save query, then this query would save the data to the
+      following location:<programlisting> /home/scidb/scidb-data/000/2/intensity_data.opaque</programlisting></para>
+
+      <para>For details on SciDB paths, see <xref
+      linkend="sciDBLogs"/>.</para>
 
       <para>If you want the resulting opaque-formatted file to describe
       something other than the original array—say, a subset of it or an array
@@ -1589,8 +1620,8 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         <listitem>
           <para>In AFL, you can establish the result array you want and use
           that result array as an operand of the SAVE operator. For more
-          information, see the SAVE section of the SciDB Operator Reference
-          chapter.</para>
+          information, see the <link linkend="saveOperator">Save Operator
+          Reference topic</link>.</para>
         </listitem>
       </itemizedlist>
 
@@ -1598,9 +1629,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       coordinator node, you need to move the file to a location where the
       other SciDB installation can access it when you run the load command
       there.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section id="opaqueLoad">
       <title>Load the Data</title>
 
       <para><indexterm>
@@ -1667,47 +1698,93 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 </programlisting> The result of this command is the array in the destination
       installation of SciDB. You have completed the opaque loading
       procedure.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Data with Special Values</title>
 
-    <para><indexterm>
-        <primary>loading data</primary>
+    <para>This section discusses default attribute values for missing values,
+    and some behavior for empty cells.</para>
 
-        <secondary>special values</secondary>
-      </indexterm><indexterm>
-        <primary>data</primary>
+    <section>
+      <title>Data with Missing Values</title>
 
-        <secondary>loading special</secondary>
-      </indexterm>Suppose you have a load file that is missing some values,
-    like this file, <code>v4.scidb</code>:</para>
+      <para><indexterm>
+          <primary>loading data</primary>
 
-    <programlisting language="test">--shell --show-output=yes --show-query=no --command=cat ../examples/v4.scidb</programlisting>
+          <secondary>special values</secondary>
+        </indexterm><indexterm>
+          <primary>data</primary>
 
-    <para>The load file <code>v4.scidb</code> has a missing value in the third
-    cell. If you create an array and load this data set, SciDB will substitute
-    0 for the missing value: <programlisting language="test">--aql CREATE ARRAY v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0] --show-output=no
---aql LOAD v4 FROM '../examples/v4.scidb'; --show-output=no</programlisting></para>
+          <secondary>loading special</secondary>
+        </indexterm><indexterm>
+          <primary>arrays</primary>
 
-    <para>The out-of-the-box default value for each datatype is described in
-    the chapter describing SciDB datatypes: SciDB Data Types and Casting.To
-    change the default value, that is, the value the SciDB substitutes for the
-    missing data, set the DEFAULT attribute option. This code creates an array
-    <code>v4_dflt</code> with default attribute value set to 111:</para>
+          <secondary>special values</secondary>
+        </indexterm>Suppose you have a load file that is missing some values,
+      like this file, <code>v4.scidb</code>:</para>
 
-    <programlisting language="test">--aql CREATE ARRAY v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0] --show-output=no
---aql LOAD v4_dflt FROM '../examples/v4.scidb';  --show-output=no</programlisting>
+      <programlisting language="test">--shell --show-output=yes --show-query=no --command=cat ../examples/v4.scidb</programlisting>
 
-    <para>Load files may also contain null values, such as in this file,
-    <code>v4_null.scidb</code>: <programlisting language="test">--shell --show-query=no --show-output=yes --command=cat ../examples/v4_null.scidb</programlisting>
-    To preserve null values at load time, add the NULL option to the attribute
-    type: <programlisting language="test">--aql CREATE ARRAY v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0]; --show-output=no 
+      <para>The load file <code>v4.scidb</code> has a missing value in the
+      third cell. If you create an array and load this data set, SciDB will
+      substitute 0 for the missing value: <programlisting language="test">--aql CREATE ARRAY v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0] --show-output=no
+--aql LOAD v4 FROM '../examples/v4.scidb' --output-format=dense</programlisting></para>
+
+      <para><indexterm>
+          <primary>attributes</primary>
+
+          <secondary>default values</secondary>
+        </indexterm><indexterm>
+          <primary>default attribute values</primary>
+        </indexterm>The out-of-the-box default value for each datatype is
+      described in <xref linkend="dataTypes"/>.To change the default value,
+      that is, the value the SciDB substitutes for the missing data, set the
+      DEFAULT attribute option. This code creates an array
+      <code>v4_dflt</code> with default attribute value set to 111:</para>
+
+      <programlisting language="test">--aql CREATE ARRAY v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0] --show-output=no
+--aql LOAD v4_dflt FROM '../examples/v4.scidb' --output-format=dense
+</programlisting>
+
+      <para>Load files may also contain null values, such as in this file,
+      <code>v4_null.scidb</code>: <programlisting language="test">--shell --show-query=no --show-output=yes --command=cat ../examples/v4_null.scidb</programlisting>
+      To preserve null values at load time, add the NULL option to the
+      attribute type: <programlisting language="test">--aql CREATE ARRAY v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0]; --show-output=no 
 --aql LOAD v4_null FROM '../examples/v4_null.scidb'; --show-output=no </programlisting></para>
-  </sect1>
+    </section>
 
-  <sect1>
+    <section>
+      <title>Empty Cells</title>
+
+      <para><indexterm>
+          <primary>empty cells</primary>
+        </indexterm><indexterm>
+          <primary>arrays</primary>
+
+          <secondary>empty cells</secondary>
+        </indexterm>In addition to missing values for attributes, SciDB arrays
+      may also contain completely empty cells. For example, if we load
+      <code>v4.scidb</code> into an array with a dimension that is larger than
+      the supplied data, the array will contain empty cells:<programlisting
+      language="test">--aql CREATE ARRAY v6_dflt &lt;val1:int8,val2:int8 default 111&gt;
+      [i=0:5,6,0] --show-output=no
+--aql LOAD v6_dflt FROM '../examples/v4.scidb' --output-format=dense
+</programlisting></para>
+
+      <para>Note that the last two cells of the array are empty. If you do not
+      want empty cells, you can use the NOT EMPTY keywords when you create the
+      array:<programlisting language="test">--aql CREATE NOT EMPTY ARRAY v6_dflt_notEmpty &lt;val1:int8,val2:int8 default 111&gt;[i=0:5,6,0] --show-output=no
+--aql LOAD v6_dflt_notEmpty FROM '../examples/v4.scidb' --output-format=dense
+</programlisting></para>
+
+      <para>Note that for val2, the supplied default value (111) is used, and
+      for val1, the default value of the int8 datatype is used (zero).</para>
+    </section>
+  </section>
+
+  <section>
     <title>Handling Errors During Load</title>
 
     <para><indexterm>
@@ -1720,6 +1797,8 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         <primary>data</primary>
 
         <secondary>load errors</secondary>
+      </indexterm><indexterm>
+        <primary>shadow arrays</primary>
       </indexterm>By default, if an error occurs during load, SciDB displays
     an error message to stdout and cancels the operation. Because load is
     designed to work on high volumes of data, the SciDB load facility includes
@@ -1927,7 +2006,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         </listitem>
 
         <listitem>
-          <para>The sixth row has one correct value (Medium) in the first
+          <para>The sixth row has one correct value (Low) in the first
           attribute. The second attribute has been populated with the default
           value for that attribute because that attribute does not allow
           nulls. By contrast, the third attribute, which also generated an
@@ -2020,5 +2099,5 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     during the load. How you choose to remedy or otherwise respond to those
     problems depends on the nature of your data and the data-quality policies
     of your organization.</para>
-  </sect1>
+  </section>
 </chapter>

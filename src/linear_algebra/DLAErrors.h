@@ -70,6 +70,9 @@ enum
     DLA_ERROR40,// Non-zero chunk overlap is not supported %1%
     DLA_ERROR41,//ChunkInterval is too small
     DLA_ERROR42,//ChunkInterval is too large
+    DLA_ERROR43,// array dimensions must be of equal size, temporarily
+    DLA_ERROR44,// dimensions must start at 0
+    DLA_ERROR45,// dimensions must be int or uint types, temporarily
     DLA_WARNING1, // convergence is not reached; iteration limit exceeded
     DLA_WARNING2, // rank deficient problem
     DLA_WARNING3, // the model is overparameterized and some coefficients are not identifiable

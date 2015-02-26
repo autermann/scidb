@@ -54,6 +54,42 @@ create array ColInf<a: double>  [r=0:1,2,0, c=0:*,2,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gemm(ColInf, Valid, Valid)"
 remove(ColInf)
 
+# matrix must be square, temporarily
+create array NonSquare<a: double>  [r=0:0,2,0, c=0:1,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gemm(Valid, Valid, NonSquare)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gemm(Valid, NonSquare, Valid)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR43 "gemm(NonSquare, Valid, Valid)"
+remove(NonSquare)
+
+# dimensions must start at 0, temporarily
+create array StartOne<a: double>  [r=1:1,2,0, c=1:1,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44 "gemm(Valid, Valid, StartOne)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44 "gemm(Valid, StartOne, Valid)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR44 "gemm(StartOne, Valid, Valid)"
+remove(StartOne)
+
+# dimensions must be int or uint types, temporarily
+create array NonInt<a: double>  [r(float)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, Valid, NonInt)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, NonInt, Valid)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(NonInt, Valid, Valid)"
+remove(NonInt)
+create array NonInt<a: double>  [r(double)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, Valid, NonInt)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, NonInt, Valid)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(NonInt, Valid, Valid)"
+remove(NonInt)
+create array NonInt<a: double>  [r(char)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, Valid, NonInt)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, NonInt, Valid)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(NonInt, Valid, Valid)"
+remove(NonInt)
+create array NonInt<a: double>  [r(string)=1,2,0, c=0:0,2,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, Valid, NonInt)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(Valid, NonInt, Valid)"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR45 "gemm(NonInt, Valid, Valid)"
+remove(NonInt)
+
 # chunksize too small
 create array chunkTooSmall <a: double> [r=0:1,31,0, c=0:1,31,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gemm(Valid, Valid, chunkTooSmall)"
@@ -98,19 +134,23 @@ remove(ColOverlap)
 # (better for maintenance, and teaching the user, IMHO)
 #
 
-# sizes must follow matrix-multiply rules
-create array Square<a: double> [r=0:1, 32,0, c=0:1, 32,0]
-create array Wide<a: double>   [r=0:1, 32,0, c=0:10,32,0]
-create array Tall<a: double>   [r=0:10,32,0, c=0:1, 32,0]
-# catch mismatch between A's cols and B's rows
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Wide, Square, Square)"
-# catch mismatch between A's rows and C's rows
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Tall, Square, Square)"
-# catch mismatch between B's cols and C's cols
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Square, Wide, Square)"
-remove(Square)
-remove(Wide)
-remove(Tall)
+# TEMPORARY all non-square and non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+#           will be fixed by #2200 and/or #2202
+#
+## sizes must follow matrix-multiply rules
+#create array Square<a: double> [r=0:1, 32,0, c=0:1, 32,0]
+#create array Wide<a: double>   [r=0:1, 32,0, c=0:10,32,0]
+#create array Tall<a: double>   [r=0:10,32,0, c=0:1, 32,0]
+## catch mismatch between A's cols and B's rows
+#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Wide, Square, Square)"
+## catch mismatch between A's rows and C's rows
+#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Tall, Square, Square)"
+## catch mismatch between B's cols and C's cols
+#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR4 "gemm(Square, Wide, Square)"
+#remove(Square)
+#remove(Wide)
+#remove(Tall)
 
 # NOTE: cannot test mismatched chunk size when min and max are already set to same value...
 #       the min/max check happens first

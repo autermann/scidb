@@ -92,6 +92,9 @@ const char TID_FIXED_STRING[] = "string_*";
 
 #define IS_REAL(type) (type == TID_FLOAT || type == TID_DOUBLE)
 
+#define IS_INTEGRAL(type) (type == TID_INT8  || type == TID_INT16  || type == TID_INT32  || type == TID_INT64 || \
+                           type == TID_UINT8 || type == TID_UINT16 || type == TID_UINT32 || type == TID_UINT64 )
+
 #define IS_SIGNED(type) (type == TID_INT8 || type == TID_INT16 || type == TID_INT32 || type == TID_INT64\
     || type == TID_FLOAT || type == TID_DOUBLE)
 

@@ -32,10 +32,18 @@ BuildRequires: doxygen
 BuildRequires: fop
 BuildRequires: docbook-style-xsl
 BuildRequires: libxslt
+BuildRequires: mpich2-devel
+BuildRequires: lapack-devel
+BuildRequires: blas-devel
+BuildRequires: openssh-clients
 Requires: python-paramiko
 Requires: python-crypto
 Requires: python-argparse
 Requires: postgresql >= 8.4, postgresql < 8.5
+Requires: openssh-clients
+Requires: mpich2
+Requires: lapack
+Requires: blas
 %description
 SciDB - database for extra large data processing
 

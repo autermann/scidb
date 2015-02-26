@@ -5,7 +5,7 @@
 <chapter>
   <title>Basic Array Tasks</title>
 
-  <sect1>
+  <section>
     <title>Selecting Data From an Array</title>
 
     <para><indexterm>
@@ -20,65 +20,71 @@
         <secondary>select</secondary>
       </indexterm>The AQL Data Manipulation Language (DML) provides queries to
     access and operate on array data. The basis for selecting data from a
-    SciDB array is the AQL <code> <command>SELECT</command> </code> statement
-    with <code> <command>INTO</command> </code>, <code>
-    <command>FROM</command> </code>, and <code> <command>WHERE</command>
-    </code> clauses. The syntax of the <code> <command>SELECT</command>
-    </code> statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable>
-   [<command>INTO</command> <replaceable>target_array</replaceable>]
-    <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
-   [<command>WHERE</command> <replaceable>expression</replaceable>]
-</synopsis> The arguments for the statement are: <variablelist>
-        <?dbfo term-width="1.5in"?>
+    SciDB array is the AQL <code><command>SELECT</command></code> statement
+    with <code><command>INTO</command></code>,
+    <code><command>FROM</command></code>, and
+    <code><command>WHERE</command></code> clauses.</para>
 
-        <varlistentry>
-          <term><replaceable>expression</replaceable></term>
+    <section>
+      <title>SELECT Statement Syntax</title>
 
-          <listitem>
-            <para><code><command>SELECT</command></code>
-            <replaceable>expression</replaceable> can select individual
-            attributes and dimensions, as well as constants and expressions.
-            The wildcard character * means select all attributes.</para>
-          </listitem>
-        </varlistentry>
+      <para>The syntax of the <code> <command>SELECT</command> </code>
+      statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable>
+       [<command>INTO</command> <replaceable>target_array</replaceable>]
+       <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
+       [<command>WHERE</command> <replaceable>expression</replaceable>]
+       </synopsis> The arguments for the statement are: <variablelist>
+          <?dbfo term-width="1.5in"?>
 
-        <varlistentry>
-          <term><replaceable>target_array</replaceable></term>
+          <varlistentry>
+            <term><replaceable>expression</replaceable></term>
 
-          <listitem>
-            <para>The <code><command>INTO</command></code> clause can create
-            an array to store the output of the query. The target array may
-            also be a pre-existing array in the current SciDB
-            namespace.</para>
-          </listitem>
-        </varlistentry>
+            <listitem>
+              <para><code><command>SELECT</command></code>
+              <replaceable>expression</replaceable> can select individual
+              attributes and dimensions, as well as constants and expressions.
+              The wildcard character * means select all attributes.</para>
+            </listitem>
+          </varlistentry>
 
-        <varlistentry>
-          <term><replaceable>array_expression</replaceable> |
-          <replaceable>source_array</replaceable></term>
+          <varlistentry>
+            <term><replaceable>target_array</replaceable></term>
 
-          <listitem>
-            <para>The <code><command>FROM</command></code> clause takes a
-            SciDB array or array expression as argument. The
-            <replaceable>array_expression</replaceable> argument is an
-            expression or subquery that returns an array result. The
-            <replaceable>source_array</replaceable> is an array that has been
-            created and stored in the current SciDB namespace.</para>
-          </listitem>
-        </varlistentry>
+            <listitem>
+              <para>The <code><command>INTO</command></code> clause can create
+              an array to store the output of the query. The target array may
+              also be a pre-existing array in the current SciDB
+              namespace.</para>
+            </listitem>
+          </varlistentry>
 
-        <varlistentry>
-          <term><replaceable>expression</replaceable></term>
+          <varlistentry>
+            <term><replaceable>array_expression</replaceable> |
+            <replaceable>source_array</replaceable></term>
 
-          <listitem>
-            <para>The <replaceable>expression</replaceable> argument of the
-            <code><command>WHERE</command></code> clause allows to you specify
-            parameters that filter the query.</para>
-          </listitem>
-        </varlistentry>
-      </variablelist></para>
+            <listitem>
+              <para>The <code><command>FROM</command></code> clause takes a
+              SciDB array or array expression as argument. The
+              <replaceable>array_expression</replaceable> argument is an
+              expression or subquery that returns an array result. The
+              <replaceable>source_array</replaceable> is an array that has
+              been created and stored in the current SciDB namespace.</para>
+            </listitem>
+          </varlistentry>
 
-    <sect2>
+          <varlistentry>
+            <term><replaceable>expression</replaceable></term>
+
+            <listitem>
+              <para>The <replaceable>expression</replaceable> argument of the
+              <code><command>WHERE</command></code> clause allows to you
+              specify parameters that filter the query.</para>
+            </listitem>
+          </varlistentry>
+        </variablelist></para>
+    </section>
+
+    <section>
       <title>The SELECT Statement</title>
 
       <para>AQL expressions in the <code> <command>SELECT</command> </code>
@@ -146,10 +152,10 @@ SELECT val_b/10 FROM B; --output-format=auto
       array or any operation that outputs an array as an argument. The
       <code><command>INTO</command></code> clause stores the output of a
       query.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Joins</title>
 
     <para><indexterm>
@@ -240,9 +246,9 @@ SELECT val_b/10 FROM B; --output-format=auto
     at coordinate <code>{k=j}</code> of <code>vector3</code>: <programlisting
     language="test">--aql SELECT * FROM m3x3 JOIN vector3 ON m3x3.j = vector3.k; --output-format=auto 
 </programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h3">
+  <section remap="h3">
     <title>Aliases</title>
 
     <para><indexterm>
@@ -250,7 +256,9 @@ SELECT val_b/10 FROM B; --output-format=auto
 
         <secondary>aliases</secondary>
       </indexterm><indexterm>
-        <primary>query aliases</primary>
+        <primary>queries</primary>
+
+        <secondary>aliases</secondary>
       </indexterm><indexterm>
         <primary>arrays</primary>
 
@@ -259,6 +267,8 @@ SELECT val_b/10 FROM B; --output-format=auto
         <primary>AQL</primary>
 
         <secondary>as</secondary>
+      </indexterm><indexterm>
+        <primary>aliases</primary>
       </indexterm>AQL provides a way to refer to arrays and array attributes
     in a query via aliases. These are useful when using the same array
     repeatedly in an AQL statement, or when abbreviating a long array name.
@@ -268,9 +278,9 @@ SELECT val_b/10 FROM B; --output-format=auto
     the array can use the fully qualified name using the dotted naming
     convention. <programlisting language="test">--aql  SELECT data.i*10 FROM A AS data WHERE A.i &lt; 5; --output-format=auto 
 </programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h3">
+  <section remap="h3">
     <title>Nested Subqueries</title>
 
     <para><indexterm>
@@ -301,9 +311,9 @@ SELECT val_b/10 FROM B; --output-format=auto
           <para>Squares the result.</para>
         </listitem>
       </orderedlist></para>
-  </sect1>
+  </section>
 
-  <sect1 remap="h3">
+  <section remap="h3">
     <title>Data Sampling</title>
 
     <para><indexterm>
@@ -331,5 +341,5 @@ bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</rep
     results by seeding the random number generator. All calls to the random
     number generator with the same seed produce the same random number. The
     seed must be a 64-bit integer.</para>
-  </sect1>
+  </section>
 </chapter>

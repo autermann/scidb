@@ -1,0 +1,103 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv id="countAggregate">
+    <refname>count</refname>
+
+    <refpurpose><indexterm>
+        <primary>count</primary>
+      </indexterm><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>count</secondary>
+      </indexterm>Returns a count of non-empty cells, or attributes that are
+    not null.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>AQL% <command>SELECT</command> count(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;
+
+AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>))</synopsis>
+
+    <para> OR</para>
+
+    <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
+
+    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,count(*))</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>If you use the count(<replaceable>attribute</replaceable>) syntax,
+    the count aggregate counts everything except the following:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>empty cells</para>
+      </listitem>
+
+      <listitem>
+        <para>attribute values that are NULL.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>If you use the count(*) syntax, the count aggregate returns a count
+    of the all the cells present (both NULL and NOT NULL).</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Examples</title>
+
+    <informalexample>
+      <para>This example finds the number of nonempty cells in a 3<symbol role="symbolfont">×</symbol>3 matrix.</para>
+
+      <procedure>
+        <step>
+          <para>Create a matrix m3x3:<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
+        </step>
+
+        <step>
+          <para>Put values 1 along the diagonal of m3x3 and leave the
+          remaining cells empty:<para><programlisting>AFL% store(build_sparse(m3x3,1,i=j),m3x3);  </programlisting><screen>[
+[(1),(),()],
+[(),(1),()],
+[(),(),(1)]
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para>Find the number of nonempty cells in the
+          matrix:<para><programlisting>AFL% aggregate(m3x3,count(val));  </programlisting><screen>[(3)]
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example finds the number of nonempty and non-null cells from
+      a matrix that contains some NULL values.</para>
+
+      <procedure>
+        <step>
+          <para>Show the contents of count_array:<para><screen>[
+[(),(),()],
+[(null),(null),(null)],
+[("a7"),("a8"),("a9")]
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para>Count the number of nonempty cells:<para><programlisting>AQL% <command>SELECT</command> count(*) <command>FROM</command> A;  </programlisting><screen>[(6)]
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Count the number of nonempty and non-null cells for the
+          <literal>value</literal> attribute:<para><programlisting>AQL% <command>SELECT</command> count(value) <command>FROM</command> A;  </programlisting><screen>[(3)]
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

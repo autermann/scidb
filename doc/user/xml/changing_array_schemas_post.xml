@@ -34,7 +34,7 @@
     </listitem>
   </itemizedlist>
 
-  <sect1 id="redimSection">
+  <section id="redimSection">
     <title>Redimensioning an Array</title>
 
     <para><indexterm>
@@ -72,8 +72,8 @@
 "device-2","probe-4",511.29
 "device-3","probe-4",557.76
 "device-4","probe-4",606.25
-</screen> This data has three columns, two of which are stings and one
-    which is a floating-point number. The column headers are 'd','p',and
+</screen> This data has three columns, two of which are strings and
+    one which is a floating-point number. The column headers are 'd','p',and
     'val'. To load this data set, create a 1-dimensional SciDB array with
     three attributes and load the data into it. For this example, the array is
     named expo. The dimension name is i, the dimension size is 25, the chunk
@@ -217,7 +217,7 @@
 [(),(),(),(),()]
 ]</screen></para></para></para></para>
 
-    <sect2>
+    <section>
       <title>Cell Collisions</title>
 
       <para><indexterm>
@@ -245,9 +245,9 @@
 
       <para>For details on these techniques, see the <link linkend="redimension">redimension</link> and <link linkend="redimensionStore">redimension_store</link> operator reference
       sections.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Redimensioning Arrays Containing Null Values</title>
 
       <para><indexterm>
@@ -294,10 +294,10 @@ val3:double &gt;
       NULL values into non-NULL values. This procedure is described in the
       <link linkend="substituteOperator">substitute</link> reference
       topic.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Transformations</title>
 
     <para><indexterm>
@@ -325,7 +325,7 @@ val3:double &gt;
       <command>FROM </command> operation( <replaceable>source_array </replaceable>, <replaceable>parameters </replaceable>)
       </synopsis></para>
 
-    <sect2 id="rearrangeSection">
+    <section id="rearrangeSection">
       <title>Rearranging Array Data</title>
 
       <para><indexterm>
@@ -429,9 +429,9 @@ j=0:2,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>FRO
 [(5),(4),(3)],
 [(2),(1),(0)]
 ]</screen></para></para>
-    </sect2>
+    </section>
 
-    <sect2 id="reduceSection">
+    <section id="reduceSection">
       <title>SciDB Array Reducing Operators</title>
 
       <para><indexterm>
@@ -601,10 +601,10 @@ j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
 ]</screen></para></para></para></para>
         </step>
       </procedure>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1 id="changeAttributes">
+  <section id="changeAttributes">
     <title>Changing Array Attributes</title>
 
     <para><indexterm>
@@ -676,12 +676,12 @@ j=0:2,3,0]</screen></para></para>
 [(13,9),(14,16),(15,25)],
 [(16,36),(17,49),(18,64)]
 ]</screen></para></para>
-  </sect1>
+  </section>
 
-  <sect1 id="changeDim">
+  <section id="changeDim">
     <title>Changing Array Dimensions</title>
 
-    <sect2>
+    <section>
       <title>Changing Chunk Size</title>
 
       <para><indexterm>
@@ -708,9 +708,9 @@ j=0:2,3,0]</screen></para></para>
       queries.<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> chunks_overlap
     <command>FROM</command> repart(chunks,&lt;val1:double,val2:double&gt;
      [i=0:999,100,10,j=0:999,100,10]);  </programlisting></para></para>
-    </para></sect2>
+    </para></section>
 
-    <sect2>
+    <section>
       <title>Appending a Dimension</title>
 
       <para><indexterm>
@@ -818,6 +818,6 @@ t(string)=5,5,0]</screen></para></para>
 
 [d=0:1,1,0,
 t(string)=5,5,0]</screen></para></para></para></para></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 </chapter>

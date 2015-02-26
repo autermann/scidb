@@ -1,0 +1,26 @@
+# See ticket #1786
+#
+
+--setup
+--start-query-logging
+--start-igdata
+
+create not empty array A1k <x:float>[i=1:1000,500,0, j=1:1000,500,0]
+store(build(A1k, i*1000+j), A1k)
+
+create array mat_4800_4800 <a: double> [I=0:4799,400,0, J=0:4799,400,0]
+store(build(mat_4800_4800, I + J - 1), mat_4800_4800)
+
+
+--test
+
+multiply(A1k, transpose(A1k), 'iterative')
+multiply(mat_4800_4800, transpose(mat_4800_4800))
+--stop-igdata
+
+
+--cleanup
+remove(A1k)
+remove(mat_4800_4800)
+--stop-query-logging
+

@@ -413,6 +413,10 @@ namespace scidb
         scidb::Mutex _mutex;
         bool _isReady;
         boost::shared_ptr<scidb::Scheduler> _cleanupScheduler;
+	size_t _mpiType;
+	std::string _mpiInstallDir;
+	std::string _mpiDaemonBin;
+	std::string _mpiLauncherBin;
 
         void initMpi();
         static void initiateCleanup();
@@ -433,20 +437,18 @@ namespace scidb
          * @param installPath this instance install/data path
          * @return filename of the MPI launcher relative to installPath
          */
-        static std::string getLauncherBinFile(const std::string& installPath)
+        std::string getLauncherBinFile(const std::string& installPath)
         {
-            string mpiDir = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_DIR);
-            return MpiLauncher::getLauncherPath(mpiDir);
+	    return _mpiInstallDir + "/bin/" + _mpiLauncherBin;
         }
 
         /**
          * @param installPath this instance install/data path
-         * @return filename of the MPI daemon process (i.e. orted) relative to installPath
+         * @return filename of the MPI daemon process (e.g. orted) relative to installPath
          */
-        static std::string getDaemonBinFile(const std::string& installPath)
+        std::string getDaemonBinFile(const std::string& installPath)
         {
-            string mpiDir = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_DIR);
-            return MpiLauncher::getDaemonPath(mpiDir);
+	    return _mpiInstallDir + "/bin/" + _mpiDaemonBin;
         }
 
         /**
@@ -461,9 +463,9 @@ namespace scidb
          * @todo XXX this method does not work correctly under OMPI
          *           (because we dont set the correct environment for launcher/daemon)
          */
-        static bool canRecognizeProc(const std::string& installPath,
-                                     const std::string& clusterUuid,
-                                     pid_t pid);
+        bool canRecognizeProc(const std::string& installPath,
+			      const std::string& clusterUuid,
+			      pid_t pid);
     public:
         explicit MpiManager();
         virtual ~MpiManager() {}
@@ -486,6 +488,10 @@ namespace scidb
         boost::shared_ptr<MpiOperatorContext> checkAndSetCtx(scidb::QueryID queryId,
                                                              const boost::shared_ptr<MpiOperatorContext>& ctx);
         bool removeCtx(scidb::QueryID queryId);
+
+	MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
+	MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout);
+
         /// for internal use
         void forceInitMpi();
     };

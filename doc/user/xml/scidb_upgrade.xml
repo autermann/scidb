@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE sect1 PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<sect1 remap="h2">
+  <title>Upgrading SciDB</title>
+
+  <para><indexterm>
+      <primary>SciDB</primary>
+
+      <secondary>upgrading</secondary>
+    </indexterm><indexterm>
+      <primary>upgrade SciDB</primary>
+    </indexterm>This section describes how to upgrade your version of SciDB.
+  For this section, we use the following conventions:<itemizedlist>
+      <listitem>
+        <para>To represent your current version: <emphasis
+        role="bold">scidbOldVersion</emphasis>.</para>
+      </listitem>
+
+      <listitem>
+        <para>To represent the new version that you are installing: <emphasis
+        role="bold">scidbNewVersion</emphasis>.</para>
+      </listitem>
+    </itemizedlist></para>
+
+  <para>For example, if you are upgrading from 12.10 to 13.1:<itemizedlist>
+      <listitem>
+        <para><emphasis role="bold">scidbOldVersion</emphasis> = 12.10</para>
+      </listitem>
+
+      <listitem>
+        <para><emphasis role="bold">scidbNewVersion</emphasis> = 13.1</para>
+      </listitem>
+    </itemizedlist></para>
+
+  <para>If you are upgrading from a previous version of SciDB, make sure to
+  perform the following tasks:</para>
+
+  <procedure>
+    <step>
+      <para>Backup your data. The recommended way to do this is to use opaque
+      save. You need to repeat the procedure for each of your arrays. You
+      should also note the schema for each array.<orderedlist
+          numeration="loweralpha">
+          <listitem>
+            <para>Use opaque save to save your first array.<programlisting>AQL% <command>SAVE</command> <replaceable>array-name</replaceable> <command>INTO</command> '<replaceable>saved_array</replaceable>' <command>AS</command> 'OPAQUE'</programlisting>This
+            saves the array data to <replaceable>saved_array</replaceable> on
+            disk, under your SciDB base path folder. Repeat this for each of
+            your arrays. For details, see <xref linkend="opaqueSave"/>.</para>
+          </listitem>
+
+          <listitem>
+            <para>Note the schema for each of your arrays. You can use
+            <literal>list('arrays')</literal> to get a list of your arrays,
+            and then use <literal>show(array-name)</literal> for each
+            array.<programlisting>AFL% list('arrays');
+AFL% show(<replaceable>array_1</replaceable>);
+AFL% show(<replaceable>array_2</replaceable>);
+:
+AFL% show(<replaceable>array_n</replaceable>);
+</programlisting></para>
+          </listitem>
+
+          <listitem>
+            <para>Optionally, you can copy the arrays from the SciDB folder to
+            another folder or even disk, so that you can restore them even if
+            you change your database name or configuration of your SciDB
+            instances.</para>
+          </listitem>
+        </orderedlist></para>
+    </step>
+
+    <step>
+      <para>Stop SciDB, if it is running. From the SciDB user account, run the
+      following command, where <emphasis role="bold">myDataBase</emphasis> is
+      the name of your database:<programlisting>scidb.py stopall <emphasis
+            role="bold">myDataBase</emphasis></programlisting></para>
+    </step>
+
+    <step>
+      <para>If you want to keep your current SciDB configuration file, make a
+      backup copy of it somewhere. By default, the file is in the following
+      location:</para>
+
+      <para><literallayout>opt/scidb/<emphasis role="bold">scidbOldVersion</emphasis>/etc/config.ini</literallayout></para>
+    </step>
+
+    <step>
+      <para>Remove the old SciDB configuration area. If you installed to the
+      default location, run the following command (as root):<programlisting>rm -Rf /opt/scidb/<emphasis
+            role="bold">scidbOldVersion</emphasis>/</programlisting>For
+      example, if your current version is 12.10, the above command removes the
+      <literal>/opt/scidb/12.10 </literal>folder and all of its sub
+      folders.</para>
+    </step>
+
+    <step>
+      <para>Update your environment variables to refer to the new version of
+      SciDB. Make sure to change your SciDB Version variable from its current
+      value to the <emphasis role="bold">scidbNewVersion</emphasis>. Old
+      version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbOldVersion</emphasis> # This should be set in your environment.</programlisting>Set
+      to new version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbNewVersion</emphasis></programlisting>For
+      details, see the <emphasis>Set Environment Variables</emphasis>
+      section.</para>
+    </step>
+
+    <step>
+      <para>If you copied your existing config.ini file, make sure to change
+      all occurrences of <emphasis role="bold">scidbOldVersion </emphasis>to
+      <emphasis role="bold">scidbNewVersion</emphasis>. After you edit the
+      file, copy it to the <literal>/opt/scidb/13.1/etc/
+      </literal>folder.</para>
+    </step>
+
+    <step>
+      <para>To continue the upgrade process, proceed to <xref
+      linkend="PackageInstall"/>.</para>
+    </step>
+
+    <step>
+      <para>After you have the the new version of SciDB running, restore the
+      data that you saved in step 1. For details, see <xref
+      linkend="opaqueLoad"/>.</para>
+    </step>
+  </procedure>
+</sect1>

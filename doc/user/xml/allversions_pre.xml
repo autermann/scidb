@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>allversions</refname>
+
+    <refpurpose><indexterm>
+        <primary>versions</primary>
+
+        <secondary>arrays</secondary>
+      </indexterm><indexterm>
+        <primary>allversions</primary>
+      </indexterm>Return a result array containing all versions of an existing
+    array.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>allversions(<replaceable>named_array</replaceable>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The allversions operator takes all versions of an array and returns
+    a result array that combines all versions of
+    <replaceable>named_arrary</replaceable> into one array. The resulting
+    array has a dimension called VersionNo that has indices
+    1–<replaceable>final_array_version</replaceable> appended to the left-most
+    dimension. The argument <replaceable>named_array</replaceable> must be an
+    array that was previously created and stored in the SciDB
+    namespace.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example creates a 3<symbol role="symbolfont">×</symbol>3
+      matrix, updates it, and then uses allversions to combine all previous
+      versions of the array.</para>
+
+      <procedure>
+        <step>
+          <para>Create array m3x3 and load zeros into it:<programlisting
+          language="test">--afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],0),m3x3); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Update m3x3 with 100 in every cell:<programlisting
+          language="test">--afl store(build(m3x3,100),m3x3); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Update m3x3 with 200 in every cell:<programlisting
+          language="test">--afl store(build(m3x3,200),m3x3); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Use allversions in a store statement to store an array
+          containing all three versions of m3x3:<programlisting
+          language="test">--afl store(allversions(m3x3),m3x3_versions); --output-format=dense --chunkify=yes</programlisting>
+          The array m3x3_versions has the following schema: <programlisting
+          language="test">--afl show(m3x3_versions); --show-query=no</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

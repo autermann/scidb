@@ -436,6 +436,14 @@ class ConstChunk : public SharedBuffer
     }
 
     /**
+     * Check if this is MemChunk.
+     */
+    virtual bool isMemChunk() const
+    {
+        return false;
+    }
+
+    /**
      * Check if chunk contains plain data: non nullable, non-emptyable, non-sparse
      */
    virtual bool isPlain() const;
@@ -553,12 +561,12 @@ class Chunk : public ConstChunk
 {
    double expectedDensity;
 
- protected:
+protected:
    Chunk() {
       expectedDensity = 0;
    }
 
- public:
+public:
 
    /**
     * Allocate and memcpy from a raw byte array.
@@ -628,8 +636,30 @@ class Chunk : public ConstChunk
    virtual boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
                                                         int iterationMode = ChunkIterator::NO_EMPTY_CHECK) = 0;
 
-   virtual void merge(ConstChunk const& with,
-                      boost::shared_ptr<Query>& query);
+   virtual void merge(ConstChunk const& with, boost::shared_ptr<Query>& query);
+
+   /**
+    * This function merges at the cell level. SLOW!
+    * @param[in] with   the source chunk
+    * @param[in] query
+    *
+    * @note The caller should call merge(), instead of directly calling this.
+    */
+   virtual void shallowMerge(ConstChunk const& with, boost::shared_ptr<Query>& query);
+
+   /**
+    * This function tries to merge at the segment level. FAST!
+    * Segment-level merging is performed if both chunks have empty-bitmap attached to the end.
+    * Otherwise, shallowMerge is called.
+    *
+    * @param[in] with   the source chunk
+    * @param[in] query
+    *
+    * @note The caller should call merge(), instead of directly calling this.
+    * @pre The chunks must be MemChunks.
+    * @pre The chunks must be in RLE format.
+    */
+   virtual void deepMerge(ConstChunk const& with, boost::shared_ptr<Query>& query);
 
    /**
     * Perform a generic aggregate-merge of this with another chunk.
@@ -828,6 +858,15 @@ public:
      * @return the sorted set of coordinates, containing the first coordinate of every chunk present in the array
      */
     virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const;
+
+    /**
+     * If hasChunkPositions() is true, return getChunkPositions(); otherwise build a list of chunk positions manually
+     * by iterating over the chunks of one of the array attributes. The attribute to iterate over is chosen according to a heuristic,
+     * using empty_tag if available, otherwise picking the smallest fixed-size attribute. The array getSupportedAccess() must be
+     * at least MULTI_PASS.
+     * @return the sorted set of coordinates, containing the first coordinate of every chunk present in the array
+     */
+    virtual boost::shared_ptr<CoordinateSet> findChunkPositions() const;
 
     /**
      * Determine if the array is materialized; which means all chunks are populated either memory or on disk, and available on request.

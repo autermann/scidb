@@ -34,6 +34,7 @@
 # include <errno.h>
 # include <iostream>
 # include <string>
+# include <set>
 # include <fstream>
 # include <sstream>
 # include <log4cxx/patternlayout.h>
@@ -223,7 +224,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 				_errStream << "Error while opening of the file " << queryoutput_file;
 				if(queryResult.queryID && _dbconnection) {
 					_scidb.cancelQuery(queryResult.queryID, _dbconnection);
-                                }
+                               }
 				throw SystemError (FILE_LINE_FUNCTION, _errStream.str ());
 			}
 
@@ -283,8 +284,9 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
         if (queryResult.queryID && _dbconnection) {
             try {
                 _scidb.cancelQuery(queryResult.queryID, _dbconnection);
-            } catch (const std::exception& e) {
-                LOG4CXX_ERROR(_logger, "Exception CAUGHT for cancel query...:" << e.what ());
+            } catch (const std::exception& err) {
+                LOG4CXX_ERROR(_logger, "Exception: " << err.what()
+                              <<" CAUGHT on query cancellation while handling: " << e.what ());
             }
         }
 		return FAILURE;
@@ -295,7 +297,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		LOG4CXX_INFO (_logger, "Exception CAUGHT for SCIDB query...:" << e.what ());
 
 		/*TODO: expected_error_code should be compared with actual error code returned
-         * i.e. expected exception and actual exception received should match.
+                 * i.e. expected exception and actual exception received should match.
 		 * This case refers to --error <scidb query>
 		 * which failed as was expected.
 		 */
@@ -304,17 +306,31 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			_resultfileStream << "[An error expected at this place for the query \"" << queryString << "\".";
 			_resultfileStream << " And it failed";
 
-			if (errorInfo->_expected_errorcode != "" || errorInfo->_expected_errorcode2 != "" || errorInfo->_expected_errns != "" || errorInfo->_expected_errshort != int32_t(~0) || errorInfo->_expected_errlong != int32_t(~0))
+			if (errorInfo->_expected_errorcode != "" ||
+                            errorInfo->_expected_errorcode2 != "" ||
+                            errorInfo->_expected_errns != "" ||
+                            errorInfo->_expected_errshort != int32_t(~0) ||
+                            !errorInfo->_expected_errlong.empty())
 			{
-				_resultfileStream << " with error code = " << e.getStringifiedErrorId();
-				if (errorInfo->_expected_errorcode2 != "")
-					_resultfileStream << " error code2 = " << e.getErrorId();
-				if (errorInfo->_expected_errns != "")
-					_resultfileStream << " error namespace = " << e.getErrorsNamespace();
-				if (errorInfo->_expected_errshort != int32_t(~0))
-					_resultfileStream << " short code = " << e.getShortErrorCode();
-				if (errorInfo->_expected_errlong != int32_t(~0))
-					_resultfileStream << " long code = " << e.getLongErrorCode();
+                                // In case of multiple allowed error codes we will not print the actual value
+                                // until we check it. However, not to break the old tests (with a single allowed value)
+                                // we will still print it.
+                                if (errorInfo->_expected_errlong.size()<2) {
+
+                                    _resultfileStream << " with error code = " << e.getStringifiedErrorId();
+                                    if (errorInfo->_expected_errorcode2 != "") {
+                                        _resultfileStream << " error code2 = " << e.getErrorId();
+                                    }
+                                    if (errorInfo->_expected_errns != "") {
+                                        _resultfileStream << " error namespace = " << e.getErrorsNamespace();
+                                    }
+                                    if (errorInfo->_expected_errshort != int32_t(~0)) {
+                                        _resultfileStream << " short code = " << e.getShortErrorCode();
+                                    }
+                                    if (!errorInfo->_expected_errlong.empty()) { 
+                                        _resultfileStream << " long code = " << e.getLongErrorCode();
+                                    }
+                                }
 				_resultfileStream << ". Expected";
 
 				stringstream expectedTmp;
@@ -326,8 +342,18 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
                 			expectedTmp << " error namespace = " << errorInfo->_expected_errns;
             			if (errorInfo->_expected_errshort != int32_t(~0))
                 			expectedTmp << " short code = " <<  errorInfo->_expected_errshort;
-            			if (errorInfo->_expected_errlong != int32_t(~0))
-                			expectedTmp << " long code = " <<  errorInfo->_expected_errlong;
+                                if (!errorInfo->_expected_errlong.empty()) {
+                                    expectedTmp << " long code = " ;
+                                    for (set<int32_t>::const_iterator i=errorInfo->_expected_errlong.begin();
+                                         i != errorInfo->_expected_errlong.end(); ) {
+                                        expectedTmp << (*i);
+
+                                        ++i;
+                                        if (i != errorInfo->_expected_errlong.end()) {
+                                            expectedTmp << ",";
+                                        }
+                                    }
+                                }
             			_resultfileStream << expectedTmp.str() << ".]" << endl << endl;
 
 			/* compare actual and expected error codes */
@@ -336,7 +362,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			    || (errorInfo->_expected_errorcode2 != "" && errorInfo->_expected_errorcode2 != e.getErrorId())
 			    || (errorInfo->_expected_errns != "" && errorInfo->_expected_errns != e.getErrorsNamespace())
 			    || (errorInfo->_expected_errshort != int32_t(~0) && errorInfo->_expected_errshort != e.getShortErrorCode())
-			    || (errorInfo->_expected_errlong != int32_t(~0) && errorInfo->_expected_errlong != e.getLongErrorCode())
+			    || (!errorInfo->_expected_errlong.empty() && errorInfo->_expected_errlong.count(e.getLongErrorCode()) < 1)
 			    )
 			  {
 				_errorCodesDiffer = true;
@@ -351,12 +377,16 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 // We should now return SUCCESS because we dont want the test to throw EXECUTOR_ERROR and jump to cleanup section if the actual error code does not match with the expected error code.
 			  }
 			}
-			else
-				_resultfileStream << ".]" << endl << endl;
-
+			else {
+                            _resultfileStream << ".]" << endl << endl;
+                        }
 			LOG4CXX_INFO (_logger, "This was an expected Exception. Hence continuing...");
 			if(queryResult.queryID && _dbconnection) {
-                            _scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                            try {
+                                _scidb.cancelQuery(queryResult.queryID, _dbconnection);
+                            } catch (const std::exception& e) {
+                                LOG4CXX_ERROR(_logger, "Exception CAUGHT for cancel query...:" << e.what ());
+                            }
                         }
 			return SUCCESS;
 		}
@@ -385,8 +415,9 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
         if(queryResult.queryID && _dbconnection) {
             try {
                 _scidb.cancelQuery(queryResult.queryID, _dbconnection);
-            } catch (const std::exception& e) {
-                LOG4CXX_ERROR(_logger, "Exception CAUGHT for cancel query...:" << e.what ());
+            } catch (const std::exception& err) {
+                 LOG4CXX_ERROR(_logger, "Exception: " << err.what()
+                              <<" CAUGHT on query cancellation while handling: " << e.what ());
             }
         }
         throw ExecutorError(FILE_LINE_FUNCTION, "SciDB query execution failed with unhandled exception");
@@ -1606,14 +1637,14 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
 				);
 
 		desc.add_options()
-            ("code", po::value<string>(), "Expected stringified error id.")
-            ("shortid", po::value<string>(), "Expected non-stringified error id.")
-            ("namespace", po::value<string>(), "Expected error code namespace.")
-            ("short", po::value<int32_t>(), "Expected short error code.")
-            ("long", po::value<int32_t>(), "Expected long error code.")
-			("igdata",                    "Whether data output by the query should be ignored or stored in a .expected/.out file.")
-		    ("aql",  po::value<string>(), "AQL query to be executed.")
-			("afl",  po::value<string>(), "AFL query to be executed.");
+                ("code", po::value<string>(), "Expected stringified error id.")
+                ("shortid", po::value<string>(), "Expected non-stringified error id.")
+                ("namespace", po::value<string>(), "Expected error code namespace.")
+                ("short", po::value<int32_t>(), "Expected short error code.")
+                ("long", po::value< vector<int32_t> > (), "Expected long error code.")
+                ("igdata",                    "Whether data output by the query should be ignored or stored in a .expected/.out file.")
+                ("aql",  po::value<string>(), "AQL query to be executed.")
+                ("afl",  po::value<string>(), "AFL query to be executed.");
 
 		po::variables_map vm;
 		po::store (po::parse_command_line (argc, argv, desc), vm);
@@ -1621,43 +1652,47 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
 
 		int aql_given = 0;
 		int afl_given = 0;
-        if (!vm.empty ())
+                if (!vm.empty ())
 		{
-		    if (vm.count("code"))
+		    if (vm.count("code")) {
 				eco->_expected_errorcode = vm["code"].as<string>();
+                    }
 
-            if (vm.count("shortid"))
-                eco->_expected_errorcode2 = vm["shortid"].as<string>();
+                    if (vm.count("shortid")) {
+                        eco->_expected_errorcode2 = vm["shortid"].as<string>();
+                    }
+                    if (vm.count("namespace")) {
+                        eco->_expected_errns = vm["namespace"].as<string>();
+                    }
+                    if (vm.count("short")) {
+                        eco->_expected_errshort = vm["short"].as<int32_t>();
+                    }
+                    if (vm.count("long")) {
+                        vector<int32_t> v = vm["long"].as<vector<int32_t> >();
+                        eco->_expected_errlong.insert(v.begin(), v.end());
+                    }
+                    if (vm.count ("igdata")) {
+                        eco->_igdata = true;
+                    }
+                    if (vm.count ("aql"))
+                    {
+                        if (afl_given) {
+                            throw (string ("Only one of --aql or --afl can be given."));
+                        }
+                        eco->_query = vm["aql"].as<string>();
+                        aql_given = 1;
+                        eco->_afl = false;
+                    }
 
-			if (vm.count("namespace"))
-			    eco->_expected_errns = vm["namespace"].as<string>();
-
-            if (vm.count("short"))
-                eco->_expected_errshort = vm["short"].as<int32_t>();
-
-			if (vm.count("long"))
-                eco->_expected_errlong = vm["long"].as<int32_t>();
-
-			if (vm.count ("igdata"))
-				eco->_igdata = true;
-
-			if (vm.count ("aql"))
-			{
-				if (afl_given)
-					throw (string ("Only one of --aql or --afl can be given."));
-				eco->_query = vm["aql"].as<string>();
-				aql_given = 1;
-				eco->_afl = false;
-			}
-
-			if (vm.count ("afl"))
-			{
-				if (aql_given)
-					throw (string ("Only one of --aql or --afl can be given."));
-				eco->_query = vm["afl"].as<string>();
-				afl_given = 1;
-				eco->_afl = true;
-			}
+                    if (vm.count ("afl"))
+                    {
+                        if (aql_given) {
+                            throw (string ("Only one of --aql or --afl can be given."));
+                        }
+                        eco->_query = vm["afl"].as<string>();
+                        afl_given = 1;
+                        eco->_afl = true;
+                    }
 		}
 
 //		if (!code_given)

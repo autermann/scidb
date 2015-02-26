@@ -246,16 +246,16 @@ public:
         for (size_t i = 0; i < tile->nSegments(); i++)
         {
             const RLEPayload::Segment& v = tile->getSegment(i);
-            if (v.null)
+            if (v._null)
                 continue;
-            if (v.same) {
-                T value = getPayloadValue<T>(tile, v.valueIndex);
+            if (v._same) {
+                T value = getPayloadValue<T>(tile, v._valueIndex);
                 if (!skipValue(value)) {
                     A<T, TR>::multAggregate(s, value, v.length());
                 }
             } else {
-                const size_t end = v.valueIndex + v.length();
-                for (size_t j = v.valueIndex; j < end; j++) {
+                const size_t end = v._valueIndex + v.length();
+                for (size_t j = v._valueIndex; j < end; j++) {
                     T value = getPayloadValue<T>(tile, j);
                     if (!skipValue(value)) {
                         A<T, TR>::aggregate(s, value);
@@ -367,13 +367,13 @@ public:
         for (size_t i = 0; i < tile->nSegments(); i++)
         {
             const RLEPayload::Segment& v = tile->getSegment(i);
-            if (v.null)
+            if (v._null)
                 continue;
-            if (v.same) {
-                A<T, TR>::multAggregate(s, getPayloadValue<T>(tile, v.valueIndex), v.length());
+            if (v._same) {
+                A<T, TR>::multAggregate(s, getPayloadValue<T>(tile, v._valueIndex), v.length());
             } else {
-                const size_t end = v.valueIndex + v.length();
-                for (size_t j = v.valueIndex; j < end; j++) {
+                const size_t end = v._valueIndex + v.length();
+                for (size_t j = v._valueIndex; j < end; j++) {
                     A<T, TR>::aggregate(s, getPayloadValue<T>(tile, j));
                 }
             }

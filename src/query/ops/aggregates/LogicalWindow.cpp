@@ -1,4 +1,3 @@
-
 /*
 **
 * BEGIN_COPYRIGHT
@@ -25,10 +24,12 @@
  * LogicalWindow.cpp
  *
  *  Created on: Apr 11, 2010
- *      Author: Knizhnik, poliocough@gmail.com
+ *      Author: Knizhnik, poliocough@gmail.com, 
+ *              Paul Brown <paulgeoffreybrown@gmail.com> 
  */
 
 #include <boost/shared_ptr.hpp>
+#include <log4cxx/logger.h>
 
 #include "query/Operator.h"
 #include "system/Exceptions.h"
@@ -44,13 +45,17 @@ using namespace std;
  * @brief The operator: window().
  *
  * @par Synopsis:
- *   window( srcArray {, leftEdge, rightEdge}+ {, AGGREGATE_CALL}+ )
+ *   window( srcArray {, leftEdge, rightEdge}+ {, AGGREGATE_CALL}+ [, METHOD ] )
  *   <br> AGGREGATE_CALL := AGGREGATE_FUNC(inputAttr) [as resultName]
  *   <br> AGGREGATE_FUNC := approxdc | avg | count | max | min | sum | stdev | var | some_use_defined_aggregate_function
+ *   <br> METHOD := 'materialize' | 'probe'
  *
  * @par Summary:
- *   Produces a result array with the same dimensions as the source array, where each cell stores some aggregates calculated over
- *   a window covering the current cell. A pair of (leftEdge, rightEdge) must exist for every dimension.
+ *   Produces a result array with the same size and dimensions as the source 
+ *   array, where each ouput cell stores some aggregate calculated over a 
+ *   window around the corresponding cell in the source array. A pair of 
+ *   window specification values (leftEdge, rightEdge) must exist for every 
+ *   dimension in the source and output array. 
  *
  * @par Input:
  *   - srcArray: a source array with srcAttrs and srcDims.
@@ -62,6 +67,15 @@ using namespace std;
  *     For instance, the default resultName for sum(sales) is 'sales_sum'.
  *     The count aggregate may take * as the input attribute, meaning to count all the items in the group including null items.
  *     The default resultName for count(*) is 'count'.
+ *   - An optional final argument that specifies how the operator is to perform
+ *     its calculation. At the moment, we support two internal algorithms: 
+ *     "materialize" (which materializes an entire source chunk before 
+ *     computing the output windows) and "probe" (which probes the source 
+ *     array for the data in each window). In general, materializing the input
+ *     is a more efficient strategy, but when we're using thin(...) in 
+ *     conjunction with window(...), we're often better off using probes, 
+ *     rather than materilization. This is a decision that the optimizer needs 
+ *     to make. 
  *
  * @par Output array:
  *        <
@@ -97,32 +111,69 @@ using namespace std;
 class LogicalWindow: public LogicalOperator
 {
 public:
+   
     LogicalWindow(const std::string& logicalName, const std::string& alias):
             LogicalOperator(logicalName, alias)
-        {
-                ADD_PARAM_INPUT()
-                ADD_PARAM_VARIES()
-        }
+    {
+        //
+        //  Input to the operator consists of an input array, followed 
+        // by a variable list of paramaters. 
+        ADD_PARAM_INPUT();
+        ADD_PARAM_VARIES();
+    }
 
+    /**
+     * @see LogicalOperator::nextVaryParamPlaceholder()
+     */
     std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
+        //
+        //  The arguments to the window(...) operator are: 
+        //     window( srcArray {, leftEdge, rightEdge}+ {, AGGREGATE_CALL}+ [, METHOD ] )
+        // 
+        //   * There must be as many {, leftEdge, rightEdge}+ pairs as there are dimensions 
+        //     in srcArray. 
+        //   * There must be at least one aggregate.
+        //   * The (optional) [, METHOD] is a string. 
+        // 
         std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-        if (_parameters.size() < schemas[0].getDimensions().size() * 2)
+
+        if (_parameters.size() < schemas[0].getDimensions().size() * 2) 
         {
             res.push_back(PARAM_CONSTANT("int64"));
-        }
-        else if (_parameters.size() == schemas[0].getDimensions().size() * 2)
+        } else if (_parameters.size() == schemas[0].getDimensions().size() * 2) 
         {
             res.push_back(PARAM_AGGREGATE_CALL());
-        }
-        else
+        } else 
         {
+            //  In this part we expect either an optional aggregate 
+            // or an optional string AFTER aggregate. If the last one 
+            // was an aggregate, the next one might be an aggregate, 
+            // or a string. But otherwise (it was a string) then all 
+            // you can have is the END_OF_VARIES.
+            if (_parameters[_parameters.size() - 1]->getParamType() ==
+PARAM_AGGREGATE_CALL)
+            {
+                res.push_back(PARAM_AGGREGATE_CALL());
+                res.push_back(PARAM_CONSTANT(TID_STRING));
+            }
             res.push_back(END_OF_VARIES_PARAMS());
-            res.push_back(PARAM_AGGREGATE_CALL());
         }
         return res;
     }
 
+    /**
+     *  Construct the description of the output array based on the input 
+     *
+     *   The output array of the window(...) operator is the same size and 
+     *  shape as the input, and has a set of attributes the same size and 
+     *  type as the aggregates. 
+     *
+     *  @param ArrayDesc& desc - ArrayDesc of the input array
+     *
+     *  @return ArrayDesc - ArrayDesc of output array from window(...) op
+     * 
+     */
     inline ArrayDesc createWindowDesc(ArrayDesc const& desc)
     {
         Dimensions const& dims = desc.getDimensions();
@@ -148,9 +199,49 @@ public:
 
         ArrayDesc output (desc.getName(), Attributes(), aggDims);
 
+        //
+        //  Process the variadic parameters to the operator. Check 
+        // that the aggregates make sense, and check for the presence 
+        // of the optional variable argument that tells the operator 
+        // which algorithm to use. 
         for (size_t i = dims.size() * 2, size = _parameters.size(); i < size; i++)
         {
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], desc, output);
+            boost::shared_ptr<scidb::OperatorParam> param = _parameters[i];
+
+            switch ( param->getParamType() ) { 
+               case PARAM_AGGREGATE_CALL:
+                   addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) param, desc, output);
+                break;
+               case PARAM_LOGICAL_EXPRESSION:
+               { 
+                   //
+                   //  If there is a Logical Expression at this point, 
+                   // it needs to be a constant string, and the string 
+                   // needs to be one of the two legitimate algorithm names. 
+                   const boost::shared_ptr<OperatorParamLogicalExpression> paramLogicalExpression = boost::static_pointer_cast<OperatorParamLogicalExpression>(param);
+                   if ((paramLogicalExpression->isConstant()) && 
+                       (TID_STRING == paramLogicalExpression->getExpectedType
+().typeId())) 
+                   { 
+                       string s(boost::static_pointer_cast<Constant>(paramLogicalExpression->getExpression())->getValue().getString());
+
+                       if (!((s == WindowArray::PROBE) || (s == WindowArray::MATERIALIZE ))) 
+                       {
+                           stringstream ss; 
+                           ss << WindowArray::PROBE << " or " << WindowArray::MATERIALIZE;
+                           throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, 
+                                                      SCIDB_LE_OP_WINDOW_ERROR5,
+                                                      _parameters[i]->getParsingContext()) 
+                           << ss.str();
+                       } 
+                   }
+               }
+                break;
+               default: 
+                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, 
+                                            SCIDB_LE_OP_WINDOW_ERROR5,
+                                            _parameters[i]->getParsingContext());
+            }
         }
 
         if ( desc.getEmptyBitmapAttribute())
@@ -163,9 +254,12 @@ public:
         return output;
     }
 
+    /**
+     *  @see LogicalOperator::inferSchema()
+     */
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
     {
-        assert(schemas.size() == 1);
+        SCIDB_ASSERT(schemas.size() == 1);
 
         ArrayDesc const& desc = schemas[0];
         size_t nDims = desc.getDimensions().size();
@@ -192,9 +286,13 @@ public:
                 _parameters[0]->getParsingContext());
         return createWindowDesc(desc);
     }
+
+private: 
+    static const std::string PROBE;
+    static const std::string MATERIALIZE;
+
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalWindow, "window")
 
-
-}  // namespace ops
+}  // namespace scidb

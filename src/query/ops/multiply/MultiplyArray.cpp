@@ -409,10 +409,10 @@ namespace scidb
             void* leftData = leftChunk->getData();
             if (leftChunk->isRLE()) { 
                 ConstRLEPayload leftPayload((char const*)leftData);
-                if (leftPayload.nSegments() != 1 || leftPayload.getSegment(0).same || leftPayload.getSegment(0).length() != iChunkLen*kChunkLen) { 
-                    if (leftPayload.nSegments() == 1 && leftPayload.getSegment(0).same) { 
+                if (leftPayload.nSegments() != 1 || leftPayload.getSegment(0)._same || leftPayload.getSegment(0).length() != iChunkLen*kChunkLen) {
+                    if (leftPayload.nSegments() == 1 && leftPayload.getSegment(0)._same) {
                         Value val;
-                        leftPayload.getValueByIndex(val, leftPayload.getSegment(0).valueIndex);
+                        leftPayload.getValueByIndex(val, leftPayload.getSegment(0)._valueIndex);
                         if (val.isZero()) { // result is 0
                             return;
                         }
@@ -420,7 +420,7 @@ namespace scidb
                     MaterializedArray::materialize(leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
                     leftData = leftMatChunk.getData();
                 } else { 
-                    leftData = leftPayload.getRawValue(leftPayload.getSegment(0).valueIndex);
+                    leftData = leftPayload.getRawValue(leftPayload.getSegment(0)._valueIndex);
                 }
             }
 
@@ -428,10 +428,10 @@ namespace scidb
             void* rightData = rightChunk->getData();
             if (rightChunk->isRLE()) { 
                 ConstRLEPayload rightPayload((char const*)rightData);
-                if (rightPayload.nSegments() != 1 || rightPayload.getSegment(0).same || rightPayload.getSegment(0).length() != jChunkLen*kChunkLen) {
-                    if (rightPayload.nSegments() == 1 && rightPayload.getSegment(0).same) { 
+                if (rightPayload.nSegments() != 1 || rightPayload.getSegment(0)._same || rightPayload.getSegment(0).length() != jChunkLen*kChunkLen) {
+                    if (rightPayload.nSegments() == 1 && rightPayload.getSegment(0)._same) {
                         Value val;
-                        rightPayload.getValueByIndex(val, rightPayload.getSegment(0).valueIndex);
+                        rightPayload.getValueByIndex(val, rightPayload.getSegment(0)._valueIndex);
                         if (val.isZero()) { // result is 0
                             return;
                         }
@@ -439,7 +439,7 @@ namespace scidb
                     MaterializedArray::materialize(rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
                     rightData = rightMatChunk.getData();
                 } else { 
-                    rightData = rightPayload.getRawValue(rightPayload.getSegment(0).valueIndex);
+                    rightData = rightPayload.getRawValue(rightPayload.getSegment(0)._valueIndex);
                 }
             }
  

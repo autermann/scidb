@@ -250,6 +250,13 @@ static string genUniqueObjectName(const string& prefix, unsigned int &initialCou
 static void prohibitDdl(shared_ptr<LogicalQueryPlanNode> planNode);
 
 /**
+ * @brief Check if given plan node can not be nested and throw exception if true
+ *
+ * @param planNode Query plan node
+ */
+static void prohibitNesting(shared_ptr<LogicalQueryPlanNode> planNode);
+
+/**
  * @brief Try to fit input into destination schema by inserting empty attribute, casting and reparting
  *
  * @param input Input logical plan
@@ -982,6 +989,7 @@ static bool matchOperatorParam(AstNode *ast, const OperatorParamPlaceholders &pl
                 {
                     input = AstToLogicalPlan(ast, query);
                     prohibitDdl(input);
+                    prohibitNesting(input);
                 }
                 else
                 {
@@ -1153,26 +1161,35 @@ static bool matchOperatorParam(AstNode *ast, const OperatorParamPlaceholders &pl
                         || ast->getType() == int64Node || ast->getType() == realNode
                         || ast->getType() == null || ast->getType() == boolNode)
                 {
-                    if (matched && !(matched & PLACEHOLDER_CONSTANT))
-                    {
-                        throw USER_QUERY_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_AMBIGUOUS_OPERATOR_PARAMETER,
-                            paramCtxt);
-                    }
-
-                    shared_ptr<LogicalExpression> lExpr = AstToLogicalExpression(ast);
+                    shared_ptr<LogicalExpression> lExpr;
                     shared_ptr<Expression> pExpr = make_shared<Expression>();
 
                     try
                     {
+                       lExpr = AstToLogicalExpression(ast);
                        pExpr->compile(lExpr, query, false, placeholder->getRequiredType().typeId());
                     }
                     catch (const Exception &e)
                     {
                         if (e.getLongErrorCode() == SCIDB_LE_REF_NOT_FOUND
-                            || e.getLongErrorCode() == SCIDB_LE_TYPE_CONVERSION_ERROR)
+                            || e.getLongErrorCode() == SCIDB_LE_TYPE_CONVERSION_ERROR
+                            || e.getLongErrorCode() == SCIDB_LE_UNEXPECTED_OPERATOR_IN_EXPRESSION)
                         {
                             break;
                         }
+                    }
+
+                    //Ignore non-constant expressions to avoid conflicts with
+                    //PLACEHOLDER_EXPRESSION and PLACEHOLDER_AGGREGATE_CALL
+                    if (!pExpr->isConstant())
+                    {
+                        break;
+                    }
+
+                    if (matched && !(matched & PLACEHOLDER_CONSTANT))
+                    {
+                        throw USER_QUERY_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_AMBIGUOUS_OPERATOR_PARAMETER,
+                            paramCtxt);
                     }
 
                     if (!(matched & PLACEHOLDER_CONSTANT))
@@ -2072,6 +2089,7 @@ static shared_ptr<LogicalQueryPlanNode> passJoinItem(AstNode *ast, shared_ptr<Qu
 
             result = AstToLogicalPlan(expr, query);
             prohibitDdl(result);
+            prohibitNesting(result);
 
             const string alias = ast->getChild(namedExprArgName) ? ast->getChild(namedExprArgName)->asNodeString()->getVal() : "";
             result->getLogicalOperator()->setAliasName(alias);
@@ -3982,6 +4000,7 @@ static shared_ptr<LogicalQueryPlanNode> passThinClause(AstNode *ast, shared_ptr<
 
     shared_ptr<LogicalQueryPlanNode> result = AstToLogicalPlan(arrayRef, query);
     prohibitDdl(result);
+    prohibitNesting(result);
 
     const ArrayDesc& thinInputSchema = result->inferTypes(query);
 
@@ -4052,6 +4071,15 @@ static void prohibitDdl(shared_ptr<LogicalQueryPlanNode> planNode)
     {
         throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_DDL_CANT_BE_NESTED,
             planNode->getParsingContext());
+    }
+}
+
+static void prohibitNesting(shared_ptr<LogicalQueryPlanNode> planNode)
+{
+    if (planNode->getLogicalOperator()->getProperties().noNesting)
+    {
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_NESTING_PROHIBITED,
+            planNode->getParsingContext()) << planNode->getLogicalOperator()->getLogicalName();
     }
 }
 

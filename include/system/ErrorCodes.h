@@ -471,12 +471,16 @@ ERRCODE(SCIDB_LE_OPERATION_FAILED_WITH_ERRNO,       395); //Operation %1% failed
 ERRCODE(SCIDB_LE_OP_RLE_EXPECTED,                   396); //Chunk expected to be in RLE format
 ERRCODE(SCIDB_LE_OP_NONEMPTY_EXPECTED,              397); //Non-emptyable array expected
 ERRCODE(SCIDB_LE_RESOURCE_BUSY,                     398); //Not enough resources: %1%
+ERRCODE(SCIDB_LE_NESTING_PROHIBITED,                399); //Operator %1% can not be nested
+ERRCODE(SCIDB_LE_OP_WINDOW_ERROR5,                  400); //Algorithm must be one of %1% 
+ERRCODE(SCIDB_LE_OP_WINDOW_ERROR6,                  401); //Using materialize op without materialized input
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%
 ERRCODE(SCIDB_LE_LIBPQ_NOT_THREADSAFE,              1002); //libpq is not built as threadsafe, rebuild it with --enable-thread-safety
 ERRCODE(SCIDB_LE_CANT_CONNECT_PG,                   1003); //Can not connect to PostgreSQL catalog: '%1'
 ERRCODE(SCIDB_LE_UNREACHABLE_CODE,                  1004); //Fatal: Unreachable code is reached in '%1%'
+ERRCODE(SCIDB_LE_UNITTEST_FAILED,                   1005); //Unit test failed! Test = '%1%', failure = '%2%'
 
 // copied from P4
 ERRCODE(SCIDB_LE_DLA_ERROR13,               2001); //Request for unknown attribute

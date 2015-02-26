@@ -1,0 +1,202 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry id="loadOperator">
+  <refnamediv>
+    <refname>load</refname>
+
+    <refpurpose>Load data to an array from a file.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>load(<replaceable>output_array</replaceable>,<replaceable>input_file, instance_id, format</replaceable><optional>,<optional><replaceable>max_errors, shadow_array</replaceable></optional></optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para><indexterm>
+        <primary>load operator</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>load from file</secondary>
+      </indexterm>The AFL load operator loads data from
+    <replaceable>input_file</replaceable> into the cells of a SciDB array,
+    <replaceable>output_array</replaceable>. The load operator takes the
+    following arguments:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para><replaceable>output_array</replaceable> — The name of a SciDB
+        array to hold the data.</para>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>input_file</replaceable> — The complete path to the
+        file that contains the source data for the array.</para>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>instance_id</replaceable> — Specifies the instance
+        or instances for performing the load. The value must be one of the
+        following:</para>
+
+        <itemizedlist>
+          <listitem>
+            <para><emphasis role="bold">-2</emphasis>: Load all data using the
+            coordinator instance of the query.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">-1</emphasis>: Initiate the load from
+            all instances. That is, the load is distributed to all instances,
+            and the data is loaded concurrently.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">0</emphasis>, <emphasis role="bold">1</emphasis>, ...: Load all data using the specified
+            instance ID.</para>
+          </listitem>
+        </itemizedlist>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>format</replaceable> — A string that specifies the
+        format for the incoming data. The LOAD command uses the format string
+        as a guide for interpreting the contents of the binary file.</para>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>max_errors</replaceable> — An optional parameter to
+        specify the limit of errors before the operator will fail. The default
+        value is 0, meaning that if any errors are encountered, the operation
+        will fail.</para>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>shadow_array</replaceable> — An optional parameter
+        for specifying a "shadow array." This is a mechanism by which you can
+        keep track of errors while still loading the error-free values.</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example loads data from a binary file.</para>
+
+      <procedure>
+        <step>
+          <para>Create an array to hold the array data: <para><programlisting>AFL% CREATE ARRAY intensityFlat
+   &lt; exposure:string, elapsedTime:int64,
+   measuredIntensity:int64 null &gt; [i=0:*,5,0];  </programlisting></para></para>
+        </step>
+
+        <step>
+          <para>Load the data, specifying a maximum of 99 errors, and saving
+          information to a shadow array: <para><programlisting>AFL% load(intensityFlat,'../examples/intensity_data.bin',-1,
+   '(string, int64, int64 null)',99,shadowArray);  </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
+{0} "High",0,100
+{1} "High",1,100
+{2} "High",2,99
+{3} "High",3,99
+{4} "High",4,98
+{5} "High",0,100
+{6} "High",1,100
+{7} "High",2,99
+{8} "High",3,99
+{9} "High",4,98
+{10} "High",0,100
+{11} "High",1,100
+{12} "High",2,99
+{13} "High",3,99
+{14} "High",4,98
+{15} "High",5,97
+{16} "High",6,null
+{17} "High",7,null
+{18} "Medium",0,100
+{19} "Medium",1,95
+{20} "High",5,97
+{21} "High",6,null
+{22} "High",7,null
+{23} "Medium",0,100
+{24} "Medium",1,95
+{25} "High",5,97
+{26} "High",6,null
+{27} "High",7,null
+{28} "Medium",0,100
+{29} "Medium",1,95
+{30} "Medium",2,89
+{31} "Medium",3,null
+{32} "Medium",4,null
+{33} "Medium",5,80
+{34} "Medium",6,78
+{35} "Medium",2,89
+{36} "Medium",3,null
+{37} "Medium",4,null
+{38} "Medium",5,80
+{39} "Medium",6,78
+{40} "Medium",2,89
+{41} "Medium",3,null
+{42} "Medium",4,null
+{43} "Medium",5,80
+{44} "Medium",6,78
+{45} "Medium",7,77
+{46} "Low",0,100
+{47} "Low",1,85
+{48} "Low",2,71
+{49} "Low",3,60
+{50} "Medium",7,77
+{51} "Low",0,100
+{52} "Low",1,85
+{53} "Low",2,71
+{54} "Low",3,60
+{55} "Medium",7,77
+{56} "Low",0,100
+{57} "Low",1,85
+{58} "Low",2,71
+{59} "Low",3,60
+{60} "Low",4,50
+{61} "Low",5,41
+{62} "Low",6,35
+{63} "Low",7,29
+{65} "Low",4,50
+{66} "Low",5,41
+{67} "Low",6,35
+{68} "Low",7,29
+{70} "Low",4,50
+{71} "Low",5,41
+{72} "Low",6,35
+{73} "Low",7,29
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>Now, let's see what happens if the measuredIntensity attribute
+          does not allow nulls: <para><programlisting>AFL% remove(intensityFlat);  </programlisting><programlisting>AFL% CREATE ARRAY intensityFlat
+&lt; exposure:string, elapsedTime:int64, measuredIntensity:int64 &gt;
+[i=0:*,5,0];  </programlisting><programlisting>AFL% load(intensityFlat,'../examples/intensity_data.bin',-1,
+   '(string, int64, int64)',99,shadowArray);  </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
+{0} "High",0,25855
+{1} "",0,0
+{5} "High",0,25855
+{6} "",0,0
+{10} "High",0,25855
+{11} "",0,0
+</screen></para></para>
+        </step>
+
+        <step>
+          <para>View the data in shadowArray to get details on why the file
+          did not load correctly: <para><programlisting>AFL% scan(shadowArray)  </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity,row_offset
+{1} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
+{6} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
+{11} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
+</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

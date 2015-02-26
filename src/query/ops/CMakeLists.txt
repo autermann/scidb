@@ -127,10 +127,9 @@ set(ops_lib_src
     build_sparse/LogicalBuildSparse.cpp
     build_sparse/PhysicalBuildSparse.cpp
     build_sparse/BuildSparseArray.cpp
-    transpose/PhysicalOrderedTranspose.cpp
-    transpose/PhysicalUnorderedTranspose.cpp
-    transpose/TransposeArray.cpp
+    transpose/PhysicalTranspose.cpp
     transpose/LogicalTranspose.cpp
+    transpose/TransposeArray.cpp
     cast/LogicalCast.cpp
     cast/PhysicalCast.cpp
     remove/LogicalRemove.cpp
@@ -211,6 +210,8 @@ set(ops_lib_src
     variable_window/PhysicalVariableWindow.cpp
     insert/LogicalInsert.cpp
     insert/PhysicalInsert.cpp
+    test/splitarray/LogicalSplitArrayTest.cpp
+    test/splitarray/PhysicalSplitArrayTest.cpp
 )
 
 file(GLOB_RECURSE ops_lib_include "*.h")

@@ -149,13 +149,13 @@ sl_int_t pdgemmSlave(void* bufs[], size_t sizes[], unsigned count)
     // debug that the input is readable and show its contents
     if(DBG) {
         for(int ii=0; ii < SIZE_A; ii++) {
-            std::cerr << "("<< MYPROW << "," << MYPCOL << ") A["<<ii<<"] = " << A[ii] << std::endl;
+            std::cerr << "Pgrid("<< MYPROW << "," << MYPCOL << ") A["<<ii<<"] = " << A[ii] << std::endl;
         }
         for(int ii=0; ii < SIZE_B; ii++) {
-            std::cerr << "("<< MYPROW << "," << MYPCOL << ") B["<<ii<<"] = " << B[ii] << std::endl;
+            std::cerr << "Pgrid("<< MYPROW << "," << MYPCOL << ") B["<<ii<<"] = " << B[ii] << std::endl;
         }
         for(int ii=0; ii < SIZE_C; ii++) {
-            std::cerr << "("<< MYPROW << "," << MYPCOL << ") C["<<ii<<"] = " << C[ii] << std::endl;
+            std::cerr << "Pgrid("<< MYPROW << "," << MYPCOL << ") C["<<ii<<"] = " << C[ii] << std::endl;
         }
     }
 

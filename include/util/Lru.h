@@ -93,7 +93,6 @@ public:
      * The number of elements.
      */
     size_t size() {
-        assert(_list.size()==_size);
         return _size;
     }
 
@@ -241,7 +240,6 @@ public:
      * The number of elements.
      */
     size_t size() {
-        assert(_list.size()==_size);
         return _size;
     }
 
@@ -253,10 +251,20 @@ public:
     }
 
     /**
+     * Return an iterator to the first element in the LRU.
+     * @return the iterator to the first element; end if empty
+     */
+    ListIterator begin()
+    {
+        return _list.begin();
+    }
+
+    /**
      * The owner of space, if storing this value, has not inserted itself into the LRU yet.
      * @return ListIterator.end()
      */
-    ListIterator end() {
+    ListIterator end()
+    {
         return _list.end();
     }
 

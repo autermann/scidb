@@ -66,12 +66,23 @@ namespace scidb
 class LogicalTranspose : public LogicalOperator
 {
 public:
-	LogicalTranspose(const std::string& logicalName, const std::string& alias):
-	    LogicalOperator(logicalName, alias)
-	{
+    /**
+     * Create the transpose operator.
+     * @param logicalName the operator name
+     * @param alias the alias
+     */
+    LogicalTranspose(const std::string& logicalName, const std::string& alias):
+        LogicalOperator(logicalName, alias)
+    {
         ADD_PARAM_INPUT()
- 	}
+    }
 
+    /**
+     * Determine the schema of the output.
+     * @param schemas the shapes of all the input arrays, only one expected
+     * @param query the query context
+     * @return the 0th element of schemas with the dimensions in reverse order
+     */
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);

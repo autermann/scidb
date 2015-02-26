@@ -298,7 +298,7 @@ getScidbMPIEnvVar(const string& clusterUuid,
                   const string& launchId)
 {
     stringstream var;
-    var << SCIDBMPI_ENV_VAR <<"="<< clusterUuid <<"."<< queryId <<"."<< launchId;
+    var << SCIDBMPI_ENV_VAR <<"="<< queryId <<"."<< launchId <<"." << clusterUuid;
     return var.str();
 }
 
@@ -308,16 +308,32 @@ parseScidbMPIEnvVar(const string& envVarValue,
                     uint64_t& queryId,
                     uint64_t& launchId)
 {
-    string format;
-    format += clusterUuid + ".%"PRIu64".%"PRIu64"%n";
-    int n=0;
-    int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &queryId, &launchId, &n);
-    if (rc == EOF || rc < 2) {
-        return false;
-    }
-    return true;
+  string uuid;
+  bool rc = parseScidbMPIEnvVar(envVarValue,
+				queryId,
+				launchId,
+				uuid);
+  return (rc && (uuid==clusterUuid));
 }
 
+bool
+parseScidbMPIEnvVar(const string& envVarValue,
+                    uint64_t& queryId,
+                    uint64_t& launchId,
+		    string& clusterUuid)
+{
+  std::vector<char> buf(envVarValue.size()+1);
+  string format("%"PRIu64".%"PRIu64".%s""%n");
+  int n=0;
+  int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &queryId, &launchId, &buf[0], &n);
+  if (rc == EOF || rc < 3) {
+    return false;
+  }
+  buf[buf.size()-1]='\0';
+  clusterUuid = string(&buf[0]);
+  return true;
+}
+ 
 bool matchEnvVar(const std::string& varName,
                  char* varPair,
                  std::string& varValue)

@@ -40,7 +40,7 @@
     </listitem>
   </itemizedlist>
 
-  <sect1 id="CreateArray">
+  <section id="CreateArray">
     <title>Create an Array</title>
 
     <para><indexterm>
@@ -138,7 +138,7 @@
                   In this case, you will need to specify the dimension data
                   type in the name argument like this:
                   <replaceable>dimension_name</replaceable>(<replaceable>dimension_dataype</replaceable>).
-                  Note that version 12.12 of SciDB and Paradigm4 support
+                  Note that version 13.1 of SciDB and Paradigm4 support
                   non-integer dimensions only partially. Dimension names may
                   only contain alphanumeric characters and underscores
                   (_).</para>
@@ -225,9 +225,9 @@
     ARRAY</command></code> statement: <programlisting language="test">
 --aql DROP ARRAY A; --show-output=no
 </programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Attributes</title>
 
     <para><indexterm>
@@ -246,14 +246,21 @@
     attribute called <code>price</code>, and a date-time attribute called
     <code>sold</code>: <programlisting language="test">
 --aql CREATE ARRAY products &lt;name:string,price:float default float(100.0),sold:datetime&gt; [i=0:*,10,0]; --show-output=no
-</programlisting> Attributes are by default set to not null. To allow an
+</programlisting></para>
+
+    <para><indexterm>
+        <primary>nulls</primary>
+
+        <secondary>allowing in attributes</secondary>
+      </indexterm>Attributes are by default set to not null. To allow an
     attribute to have value NULL, add NULL to the attribute data type
-    declaration: <programlisting language="test">
+    declaration:<programlisting language="test">
 --aql 
 CREATE ARRAY product_null &lt;name:string NULL,price:float NULL,sold:datetime NULL&gt;
 [i=0:*,10,0]; --show-output=no
-</programlisting> This allows the attribute to store NULL values at data
-    load.</para>
+</programlisting></para>
+
+    <para>This allows the attribute to store NULL values at data load.</para>
 
     <para>An attribute takes on a default value of 0 when no other value is
     provided. To set a default value other than 0, set the DEFAULT value of
@@ -263,11 +270,17 @@ CREATE ARRAY product_null &lt;name:string NULL,price:float NULL,sold:datetime NU
 --aql CREATE ARRAY product_dflt &lt;name:string, price:float default float(100.0), sold:datetime&gt; [i=0:*,10,0]; --show-output=no
 </programlisting></para>
 
-    <sect2>
+    <section>
       <title>NULL and Default Attribute Values</title>
 
-      <para>SciDB offers functionality to work with missing data. This chapter
-      uses the data set m4x4_missing.txt, shown here: <programlisting
+      <para><indexterm>
+          <primary>attributes</primary>
+
+          <secondary>default values</secondary>
+        </indexterm><indexterm>
+          <primary>default attribute values</primary>
+        </indexterm>SciDB offers functionality to work with missing data.
+      Consider the data set m4x4_missing.txt, shown here: <programlisting
       language="test">
 --shell --command=cat ../examples/m4x4_missing.txt; --show-query=no
 </programlisting></para>
@@ -284,15 +297,21 @@ CREATE ARRAY product_null &lt;name:string NULL,price:float NULL,sold:datetime NU
 --afl load(m4x4_missing, '../examples/m4x4_missing.txt'); --output-format=auto --chunkify=yes
 </programlisting></para>
 
-      <para>To change the default value, that is, the value the SciDB
+      <para><indexterm>
+          <primary>empty cells</primary>
+        </indexterm><indexterm>
+          <primary>arrays</primary>
+
+          <secondary>empty cells</secondary>
+        </indexterm>To change the default value, that is, the value the SciDB
       substitutes for the missing data, set the default clause of the
       attribute option: <programlisting language="test">--afl remove(m4x4_missing); --show-query=no --show-output=no
 --afl CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32 default 5468&gt;[x=0:3,4,0,y=0:3,4,0]; --show-output=no
 --afl load(m4x4_missing, '../examples/m4x4_missing.txt'); --output-format=auto --chunkify=yes
 </programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Codes for Missing Data</title>
 
       <para><indexterm>
@@ -305,6 +324,8 @@ CREATE ARRAY product_null &lt;name:string NULL,price:float NULL,sold:datetime NU
           <primary>loading data</primary>
 
           <secondary>missing values</secondary>
+        </indexterm><indexterm>
+          <primary>missing reason code</primary>
         </indexterm>In addition to simple single-valued NULL substitution
       described in the previous section, SciDB also supports multi-valued
       NULLs using the notion of <emphasis>missing reason codes</emphasis>.
@@ -325,9 +346,13 @@ CREATE ARRAY product_null &lt;name:string NULL,price:float NULL,sold:datetime NU
       of financial market data, data may be missing because "market closed",
       "trading halted", or "data feed down".</para>
 
-      <para>The examples below show how to represent missing data in the load
-      file. ? or null represent null values, and ?2 represents null value with
-      a reason code of 2. <programlisting>[[ ( 10, 4.5, "My String", 'C'), (10, 5.1, ?1, 'D'), 
+      <para><indexterm>
+          <primary>?</primary>
+
+          <see>nulls</see>
+        </indexterm>The examples below show how to represent missing data in
+      the load file. A question mark (?) or null represent null values, and ?2
+      represents null value with a reason code of 2.<programlisting>[[ ( 10, 4.5, "My String", 'C'), (10, 5.1, ?1, 'D'), 
 (?2, 5.1, "Another String", ?) ...
 
 or
@@ -337,12 +362,81 @@ or
 </programlisting></para>
 
       <para>Use the substitute operator to substitute different values for
-      each type of NULL. For more information on NULL substitution see the
-      SciDB Operator Reference entry for substitute.</para>
-    </sect2>
-  </sect1>
+      each type of NULL. For more information on NULL substitution, see the
+      <link linkend="substituteOperator">substitute</link> operator
+      reference.</para>
+    </section>
 
-  <sect1 id="array_dimensions">
+    <section>
+      <title>Functions for Missing Values</title>
+
+      <para><indexterm>
+          <primary>missing_reason function</primary>
+        </indexterm><indexterm>
+          <primary>functions</primary>
+
+          <secondary>missing_reason</secondary>
+        </indexterm>There is a function, <literal>missing_reason</literal>,
+      that returns the missing reason code for array data. For example,
+      consider an array with the following data:<programlisting
+      language="test">--afl store(build(&lt;val:double null&gt; [i=0:4,5,0], '[47.0, ?, -21.1, ?100, ?50]',true), A); --show-query=no --show-output=no
+--afl scan(A) --show-query=no --output-format=dense</programlisting>Run
+      <literal>missing_reason</literal> against the values in the array, and
+      compare against the original values:<programlisting language="test">--afl apply(A,MRcode, missing_reason(val)); --output-format=dcsv
+</programlisting></para>
+
+      <para>As illustrated by this example, we can see that
+      <literal>missing_reason</literal> returns integer values as
+      follows:<itemizedlist>
+          <listitem>
+            <para>For ordinary attribute values, it returns -1.</para>
+          </listitem>
+        </itemizedlist><itemizedlist>
+          <listitem>
+            <para>For the standard null value, it returns 0.</para>
+          </listitem>
+
+          <listitem>
+            <para>For null values that contain a missing reason code, it
+            returns the code.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para><indexterm>
+          <primary>missing function</primary>
+        </indexterm><indexterm>
+          <primary>functions</primary>
+
+          <secondary>missing</secondary>
+        </indexterm>There is another function, <literal>missing</literal>,
+      that returns the missing reason code from an integer array. Suppose, for
+      example, that you have an array that contains integers where the values
+      represent missing reason codes:<programlisting language="test">--afl store(build(&lt;val:int32 null default null&gt; [i=0:5,6,0], '[-1,47,23,0,127,-1]',true), arrayB); --show-query=no --show-output=no
+--afl scan(arrayB) --show-query=no --output-format=dense</programlisting>Now
+      run <literal>missing</literal> against the values in the
+      array:<programlisting language="test">--afl apply(arrayB,MRcode, missing(val)); --output-format=dcsv
+</programlisting></para>
+
+      <para>We can see that the function,
+      <literal>missing</literal>(<replaceable>x</replaceable>), returns values
+      as follows:<itemizedlist>
+          <listitem>
+            <para>If x= -1, it returns &lt;void&gt;.</para>
+          </listitem>
+        </itemizedlist><itemizedlist>
+          <listitem>
+            <para>If x= 0, it returns null.</para>
+          </listitem>
+
+          <listitem>
+            <para>If x is an integer, it returns the missing reason code that
+            corresponds to x.</para>
+          </listitem>
+        </itemizedlist></para>
+    </section>
+  </section>
+
+  <section id="array_dimensions">
     <title>Array Dimensions</title>
 
     <para>A SciDB array must have at least one dimension. Dimensions form the
@@ -356,7 +450,7 @@ or
       size.</para>
     </note>
 
-    <sect2 remap="h3" xml:id="ChunkOverlap">
+    <section xml:id="ChunkOverlap">
       <title>Chunk Overlap</title>
 
       <para><indexterm>
@@ -388,9 +482,9 @@ or
           than one chunk.</para>
         </listitem>
       </itemizedlist>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="Unboundeddimensions">
+    <section xml:id="Unboundeddimensions">
       <title>Unbounded Dimensions</title>
 
       <para><indexterm>
@@ -418,13 +512,13 @@ or
           </listitem>
         </itemizedlist><programlisting language="test">--aql CREATE ARRAY open &lt;val:double&gt;[I=0:9,10,0,J=0:*,10,0]; --show-output=no
 </programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2 remap="h3" xml:id="Non-integerdimensionsandMappingarrays">
+    <section xml:id="Non-integerdimensionsandMappingarrays">
       <title>Non-integer Dimensions and Mapping Arrays</title>
 
       <note>
-        <para>Version 12.12 of SciDB only partially supports non-integer
+        <para>Version 13.1 of SciDB only partially supports non-integer
         dimensions.</para>
       </note>
 
@@ -462,10 +556,10 @@ or
 </programlisting> The attributes of the array <code>person</code> and
       <code>time</code> are: <programlisting language="test">--aql SELECT * FROM winners;
 </programlisting></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Changing Array Names</title>
 
     <para><indexterm>
@@ -496,12 +590,12 @@ or
     <code>Event</code>. <programlisting language="test">--aql SELECT * INTO winnerGrid FROM cast(OlympicWinners, &lt; LastName: string, elapsedTime: double&gt;
 [x=1996:2008,1000,0,y=0:*,1000,0] ); --show-query=yes --show-output=yes
 --schema winnerGrid; --show-query=no</programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1 id="array_dimensions_1">
+  <section id="array_dimensions_1">
     <title>Database Design</title>
 
-    <sect2>
+    <section>
       <title>Selecting Dimensions and Attributes</title>
 
       <para><indexterm>
@@ -556,9 +650,9 @@ or
       different types of analytic queries. Redimensioning is used to transform
       attributes to dimensions and vice-versa. Redimensioning an array is
       explained in <xref linkend="ChangingArraySchemas"/>.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Chunk Size Selection</title>
 
       <para><indexterm>
@@ -594,6 +688,6 @@ or
       functionality</link> of SciDB to change the chunk size as necessary.
       Repartitioning an array is explained in <xref
       linkend="ChangingArraySchemas"/>.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 </chapter>

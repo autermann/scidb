@@ -142,9 +142,17 @@ public:
         size_t nDims = leftDimensions.size();
         Dimensions newDimensions(nDims);
 
-        if (leftDimensions[0].getLength() == INFINITE_LENGTH
-                || rightDimensions[0].getLength() == INFINITE_LENGTH)
+        ArrayDesc lDesc, rDesc;
+        if ((SystemCatalog::getInstance()->getArrayDesc(schemas[0].getName(), lDesc, false) &&
+                lDesc.getDimensions()[0].getLength() == INFINITE_LENGTH) ||
+            (SystemCatalog::getInstance()->getArrayDesc(schemas[1].getName(), rDesc, false) &&
+                rDesc.getDimensions()[0].getLength() == INFINITE_LENGTH) ||
+            (leftDimensions[0].getLength() == INFINITE_LENGTH ||
+                rightDimensions[0].getLength() == INFINITE_LENGTH))
+        {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CONCAT_ERROR1);
+        }
+
         newDimensions[0] = DimensionDesc(leftDimensions[0].getBaseName(),
                 leftDimensions[0].getNamesAndAliases(),
                 leftDimensions[0].getStartMin(),

@@ -184,8 +184,10 @@ void initConfig(int argc, char* argv[])
         (CONFIG_REPLICATION_SEND_QUEUE_SIZE, 0, "replication-send-queue-size", "REPLICATION_SEND_QUEUE_SIZE", "", Config::INTEGER, "The length of outgoing replication queue (across all connections)", 1000, false)
         (CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT, 0, "array-emptyable-by-default", "ARRAY_EMPTYABLE_BY_DEFAULT", "", Config::BOOLEAN, "Be default arrays are emptyable", true, false)
         (CONFIG_LOAD_SCAN_BUFFER, 0, "load-scan-buffer", "LOAD_SCAN_BUFFER", "", Config::INTEGER, "Number of MB for one input buffer used in InputScanner", 1, false)
-        (CONFIG_MPI_DIR, 0, "mpi-dir", "MPI_DIR", "", Config::STRING, "Location of OpenMPI installation.", DEFAULT_MPI_DIR(), false)
-    (CONFIG_MPI_IF, 0, "mpi-if", "MPI_IF", "", Config::STRING, "Network interface to use for MPI traffic", string(""), false)
+        (CONFIG_MATERIALIZED_WINDOW_THRESHOLD, 0, "materialized-window-threshhold", "MATERIALIZED_WINDOW_THRESHHOLD", "", Config::INTEGER, "Size in Megabytes above which we will not materialize the input chunk to a window(...) operation", 16, false)
+        (CONFIG_MPI_DIR, 0, "mpi-dir", "MPI_DIR", "", Config::STRING, "Location of MPI installation.", DEFAULT_MPI_DIR(), false)
+        (CONFIG_MPI_IF, 0, "mpi-if", "MPI_IF", "", Config::STRING, "Network interface to use for MPI traffic", string(""), false)
+        (CONFIG_MPI_TYPE, 0, "mpi-type", "MPI_TYPE", "", Config::STRING, "MPI installation type [mpich2-1.2 | mpich2-1.4].", DEFAULT_MPI_TYPE(), false)
         ;
 
     cfg->addHook(configHook);

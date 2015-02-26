@@ -106,7 +106,7 @@ void MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
 
     _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
     if (_mustLaunch) {
-        _launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(_launchId, query));
+        _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
         _ctx->setLauncher(_launchId, _launcher);
         std::vector<std::string> args;
         _launcher->launch(args, membership, maxSlaves);

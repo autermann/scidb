@@ -51,7 +51,8 @@ elif [ -d .svn ]; then
 fi
 
 echo Preparing result dir
-mkdir "${result_dir}"
+mkdir -p "${result_dir}" || die Can not create "${result_dir}"
+result_dir=`readlink -f "${result_dir}"`
 
 if [ $target != "insource" ]; then
     echo Preparing building dir ${build_dir}

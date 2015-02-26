@@ -165,21 +165,21 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
     if(DBG) std::cerr << tmp2.str() << std::endl;
 
     // find M,N from input array
-    slpp::int_t M = nrow(Ain.get());
-    slpp::int_t N = ncol(Ain.get());
+    slpp::int_t M = nRow(Ain);
+    slpp::int_t N = nCol(Ain);
     if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
 
     // find MB,NB from input array, which is the chunk size
 
-    checkInputArray(Ain.get());
+    checkInputArray(Ain);
     //!
     //!.... Set up ScaLAPACK array descriptors ........................................
     //!
 
     // these formulas for LLD (loacal leading dimension) and LTD (local trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
-    const slpp::int_t MB= brow(Ain.get());
-    const slpp::int_t NB= bcol(Ain.get());
+    const slpp::int_t MB= chunkRow(Ain);
+    const slpp::int_t NB= chunkCol(Ain);
     const slpp::int_t one = 1 ;
     slpp::int_t MIN_MN = std::min(M,N);
 
@@ -190,40 +190,63 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
     if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW << std::endl;
     if(DBG) std::cerr << "--> LLD_A = " << LLD_A << std::endl;
 
-    // LTD(A)
-    slpp::int_t LTD_A = std::max(one, numroc_( N, NB, MYPCOL, CSRC, NPCOL ));
-    if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
-    if(DBG) std::cerr << "-->LTD_A = " << LTD_A << std::endl;
+    // LLD(U)
+    slpp::int_t LLD_U = LLD_A;
 
     // LLD(VT)
     slpp::int_t LLD_VT = std::max(one, numroc_( MIN_MN, MB, MYPROW, RSRC, NPROW ));
     if(DBG) std::cerr << "MIN_MN:"<<MIN_MN <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW << std::endl;
     if(DBG) std::cerr << "-->LLD_VT = " << LLD_VT << std::endl;
 
-    // LTD(U)
+    // LTD(A)
+    slpp::int_t LTD_A = std::max(one, numroc_( N, NB, MYPCOL, CSRC, NPCOL ));
+    if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
+    if(DBG) std::cerr << "-->LTD_A = " << LTD_A << std::endl;
+
+     // LTD(U)
     slpp::int_t LTD_U = std::max(one, numroc_( MIN_MN, NB, MYPCOL, CSRC, NPCOL ));
     if(DBG) std::cerr << "MIN_MN:"<<MIN_MN <<" NB:"<<NB << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->LTD_U = " << LTD_U << std::endl;
 
 
     // create ScaLAPACK array descriptors
-    if(DBG) std::cerr << "descinit_ DESC_A" << std::endl;
+    slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
+
     slpp::desc_t DESC_A;
-    descinit_(DESC_A, M, N, MB, NB, 0, 0, ICTXT, LLD_A, *INFO);
-    if(DBG) std::cerr << "DESC_A=" << DESC_A << std::endl;
+    descinit_(DESC_A,  M, N,      MB, NB, 0, 0, ICTXT, LLD_A, descinitINFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_A) failed, INFO " << descinitINFO
+                                                                            << " DESC_A " << DESC_A);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPISvd: descinit(DESC_A) failed");
+    }
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_A=" << DESC_A);
 
-    if(DBG) std::cerr << "descinit_ DESC_U" << std::endl;
     slpp::desc_t DESC_U;
-    descinit_(DESC_U, M, MIN_MN, MB, NB, 0, 0, ICTXT, LLD_A, *INFO);
+    descinit_(DESC_U,  M, MIN_MN, MB, NB, 0, 0, ICTXT, LLD_U, descinitINFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_U) failed, INFO " << descinitINFO
+                                                                            << " DESC_U " << DESC_U);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "descinit(DESC_U) failed");
+    }
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_U=" << DESC_U);
 
-    if(DBG) std::cerr << "descinit_ DESC_VT" << std::endl;
     slpp::desc_t DESC_VT;
-    descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, ICTXT, LLD_VT, *INFO);
+    descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, ICTXT, LLD_VT, descinitINFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_VT) failed, INFO " << descinitINFO
+                                                                            << " DESC_VT " << DESC_VT);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPISvd(): descinit(DESC_VT) failed");
+    }
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_VT=" << DESC_VT);
 
-    // S is different: global, not distributed, so its LLD(S) == LEN(S)
-    if(DBG) std::cerr << "descinit_ DESC_S" << std::endl;
-    slpp::desc_t DESC_S;
-    descinit_(DESC_S, MIN_MN, 1, MB, NB, 0, 0, ICTXT, MIN_MN, *INFO);
+    slpp::desc_t DESC_S; // S is different: global, not distributed, so its LLD(S) == LEN(S) == MIN(M,N)
+    descinit_(DESC_S,  MIN_MN, 1, MB, NB, 0, 0, ICTXT, MIN_MN, descinitINFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPISvd: descinit(DESC_S) failed, INFO " << descinitINFO
+                                                                            << " DESC_S " << DESC_S);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "SVDPhysical::invokeMPISvd(): descinit(DESC_S) failed");
+    }
+    LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPISvd(): DESC_S=" << DESC_S);
 
     //REFACTOR
     if(DBG) {
@@ -476,9 +499,10 @@ shared_ptr<Array> SVDPhysical::execute(std::vector< shared_ptr<Array> >& inputAr
 
     // redistribute input arrays to ScaLAPACK block-cyclic
     std::vector<shared_ptr<Array> > redistInputs = redistributeInputArrays(inputArrays, query);
-
-    // REFACTOR make a checkArgs(inputArrays, query); + assert just one input
-    shared_ptr<Array> input = redistInputs[0];  // just one input
+    LOG4CXX_DEBUG(logger, "SVDPhysical::execute():"
+                           << " chunksize (" << redistInputs[0]->getArrayDesc().getDimensions()[0].getChunkInterval()
+                           << ", "           << redistInputs[0]->getArrayDesc().getDimensions()[1].getChunkInterval()
+                           << ")");
 
     //!
     //!.... Initialize the (imitation)BLACS used by the instances to calculate sizes

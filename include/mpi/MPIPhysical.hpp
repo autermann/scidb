@@ -42,11 +42,6 @@
 namespace scidb {
 using namespace boost;
 
-inline int64_t nrow(Array* a) { return a->getArrayDesc().getDimensions()[0].getLength(); }
-inline int64_t ncol(Array* a) { return a->getArrayDesc().getDimensions()[1].getLength(); }
-inline int64_t brow(Array* a) { return a->getArrayDesc().getDimensions()[0].getChunkInterval(); }
-inline int64_t bcol(Array* a) { return a->getArrayDesc().getDimensions()[1].getChunkInterval(); }
-
 inline Coordinates getStart(Array* a) {
     Coordinates result(2);
     result[0] = a->getArrayDesc().getDimensions()[0].getStart();

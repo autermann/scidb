@@ -17,6 +17,7 @@ scan(count_array)
 count(count_array)  
 count(count_array,i)  
 count(count_array,j)  
+count(count_array,i,j)  
 
 --stop-query-logging
 

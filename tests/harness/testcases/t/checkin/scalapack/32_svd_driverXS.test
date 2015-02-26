@@ -1,19 +1,20 @@
 --setup
 
---shell --command "echo [dense_linear_algebra]                >> /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "echo tests=SVD                      >> /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "echo error-limit=256                 >> /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "echo size-list=XSMALLEST_SIZE_LIST  >> /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "echo divisor-list=2,3               >> /tmp/32_svd_driverXS.$PPID.cfg"
+--shell --command "echo [dense_linear_algebra]                >> /tmp/$PPID.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$PPID.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/$PPID.cfg"
+--shell --command "echo tests=SVD                      >> /tmp/$PPID.cfg"
+--shell --command "echo error-limit=256                 >> /tmp/$PPID.cfg"
+--shell --command "echo size-list=+:5:5:1               >> /tmp/$PPID.cfg"
+# divisor-list cannot be used until automatic repart is enabled
+#--shell --command "echo divisor-list=2,3               >> /tmp/$PPID.cfg"
 
 --test
---shell --command "python ../../bin/dla_driver.py /tmp/32_svd_driverXS.$PPID.cfg 1> /tmp/32_svd_driverXS.$PPID.stdout 2> /tmp/32_svd_driverXS.$PPID.stderr"
---shell --command "cat /tmp/32_svd_driverXS.$PPID.stderr"
---shell --command "cat /tmp/32_svd_driverXS.$PPID.stdout" --store
+--shell --command "python ../../bin/dla_driver.py /tmp/$PPID.cfg 1> /tmp/$PPID.stdout 2> /tmp/$PPID.stderr"
+--shell --command "cat /tmp/$PPID.stderr"
+--shell --command "cat /tmp/$PPID.stdout" --store
 
 --cleanup
---shell --command "rm /tmp/32_svd_driverXS.$PPID.cfg"
---shell --command "rm /tmp/32_svd_driverXS.$PPID.stdout"
---shell --command "rm /tmp/32_svd_driverXS.$PPID.stderr" 
+--shell --command "rm /tmp/$PPID.cfg"
+--shell --command "rm /tmp/$PPID.stdout"
+--shell --command "rm /tmp/$PPID.stderr" 

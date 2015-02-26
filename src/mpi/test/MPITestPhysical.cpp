@@ -123,7 +123,7 @@ class PhysicalMpiTest: public MPIPhysical
 
             boost::shared_ptr<MpiLauncher> launcher;
             if (_mustLaunch) {
-                launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+                launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
                 // Perform some negative testing on the launcher object
                 try {
                     vector<pid_t> pids;
@@ -387,7 +387,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             std::vector<std::string> args;
 	    launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -519,7 +519,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             stringstream ss;
             ss << SLAVE_DELAY_SEC;
@@ -648,7 +648,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             std::vector<std::string> args;
 	    launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -757,7 +757,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -824,7 +824,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -876,7 +876,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -940,7 +940,7 @@ class PhysicalMpiTest: public MPIPhysical
 
 	boost::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(launchId, query));
+	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launchId, launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());

@@ -35,21 +35,37 @@ endif()
 ######################
 set(USE_LOCAL_MPI 1) # If set, will find MPICH2, while the current find module will have selected OpenMPI
 if (USE_LOCAL_MPI)
-  set(LOCAL_MPI_PATH "/usr") # example
-  message(STATUS "WARNING-- using locally installed MPICH2")
-  set(MPI_INCLUDE "-I ${LOCAL_MPI_PATH}/include/mpich2")
-  set(MPI_Fortran_COMPILER "${LOCAL_MPI_PATH}/bin/mpif77.mpich2")
-  set(MPI_CXX_COMPILER "${LOCAL_MPI_PATH}/bin/mpic++.mpich2")
-  set(MPI_CC_COMPILER "${LOCAL_MPI_PATH}/bin/mpicc.mpich2")
-  set(MPI_LIBRARIES "${LOCAL_MPI_PATH}/lib/libmpichf90.a") # fill in the blanks
-  set(MPI_Fortran_FOUND 1) # emulate find_package()
-  set(MPI_CXX_FOUND 1)     # emulate find_package()
-  set(MPI_CC_FOUND 1)      # emulate find_package()
-  set(MPICH_FOUND 1) # we have MPICH, need custom ScaLAPACK
+   set(LOCAL_MPI_PATH "UNDEFINED_FOR_THIS_PLATFORM")
+   set(MPICH2_SUFFIX "")
+
+   if(${DISTRO_NAME_VER} MATCHES "Ubuntu-12.04")
+       set(LOCAL_MPI_PATH "/usr")
+       set(MPI_INCLUDE "-I ${LOCAL_MPI_PATH}/include/mpich2")
+       set(MPICH2_SUFFIX ".mpich2")
+   endif()
+
+   if(${DISTRO_NAME_VER} MATCHES "CentOS-6.3")
+       set(LOCAL_MPI_PATH "/usr/lib64/mpich2")
+       set(MPI_INCLUDE "-I /usr/include/mpich2-x86_64")
+   endif()
+
+   message(STATUS "WARNING-- using locally installed MPICH2")
+   message(STATUS "Local MPICH2 path: ${LOCAL_MPI_PATH}")
+
+   if (NOT ${LOCAL_MPI_PATH} MATCHES "UNDEFINED_FOR_THIS_PLATFORM")
+       set(MPI_Fortran_COMPILER "${LOCAL_MPI_PATH}/bin/mpif77${MPICH2_SUFFIX}")
+       set(MPI_CXX_COMPILER "${LOCAL_MPI_PATH}/bin/mpic++${MPICH2_SUFFIX}")
+       set(MPI_CC_COMPILER "${LOCAL_MPI_PATH}/bin/mpicc${MPICH2_SUFFIX}")
+       set(MPI_LIBRARIES "${LOCAL_MPI_PATH}/lib/libmpichf90.a") # fill in the blanks
+       set(MPI_Fortran_FOUND 1) # emulate find_package()
+       set(MPI_CXX_FOUND 1)     # emulate find_package()
+       set(MPI_CC_FOUND 1)      # emulate find_package()
+       set(MPICH_FOUND 1) # we have MPICH, need custom ScaLAPACK
+   endif()
 else (USE_LOCAL_MPI)
-  set(MPI_Fortran_COMPILER mpif77) # must be before find_package to be path-resolved
-  find_package(MPI)
-  MESSAGE(STATUS "MPI_Fortran_COMPILER=${MPI_Fortran_COMPILER}")
+   set(MPI_Fortran_COMPILER mpif77) # must be before find_package to be path-resolved
+   find_package(MPI)
+   MESSAGE(STATUS "MPI_Fortran_COMPILER=${MPI_Fortran_COMPILER}")
 endif(USE_LOCAL_MPI)
 
 #

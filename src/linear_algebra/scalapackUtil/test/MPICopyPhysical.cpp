@@ -138,20 +138,20 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     if(DBG) std::cerr << tmp2.str() << std::endl;
 
     // find M,N from input array
-    slpp::int_t M = nrow(Ain.get());
-    slpp::int_t N = ncol(Ain.get());
+    slpp::int_t M = nRow(Ain);
+    slpp::int_t N = nCol(Ain);
     if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
 
 
-    checkInputArray(Ain.get());
+    checkInputArray(Ain);
     //!
     //!.... Set up ScaLAPACK array descriptors ........................................
     //!
 
     // these formulas for LLD (loacal leading dimension) and LTD (local trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
-	const slpp::int_t MB= brow(Ain.get());  // chunk size
-	const slpp::int_t NB= bcol(Ain.get());
+	const slpp::int_t MB= chunkRow(Ain);  // chunk sizes
+	const slpp::int_t NB= chunkCol(Ain);
     const slpp::int_t one = 1 ;
 
     // LLD(IN)
@@ -159,19 +159,35 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
     if(DBG) std::cerr << "--> LLD_IN = " << LLD_IN << std::endl;
 
+    // LLD(OUT)
+    slpp::int_t LLD_OUT = LLD_IN; // because its a copy operation
+
     // LTD(IN)
     slpp::int_t LTD_IN = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
     if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
     if(DBG) std::cerr << "-->LTD_IN = " << LTD_IN << std::endl;
 
     // create ScaLAPACK array descriptors
+    slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
     if(DBG) std::cerr << "descinit_ DESC_IN" << std::endl;
     slpp::desc_t DESC_IN;
-    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, *INFO);
+    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, descinitINFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPICopy: descinit(DESC_IN) failed, INFO " << descinitINFO
+                                                                                 << " DESC_IN " << DESC_IN);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPICopy: descinit(DESC_IN) failed");
+    }
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPICopy: DESC_IN " << DESC_IN);
 
     if(DBG) std::cerr << "descinit_ DESC_OUT" << std::endl;
     slpp::desc_t DESC_OUT;
-    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, *INFO);
+    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LLD_OUT, descinitINFO);
+    if (descinitINFO != 0) {
+        LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPICopy: descinit(DESC_IN) failed, INFO " << descinitINFO
+                                                                                << " DESC_OUT " << DESC_OUT);
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical::invokeMPICopy: descinit(DESC_OUT) failed");
+    }
+    LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPICopy: DESC_OUT " << DESC_OUT);
 
     // create ScaLAPACK array descriptors
     slpp::int_t MP = LLD_IN;

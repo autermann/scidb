@@ -4,7 +4,9 @@
   <refnamediv>
     <refname>list</refname>
 
-    <refpurpose>List contents of SciDB namespace</refpurpose>
+    <refpurpose><indexterm>
+        <primary>list operator</primary>
+      </indexterm>List contents of SciDB namespace</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -15,8 +17,6 @@
     <title>Summary</title>
 
     <para><indexterm>
-        <primary>list arrays</primary>
-      </indexterm><indexterm>
         <primary>arrays</primary>
 
         <secondary>versions</secondary>
@@ -34,32 +34,47 @@
 
           <tbody>
             <row>
-              <entry>aggregates</entry>
+              <entry><indexterm>
+                  <primary>aggregates</primary>
+
+                  <secondary>listing</secondary>
+                </indexterm>aggregates</entry>
 
               <entry>Show all operators that take as input a SciDB array and
               return a scalar.</entry>
             </row>
 
             <row>
-              <entry>arrays</entry>
+              <entry><indexterm>
+                  <primary>arrays</primary>
 
-              <entry>Show all arrays. Each function will be listed with its
-              available datatypes and the library in functions which it
-              resides. If <replaceable>version_flag</replaceable> is true, the
-              operator lists all versions of each array. Thus, if an array has
-              n versions, the output will include n+1 rows for that
+                  <secondary>listing</secondary>
+                </indexterm>arrays</entry>
+
+              <entry>Show all arrays. If
+              <replaceable>version_flag</replaceable> is true, the operator
+              lists all versions of each array. Thus, if an array has n
+              versions, the output will include n+1 rows for that
               array.</entry>
             </row>
 
             <row>
-              <entry>functions</entry>
+              <entry><indexterm>
+                  <primary>functions</primary>
+
+                  <secondary>listing</secondary>
+                </indexterm>functions</entry>
 
               <entry>Show all functions and the libraries in which they
               reside.</entry>
             </row>
 
             <row>
-              <entry>instances</entry>
+              <entry><indexterm>
+                  <primary>instances</primary>
+
+                  <secondary>listing</secondary>
+                </indexterm>instances</entry>
 
               <entry>Show all SciDB instances. Each instance will be listed
               with its port, id number, and time and date stamps for when it
@@ -67,27 +82,41 @@
             </row>
 
             <row>
-              <entry>libraries</entry>
+              <entry><indexterm>
+                  <primary>libraries</primary>
+
+                  <secondary>listing</secondary>
+                </indexterm>libraries</entry>
 
               <entry>Show all libraries that are loaded in the current SciDB
               session.</entry>
             </row>
 
             <row>
-              <entry>operators</entry>
+              <entry><indexterm>
+                  <primary>operators</primary>
+
+                  <secondary>listing</secondary>
+                </indexterm>operators</entry>
 
               <entry>Show all operators and the libraries in which they
               reside.</entry>
             </row>
 
             <row>
-              <entry>types</entry>
+              <entry><indexterm>
+                  <primary>data types</primary>
+                </indexterm>types</entry>
 
               <entry>Show all the datatypes the SciDB supports.</entry>
             </row>
 
             <row>
-              <entry>queries</entry>
+              <entry><indexterm>
+                  <primary>queries</primary>
+
+                  <secondary>listing active</secondary>
+                </indexterm>queries</entry>
 
               <entry>Show all active queries. Each active query will have an
               id, a time and date when it was queries initiated, an error
@@ -108,18 +137,24 @@
 
       <procedure>
         <step>
-          <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>{No} name,id,schema
-{0} "vector0",6205,"vector0&lt;val:double&gt; [i=0:4,5,0]"
-{1} "vector1",6207,"vector1&lt;val:string&gt; [i=0:4,5,0]"
+          <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>{No} name,id,schema,availability
+{0} "C",3221,"C&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
+{1} "product",3223,"product&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
+{2} "vector0",3440,"vector0&lt;val:double&gt; [i=0:4,5,0]",true
+{3} "vector1",3442,"vector1&lt;val:string&gt; [i=0:4,5,0]",true
 </screen></para></para>
         </step>
 
         <step>
-          <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>{No} name,id,schema
-{0} "vector0",6205,"vector0&lt;val:double&gt; [i=0:4,5,0]"
-{1} "vector0@1",6206,"vector0@1&lt;val:double&gt; [i=0:4,5,0]"
-{2} "vector1",6207,"vector1&lt;val:string&gt; [i=0:4,5,0]"
-{3} "vector1@1",6208,"vector1@1&lt;val:string&gt; [i=0:4,5,0]"
+          <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>{No} name,id,schema,availability
+{0} "C",3221,"C&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
+{1} "C@1",3222,"C@1&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
+{2} "product",3223,"product&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
+{3} "product@1",3224,"product@1&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
+{4} "vector0",3440,"vector0&lt;val:double&gt; [i=0:4,5,0]",true
+{5} "vector0@1",3441,"vector0@1&lt;val:double&gt; [i=0:4,5,0]",true
+{6} "vector1",3442,"vector1&lt;val:string&gt; [i=0:4,5,0]",true
+{7} "vector1@1",3443,"vector1@1&lt;val:string&gt; [i=0:4,5,0]",true
 </screen></para></para>
         </step>
 
@@ -128,11 +163,16 @@
 {0} "ApproxDC"
 {1} "avg"
 {2} "count"
-{3} "max"
-{4} "min"
-{5} "stdev"
-{6} "sum"
-{7} "var"
+{3} "first"
+{4} "last"
+{5} "mad"
+{6} "max"
+{7} "median"
+{8} "min"
+{9} "stdev"
+{10} "sum"
+{11} "top_five"
+{12} "var"
 </screen></para></para>
         </step>
       </procedure>

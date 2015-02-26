@@ -741,11 +741,11 @@ void Value::makeTileConstant(const TypeId& typeId)
 
     RLEPayload& p = *getTile(typeId);
     RLEPayload::Segment s;
-    s.same = true;
-    s.null = isNull();
-    s.pPosition = 0;
-    s.valueIndex = 0;
-    if (!s.null) {
+    s._same = true;
+    s._null = isNull();
+    s._pPosition = 0;
+    s._valueIndex = 0;
+    if (!s._null) {
         std::vector<char> varPart;
         p.appendValue(varPart, *this, 0);
         p.setVarPart(varPart);

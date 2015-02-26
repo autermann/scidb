@@ -24,6 +24,20 @@ CREATE ARRAY m4x4_missing <val1:double,val2:int32 default 5468>[x=0:3,4,0,y=0:3,
 load(m4x4_missing, '../examples/m4x4_missing.txt')  
 --set-format dcsv
 --start-igdata
+store(build(<val:double null> [i=0:4,5,0], '[47.0, ?, -21.1, ?100, ?50]',true), A)  
+--set-format dense
+--stop-igdata
+scan(A) 
+--set-format dcsv
+apply(A,MRcode, missing_reason(val))  
+--start-igdata
+store(build(<val:int32 null default null> [i=0:5,6,0], '[-1,47,23,0,127,-1]',true), arrayB)  
+--set-format dense
+--stop-igdata
+scan(arrayB) 
+--set-format dcsv
+apply(arrayB,MRcode, missing(val))  
+--start-igdata
 --aql CREATE ARRAY open <val:double>[I=0:9,10,0,J=0:*,10,0]  
 --aql CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]  
 --aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0] 
@@ -50,6 +64,8 @@ remove(products)
 remove(product_null)
 remove(product_dflt)
 remove(m4x4_missing)
+remove(A)
+remove(arrayB)
 remove(open)
 remove(winnersFlat)
 remove(OlympicWinners)

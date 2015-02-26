@@ -93,6 +93,8 @@ public:
 	LogicalRedimensionStore(const string& logicalName, const std::string& alias):
 	        LogicalOperator(logicalName, alias)
 	{
+        _properties.noNesting = true;
+
 		ADD_PARAM_INPUT()
 		ADD_PARAM_OUT_ARRAY_NAME()
 		ADD_PARAM_VARIES()

@@ -22,7 +22,6 @@ aggregate(A,ApproxDC(num),sum(num))
 aggregate(A,ApproxDC(num),sum(num),min(num),max(num),count(num))
 
 ApproxDC(B)
-ApproxDC(concat(B,B))
 ApproxDC(join(B,B))
 aggregate(B,ApproxDC(val))
 aggregate(B,ApproxDC(val),sum(val),min(val),max(val),count(val))

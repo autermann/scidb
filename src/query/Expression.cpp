@@ -258,7 +258,7 @@ void Expression::compile(std::string functionName,
         assert(!_props[i].isConst);
         Type const& type = TypeLibrary::getType(_props[i].type);
         _eargs[i] = Value(type);
-        if (tile) { 
+        if (tile) {
             _eargs[i].getTile(_props[i].type);
         }
     }
@@ -531,6 +531,7 @@ Expression::internalCompile(boost::shared_ptr<LogicalExpression> expr,
         // Compiling child expressions and saving their types
         vector<TypeId> funcArgTypes(e->getArgs().size());
         // Reverse order is needed to provide evaluation from left to right
+        bool argumentsAreConst = true;
         for (int i = e->getArgs().size() - 1; i >=0 ; i--)
         {
             size_t newSkipIndex = skipIndex;
@@ -556,6 +557,8 @@ Expression::internalCompile(boost::shared_ptr<LogicalExpression> expr,
                                                      f.argIndex + i,
                                                      newSkipIndex, newSkipValue);
             funcArgTypes[i] = _props[f.argIndex + i].type;
+            argumentsAreConst = argumentsAreConst &&
+                    (_props[f.argIndex + i].isConst || _props[f.argIndex + i].isConstantFunction);
         }
         // Searching function pointer for given function name and type of arguments
         FunctionDescription functionDesc;
@@ -579,6 +582,7 @@ Expression::internalCompile(boost::shared_ptr<LogicalExpression> expr,
                 // We need to swap functions producing arguments for this call
                 swapArguments(f.argIndex);
             }
+            _props[resultIndex].isConstantFunction = functionDesc.isDeterministic() && argumentsAreConst;
             /**
              * TODO: here it would be useful to set isConst and notNull
                          * flags for result arg prop. Also here we can evaluate function

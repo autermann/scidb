@@ -183,7 +183,7 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
 
     boost::shared_ptr<scidb::ConstArrayIterator> chunksIt;
     for(chunksIt = array->getConstIterator(/*attrid*/0); ! chunksIt->end(); ++(*chunksIt) ) {
-        if(DBG) std::cerr << "extractDataToOp: next X chunk" << std::endl ;
+        if(DBG) std::cerr << "extractDataToOp: next chunksIt" << std::endl ;
 
         // question: when would getPosition() differ from getFirstPosition()
         //           when using the chunk-level interface?
@@ -223,6 +223,8 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
             // we'll assert.  In the future we can decide what
             // to do.
             if (!aligned || hasOverlap || isEmptyable || isNullable || chunk.isRLE() || chunk.isSparse()) {
+                if(DBG) std::cerr << "extractDataToOp: chunk/tile iteration mode" << std::endl ;
+
                 for (boost::shared_ptr<scidb::ConstChunkIterator> ci =
                         chunk.getConstIterator(scidb::ChunkIterator::INTENDED_TILE_MODE|
                                                scidb::ChunkIterator::IGNORE_OVERLAPS|
@@ -233,17 +235,31 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
                     scidb::Value& value = ci->getItem();
 
                     if(!(ci->getMode() & ChunkIterator::TILE_MODE)) { // XXX TODO: if tile mode is not supported, can we do better ?
-                        // This is the reference version.  Short, but 20-50x slower
-                        // than the optimized version below.
-                        // If we were to refactor this stuff into template-based programming
+                        if(DBG) std::cerr << "extractDataToOp: tile mode not available, extract is 20-50x slower" << std::endl ;
+
+                        // This is the reference version using item iteration.
+                        // The code is compact, but the last time I measured, it was 20-50x slower
+                        // than the inlined-operator mode below.
+
+                        // If we were to refactor this item iterator stuff into template-based programming
                         // we could have the best of both worlds.
-                        assert(!value.isNull()) ; // ssvdNorm is undefined in the presence of nulls
+                        // assert(!value.isNull()) ; // enable this line and run t/scalapack/gemm_03.test
+                                                     // or otherwise give an input with nulls that also causes
+                                                     // the TILE_MODE bit to not be set.  This can be used to
+                                                     // demonstrate demonstrate #2245
+                                                     // that IGNORE_NULL_VALUES is a request that the iterator
+                                                     // chooses to *ignore* when iteratore mode does not have TILE_MODE set.
+                                                     // Perhaps I am to check the getMode() for every requested attribute?
+                                                     // Another case of the risks of maintaining non-tile mode.
+                                                     // assert() disabled to resolve #2217
                         if (!value.isNull()) {
                             scidb::Coordinates const& itemPos = ci->getPosition();
                             double val = * reinterpret_cast<double*>(ci->getItem().data());
                             extractOp(val, itemPos[0], itemPos[1]);
                         }
                     } else {
+                        if(DBG) std::cerr << "extractDataToOp: tile mode" << std::endl ;
+
                         // TODO: the fast version needs factoring into inline methods and
                         //       templates.  It has become too unweildy.
                         // This is the fast version.  The actual operation from the template
@@ -284,13 +300,14 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
                         volatile const int64_t colEndPhys = chunkOrigin[1] + colChunkSize ; // array can physically go to here
 
                         for (size_t seg = 0; seg < tile->nSegments(); seg++) {
+                            if(DBG) std::cerr << "extractDataToOp: next tile segment" << std::endl ;
                             // segments have length and value
                             // we won't check if( seg.null ), we are trying to do this in 10 machine cycles
                             // TODO: add check at array level, which raises exception if the attribute is nullable
                             const scidb::RLEPayload::Segment& segment = tile->getSegment(seg);
-                            if (segment.same) {
+                            if (segment._same) {
                                 // run-length coded value, to be repeated segment.length() times
-                                void* values = tile->getRawValue(segment.valueIndex);
+                                void* values = tile->getRawValue(segment._valueIndex);
                                 //assert(! (reinterpret_cast<uint64_t>(values) % sizeof(double))) ;
                                 bool unaligned = reinterpret_cast<uint64_t>(values) % sizeof(double) ;
                                 double val ;
@@ -333,14 +350,14 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID, 
                                 }
                             } else {
                                 // non-run-length (literal) segment
-                                const size_t end = segment.valueIndex + segment.length();
-                                void* first = tile->getRawValue(segment.valueIndex);
+                                const size_t end = segment._valueIndex + segment.length();
+                                void* first = tile->getRawValue(segment._valueIndex);
                                 
                                 // we NEED the alignment of doubles.  byte-copying is too much
                                 // of a slowdown on a 64-bit machine
                                 // assert(!(reinterpret_cast<uint64_t>(values) % sizeof(double))) ;
                                 bool unaligned = reinterpret_cast<uint64_t>(first) % sizeof(double) ;
-                                for (size_t ii = segment.valueIndex; ii < end; ii++) {
+                                for (size_t ii = segment._valueIndex; ii < end; ii++) {
                                     void* values = tile->getRawValue(ii);
                                     double val ;
                                     if(unaligned) {

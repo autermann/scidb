@@ -26,14 +26,13 @@ project(SciDB C CXX Fortran)
 
 
 file(READ "${CMAKE_SOURCE_DIR}/version" _SCIDB_VERSION)
-STRING(REGEX MATCH "^([0-9]*)\\.([0-9]*)\\.([0-9]*)\\.([a-zA-Z]*).*$" __SCIDB_VERSION "${_SCIDB_VERSION}")
+STRING(REGEX MATCH "^([0-9]*)\\.([0-9]*)\\.([0-9]*).*$" __SCIDB_VERSION "${_SCIDB_VERSION}")
 if(NOT __SCIDB_VERSION)
     message(FATAL_ERROR "Can not parse 'version' file")
 endif()
 set(SCIDB_VERSION_MAJOR "${CMAKE_MATCH_1}")
 set(SCIDB_VERSION_MINOR "${CMAKE_MATCH_2}")
 set(SCIDB_VERSION_PATCH "${CMAKE_MATCH_3}")
-set(SCIDB_VERSION_CODENAME "${CMAKE_MATCH_4}")
 
 set(SCIDB_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}.${SCIDB_VERSION_PATCH}")
 set(SCIDB_SHORT_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}")
@@ -89,7 +88,7 @@ if(NOT SCIDB_REVISION)
     message(FATAL_ERROR "Can not fetch working copy version and can't find revision file.")
 endif()
 
-set(SCIDB_VERSION "${SCIDB_VERSION}.${SCIDB_REVISION} (${SCIDB_VERSION_CODENAME})")
+set(SCIDB_VERSION "${SCIDB_VERSION}.${SCIDB_REVISION}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
@@ -152,9 +151,6 @@ message("DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
 set(LIBREADLINE_STATIC OFF)
 if(${DISTRO_NAME_VER} MATCHES "RedHat-6")
  message(error "We do not support RedHat build. Use CentOS instead")
-endif()
-if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
- set(DISABLE_SCALAPACK 1)
 endif()
 
 if(${DISTRO_NAME_VER} MATCHES "RedHat-[0-9][.][0-9]" OR ${DISTRO_NAME_VER} MATCHES "SUSE")
@@ -294,7 +290,10 @@ ENABLE_TESTING()
 INCLUDE(CTest)
 
 ADD_TEST(NightlyTest "/bin/bash" ${GENERAL_HARNESSTEST_DIRECTORY}/runharness.sh)
-set_tests_properties (NightlyTest PROPERTIES TIMEOUT 32000)
+if (NOT HARNESS_TEST_TIMEOUT)
+  set(HARNESS_TEST_TIMEOUT 32000)
+endif(NOT HARNESS_TEST_TIMEOUT)
+set_tests_properties (NightlyTest PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
 
 
 #

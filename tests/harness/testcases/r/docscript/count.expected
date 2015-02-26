@@ -19,6 +19,9 @@ SCIDB QUERY : <count(count_array,i)>
 SCIDB QUERY : <count(count_array,j)>
 [(0),(1),(1),(0)]
 
+SCIDB QUERY : <count(count_array,i,j)>
+[[(0),(0),(0),(0)],[(0),(1),(1),(0)],[(0),(0),(0),(0)],[(0),(0),(0),(0)]]
+
 Query was executed successfully
 
 Query was executed successfully

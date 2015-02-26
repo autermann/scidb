@@ -2,7 +2,7 @@ SCIDB QUERY : <count(list('libraries'))>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <load_library('operators')>
-[An error expected at this place for the query "load_library('operators')". And it failed with error code = scidb::SCIDB_SE_PLUGIN_MGR::SCIDB_LE_CANT_LOAD_MODULE. Expected error code = scidb::SCIDB_SE_PLUGIN_MGR::SCIDB_LE_CANT_LOAD_MODULE.]
+[An error expected at this place for the query "load_library('operators')". And it failed with error code = scidb::SCIDB_SE_PLUGIN_MGR::SCIDB_LE_TOO_NEW_MODULE. Expected error code = scidb::SCIDB_SE_PLUGIN_MGR::SCIDB_LE_TOO_NEW_MODULE.]
 
 SCIDB QUERY : <count(list('libraries'))>
 [Query was executed successfully, ignoring data output by this query.]

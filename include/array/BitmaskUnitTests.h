@@ -62,17 +62,17 @@ public:
         bitmaskOne.clear();
 
         RLEEmptyBitmap::Segment seg;
-        seg.lPosition = 3;
-        seg.pPosition = 5;
-        seg.length=5;
+        seg._lPosition = 3;
+        seg._pPosition = 5;
+        seg._length=5;
         bitmaskOne.addSegment(seg);
-        seg.lPosition = 10;
-        seg.pPosition = 11;
-        seg.length=1;
+        seg._lPosition = 10;
+        seg._pPosition = 11;
+        seg._length=1;
         bitmaskOne.addSegment(seg);
-        seg.lPosition = 13;
-        seg.pPosition = 14;
-        seg.length=3;
+        seg._lPosition = 13;
+        seg._pPosition = 14;
+        seg._length=3;
         bitmaskOne.addSegment(seg);
     }
 
@@ -185,9 +185,9 @@ public:
         testIteratorHelper(eCopy2, bm1Copy2);
 
         RLEEmptyBitmap::Segment ns;
-        ns.lPosition=17;
-        ns.pPosition=17;
-        ns.length=2;
+        ns._lPosition=17;
+        ns._pPosition=17;
+        ns._length=2;
 
         eCopy2.addSegment(ns);
         bm1Copy2.addSegment(ns);

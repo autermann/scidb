@@ -22,7 +22,11 @@
 
 # shared library for user defined objects
 set (misc_src
- 	misc.cpp
+    misc.cpp
+    ../../src/array/LogicalTestCache.cpp
+    ../../src/array/PhysicalTestCache.cpp
+    ../../src/array/UnitTestDeepChunkMergeLogical.cpp
+    ../../src/array/UnitTestDeepChunkMergePhysical.cpp
 )
 
 file(GLOB misc_include "*.h")

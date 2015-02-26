@@ -1,16 +1,22 @@
-# keep this file sorted to avoid merging in duplicate values
+#
+# keep this file sorted to avoid accidental merges of duplicate lines
+#
+
+# Disable suite containing very large data
+bigdata
+
+# other tests/suites
 checkin.other.sample_1
 checkin.other.sample_2
 checkin.other.bernoulli_1
 checkin.other.bernoulli_3
-# next needs conversion to chunksize 32x32
-checkin.scalapack.20_svd_oldVals
-# next two superseded by svd_driverLong_order1to288c32
-checkin.scalapack.31_svd_doSvdWithMetrics_verySmall
-checkin.scalapack.32_svd_driverXS
 checkin.other.scidbLoadCsv_01_basic
 checkin.other.scidbLoadCsv_02_non_int_dimensions
 checkin.newaql.aggregate_004
+# next needs conversion to chunksize 32x32
+checkin.scalapack.20_svd_oldVals
+# next has output that is currently too verbose
+checkin.scalapack.31_svd_doSvdWithMetrics_verySmall
 data_model
 doc.redimension_2
 doc.redimension_store_1
@@ -21,6 +27,11 @@ doc.ug_loadingData_specialValues
 doc.ug_loadingData_errors
 other.repart_setopt
 perf.repart
+#next 4 are now for 64instance clusters only (4 instance ones are o1to96)
+scalapack.64instance.10_gemm_driver_allstd_o1to288c32
+scalapack.64instance.20_svd_doSvd_o1to288c32
+scalapack.64instance.31_svd_driver_random_t1to4_o1to1024c32
+scalapack.64instance.35_svd_driver_allstd_o1to288c32
 scalapack.perf
 scalapack.perf.30_svd_doSvd_2_M
 scalapack.smallest_sizes
@@ -40,11 +51,50 @@ iqueryabort.abort_update
 z_valgrind.z_valgrind
 @CONFIGURE_DISABLE_TESTS_SCALAPACK@
 @CONFIGURE_DISABLE_TESTS_NOT_DEBUG@
+
 #
-# next 3 lines: #2194: inverse disabled until (#2182) SplitArray is fixed
+# next 3 lines: grouped at end because they all concern the same operator
+# inverse: #2194: inverse disabled
+# code will be removed on the completion of QR and Solve for SciDB, so that if
+# there is a problem with that schedule we can re-enable inverse quickly and at low cost if necessary
 #
 checkin.other.inverse
 docscript.inverse
 other.basic_matrix_inverse
 
+# re-enable after closing ticket 2234
+docscript.load
+
+# re-enable after closing ticket 2235
+injecterror.inject_2_redim
+
+# re-enable after closing ticket 2236
+injecterror.inject_2_store
+
+# re-enable after closing ticket 2237
+injecterror.inject_2_update
+
+# re-enable after closing ticket 2238
+injecterror.inject_4_mapping
+
+# re-enable after closing ticket 2239
+iqueryabort.abort_load
+
+# re-enable after closing ticket 2240
+pload.loadcsv_shadow_array
+
+#re-enable after closing ticket 2200, test is on rectangular inputs
+scalapack.gemm_01
+
+#re-enable after closing ticket 2200, test is on rectangular inputs
+scalapack.gesvd_01
+
+#re-enable after closing ticket 2222
+scalapack.gemm_sparse_dense
+
+#re-enable after closing ticket 2174
+other.bernoulli_2
+
+#re-enable after closing ticket 2232
+docscript.allversions
 

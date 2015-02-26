@@ -80,6 +80,18 @@ function die
     exit 1
 }
 
+function expect_rpmsign_script
+{
+cat << ENDOFSCRIPT
+spawn rpm --define "_gpg_name $2" --addsign "$1"
+expect -exact "Enter pass phrase: "
+send -- "Secret passphrase\r"
+expect eof
+catch wait result
+exit [lindex \$result 3]
+ENDOFSCRIPT
+}
+
 if [ "$3" != "" ]; then
     dirs="$3"
 else
@@ -110,18 +122,16 @@ elif [ "$repotype" == "yum" ]; then
         echo Checking dir $release_dir
         check_yum_dir "$release_dir"
         if [ "$?" = "0" ]; then
+            for f in $release_dir/*.rpm; do
+                echo Signing package $f
+                expect_rpmsign_script "$f" "$2" | /usr/bin/expect - || die expect_rpmsign_script
+            done
+
             echo Building repo inside $release_dir
             rm -rf "$release_dir/repodata"
             createrepo "$release_dir"
             echo Signing repo $release_dir
-            gpg -u "$2" --detach-sign --armor "$release_dir/repodata/repomd.xml"
-         
-            #FIXME: Debian rpmsign can't use key-id from arguments!   
-            #for f in $release_dir/*.rpm; do
-            #    echo Signing package $f
-            #    echo -e "spawn rpmsign --key-id $2 --resign $f\nexpect -exact \"Enter pass phrase: \"\nsend -- \"Secret passphrase\\\r\"\nexpect eof\nwait\n" | expect -
-            #    echo $?
-            #done
+            gpg -u "$2" --detach-sign --armor "$release_dir/repodata/repomd.xml"         
         fi
     done
 else

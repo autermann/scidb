@@ -57,7 +57,9 @@ export BRANCH_NAME="${4}"
 export COORDINATOR="${5}"
 export PLATFORM="${6}"
 export THREAD_COUNT="${7}"
-
+export SCIDB_VER=`awk -F . '{print $1"."$2}' ${SOURCE_PATH}/version`
+export SCIDB_CLUSTER_NAME=scidb
+export SCIDB_CONFIG_FILE=/opt/scidb/${SCIDB_VER}/etc/config.in
 CTESTScriptLOCATION="$BUILD_PATH/cdash"
 
 if ! test -f "${SOURCE_PATH}/cdash/SciDB_DashboardSubmission.cmake"

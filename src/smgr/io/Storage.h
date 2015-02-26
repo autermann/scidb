@@ -271,6 +271,8 @@ namespace scidb
         /**
          * Remove a persistent array from the system. Does nothing if the
          * specified array is not present.
+         * This routine must be called on either all versions of uaId in sequence
+         * (as in "remove(array)") or on the last version of uaId only (as in "rollback").
          * @param uaId the Unversioned Array ID
          * @param arrId the Versioned Array ID
          * @param timestamp optional - if set, remove only chunks older than timestamp

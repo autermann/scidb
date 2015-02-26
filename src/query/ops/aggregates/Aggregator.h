@@ -96,9 +96,9 @@ public:
             else
             {
                 RLEEmptyBitmap::Segment seg;
-                seg.lPosition=iter.getPPos();
-                seg.pPosition=iter.getPPos();
-                seg.length = iter.getSegLength();
+                seg._lPosition=iter.getPPos();
+                seg._pPosition=iter.getPPos();
+                seg._length = iter.getSegLength();
                 _bm.addSegment(seg);
             }
             iter.toNextSegment();
@@ -297,7 +297,7 @@ struct AggregationFlags
  */
 class AggregatePartitioningOperator: public  PhysicalOperator
 {
-  private:
+  protected:
      vector <AggIOMapping> _ioMappings;
      vector <AggregatePtr> _aggs;
 

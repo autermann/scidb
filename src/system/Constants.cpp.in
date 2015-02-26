@@ -46,8 +46,6 @@ uint32_t SCIDB_VERSION_MINOR() { return @CONFIGURE_SCIDB_VERSION_MINOR@; }
 uint32_t SCIDB_VERSION_PATCH() { return @CONFIGURE_SCIDB_VERSION_PATCH@; }
 uint32_t SCIDB_VERSION_BUILD() { return @CONFIGURE_SCIDB_VERSION_BUILD@; }
 
-const char* SCIDB_VERSION_CODENAME() { return "@CONFIGURE_SCIDB_VERSION_CODENAME@"; }
-
 const char* SCIDB_INSTALL_PREFIX() { return "@CMAKE_INSTALL_PREFIX@"; }
 
 std::string SCIDB_BUILD_INFO_STRING(const char* separator)
@@ -60,6 +58,11 @@ std::string SCIDB_BUILD_INFO_STRING(const char* separator)
 std::string DEFAULT_MPI_DIR()
 {
     return std::string("@CONFIGURE_DEFAULT_MPI_DIR@");
+}
+
+std::string DEFAULT_MPI_TYPE()
+{
+    return std::string("@CONFIGURE_DEFAULT_MPI_TYPE@");
 }
 //the Ubuntu openmpi package is installed into /usr
 extern const size_t MB = 1024*1024;

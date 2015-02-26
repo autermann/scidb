@@ -110,14 +110,14 @@ public:
         CPPUNIT_ASSERT(FunctionLibrary::getInstance()->findFunction("is_null", boost::assign::list_of(TID_INT32), func, convs, true));
         Value inTile(TypeLibrary::getType(TID_INT32), true);
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = true;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile.getTile()->addRawValues();
+        inSeg._pPosition = 0;
+        inSeg._same = true;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile.getTile()->addRawValues();
         inTile.getTile()->addSegment(inSeg);
-        inSeg.pPosition = 32;
-        inSeg.same = true;
-        inSeg.null = true;
+        inSeg._pPosition = 32;
+        inSeg._same = true;
+        inSeg._null = true;
         inTile.getTile()->addSegment(inSeg);
         inTile.getTile()->flush(64);
         int32_t* p = (int32_t*)inTile.getTile()->getRawValue(0);
@@ -142,10 +142,10 @@ public:
         ExpressionContext ec(e);
 
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = ec[0].getTile()->addRawValues(32);
+        inSeg._pPosition = 0;
+        inSeg._same = false;
+        inSeg._null = false;
+        inSeg._valueIndex = ec[0].getTile()->addRawValues(32);
         ec[1].getTile()->addRawValues(32);
 
         ec[0].getTile()->addSegment(inSeg);
@@ -177,10 +177,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("-", boost::assign::list_of(TID_INT32), func, convs, true);
         Value inTile(TypeLibrary::getType(TID_INT32), true);
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile.getTile()->addRawValues(32);
+        inSeg._pPosition = 0;
+        inSeg._same = false;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile.getTile()->addRawValues(32);
         inTile.getTile()->addSegment(inSeg);
         inTile.getTile()->flush(32);
         int32_t* p = (int32_t*)inTile.getTile()->getRawValue(0);
@@ -204,10 +204,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("-", boost::assign::list_of(TID_INT32), func, convs, true);
         Value inTile(TypeLibrary::getType(TID_INT32), true);
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = true;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile.getTile()->addRawValues();
+        inSeg._pPosition = 0;
+        inSeg._same = true;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile.getTile()->addRawValues();
         inTile.getTile()->addSegment(inSeg);
         inTile.getTile()->flush(32);
         int32_t* p = (int32_t*)inTile.getTile()->getRawValue(0);
@@ -228,10 +228,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("+", boost::assign::list_of(TID_INT32)(TID_INT32), func, convs, true);
         Value inTile[2] = {Value(TypeLibrary::getType(TID_INT32), true), Value(TypeLibrary::getType(TID_INT32), true)};
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[0].getTile()->addRawValues(32);
+        inSeg._pPosition = 0;
+        inSeg._same = false;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[0].getTile()->addRawValues(32);
         inTile[1].getTile()->addRawValues(32);
 
         inTile[0].getTile()->addSegment(inSeg);
@@ -267,10 +267,10 @@ public:
         CPPUNIT_ASSERT(func.getFuncPtr());
         Value inTile[2] = {Value(TypeLibrary::getType(TID_BOOL), true), Value(TypeLibrary::getType(TID_BOOL), true)};
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[0].getTile()->addRawValues(32);
+        inSeg._pPosition = 0;
+        inSeg._same = false;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[0].getTile()->addRawValues(32);
         inTile[1].getTile()->addRawValues(32);
 
         inTile[0].getTile()->addSegment(inSeg);
@@ -301,10 +301,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("+", boost::assign::list_of(TID_INT32)(TID_INT32), func, convs, true);
         Value inTile[2] = {Value(TypeLibrary::getType(TID_INT32), true), Value(TypeLibrary::getType(TID_INT32), true)};
         RLEPayload::Segment inSeg;
-        inSeg.pPosition = 0;
-        inSeg.same = true;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[0].getTile()->addRawValues();
+        inSeg._pPosition = 0;
+        inSeg._same = true;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[0].getTile()->addRawValues();
         inTile[1].getTile()->addRawValues();
 
         inTile[0].getTile()->addSegment(inSeg);
@@ -342,43 +342,43 @@ public:
         RLEPayload::Segment inSeg;
 
         // Adding 10 same values into tile 0
-        inSeg.pPosition = 0;
-        inSeg.same = true;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[0].getTile()->addRawValues();
+        inSeg._pPosition = 0;
+        inSeg._same = true;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[0].getTile()->addRawValues();
         inTile[0].getTile()->addSegment(inSeg);
-        int32_t* p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg.valueIndex);
+        int32_t* p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg._valueIndex);
         *p = 5;
 
         // Adding 20 different values into tile 0
-        inSeg.pPosition = 10;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[0].getTile()->addRawValues(20);
+        inSeg._pPosition = 10;
+        inSeg._same = false;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[0].getTile()->addRawValues(20);
         inTile[0].getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg.valueIndex);
+        p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg._valueIndex);
         for (int i = 0; i < 20; i++)
             *p++ = i;
 
         inTile[0].getTile()->flush(30);
 
         // Adding 20 different values into tile 1
-        inSeg.pPosition = 0;
-        inSeg.same = false;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[1].getTile()->addRawValues(20);
+        inSeg._pPosition = 0;
+        inSeg._same = false;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[1].getTile()->addRawValues(20);
         inTile[1].getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg.valueIndex);
+        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg._valueIndex);
         for (int i = 0; i < 20; i++)
             *p++ = i;
 
         // Adding 20 same values into tile 1
-        inSeg.pPosition = 20;
-        inSeg.same = true;
-        inSeg.null = false;
-        inSeg.valueIndex = inTile[1].getTile()->addRawValues();
+        inSeg._pPosition = 20;
+        inSeg._same = true;
+        inSeg._null = false;
+        inSeg._valueIndex = inTile[1].getTile()->addRawValues();
         inTile[1].getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg.valueIndex);
+        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg._valueIndex);
         *p = 5;
 
         inTile[1].getTile()->flush(40);

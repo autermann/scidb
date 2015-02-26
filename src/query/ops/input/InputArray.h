@@ -320,15 +320,19 @@ CommonCase:
                 tmpValue.clear();
                 while (true) {
                     ch = getChar();
-                    if (ch == '\\') {
+                    if (ch == '\\')
+                    {
                         ch = getChar();
+                    }
+                    else
+                    {
+                        if (ch == '\"') {
+                            missingReason = -1;
+                            return TKN_LITERAL;
+                        }
                     }
                     if (ch == EOF)
                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR13);
-                    if (ch == '\"') {
-                        missingReason = -1;
-                        return TKN_LITERAL;
-                    }
                     Append(ch);
                 }
                 break;

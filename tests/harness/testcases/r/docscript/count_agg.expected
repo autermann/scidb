@@ -1,0 +1,36 @@
+SCIDB QUERY : <CREATE ARRAY m3x3<val:double>[i=0:2,3,0,j=0:2,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build_sparse(m3x3,1,i=j),m3x3)>
+[[(1),(),()],[(),(1),()],[(),(),(1)]]
+
+SCIDB QUERY : <aggregate(m3x3,count(val))>
+[(3)]
+
+SCIDB QUERY : <create array aFlat <row:int64, col:int64, value:string null> [csvRow=0:5,6,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <load aFlat from '../examples/aInsert.scidb'>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array A <value:string null> [row=1:3,3,0, col=1:3,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(aFlat,A)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <select * from A>
+[[(),(),()],[(null),(null),(null)],[("a7"),("a8"),("a9")]]
+
+SCIDB QUERY : <select count(*) from A>
+[(6)]
+
+SCIDB QUERY : <select count(value) from A>
+[(3)]
+
+Query was executed successfully
+
+Query was executed successfully
+
+Query was executed successfully
+

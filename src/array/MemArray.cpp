@@ -26,6 +26,8 @@
  * @brief Temporary (in-memory) array implementation
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
+ * @author poliocough@gmail.com
+ * @author others
  */
 
 #include "log4cxx/logger.h"
@@ -473,9 +475,10 @@ namespace scidb
     //
     LruMemChunk::LruMemChunk(): _whereInLru(SharedMemCache::getLru().end())
     {
-        swapFileOffset = -1;
-        swapFileSize = 0;
-        accessCount = 0;
+        _swapFileOffset = -1;
+        _swapFileSize = 0;
+        _accessCount = 0;
+        _sizeAtLastUnPin = 0;
     }
 
     LruMemChunk::~LruMemChunk()
@@ -542,21 +545,32 @@ namespace scidb
     {
     }
 
+    /*
+     * Some notes:
+     *  The LRU contains only chunks that are currently in-memory AND not pinned (access count 0).
+     *  Invariant: if a chunk is on the LRU, its access count is 0; also if a chunk's access count is 0, it's on the LRU.
+     *  Invariant: if a chunk is on the LRU, its size equals _sizeAtLastUnPin.
+     *  If a chunk is pinned, it could be accessed, or modified. We know nothing about its real "size". We only know "_sizeAtLastUnPin".
+     *  _usedMemSize is the sum of the sizes of all the pinned chunks AND all the chunks on the LRU.
+     * -AP 1/30/13
+     */
+
     void SharedMemCache::pinChunk(LruMemChunk &chunk)
     {
         ScopedMutexLock cs(_mutex);
-        if (chunk.accessCount++ == 0) {
+        if (chunk._accessCount++ == 0) {
+            chunk._sizeAtLastUnPin = chunk.size;  //mostly redundant. just in case someone is doing something clever
             if (chunk.getData() == NULL) {
                 if (_usedMemSize > _usedMemThreshold) {
                     swapOut();
                 }
                 if (chunk.size != 0) {
-                    assert(chunk.swapFileOffset >= 0);
+                    assert(chunk._swapFileOffset >= 0);
                     chunk.data.reset(new char[chunk.size]);
                     if (!chunk.getData())
                         throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
                     const MemArray* array = (const MemArray*)chunk.array;
-                    File::readAll(array->_swapFile, chunk.getData(), chunk.size, chunk.swapFileOffset);
+                    File::readAll(array->_swapFile, chunk.getData(), chunk.size, chunk._swapFileOffset);
                     ++_loadsNum;
                     _usedMemSize += chunk.size;
                 }
@@ -570,12 +584,21 @@ namespace scidb
     void SharedMemCache::unpinChunk(LruMemChunk &chunk)
     {
         ScopedMutexLock cs(_mutex);
-        assert(chunk.accessCount > 0);
-        if (--chunk.accessCount == 0) {
-            if (chunk.getData() != NULL) {
-                if (chunk.swapFileSize < chunk.size) {
-                    _usedMemSize += chunk.size - chunk.swapFileSize;
-                }
+        assert(chunk._accessCount > 0);
+        if (--chunk._accessCount == 0) {
+            //if chunk was changed, its size could be different
+            //subtract OLD size and add NEW size to _usedMemSize to account for the delta
+            assert(_usedMemSize >= chunk._sizeAtLastUnPin);
+            _usedMemSize -= chunk._sizeAtLastUnPin;
+            if (chunk.getData() == NULL)
+            {
+                assert(chunk.size == 0);
+                chunk._sizeAtLastUnPin = 0;
+            }
+            else
+            {
+                _usedMemSize += chunk.size;
+                chunk._sizeAtLastUnPin = chunk.size;
                 assert(chunk.isEmpty());
                 chunk.pushToLru();
                 if (_usedMemSize > _usedMemThreshold) {
@@ -594,17 +617,17 @@ namespace scidb
             bool popped = _theLru.pop(victim);
             SCIDB_ASSERT(popped);
             assert(victim!=NULL);
-            assert(victim->accessCount == 0);
+            assert(victim->_accessCount == 0);
             assert(victim->getData() != NULL);
             assert(!victim->isEmpty());
             victim->prune();
-            _usedMemSize -= victim->size;
-            int64_t offset = victim->swapFileOffset;
+            _usedMemSize -= victim->size; //victim is not pinned, so the size is correct
+            int64_t offset = victim->_swapFileOffset;
             MemArray* array = (MemArray*)victim->array;
-            if (offset < 0 || victim->swapFileSize < victim->size) {
-                offset = victim->swapFileOffset = array->_usedFileSize;
+            if (offset < 0 || victim->_swapFileSize < victim->size) {
+                offset = victim->_swapFileOffset = array->_usedFileSize;
                 array->_usedFileSize += victim->size;
-                victim->swapFileSize = victim->size;
+                victim->_swapFileSize = victim->size;
             }
             if (array->_swapFile < 0) {
                 array->_swapFile = File::createTemporary(array->getName());
@@ -613,12 +636,13 @@ namespace scidb
             ++_swapNum;
             victim->free();
         }
+        SCIDB_ASSERT(sizeCoherent());
     }
 
     void SharedMemCache::deleteChunk(LruMemChunk &chunk)
     {
         ScopedMutexLock cs(_mutex);
-        assert(chunk.accessCount == 0);
+        assert(chunk._accessCount == 0);
         chunk.removeFromLru();
     }
 
@@ -628,21 +652,41 @@ namespace scidb
         for (map<Address, LruMemChunk>::iterator i = array._chunks.begin(); i != array._chunks.end(); i++)
         {
             LruMemChunk &chunk = i->second;
-
-            assert(chunk.accessCount == 0);
-
-            /**
-             *  This code helps us to keep cache size correct even in case of
-             *  incorrectly handled errors
-             */
-            if (chunk.accessCount > 0) {
-                _usedMemSize -= chunk.size;
-                LOG4CXX_DEBUG(logger, "Warning: accessCount is " << chunk.accessCount << " due clean up of mem array '" << chunk.arrayDesc->getName());
+            assert(chunk._accessCount == 0);
+            if (chunk.getData() != NULL) {
+                //chunk could be pinned or just on the LRU.
+                _usedMemSize -= chunk._sizeAtLastUnPin;
+            }
+            if (chunk._accessCount > 0) {
+                LOG4CXX_DEBUG(logger, "Warning: accessCount is " << chunk._accessCount << " due clean up of mem array '" << chunk.arrayDesc->getName());
             }
             if (!chunk.isEmpty()) {
                 chunk.removeFromLru();
             }
         }
+        SCIDB_ASSERT(sizeCoherent());
+    }
+
+    uint64_t SharedMemCache::computeSizeOfLRU()
+    {
+        ScopedMutexLock cs(_mutex);
+        list<LruMemChunk*>::iterator iter = _theLru.begin();
+        size_t res = 0;
+        while (iter != _theLru.end())
+        {
+            LruMemChunk* ch = (*iter);
+            res += ch->_sizeAtLastUnPin;
+            ++iter;
+        }
+        return res;
+    }
+
+    bool SharedMemCache::sizeCoherent()
+    {
+        size_t lruSize = computeSizeOfLRU();
+        LOG4CXX_DEBUG(logger, "SharedMemCache::sizeCoherent computed "<<lruSize<<" used "<<_usedMemSize);
+        //computedSize does not include chunks that are pinned and not on the LRU. So we can't always check for strict equality.
+        return lruSize <= _usedMemSize;
     }
 
     SharedMemCache SharedMemCache::_sharedMemCache;
@@ -728,7 +772,7 @@ namespace scidb
     void MemArrayIterator::deleteChunk(Chunk& aChunk)
     {
         LruMemChunk& chunk = (LruMemChunk&)aChunk;
-        chunk.accessCount = 0;
+        chunk._accessCount = 0;
         SharedMemCache::getInstance().deleteChunk(chunk);
         array._chunks.erase(chunk.addr);
     }
@@ -1013,10 +1057,10 @@ namespace scidb
             char* dst = bufPos;
             for (size_t i = 0, n = tile->nSegments(); i < n; i++) { 
                 RLEPayload::Segment const& s = tile->getSegment(i);
-                assert(!s.null);
-                char* src = tile->getRawValue(s.valueIndex);
+                assert(!s._null);
+                char* src = tile->getRawValue(s._valueIndex);
                 size_t len = (size_t)s.length();
-                if (s.same) {  
+                if (s._same) {
                     for (size_t j = 0; j < len; j++) { 
                         memcpy(dst, src, elemSize);
                         dst += elemSize;

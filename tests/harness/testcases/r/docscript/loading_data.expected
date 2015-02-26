@@ -65,7 +65,7 @@ SCIDB QUERY : <SELECT * FROM analyze(winnersFlat)>
 SCIDB QUERY : <CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <SELECT * FROM redimension_store(winnersFlat,winners)>
+SCIDB QUERY : <redimension_store(winnersFlat,winners)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <SELECT * FROM list('types')>
@@ -77,6 +77,33 @@ SCIDB QUERY : <CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, 
 SCIDB QUERY : <LOAD intensityFlat FROM '../examples/intensity_data.bin' AS '(string, int64, int64 null)'>
 [Query was executed successfully, ignoring data output by this query.]
 
+SCIDB QUERY : <SELECT exposure, strlen(exposure) FROM intensityFlat>
+{i} exposure,expr
+{0} "High",4
+{1} "High",4
+{2} "High",4
+{3} "High",4
+{4} "High",4
+{5} "High",4
+{6} "High",4
+{7} "High",4
+{8} "Medium",6
+{9} "Medium",6
+{10} "Medium",6
+{11} "Medium",6
+{12} "Medium",6
+{13} "Medium",6
+{14} "Medium",6
+{15} "Medium",6
+{16} "Low",3
+{17} "Low",3
+{18} "Low",3
+{19} "Low",3
+{20} "Low",3
+{21} "Low",3
+{22} "Low",3
+{23} "Low",3
+
 SCIDB QUERY : <SELECT * FROM analyze(intensityFlat)>
 {attribute_number} attribute_name,min,max,distinct_count,non_null_count
 {0} "elapsedTime","0","7",8,24
@@ -86,7 +113,7 @@ SCIDB QUERY : <SELECT * FROM analyze(intensityFlat)>
 SCIDB QUERY : <CREATE ARRAY intensity <measuredIntensity:int64 null> [exposure(string)=3,3,0, elapsedTime=0:40000,10000,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <SELECT * FROM redimension_store(intensityFlat,intensity)>
+SCIDB QUERY : <redimension_store(intensityFlat,intensity)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <remove(intensityFlat)>
@@ -128,13 +155,13 @@ SCIDB QUERY : <CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <LOAD v4 FROM '../examples/v4.scidb'>
-[Query was executed successfully, ignoring data output by this query.]
+[(0,100),(1,99),(2,0),(3,97)]
 
 SCIDB QUERY : <CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <LOAD v4_dflt FROM '../examples/v4.scidb'>
-[Query was executed successfully, ignoring data output by this query.]
+[(0,100),(1,99),(2,111),(3,97)]
 
 SCIDB QUERY : <cat ../examples/v4_null.scidb>
 [
@@ -145,6 +172,18 @@ SCIDB QUERY : <CREATE ARRAY v4_null <val1:int8,val2:int8 NULL> [i=0:3,4,0]>
 
 SCIDB QUERY : <LOAD v4_null FROM '../examples/v4_null.scidb'>
 [Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY v6_dflt <val1:int8,val2:int8 default 111> [i=0:5,6,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD v6_dflt FROM '../examples/v4.scidb'>
+[(0,100),(1,99),(2,111),(3,97),(),()]
+
+SCIDB QUERY : <CREATE NOT EMPTY ARRAY v6_dflt_notEmpty <val1:int8,val2:int8 default 111>[i=0:5,6,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <LOAD v6_dflt_notEmpty FROM '../examples/v4.scidb'>
+[(0,100),(1,99),(2,111),(3,97),(0,111),(0,111)]
 
 SCIDB QUERY : <remove(intensityFlat)>
 [Query was executed successfully, ignoring data output by this query.]
@@ -211,6 +250,10 @@ SCIDB QUERY : <SELECT * FROM intensityFlatBadCells>
 {1} "High",null,0,"Failed to parse string",99,null,35
 {4} "Medium",null,0,"Failed to parse string",null,"Failed to parse string",94
 {5} "Low",null,0,"Assigning NULL to non-nullable attribute",null,"Failed to parse string",110
+
+Query was executed successfully
+
+Query was executed successfully
 
 Query was executed successfully
 

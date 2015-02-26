@@ -17,13 +17,11 @@
   <emphasis>sort</emphasis> which rearranges array data and returns a vector
   of sorted items.</para>
 
-  <sect1>
+  <section>
     <title>Aggregates</title>
 
     <para><indexterm>
         <primary>aggregates</primary>
-
-        <secondary>list of</secondary>
       </indexterm>SciDB offers the following aggregate methods that calculate
     summaries over groups of values in an array.</para>
 
@@ -158,7 +156,7 @@ y=0:3,4,0]</screen><programlisting>AFL% scan(m4x4_2attr);  </programlisting><scr
 [(12,24),(13,26),(14,28),(15,30)]
 ]</screen></para></para></para>
 
-    <sect2>
+    <section>
       <title>Grand Aggregates</title>
 
       <para><indexterm>
@@ -234,9 +232,9 @@ min_1:double NULL DEFAULT null &gt;
 </programlisting><screen>{i} a,b
 {0} 4,16
 </screen></para></para></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Group-By Aggregates</title>
 
       <para><indexterm>
@@ -306,9 +304,9 @@ min_1:double NULL DEFAULT null &gt;
 {2} 14
 {3} 15
 </screen></para></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Grid Aggregates</title>
 
       <para><indexterm>
@@ -361,9 +359,9 @@ y=0:1,4,0]</screen></para></para></para>
 [(5,0),(7,2)],
 [(13,8),(15,10)]
 ]</screen></para></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Window Aggregates</title>
 
       <para><indexterm>
@@ -407,7 +405,9 @@ AQL% <command>SELECT</command> <replaceable>aggregate</replaceable> <replaceable
       <para><indexterm>
           <primary>aggregates</primary>
 
-          <secondary>window, fixed</secondary>
+          <secondary>window</secondary>
+
+          <tertiary>fixed</tertiary>
         </indexterm>For example, you can use fixed window to calculate a
       running sum for a 3x3 window on array <code>m4x4</code>.</para>
 
@@ -450,7 +450,9 @@ y=0:3,4,0]</screen></para></para></para>
       <para><indexterm>
           <primary>aggregates</primary>
 
-          <secondary>window, variable</secondary>
+          <secondary>window</secondary>
+
+          <tertiary>variable</tertiary>
         </indexterm>In contrast, the boundary of a variable window can vary
       since the window size includes only nonempty values. Both the number of
       preceding (nonempty) values and following (nonempty) values relative to
@@ -496,9 +498,9 @@ i 1 <command>PRECEDING</command> <command>AND</command> 1 <command>FOLLOWING</co
 [(12),(),(20),(7)],
 [(12),(),(),()],
 [(),(13),(20),()]
-]</screen></para></para></para></sect2>
+]</screen></para></para></para></section>
 
-    <sect2>
+    <section>
       <title>Aggregation During Redimension</title>
 
       <para><indexterm>
@@ -579,10 +581,10 @@ event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, u
 {"USA"} 3
 </screen><para>Notice that the sum of the counts is 12—the number of nonempty
       cells in the "winners" array.</para>
-    </para></para></para></para></sect2>
-  </sect1>
+    </para></para></para></para></section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Order Statistics</title>
 
     <para>SciDB offers the following ordering and ranking capabilities.</para>
@@ -605,7 +607,7 @@ event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, u
       </listitem>
     </itemizedlist>
 
-    <sect2 remap="h3">
+    <section remap="h3">
       <title>Sort</title>
 
       <para><indexterm>
@@ -672,9 +674,9 @@ event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, u
 {4} 8,null
 {5} 13,null
 {6} 14,null
-</screen></para></para></para></sect2>
+</screen></para></para></para></section>
 
-    <sect2 remap="h3">
+    <section remap="h3">
       <title>Ranking Methods</title>
 
       <para><indexterm>
@@ -740,9 +742,9 @@ j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4_double);  </programlisting><sc
 [(9,3),(11,4),(3,1),(7,2.5)],
 [(11,4),(4,1),(6,2),(11,4)],
 [(6,2),(5,2),(11,4),(7,2.5)]
-]</screen></para></para></para></sect2>
+]</screen></para></para></para></section>
 
-    <sect2>
+    <section>
       <title>Calculating Quantiles</title>
 
       <para><indexterm>
@@ -788,6 +790,6 @@ j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4_floor);  </programlisting><scr
 {7} 0.875,11
 {8} 1,11
 </screen></para></para></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 </chapter>

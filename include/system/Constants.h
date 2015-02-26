@@ -46,13 +46,12 @@ uint32_t SCIDB_VERSION_MINOR();
 uint32_t SCIDB_VERSION_PATCH();
 uint32_t SCIDB_VERSION_BUILD();
 
-const char* SCIDB_VERSION_CODENAME();
-
 const char* SCIDB_INSTALL_PREFIX();
 
 std::string SCIDB_BUILD_INFO_STRING(const char* separator = "\n");
 
 std::string DEFAULT_MPI_DIR();
+std::string DEFAULT_MPI_TYPE();
 
 extern const size_t MB;
 extern const size_t GB;

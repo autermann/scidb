@@ -34,14 +34,23 @@
     m+n-p dimensional array in which each cell is computed by concatenating
     the attributes as follows:</para>
 
-    <para>For a 2-dimensional array A with dimensions i, j, and a
-    1-dimensional array B with dimension k, cross_join(A, B, j, k) results in
-    a 2-dimensional array with coordinates {i, j} in which the cell at
-    coordinate position {i, j} of the output is computed as the concatenation
-    of cells {i, j} of A with cell at coordinate {k=j} of B.</para>
+    <blockquote>
+      <para>For a 2-dimensional array A with dimensions i, j, and a
+      1-dimensional array B with dimension k, cross_join(A, B, j, k) results
+      in a 2-dimensional array with coordinates {i, j} in which the cell at
+      coordinate position {i, j} of the output is computed as the
+      concatenation of cells {i, j} of A with cell at coordinate {k=j} of
+      B.</para>
+    </blockquote>
 
     <para>If the join dimensions are different lengths, the cross-join will
     return the smaller dimension for the join points.</para>
+
+    <note>
+      <para>The <literal>cross_join</literal> operator is sensitive to the
+      order of arguments: always pass the larger array as the first
+      argument.</para>
+    </note>
   </refsect1>
 
   <refsect1>

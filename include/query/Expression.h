@@ -209,7 +209,7 @@ public:
     }
 
     bool isConstant() const {
-        return _props.size() == 1 && _props[0].isConst;
+        return _props.size() > 0 && (_props[0].isConst || _props[0].isConstantFunction);
     }
 
     const std::vector<BindInfo>& getBindings() const {
@@ -268,13 +268,15 @@ private:
     {
         TypeId type;
         bool isConst;  /**< true if value presents and is constant */
-        ArgProp(): type( TID_VOID), isConst(false)
+        bool isConstantFunction;
+        ArgProp(): type( TID_VOID), isConst(false), isConstantFunction(false)
         {
         }
         ArgProp& operator=(const ArgProp& val)
         {
             type = val.type;
             isConst = val.isConst;
+            isConstantFunction = val.isConstantFunction;
             return *this;
         }
 
@@ -283,6 +285,7 @@ private:
         {
             ar & type;
             ar & isConst;
+            ar & isConstantFunction;
         }
     };
     std::vector<ArgProp> _props; /**< a vector of argument properties for right compilation and optimizations */

@@ -74,7 +74,7 @@
       </listitem>
     </itemizedlist></para>
 
-  <sect1>
+  <section>
     <title>The INSERT INTO statement</title>
 
     <para><indexterm>
@@ -364,9 +364,9 @@
  --show-query=yes
  --show-output=yes
 </programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>The UPDATE ... SET statement</title>
 
     <para><indexterm>
@@ -386,9 +386,9 @@
     based on conditions. For example, you can select only cells with absolute
     values greater than 5 to set their multiplicative inverse:<programlisting
     language="test">--aql UPDATE m4x4 SET val=-pow(val,-1) WHERE abs(val) &gt; 5; --output-format=dense --chunkify=yes</programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Versions</title>
 
     <para><indexterm>
@@ -418,5 +418,5 @@
     <para>You can use the array version name in any query. The unqualified
     name of the array always refers to the most recent version as of the start
     of the query.</para>
-  </sect1>
+  </section>
 </chapter>

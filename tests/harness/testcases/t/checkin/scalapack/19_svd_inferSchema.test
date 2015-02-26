@@ -1,8 +1,15 @@
 --setup
 
-#minimal matrix
+#minimal matrices
+# 1c32
 create array A_1c32 <x:double>[r=0:0,32,0, c=0:0,32,0]
 store(build(A_1c32, 1), A_1c32)
+# 12c32 - rectangular slab (wide)
+create array A_12c32 <x:double>[r=0:0,32,0, c=0:1,32,0]
+store(build(A_12c32, 1 + r*2+c), A_12c32)
+# 21c32 - rectangular pane (tall)
+create array A_21c32 <x:double>[r=0:1,32,0, c=0:0,32,0]
+store(build(A_21c32, 1 + r*2+c), A_21c32)
 
 --test
 # make it easier for a human to see the matrix location of differing values
@@ -23,7 +30,7 @@ gesvd(A_1c32, 'VT')
 # other names for S
 gesvd(A_1c32, 'SIGMA')
 
-# invalid parameter 'foo'
+# invalid output type, e.g. 'foo'
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33 "gesvd(A_1c32, 'foo')"
 
 store(gesvd(A_1c32, 'U'),  tmp)
@@ -50,8 +57,22 @@ store(gesvd(M_second_i, 'VT'), tmp)
 remove(tmp)
 remove(M_second_i)
 
+# TEMPORARY all non-square and non-zero starting index cases are
+#           temporarily errors ... ScaLAPACK DLA_ERROR43 and 44, respectively
+#           will be fixed by #2200 and/or #2202
+#
+# so far matrices have been 1x1.
+# demonstrate rectangular matrices are accepted
+#store(gesvd(A_12c32, 'U'),  tmp)
+#remove(tmp)
+#store(gesvd(A_21c32, 'U'),  tmp)
+#remove(tmp)
+
+
 --cleanup
 
 # inputs
 remove(A_1c32)
+remove(A_12c32)
+remove(A_21c32)
 

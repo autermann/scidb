@@ -42,11 +42,42 @@ using namespace std;
 namespace scidb
 {
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.mpi"));
+
+bool startsWith(const std::string& left, const std::string& right)
+{
+  if (right.size() > left.size()) {
+    return false;
+  }
+  return (0 == left.compare(0, right.size(), right));
+}
+
 MpiManager::MpiManager() : _isReady(false)
 {
     const time_t MIN_CLEANUP_PERIOD = 5; //sec
     scidb::Scheduler::Work workItem = boost::bind(&MpiManager::initiateCleanup);
     _cleanupScheduler = scidb::getScheduler(workItem, MIN_CLEANUP_PERIOD);
+
+    string mpiTypeStr = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_TYPE);
+    assert(!mpiTypeStr.empty());
+    _mpiInstallDir = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_DIR);
+    assert(!_mpiInstallDir.empty());
+
+    if (startsWith(mpiTypeStr, mpi::getMpiTypeStr(mpi::MPICH12)) ) {
+      _mpiType = mpi::MPICH12;
+      _mpiDaemonBin = mpi::MPICH12_DAEMON_BIN;
+      _mpiLauncherBin = mpi::MPICH_LAUNCHER_BIN;
+    } else if (startsWith(mpiTypeStr, mpi::getMpiTypeStr(mpi::MPICH14)) ) {
+      _mpiType = mpi::MPICH14;
+      _mpiDaemonBin = mpi::MPICH_DAEMON_BIN;
+      _mpiLauncherBin = mpi::MPICH_LAUNCHER_BIN;
+    } else if (startsWith(mpiTypeStr, mpi::getMpiTypeStr(mpi::OMPI16)) ) {
+      _mpiType = mpi::OMPI16;
+      _mpiDaemonBin = mpi::OMPI_DAEMON_BIN;
+      _mpiLauncherBin = mpi::OMPI_LAUNCHER_BIN;
+    } else {
+      throw (SYSTEM_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
+	     << string("Unrecognized MPI type value: ")+mpiTypeStr);
+   }
 }
 
 void MpiManager::initiateCleanup()
@@ -512,7 +543,7 @@ bool MpiErrorHandler::killProc(const std::string& installPath,
     const char *myFuncName = "MpiErrorHandler::killProc";
     bool doesProcExist = false;
     if (pid > 0) {
-        if (!MpiManager::canRecognizeProc(installPath, clusterUuid, pid)) {
+      if (!MpiManager::getInstance()->canRecognizeProc(installPath, clusterUuid, pid)) {
             return doesProcExist;
         }
         LOG4CXX_DEBUG(logger, myFuncName << ": killing pid ="<<pid);
@@ -566,13 +597,17 @@ bool MpiManager::canRecognizeProc(const std::string& installPath,
     }
 
     std::string procEnvVar;
-    mpi::readProcEnvVar(pidFileName,
+    if (!mpi::readProcEnvVar(pidFileName,
                         mpi::SCIDBMPI_ENV_VAR,
-                        procEnvVar);
+			     procEnvVar)) {
+      LOG4CXX_TRACE(logger, myFuncName << ": cannot extract " << mpi::SCIDBMPI_ENV_VAR << " from " << pidFileName);
+      return false;
+    }
     uint64_t queryId(0);
     uint64_t launchId(0);
     if (!mpi::parseScidbMPIEnvVar(procEnvVar, clusterUuid, queryId, launchId)) {
-        return false;
+      LOG4CXX_TRACE(logger, myFuncName << ": cannot parse " << procEnvVar << " from " << pidFileName);
+      return false;
     }
     return (!Query::getQueryByID(queryId, false, false));
 }
@@ -604,5 +639,34 @@ const std::string& MpiManager::getInstallPath(const boost::shared_ptr<const Inst
     std::string* p(NULL);
     return *p;
 }
+
+MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q)
+{
+  if (_mpiType == mpi::MPICH12 ) {
+    return new MpiLauncherMPICH12(launchId, q);
+  } else if (_mpiType == mpi::MPICH14 ) {
+    return new MpiLauncherMPICH(launchId, q);
+  } else if (_mpiType == mpi::OMPI16 ) {
+    return new MpiLauncherOMPI(launchId, q);
+  }
+  throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+	 << "MpiManager::newMPILauncher");
+  return NULL;
+}
+
+MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout)
+{
+  if (_mpiType == mpi::MPICH12 ) {
+    return new MpiLauncherMPICH12(launchId, q, timeout);
+  } else if (_mpiType == mpi::MPICH14 ) {
+    return new MpiLauncherMPICH(launchId, q, timeout);
+  } else if (_mpiType == mpi::OMPI16 ) {
+    return new MpiLauncherOMPI(launchId, q, timeout);
+  }
+  throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+	 << "MpiManager::newMPILauncher");
+  return NULL;
+}
+
 
 }

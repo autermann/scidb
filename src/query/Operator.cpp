@@ -1240,7 +1240,10 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
                 boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
                 if (chunk.isRLE() && isEmptyable) {
                     if (!sharedEmptyBitmap) {
+                        assert(nAttrs == attrId+1);
                         sharedEmptyBitmap = chunk.getEmptyBitmap();
+                    } else {
+                        assert(nAttrs > attrId+1);
                     }
                     if (!attributeDesc.isEmptyIndicator()) {
                         emptyBitmap = sharedEmptyBitmap;

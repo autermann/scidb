@@ -42,7 +42,7 @@
         </step>
 
         <step>
-          <para>Store values of random values between 0 and 1 in
+          <para>Store values of random values between 0 and 9 in
           m3x3:<programlisting language="test">--afl store(build(m3x3,random()%10),m3x3); --output-format=dense --chunkify=yes --show-output-in-test-file=no</programlisting></para>
         </step>
 

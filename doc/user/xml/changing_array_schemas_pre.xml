@@ -36,7 +36,7 @@
     </listitem>
   </itemizedlist>
 
-  <sect1 id="redimSection">
+  <section id="redimSection">
     <title>Redimensioning an Array</title>
 
     <para><indexterm>
@@ -51,8 +51,8 @@
     <para>For example, suppose you have a csv file like this: <programlisting
     language="test">
 --shell --show-query=no --show-output=yes --command=cat ../examples/expo_example.txt
-</programlisting> This data has three columns, two of which are stings and one
-    which is a floating-point number. The column headers are 'd','p',and
+</programlisting> This data has three columns, two of which are strings and
+    one which is a floating-point number. The column headers are 'd','p',and
     'val'. To load this data set, create a 1-dimensional SciDB array with
     three attributes and load the data into it. For this example, the array is
     named expo. The dimension name is i, the dimension size is 25, the chunk
@@ -190,7 +190,7 @@
     language="test">--aql SELECT val FROM two_dim WHERE d='device-2' and p='probe-3'; --show-output=yes --show-query=yes  --output-format=dense --chunkify=yes
 </programlisting></para>
 
-    <sect2>
+    <section>
       <title>Cell Collisions</title>
 
       <para><indexterm>
@@ -220,9 +220,9 @@
       linkend="redimension">redimension</link> and <link
       linkend="redimensionStore">redimension_store</link> operator reference
       sections.</para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Redimensioning Arrays Containing Null Values</title>
 
       <para><indexterm>
@@ -254,10 +254,10 @@
       NULL values into non-NULL values. This procedure is described in the
       <link linkend="substituteOperator">substitute</link> reference
       topic.</para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1>
+  <section>
     <title>Array Transformations</title>
 
     <para><indexterm>
@@ -285,7 +285,7 @@
       <command>FROM </command> operation( <replaceable>source_array </replaceable>, <replaceable>parameters </replaceable>)
       </synopsis></para>
 
-    <sect2 id="rearrangeSection">
+    <section id="rearrangeSection">
       <title>Rearranging Array Data</title>
 
       <para><indexterm>
@@ -376,9 +376,9 @@
 --aql SELECT * FROM m3x3;  --show-query=yes --show-output=yes --output-format=dense --chunkify=yes
 --aql SELECT * FROM reverse(m3x3); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes
 	</programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2 id="reduceSection">
+    <section id="reduceSection">
       <title>SciDB Array Reducing Operators</title>
 
       <para><indexterm>
@@ -497,10 +497,10 @@
           language="test">--afl thin(square_array,2,8,1,2); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
       </procedure>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 
-  <sect1 id="changeAttributes">
+  <section id="changeAttributes">
     <title>Changing Array Attributes</title>
 
     <para><indexterm>
@@ -556,12 +556,12 @@
     them using the following statement. <programlisting language="test">
 --aql SELECT val2, val3 FROM m3x3_new_attr; --output-format=dense --chunkify=yes
       </programlisting></para>
-  </sect1>
+  </section>
 
-  <sect1 id="changeDim">
+  <section id="changeDim">
     <title>Changing Array Dimensions</title>
 
-    <sect2>
+    <section>
       <title>Changing Chunk Size</title>
 
       <para><indexterm>
@@ -591,9 +591,9 @@
       queries.<programlisting language="test">--aql SELECT * INTO chunks_overlap
     FROM repart(chunks,&lt;val1:double,val2:double&gt;
      [i=0:999,100,10,j=0:999,100,10]); --show-output=no</programlisting></para>
-    </sect2>
+    </section>
 
-    <sect2>
+    <section>
       <title>Appending a Dimension</title>
 
       <para><indexterm>
@@ -630,6 +630,6 @@
       dimension to the array to increase its dimensionality. <programlisting
       language="test">--aql SELECT * into Dsp_new FROM concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d));
 --schema Dsp_new</programlisting></para>
-    </sect2>
-  </sect1>
+    </section>
+  </section>
 </chapter>

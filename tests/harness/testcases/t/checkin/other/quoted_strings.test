@@ -1,0 +1,12 @@
+--setup
+--aql create array Q<a:string>[i=1:2,2,0]
+
+--test
+--aql load Q from '../tests/harness/testcases/data/quotes.txt'
+--aql select * from Q
+--aql select * from array(Q, '[("fo\"o"), ("bar")]')
+--aql select * into Q from array(Q, '[("fo\"o"), ("bar")]')
+--aql select * from Q
+
+--cleanup
+--aql drop array Q

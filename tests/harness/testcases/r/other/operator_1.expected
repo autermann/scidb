@@ -199,7 +199,7 @@ SCIDB QUERY : <project(substitute(Test1,build(<a:double> [x=0:1,2,0], iif( x = 0
 {x} b,a
 
 SCIDB QUERY : <project(redimension_store(build(Test2,x*3.9),Test3),y)>
-[An error expected at this place for the query "project(redimension_store(build(Test2,x*3.9),Test3),y)". And it failed with error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_ARRAY_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_ARRAY_DOESNT_EXIST.]
+[An error expected at this place for the query "project(redimension_store(build(Test2,x*3.9),Test3),y)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED.]
 
 SCIDB QUERY : <redimension_store(build(Test2,x*3.9),Test3)>
 {a} y

@@ -192,8 +192,7 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalBuildSparse);
 
 // Transpose
 LOGICAL_BUILDIN_OPERATOR(LogicalTranspose);
-//PHYSICAL_BUILDIN_OPERATOR(PhysicalUnorderedTranspose);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalOrderedTranspose);
+PHYSICAL_BUILDIN_OPERATOR(PhysicalTranspose);
 
 // Cast
 LOGICAL_BUILDIN_OPERATOR(LogicalCast);
@@ -353,3 +352,8 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalInsert);
 // variable_window
 LOGICAL_BUILDIN_OPERATOR(LogicalVariableWindow);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalVariableWindow);
+
+// splitarraytest
+LOGICAL_BUILDIN_OPERATOR(LogicalSplitArrayTest);
+PHYSICAL_BUILDIN_OPERATOR(PhysicalSplitArrayTest);
+

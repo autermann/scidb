@@ -28,9 +28,9 @@ set (savebmp_src
 )
 
 add_library(savebmp SHARED ${savebmp_src})
-set_target_properties(bestmatch PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
+set_target_properties(savebmp PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
 
 if (APPLE)
-  set_target_properties(bestmatch PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+  set_target_properties(savebmp PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif (APPLE)
 

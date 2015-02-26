@@ -50,11 +50,17 @@ SCIDB QUERY : <slice(A,x,0)>
 SCIDB QUERY : <slice(A,x,5000)>
 [{5000}(55010)]
 
-SCIDB QUERY : <concat(subarray(A,0,0,5,5),subarray(B,0,0,5,5))>
+SCIDB QUERY : <store(subarray(B,0,0,5,5),Bsub)>
+[[{0,0}(10)]]
+
+SCIDB QUERY : <concat(subarray(A,0,0,5,5),Bsub)>
 [[{0,0}(10),{6,0}(10)]]
 
-SCIDB QUERY : <concat(between(A,0,0,5,5),between(B,0,0,5,5))>
-[An error expected at this place for the query "concat(between(A,0,0,5,5),between(B,0,0,5,5))". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT.]
+SCIDB QUERY : <store(between(B,0,0,5,5),Bbetw)>
+[[{0,0}(10)]]
+
+SCIDB QUERY : <concat(between(A,0,0,5,5),Bbetw)>
+[An error expected at this place for the query "concat(between(A,0,0,5,5),Bbetw)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT.]
 
 SCIDB QUERY : <count(join(C,C))>
 {0}[{0}(3)]
@@ -81,5 +87,11 @@ SCIDB QUERY : <remove(C)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(AAA)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Bsub)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(Bbetw)>
 Query was executed successfully
 

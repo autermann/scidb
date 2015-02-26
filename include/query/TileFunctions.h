@@ -444,11 +444,11 @@ void rle_binary_func(const Value** args, Value* result, void*)
 
     if (ps1_length == INFINITE_LENGTH) {
         // v1 is constant with infinity length. Allign it pPosition to v2
-        ps1.pPosition = ps2.pPosition;
+        ps1._pPosition = ps2._pPosition;
     } else {
         if (ps2_length == INFINITE_LENGTH) {
             // v2 is constant with infinity length. Allign it pPosition to v1
-            ps2.pPosition = ps1.pPosition;
+            ps2._pPosition = ps1._pPosition;
         }
     }
 
@@ -456,7 +456,7 @@ void rle_binary_func(const Value** args, Value* result, void*)
     {
         // At this point ps1 and ps2 should alligned
         // Segment with less length will be iterated and with more length cut at the end of loop
-        assert(ps1.pPosition == ps2.pPosition);
+        assert(ps1._pPosition == ps2._pPosition);
         const uint64_t length = std::min(ps1_length, ps2_length);
         if (length == 0) {
             break;
@@ -464,55 +464,55 @@ void rle_binary_func(const Value** args, Value* result, void*)
         RLEPayload::Segment rs;
 
         // Check NULL cases
-        if ( (ps1.same && ps1.null) || (ps2.same && ps2.null) ) {
-            rs.same = true;
-            rs.null = true;
-            rs.pPosition = ps1.pPosition;
-            rs.valueIndex = ps1.null ? ps1.valueIndex : ps2.valueIndex; // which missingReason is to use?
+        if ( (ps1._same && ps1._null) || (ps2._same && ps2._null) ) {
+            rs._same = true;
+            rs._null = true;
+            rs._pPosition = ps1._pPosition;
+            rs._valueIndex = ps1._null ? ps1._valueIndex : ps2._valueIndex; // which missingReason is to use?
         } else { // No one is NULL and we can evaluate
-            rs.null = false;
-            rs.pPosition = ps1.pPosition;
-            if (ps1.same) {
-                if (ps2.same) {
-                    rs.same = true;
-                    rs.valueIndex = addPayloadValues<TR>(res.getTile());
-                    TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1.valueIndex),
-                                               getPayloadValue<T2>(v2.getTile(), ps2.valueIndex));
+            rs._null = false;
+            rs._pPosition = ps1._pPosition;
+            if (ps1._same) {
+                if (ps2._same) {
+                    rs._same = true;
+                    rs._valueIndex = addPayloadValues<TR>(res.getTile());
+                    TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1._valueIndex),
+                                               getPayloadValue<T2>(v2.getTile(), ps2._valueIndex));
                     setVarPart<TR>(r, varPart);
-                    setPayloadValue<TR>(res.getTile(), rs.valueIndex, r);
+                    setPayloadValue<TR>(res.getTile(), rs._valueIndex, r);
                 } else {
-                    rs.same = false;
-                    rs.valueIndex = addPayloadValues<TR>(res.getTile(), length);
-                    size_t i = rs.valueIndex;
-                    size_t j = ps2.valueIndex;
+                    rs._same = false;
+                    rs._valueIndex = addPayloadValues<TR>(res.getTile(), length);
+                    size_t i = rs._valueIndex;
+                    size_t j = ps2._valueIndex;
                     const size_t end = j + length;
                     while (j < end) {
-                        TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1.valueIndex),
+                        TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1._valueIndex),
                                                    getPayloadValue<T2>(v2.getTile(), j++));
                         setVarPart<TR>(r, varPart);
                         setPayloadValue<TR>(res.getTile(), i++, r);
                     }
                 }
             } else { // dense non-nullable data
-                if (ps2.same) {
-                    rs.same = false;
-                    rs.valueIndex = addPayloadValues<TR>(res.getTile(), length);
-                    size_t i = rs.valueIndex;
-                    size_t j = ps1.valueIndex;
+                if (ps2._same) {
+                    rs._same = false;
+                    rs._valueIndex = addPayloadValues<TR>(res.getTile(), length);
+                    size_t i = rs._valueIndex;
+                    size_t j = ps1._valueIndex;
                     const size_t end = j + length;
                     while (j < end) {
                         TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), j++),
-                                                   getPayloadValue<T2>(v2.getTile(), ps2.valueIndex));
+                                                   getPayloadValue<T2>(v2.getTile(), ps2._valueIndex));
                         setVarPart<TR>(r, varPart);
                         setPayloadValue<TR>(res.getTile(), i++, r);
                     }
                 } else {
-                    rs.same = false;
-                    rs.valueIndex = addPayloadValues<TR>(res.getTile(), length);
-                    size_t i = rs.valueIndex;
-                    size_t j1 = ps1.valueIndex;
-                    size_t j2 = ps2.valueIndex;
-                    if (!fastDenseBinary<O, T1, T2, TR>(length, (const char*)v1.getTile()->getFixData(), j1, (const char*)v2.getTile()->getFixData(), j2, res.getTile()->getFixData(), int(rs.valueIndex)))
+                    rs._same = false;
+                    rs._valueIndex = addPayloadValues<TR>(res.getTile(), length);
+                    size_t i = rs._valueIndex;
+                    size_t j1 = ps1._valueIndex;
+                    size_t j2 = ps2._valueIndex;
+                    if (!fastDenseBinary<O, T1, T2, TR>(length, (const char*)v1.getTile()->getFixData(), j1, (const char*)v2.getTile()->getFixData(), j2, res.getTile()->getFixData(), int(rs._valueIndex)))
                     {
                         const size_t end = j1 + length;
                         while (j1 < end) {
@@ -526,7 +526,7 @@ void rle_binary_func(const Value** args, Value* result, void*)
             }
         }
         res.getTile()->addSegment(rs);
-        chunkSize = rs.pPosition + length;
+        chunkSize = rs._pPosition + length;
 
         // Moving to the next segments
         if (ps1_length == ps2_length) {
@@ -544,19 +544,19 @@ void rle_binary_func(const Value** args, Value* result, void*)
                     break;
                 ps1 = v1.getTile()->getSegment(i1);
                 ps1_length = v1.getTile()->getSegment(i1).length();
-                ps2.pPosition += length;
+                ps2._pPosition += length;
                 ps2_length -= length;
-                if (!ps2.same)
-                    ps2.valueIndex += length;
+                if (!ps2._same)
+                    ps2._valueIndex += length;
             } else {
                 if (++i2 >= v2.getTile()->nSegments())
                     break;
                 ps2 = v2.getTile()->getSegment(i2);
                 ps2_length = v2.getTile()->getSegment(i2).length();
-                ps1.pPosition += length;
+                ps1._pPosition += length;
                 ps1_length -= length;
-                if (!ps1.same)
-                    ps1.valueIndex += length;
+                if (!ps1._same)
+                    ps1._valueIndex += length;
             }
         }
     }
@@ -884,15 +884,15 @@ void rle_tile_to_scalar(const Value** args, Value* result, void* state)
         for (; i < vTile->nSegments(); i++)
         {
             const RLEPayload::Segment& v = vTile->getSegment(i);
-            if (!v.null) {
-                accumulator.init(getPayloadValue<T>(vTile, v.valueIndex));
-                if (v.same) {
+            if (!v._null) {
+                accumulator.init(getPayloadValue<T>(vTile, v._valueIndex));
+                if (v._same) {
                     if (v.length() > 1) {
-                        accumulator.multAggregate(getPayloadValue<T>(vTile, v.valueIndex), v.length() - 1);
+                        accumulator.multAggregate(getPayloadValue<T>(vTile, v._valueIndex), v.length() - 1);
                     }
                 } else {
-                    const size_t end = v.valueIndex + v.length();
-                    for (size_t j = v.valueIndex + 1; j < end; j++) {
+                    const size_t end = v._valueIndex + v.length();
+                    for (size_t j = v._valueIndex + 1; j < end; j++) {
                         accumulator.aggregate(getPayloadValue<T>(vTile, j));
                     }
                 }
@@ -910,14 +910,14 @@ void rle_tile_to_scalar(const Value** args, Value* result, void* state)
         for (; i < vTile->nSegments(); i++)
         {
             const RLEPayload::Segment& v = vTile->getSegment(i);
-            if (v.null)
+            if (v._null)
                 continue;
             isNull = false;
-            if (v.same) {
-                accumulator.multAggregate(getPayloadValue<T>(vTile, v.valueIndex), v.length());
+            if (v._same) {
+                accumulator.multAggregate(getPayloadValue<T>(vTile, v._valueIndex), v.length());
             } else {
-                const size_t end = v.valueIndex + v.length();
-                for (size_t j = v.valueIndex; j < end; j++) {
+                const size_t end = v._valueIndex + v.length();
+                for (size_t j = v._valueIndex; j < end; j++) {
                     accumulator.aggregate(getPayloadValue<T>(vTile, j));
                 }
             }
@@ -926,16 +926,16 @@ void rle_tile_to_scalar(const Value** args, Value* result, void* state)
 
     if (firstCall) {
         RLEPayload::Segment r;
-        r.null = isNull;
-        r.pPosition = 0;
-        r.same = true;
-        r.valueIndex = 0;
+        r._null = isNull;
+        r._pPosition = 0;
+        r._same = true;
+        r._valueIndex = 0;
         rTile->addSegment(r);
         addPayloadValues<TR>(rTile, 1);
         rTile->flush(1);
     }
     if (!isNull) {
-        const_cast<ConstRLEPayload::Segment&>(rTile->getSegment(0)).null = false;
+        const_cast<ConstRLEPayload::Segment&>(rTile->getSegment(0))._null = false;
         setPayloadValue<TR>(rTile, 0, accumulator.final());
     }
     *static_cast< typename A<T, TR>::State* >(state) = accumulator.state;

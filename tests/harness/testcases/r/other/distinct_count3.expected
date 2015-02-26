@@ -36,9 +36,6 @@ SCIDB QUERY : <aggregate(A,ApproxDC(num),sum(num),min(num),max(num),count(num))>
 SCIDB QUERY : <ApproxDC(B)>
 {0}[{0}(2)]
 
-SCIDB QUERY : <ApproxDC(concat(B,B))>
-{0}[{0}(2)]
-
 SCIDB QUERY : <ApproxDC(join(B,B))>
 {0}[{0}(2)]
 

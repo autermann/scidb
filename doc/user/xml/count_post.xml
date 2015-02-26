@@ -4,24 +4,25 @@
   <refnamediv>
     <refname>count</refname>
 
-    <refpurpose>Count nonempty cells</refpurpose>
+    <refpurpose><indexterm>
+        <primary>count</primary>
+      </indexterm>Returns a count of non-empty cells.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>count(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+    <synopsis>count(<replaceable>array</replaceable><optional> ,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>count</primary>
-      </indexterm>The count operator counts nonempty cells of the input array.
-    When dimensions are provided they are used to do a group-by and a count
-    per resulting group is returned.</para>
+    <para>The count operator counts nonempty cells of the input array. When
+    dimensions are provided they are used to do a group-by and a count per
+    resulting group is returned. When dimensions are provided, they are used
+    to do a group-by, and a count per resulting group is returned.</para>
 
     <note>
-      <para>The count aggregate provides the same functionality as the count
+      <para>The count aggregate provides similar functionality to the count
       operator. For details, see the <link linkend="countAggregate">count</link> aggregate reference.</para>
     </note>
   </refsect1>
@@ -30,9 +31,9 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example finds the element count value along the second
-      dimension of a 4<symbol role="symbolfont">×</symbol>4 array where some
-      cells are empty.</para>
+      <para>This example finds the element count value along the first and
+      second dimension of a 4<symbol role="symbolfont">×</symbol>4 array where
+      some cells are empty.</para>
 
       <procedure>
         <step>
@@ -69,6 +70,17 @@
           count_array:<para><programlisting>AFL% count(count_array,i);  </programlisting><screen>[(0),(2),(0),(0)]
 </screen><para><programlisting>AFL% count(count_array,j);  </programlisting><screen>[(0),(1),(1),(0)]
 </screen></para></para></para>
+        </step>
+
+        <step>
+          <para>If we specify both dimensions, the operator returns an array
+          of the original size, with a single value that represents whether or
+          not each cell is empty:<para><programlisting>AFL% count(count_array,i,j);  </programlisting><screen>[
+[(0),(0),(0),(0)],
+[(0),(1),(1),(0)],
+[(0),(0),(0),(0)],
+[(0),(0),(0),(0)]
+]</screen></para></para>
         </step>
       </procedure>
     </informalexample>

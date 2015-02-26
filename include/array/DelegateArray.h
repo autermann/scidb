@@ -266,7 +266,11 @@ class SplitArray : public DelegateArray
     };
 
   public:
-    SplitArray(ArrayDesc const& desc, const boost::shared_array<char>& src, Coordinates const& from, Coordinates const& till);
+    SplitArray(ArrayDesc const& desc,
+               const boost::shared_array<char>& src,
+               Coordinates const& from,
+               Coordinates const& till,
+               shared_ptr<Query>const& query);
     virtual ~SplitArray();
 
     /**
@@ -282,12 +286,15 @@ class SplitArray : public DelegateArray
     const Coordinates& from() const { return _from; }
     const Coordinates& till() const { return _till; }
     const Coordinates& size() const { return _size; }
+    const Coordinates& startingChunk() const { return _startingChunk; }
   private:
+    Coordinates _startingChunk;
     Coordinates _from;
     Coordinates _till;
     Coordinates _size;
     boost::shared_array<char> _src;
     bool        _empty;
+    const boost::weak_ptr<scidb::Query> _query;
 };
 
 /**
@@ -308,7 +315,7 @@ class MaterializedArray : public DelegateArray
     size_t _cacheSize;
 
     static void materialize(MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format);
-    
+
     boost::shared_ptr<MemChunk> getMaterializedChunk(ConstChunk const& inputChunk);
 
     class ArrayIterator : public DelegateArrayIterator
@@ -326,8 +333,8 @@ class MaterializedArray : public DelegateArray
         ArrayIterator(MaterializedArray& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat);
     };
 
-	MaterializedArray(boost::shared_ptr<Array> input, MaterializeFormat chunkFormat = PreserveFormat);
-    
+    MaterializedArray(boost::shared_ptr<Array> input, MaterializeFormat chunkFormat = PreserveFormat);
+
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 };
 

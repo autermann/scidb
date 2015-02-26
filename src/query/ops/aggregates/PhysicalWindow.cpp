@@ -24,14 +24,13 @@
  * PhysicalWindow.cpp
  *
  *  Created on: Apr 11, 2010
- *      Author: Knizhnik, poliocough@gmail.com
+ *      Author: Knizhnik, poliocough@gmail.com, 
+ *              Paul Brown <paulgeoffreybrown@gmail.com>
  */
-
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "array/Array.h"
 #include "WindowArray.h"
-
 
 namespace scidb {
 
@@ -44,6 +43,7 @@ private:
     vector<WindowBoundaries> _window;
 
 public:
+
     PhysicalWindow(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
 	     PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
@@ -58,6 +58,9 @@ public:
         }
 	}
 
+    /**
+     * @see PhysicalOperator::requiresRepart()
+     */
     virtual bool requiresRepart(ArrayDesc const& inputSchema) const
     {
         Dimensions const& dims = inputSchema.getDimensions();
@@ -72,6 +75,9 @@ public:
         return false;
     }
 
+    /**
+     * @see PhysicalOperator::getRepartSchema()
+     */
     virtual ArrayDesc getRepartSchema(ArrayDesc const& inputSchema) const
     {
         Attributes attrs = inputSchema.getAttributes();
@@ -105,8 +111,6 @@ public:
         return ArrayDesc(inputSchema.getName(), attrs, dims);
     }
 
-
-    //FIXME: Why this is checking during execution?!
     void verifyInputSchema(ArrayDesc const& input) const
     {
         Dimensions const& dims = input.getDimensions();
@@ -118,13 +122,14 @@ public:
         }
     }
 
-	/***
-	 * Window is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-	 * that overrides the chunkiterator method.
+	/**
+	 * window(...) is a pipelined operator, hence it executes by returning an 
+     * iterator-based array to the consumer that overrides the chunkiterator 
+     * method.
 	 */
 	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-        assert(inputArrays.size() == 1);
+        SCIDB_ASSERT(inputArrays.size() == 1);
 
         if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
         {
@@ -136,30 +141,42 @@ public:
 
         vector<AttributeID> inputAttrIDs;
         vector<AggregatePtr> aggregates;
+        string method;
 
+        //
+        //  Probe the list of operator parameters for aggregates and 
+        // the optional "method" argument. Note that checks about the 
+        // correctness of these arguments (valid aggregate names, 
+        // valid method names) have already occurred in LogicalWindow. 
         for (size_t i = inDesc.getDimensions().size() * 2, size = _parameters.size(); i < size; i++)
         {
-            AttributeID inAttId;
-
-            AggregatePtr agg = resolveAggregate((shared_ptr <OperatorParamAggregateCall> const&) _parameters[i],
+            boost::shared_ptr<scidb::OperatorParam> & param = _parameters[i];
+             
+            if (PARAM_AGGREGATE_CALL == param->getParamType()) 
+            { 
+                AttributeID inAttId;
+                AggregatePtr agg = resolveAggregate((shared_ptr <OperatorParamAggregateCall> const&) _parameters[i],
                                                 inDesc.getAttributes(),
                                                 &inAttId,
                                                 0);
 
-            aggregates.push_back(agg);
+                aggregates.push_back(agg);
 
-            if (inAttId == (AttributeID) -1)
-            {
-                //for count(*); optimize later
-                inputAttrIDs.push_back(0);
-            }
-            else
-            {
-                inputAttrIDs.push_back(inAttId);
+                if (inAttId == (AttributeID) -1) 
+                {
+                    //for count(*); optimize later
+                    inputAttrIDs.push_back(0);
+                } else 
+                {
+                    inputAttrIDs.push_back(inAttId);
+                }
+            } else if (PARAM_PHYSICAL_EXPRESSION == param->getParamType()) 
+            { 
+                method = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)param)->getExpression()->evaluate().getString();
             }
         }
-
-        return boost::shared_ptr<Array>(new WindowArray(_schema, inputArrays[0], _window, inputAttrIDs, aggregates));
+ 
+        return boost::shared_ptr<Array>(new WindowArray(_schema, inputArrays[0], _window, inputAttrIDs, aggregates, method));
     }
 };
     

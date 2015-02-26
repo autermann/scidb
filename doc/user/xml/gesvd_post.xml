@@ -8,6 +8,10 @@
         <primary>gesvd</primary>
       </indexterm><indexterm>
         <primary>singular value decomposition</primary>
+      </indexterm><indexterm>
+        <primary>svd</primary>
+
+        <see>gesvd</see>
       </indexterm>Produces a result matrix containing any one of the three
     components of the singular value decomposition of a general
     matrix.</refpurpose>
@@ -20,9 +24,18 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>Produces a singular value decomposition (SVD) of the input matrix
-    and returns one of the three factors. For a definition of the SVD, see
-    <ulink url="http://en.wikipedia.org/wiki/Singular_value_decomposition">http://en.wikipedia.org/wiki/Singular_value_decomposition</ulink>.</para>
+    <para>For a matrix <emphasis>M</emphasis>, GESVD returns the matrix
+    factorization:<informalequation>
+        <alt>M = U\Sigma V^*</alt>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata fileref="../equations/svd.png" scale="60"/>
+          </imageobject>
+        </mediaobject>
+      </informalequation>The <literal>gesvd </literal>operator produces a
+    singular value decomposition (SVD) of the input matrix and returns one of
+    the three factors. For more details of the SVD, see <ulink url="http://en.wikipedia.org/wiki/Singular_value_decomposition">http://en.wikipedia.org/wiki/Singular_value_decomposition</ulink>.</para>
 
     <para>The <replaceable>factor </replaceable>must be one of the following
     values:<itemizedlist>
@@ -103,48 +116,29 @@
       <procedure>
         <step>
           <para>Construct a rotation matrix, A, that rotates by <symbol role="symbolfont">π</symbol>/6.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:1,32,0,j=0:1,32,0],
-    iif(i=j,sqrt(3)/2, iif(i=1,0.5,-0.5))),A);  </programlisting><screen>[
-[(0.866025),(-0.5)],
-[(0.5),(0.866025)]
-]</screen></para></para>
+    iif(i=j,sqrt(3)/2, iif(i=1,0.5,-0.5))),A);  </programlisting></para></para>
         </step>
 
         <step>
           <para>Construct a scaling matrix, B, that distorts by a factor of
-          2.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:1,32,0,j=0:1,32,0],iif(i!=j, 0, iif(i=0,2,1))),B);  </programlisting><screen>[
-[(2),(0)],
-[(0),(1)]
-]</screen></para></para>
+          2.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:1,32,0,j=0:1,32,0],iif(i!=j, 0, iif(i=0,2,1))),B);  </programlisting></para></para>
         </step>
 
         <step>
           <para>Construct a rotation matrix, C, that rotates by
           -π/6.<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:1,32,0,j=0:1,32,0],
-    iif(i=j,sqrt(3)/2, iif(i=1,-0.5,0.5))),C);  </programlisting><screen>[
-[(0.866025),(0.5)],
-[(-0.5),(0.866025)]
-]</screen></para></para>
+    iif(i=j,sqrt(3)/2, iif(i=1,-0.5,0.5))),C);  </programlisting></para></para>
         </step>
 
         <step>
           <para>Multiply the matrices together. The product becomes the input
-          to the <literal>gesvd</literal> operator.<para><programlisting>AFL% store(multiply(multiply(A,B),C),product);  </programlisting><screen>[
-[(1.75),(0.433013)],
-[(0.433013),(1.25)]
-]</screen></para></para>
+          to the <literal>gesvd</literal> operator.<para><programlisting>AFL% store(multiply(multiply(A,B),C),product);  </programlisting></para></para>
         </step>
 
         <step>
           <para>Calculate the U, S, and VT decompositions.</para>
 
-          <para><para><programlisting>AFL% gesvd(product,'U');  </programlisting><screen>[
-[(-0.866025),(-0.5)],
-[(-0.5),(0.866025)]
-]</screen><para><programlisting>AFL% gesvd(product,'S');  </programlisting><screen>[(2),(1)]
-</screen><para><programlisting>AFL% gesvd(product,'VT');  </programlisting><screen>[
-[(-0.866025),(-0.5)],
-[(-0.5),(0.866025)]
-]</screen>Note
+          <para><para><programlisting>AFL% gesvd(product,'U');  </programlisting><para><programlisting>AFL% gesvd(product,'S');  </programlisting><para><programlisting>AFL% gesvd(product,'VT');  </programlisting>Note
           that the factors match the matrices that we used to construct the
           input to <literal>gesvd</literal>, except for the signs of some of
           the matrix values. This happens because SVD in only unique up to the
