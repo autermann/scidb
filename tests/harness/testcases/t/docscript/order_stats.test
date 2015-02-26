@@ -19,7 +19,7 @@ scan(m4x4_empty)
 --aql  SELECT * FROM sort(m4x4_empty, val desc)  
 --start-igdata
 CREATE ARRAY m4x4_double < val:double >[i=0:3,4,0,j=0:3,4,0]  
-load(m4x4_double, '../tests/harness/testcases/data/doc/m4x4_double.scidb')  
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odcsv -naq "load(m4x4_double, '${TEST_DATA_DIR}/doc/m4x4_double.scidb')""
 --stop-igdata
 show(m4x4_double)
 --set-format auto

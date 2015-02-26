@@ -26,10 +26,10 @@ set(scidbclient_src
     ../system/Exceptions.cpp
     ../array/Metadata.cpp
     ${CMAKE_BINARY_DIR}/src/system/Constants.cpp
-    ../smgr/io/DBLoader.cpp
+    ../smgr/io/ArrayWriter.cpp
     ../smgr/io/TemplateParser.cpp
     ../array/Array.cpp
-    ../array/MemArray.cpp
+    ../array/MemChunk.cpp
     ../array/StreamArray.cpp
     ../query/TypeSystem.cpp
     ../query/FunctionLibrary.cpp

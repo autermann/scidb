@@ -5,8 +5,8 @@ CREATE ARRAY sample1 <val:int32> [x=0:7,3,0]
 CREATE ARRAY sample2 <val:int32> [x=0:20,6,0]
 CREATE ARRAY sample3 <val:int32> [x=-10:10,6,0]
 --test
-load(Data1,'../tests/harness/testcases/data/data.txt')
-load(UB,'../tests/harness/testcases/data/ub.txt')
+load(Data1,'${TEST_DATA_DIR}/data.txt')
+load(UB,'${TEST_DATA_DIR}/ub.txt')
 store(build(sample1,x+1),sample1)
 store(build(sample2,x+40),sample2)
 store(build(sample3,x+50),sample3)

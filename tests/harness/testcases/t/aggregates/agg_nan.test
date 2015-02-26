@@ -4,16 +4,20 @@
 # Tests to verify the correct handling of NaN on 1D and 2D arrays
 
 create array foo<val:double> [x=0:4,5,0]
-load (foo, '../tests/harness/testcases/data/nan.txt')
+#load (foo, '${TEST_DATA_DIR}/nan.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load (foo, '${TEST_DATA_DIR}/nan.txt')""
 
 create array foo1<val:double> [x=0:4,5,0]
-load (foo1, '../tests/harness/testcases/data/nan1.txt')
+#load (foo1, '${TEST_DATA_DIR}/nan1.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load (foo1, '${TEST_DATA_DIR}/nan1.txt')""
 
 create array foo2<val:double> [x=0:4,5,0]
-load (foo2, '../tests/harness/testcases/data/nan2.txt')
+#load (foo2, '${TEST_DATA_DIR}/nan2.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load (foo2, '${TEST_DATA_DIR}/nan2.txt')""
 
 create array foo3<val:double null> [x=0:3,2,0 ,y=1:4,3,0]
-load (foo3, '../tests/harness/testcases/data/nanull2d.txt')
+#load (foo3, '${TEST_DATA_DIR}/nanull2d.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load (foo3, '${TEST_DATA_DIR}/nanull2d.txt')""
 
 --test
 aggregate(foo, min(val),max(val))
@@ -22,7 +26,8 @@ aggregate(foo2,min(val),max(val))
 
 --aql update foo2 set val= 1 where x=0
 aggregate(foo2, min(val),max(val),avg(val))
-load (foo2, '../tests/harness/testcases/data/nan2.txt')
+#load (foo2, '${TEST_DATA_DIR}/nan2.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load (foo2, '${TEST_DATA_DIR}/nan2.txt')""
 --aql update foo2 set val= 1 where x=3
  aggregate(foo2, min(val),max(val),avg(val))
 --aql  update foo2 set val= 1/(1.0-1.0) where x=2

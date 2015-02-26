@@ -320,11 +320,9 @@ namespace scidb {
         ElapsedMilliSeconds timing;
 
         // Init config parameters
-        bool parallelSort =
-            Config::getInstance()->getOption<bool>(CONFIG_PARALLEL_SORT) &&
-            inputArray->getSupportedAccess() == Array::RANDOM;
-        size_t numJobs = parallelSort ?  Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS) : 1;
-        _memLimit = Config::getInstance()->getOption<int>(CONFIG_MERGE_SORT_BUFFER)*MB;
+        size_t numJobs = inputArray->getSupportedAccess() == Array::RANDOM ?
+	  Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS) : 1;
+        _memLimit = Config::getInstance()->getOption<int>(CONFIG_MERGE_SORT_BUFFER)*MiB;
         _nStreams = Config::getInstance()->getOption<int>(CONFIG_MERGE_SORT_NSTREAMS);
         _pipelineLimit = Config::getInstance()->getOption<int>(CONFIG_MERGE_PIPELINE_LIMIT);
 

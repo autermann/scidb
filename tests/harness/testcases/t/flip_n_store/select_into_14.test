@@ -1,14 +1,14 @@
 --setup
 --start-query-logging
-create empty array A <a:int32>[x=0:2,3,0,y=-2:2,1,0]
-create empty array B <b:string>[x=0:2,3,0,y=-2:2,1,0]
-create empty array C <b:string,a:int32> [x=0:2,3,0,y=-2:2,1,0]
-create empty array D <b:string> [x=0:2,3,0,y=-2:2,1,0]
-create empty array E <a:int32> [x=0:2,3,0,y=-2:2,1,0]
-#create empty array F <b:string> [a(int32)=15,2,0]
-create empty array G <a:int32> [b(string)=15,2,0]
-store(build_sparse(A,x+y+10,y%2=1),A)
-store(build_sparse(B,string(x)+'_'+string(y),y%2=1),B)
+create array A <a:int32>[x=0:2,3,0,y=-2:2,1,0]
+create array B <b:string>[x=0:2,3,0,y=-2:2,1,0]
+create array C <b:string,a:int32> [x=0:2,3,0,y=-2:2,1,0]
+create array D <b:string> [x=0:2,3,0,y=-2:2,1,0]
+create array E <a:int32> [x=0:2,3,0,y=-2:2,1,0]
+#create array F <b:string> [a(int32)=15,2,0]
+create array G <a:int32> [b(string)=15,2,0]
+store(filter(build(A,x+y+10),y%2=1),A)
+store(filter(build(B,string(x)+'_'+string(y)),y%2=1),B)
 
 --test
 --aql select * into C from A,B

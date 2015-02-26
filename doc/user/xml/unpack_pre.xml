@@ -19,15 +19,15 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The unpack operator unpacks a multidimensional array into a
-    single-dimensional result array creating new attributes to represent
-    source array dimension values. The result array has a single zero-based
-    dimension and attributes combining variables of the input array. The name
-    for the new single dimension is passed to the operator as the second
-    argument.</para>
+    <para>The <code>unpack()</code> operator unpacks a multidimensional array
+    into a single-dimensional result array creating new attributes to
+    represent source array dimension values. The result array has a single
+    zero-based dimension and attributes combining variables of the input
+    array. The name for the new single dimension is passed to the operator as
+    the second argument.</para>
 
     <para>You can control the chunk size of the resulting array with the
-    optional chunk_size parameter. The default chunk size is 1 million.</para>
+    optional <code>chunk_size</code> parameter.</para>
 
     <para><indexterm>
         <primary>binary save</primary>

@@ -7,7 +7,7 @@ create array yec <person:string,time:double> [year=1996:2008,13,0, event(string)
 --shell --command "csv2scidb -s 1 -p SNSSN < $DOC_DATA/winners2_2.csv > $DOC_DATA/winners2_2.scidb"
 
 --test
---aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2_2.scidb'
+--aql load winnersFlat from '${TEST_DATA_DIR}/doc/winners2_2.scidb'
 store(redimension(winnersFlat, winnersCanonical), winnersCanonical)
 store(redimension(winnersCanonical,yec),yec)
 

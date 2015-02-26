@@ -505,7 +505,7 @@ class PhysicalMpiTest: public MPIPhysical
 	boost::shared_ptr<SharedMemoryIpc> shmIpcOut(mpi::newSharedMemoryIpc(ipcNameOut));
 	_ctx->addSharedMemoryIpc(launchId, shmIpcOut);
 
-	const int64_t LARGE_SHM_SIZE = 64*1024*1024;
+	const int64_t LARGE_SHM_SIZE = 64*MiB;
 
 	char* ptrIn(NULL);
 	char* ptrOut(NULL);

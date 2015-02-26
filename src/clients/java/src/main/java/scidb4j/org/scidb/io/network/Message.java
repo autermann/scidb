@@ -22,7 +22,7 @@
 package org.scidb.io.network;
 
 import java.io.IOException;
-import java.io.InputStream;
+import org.scidb.util.InputStreamWithReadall;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -70,7 +70,7 @@ public abstract class Message
 
     /**
      * Make message from header
-     * 
+     *
      * @param header Message header
      */
     public Message(Header header)
@@ -80,15 +80,15 @@ public abstract class Message
 
     /**
      * Make message from stream
-     * 
+     *
      * It will read header first and then construct proper message
-     * 
+     *
      * @param is Input stream
      * @return Network message
      * @throws org.scidb.client.Error
      * @throws IOException
      */
-    public static Message parseFromStream(InputStream is) throws org.scidb.client.Error, IOException
+    public static Message parseFromStream(InputStreamWithReadall is) throws org.scidb.client.Error, IOException
     {
         Header hdr = Header.parseFromStream(is);
 
@@ -109,7 +109,7 @@ public abstract class Message
 
     /**
      * Serialize message to stream
-     * 
+     *
      * @param os Output stream for writing
      * @throws IOException
      */
@@ -133,7 +133,7 @@ public abstract class Message
 
     /**
      * Returns size of serialized protobuf part
-     * 
+     *
      * @return Size of serialized protobuf part
      */
     public int getRecordSize()
@@ -143,7 +143,7 @@ public abstract class Message
 
     /**
      * Set serialized protobuf part
-     * 
+     *
      * @param record Protobuf record
      */
     private void setRecord(com.google.protobuf.GeneratedMessage record)
@@ -153,7 +153,7 @@ public abstract class Message
 
     /**
      * Get serialized protobuf part
-     * 
+     *
      * @return Protobuf record
      */
     public com.google.protobuf.GeneratedMessage getRecord()
@@ -163,7 +163,7 @@ public abstract class Message
 
     /**
      * Returns message header structure
-     * 
+     *
      * @return Header
      */
     public Header getHeader()
@@ -172,10 +172,14 @@ public abstract class Message
     }
 
     /**
-     * Message header which delimit protobuf parts
+     * Message header which delimit protobuf parts.
+     * Note to developers: the headerSize is 32, even though the total size of all fields in class Header
+     * is 28. The reason is that the corresponding server-side C++ structure is 8-byte aligned.
      */
     public static class Header
-    {
+    {   /// Must match the server network protocol version (in src/network/BaseConnection.h)
+        public static final short NET_PROTOCOL_CURRENT_VER = 4;
+
         public static final int headerSize = 32;
         public short netProtocolVersion; // uint16_t
         public short messageType; // uint16_t
@@ -189,7 +193,7 @@ public abstract class Message
          */
         public Header()
         {
-            this.netProtocolVersion = 3;
+            this.netProtocolVersion = NET_PROTOCOL_CURRENT_VER;
             this.messageType = (short) 0;
             this.sourceInstanceID = ~0;
             this.recordSize = 0;
@@ -199,7 +203,7 @@ public abstract class Message
 
         /**
          * Construct header and fill query id and message type
-         * 
+         *
          * @param queryId Query ID
          * @param messageType Message type
          */
@@ -212,16 +216,18 @@ public abstract class Message
 
         /**
          * Make header from stream
-         * 
+         *
          * @param is Stream for reading
          * @return Header
          * @throws IOException
          */
-        public static Header parseFromStream(InputStream is) throws IOException
+        public static Header parseFromStream(InputStreamWithReadall is) throws IOException
         {
             Header res = new Header();
             byte[] b = new byte[Header.headerSize];
-            is.read(b, 0, Header.headerSize);
+            if (is.readAll(b, 0, Header.headerSize) != Header.headerSize) {
+                throw new IOException("Failed to read the full Message::Header");
+            }
             ByteBuffer buf = ByteBuffer.wrap(b);
 
             buf.order(ByteOrder.LITTLE_ENDIAN);
@@ -239,14 +245,14 @@ public abstract class Message
 
     /**
      * Query preparing and executing message
-     * 
+     *
      * Only for sending
      */
     public static class Query extends Message
     {
         /**
          * Constructor
-         * 
+         *
          * @param queryId Query ID
          * @param queryString Query string
          * @param afl true=AFL, false=AQL
@@ -266,30 +272,33 @@ public abstract class Message
 
     /**
      * Error message
-     * 
+     *
      * Only for receiving
      */
     public static class Error extends Message
     {
         /**
          * Constructor
-         * 
+         *
          * @param hdr Header
          * @param is Input stream
          * @throws IOException
          */
-        public Error(Header hdr, InputStream is) throws IOException
+        public Error(Header hdr, InputStreamWithReadall is) throws IOException
         {
             super(hdr);
             assert (hdr.messageType == mtError);
             byte[] buf = new byte[hdr.recordSize];
-            is.read(buf, 0, hdr.recordSize);
+            if (is.readAll(buf, 0, hdr.recordSize) != hdr.recordSize)  {
+                throw new IOException("Failed to read the full Error::Header.");
+            }
+
             super.setRecord(ScidbMsg.Error.parseFrom(buf));
         }
 
         /**
          * Returns Cast base protobuf record to Error and return
-         * 
+         *
          * @return Error protobuf record
          */
         @Override
@@ -308,23 +317,26 @@ public abstract class Message
     {
         /**
          * Constructor
-         * 
+         *
          * @param hdr Header
          * @param is Input stream
          * @throws IOException
          */
-        public QueryResult(Header hdr, InputStream is) throws IOException
+        public QueryResult(Header hdr, InputStreamWithReadall is) throws IOException
         {
             super(hdr);
             assert (hdr.messageType == mtQueryResult);
             byte[] buf = new byte[hdr.recordSize];
-            is.read(buf, 0, hdr.recordSize);
+            if (is.readAll(buf, 0, hdr.recordSize) != hdr.recordSize)  {
+                throw new IOException("Failed to read the full QueryResult::Header");
+            }
+
             super.setRecord(ScidbMsg.QueryResult.parseFrom(buf));
         }
 
         /**
          * Returns Cast base protobuf record to QueryResult and return
-         * 
+         *
          * @return QueryResult protobuf record
          */
         @Override
@@ -333,7 +345,7 @@ public abstract class Message
             return (ScidbMsg.QueryResult) super.getRecord();
         }
     }
-    
+
     /**
      * Fetch chunk message
      *
@@ -343,7 +355,7 @@ public abstract class Message
     {
         /**
          * Constructor
-         * 
+         *
          * @param queryId Query ID
          * @param attributeId Attribute to fetch
          * @param arrayName Array name to fetch
@@ -357,31 +369,37 @@ public abstract class Message
             super.setRecord(recBuilder.build());
         }
     }
-    
+
     /**
      * Chunk message
-     * 
+     *
      * Only for receiving
      */
     public static class Chunk extends Message
     {
         private byte[] chunkData = null;
-        
+
         /**
          * Constructor
-         * 
+         *
          * @param hdr Header
          * @param is Input stream
          * @throws IOException
          */
-        public Chunk(Header hdr, InputStream is) throws IOException
+        public Chunk(Header hdr, InputStreamWithReadall is) throws IOException
         {
             super(hdr);
             assert (hdr.messageType == mtChunk);
             byte[] buf = new byte[hdr.recordSize];
-            is.read(buf, 0, hdr.recordSize);
+            if (is.readAll(buf, 0, hdr.recordSize) != hdr.recordSize)  {
+                throw new IOException("Failed to read the full Chunk::Header");
+            }
+
             chunkData = new byte[hdr.binarySize];
-            is.read(chunkData, 0, hdr.binarySize);
+            if (is.readAll(chunkData, 0, hdr.binarySize) != hdr.binarySize) {
+                throw new IOException("Failed to read the full Chunk data");
+            }
+
             super.setRecord(ScidbMsg.Chunk.parseFrom(buf));
         }
 
@@ -393,10 +411,10 @@ public abstract class Message
         {
             return chunkData;
         }
-        
+
         /**
          * Returns Cast base protobuf record to Chunk and return
-         * 
+         *
          * @return Chunk protobuf record
          */
         @Override

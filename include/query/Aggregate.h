@@ -39,14 +39,47 @@
 #include "array/Metadata.h"
 #include "array/RLE.h"
 #include "query/TileFunctions.h"
+#include "util/arena/Vector.h"
 
 namespace scidb
 {
 
 typedef boost::shared_ptr<class Aggregate> AggregatePtr;
 
+/**
+ * Base class of aggregate functions.
+ *
+ * We assume all the aggregates can be computed in a distributed manner.
+ * That is, the caller may divide the source data into groups, call the aggregate function in each group, and
+ * call the aggregation function over the aggregate results.
+ * To support algebraic and holistic aggregate functions, we keep intermediate state.
+ * For instance, the state of the algebraic avg() is a running sum and a running count.
+ * As another example, the state of the holistic median() is *all* the values.
+ *
+ * We classify our aggregate functions into two categories: those that are order sensitive, and those aren't.
+ * Order-sensitive aggregates, such as last_value(), requires the aggregate functions to be called in a deterministic order.
+ * If the AFL operator (e.g. redimension()) cannot guarantee to call the aggregate function in order, we error out.
+ * The error will be thrown in the inferSchema() function of some child class of LogicalOperator.
+ *
+ * Note that an order-sensitive requirement may be satisfied even if the operator is distributed, as long as three conditions are met:
+ * (a) Each group only contains consecutive values.
+ *     E.g. [1, 2, 3, 4, 5] may be divided into [1, 2] and [3, 4, 5], but not [1, 5] and [2, 3, 4].
+ * (b) Within each group, aggregation is applied in order.
+ * (c) The intermediate results are aggregated also in order.
+ *     E.g. the last_value of the two groups above are 2 and 5, and to get the overall result, last_value needs to see 2 before 5.
+ */
 class Aggregate
 {
+public:
+    /**
+     * Whether aggregation must be applied in a deterministic order.
+     * Default is false. Right now, only first_value and last_value (in the enterprise edition) are order sensitive.
+     */
+    virtual bool isOrderSensitive()
+    {
+        return false;
+    }
+
 protected:
     std::string _aggregateName;
     Type _inputType;
@@ -309,7 +342,8 @@ public:
             A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()), value);
             state.setNull(-1);
         }
-        A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), *reinterpret_cast<T*>(input.data()));
+        A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()),
+                            *reinterpret_cast<T*>(input.data()));
     }
 
     virtual void accumulatePayload(Value& state, ConstRLEPayload const* tile)
@@ -425,6 +459,63 @@ public:
     }
 
     AggregatePtr createAggregate(std::string const& aggregateName, Type const& aggregateType) const;
+};
+
+
+/**
+ * An @c AggIOMapping associates an input attribute with N output
+ * attributes and their corresponding @c Aggregate objects.
+ */
+class AggIOMapping
+{
+public:
+    AggIOMapping()
+        : _inputAttributeId(INVALID_ATTRIBUTE_ID)
+    {}
+
+    AggIOMapping(AttributeID inAttId, AttributeID outAttId, AggregatePtr agg)
+        : _inputAttributeId(inAttId)
+        , _outputAttributeIds(1, outAttId)
+        , _aggregates(1, agg)
+    {}
+
+    void setInputAttributeId(AttributeID id) { _inputAttributeId = id; }
+    int64_t getInputAttributeId() const { return _inputAttributeId; }
+    bool validAttributeId() const { return _inputAttributeId != INVALID_ATTRIBUTE_ID; }
+
+    AggregatePtr getAggregate(size_t i) const { return _aggregates[i]; }
+    AttributeID getOutputAttributeId(size_t i) const { return _outputAttributeIds[i]; }
+
+    // Not a good idea to give out handles to private data, but saves
+    // N smart pointer copies in PhysicalVariableWindow.  *Sigh*, OK, OK.
+    const std::vector<AggregatePtr>& getAggregates() const { return _aggregates; }
+
+    size_t size() const { return _aggregates.size(); }
+    bool empty() const { return _aggregates.empty(); }
+
+    void push_back(AttributeID id, AggregatePtr ptr)
+    {
+        _outputAttributeIds.push_back(id);
+        _aggregates.push_back(ptr);
+    }
+
+    void merge(const AggIOMapping& other)
+    {
+        assert(other._outputAttributeIds.size() == other._aggregates.size());
+        _outputAttributeIds.insert(_outputAttributeIds.end(),
+                                   other._outputAttributeIds.begin(),
+                                   other._outputAttributeIds.end());
+        _aggregates.insert(_aggregates.end(),
+                           other._aggregates.begin(),
+                           other._aggregates.end());
+    }
+
+private:
+    AttributeID _inputAttributeId;
+
+    // Parallel arrays, _outAttr[i] corresponds to _agg[i].
+    std::vector<AttributeID> _outputAttributeIds;
+    std::vector<AggregatePtr> _aggregates;
 };
 
 } //namespace scidb

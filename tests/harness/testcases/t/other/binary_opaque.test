@@ -126,7 +126,7 @@ scan(Dsp3)
 aggregate(versions(expo),count(*))
 
 # Load, failure case.
-#--error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(A2, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 2)"
+#--error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(A2, '${TEST_DATA_DIR}/A2_err.txt', -2, 'text', 2)"
 
 
 # Wrong args (should work, print a warning and continue)

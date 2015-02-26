@@ -1,6 +1,6 @@
 --setup
 create array foo<a:string> [i=0:2,3,0]
-create empty array bar<i:int64> [a(string)=10,10,0]
+create array bar<i:int64> [a(string)=10,10,0]
 
 --aql select * into foo from build(foo, 'a')
 --aql update foo set a='b' where i=1

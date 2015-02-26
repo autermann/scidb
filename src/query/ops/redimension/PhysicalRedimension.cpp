@@ -28,6 +28,7 @@
  *  @author poliocough@gmail.com
  */
 
+#include <boost/foreach.hpp>
 #include "RedimensionCommon.h"
 #include <log4cxx/logger.h>
 

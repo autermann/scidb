@@ -37,8 +37,8 @@
 #include <string.h>
 #include <string>
 
-#include <boost/shared_ptr.hpp> 
-#include <boost/make_shared.hpp> 
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/format.hpp>
 
 #include "system/ErrorCodes.h"
@@ -49,17 +49,21 @@
     scidb::SystemException(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
     long_error_code, #short_error_code, #long_error_code)
 
-#define SYSTEM_EXCEPTION_SPTR(short_error_code, long_error_code)\
-    boost::make_shared<scidb::SystemException>(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
-    long_error_code, #short_error_code, #long_error_code)
+#define SYSTEM_EXCEPTION_SPTR(short_error_code, long_error_code)        \
+    boost::make_shared<scidb::SystemException>(                         \
+        REL_FILE, __FUNCTION__, __LINE__, "scidb",                      \
+        int(short_error_code), int(long_error_code),                    \
+        #short_error_code, #long_error_code)
 
 #define USER_EXCEPTION(short_error_code, long_error_code)\
     scidb::UserException(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
     long_error_code, #short_error_code, #long_error_code)
 
-#define USER_EXCEPTION_SPTR(short_error_code, long_error_code)\
-    boost::make_shared<scidb::UserException>(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
-    long_error_code, #short_error_code, #long_error_code)
+#define USER_EXCEPTION_SPTR(short_error_code, long_error_code)  \
+    boost::make_shared<scidb::UserException>(                   \
+        REL_FILE, __FUNCTION__, __LINE__, "scidb",              \
+        int(short_error_code), int(long_error_code),            \
+        #short_error_code, #long_error_code)
 
 #define USER_QUERY_EXCEPTION(short_error_code, long_error_code, parsing_context)\
     scidb::UserQueryException(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
@@ -71,9 +75,11 @@
         exception.what(), exception.getStringifiedShortErrorCode().c_str(),\
         exception.getStringifiedLongErrorCode().c_str(), parsing_context)
 
-#define USER_QUERY_EXCEPTION_SPTR(short_error_code, long_error_code, parsing_context)\
-    boost::make_shared<scidb::UserQueryException>(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
-        long_error_code, #short_error_code, #long_error_code, parsing_context)
+#define USER_QUERY_EXCEPTION_SPTR(short_error_code, long_error_code, parsing_context) \
+    boost::make_shared<scidb::UserQueryException>(                      \
+        REL_FILE, __FUNCTION__, __LINE__, "scidb",                      \
+        int(short_error_code), int(long_error_code),                    \
+        #short_error_code, #long_error_code, parsing_context)
 
 #define PLUGIN_SYSTEM_EXCEPTION(error_namespace, short_error_code, long_error_code)\
     scidb::SystemException(REL_FILE, __FUNCTION__, __LINE__, error_namespace, short_error_code,\
@@ -104,9 +110,10 @@
 
 #define ASSERT_EXCEPTION(_cond_, _msg_) \
      do { \
-         assert(_cond_); \
-         if (!_cond_) { \
-             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << _msg_; \
+         bool cond = (_cond_); /* evaluate once */ \
+         assert(cond); \
+         if (!cond) { \
+             throw SYSTEM_EXCEPTION(scidb::SCIDB_SE_INTERNAL, scidb::SCIDB_LE_UNREACHABLE_CODE) << _msg_; \
          } \
      } while (0)
 
@@ -116,9 +123,9 @@ namespace scidb
 class ParsingContext;
 
 /*
- * Base exception class 
+ * Base exception class
  */
-class 
+class
 __attribute__((visibility("default")))
 Exception: public std::exception
 {
@@ -167,6 +174,7 @@ public:
 
     uint64_t getQueryId() const;
 
+    void setQueryId(uint64_t queryId);
 protected:
     virtual void format() = 0;
 
@@ -187,7 +195,7 @@ protected:
 /*
  * Exceptions caused by some user-actions
  */
-class 
+class
 __attribute__((visibility("default")))
 UserException: public Exception
 {
@@ -242,7 +250,7 @@ boost::shared_ptr<UserException> operator <<(boost::shared_ptr<UserException> e,
 /*
  * Exceptions caused by wrong queries
  */
-class 
+class
 __attribute__((visibility("default")))
 UserQueryException: public UserException
 {
@@ -299,7 +307,7 @@ boost::shared_ptr<UserQueryException> operator <<(boost::shared_ptr<UserQueryExc
 /*
  * Exceptions caused by some errors in core
  */
-class 
+class
 __attribute__((visibility("default")))
 SystemException: public Exception
 {

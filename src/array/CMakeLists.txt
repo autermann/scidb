@@ -24,6 +24,7 @@ set (array_src
     Array.cpp
     Tile.cpp
     MemArray.cpp
+    MemChunk.cpp
     StreamArray.cpp
     DelegateArray.cpp
     TupleArray.cpp
@@ -35,6 +36,8 @@ set (array_src
     DeepChunkMerger.cpp
     MergeSortArray.cpp
     SortArray.cpp
+    TransientCache.cpp
+    SpatialRangesChunkPosIterator.cpp
 )
 
 file(GLOB array_include "*.h")

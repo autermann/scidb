@@ -107,7 +107,6 @@
 %token<keyword>     DEFAULT
 %token<keyword>     DESC
 %token<keyword>     DROP
-%token<keyword>     EMPTY
 %token<keyword>     ERRORS
 %token<keyword>     FIXED
 %token<keyword>     FN
@@ -143,6 +142,7 @@
 %token<keyword>     SHADOW
 %token<keyword>     START
 %token<keyword>     STEP
+%token<keyword>     TEMP
 %token<keyword>     THIN
 %token<keyword>     TO
 %token<keyword>     UNBOUND
@@ -161,7 +161,6 @@
 %type<node>         attribute
 %type<node>         dimension dimension_hi
 %type<node>         nullable
-%type<node>         emptyable
 %type<node>         default
 %type<node>         default_value
 %type<node>         compression
@@ -178,7 +177,6 @@
 %type<node>         version_clause
 %type<node>         application
 %type<node>         operand
-%type<node>         schema_exp
 %type<node>         reference
 %type<node>         select_exp
 %type<node>         grw_as_clause
@@ -329,17 +327,7 @@ exp:
              _fac.newApp(@$,">=" ,$1,$3),
              _fac.newApp(@$,"<=" ,_fac.newCopy($1),$5));
     }
-    | exp AS identifier
-    {
-        switch ($1->getType())
-        {
-            case application: $1->set(applicationArgAlias,_fac.newCopy($3));break;
-            case reference:   $1->set(referenceArgAlias,  _fac.newCopy($3));break;
-            default:                                                        break;
-        }
-
-        $$ = $1;
-    }
+    | exp AS identifier                                  {$$ = setAlias($1,_fac.newCopy($3));}
     | LET '{' bindings   '}' IN  exp                     {$$ = _fac.newFix(@$,_fac.newList(@3,$3),$6);}
     | FN  '(' parameters ')' '{' exp '}'                 {$$ = _fac.newAbs(@$,_fac.newList(@3,$3),$6);}
     ;
@@ -380,17 +368,7 @@ reduced_exp:
     | reduced_exp GTEQ reduced_exp                       {$$ = _fac.newApp(@2,">=", $1,$3);}
     | reduced_exp IS NULL_VALUE                          {$$ = _fac.newApp(@3,"is_null",$1);}
     | reduced_exp IS NOT NULL_VALUE                      {$$ = _fac.newApp(@3,"not",_fac.newApp(@4,"is_null",$1));}
-    | reduced_exp AS identifier
-    {
-        switch ($1->getType())
-        {
-            case application: $1->set(applicationArgAlias,_fac.newCopy($3));break;
-            case reference:   $1->set(referenceArgAlias,  _fac.newCopy($3));break;
-            default:                                                        break;
-        }
-
-        $$ = $1;
-    }
+    | reduced_exp AS identifier                          {$$ = setAlias($1,_fac.newCopy($3));}
     ;
 
 atomic_exp:
@@ -402,18 +380,18 @@ atomic_exp:
     ;
 
 reference:
-      identifier version_clause order                    {$$ = _fac.newNode(reference,@$,0,$1,$2,$3,0);}
-    | identifier '.' identifier order                    {$$ = _fac.newNode(reference,@$,$1,$3,0,$4,0);}
+      identifier version_clause order                    {$$ = _fac.newRef(@$,$1,$2,$3);}
+    | identifier '.' identifier order                    {$$ = _fac.newRef(@$,$3,$1,$4);}
     ;
 
 application:
-      identifier '(' asterisk ')'                        {$$ = _fac.newNode(application,@$,$1,_fac.newNode(list,@2,$3),0,_fac.newBoolean(@1,false));}
-    | identifier '(' operands ')'                        {$$ = _fac.newNode(application,@$,$1,_fac.newList(@3,$3),     0,_fac.newBoolean(@1,false));}
+      identifier '(' asterisk ')'                        {$$ = _fac.newApp(@$,$1,$3);}
+    | identifier '(' operands ')'                        {$$ = _fac.newApp(@$,$1,_fac.pop($3));}
     ;
 
 operand:
       exp                                                {$$ = $1;}
-    | schema_exp                                         {$$ = $1;}
+    | schema                                             {$$ = $1;}
     | select_exp                                         {$$ = $1;}
     ;
 
@@ -426,10 +404,6 @@ version_clause:
 select_exp:
       '('                                                {$<lexicon>$ = yylex.setLexicon(AQL);}
       select_array_statement ')'                         {$$ = $3;      yylex.setLexicon($<lexicon>2);}
-    ;
-
-schema_exp:
-      emptyable schema                                   {$$ = $2->set(schemaArgEmpty,$1);}
     ;
 
 order:
@@ -493,6 +467,7 @@ identifier:
     | DEFAULT                                            {$$ = _fac.newString(@$,$1);}
     | IS                                                 {$$ = _fac.newString(@$,$1);}
     | RESERVE                                            {$$ = _fac.newString(@$,$1);}
+    | TEMP                                               {$$ = _fac.newString(@$,$1);}
 /* Context sensitive keywords specific to AQL: */
     | ALL                                                {$$ = _fac.newString(@$,$1);}
     | BY                                                 {$$ = _fac.newString(@$,$1);}
@@ -520,7 +495,8 @@ identifier:
 /****************************************************************************/
 
 create_array_statement:
-      CREATE emptyable ARRAY reference schema            {$$ = _fac.newApp(@$,"Create_Array",$4,$5->set(schemaArgEmpty,$2));}
+      CREATE      ARRAY reference schema                 {$$ = _fac.newApp(@$,"Create_Array",$3,$4);}
+    | CREATE TEMP ARRAY reference schema                 {$$ = _fac.newApp(@$,"Create_Array",$4,$5,_fac.newString(@3,"temp"));}
     ;
 
 schema:
@@ -549,12 +525,6 @@ default_value:
     | '+' application                                    {$$ = $2;}
     | '-' application                                    {$$ = _fac.newApp(@1,"-",$2);}
     | '(' exp ')'                                        {$$ = $2;}
-    ;
-
-emptyable:
-          EMPTY                                          {$$ = _fac.newBoolean(@$,true);}
-    | NOT EMPTY                                          {$$ = _fac.newBoolean(@$,false);}
-    | blank                                              {$$ = _fac.newBoolean(@$,true);}
     ;
 
 nullable:
@@ -762,21 +732,7 @@ named_exp:
       exp
     {
      // lift an optional alias up from the expression to the namedExpr - todo: jab: move this into the translator
-        Node* alias = 0;
-
-        switch ($1->getType())
-        {
-            case application: alias = $1->get(applicationArgAlias);break;
-            case reference:   alias = $1->get(referenceArgAlias);  break;
-            default:                                               break;
-        }
-
-        if (alias != 0)
-        {
-            alias = _fac.newCopy(alias);
-        }
-
-        $$ = _fac.newNode(namedExpr,@$,$1,alias);
+        $$ = _fac.newNode(namedExpr,@$,$1,_fac.newCopy(getAlias($1)));
     }
     ;
 
@@ -803,7 +759,7 @@ array_literal:
 
 array_literal_schema:
       reference                                          {$$ = $1;}
-    | schema_exp                                         {$$ = $1;}
+    | schema                                             {$$ = $1;}
     ;
 
 joined_input:

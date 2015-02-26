@@ -27,21 +27,20 @@
  *      Author: knizhnik@garret.ru
  */
 
-#include "query/Operator.h"
-#include "array/Metadata.h"
-#include "array/Array.h"
+#include <query/Operator.h>
+#include <array/Metadata.h>
+#include <array/Array.h>
 #include "BetweenArray.h"
-
 
 namespace scidb {
 
 class PhysicalBetween: public  PhysicalOperator
 {
 public:
-        PhysicalBetween(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-             PhysicalOperator(logicalName, physicalName, parameters, schema)
-        {
-        }
+    PhysicalBetween(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+         PhysicalOperator(logicalName, physicalName, parameters, schema)
+    {
+    }
 
     Coordinates getWindowStart(const boost::shared_ptr<Query>& query) const
     {
@@ -51,14 +50,13 @@ public:
         for (size_t i = 0; i < nDims; i++)
         {
             Value const& coord = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate();
-            if (coord.isNull()) {
-                result[i] = dims[i].getLowBoundary();
-            } else {
+            if ( coord.isNull() || coord.getInt64() < dims[i].getStart())
+            {
+                result[i] = dims[i].getStart();
+            }
+            else
+            {
                 result[i] = coord.getInt64();
-                if (dims[i].getStart() != MIN_COORDINATE && result[i] < dims[i].getStart())
-                {
-                    result[i] = dims[i].getStart();
-                }
             }
         }
         return result;
@@ -72,14 +70,13 @@ public:
         for (size_t i = 0; i < nDims; i++)
         {
             Value const& coord = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i + nDims])->getExpression()->evaluate();
-            if (coord.isNull()) {
-                result[i] = dims[i].getHighBoundary();
-            } else {
+            if (coord.isNull() || coord.getInt64() > dims[i].getEndMax())
+            {
+                result[i] = dims[i].getEndMax();
+            }
+            else
+            {
                 result[i] = coord.getInt64();
-                if (result[i] > dims[i].getEndMax())
-                {
-                    result[i] = dims[i].getEndMax();
-                }
             }
         }
         return result;
@@ -94,8 +91,7 @@ public:
     }
 
    /***
-    * Between is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-    * that overrides the chunkiterator method.
+    * Between is a pipelined operator, hence it executes by returning an iterator-based array to the consumer.
     */
    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
                                      boost::shared_ptr<Query> query)
@@ -106,8 +102,11 @@ public:
 
       Coordinates lowPos = getWindowStart(query);
       Coordinates highPos = getWindowEnd(query);
-
-      return boost::shared_ptr< Array>(make_shared<BetweenArray>(_schema, lowPos, highPos, inputArray, _tileMode));
+      SpatialRangesPtr spatialRangesPtr = make_shared<SpatialRanges>(lowPos.size());
+      if (isDominatedBy(lowPos, highPos)) {
+          spatialRangesPtr->_ranges.push_back(SpatialRange(lowPos, highPos));
+      }
+      return boost::shared_ptr<Array>(make_shared<BetweenArray>(_schema, spatialRangesPtr, inputArray));
    }
 };
 

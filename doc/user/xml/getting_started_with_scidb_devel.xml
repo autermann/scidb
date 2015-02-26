@@ -86,9 +86,9 @@ quit or exit   - End iquery session</programlisting></para>
         <primary>query output</primary>
       </indexterm><indexterm>
         <primary>formatting, output</primary>
-      </indexterm>Available options for output format are csv, csv+, dcsv,
-    dense, lcsv+, sparse, and lsparse. These options are described in the
-    following table:</para>
+      </indexterm>Available options for output format are csv, csv+, lcsv+,
+    dcsv, dense, tsv, tsv+, ltsv+, sparse, and lsparse. These options are
+    described in the following table:</para>
 
     <informaltable frame="all" id="outputOptions">
       <tgroup cols="2">
@@ -106,7 +106,7 @@ quit or exit   - End iquery session</programlisting></para>
 
         <tbody>
           <row>
-            <entry>auto (default)</entry>
+            <entry>auto</entry>
 
             <entry>SciDB array format.</entry>
           </row>
@@ -124,22 +124,6 @@ quit or exit   - End iquery session</programlisting></para>
           </row>
 
           <row>
-            <entry>dcsv</entry>
-
-            <entry>Format used in most doc examples. Visually distinguishes
-            dimensions from attributes. This is the default output
-            format.</entry>
-          </row>
-
-          <row>
-            <entry>dense</entry>
-
-            <entry>Ideal for viewing 2-dimensional arrays. Displays empty
-            cells as parentheses. Not recommended for very sparse
-            arrays.</entry>
-          </row>
-
-          <row>
             <entry>lcsv+</entry>
 
             <entry>Comma-separated values with dimension indices and a Boolean
@@ -148,11 +132,39 @@ quit or exit   - End iquery session</programlisting></para>
           </row>
 
           <row>
-            <entry>lsparse</entry>
+            <entry>dcsv (default)</entry>
 
-            <entry>Sparse SciDB array format and a Boolean flag attribute,
-            <emphasis role="bold">EmptyTag</emphasis>, showing if a cell is
-            empty.</entry>
+            <entry>Format used in most doc examples. Visually distinguishes
+            dimensions from attributes. This is the default output
+            format.</entry>
+          </row>
+
+          <row>
+            <entry>tsv</entry>
+
+            <entry>Tab-separated values.</entry>
+          </row>
+
+          <row>
+            <entry>tsv+</entry>
+
+            <entry>Tab-separated values with dimension indices.</entry>
+          </row>
+
+          <row>
+            <entry>ltsv+</entry>
+
+            <entry>Tab-separated values with dimension indices and a Boolean
+            flag attribute, <emphasis role="bold">EmptyTag</emphasis>, showing
+            if a cell is empty.</entry>
+          </row>
+
+          <row>
+            <entry>dense</entry>
+
+            <entry>Ideal for viewing 2-dimensional arrays. Displays empty
+            cells as parentheses. Not recommended for very sparse
+            arrays.</entry>
           </row>
 
           <row>
@@ -188,9 +200,8 @@ quit or exit   - End iquery session</programlisting></para>
           <tbody>
             <row>
               <entry>
-                <code>-w [ --precision ]</code>
-
-                <replaceable>precision</replaceable>
+                <para>-w [ --precision ]
+                <replaceable>precision</replaceable></para>
               </entry>
 
               <entry><indexterm>
@@ -202,71 +213,49 @@ quit or exit   - End iquery session</programlisting></para>
             </row>
 
             <row>
-              <entry>
-                <code>-c [ --host ]</code>
-
-                <replaceable>host_name</replaceable>
-              </entry>
+              <entry>-c [ --host ]
+              <replaceable>host_name</replaceable></entry>
 
               <entry>Host of one of the cluster instances. Default is
               'localhost'.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-p [ --port ]</code>
-
-                <replaceable>port_number</replaceable>
-              </entry>
+              <entry>-p [ --port ]<replaceable>
+              port_number</replaceable></entry>
 
               <entry>Port for connection. Default is 1239.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-q [ --query ]</code>
-
-                <replaceable>query</replaceable>
-              </entry>
+              <entry>-q [ --query ] <replaceable>query</replaceable></entry>
 
               <entry>Query to be executed.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-f [ --query-file ]</code>
-
-                <replaceable>input_filename</replaceable>
-              </entry>
+              <entry>-f [ --query-file ]<replaceable>
+              input_filename</replaceable></entry>
 
               <entry>File with query to be executed.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-r [ --result ]</code>
-
-                <replaceable>target_filename</replaceable>
-              </entry>
+              <entry>-r [ --result ]
+              <replaceable>target_filename</replaceable></entry>
 
               <entry>Filename where result data will be stored.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-o [ --format ]</code>
-
-                <replaceable>format</replaceable>
-              </entry>
+              <entry>-o [ --format ] <replaceable>format</replaceable></entry>
 
               <entry>Output format. See the previous table for available
-              options. Default is 'auto'.</entry>
+              options. Default is 'dcsv'.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-v [ --verbose ]</code>
-              </entry>
+              <entry>-v [ --verbose ]</entry>
 
               <entry>Print the debugging information. Disabled by default.
               Useful for displaying data such as number of chunks and chunk
@@ -274,17 +263,13 @@ quit or exit   - End iquery session</programlisting></para>
             </row>
 
             <row>
-              <entry>
-                <code>-t [ --timer ]</code>
-              </entry>
+              <entry>-t [ --timer ]</entry>
 
               <entry>Query setup time (in seconds).</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-n [ --no-fetch ]</code>
-              </entry>
+              <entry>-n [ --no-fetch ]</entry>
 
               <entry>Skip data fetching. Disabled by default. Useful when the
               result array is large, and you do not want to have the results
@@ -292,33 +277,26 @@ quit or exit   - End iquery session</programlisting></para>
             </row>
 
             <row>
-              <entry>
-                <code>-a [ --afl ]</code>
-              </entry>
+              <entry>-a [ --afl ]</entry>
 
               <entry>Switch to AFL query language mode. Default is
               AQL.</entry>
             </row>
 
             <row>
-              <entry>-<code>u [ --plugins ]
-              </code><replaceable>path</replaceable></entry>
+              <entry>-u [ --plugins ] <replaceable>path</replaceable></entry>
 
               <entry>Path to the plugins directory.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-h [ --help ]</code>
-              </entry>
+              <entry>-h [ --help ]</entry>
 
               <entry>Show help.</entry>
             </row>
 
             <row>
-              <entry>
-                <code>-V [ --version ]</code>
-              </entry>
+              <entry>-V [ --version ]</entry>
 
               <entry><indexterm>
                   <primary>versions</primary>
@@ -328,9 +306,7 @@ quit or exit   - End iquery session</programlisting></para>
             </row>
 
             <row>
-              <entry>
-                <code>ignore-errors</code>
-              </entry>
+              <entry>--ignore-errors</entry>
 
               <entry>Ignore execution errors in batch mode.</entry>
             </row>
@@ -498,8 +474,8 @@ quit or exit   - End iquery session</programlisting></para>
     <para>Note the following:<itemizedlist>
         <listitem>
           <para>Your version of iquery must match the version of SciDB. For
-          example, if your SciDB installation is at version 13.12, you must
-          download and install iquery version 13.12.</para>
+          example, if your SciDB installation is at version 14.7, you must
+          download and install iquery version 14.7.</para>
         </listitem>
 
         <listitem>
@@ -520,11 +496,11 @@ quit or exit   - End iquery session</programlisting></para>
 
         <itemizedlist>
           <listitem>
-            <para>On Ubuntu:<programlisting>wget -O- http://downloads.paradigm4.com/key | sudo apt-key add -</programlisting></para>
+            <para>On Ubuntu:<programlisting>wget -O- https://downloads.paradigm4.com/key | sudo apt-key add -</programlisting></para>
           </listitem>
 
           <listitem>
-            <para>On CentOS or RHEL:<programlisting>wget http://downloads.paradigm4.com/key
+            <para>On CentOS or RHEL:<programlisting>wget https://downloads.paradigm4.com/key
 sudo rpm --import key
 rm -f key</programlisting></para>
           </listitem>
@@ -537,7 +513,7 @@ rm -f key</programlisting></para>
             <listitem>
               <para>On Ubuntu, create the file
               <code>/etc/apt/sources.list.d/scidb.list</code> and add the
-              following line:<programlisting>deb  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/</programlisting></para>
+              following line:<programlisting>deb  https://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/</programlisting></para>
             </listitem>
 
             <listitem>
@@ -545,7 +521,7 @@ rm -f key</programlisting></para>
               <code>/etc/yum.repos.d/scidb.repo</code> file and add the
               following lines:<programlisting>[scidb]
 name=SciDB
-baseurl=http://downloads.paradigm4.com/centos6.3/&scidb_version;/
+baseurl=https://downloads.paradigm4.com/centos6.3/&scidb_version;/
 gpgcheck=1</programlisting></para>
             </listitem>
           </itemizedlist></para>
@@ -784,6 +760,19 @@ Convertible, 26.8
         separate data-preparation utility provided with SciDB. To see all
         options available for csv2scidb, type <literal>csv2scidb
         --help</literal> at the command line.</para>
+
+        <para><indexterm>
+            <primary>SciDB-formatted text file example</primary>
+          </indexterm>After running this command, you will have the following
+        SciDB-formatted text file, <emphasis
+        role="bold">datafile.scidb</emphasis>:</para>
+
+        <programlisting>0}[
+("Truck", 23.5),
+("Sedan", 48.7),
+("SUV", 19.6),
+("Convertible", 26.8)
+]</programlisting>
       </step>
 
       <step>

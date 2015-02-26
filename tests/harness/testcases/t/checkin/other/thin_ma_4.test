@@ -3,7 +3,7 @@
 create array A <a:int32 null, b:string null> [x=0:8,6,0]
 create array Ti <a:int32> [x=0:8,6,0]
 create array Ts <b:string> [x=0:8,6,0]
---aql select * into A from build_sparse(Ti,x+10,true),build_sparse(Ts,x+10,true)
+--aql select * into A from filter(build(Ti,x+10),true),filter(build(Ts,x+10),true)
 --aql update A set a=null where x=3
 --aql update A set b=null where x=5
 --aql update A set a=null, b=null where x=3 and x=5

@@ -20,7 +20,7 @@
 * END_COPYRIGHT
 */
 
-/* 
+/*
  * InputArray.cpp
  *
  *  Created on: Sep 23, 2010
@@ -53,7 +53,7 @@ namespace scidb
     using namespace boost;
     using namespace boost::archive;
 
-    const int GETHOSTBYNAME_BUF_SIZE = 1024;
+    const int GETHOSTBYNAME_BUF_SIZE = 1*KiB;
 
 
 #ifdef SUPPORT_INPUT_FROM_SOCKET // sockets support is not confirmed
@@ -71,7 +71,7 @@ namespace scidb
         struct hostent ent;  // entry in hosts table
         char ghbn_buf[GETHOSTBYNAME_BUF_SIZE];
         int h_err;
-        
+
         if (gethostbyname_r(host.c_str(), &ent, ghbn_buf, sizeof ghbn_buf, &hp, &h_err) != 0
             || hp == NULL
             || hp->h_addrtype != AF_INET)
@@ -80,7 +80,7 @@ namespace scidb
             return -1;
         }
 #else
-        if ((hp = gethostbyname(host.c_str())) == NULL || hp->h_addrtype != AF_INET) 
+        if ((hp = gethostbyname(host.c_str())) == NULL || hp->h_addrtype != AF_INET)
         {
             LOG4CXX_DEBUG(logger, "Failed to resolve host " << host << ", errno = " << errno);
             return -1;
@@ -92,7 +92,7 @@ namespace scidb
         int sd = -1;
         for (int i = 0; hp->h_addr_list[i] != NULL; i++) {
             memcpy(&sock_inet.sin_addr, hp->h_addr_list[i], sizeof sock_inet.sin_addr);
-            sd = socket(AF_INET, SOCK_STREAM, 0);                            
+            sd = socket(AF_INET, SOCK_STREAM, 0);
             if (sd < 0) {
                 LOG4CXX_DEBUG(logger, "Attempt to create socket failed with errno = " << errno);
                 return -1;
@@ -100,20 +100,20 @@ namespace scidb
             do {
                 rc = ::connect(sd, (sockaddr*)&sock_inet, sizeof(sock_inet));
             } while (rc < 0 && errno == EINTR);
-            
+
             if (rc < 0) {
                 if (errno != ENOENT && errno != ECONNREFUSED) {
                     close(sd);
                     sd = -1;
                     break;
                 }
-            } else { 
+            } else {
                 break;
             }
             close(sd);
             sd = -1;
         }
-        if (sd < 0) { 
+        if (sd < 0) {
             LOG4CXX_DEBUG(logger, "Failed to connect to host " << host << ", errno = " << errno);
             close(sd);
             return -1;
@@ -129,7 +129,7 @@ namespace scidb
         memcpy(buf, input.c_str(), size+1);
         f = openMemoryStream(buf, size);
     }
-        
+
     bool Scanner::open(string const& input, InputType inputType, boost::shared_ptr<Query> query)
     {
         missingReason = -1;
@@ -140,14 +140,14 @@ namespace scidb
         {
 #ifdef SUPPORT_INPUT_FROM_SOCKET // sockets support is not confirmed
             size_t at = input.find('@');
-            if (at != string::npos) { 
+            if (at != string::npos) {
                 int sd = openSocket(input);
                 if (sd < 0) {
                     return false;
                 }
                 f = fdopen(sd, AS_BINARY_FILE == inputType ? "rb" : "r");
-            } 
-            else 
+            }
+            else
 #endif
             {
                 LOG4CXX_DEBUG(logger, "Attempting to open file '" << input << "' for input");
@@ -164,15 +164,15 @@ namespace scidb
             filePath = "<string>";
             openStringStream(input);
         }
-        if (f != NULL && inputType != AS_BINARY_FILE) { 
+        if (f != NULL && inputType != AS_BINARY_FILE) {
             doubleBuffer = shared_ptr<BufferedFileInput>(new BufferedFileInput(f, query));
         }
         return true;
     }
-    
+
     void InputArray::resetShadowChunkIterators()
     {
-        for (size_t i = 0, n = shadowChunkIterators.size(); i < n; i++) { 
+        for (size_t i = 0, n = shadowChunkIterators.size(); i < n; i++) {
             shadowChunkIterators[i]->flush();
         }
         shadowChunkIterators.clear();
@@ -265,13 +265,13 @@ namespace scidb
         }
         return self.iterators[attr];
     }
-    
-    static ArrayDesc generateShadowArraySchema(ArrayDesc const& targetArray, string const& shadowArrayName) 
+
+    static ArrayDesc generateShadowArraySchema(ArrayDesc const& targetArray, string const& shadowArrayName)
     {
         Attributes const& srcAttrs = targetArray.getAttributes(true);
         size_t nAttrs = srcAttrs.size();
         Attributes dstAttrs(nAttrs+2);
-        for (size_t i = 0; i < nAttrs; i++) { 
+        for (size_t i = 0; i < nAttrs; i++) {
             dstAttrs[i] = AttributeDesc(i, srcAttrs[i].getName(), TID_STRING,  AttributeDesc::IS_NULLABLE, 0);
         }
         dstAttrs[nAttrs] = AttributeDesc(nAttrs, "row_offset", TID_INT64, 0, 0);
@@ -315,17 +315,17 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         for (size_t i = 0; i < nAttrs; i++) {
             types[i] = attrs[i].getType();
             attrVal[i] = Value(TypeLibrary::getType(types[i]));
-            if (attrs[i].isEmptyIndicator()) { 
+            if (attrs[i].isEmptyIndicator()) {
                 attrVal[i].setBool(true);
             }
         }
-        if (!shadowArrayName.empty()) { 
+        if (!shadowArrayName.empty()) {
             shadowArray = boost::shared_ptr<Array>(new MemArray(generateShadowArraySchema(array, shadowArrayName),query));
         }
-        if (!format.empty() && (format[0] == '(' || compareStringsIgnoreCase(format, "opaque") == 0)) { 
+        if (!format.empty() && (format[0] == '(' || compareStringsIgnoreCase(format, "opaque") == 0)) {
             templ = TemplateParser::parse(array, format, true);
             binaryLoad = true;
-        } else { 
+        } else {
             binaryLoad = false;
             for (size_t i = 0; i < nAttrs; i++) {
                 if (!isBuiltinType(types[i])) {
@@ -334,24 +334,24 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             }
         }
         chunkPos[nDims-1] -= dims[nDims-1].getChunkInterval();
-        if (!scanner.open(input, inputType, query))  { 
+        if (!scanner.open(input, inputType, query))  {
             LOG4CXX_DEBUG(logger,"Attempt to open input file '" << input<< "' and failed with errno = " << errno);
-            if (parallel) { 
-                state = EmptyArray;                
+            if (parallel) {
+                state = EmptyArray;
                 LOG4CXX_WARN(logger, "Failed to open file " << input << " for input");
-            } else { 
+            } else {
                 scheduleSG(query);
                 throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_OPEN_FILE) << input << errno;
             }
         }
-            
+
     }
     //
     // This function simulates SG opertator, may there is better way to use SG code directly?
     //
-    
-    static void redistributeCallback(void* arg) 
-    { 
+
+    static void redistributeCallback(void* arg)
+    {
         ((InputArray*)arg)->sg();
     }
 
@@ -371,7 +371,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         ArrayDesc desc;
 
         LOG4CXX_DEBUG(logger, "Redistribute shadow array " << shadowArrayName);
-        if (query->getCoordinatorID() == COORDINATOR_INSTANCE) { 
+        if (query->getCoordinatorID() == COORDINATOR_INSTANCE) {
             lock = boost::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(shadowArrayName,
                                                                                           query->getQueryID(),
                                                                                           Cluster::getInstance()->getLocalInstanceId(),
@@ -382,13 +382,13 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
 
             bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(shadowArrayName, desc, false);
             VersionID lastVersion = 0;
-            if (!arrayExists) { 
+            if (!arrayExists) {
                 lock->setLockMode(SystemCatalog::LockDesc::CRT);
                 bool updatedArrayLock = SystemCatalog::getInstance()->updateArrayLock(lock);
                 SCIDB_ASSERT(updatedArrayLock);
                 desc = shadowArrayDesc;
                 SystemCatalog::getInstance()->addArray(desc, psHashPartitioned);
-            } else { 
+            } else {
                 if (desc.getAttributes().size() != shadowArrayDesc.getAttributes().size() ||
                     desc.getDimensions().size() != shadowArrayDesc.getDimensions().size())
                 {
@@ -403,27 +403,26 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             lock->setArrayVersion(version);
             bool updatedArrayLock = SystemCatalog::getInstance()->updateArrayLock(lock);
             SCIDB_ASSERT(updatedArrayLock);
-            
+
             shadowArrayVersionName = ArrayDesc::makeVersionedName(shadowArrayName, version);
             LOG4CXX_DEBUG(logger, "Create shadow array " << shadowArrayVersionName);
             shadowArrayDesc = ArrayDesc(shadowArrayVersionName,  desc.getAttributes(), desc.getDimensions());
             SystemCatalog::getInstance()->addArray(shadowArrayDesc, ps);
-            
+
             arrayID = shadowArrayDesc.getId();
             lock->setArrayVersionId(shadowArrayDesc.getId());
             updatedArrayLock = SystemCatalog::getInstance()->updateArrayLock(lock);
             SCIDB_ASSERT(updatedArrayLock);
-        } else { 
+        } else {
             bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(shadowArrayName, desc, false);
             VersionID lastVersion = 0;
-            if (arrayExists) { 
+            if (arrayExists) {
                 lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
             }
             version = lastVersion+1;
-            LOG4CXX_DEBUG(logger, "Use version " << version << " of shadow array " << shadowArrayName); 
+            LOG4CXX_DEBUG(logger, "Use version " << version << " of shadow array " << shadowArrayName);
             shadowArrayVersionName = ArrayDesc::makeVersionedName(shadowArrayName, version);
         }
-        query->exclusiveLock(shadowArrayName);
 
         shadowArray = redistribute(shadowArray, query, ps); // it will synchronize all nodes with coordinator
 
@@ -441,7 +440,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock, lock, _1);
             query->pushFinalizer(f);
             SystemCatalog::ErrorChecker errorChecker = bind(&Query::validate, query);
-            if (!SystemCatalog::getInstance()->lockArray(lock, errorChecker)) { 
+            if (!SystemCatalog::getInstance()->lockArray(lock, errorChecker)) {
                 throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK) << shadowArrayName;
             }
         }
@@ -466,7 +465,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
     void InputArray::sg()
     {
         shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-        if (shadowArray) { 
+        if (shadowArray) {
             redistributeShadowArray(query);
         }
     }
@@ -476,56 +475,60 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         boost::shared_ptr<SGContext> sgCtx =  boost::dynamic_pointer_cast<SGContext>(query->getOperatorContext());
         resetShadowChunkIterators();
         shadowArrayIterators.clear();
-        if (sgCtx) { 
+        if (sgCtx) {
             sgCtx->onSGCompletionCallback = redistributeCallback;
             sgCtx->callbackArg = this;
-        } else { 
+        } else {
             sg();
         }
     }
 
-    void InputArray::handleError(Exception const& x, boost::shared_ptr<ChunkIterator> iterator, AttributeID i, int64_t pos)
+    void InputArray::handleError(Exception const& x,
+                                 boost::shared_ptr<ChunkIterator> iterator,
+                                 AttributeID i,
+                                 int64_t pos)
     {
         scanner.setPosition(pos);
         string const& msg = x.getErrorMessage();
         Attributes const& attrs = desc.getAttributes();
-        LOG4CXX_ERROR(logger, "Failed to convert attribute " << attrs[i].getName() << " at postion " << pos << " line " << scanner.getLine()
+        LOG4CXX_ERROR(logger, "Failed to convert attribute " << attrs[i].getName()
+                      << " at position " << pos << " line " << scanner.getLine()
                       << " column " << scanner.getColumn() << ": " << msg);
-        if (++nErrors > maxErrors) { 
+        if (++nErrors > maxErrors) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR16);
         }
-        if (attrs[i].isNullable()) { 
+        if (attrs[i].isNullable()) {
             attrVal[i].setNull();
-        } else { 
+        } else {
             attrVal[i].setSize(TypeLibrary::getType(attrs[i].getType()).byteSize());
             attrVal[i] = TypeLibrary::getDefaultValue(attrs[i].getType());
         }
         iterator->writeItem(attrVal[i]);
-        if (shadowArray) { 
+        if (shadowArray) {
             if (shadowChunkIterators.empty()) {
                 shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-                if (shadowArrayIterators.empty()) { 
+                if (shadowArrayIterators.empty()) {
                     shadowArrayIterators.resize(nAttrs+1);
-                    for (size_t j = 0; j < nAttrs; j++) { 
+                    for (size_t j = 0; j < nAttrs; j++) {
                         shadowArrayIterators[j] = shadowArray->getIterator(j);
                     }
                     shadowArrayIterators[nAttrs] = shadowArray->getIterator(nAttrs);
                 }
                 shadowChunkIterators.resize(nAttrs+1);
-                for (size_t j = 0; j < nAttrs; j++) { 
+                for (size_t j = 0; j < nAttrs; j++) {
                     shadowChunkIterators[j] = shadowArrayIterators[j]->newChunk(chunkPos, 0).getIterator(query, ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
                 }
-                shadowChunkIterators[nAttrs] = shadowArrayIterators[nAttrs]->newChunk(chunkPos, 0).getIterator(query, ChunkIterator::SEQUENTIAL_WRITE);                                            
+                shadowChunkIterators[nAttrs] = shadowArrayIterators[nAttrs]->newChunk(chunkPos, 0).getIterator(query, ChunkIterator::SEQUENTIAL_WRITE);
             }
             Coordinates const& currPos = iterator->getPosition();
-            if (lastBadAttr < 0) { 
+            if (lastBadAttr < 0) {
                 Value rowOffset;
                 rowOffset.setInt64(pos);
-                shadowChunkIterators[nAttrs]->setPosition(currPos); 
-                shadowChunkIterators[nAttrs]->writeItem(rowOffset); 
+                shadowChunkIterators[nAttrs]->setPosition(currPos);
+                shadowChunkIterators[nAttrs]->writeItem(rowOffset);
             }
             strVal.setNull();
-            while (AttributeID(++lastBadAttr) < i) {                                             
+            while (AttributeID(++lastBadAttr) < i) {
                 shadowChunkIterators[lastBadAttr]->setPosition(currPos);
                 shadowChunkIterators[lastBadAttr]->writeItem(strVal);
             }
@@ -537,13 +540,13 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
 
     void InputArray::completeShadowArrayRow()
     {
-        if (lastBadAttr >= 0) { 
-            strVal.setNull(); 
+        if (lastBadAttr >= 0) {
+            strVal.setNull();
             Coordinates const& currPos =  shadowChunkIterators[nAttrs]->getPosition(); // rowOffset attribute should be already set
-            while (AttributeID(++lastBadAttr) < nAttrs) {                                             
+            while (AttributeID(++lastBadAttr) < nAttrs) {
                 shadowChunkIterators[lastBadAttr]->setPosition(currPos);
                 shadowChunkIterators[lastBadAttr]->writeItem(strVal);
-            }                    
+            }
         }
     }
 
@@ -562,20 +565,20 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
         }
         for (size_t i = 0; i < nDims; i++) {
-            if (dims1[i].getChunkInterval() != dims2[i].getChunkInterval()) { 
+            if (dims1[i].getChunkInterval() != dims2[i].getChunkInterval()) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
-            if (dims1[i].getChunkOverlap() != dims2[i].getChunkOverlap()) { 
+            if (dims1[i].getChunkOverlap() != dims2[i].getChunkOverlap()) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
         }
         for (size_t i = 0; i < nAttrs; i++) {
-            if (attrs1[i].getType() != attrs2[i].getType()) { 
+            if (attrs1[i].getType() != attrs2[i].getType()) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
-            if (attrs1[i].getFlags() != attrs2[i].getFlags()) { 
+            if (attrs1[i].getFlags() != attrs2[i].getFlags()) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-            }                        
+            }
         }
     }
 
@@ -589,25 +592,25 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         FILE* f = scanner.getFile();
         OpaqueChunkHeader hdr;
         for (size_t i = 0; i < nAttrs; i++) {
-            if (fread(&hdr, sizeof hdr, 1, f) != 1) { 
-                if (i == 0) { 
+            if (fread(&hdr, sizeof hdr, 1, f) != 1) {
+                if (i == 0) {
                     state = EndOfStream;
                     scheduleSG(query);
                     return false;
                 } else {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                 }
-            } 
-            if (hdr.magic != OPAQUE_CHUNK_MAGIC) { 
+            }
+            if (hdr.magic != OPAQUE_CHUNK_MAGIC) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR10);
             }
-            if (hdr.version != SCIDB_OPAQUE_FORMAT_VERSION) { 
+            if (hdr.version != SCIDB_OPAQUE_FORMAT_VERSION) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MISMATCHED_OPAQUE_FORMAT_VERSION) << hdr.version << SCIDB_OPAQUE_FORMAT_VERSION;
             }
-            if (hdr.flags & OpaqueChunkHeader::ARRAY_METADATA)  { 
+            if (hdr.flags & OpaqueChunkHeader::ARRAY_METADATA)  {
                 string arrayDescStr;
                 arrayDescStr.resize(hdr.size);
-                if (fread(&arrayDescStr[0], 1, hdr.size, f) != hdr.size) { 
+                if (fread(&arrayDescStr[0], 1, hdr.size, f) != hdr.size) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                 }
                 stringstream ss;
@@ -619,21 +622,21 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                 i -= 1; // compencate increment in for: repeat loop and try to load more mapping arrays
                 continue;
             }
-            if (hdr.signature != signature) { 
+            if (hdr.signature != signature) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-            }                        
-            if (fread(&chunkPos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims) { 
+            }
+            if (fread(&chunkPos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
             }
             if (hdr.flags & OpaqueChunkHeader::COORDINATE_MAPPING)
             {
                 //TODO-3667: remove this in next release (give folks one release cycle to adjust with proper error message)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ILLEGAL_OPERATION) << "Cannot re-load old style non-integer dimensions";
-            } else { 
-                if (hdr.nDims != nDims) { 
+            } else {
+                if (hdr.nDims != nDims) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_WRONG_NUMBER_OF_DIMENSIONS);
                 }
-                if (hdr.attrId != i) {                         
+                if (hdr.attrId != i) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNEXPECTED_DESTINATION_ATTRIBUTE) << attrs[i].getName();
                 }
                 Address addr(i, chunkPos);
@@ -642,7 +645,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                 chunk.setRLE((hdr.flags & OpaqueChunkHeader::RLE_FORMAT) != 0);
                 chunk.setSparse((hdr.flags & OpaqueChunkHeader::SPARSE_CHUNK) != 0);
                 chunk.allocate(hdr.size);
-                if (fread(chunk.getData(), 1, hdr.size, f) != hdr.size) { 
+                if (fread(chunk.getData(), 1, hdr.size, f) != hdr.size) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                 }
                 chunk.write(query);
@@ -663,11 +666,11 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         int ch = getc(f);
         if (ch != EOF) {
             ungetc(ch, f);
-        } else { 
+        } else {
             state = EndOfStream;
             scheduleSG(query);
             return false;
-        }         
+        }
         size_t i = nDims-1;
         while (true) {
             chunkPos[i] += dims[i].getChunkInterval();
@@ -691,22 +694,22 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         }
         size_t nCols = templ.columns.size();
         vector<uint8_t> buf(8);
-        while (!chunkIterators[0]->end() && (ch = getc(f)) != EOF) { 
+        while (!chunkIterators[0]->end() && (ch = getc(f)) != EOF) {
             ungetc(ch, f);
             lastBadAttr = -1;
             nLoadedCells += 1;
             for (size_t i = 0, j = 0; i < nAttrs; i++, j++) {
-                while (j < nCols && templ.columns[j].skip) { 
+                while (j < nCols && templ.columns[j].skip) {
                     ExchangeTemplate::Column const& column = templ.columns[j++];
-                    if (column.nullable) { 
+                    if (column.nullable) {
                         int8_t missingReason;
-                        if (fread(&missingReason, sizeof(missingReason), 1, f) != 1) { 
+                        if (fread(&missingReason, sizeof(missingReason), 1, f) != 1) {
                             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                         }
                     }
                     uint32_t size = (uint32_t)column.fixedSize;
-                    if (size == 0) { 
-                        if (fread(&size, sizeof(size), 1, f) != 1) { 
+                    if (size == 0) {
+                        if (fread(&size, sizeof(size), 1, f) != 1) {
                             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                         }
                     }
@@ -718,18 +721,18 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                     }
                 }
                 long pos = ftell(f);
-                try { 
-                    if (j < nCols) { 
+                try {
+                    if (j < nCols) {
                         ExchangeTemplate::Column const& column = templ.columns[j];
                         int8_t missingReason = -1;
-                        if (column.nullable) { 
-                            if (fread(&missingReason, sizeof(missingReason), 1, f) != 1) { 
+                        if (column.nullable) {
+                            if (fread(&missingReason, sizeof(missingReason), 1, f) != 1) {
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                             }
-                        }                               
+                        }
                         uint32_t size = (uint32_t)column.fixedSize;
-                        if (size == 0) { 
-                            if (fread(&size, sizeof(size), 1, f) != 1) { 
+                        if (size == 0) {
+                            if (fread(&size, sizeof(size), 1, f) != 1) {
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                             }
                         }
@@ -744,22 +747,22 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                             chunkIterators[i]->writeItem(attrVal[i]);
                         } else {
                             binVal[i].setSize(size);
-                            if (fread(binVal[i].data(), 1, size, f) != size) { 
+                            if (fread(binVal[i].data(), 1, size, f) != size) {
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
                             }
                             if (column.converter) {
                                 Value const* v = &binVal[i];
                                 column.converter(&v, &attrVal[i], NULL);
                                 chunkIterators[i]->writeItem(attrVal[i]);
-                            } else { 
+                            } else {
                                 chunkIterators[i]->writeItem(binVal[i]);
                             }
                         }
-                    } else { 
+                    } else {
                         // empty tag
                         chunkIterators[i]->writeItem(attrVal[i]);
                     }
-                } catch(Exception const& x) { 
+                } catch(Exception const& x) {
                     handleError(x, chunkIterators[i], i, pos);
                 }
                 ++(*chunkIterators[i]);
@@ -774,7 +777,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         resetShadowChunkIterators();
         return true;
     }
-    
+
 
     bool InputArray::loadTextChunk(boost::shared_ptr<Query>& query, size_t chunkIndex)
     {
@@ -919,7 +922,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                                 std::stringstream ss;
                                 ss << "From sparse load file '" << scanner.getFilePath() << "' at coord " << pos << " is out of chunk bounds :" << chunkPos;
                                 LOG4CXX_DEBUG(logger, ss.str());
-                                
+
                                 if (!chunkIterators[i]->setPosition(pos))
                                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR7);
                             }
@@ -946,7 +949,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                         } else {
                             if (tkn != TKN_LITERAL)
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR8);
-                            try { 
+                            try {
                                 if (scanner.isNull()) {
                                     if (!desc.getAttributes()[i].isNullable())
                                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
@@ -961,9 +964,9 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                                 if (i == emptyTagAttrID) {
                                     if (!attrVal[i].getBool())
                                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR9);
-                                }                                    
+                                }
                                 chunkIterators[i]->writeItem(attrVal[i]);
-                            } catch(Exception const& x) { 
+                            } catch(Exception const& x) {
                                 try
                                 {
                                     handleError(x, chunkIterators[i], i, pos);
@@ -976,7 +979,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                                     }
                                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR16);
                                 }
-                            } 
+                            }
                             tkn = scanner.get();
                             if (inParen && i+1 < nAttrs && tkn == TKN_COMMA) {
                                 tkn = scanner.get();
@@ -1010,20 +1013,20 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                     if (tkn != TKN_TUPLE_END)
                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR2) << ")";
                     tkn = scanner.get();
-                    if (!isSparse && tkn == TKN_MULTIPLY) { 
+                    if (!isSparse && tkn == TKN_MULTIPLY) {
                         tkn = scanner.get();
                         if (tkn != TKN_LITERAL)
                             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR2) << "multiplier";
                         Value countVal;
                         StringToValue(TID_INT64, scanner.getValue(), countVal);
                         int64_t count = countVal.getInt64();
-                        while (--count != 0) { 
+                        while (--count != 0) {
                             for (size_t i = 0; i < nAttrs; i++) {
                                 chunkIterators[i]->writeItem(attrVal[i]);
                                 ++(*chunkIterators[i]);
                             }
                         }
-                        tkn = scanner.get(); 
+                        tkn = scanner.get();
                         pos = chunkIterators[0]->getPosition();
                         pos[nDims-1] -= 1;
                     }
@@ -1085,14 +1088,14 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
     EndScanChunk:
         if (!isSparse && emptyTagAttrID == INVALID_ATTRIBUTE_ID) {
             for (size_t i = 0; i < nAttrs; i++) {
-                if (chunkIterators[i] && chunkIterators[i]->getChunk().isRLE()) { 
+                if (chunkIterators[i] && chunkIterators[i]->getChunk().isRLE()) {
                     while (!chunkIterators[i]->end()) {
                         chunkIterators[i]->writeItem(attrs[i].getDefaultValue());
                         ++(*chunkIterators[i]);
                     }
                 }
             }
-        }        
+        }
         for (size_t i = 0; i < nAttrs; i++) {
             if (chunkIterators[i]) {
                 chunkIterators[i]->flush();
@@ -1101,7 +1104,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         resetShadowChunkIterators();
         return true;
     }
-        
+
     bool InputArray::moveNext(size_t chunkIndex)
     {
         if (chunkIndex > currChunkIndex+1) {
@@ -1111,7 +1114,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         if (chunkIndex <= currChunkIndex) {
             return true;
         }
-        if (state == EmptyArray) { 
+        if (state == EmptyArray) {
             state = EndOfStream;
             scheduleSG(query);
             return false;
@@ -1121,15 +1124,15 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         }
 
         bool result;
-        if (binaryLoad) { 
-            if (templ.opaque) { 
+        if (binaryLoad) {
+            if (templ.opaque) {
                 result = loadOpaqueChunk(query, chunkIndex);
-            } else { 
+            } else {
                 result = loadBinaryChunk(query, chunkIndex);
             }
-        } else { 
+        } else {
             result = loadTextChunk(query, chunkIndex);
-        }        
+        }
         if (result) {
             nLoadedChunks += 1;
             LOG4CXX_TRACE(logger, "Loading of " << desc.getName() << " is in progress: load at this moment " << nLoadedChunks << " chunks and " << nLoadedCells << " cells with " << nErrors << " errors");
@@ -1143,8 +1146,8 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
     InputArray::~InputArray()
     {
         LOG4CXX_INFO(logger, "Loading of " << desc.getName() << " is completed: loaded " << nLoadedChunks << " chunks and " << nLoadedCells << " cells with " << nErrors << " errors");
-    }        
-    
+    }
+
 
     ConstChunk const& InputArray::getChunk(AttributeID attr, size_t chunkIndex)
     {

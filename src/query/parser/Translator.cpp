@@ -181,6 +181,26 @@ static integer getInteger(const Node* ast,child c,integer otherwise = 0)
     return otherwise;                                    // Return the default
 }
 
+const Node* getChildSafely(const Node* ast,child c)
+{
+    assert(ast != 0);                                    // Validate arguments
+
+    if (const Node* p = ast->get(c))                     // Has child 'c'?
+    {
+        return p;                                        // ...so return it
+    }
+
+    return ast;                                          // Go with the parent
+}
+
+/****************************************************************************/
+// temporary glue while introducing type 'variable' into the AST hiererchy
+static Name* getApplicationArgName         (const Node* n){assert(n!=0 && n->is(application));return n->get(applicationArgOperator)->get(variableArgName);}
+static Name* getReferenceArgName           (const Node* n){assert(n!=0 && n->is(reference  ));return n->get(referenceArgName)      ->get(variableArgName);}
+static Name* getReferenceArgArrayName      (const Node* n){assert(n!=0 && n->is(reference  ));Node*  N = n->get(referenceArgArray);return N?N->get(variableArgName):0;}
+static chars getStringApplicationArgName   (const Node* n){if (const Node* s=getApplicationArgName(n))   {return s->getString();} return "";}
+static chars getStringReferenceArgName     (const Node* n){if (const Node* s=getReferenceArgName(n))     {return s->getString();} return "";}
+static chars getStringReferenceArgArrayName(const Node* n){if (const Node* s=getReferenceArgArrayName(n)){return s->getString();} return "";}
 /****************************************************************************/
 
 LQPNPtr Translator::AstToLogicalPlan(const Node* ast,bool canonicalize)
@@ -207,9 +227,9 @@ LQPNPtr Translator::AstToLogicalPlan(const Node* ast,bool canonicalize)
 
 int64_t Translator::estimateChunkInterval(cnodes nodes)
 {
-    int64_t const targetChunkSize   = 500000;
-    int64_t       knownChunksSize   = 1;
-    size_t        unkownChunksCount = 0;
+    int64_t const targetChunkSize    = 1000000;          // See #3936
+    int64_t       knownChunksSize    = 1;
+    size_t        unknownChunksCount = 0;
 
     BOOST_FOREACH (const Node* d,nodes)
     {
@@ -221,17 +241,21 @@ int64_t Translator::estimateChunkInterval(cnodes nodes)
         }
         else
         {
-            ++unkownChunksCount;
+            ++unknownChunksCount;
         }
     }
 
-    // Nothing to estimate if all dimensions defined
-    if (!unkownChunksCount)
+
+ /* If all the dimensions were specified, then there is no need to guess...*/
+
+    if (unknownChunksCount == 0)
     {
-        return 0;
+        return knownChunksSize;
     }
 
-    return pow(targetChunkSize / knownChunksSize, 1.0/unkownChunksCount);
+    int64_t r = floor(pow(max(1L,targetChunkSize/knownChunksSize),1.0/unknownChunksCount));
+    assert(r > 0);
+    return r;
 }
 
 Value Translator::passConstantExpression(const Node* ast,TypeId targetType)
@@ -309,37 +333,37 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
 
         if (dim_l == MAX_COORDINATE)
         {
-            fail(SYNTAX(SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,d->get(dimensionArgLoBound)));
+            fail(SYNTAX(SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,getChildSafely(d,dimensionArgLoBound)));
         }
 
         if (dim_l<=MIN_COORDINATE || dim_l> MAX_COORDINATE)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,d->get(dimensionArgLoBound)) << MIN_COORDINATE << MAX_COORDINATE);
+            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgLoBound)) << MIN_COORDINATE << MAX_COORDINATE);
         }
 
         if (dim_h<=MIN_COORDINATE || dim_h> MAX_COORDINATE)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,d->get(dimensionArgHiBound))<< MIN_COORDINATE << MAX_COORDINATE);
+            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgHiBound))<< MIN_COORDINATE << MAX_COORDINATE);
         }
 
         if (dim_h<dim_l && dim_h+1 != dim_l)
         {
-            fail(SYNTAX(SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW,d->get(dimensionArgHiBound)));
+            fail(SYNTAX(SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW,getChildSafely(d,dimensionArgHiBound)));
         }
 
         if (dim_i <= 0)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_CHUNK_SIZE,d->get(dimensionArgChunkInterval)) << numeric_limits<int64_t>::max());
+            fail(SYNTAX(SCIDB_LE_INCORRECT_CHUNK_SIZE,getChildSafely(d,dimensionArgChunkInterval)) << numeric_limits<int64_t>::max());
         }
 
         if (dim_o < 0)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_OVERLAP_SIZE,d->get(dimensionArgChunkOverlap)) << numeric_limits<int64_t>::max());
+            fail(SYNTAX(SCIDB_LE_INCORRECT_OVERLAP_SIZE,getChildSafely(d,dimensionArgChunkOverlap)) << numeric_limits<int64_t>::max());
         }
 
         if (dim_o > dim_i)
         {
-            fail(SYNTAX(SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,d->get(dimensionArgChunkOverlap)));
+            fail(SYNTAX(SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,getChildSafely(d,dimensionArgChunkOverlap)));
         }
 
         dimensions.push_back(DimensionDesc(dim_n,dim_l,dim_h,dim_i,dim_o));
@@ -349,7 +373,6 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
 void Translator::passSchema(const Node* ast,ArrayDesc& schema,const string& arrayName)
 {
     const Node* list    = ast->get(schemaArgAttributes);
-    const bool  addEmpty= ast->get(schemaArgEmpty)->getBoolean();
     Attributes attributes;
     attributes.reserve(list->getSize());
     set<string> usedNames;
@@ -454,11 +477,9 @@ void Translator::passSchema(const Node* ast,ArrayDesc& schema,const string& arra
         }
     }
 
-    if (addEmpty)
-    {
-        //FIXME: Which compressor for empty indicator attribute?
-        attributes.push_back(AttributeDesc(attributes.size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
-    }
+    // In 14.3, all arrays became emptyable
+    //FIXME: Which compressor for empty indicator attribute?
+    attributes.push_back(AttributeDesc(attributes.size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
     Dimensions dimensions;
 
@@ -469,7 +490,7 @@ void Translator::passSchema(const Node* ast,ArrayDesc& schema,const string& arra
 
 LQPNPtr Translator::passAFLOperator(const Node *ast)
 {
-    const chars opName   = getString(ast,applicationArgName);
+    const chars opName   = getStringApplicationArgName(ast);
     cnodes astParameters = ast->getList(applicationArgOperands);
     const string opAlias = getString(ast,applicationArgAlias);
 
@@ -631,14 +652,14 @@ LQPNPtr Translator::passAFLOperator(const Node *ast)
 shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(const Node *arrayReferenceAST,bool inputSchema)
 {
     ArrayDesc schema;
-    string arrayName = arrayReferenceAST->get(referenceArgName)->getString();
+    string arrayName = getStringReferenceArgName(arrayReferenceAST);
     string dimName;
     assert(arrayName != "");
     assert(arrayName.find('@') == string::npos);
 
-    if (arrayReferenceAST->get(referenceArgArrayName))
+    if (const Node* n = getReferenceArgArrayName(arrayReferenceAST))
     {
-        fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,arrayReferenceAST->get(referenceArgArrayName)));
+        fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,n));
     }
 
     if (!inputSchema)
@@ -652,7 +673,7 @@ shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(co
 
     if (!systemCatalog->getArrayDesc(arrayName, schema, false))
     {
-        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST,arrayReferenceAST->get(referenceArgName)) << arrayName);
+        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST,getReferenceArgName(arrayReferenceAST)) << arrayName);
     }
 
     version = LAST_VERSION;
@@ -724,8 +745,7 @@ bool Translator::matchOperatorParam(const Node* ast,
                     input = passImplicitScan(ast);
                 }
                 //This input is result of other operator, so go deeper in tree and translate this operator.
-                else if ( (ast->is(application) && !ast->get(applicationArgIsScalar)->getBoolean())
-                        || ast->is(selectArray))
+                else if (ast->is(application) || ast->is(selectArray))
                 {
                     input = AstToLogicalPlan(ast);
                     prohibitDdl(input);
@@ -777,8 +797,8 @@ bool Translator::matchOperatorParam(const Node* ast,
                 {
                     shared_ptr<OperatorParamAttributeReference> opParam = make_shared<OperatorParamAttributeReference>(
                             newParsingContext(ast),
-                            getString(ast,referenceArgArrayName),
-                            getString(ast,referenceArgName),
+                            getStringReferenceArgArrayName(ast),
+                            getStringReferenceArgName(ast),
                             placeholder->isInputSchema());
 
                     opParam->setSortAscent(getInteger(ast,referenceArgOrder,ascending) == ascending);
@@ -827,8 +847,8 @@ bool Translator::matchOperatorParam(const Node* ast,
                 {
                     shared_ptr<OperatorParamReference> opParam = make_shared<OperatorParamDimensionReference>(
                             newParsingContext(ast),
-                            getString(ast,referenceArgArrayName),
-                            getString(ast,referenceArgName),
+                            getStringReferenceArgArrayName(ast),
+                            getStringReferenceArgName(ast),
                             placeholder->isInputSchema());
 
                     //Trying resolve dimension in input schema
@@ -982,12 +1002,12 @@ bool Translator::matchOperatorParam(const Node* ast,
                         fail(INTERNAL( SCIDB_LE_AMBIGUOUS_OPERATOR_PARAMETER,ast));
                     }
 
-                    if (ast->has(referenceArgArrayName))
+                    if (getReferenceArgArrayName(ast) != 0)
                     {
                         fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,ast));
                     }
 
-                    const chars arrayName = getString(ast,referenceArgName);
+                    const chars arrayName = getStringReferenceArgName(ast);
                     ArrayDesc schema;
                     if (!SystemCatalog::getInstance()->getArrayDesc(arrayName, schema, false))
                     {
@@ -1092,7 +1112,7 @@ string Translator::astParamToString(const Node* ast) const
     switch (ast->getType())
     {
         default: SCIDB_UNREACHABLE();
-        case application:       return getBoolean(ast,applicationArgIsScalar) ? "expression" : "operator (or function)";
+        case application:       return "operator (or function)";
         case reference:         return ast->has(referenceArgVersion)     ? "array name" : "reference (array, attribute or dimension name)";
         case schema:            return "schema";
         case cnull:             return "constant with unknown type";
@@ -1228,7 +1248,7 @@ shared_ptr<OperatorParamAggregateCall> Translator::passAggregateCall(const Node*
 
     return make_shared<OperatorParamAggregateCall> (
             newParsingContext(ast),
-            getString(ast,applicationArgName),
+            getStringApplicationArgName(ast),
             opParam,
             getString(ast,applicationArgAlias));
 }
@@ -1277,13 +1297,13 @@ LQPNPtr Translator::passSelectStatement(const Node *ast)
         if (selectList->getSize() > 1
             ||  selectList->get(listArg0)->is(asterisk)
             || !selectList->get(listArg0)->get(namedExprArgExpr)->is(application)
-            || !AggregateLibrary::getInstance()->hasAggregate(selectList->get(listArg0)->get(namedExprArgExpr)->get(applicationArgName)->getString()))
+            || !AggregateLibrary::getInstance()->hasAggregate(getStringApplicationArgName(selectList->get(listArg0)->get(namedExprArgExpr))))
         {
              fail(SYNTAX(SCIDB_LE_AGGREGATE_EXPECTED,selectList));
         }
 
         const Node* aggregate = selectList->get(listArg0)->get(namedExprArgExpr);
-        const chars funcName  = getString(aggregate,applicationArgName);
+        const chars funcName  = getStringApplicationArgName(aggregate);
         const Node* funcParams = aggregate->get(applicationArgOperands);
 
         if (funcParams->getSize() != 1)
@@ -1336,12 +1356,8 @@ LQPNPtr Translator::passSelectStatement(const Node *ast)
                 size_t attNo = aggInputSchema.getEmptyBitmapAttribute() && aggInputSchema.getEmptyBitmapAttribute()->getId() == 0 ? 1 : 0;
 
                 Node *aggregateCallAst = _fac.newApp(aggregate->getWhere(),funcName,
-                            _fac.newNode(
-                                reference,
-                                funcParams->get(listArg0)->getWhere(),
-                                0,
-                                _fac.newString(funcParams->get(listArg0)->getWhere(),aggInputSchema.getAttributes()[attNo].getName()),
-                                0,0,0));
+                            _fac.newRef(funcParams->get(listArg0)->getWhere(),
+                                _fac.newString(funcParams->get(listArg0)->getWhere(),aggInputSchema.getAttributes()[attNo].getName())));
                 aggCallParam = passAggregateCall(
                             aggregateCallAst,
                             vector<ArrayDesc>(1, aggInputSchema));
@@ -1523,7 +1539,7 @@ bool Translator::passGeneralizedJoinOnClause(vector<shared_ptr<OperatorParamRefe
 {
     if (ast->is(application))
     {
-        const string funcName = ast->get(applicationArgName)->getString();
+        const string funcName  = getStringApplicationArgName(ast);
         const Node* funcParams = ast->get(applicationArgOperands);
 
         if (funcName == "and")
@@ -1544,10 +1560,8 @@ bool Translator::passGeneralizedJoinOnClause(vector<shared_ptr<OperatorParamRefe
             const Node *leftDim  = funcParams->get(listArg0);
             const Node *rightDim = funcParams->get(listArg1);
 
-            const string leftObjectName = leftDim->get(referenceArgName)->getString();
-            const string leftArrayName = leftDim->get(referenceArgArrayName) ?
-                    leftDim->get(referenceArgArrayName)->getString() :
-                    "";
+            const string leftObjectName = getStringReferenceArgName(leftDim);
+            const string leftArrayName  = getStringReferenceArgArrayName(leftDim);
 
             params.push_back(make_shared<OperatorParamDimensionReference>(
                     newParsingContext(leftDim),
@@ -1555,10 +1569,8 @@ bool Translator::passGeneralizedJoinOnClause(vector<shared_ptr<OperatorParamRefe
                     leftObjectName,
                     true));
 
-            const string rightObjectName = rightDim->get(referenceArgName)->getString();
-            const string rightArrayName = rightDim->get(referenceArgArrayName) ?
-                    rightDim->get(referenceArgArrayName)->getString() :
-                    "";
+            const string rightObjectName = getStringReferenceArgName(rightDim);
+            const string rightArrayName  = getStringReferenceArgArrayName(rightDim);
 
             params.push_back(make_shared<OperatorParamDimensionReference>(
                     newParsingContext(rightDim),
@@ -1598,7 +1610,7 @@ LQPNPtr Translator::passJoinItem(const Node *ast)
         {
             Node* expr = ast->get(namedExprArgExpr);
 
-            if ( ( !expr->is(application) || (getBoolean(expr,applicationArgIsScalar)) )
+            if (   !expr->is(application)
                 && !expr->is(reference)
                 && !expr->is(selectArray))
             {
@@ -1675,8 +1687,8 @@ LQPNPtr Translator::passOrderByClause(const Node* ast, const LQPNPtr &input)
     {
         shared_ptr<OperatorParamAttributeReference> sortParam = make_shared<OperatorParamAttributeReference>(
             newParsingContext(sortAttributeAst),
-            getString(sortAttributeAst,referenceArgArrayName),
-            getString(sortAttributeAst,referenceArgName),
+            getStringReferenceArgArrayName(sortAttributeAst),
+            getStringReferenceArgName(sortAttributeAst),
             true);
 
         sortParam->setSortAscent(getInteger(sortAttributeAst,referenceArgOrder,ascending) == ascending);
@@ -1798,7 +1810,7 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
     Node *arrayRef = ast->get(updateArrayArgArrayRef);
     LQPNPtr result = passImplicitScan(arrayRef);
 
-    const string arrayName = arrayRef->get(referenceArgName)->getString();
+    const string arrayName = getStringReferenceArgName(arrayRef);
 
     ArrayDesc arrayDesc;
     SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
@@ -1830,11 +1842,10 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
                 if (expressionType(AstToLogicalExpression(attExpr), _qry, schemas) != TypeLibrary::getType(att.getType()).typeId())
                 {
                     //Wrap expression with type converter appropriate attribute type
-                    attExpr = _fac.newNode(application,
+                    attExpr = _fac.newApp(
                                 attExpr->getWhere(),
                                _fac.newString(attExpr->getWhere(),TypeLibrary::getType(att.getType()).name()),
-                               _fac.newNode(list,attExpr->getWhere(),_fac.newCopy(attExpr)),
-                               0,0);
+                               _fac.newCopy(attExpr));
                 }
 
                 /* Converting WHERE predicate into iif application in aply operator parameter:
@@ -1853,7 +1864,7 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
                                  _fac.newBoolean(w,false),
                                  _fac.newCopy(whereExpr)),
                                  _fac.newCopy(attExpr),
-                                 _fac.newNode(reference,w,0,_fac.newString(w,attName),0,0,0));
+                                 _fac.newRef(w,_fac.newString(w,attName)));
                 }
 
                 applyParams.push_back(make_shared<OperatorParamAttributeReference>(newParsingContext(updateItem),
@@ -1907,7 +1918,7 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
     LogicalOperator::Parameters storeParams;
 
     storeParams.push_back(make_shared<OperatorParamArrayReference>(
-            newParsingContext(arrayRef->get(referenceArgName)), "", arrayName, true));
+            newParsingContext(getReferenceArgName(arrayRef)), "", arrayName, true));
 
     shared_ptr<LogicalOperator> storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
     storeOp->setParameters(storeParams);
@@ -2112,7 +2123,7 @@ bool Translator::astHasUngroupedReferences(const Node* ast,const set<string>& gr
             return false;
         }
 
-        case reference: return grouped.find(ast->get(referenceArgName)->getString()) == grouped.end();
+        case reference: return grouped.find(getStringReferenceArgName(ast)) == grouped.end();
         case asterisk:  return true;
         default:        return false;
     }
@@ -2125,7 +2136,7 @@ bool Translator::astHasAggregates(const Node* ast) const
         case olapAggregate: ast = ast->get(olapAggregateArgApplication); // and fall through
         case application:
         {
-            if (AggregateLibrary::getInstance()->hasAggregate(ast->get(applicationArgName)->getString()))
+            if (AggregateLibrary::getInstance()->hasAggregate(getStringApplicationArgName(ast)))
                 return true;
 
             BOOST_FOREACH(const Node* a,ast->getList(applicationArgOperands))
@@ -2166,7 +2177,7 @@ Node* Translator::decomposeExpression(
                 ? ast
                 : ast->get(olapAggregateArgApplication);
 
-            const chars funcName = funcNode->get(applicationArgName)->getString();
+            const chars funcName = getStringApplicationArgName(funcNode);
             const Node* funcArgs = funcNode->get(applicationArgOperands);
 
             bool isAggregate = AggregateLibrary::getInstance()->hasAggregate(funcName);
@@ -2250,7 +2261,7 @@ Node* Translator::decomposeExpression(
                     }
 
                     // Finally returning reference to aggregate result in overall expression
-                    return _fac.newNode(reference,funcNode->get(applicationArgOperands)->getWhere(),0,_fac.newCopy(alias),0,0,0);
+                    return _fac.newRef(funcNode->get(applicationArgOperands)->getWhere(),_fac.newCopy(alias));
                 }
                 // Handle select statement
                 else
@@ -2282,18 +2293,14 @@ Node* Translator::decomposeExpression(
 
                     // Aggregate call will be translated later into AGGREGATE(input, aggregate(preEvalAttName) as postEvalName)
                     Node *aggregateExpression =
-                        _fac.newNode(application, ast->getWhere(),
-                        _fac.newCopy(ast->get(applicationArgName)),
-                        _fac.newNode(list, ast->get(applicationArgOperands)->getWhere(),
-                        _fac.newNode(reference,ast->get(applicationArgOperands)->getWhere(),0,_fac.newCopy(preEvalAttName),0,0,0)),
-                        postEvalAttName,
-                        _fac.newBoolean(ast->getWhere(),false)
-                        );
-
+                        _fac.newApp(ast->getWhere(),
+                        _fac.newCopy(getApplicationArgName(ast)),
+                        _fac.newRef(ast->get(applicationArgOperands)->getWhere(),_fac.newCopy(preEvalAttName)));
+                    aggregateExpression->set(applicationArgAlias,postEvalAttName);
                     aggregateFunctions.push_back(aggregateExpression);
 
                     // Finally returning reference to aggregate result in overall expression
-                    return _fac.newNode(reference,funcNode->get(applicationArgOperands)->getWhere(),0,_fac.newCopy(postEvalAttName),0,0,0);
+                    return _fac.newRef(funcNode->get(applicationArgOperands)->getWhere(),_fac.newCopy(postEvalAttName));
                 }
             }
             // This is scalar function. We must pass each argument and construct new function call
@@ -2323,11 +2330,9 @@ Node* Translator::decomposeExpression(
                             joinOrigin));
                 }
 
-                return _fac.newNode(application, ast->getWhere(),
-                        _fac.newCopy(funcNode->get(applicationArgName)),
-                        _fac.newNode(list,ast->get(applicationArgOperands)->getWhere(),newArgs),
-                        0, // no alias
-                        _fac.newBoolean(ast->getWhere(),false));
+                return _fac.newApp(ast->getWhere(),
+                       _fac.newCopy(getApplicationArgName(funcNode)),
+                       newArgs);
             }
 
             break;
@@ -2414,8 +2419,7 @@ LQPNPtr Translator::passSelectList(
             case groupByClause:
                 BOOST_FOREACH (const Node *dimensionAST, grwAsClause->getList(groupByClauseArgList))
                 {
-                    assert(dimensionAST->is(reference));
-                    groupedDimensions.insert(getString(dimensionAST,referenceArgName));
+                    groupedDimensions.insert(getStringReferenceArgName(dimensionAST));
                 }
                 break;
             case redimensionClause:
@@ -2469,8 +2473,8 @@ LQPNPtr Translator::passSelectList(
                  && !(grwAsClause && grwAsClause->is(redimensionClause)))
                 {
                     const Node* refNode = selItem->get(namedExprArgExpr);
-                    const chars name   = getString(refNode,referenceArgName);
-                    const chars alias  = getString(refNode,referenceArgArrayName);
+                    const chars name   = getStringReferenceArgName(refNode);
+                    const chars alias  = getStringReferenceArgArrayName(refNode);
                     // Strange issue with BOOST_FOREACH infinity loop. Leaving for-loop instead.
                     for(vector<AttributeDesc>::const_iterator attIt = inputSchema.getAttributes().begin();
                         attIt != inputSchema.getAttributes().end(); ++attIt)
@@ -2500,8 +2504,8 @@ LQPNPtr Translator::passSelectList(
 
                     shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
                         newParsingContext(selItem),
-                        getString(refNode,referenceArgArrayName),
-                        getString(refNode,referenceArgName),
+                        getStringReferenceArgArrayName(refNode),
+                        getStringReferenceArgName(refNode),
                         true);
 
                     resolveParamAttributeReference(inputSchemas, param);
@@ -2555,22 +2559,21 @@ LQPNPtr Translator::passSelectList(
                         string prefix;
                         if (selItem->get(namedExprArgExpr)->is(application)
                             && AggregateLibrary::getInstance()->hasAggregate(
-                                selItem->get(namedExprArgExpr)->get(applicationArgName)->getString()))
+                                getStringApplicationArgName(selItem->get(namedExprArgExpr))))
                         {
                             outputNameNode = _fac.newString(selItem->getWhere(),
                                 genUniqueObjectName(
-                                    selItem->get(namedExprArgExpr)->get(applicationArgName)->getString(),
+                                    getStringApplicationArgName(selItem->get(namedExprArgExpr)),
                                     externalAggregateCounter, inputSchemas, false, selectList->getList()));
                         }
                         else if (olapAggregate == selItem->get(namedExprArgExpr)->getType()
                             && AggregateLibrary::getInstance()->hasAggregate(
-                                selItem->get(namedExprArgExpr)->get(olapAggregateArgApplication)
-                                    ->get(applicationArgName)->getString()))
+                                getStringApplicationArgName(selItem->get(namedExprArgExpr)->get(olapAggregateArgApplication))))
                         {
                             Node* funcNode = selItem->get(namedExprArgExpr)->get(olapAggregateArgApplication);
                             outputNameNode = _fac.newString(funcNode->getWhere(),
                                 genUniqueObjectName(
-                                    funcNode->get(applicationArgName)->getString(),
+                                    getStringApplicationArgName(funcNode),
                                     externalAggregateCounter, inputSchemas, false, selectList->getList()));
                         }
                         else
@@ -2694,8 +2697,8 @@ LQPNPtr Translator::passSelectList(
                         {
                             variableWindow = windowClause->get(windowClauseArgVariableWindowFlag)->getBoolean();
                             Node* dimNameClause  = dimensionRange->get(windowDimensionRangeArgName);
-                            const chars dimName  = getString(dimNameClause,referenceArgName);
-                            const chars dimAlias = getString(dimNameClause,referenceArgArrayName);
+                            const chars dimName  = getStringReferenceArgName(dimNameClause);
+                            const chars dimAlias = getStringReferenceArgArrayName(dimNameClause);
 
                             resolveDimension(inputSchemas, dimName, dimAlias, inputNo, dimNo, newParsingContext(dimNameClause), true);
 
@@ -2801,8 +2804,8 @@ LQPNPtr Translator::passSelectList(
                         Node* dimNameClause = regridDimension->get(regridDimensionArgName);
 
                         resolveDimension(inputSchemas,
-                                         getString(dimNameClause,referenceArgName),
-                                         getString(dimNameClause,referenceArgArrayName),
+                                         getStringReferenceArgName(dimNameClause),
+                                         getStringReferenceArgArrayName(dimNameClause),
                                          inputNo,
                                          dimNo,
                                          newParsingContext(dimNameClause),
@@ -2853,8 +2856,8 @@ LQPNPtr Translator::passSelectList(
                     Attributes redimensionAttrs;
                     BOOST_FOREACH(Node *aggCallNode, aggregateFunctions)
                     {
-                        const chars aggName = aggCallNode->get(applicationArgName)->getString();
-                        const chars aggAlias = aggCallNode->get(applicationArgAlias)->getString();
+                        const chars aggName  = getStringApplicationArgName(aggCallNode);
+                        const chars aggAlias = getString(aggCallNode,applicationArgAlias);
 
                         Type aggParamType;
                         if (aggCallNode->get(applicationArgOperands)->get(listArg0)->is(asterisk))
@@ -2865,7 +2868,7 @@ LQPNPtr Translator::passSelectList(
                         else
                         if (aggCallNode->get(applicationArgOperands)->get(listArg0)->is(reference))
                         {
-                            const chars aggAttrName = getString(aggCallNode->get(applicationArgOperands)->get(listArg0),referenceArgName);
+                            const chars aggAttrName = getStringReferenceArgName(aggCallNode->get(applicationArgOperands)->get(listArg0));
 
                             LOG4CXX_TRACE(logger, "Getting type of " << aggName << "(" << aggAttrName << ") as " << aggAlias);
 
@@ -2959,9 +2962,9 @@ LQPNPtr Translator::passSelectList(
                 }
 
                 shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamDimensionReference>(
-                                        newParsingContext(groupByItem->get(referenceArgName)),
-                                        getString(groupByItem,referenceArgArrayName),
-                                        getString(groupByItem,referenceArgName),
+                                        newParsingContext(getReferenceArgName(groupByItem)),
+                                        getStringReferenceArgArrayName(groupByItem),
+                                        getStringReferenceArgName(groupByItem),
                                         true);
                 resolveParamDimensionReference(preEvalInputSchemas, refParam);
                 aggregateParams[""].second.push_back(refParam);
@@ -3134,8 +3137,8 @@ LQPNPtr Translator::passThinClause(const Node *ast)
 
         resolveDimension(
                 vector<ArrayDesc>(1, thinInputSchema),
-                getString(dimNameClause,referenceArgName),
-                getString(dimNameClause,referenceArgArrayName),
+                getStringReferenceArgName(dimNameClause),
+                getStringReferenceArgArrayName(dimNameClause),
                 inputNo,
                 dimNo,
                 newParsingContext(dimNameClause),
@@ -3205,8 +3208,8 @@ void Translator::passReference(const Node* ast,chars& alias,chars& name)
         fail(SYNTAX(SCIDB_LE_SORTING_QUIRK_WRONG_USAGE,ast->get(referenceArgOrder)));
     }
 
-    alias = getString(ast,referenceArgArrayName);
-    name  = getString(ast,referenceArgName);
+    alias = getStringReferenceArgArrayName(ast);
+    name  = getStringReferenceArgName(ast);
 }
 
 LQPNPtr Translator::fitInput(LQPNPtr &input,const ArrayDesc& destinationSchema)
@@ -3481,7 +3484,7 @@ LEPtr Translator::onScalarFunction(const Node* ast)
 {
     assert(ast->is(application));
 
-    chars         name(getString(ast,applicationArgName));
+    chars         name(getStringApplicationArgName(ast));
     vector<LEPtr> args;
 
     if (OperatorLibrary::getInstance()->hasLogicalOperator(name))
@@ -3513,8 +3516,8 @@ LEPtr Translator::onAttributeReference(const Node* ast)
 
     return make_shared<AttributeReference>(
             newParsingContext(ast),
-            getString(ast,referenceArgArrayName),
-            getString(ast,referenceArgName));
+            getStringReferenceArgArrayName(ast),
+            getStringReferenceArgName(ast));
 }
 
 /****************************************************************************/

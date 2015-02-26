@@ -112,6 +112,46 @@ namespace scidb
         return out.str();
     }
 
+    void SystemCatalog::invalidateTempArrays()
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_invalidateTempArrays, this);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_invalidateTempArrays()
+    {
+        ScopedMutexLock mutexLock(_pgLock);
+
+        assert(_connection);
+
+        LOG4CXX_TRACE(logger, "SystemCatalog::removeTempArrays()");
+
+        try
+        {
+         /* Add the 'INVALID' flag to all entries of the 'array' table whose
+          * 'flags' field currently has the 'TRANSIENT' bit set... */
+
+            string s("update \"array\" set flags = (flags | $1) where (flags & $2)!=0");
+
+            _connection->prepare(s,s)("int",treat_direct)("int",treat_direct);
+
+            work tr(*_connection);
+            tr.prepared(s)(int(ArrayDesc::INVALID))(int(ArrayDesc::TRANSIENT)).exec();
+            tr.commit();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
+        catch (const sql_error &e)
+        {
+            LOG4CXX_ERROR(logger, "SystemCatalog::invalidateTempArrays: postgress exception:"<< e.what());
+            LOG4CXX_ERROR(logger, "SystemCatalog::invalidateTempArrays: query:"              << e.query());
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT,SCIDB_LE_PG_QUERY_EXECUTION_FAILED)       << e.query() << e.what();
+        }
+
+        LOG4CXX_TRACE(logger, "Invalidated temp arrays");
+    }
 
     const std::string& SystemCatalog::initializeCluster()
     {
@@ -684,26 +724,22 @@ namespace scidb
         return true;
     }
 
-    void SystemCatalog::getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException, boost::shared_ptr<Exception> &exception)
+    void SystemCatalog::getArrayDesc(const std::string &array_name,
+                                     ArrayDesc &array_desc,
+                                     const bool throwException,
+                                     boost::shared_ptr<Exception> &exception)
     {
         boost::function<void()> work = boost::bind(&SystemCatalog::_getArrayDesc,
                 this, cref(array_name), ref(array_desc), throwException, ref(exception));
         return Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
     }
 
-    void SystemCatalog::_getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException, boost::shared_ptr<Exception> &exception)
+    void SystemCatalog::_getArrayDesc(const std::string &array_name,
+                                      ArrayDesc &array_desc,
+                                      const bool throwException,
+                                      boost::shared_ptr<Exception> &exception)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( name = " << array_name << ")");
-
-        boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
-        if (query) {
-            boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(array_name);
-            if (tmpArray) {
-                array_desc = tmpArray->getArrayDesc();
-                assert(array_desc.getUAId()!=0);
-                return;
-            }
-        }
 
         ScopedMutexLock mutexLock(_pgLock);
 
@@ -1114,6 +1150,52 @@ namespace scidb
         return rc;
     }
 
+    bool SystemCatalog::deleteArrayVersions(const std::string &array_name, const VersionID array_version)
+    {
+        boost::function<bool()> work = boost::bind(&SystemCatalog::_deleteArrayVersions,
+                                                   this, cref(array_name), array_version);
+        return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
+    }
+
+    bool SystemCatalog::_deleteArrayVersions(const std::string &array_name, const VersionID array_version)
+    {
+        LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayVersions( array_name = " <<
+                      array_name << ", array_version = " << array_version << ")");
+
+        ScopedMutexLock mutexLock(_pgLock);
+
+        assert(_connection);
+        bool rc = false;
+        try
+        {
+            work tr(*_connection);
+            stringstream ss;
+            ss << "delete from \"array\" where name like $1||'@%' and id < "
+               << "(select id from \"array\" where name like $1||'@'||$2)";
+            _connection->prepare("delete-array-versions", ss.str())
+                ("varchar", treat_string)("integer", treat_direct);
+            result query_res =
+                tr.prepared("delete-array-versions")(array_name)(array_version).exec();
+            totalNewArrays -= query_res.affected_rows();
+            rc = (query_res.affected_rows() > 0);
+            tr.commit();
+        }
+        catch (const pqxx::broken_connection &e)
+        {
+            throw;
+        }
+        catch (const pqxx::sql_error &e)
+        {
+            LOG4CXX_ERROR(logger, "SystemCatalog::deleteArrayVersions: postgress exception:"<< e.what());
+            LOG4CXX_ERROR(logger, "SystemCatalog::deleteArrayVersions: query:"<< e.query());
+            LOG4CXX_ERROR(logger, "SystemCatalog::deleteArrayVersions: "
+                          << array_name << " version:" << array_version);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT,
+                                   SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
+        }
+        return rc;
+    }
+
     void SystemCatalog::deleteArray(const ArrayID array_id)
     {
         boost::function<void()> work = boost::bind(&SystemCatalog::_deleteArrayById,
@@ -1282,6 +1364,13 @@ namespace scidb
         return Query::runRestartableWork<VersionID, broken_connection>(work, _reconnectTries);
     }
 
+    ArrayID SystemCatalog::getOldestArrayVersion(const ArrayID id)
+    {
+        boost::function<VersionID()> work = boost::bind(&SystemCatalog::_getOldestArrayVersion,
+                this, id);
+        return Query::runRestartableWork<VersionID, broken_connection>(work, _reconnectTries);
+    }
+
 /*
 ** TODO: We will need to rework this so that we only need to go back to the
 **       persistent meta-data store when the local cache is invalidated
@@ -1330,6 +1419,40 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
                 "Unknown exception when getting last version ID for updateble array";
+        }
+        return 0;
+    }
+
+    ArrayID SystemCatalog::_getOldestArrayVersion(const ArrayID id)
+    {
+        LOG4CXX_TRACE(logger, "SystemCatalog::getOldestArrayVersion( id = " << id << ")");
+
+        ScopedMutexLock mutexLock(_pgLock);
+        try
+        {
+            work tr(*_connection);
+
+            string sql =
+                "select COALESCE(min(version_array_id),0) as vid from \"array_version\" where array_id=$1";
+            _connection->prepare("select-oldest-version", sql)
+                ("bigint", treat_direct);
+            result query_res = tr.prepared("select-oldest-version")(id).exec();
+            ArrayID array_version_id = query_res[0].at("vid").as(uint64_t());
+            tr.commit();
+            return array_version_id;
+        }
+        catch (const pqxx::broken_connection &e)
+        {
+            throw;
+        }
+        catch (const pqxx::sql_error &e)
+        {
+            LOG4CXX_ERROR(logger, "SystemCatalog::getOldestArrayVersion: postgress exception:"<< e.what());
+            LOG4CXX_ERROR(logger, "SystemCatalog::getOldestArrayVersion: query:"<< e.query());
+            LOG4CXX_ERROR(logger, "SystemCatalog::getOldestArrayVersion: "
+                          << " arrayId:" << id);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT,
+                                   SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
         }
         return 0;
     }
@@ -1984,7 +2107,6 @@ namespace scidb
             tr.prepared(sql)(compressionMethod)(array_id)(attr_id).exec();
 
             tr.commit();
-            arrayDesc->invalidate();
         }
         catch (const broken_connection &e)
         {
@@ -2363,7 +2485,6 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
          "  (select AVL.array_name, AVL.array_id, AVL.query_id, $3, AVL.array_version_id, AVL.array_version, $4, AVL.lock_mode"
          " from array_version_lock as AVL where AVL.array_name=$1::VARCHAR"
          " and AVL.query_id=$2 and AVL.instance_role=1 and (AVL.lock_mode=$5 or AVL.lock_mode=$6))";
-
       }
    }  else if (lockDesc->getLockMode() == LockDesc::RM) {
 
@@ -2847,22 +2968,28 @@ void SystemCatalog::_readArrayLocks(const InstanceID instanceId,
    }
 }
 
-uint32_t SystemCatalog::deleteArrayLocks(InstanceID instanceId)
+uint32_t SystemCatalog::deleteCoordArrayLocks(InstanceID instanceId)
 {
-    return deleteArrayLocks(instanceId, INVALID_QUERY_ID);
+    return deleteArrayLocks(instanceId, INVALID_QUERY_ID, LockDesc::COORD);
 }
 
-uint32_t SystemCatalog::deleteArrayLocks(InstanceID instanceId, QueryID queryId)
+uint32_t SystemCatalog::deleteWorkerArrayLocks(InstanceID instanceId)
+{
+    return deleteArrayLocks(instanceId, INVALID_QUERY_ID,LockDesc::WORKER);
+}
+
+uint32_t SystemCatalog::deleteArrayLocks(InstanceID instanceId, QueryID queryId, LockDesc::InstanceRole role)
 {
     boost::function<uint32_t()> work = boost::bind(&SystemCatalog::_deleteArrayLocks,
-            this, instanceId, queryId);
+                                                   this, instanceId, queryId, role);
     return Query::runRestartableWork<uint32_t, broken_connection>(work, _reconnectTries);
 }
 
-uint32_t SystemCatalog::_deleteArrayLocks(InstanceID instanceId, QueryID queryId)
+uint32_t SystemCatalog::_deleteArrayLocks(InstanceID instanceId, QueryID queryId, LockDesc::InstanceRole role)
 {
     LOG4CXX_DEBUG(logger, "SystemCatalog::deleteArrayLocks instanceId = "
                   << instanceId
+                  << " role = "<<role
                   << " queryId = "<<queryId);
    size_t numLocksDeleted = 0;
    ScopedMutexLock mutexLock(_pgLock);
@@ -2871,24 +2998,48 @@ uint32_t SystemCatalog::_deleteArrayLocks(InstanceID instanceId, QueryID queryId
    {
       assert(_connection);
 
+      uint16_t argNum = 1;
       string lockDeleteSql("delete from array_version_lock where instance_id=$1");
       bool isQuerySpecified = (queryId != INVALID_QUERY_ID && queryId != 0);
+      bool isRoleSpecified = (role !=LockDesc::INVALID_ROLE);
 
       work tr(*_connection);
 
       result query_res;
 
       if (isQuerySpecified) {
-          lockDeleteSql += " and query_id=$2";
-          _connection->prepare(lockDeleteSql, lockDeleteSql)
-          ("bigint", treat_direct)
-          ("bigint", treat_direct);
-          query_res = tr.prepared(lockDeleteSql)(instanceId)(queryId).exec();
-      } else {
-          _connection->prepare(lockDeleteSql, lockDeleteSql)
-          ("bigint", treat_direct);
-          query_res = tr.prepared(lockDeleteSql)(instanceId).exec();
+          stringstream ss;
+          ss << " and query_id=$"<< ++argNum;
+          lockDeleteSql += ss.str();
       }
+
+      if (isRoleSpecified) {
+          stringstream ss;
+          ss << " and instance_role=$"<< ++argNum;
+          lockDeleteSql += ss.str();
+      }
+
+      pqxx::prepare::declaration decl = _connection->prepare(lockDeleteSql, lockDeleteSql)
+          ("bigint", treat_direct);
+
+      if (isQuerySpecified) {
+          decl("bigint", treat_direct);
+      }
+      if (isRoleSpecified) {
+          decl("integer", treat_direct);
+      }
+
+      pqxx::prepare::invocation invc = tr.prepared(lockDeleteSql)(instanceId);
+
+      if (isQuerySpecified) {
+          invc(queryId);
+      }
+      if (isRoleSpecified) {
+          invc((int)role);
+      }
+
+      query_res = invc.exec();
+
       numLocksDeleted = query_res.affected_rows();
 
       LOG4CXX_TRACE(logger, "SystemCatalog::deleteArrayLocks: deleted "

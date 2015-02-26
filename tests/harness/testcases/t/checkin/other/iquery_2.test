@@ -3,9 +3,9 @@
 
 CREATE ARRAY RawDataForDorfs < name : string, item : string, detail : string, qty : double > [ Offset=0:27,28,0 ]
 
-load ( RawDataForDorfs, '../tests/harness/testcases/data/iquery_2.txt')
+load ( RawDataForDorfs, '${TEST_DATA_DIR}/iquery_2.txt')
 
-CREATE EMPTY ARRAY Dorfs < detail : string, qty : double > [ name(string)=7,7,0, item(string)=4,4,0 ]
+CREATE array Dorfs < detail : string, qty : double > [ name(string)=7,7,0, item(string)=4,4,0 ]
 
 store(redimension( RawDataForDorfs, Dorfs ), Dorfs )
 

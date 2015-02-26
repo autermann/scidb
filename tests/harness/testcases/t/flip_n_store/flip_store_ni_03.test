@@ -2,8 +2,8 @@
 --start-query-logging
 create array A <a:string,b:string>[x=0:2,3,0]
 create array T <a:string>[x=0:2,3,0]
-create empty array B <b:string>[a(string)=3,3,0]
-create empty array C <a:string>[b(string)=3,3,0]
+create array B <b:string>[a(string)=3,3,0]
+create array C <a:string>[b(string)=3,3,0]
 store(join(build(T,'a_'+string(x+1)),build(T,'b_'+string(x+1))),A)
 
 --test

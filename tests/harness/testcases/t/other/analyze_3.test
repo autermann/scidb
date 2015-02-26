@@ -1,9 +1,9 @@
 --setup
 --start-query-logging
 CREATE ARRAY a1 <a:int64>[x=0:*,10,0]
-load(a1,'../tests/harness/testcases/data/ub.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(a1,'${TEST_DATA_DIR}/ub.txt')""
 CREATE ARRAY a2 <a:double> [x=0:1999,100,0,y=0:1999,100,0]
-load(a2,'../tests/harness/testcases/data/xyz_sparse.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(a2,'${TEST_DATA_DIR}/xyz_sparse.txt')""
 CREATE ARRAY a3 <a:int64>[x=0:20,10,0]
 store(build(a3,x+5),a3)
 CREATE ARRAY a4 <a:int64>[x=0:1,1,0,y=0:5,4,0]

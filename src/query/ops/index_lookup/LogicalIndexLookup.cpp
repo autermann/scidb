@@ -66,7 +66,7 @@ namespace scidb
  *   The operator uses some memory to cache a part of the index_array for fast lookup of values. By default, the size
  *   of this cache is limited to MEM_ARRAY_THRESHOLD. Note this is in addition to the memory already consumed by cached
  *   MemArrays as the operator is running. If a larger or smaller limit is desired, the 'memory_limit' parameter may be
- *   used. It is provided in units of megabytes and must be at least 1.
+ *   used. It is provided in units of mebibytes and must be at least 1.
  *   <br>
  *   <br>
  *   The operator may be further optimized to reduce memory footprint, optimized with a more clever data distribution

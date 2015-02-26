@@ -33,6 +33,7 @@
 #include "query/Operator.h"
 #include "query/QueryProcessor.h"
 #include "array/DBArray.h"
+#include "array/TransientCache.h"
 #include "smgr/io/Storage.h"
 #include "system/SystemCatalog.h"
 
@@ -77,11 +78,11 @@ public:
         vector<VersionDesc> versions;
 
         const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        query->exclusiveLock(arrayName);
 
         if (SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc, true))
         {
-            StorageManager::getInstance().remove(arrayDesc.getUAId(), arrayDesc.getId());
+            StorageManager::getInstance().removeVersions(query->getQueryID(), arrayDesc.getUAId(), 0);
+            transient::remove(arrayDesc);
         }
         return boost::shared_ptr<Array>();
     }

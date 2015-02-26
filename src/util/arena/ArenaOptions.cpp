@@ -22,8 +22,8 @@
 
 /****************************************************************************/
 
-#include <system/Constants.h>                            // For kB, MB, and GB
-#include "ArenaDetails.h"                                // For implementation
+#include <system/Constants.h>                        // For KiB, MiB, and GiB
+#include "ArenaDetails.h"                            // For implementation
 
 /****************************************************************************/
 namespace scidb { namespace arena {
@@ -35,7 +35,7 @@ namespace scidb { namespace arena {
     Options::Options(name_t name)
            : _name      (name),
              _limit     (unlimited),
-             _psize     (4*KB),
+             _psize     (4*KiB),
              _parent    (getArena()),
              _finalizing(true ),
              _recycling (false),

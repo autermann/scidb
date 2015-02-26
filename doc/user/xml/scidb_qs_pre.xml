@@ -76,11 +76,26 @@
     capabilities.</para>
 
     <para>This document describes how to use a Virtual Machine (VM) with both
-    SciDB and the packages for SciDB-R and SciDB-Py. You can use this image to
+    SciDB and the packages for SciDB-R and SciDB-Py. Virtual Machine images
+    described in this document are preloaded with two SciDB-Py demos:
+    Introduction to SciDB-Py and MODIS. Introduction to SciDB-Py gives a brief
+    overview of the Python-scidb interface while MODIS showcases the usage of
+    SciDB-Py to work with a sizeable data set. You can use these images to
     quickly and easily get started using SciDB and the SciDB package for R or
     Python.</para>
 
-    <para>We also provide the following documents:<itemizedlist>
+    <para>Note that both the VirtualBox and AMI SciDB installations are
+    small-scale. That is, as configured, they are useful as an introduction to
+    SciDB, and for small amounts of data. They do, however, contain a complete
+    version of SciDB. In fact, for the AMI, you could simply adjust the
+    settings in the config.ini file and then use SciDB on a large-scale EC2
+    cluster.</para>
+
+    <para>All of the information for downloading and installing the individual
+    packages listed above is available on our <ulink
+    url="http://www.paradigm4.com">main website</ulink>.</para>
+
+    <para>In addition, we provide the following documents:<itemizedlist>
         <listitem>
           <para><emphasis>SciDB and R</emphasis> describes the R front-end to
           SciDB. Link: <ulink
@@ -115,45 +130,6 @@
           Network</ulink> (CRAN) for details about R.</para>
         </listitem>
       </itemizedlist></para>
-
-    <para>There are three basic ways that you can get started:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para><link linkend="virtualBox">Download a VirtualBox
-        image</link>.</para>
-      </listitem>
-
-      <listitem>
-        <para><link linkend="AMI">Use the SciDB Amazon Machine Image (AMI) to
-        create your own AMI</link>.</para>
-      </listitem>
-
-      <listitem>
-        <para>Download and install a full version of SciDB and SciDB-R from
-        the forum.<itemizedlist>
-            <listitem>
-              <para>SciDB: <ulink
-              url="http://www.scidb.org/forum/viewforum.php?f=14">http://www.scidb.org/forum/viewforum.php?f=14</ulink></para>
-            </listitem>
-
-            <listitem>
-              <para>SciDB-R: <ulink
-              url="http://www.scidb.org/forum/viewtopic.php?f=16&amp;t=364">http://www.scidb.org/forum/viewtopic.php?f=16&amp;t=364</ulink></para>
-            </listitem>
-          </itemizedlist></para>
-      </listitem>
-    </itemizedlist>
-
-    <para>Note that both the VirtualBox and AMI SciDB installations are
-    small-scale. That is, as configured, they are useful as an introduction to
-    SciDB, and for small amounts of data. They do, however, contain a complete
-    version of SciDB. In fact, for the AMI, you could simply adjust the
-    settings in the config.ini file and then use SciDB on a large-scale EC2
-    cluster.</para>
-
-    <para>For the most flexibility, however, we recommend that you download
-    SciDB from the forum, and install it onto your own hardware.</para>
 
     <para>If you have any questions or concerns, contact
     <email>support@scidb.org</email> for help getting started.</para>
@@ -211,7 +187,7 @@
 
           <para>
             <ulink
-            url="http://downloads.paradigm4.com/QuickStart/">http://downloads.paradigm4.com/QuickStart/</ulink>
+            url="https://downloads.paradigm4.com/QuickStart/">https://downloads.paradigm4.com/QuickStart/</ulink>
           </para>
 
           <para>Download the .ova file to a partition with at least 8GB of

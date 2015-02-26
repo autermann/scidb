@@ -2,10 +2,10 @@
 
 --start-query-logging
 
-create empty array unbounded <a:int64>[x=1:*,5,0]
-load(unbounded,'../tests/harness/testcases/data/unbounded_empty.txt')
-create empty array unbounded2 <x:int64>[a=1:*,128,0] 
-create empty array unbounded3 <a:int64>[x=1:*,128,0]
+create array unbounded <a:int64>[x=1:*,5,0]
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(unbounded,'${TEST_DATA_DIR}/unbounded_empty.txt')""
+create array unbounded2 <x:int64>[a=1:*,128,0] 
+create array unbounded3 <a:int64>[x=1:*,128,0]
 
 --test
 
@@ -39,7 +39,7 @@ rename(unbounded2, temp)
 scan(temp)
 rename(temp,unbounded2)
 scan(unbounded2)
-sample(unbounded2,1,1)
+bernoulli(unbounded2,1,1)
 dimensions(unbounded2)
 adddim(unbounded2,z)
 deldim(adddim(unbounded2,z))
@@ -61,7 +61,6 @@ project(versions(unbounded2), version_id)
 #reverse
 #concat
 #build
-#build_sparse
 #xgrid
 
 #not supported

@@ -756,7 +756,7 @@ namespace scidb
     bool ConstChunk::isRLE() const
     {
 #ifndef SCIDB_CLIENT
-        return Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT);
+        return true;
 #else
         return false;
 #endif
@@ -805,7 +805,10 @@ namespace scidb
 
     void Array::append(boost::shared_ptr<Array>& input, bool const vertical, set<Coordinates, CoordinatesLess>* newChunkCoordinates)
     {
-        if (vertical) {
+        if (vertical)
+        {
+            assert(input->getSupportedAccess() >= MULTI_PASS);
+
             for (size_t i = 0, n = getArrayDesc().getAttributes().size(); i < n; i++) {
                 boost::shared_ptr<ArrayIterator> dst = getIterator(i);
                 boost::shared_ptr<ConstArrayIterator> src = input->getConstIterator(i);
@@ -820,11 +823,14 @@ namespace scidb
                     ++(*src);
                 }
             }
-        } else {
+        }
+        else
+        {
             size_t nAttrs = getArrayDesc().getAttributes().size();
             std::vector< boost::shared_ptr<ArrayIterator> > dstIterators(nAttrs);
             std::vector< boost::shared_ptr<ConstArrayIterator> > srcIterators(nAttrs);
-            for (size_t i = 0; i < nAttrs; i++) {
+            for (size_t i = 0; i < nAttrs; i++)
+            {
                 dstIterators[i] = getIterator(i);
                 srcIterators[i] = input->getConstIterator(i);
             }
@@ -911,7 +917,8 @@ namespace scidb
     }
 
     size_t Array::extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last,
-                              Array::extractInit_t init) const
+                              Array::extractInit_t init,
+                              extractNull_t null) const
     {
         ArrayDesc const& arrDesc =  getArrayDesc();
         AttributeDesc const& attrDesc = arrDesc.getAttributes()[attrID];
@@ -994,6 +1001,27 @@ namespace scidb
                                 itemOffs += itemPos[j] - first[j];
                             }
                             memcpy((char*)buf + itemOffs*attrSize, ci->getItem().data(), attrSize);
+                        } else if (null==EXTRACT_NULL_AS_NAN) {
+                            Coordinates const& itemPos = ci->getPosition();
+                            size_t itemOffs = 0;
+                            for (j = 0; j < nDims; j++) {
+                                itemOffs *= last[j] - first[j] + 1;
+                                itemOffs += itemPos[j] - first[j];
+                            }
+                            TypeEnum typeEnum = typeId2TypeEnum(attrType.typeId());
+                            // historically, no alignment guarantee on buf
+                            char * itemAddr = (char*)buf + itemOffs*attrSize;
+                            if (typeEnum == TE_FLOAT) {
+                                float nan=NAN;
+                                std::copy((char*)&nan, (char*)&nan + sizeof(nan), itemAddr);
+                            } else if (typeEnum == TE_DOUBLE) {
+                                double nan=NAN;
+                                std::copy((char*)&nan, (char*)&nan + sizeof(nan), itemAddr);
+                            } else {
+                                SCIDB_UNREACHABLE(); // there is no such thing as NaN for other types.  The calling programmer made a serious error.
+                            }
+                        } else { // EXTRACT_NULL_AS_EXCEPTION
+                            throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "NULL to non-nullable operator";
                         }
                     }
                 } else {
@@ -1129,8 +1157,7 @@ namespace scidb
             if (chunk.isMaterialized()
                     && chunk.getArrayDesc().hasOverlap() == outChunk.getArrayDesc().hasOverlap()
                     && chunk.getAttributeDesc().isNullable() == outChunk.getAttributeDesc().isNullable()
-                    // TEMPORARY flag is set for NID array and we  have to preserve non-RLE format for it
-                    && (chunk.isRLE() == outChunk.isRLE() || chunk.isSolid() || (chunk.getArrayDesc().getFlags() & ArrayDesc::TEMPORARY))
+                    && (chunk.isRLE() == outChunk.isRLE() || chunk.isSolid())
                     // if emptyableToNonEmptyable, we cannot use memcpy because we need to insert defaultvalues
                     && !emptyableToNonEmptyable
                     && chunk.getNumberOfElements(true) == outChunk.getNumberOfElements(true)

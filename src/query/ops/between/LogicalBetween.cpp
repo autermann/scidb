@@ -81,7 +81,6 @@ class LogicalBetween: public  LogicalOperator
   public:
 	LogicalBetween(const std::string& logicalName, const std::string& alias) : LogicalOperator(logicalName, alias)
 	{
-        _properties.tile = true;
 		ADD_PARAM_INPUT()
 		ADD_PARAM_VARIES()
 	}

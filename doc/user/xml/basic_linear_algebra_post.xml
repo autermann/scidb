@@ -251,14 +251,14 @@ col=0:3,32,0]</screen><programlisting>AFL% scan(m3x2);   </programlisting><scree
 [(2),(4),(),()]
 ]</screen> You can return the left matrix, the right matrix, or a
     vector containing the singular values: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> gesvd(m3x2, 'right');   </programlisting><screen>[
-[(0.325251),(0.8759),(0.112699),(0.338098)],
-[(0.391754),(0.218207),(-0.282651),(-0.847952)],
-[(-0.272166),(0.136083),(0.872783),(-0.38165)]
+[(-0.362523),(-0.931975),(0),(0)],
+[(0.931975),(-0.362523),(0),(0)],
+[(0),(0),(1),(0)]
 ]</screen><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> gesvd(m3x2, 'left');   </programlisting><screen>[
-[(0.569595),(-0.821926),(0)],
-[(0.821926),(0.569595),(0)],
-[(0),(0),(1)]
-]</screen><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> gesvd(m3x2, 'values');   </programlisting><screen>[(5.05411),(2.90792),(0)]
+[(-0.32311),(-0.853776),(0.408248)],
+[(-0.547507),(-0.18322),(-0.816497)],
+[(-0.771904),(0.487337),(0.408248)]
+]</screen><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> gesvd(m3x2, 'values');   </programlisting><screen>[(5.76878),(0.849223),(0)]
 </screen></para></para></para></para></para>
   </section>
 </chapter>

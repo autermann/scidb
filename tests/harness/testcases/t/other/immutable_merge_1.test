@@ -1,9 +1,9 @@
 --setup
 
 create array bounded <a:int64>[x=0:30,5,0]
-load(bounded,'../tests/harness/testcases/data/unbounded.txt')
+load(bounded,'${TEST_DATA_DIR}/unbounded.txt')
 
-create empty array mutable <a:int64>[x=0:30,5,0]
+create array mutable <a:int64>[x=0:30,5,0]
 
 --test
 --start-query-logging

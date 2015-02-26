@@ -48,28 +48,16 @@ public:
         Dimensions const& dims = inputSchema.getDimensions();
         size_t nDims = dims.size();
         Coordinates result (nDims);
-
-        if (_parameters.size() == 0) { 
-            for (size_t i = 0; i < nDims; i++)
+        for (size_t i = 0; i < nDims; i++)
+        {
+            Value const& low = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate();
+            if ( low.isNull() || low.getInt64() < dims[i].getStart())
             {
-                result[i] = dims[i].getLowBoundary();
+                result[i] = dims[i].getStart();
             }
-        } else {         
-            for (size_t i = 0; i < nDims; i++)
+            else
             {
-                Value const& low = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate();
-                if (low.isNull())
-                {
-                    result[i] = dims[i].getLowBoundary();
-                }
-                else
-                {
-                    result[i] = low.getInt64();
-                    if (dims[i].getStartMin() != MIN_COORDINATE && result[i] < dims[i].getStartMin())
-                    {
-                        result[i] = dims[i].getStartMin();
-                    }
-                }
+                result[i] = low.getInt64();
             }
         }
         return result;
@@ -81,28 +69,16 @@ public:
         Dimensions const& dims = inputSchema.getDimensions();
         size_t nDims = dims.size();
         Coordinates result (nDims);
-
-        if (_parameters.size() == 0) { 
-            for (size_t i = 0; i < nDims; i++)
+        for (size_t i  = 0; i < nDims; i++)
+        {
+            Value const& high = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i + nDims])->getExpression()->evaluate();
+            if (high.isNull() || high.getInt64() > dims[i].getEndMax())
             {
-                result[i] = dims[i].getHighBoundary();
+                result[i] = dims[i].getEndMax();
             }
-        } else {         
-            for (size_t i  = 0; i < nDims; i++)
+            else
             {
-                Value const& high = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i + nDims])->getExpression()->evaluate();
-                if (high.isNull())
-                {
-                    result[i] = dims[i].getHighBoundary();
-                }
-                else
-                {
-                    result[i] = high.getInt64();
-                    if (result[i] > dims[i].getEndMax())
-                    {
-                        result[i] = dims[i].getEndMax();
-                    }
-                }
+                result[i] = high.getInt64();
             }
         }
         return result;

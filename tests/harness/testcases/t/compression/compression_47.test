@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
 create array Ts <a:string> [x=-2:3,2,0]
-create empty array eTs <a:string> [x=-2:3,2,0]
+create array eTs <a:string> [x=-2:3,2,0]
 create array Ts_rle <a:string compression 'rle'> [x=-2:3,2,0]
 create array Ts_d <a:string compression 'dictionary'> [x=-2:3,2,0]
 create array Ts_ns <a:string compression 'null suppression'> [x=-2:3,2,0]
@@ -9,8 +9,8 @@ create array Ts_be <a:string compression 'bitmap encoding'> [x=-2:3,2,0]
 create array Ts_z <a:string compression 'zlib'> [x=-2:3,2,0]
 create array Ts_bz <a:string compression 'bzlib'> [x=-2:3,2,0]
 create array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,0]
-create empty array N <x:int64> [a(string)=6,3,0]
-create empty array Nc <x:int64 compression 'rle' > [a(string)=6,3,0]
+create array N <x:int64> [a(string)=6,3,0]
+create array Nc <x:int64 compression 'rle' > [a(string)=6,3,0]
 
 --test
 --aql select * into Ts_rle from build(Ts,string(x))

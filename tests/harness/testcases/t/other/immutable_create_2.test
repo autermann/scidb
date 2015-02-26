@@ -3,7 +3,7 @@
 --test
 --start-query-logging
 
-create empty array imtest <a:int64>[x=0:100,10,0, y=0:100,10,0]
+create array imtest <a:int64>[x=0:100,10,0, y=0:100,10,0]
 
 aggregate(imtest,count(*))
 

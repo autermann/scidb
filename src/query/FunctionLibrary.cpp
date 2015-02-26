@@ -157,10 +157,12 @@ void FunctionLibrary::registerBuiltInFunctions()
     addFunction(FunctionDescription("<=", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strLessOrEq, (size_t)0));
     addFunction(FunctionDescription(">=", list_of(TID_STRING)(TID_STRING), TypeId(TID_BOOL), &strGreaterOrEq, (size_t)0));
     addFunction(FunctionDescription("strftime", list_of(TID_DATETIME)(TID_STRING), TypeId(TID_STRING), &strFTime, (size_t)0));
-    addFunction(FunctionDescription("now", vector<TypeId>(), TypeId(TID_DATETIME), &currentTime, (size_t)0, false));
+    addFunction(FunctionDescription("now", vector<TypeId>(), TypeId(TID_DATETIME), &currentTime, (size_t)0,
+                                    /*vec mode*/ false, /*commulativity*/ false, /*inferFuncArgTypes*/ NULL, /*isDeterministic*/ false));
     addFunction(FunctionDescription("+", list_of(TID_DATETIME)(TID_INT64), TypeId(TID_DATETIME), &addIntToDateTime, (size_t)0, false, true));
     addFunction(FunctionDescription("-", list_of(TID_DATETIME)(TID_INT64), TypeId(TID_DATETIME), &subIntFromDateTime, (size_t)0));
-    addFunction(FunctionDescription("random", vector<TypeId>(), TypeId(TID_UINT32), &scidb_random, (size_t)0));
+    addFunction(FunctionDescription("random", vector<TypeId>(), TypeId(TID_UINT32), &scidb_random, (size_t)0,
+                                    /*vec mode*/ false, /*commulativity*/ false, /*inferFuncArgTypes*/ NULL, /*isDeterministic*/ false));
     addConverter(TID_DATETIME, TID_STRING, &convDateTime2Str, EXPLICIT_CONVERSION_COST);
     addConverter(TID_STRING, TID_DATETIME, &convStr2DateTime, EXPLICIT_CONVERSION_COST);//TRANSFORM_CONVERSION_COST);
 
@@ -175,9 +177,10 @@ void FunctionLibrary::registerBuiltInFunctions()
     addFunction(FunctionDescription(">", list_of(TID_DATETIMETZ)(TID_DATETIMETZ), TypeId(TID_BOOL), &tzGreater, (size_t)0));
     addFunction(FunctionDescription("<=", list_of(TID_DATETIMETZ)(TID_DATETIMETZ), TypeId(TID_BOOL), &tzLessOrEq, (size_t)0));
     addFunction(FunctionDescription(">=", list_of(TID_DATETIMETZ)(TID_DATETIMETZ), TypeId(TID_BOOL), &tzGreaterOrEq, (size_t)0));
-    addFunction(FunctionDescription("tznow", vector<TypeId>(), TypeId(TID_DATETIMETZ), &currentTimeTz, (size_t)0, false));
+    addFunction(FunctionDescription("tznow", vector<TypeId>(), TypeId(TID_DATETIMETZ), &currentTimeTz, (size_t)0,
+                                    /*vec mode*/ false, /*commulativity*/ false, /*inferFuncArgTypes*/ NULL, /*isDeterministic*/ false));
 
-    addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIME), TypeId(TID_UINT8), &dayOfWeekT, (size_t) 0));
+addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIME), TypeId(TID_UINT8), &dayOfWeekT, (size_t) 0));
     addFunction(FunctionDescription("hour_of_day", list_of(TID_DATETIME), TypeId(TID_UINT8), &hourOfDayT, (size_t) 0));
     addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIMETZ), TypeId(TID_UINT8), &dayOfWeekTZ, (size_t) 0));
     addFunction(FunctionDescription("hour_of_day", list_of(TID_DATETIMETZ), TypeId(TID_UINT8), &hourOfDayTZ, (size_t) 0));

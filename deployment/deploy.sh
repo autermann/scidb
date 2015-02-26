@@ -33,6 +33,7 @@ Configuring remote access:
 
 Preparing remote machines:
   deploy.sh prepare_toolchain   <host ...>
+  deploy.sh prepare_coordinator <host ...>
   deploy.sh setup_ccache        <scidb_os_user> <host ...>
   deploy.sh prepare_chroot      <scidb_os_user> <host ...>
   deploy.sh prepare_postgresql  <postgresql_os_username>
@@ -49,7 +50,7 @@ SciDB control on remote machines:
   deploy.sh scidb_remove     {<packages_path>|<ScidbVersion>} <coordinator-host> [host ...]
   deploy.sh scidb_prepare    <scidb_os_user> <scidb_os_passwd> <db_user> <db_passwd>
                              <database> <base_path>
-                             <instance_count> <no_watchdog> <redundancy> <chunk-segment-size>
+                             <instance_count> <no_watchdog> <redundancy>
                              <coordinator-host> [host ...]
   deploy.sh scidb_start      <scidb_os_user> <database> <coordinator-host>
   deploy.sh scidb_stop       <scidb_os_user> <database> <coordinator-host>"
@@ -100,7 +101,7 @@ make
 
 ./deploy.sh scidb_install 13.6 coordinator-host host1 host2
 
-7) Configure SciDB cluster on localhost with 4 instances redundancy=1, default chunk-segment-size,
+7) Configure SciDB cluster on localhost with 4 instances redundancy=1
    and data directory root at ~/scidb-data
 
 ./deploy.sh scidb_prepare my_username \"\" mydb mydb mydb ~/scidb-data 4 1 default localhost
@@ -134,6 +135,9 @@ Commands:
                        Giving '' for <ssh_public_key> uses ~/.ssh/id_rsa.pub key.
 
   prepare_toolchain    Install the package dependencies required for building SciDB from sources.
+                       The operation is performed on all specified <host ...> as root.
+
+  prepare_coordinator  Install the package dependencies required for testing SciDB on the coordinator node.
                        The operation is performed on all specified <host ...> as root.
 
   setup_ccache         Configure ccache. This operation is not required for any other deploy.sh operations.
@@ -179,8 +183,7 @@ Commands:
                        <instance_count> - number of instances per host
                        <no_watchdog> - do not start watchdog process (default: 'false')
                        <redundancy> - the number of data replicas (distributed among the instances)
-                       <chunk-segment-size> - the size of storage file segments
-                       Use 'default' for either <redundancy> or <chunk-segment-size> to keep SciDB defaults.
+                       Use 'default' for either <redundancy> to keep SciDB defaults.
                        Consult a detailed description of config.ini in the user guide or elsewhere.
                        It will also setup a password-less ssh from <coordinator-host>
                        to *all* hosts using <scidb_os_user> and <scidb_os_passwd>
@@ -463,6 +466,14 @@ function prepare_toolchain ()
     stop_virtual_bridge_zero "${hostname}"
 }
 
+# Prepare machine for coordinator
+function prepare_coordinator ()
+{
+    local hostname=${1}
+    echo "Prepare coordinator @${hostname}"
+    remote root "" ${hostname} "./prepare_coordinator.sh ${SCIDB_VER}"
+}
+
 # Prepare chroot on remote machine for build packages 
 function prepare_chroot ()
 {
@@ -541,9 +552,8 @@ local base_path="${4}"
 local instance_count="${5}"
 local no_watchdog="${6}"
 local redundancy="${7}"
-local chunk_segment_size="${8}"
-local coordinator="${9}"
-shift 9
+local coordinator="${8}"
+shift 8
 echo "[${database}]"
 local coordinator_instance_count=${instance_count}
 let coordinator_instance_count--
@@ -561,9 +571,6 @@ if [ "${no_watchdog}" != "default" ]; then
 fi;
 if [ "${redundancy}" != "default" ]; then
     echo "redundancy=${redundancy}"
-fi;
-if [ "${chunk_segment_size}" != "default" ]; then
-    echo "chunk-segment-size=${chunk_segment_size}"
 fi;
 echo "install_root=/opt/scidb/${SCIDB_VER}"
 echo "pluginsdir=/opt/scidb/${SCIDB_VER}/lib/scidb/plugins"
@@ -595,15 +602,14 @@ function scidb_prepare ()
     local instance_count=${7}
     local no_watchdog=${8}
     local redundancy=${9}
-    local chunk_segment_size=${10}
-    local coordinator=${11}
-    shift 11
+    local coordinator=${10}
+    shift 10
 
     # grab coordinator public key
     local coordinator_key=`remote_no_password "${username}" "${password}" "${coordinator}" "${SSH} ${username}@${coordinator}  \"cat ~/.ssh/id_rsa.pub\"" | tail -1`
 
     # generate config.ini locally
-    scidb_config ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${chunk_segment_size} ${coordinator} "$@" | tee ./config.ini
+    scidb_config ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${coordinator} "$@" | tee ./config.ini
 
     # deposit config.ini to coordinator
 
@@ -728,6 +734,16 @@ case ${1} in
 	    prepare_toolchain "${hostname}"
 	done;
 	;;
+    prepare_coordinator)
+	if [ $# -lt 2 ]; then
+	    print_usage_exit 1
+	fi
+	shift 1
+
+	for hostname in $@; do 
+	    prepare_coordinator "${hostname}"
+	done;
+	;;
     setup_ccache)
 	if [ $# -lt 3 ]; then
 	    print_usage_exit 1
@@ -849,15 +865,14 @@ case ${1} in
         instance_count=${8}
         no_watchdog=${9}
         redundancy=${10}
-        chunk_segment_size=${11}
-        coordinator=${12}
-        shift 12
+        coordinator=${11}
+        shift 11
 
         # get password from stdin if not given on cmd
         if [ "${password}" == "" ]; then
            get_password "${username}"
         fi
-	scidb_prepare ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${chunk_segment_size} ${coordinator} $@
+	scidb_prepare ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${coordinator} $@
 	;;
     scidb_start)
 	if [ $# -lt 4 ]; then

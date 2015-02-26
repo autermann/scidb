@@ -105,6 +105,7 @@ struct ErrorCommandOptions
 	{
 		_afl = true;
 		_igdata = false;
+		_hideQueryString = false;
 	}
 
 	std::string _expected_errorcode; // stringified code id
@@ -116,6 +117,7 @@ struct ErrorCommandOptions
 
 	bool _afl;
 	bool _igdata;
+	bool _hideQueryString;
 	std::string _query;
 };
 

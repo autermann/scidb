@@ -11,13 +11,13 @@ create array bz <a:int32 compression 'bzlib'>[x=0:2,3,0]
 create array nf <a:int32 compression 'null filter'>[x=0:2,3,0]
 
 --test
---aql select * into rle from build_sparse(rle,x+10,x<>x)
---aql select * into d from build_sparse(d,x+10,x<>x)
---aql select * into ns from build_sparse(ns,x+10,x<>x)
---aql select * into be from build_sparse(be,x+10,x<>x)
---aql select * into z from build_sparse(z,x+10,x<>x)
---aql select * into bz from build_sparse(bz,x+10,x<>x)
---aql select * into nf from build_sparse(nf,x+10,x<>x)
+--aql select * into rle from filter(build(rle,x+10),x<>x)
+--aql select * into d from filter(build(d,x+10),x<>x)
+--aql select * into ns from filter(build(ns,x+10),x<>x)
+--aql select * into be from filter(build(be,x+10),x<>x)
+--aql select * into z from filter(build(z,x+10),x<>x)
+--aql select * into bz from filter(build(bz,x+10),x<>x)
+--aql select * into nf from filter(build(nf,x+10),x<>x)
 
 --cleanup
 remove(rle)

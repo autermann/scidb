@@ -1,8 +1,8 @@
 --setup
-create empty array A <a:string,b:string null> [x=0:*,2,0,y=0:*,2,0]
-create empty array B <b:string null> [a(string)=*,2,0]
-create empty array C <b:string null> [a(string)=2,2,0]
-load(A,'../tests/harness/testcases/data/redimension_2.txt')
+create array A <a:string,b:string null> [x=0:*,2,0,y=0:*,2,0]
+create array B <b:string null> [a(string)=*,2,0]
+create array C <b:string null> [a(string)=2,2,0]
+load(A,'${TEST_DATA_DIR}/redimension_2.txt')
 
 --test
 store(redimension(A,B),B)

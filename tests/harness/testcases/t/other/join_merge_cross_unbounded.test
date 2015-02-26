@@ -4,11 +4,11 @@
 #testcases for join,merge and cross_join for unbounded array.
 
 create array unbounded <a:int64>[x=0:*,5,0]
-load(unbounded, '../tests/harness/testcases/data/unbounded_cross.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(unbounded, '${TEST_DATA_DIR}/unbounded_cross.txt')""
 create array unbound_A <a:int64>[x=0:*,10,0]
-load(unbound_A, '../tests/harness/testcases/data/unbounded_cross.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(unbound_A, '${TEST_DATA_DIR}/unbounded_cross.txt')""
 create array Z < b: int64 >[ y=0:9,5,0]
-store(build_sparse(Z,100*y, 2<y),Z)
+store(filter(build(Z,100*y), 2<y),Z)
 
 
 

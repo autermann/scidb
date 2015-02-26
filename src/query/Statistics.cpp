@@ -59,14 +59,24 @@ ThreadContext<Statistics> currentStatistics(&StatisticsScope::systemStatistics);
 
 inline size_t printSize(size_t size)
 {
-    return size < 2 * 1024 ? size :
-                  size < (2 * 1024 * 1024) ? size / 1024 : size / (1024 * 1024);
+    if (size < 2*KiB) {
+        return size;
+    }
+    if (size < 2*MiB) {
+        return size / KiB;
+    }
+    return size / MiB;
 }
 
 inline const char* printSizeUnit(size_t size)
 {
-    return size < 2 * 1024 ? "B" :
-                  size < (2 * 1024 * 1024) ? "KB" : "MB";
+    if (size < 2*KiB) {
+        return "B";
+    }
+    if (size < 2*MiB) {
+        return "KiB";
+    }
+    return "MiB";
 }
 
 #ifndef SCIDB_CLIENT

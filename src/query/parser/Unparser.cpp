@@ -33,7 +33,7 @@ namespace scidb { namespace parser { namespace {
  *
  *  @details    Class Unparser implements a specialized tree traversal visitor
  *              that visits each node of the abstract syntax tree,  formatting
- *              each as source code that it inserts onto an output stream that
+ *              the nodes as source code that it inserts onto an output stream
  *              it carries with it on its journey around the tree.
  *
  *              This class provides the underlying implementation for the node
@@ -48,23 +48,25 @@ class Unparser : public Visitor
                                : _out(o)                 {}
 
  private:                  // From class Visitor
-    virtual void              onAbstraction (Node*&);
-    virtual void              onApplication (Node*&);
-    virtual void              onNull        (Node*&);
-    virtual void              onReal        (Node*&);
-    virtual void              onString      (Node*&);
-    virtual void              onBoolean     (Node*&);
-    virtual void              onInteger     (Node*&);
-    virtual void              onFix         (Node*&);
-    virtual void              onLet         (Node*&);
-    virtual void              onReference   (Node*&);
-    virtual void              onSchema      (Node*&);
-    virtual void              onBinding     (Node*&);
-    virtual void              onAttribute   (Node*&);
-    virtual void              onDimension   (Node*&);
+    virtual void              onAbstraction(Node*&);
+    virtual void              onApplication(Node*&);
+    virtual void              onFix        (Node*&);
+    virtual void              onLet        (Node*&);
+    virtual void              onReference  (Node*&);
+    virtual void              onSchema     (Node*&);
+    virtual void              onVariable   (Node*&);
+    virtual void              onNull       (Node*&);
+    virtual void              onReal       (Node*&);
+    virtual void              onString     (Node*&);
+    virtual void              onBoolean    (Node*&);
+    virtual void              onInteger    (Node*&);
+    virtual void              onModule     (Node*&);
+    virtual void              onBinding    (Node*&);
+    virtual void              onAttribute  (Node*&);
+    virtual void              onDimension  (Node*&);
 
  private:                  // Implementation
-            void              join          (Node*,char);
+            void              join         (Node*,const char* = "");
 
  private:                  // Representation
             ostream&          _out;                      // The output stream
@@ -78,7 +80,7 @@ void Unparser::onAbstraction(Node*& pn)
     assert(pn!=0 && pn->is(abstraction));                // Validate arguments
 
     _out << "fn(";                                       // fn (
-    join (pn->get(abstractionArgBindings),',');          //     a,..,z
+    join (pn->get(abstractionArgBindings),",");          //     a,..,z
     _out << "){";                                        //           ) {
     visit(pn->get(letArgBody));                          //     <body>
     _out << '}';                                         //             }
@@ -91,10 +93,98 @@ void Unparser::onApplication(Node*& pn)
 {
     assert(pn!=0 && pn->is(application));                // Validate arguments
 
-    _out << pn->get(applicationArgName)->getString();    // <id>
+    visit(pn->get(applicationArgOperator));              // <id>
     _out << '(';                                         //     (
-    join (pn->get(applicationArgOperands),',');          //      <a>,..,<z>
+    join (pn->get(applicationArgOperands),",");          //      <a>,..,<z>
     _out << ')';                                         //                )
+
+    if (Node* n = pn->get(applicationArgAlias))          // Has an alias name?
+    {
+        _out << " as " << n->getString();                // ...emit the alias
+    }
+}
+
+/**
+ *  Insert a formatted representation of the node 'pn' onto our output stream.
+ */
+void Unparser::onFix(Node*& pn)
+{
+    assert(pn!=0 && pn->is(fix));                        // Validate arguments
+
+    _out << "fix {";                                     // fix {
+    join (pn->get(fixArgBindings),";");                  //      <id> = ...
+    _out << "} in ";                                     //     } in
+    visit(pn->get(fixArgBody));                          //           <body>
+}
+
+/**
+ *  Insert a formatted representation of the node 'pn' onto our output stream.
+ */
+void Unparser::onLet(Node*& pn)
+{
+    assert(pn!=0 && pn->is(let));                        // Validate arguments
+
+    _out << "let {";                                     // let {
+    join (pn->get(letArgBindings),";");                  //      <id> = ...
+    _out << "} in ";                                     //     } in
+    visit(pn->get(letArgBody));                          //          <body>
+}
+
+/**
+ *  Insert a formatted representation of the node 'pn' onto our output stream.
+ */
+void Unparser::onReference(Node*& pn)
+{
+    assert(pn!=0 && pn->is(reference));                  // Validate arguments
+
+    if (Node* n = pn->get(referenceArgArray))            // Has an array name?
+    {
+        visit(n);                                        // ...visit qualifier
+        _out << '.';                                     // ...append the '.'
+    }
+
+    visit(pn->get(referenceArgName));                    // Visit the name
+
+    if (Node* n = pn->get(referenceArgVersion))          // Has version stamp?
+    {
+        _out << '@';                                     // ...append the '@'
+        visit(n);                                        // ...visit version
+    }
+
+    if (Node* n = pn->get(referenceArgOrder))            // Has an orderering?
+    {
+        _out << ' ' << order(n->getInteger());           // ...emit the order
+    }
+
+    if (Node* n = pn->get(referenceArgAlias))            // Has an alias name?
+    {
+        _out << " as " << n->getString();                // ...emit the alias
+    }
+}
+
+/**
+ *  Insert a formatted representation of the node 'pn' onto our output stream.
+ */
+void Unparser::onSchema(Node*& pn)
+{
+    assert(pn!=0 && pn->is(schema));                     // Validate arguments
+
+    _out << '<';                                         // <
+    join (pn->get(schemaArgAttributes),",");             //   a1:t1 .. an:tn
+    _out << '>';                                         // >
+    _out << '[';                                         // [
+    join (pn->get(schemaArgDimensions),",");             //   d1=b1 .. dn=bn
+    _out << ']';                                         // ]
+}
+
+/**
+ *  Insert a formatted representation of the node 'pn' onto our output stream.
+ */
+void Unparser::onVariable(Node*& pn)
+{
+    assert(pn!=0 && pn->is(variable));                   // Validate arguments
+
+    _out << pn->get(variableArgName)->getString();       // Emit variable name
 }
 
 /**
@@ -150,27 +240,11 @@ void Unparser::onInteger(Node*& pn)
 /**
  *  Insert a formatted representation of the node 'pn' onto our output stream.
  */
-void Unparser::onFix(Node*& pn)
+void Unparser::onModule(Node*& pn)
 {
-    assert(pn!=0 && pn->is(fix));                        // Validate arguments
+    assert(pn!=0 && pn->is(module));                     // Validate arguments
 
-    _out << "fix {";                                     // fix {
-    join (pn->get(fixArgBindings),';');                  //      <id> = ...
-    _out << "} in ";                                     //     } in
-    visit(pn->get(fixArgBody));                          //           <body>
-}
-
-/**
- *  Insert a formatted representation of the node 'pn' onto our output stream.
- */
-void Unparser::onLet(Node*& pn)
-{
-    assert(pn!=0 && pn->is(let));                        // Validate arguments
-
-    _out << "let {";                                     // let {
-    join (pn->get(letArgBindings),';');                  //      <id> = ...
-    _out << "} in ";                                     //     } in
-    visit(pn->get(letArgBody));                          //          <body>
+    join (pn->get(moduleArgBindings),";\n");             // <id> = ... ; ...
 }
 
 /**
@@ -187,56 +261,6 @@ void Unparser::onBinding(Node*& pn)
         _out << " = ";                                   //       =
         visit(pn->get(bindingArgBody));                  //         <body>
      }
-}
-
-/**
- *  Insert a formatted representation of the node 'pn' onto our output stream.
- */
-void Unparser::onReference(Node*& pn)
-{
-    assert(pn!=0 && pn->is(reference));                  // Validate arguments
-
-    if (Node* n = pn->get(referenceArgArrayName))        // Has an array name?
-    {
-        _out << n->getString() << '.';                   // ...emit qualifier
-    }
-
-    _out << pn->get(referenceArgName)->getString();      // Insert the name
-
-    if (Node* n = pn->get(referenceArgVersion))          // Has version stamp?
-    {
-        _out << '@' << n->getInteger();                  // ...emit version
-    }
-
-    if (Node* n = pn->get(referenceArgOrder))            // Has an orderering?
-    {
-        _out << ' ' << order(n->getInteger());           // ...emit the order
-    }
-
-    if (const Node* n = pn->get(referenceArgAlias))      // Has an alias name?
-    {
-        _out << " as " << n->getString();                // ...emit the alias
-    }
-}
-
-/**
- *  Insert a formatted representation of the node 'pn' onto our output stream.
- */
-void Unparser::onSchema(Node*& pn)
-{
-    assert(pn!=0 && pn->is(schema));                     // Validate arguments
-
-    if (Node* n = pn->get(schemaArgEmpty))               // Has an empty flag?
-    {
-        _out << (n->getBoolean() ? "not empty" : "");   // ...emit the flag
-    }
-
-    _out << '<';                                         // <
-    join (pn->get(schemaArgAttributes),',');             //   a1:t1 .. an:tn
-    _out << '>';                                         // >
-    _out << '[';                                         // [
-    join (pn->get(schemaArgDimensions),',');             //   d1=b1 .. dn=bn
-    _out << ']';                                         // ]
 }
 
 /**
@@ -319,11 +343,11 @@ void Unparser::onDimension(Node*& pn)
 
 /**
  *  Insert a formatted representation of each node in the list 'pn' in turn on
- *  the output stream, separating each with the given delimiter character.
+ *  our output stream, separating each with the given delimiter string.
  */
-void Unparser::join(Node* pn,char delimiter)
+void Unparser::join(Node* pn,const char* delimiter)
 {
-    assert(pn!=0 && pn->is(list));                       // Validate arguments
+    assert(pn!=0 && pn->is(list) && delimiter!=0);       // Validate arguments
 
     insertRange(_out,pn->getList(),delimiter);           // Emit the bindings
 }
@@ -348,6 +372,16 @@ ostream& operator<<(ostream& io,order order)
 ostream& operator<<(ostream& io,const Node* pn)
 {
     return Unparser(io)(const_cast<Node*&>(pn)), io;     // Run the unparser
+}
+
+/**
+ *  Return a string representation of the node 'pn' formatted as source code.
+ */
+string unparse(const Node* pn)
+{
+    ostringstream o;                                     // Make local stream
+    o << pn;                                             // Drop  onto stream
+    return o.str();                                      // And return string
 }
 
 /****************************************************************************/

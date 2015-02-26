@@ -32,6 +32,7 @@
 #ifndef __FUNCTION_DESCRIPTION_H__
 #define __FUNCTION_DESCRIPTION_H__
 
+#include <iostream>
 #include <stdarg.h>
 
 #include <boost/serialization/vector.hpp>
@@ -157,20 +158,25 @@ public:
 
     FunctionDescription(const std::string& name, const ArgTypes& inputArgs,
             TypeId outputArg, FunctionPointer func_ptr = NULL, size_t scratchSize = 0,
-            bool supportsVectorMode = false, bool commulativity = false, InferFunctionArgTypes inferFunctionArgTypes = NULL):
+            bool supportsVectorMode = false, bool commulativity = false, InferFunctionArgTypes inferFunctionArgTypes = NULL,
+            bool isDeterministic = true):
         _name(name),
         _inputArgs(inputArgs),
         _outputArgs(std::vector<TypeId>(1, outputArg)),
         _func_ptr(func_ptr),
         _scratchSize(scratchSize),
         _isInternal(false),
-        _isDeterministic(true),
+        _isDeterministic(isDeterministic),
         _needsFinalCall(false),
         _supportsVectorMode(supportsVectorMode),
         _commutativity(commulativity),
         _inferFunctionArgTypes(inferFunctionArgTypes)
     {
         assert(!_commutativity || inputArgs.size() == 2);
+
+        if (name == "random") {
+            std::cerr << "random's _isDeterministic is: " << _isDeterministic << std::endl;
+        }
     }
 
     /**

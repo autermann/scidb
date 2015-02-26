@@ -46,13 +46,55 @@ if(BLAS_FOUND AND LAPACK_FOUND AND MPICH_FOUND)
     message(STATUS "DEBUG-- BLAS_LIBRARIES=${BLAS_LIBRARIES}")
     message(STATUS "DEBUG-- LOCAL_LAPACK_LIBRARIES=${LOCAL_LAPACK_LIBRARIES}")
     message(STATUS "DEBUG-- LOCAL_MPI_PATH=${LOCAL_MPI_PATH}")
+    ################################################################
+    # Going to figure out if site is down
+    #
+    # Use two sets of variables to store the primary site information PRIMARY_
+    # and the mirror site information MIRROR_.
+    #
+    # Later a third set of variables NETLIB_ will be set to whichever site
+    # is up PRIMARY_ or MIRROR_.
+    set(PRIMARY_SITE "www.netlib.org")
+    set(PRIMARY_INDEX "${PRIMARY_SITE}/lapack/index")
+    set(PRIMARY_SCALAPACK_INSTALLER "${PRIMARY_SITE}/scalapack/scalapack_installer.tgz")
 
+    set(MIRROR_SITE "netlib.sandia.gov")
+    set(MIRROR_INDEX "${MIRROR_SITE}/lapack/index")
+    set(MIRROR_SCALAPACK_INSTALLER "${MIRROR_SITE}/scalapack/scalapack_installer.tgz")
+    # Test if PRIMARY_ site is up by downloading an index file
+    file(DOWNLOAD
+      http://${PRIMARY_INDEX}
+      /tmp/scalapack_download_index
+      INACTIVITY_TIMEOUT 30
+      TIMEOUT 30
+      STATUS PRIMARY_STATUS_ARRAY
+      )
+    LIST(GET PRIMARY_STATUS_ARRAY 0 PRIMARY_STATUS)
+    message(STATUS "DEBUG-- PRIMARY_STATUS=${PRIMARY_STATUS}")
+    # PRIMARY_STATUS contains status of downloading PRIMARY_SITE index file
+    # and therefore status of the PRIMARY_SITE
+    ################################################################
+    IF(PRIMARY_STATUS GREATER 0)
+      # PRIMARY_URL is down
+      message(STATUS "${PRIMARY_SITE} is down.")
+      message(STATUS "using mirror ${MIRROR_SITE}.")
+      # Get installer from mirror AND patch it to use mirror url
+      set(NETLIB_SCALAPACK_INSTALLER "${MIRROR_SCALAPACK_INSTALLER}")
+      set(NETLIB_SITE "${MIRROR_SITE}")
+    ELSE(PRIMARY_STATUS GREATER 0)
+      # NETLIB_URL is up
+      message(STATUS "${PRIMARY_SITE} is up.")
+      # Get installer from primary AND patch it to use primary url
+      set(NETLIB_SCALAPACK_INSTALLER "${PRIMARY_SCALAPACK_INSTALLER}")
+      set(NETLIB_SITE "${PRIMARY_SITE}")
+    ENDIF(PRIMARY_STATUS GREATER 0)
+    ################################################################
     ExternalProject_Add(scalapackForMPICH2
-                        PREFIX container
-                        URL http://www.netlib.org/scalapack/scalapack_installer.tgz
-                        TIMEOUT 120
-                        CONFIGURE_COMMAND ""
-                        BUILD_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external_project_build_cmd_workaround.cmake.sh ${UNTAR_DIR} ${MPI_INCLUDE} ${LOCAL_MPI_PATH}/bin ${LOCAL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MPICH2_SUFFIX}
-                        INSTALL_COMMAND "")
-                        #      but that didn't work, so had to define it
+      PREFIX container
+      URL http://${NETLIB_SCALAPACK_INSTALLER}
+      TIMEOUT 120
+      PATCH_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/patch_to_download.sh ${UNTAR_DIR} ${PRIMARY_SITE} ${NETLIB_SITE}
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external_project_build_cmd_workaround.cmake.sh ${UNTAR_DIR} ${MPI_INCLUDE} ${LOCAL_MPI_PATH}/bin ${LOCAL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MPICH2_SUFFIX}
+      INSTALL_COMMAND "")
 endif()

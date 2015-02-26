@@ -49,7 +49,6 @@
 #include "query/FunctionDescription.h"
 #include "query/FunctionLibrary.h"
 #include "query/Operator.h"
-#include "smgr/io/DBLoader.h"
 #include "array/DBArray.h"
 #include "smgr/io/Storage.h"
 #include "system/SystemCatalog.h"
@@ -78,8 +77,9 @@ public:
      * The method to return the size (in bytes) of one buffer
      */
     static int64_t bufferSize() {
-        int64_t size = Config::getInstance()->getOption<int>(CONFIG_LOAD_SCAN_BUFFER) * MB;
-        if (size<=0) size=1024;
+        int64_t size = Config::getInstance()->getOption<int>(CONFIG_LOAD_SCAN_BUFFER) * MiB;
+        if (size <= 0)
+            size = KiB;
         return size;
     }
 

@@ -63,8 +63,12 @@ size_t addPayloadValues<bool>(RLEPayload* p, size_t n)
 template <> inline
 size_t addPayloadValues<VarValue>(RLEPayload* p, size_t n)
 {
-    // Value will be really added via appendValue in set helper
-    return 0;
+    // XXX HACK alert!
+    // Note the size is set to 0 because we just want to know
+    // the next index for value insertion without growing
+    // the internal datastructure.
+    // setPayloadValue() will do it for us.
+    return p->addRawVarValues(0);
 }
 
 template <typename T>
@@ -461,6 +465,7 @@ void rle_binary_func(const Value** args, Value* result, void*)
         // At this point ps1 and ps2 should aligned
         // Segment with less length will be iterated and with more length cut at the end of loop
         assert(ps1._pPosition == ps2._pPosition);
+
         const uint64_t length = std::min(ps1_length, ps2_length);
         if (length == 0) {
             break;
@@ -516,7 +521,13 @@ void rle_binary_func(const Value** args, Value* result, void*)
                     size_t i = rs._valueIndex;
                     size_t j1 = ps1._valueIndex;
                     size_t j2 = ps2._valueIndex;
-                    if (!fastDenseBinary<O, T1, T2, TR>(length, (const char*)v1.getTile()->getFixData(), j1, (const char*)v2.getTile()->getFixData(), j2, res.getTile()->getFixData(), int(rs._valueIndex)))
+                    if (!fastDenseBinary<O, T1, T2, TR>(length,
+                                                        (const char*)v1.getTile()->getFixData(),
+                                                        j1,
+                                                        (const char*)v2.getTile()->getFixData(),
+                                                        j2,
+                                                        res.getTile()->getFixData(),
+                                                        int(rs._valueIndex)))
                     {
                         const size_t end = j1 + length;
                         while (j1 < end) {

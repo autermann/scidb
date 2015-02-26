@@ -44,8 +44,8 @@ if (USE_LOCAL_MPI)
    endif()
 
    if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
-       set(LOCAL_MPI_PATH "/usr/lib64/mpich2")
-       set(MPI_INCLUDE "-I /usr/include/mpich2-x86_64")
+       set(LOCAL_MPI_PATH "/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/mpich2")
+       set(MPI_INCLUDE "-I ${LOCAL_MPI_PATH}/include/mpich2")
    endif()
 
    message(STATUS "WARNING-- using locally installed MPICH2")

@@ -62,7 +62,7 @@
 
 # include "SciDBAPI.h"
 # include "array/Array.h"
-# include "smgr/io/DBLoader.h"
+# include "smgr/io/ArrayWriter.h"
 
 # define TESTCASE_COMMAND_SETUP             "--setup"
 # define TESTCASE_COMMAND_TEST              "--test"
@@ -158,14 +158,23 @@ string DefaultExecutor :: getErrorCodeFromException (const string &errstr)
 
 int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorCommandOptions *errorInfo)
 {
-		scidb::QueryResult queryResult;
+	scidb::QueryResult queryResult;
+
+    string qString = queryString;
+    if ((errorInfo) && (errorInfo->_hideQueryString))
+    {
+        // Igor L.: changed to hide the query string in --error directive to prevent expanded paths from shoing up in .out files.
+        qString = "(... omitted ...)";
+	}
 	try
 	{
 		assert (!queryString.empty ());
 		LOG4CXX_INFO (_logger, "Executing query : <" << queryString << ">");
 
 		if (_queryLogging == true || _ie.log_queries == true)
-			_resultfileStream << "SCIDB QUERY : <" << queryString << ">" << endl;
+		{
+			_resultfileStream << "SCIDB QUERY : <" << qString << ">" << endl;
+		}
 
 		string queryoutput_file = _ie.actual_rfile + ".queryoutput";
 
@@ -184,7 +193,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		 **/
 		if (queryResult.selective && _ignoredata_flag == false)
 		{
-            scidb::DBLoader::save (*queryResult.array, queryoutput_file, boost::shared_ptr<scidb::Query>(), _outputFormat);
+            scidb::ArrayWriter::save (*queryResult.array, queryoutput_file, boost::shared_ptr<scidb::Query>(), _outputFormat);
 		}
 		else if (queryResult.selective && _ignoredata_flag == true)
 		{
@@ -311,7 +320,8 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		 */
 		if (errorInfo)
 		{
-			_resultfileStream << "[An error expected at this place for the query \"" << queryString << "\".";
+
+			_resultfileStream << "[An error expected at this place for the query \"" << qString << "\".";
 			_resultfileStream << " And it failed";
 
 			if (errorInfo->_expected_errorcode != "" ||
@@ -335,7 +345,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
                                     if (errorInfo->_expected_errshort != int32_t(~0)) {
                                         _resultfileStream << " short code = " << e.getShortErrorCode();
                                     }
-                                    if (!errorInfo->_expected_errlong.empty()) { 
+                                    if (!errorInfo->_expected_errlong.empty()) {
                                         _resultfileStream << " long code = " << e.getLongErrorCode();
                                     }
                                 }
@@ -435,7 +445,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 	 */
 	if (errorInfo)
 	{
-		_resultfileStream << "[An error was expected at this place for the query \"" << queryString 
+		_resultfileStream << "[An error was expected at this place for the query \"" << qString
                           << "\". But actually query got executed successfully.]";
 		_resultfileStream << LINE_FEED;
 		_resultfileStream << LINE_FEED;
@@ -448,7 +458,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 }
 
 void DefaultExecutor :: disconnectFromSciDB (void) {
-    //check if a connection has already been established .. if so 
+    //check if a connection has already been established .. if so
     //close it. Connection is established if not connected in runSciDBQuery
     if (_dbconnection)
     {
@@ -457,7 +467,7 @@ void DefaultExecutor :: disconnectFromSciDB (void) {
     }
 }
 
-int DefaultExecutor :: stopTimer (const string &args) 
+int DefaultExecutor :: stopTimer (const string &args)
 {
 	LOG4CXX_INFO (_logger, "Stoping the timer...");
 
@@ -469,7 +479,7 @@ int DefaultExecutor :: stopTimer (const string &args)
 	return SUCCESS;
 }
 
-int DefaultExecutor :: startTimer (const string &args) 
+int DefaultExecutor :: startTimer (const string &args)
 {
 	LOG4CXX_INFO (_logger, "Starting a timer..." << args);
 
@@ -501,18 +511,17 @@ int DefaultExecutor :: endOutputFormat (void)
 int DefaultExecutor :: setOutputFormat(const string &args)
 {
 	LOG4CXX_INFO (_logger, "Setting Query Output Format to " << args);
-	std::string validFormats [] = {"auto", "csv", "dense", "csv+", "lcsv+", "text", "sparse", "lsparse", "store", "text", "opaque", "dcsv"};
-
-	for (int i=0; i<12; i++)
-	{
-		if (strcasecmp(validFormats[i].c_str(),args.c_str()) == 0)
-		{
-			_outputFormat = args;
-			return SUCCESS;
-		}
-	}
-	LOG4CXX_INFO (_logger, "Invalid Format: " << args << ". Switching back to dcsv format.");
-	_outputFormat = "dcsv";
+        if (scidb::ArrayWriter::isSupportedFormat(args)
+            || strcasecmp("auto", args.c_str()) == 0)
+        {
+                _outputFormat = args;
+        }
+        else
+        {
+                LOG4CXX_INFO (_logger, "Invalid Format: " << args
+                              << ". Switching back to dcsv format.");
+                _outputFormat = "dcsv";
+        }
 	return SUCCESS;
 }
 
@@ -522,16 +531,16 @@ int DefaultExecutor :: setPrecision(const string &args)
 	try
 	{
 		if(_precisionSet == false)
-			_precisionDefaultValue = scidb::DBLoader::defaultPrecision;
+                    _precisionDefaultValue = scidb::ArrayWriter::getPrecision();
 		int temp = boost::lexical_cast<int>(args);
-		scidb::DBLoader::defaultPrecision = temp;
+		scidb::ArrayWriter::setPrecision(temp);
 		_precisionSet = true;
 	}
 	catch(...)
 	{
 		LOG4CXX_INFO (_logger, "Invalid Precision Value: " << args << ". Re-setting back to default.");
 		_precisionSet = false;
-		scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+		scidb::ArrayWriter::setPrecision(_precisionDefaultValue);
 	}
 	return SUCCESS;
 }
@@ -685,7 +694,7 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
     /* store in the file specified in the --out option */
     if (!sco->_outputFile.empty ())
         _outputfileStream << "\n";
-    
+
     /* store in the .out file along with the results of different SciDB queries */
     if (sco->_store == true)
         _resultfileStream << "\n";
@@ -698,7 +707,7 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 	if (exit_code == 0)
 	{
 	return SUCCESS;
-    }	
+    }
 	LOG4CXX_INFO (_logger, "Hence this is a test case failure...");
 	return FAILURE;
 }
@@ -731,14 +740,14 @@ int DefaultExecutor :: execCommand (const string &cmd, const string &args, void 
 	{
 		long int seconds = sToi (args);
 		sleep (seconds);
-	} else if (cmd ==  TESTCASE_COMMAND_RECONNECT) 
+	} else if (cmd ==  TESTCASE_COMMAND_RECONNECT)
         {
                 LOG4CXX_INFO (_logger, "Reconnecting to SciDB");
-                //We only disconnect on --reconnect command 
+                //We only disconnect on --reconnect command
                 //connection is established in runSciDBQuery if connection object
                 //does not exist
                 disconnectFromSciDB();
-        }        
+        }
         else if (cmd == TESTCASE_COMMAND_STARTQUERYLOGGING)
 	{
 		LOG4CXX_INFO (_logger, "Starting query logging...");
@@ -1247,76 +1256,42 @@ int DefaultExecutor :: parseShellCommandOptions (string line, struct ShellComman
 			if (index >= line.length ())
 				throw (string ("Please specify the command within unescaped double quotes (\"\")."));
 
-			for ( ;index < line.length(); index++)
-			{
-				if (index1 == string::npos && line[index] == ' ')
-					continue;
+            //---------------------------------------------------------
+            string actualShellCommand;
+            string lineRemainder;
 
-				if (line[index] != '"')
-				{
-					if (index1 != string::npos && line[index] == ' ')
-						throw (string ("adjacent parameter is empty in --command."));
-					else
-						throw (string ("Please specify the command within unescaped double quotes (\"\")."));
-				}
+            size_t first_quote_pos = line.find_first_of("\"",index);
 
-				index++;
-				if (index >= line.length())
-					throw (string ("Please specify the command within unescaped double quotes (\"\")."));
+            size_t last_quote_pos = line.find_last_of("\"");
 
-				while (1)
-				{
-					size_t ending_dq = line.find ("\"", index);
+            if  (last_quote_pos == first_quote_pos)
+            {
+                throw (string ("Please specify the command within unescaped double quotes (\"\")."));
+            }
 
-					if (ending_dq == string::npos)
-						throw (string ("Please specify the command within unescaped double quotes (\"\")."));
+            actualShellCommand = line.substr( // Hack off the shell command.
+                first_quote_pos+1,
+                last_quote_pos-first_quote_pos-1
+                );
+            boost::trim(actualShellCommand);
 
-					/* if it's an escaped double quote then continue */
-					if (line[ending_dq-1] == '\\')
-					{
-						index = ending_dq + 2;
-						continue;
-					}
-					/* ending double quote must be followed by a space or line should end there */
-					else if (ending_dq+1 < line.length () && line[ending_dq+1] != ' ')
-					{
-						throw (string ("Options must be separated by a space."));
-					}
-					else
-					{
-						int chars = (ending_dq - starting_index) + 1;
-						int copy_chars = (ending_dq - starting_index) + 1 - strlen (" --command ");
-						char *actual_command = new char [copy_chars+1];
+            lineRemainder = line.substr( // Check if there is anything else on the line after --command " " option.
+                last_quote_pos+1
+                );
+            boost::trim(lineRemainder);
 
-						/* pick up the actual shell command */
-						line.copy (actual_command, copy_chars, starting_index + strlen (" --command "));
-						actual_command[copy_chars] = '\0';
-						string shellcommand = actual_command;
-						boost::trim (shellcommand);
 
-						/* remove starting and ending double quotes */
-						shellcommand.replace (0, 1, "");
-						shellcommand.replace (shellcommand.length()-1, 1, "");
-						sco->_command = shellcommand;
+            if (!lineRemainder.empty())
+            {
+                throw (string ("No other options are allowed after --command\"...\" option!"));
+            }
 
-						if (shellcommand.length() == 0)
-							throw (string ("Please specify the command within unescaped double quotes (\"\")."));
+            sco->_command = actualShellCommand;
 
-						/* remove --command="<actual shell command>" including double quotes enclosing the actual shell command
- 						 * this will make it possible for boost program options library to parse remaining options (--out, --store etc.)
- 						 * without considering any options given to actual shell command.
- 						 */
-						line.replace (starting_index, chars, " ");
-						command_removed = 1;
-						break;
-					}
-				} //END while(1)
+            line = line.substr(0,starting_index); // Remove the command option from the line.
+            //---------------------------------------------------------
 
-				if (command_removed == 1)
-					break;
-
-				throw (string ("Please specify the command within unescaped double quotes (\"\")."));
-			}
+            command_removed = 1;
 
 			index = line.find ("--command");
 			if (index != string::npos)
@@ -1724,6 +1699,7 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
                 ("short", po::value<int32_t>(), "Expected short error code.")
                 ("long", po::value< vector<int32_t> > (), "Expected long error code.")
                 ("igdata",                    "Whether data output by the query should be ignored or stored in a .expected/.out file.")
+                ("hideQueryString",           "Exclude query string from the output.")
                 ("aql",  po::value<string>(), "AQL query to be executed.")
                 ("afl",  po::value<string>(), "AFL query to be executed.");
 
@@ -1754,6 +1730,9 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
                     }
                     if (vm.count ("igdata")) {
                         eco->_igdata = true;
+                    }
+                    if (vm.count ("hideQueryString")) {
+                        eco->_hideQueryString = true;
                     }
                     if (vm.count ("aql"))
                     {
@@ -1861,18 +1840,18 @@ void DefaultExecutor :: addTestSpecificVariables (void)
     // Add environment variable that specifies test directory for
     // shell option.
     size_t lastDirSep = _ie.tcfile.find_last_of("/");
-    
+
     if (lastDirSep != std::string::npos)
     {
       std::string testFolder = _ie.tcfile.substr(0,lastDirSep);
-        
+
       _testEnvVars["TESTDIR"] = testFolder;
     }
     else
     {
       LOG4CXX_INFO (_logger, "Setting $TESTDIR environment variable failed: failed to locate dir separator in .test path!");
     }
-    
+
     //----------------------------------------------------------------
     // Set all of the above variables in the environment now.
     setTestSpecificVariables();
@@ -1888,10 +1867,10 @@ void DefaultExecutor :: setTestSpecificVariables (void)
     {
       std::string variableName;
       std::string variableValue;
-      
+
       variableName = it->first;
       variableValue = it->second;
-        
+
       if (setenv(variableName.c_str(),variableValue.c_str(),1) != 0)
      {
        LOG4CXX_INFO (_logger, "Setting environment variable $" << variableName << " failed: call to setenv returned non-zero!");
@@ -1942,7 +1921,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 			line_number++;
 
 			/* remove left and right hand side spaces.
-			 * a line containing only the spaces will be reduced to a blank line */ 
+			 * a line containing only the spaces will be reduced to a blank line */
 			boost::trim (line);
 
 			/* if blank line or a comment */
@@ -1998,7 +1977,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 				/* store --setup section to a vector of commands */
 				if (sFound && !setup_pushed_to_vector)
 				{
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.subCommands.clear ();
@@ -2029,7 +2008,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 				/* store --setup section to a vector of commands */
 				if (sFound && !setup_pushed_to_vector)
 				{
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.subCommands.clear ();
@@ -2038,7 +2017,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 				/* store --test section to a vector of commands */
 				else if (tFound && !test_pushed_to_vector)
 				{
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.subCommands.clear ();
@@ -2059,7 +2038,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					/* this means --echo is out of any section i.e. at the beginning of the file before --setup */
 					tmp.cmd = TESTCASE_COMMAND_ECHO;
 					tmp.args = line;
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.subCommands.clear ();
@@ -2099,7 +2078,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					tmp.cmd = TESTCASE_COMMAND_SHELL;
 					tmp.args = line;
 					tmp.extraInfo = sco;
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.extraInfo = 0;
@@ -2113,7 +2092,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					subtmp.args = line;
 					subtmp.extraInfo = sco;
 					tmp.subCommands.push_back (subtmp);
-				} 
+				}
 
 			/* command --aql */
 			} else if (boost::iequals (tokens[0],TESTCASE_COMMAND_AQL))
@@ -2190,7 +2169,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					/* this means --sleep is out of any section i.e. at the beginning of the file before --setup */
 					tmp.cmd = TESTCASE_COMMAND_SLEEP;
 					tmp.args = line;
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.subCommands.clear ();
@@ -2513,7 +2492,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					string error = TESTCASE_COMMAND_ERROR;
 					int command_length = error.length() + 1;
 					line.replace (0, command_length, "");
-					
+
 					if (line.empty ())
 					{
 						_errStream << "Invalid syntax for command " << TESTCASE_COMMAND_ERROR;
@@ -2555,7 +2534,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					string error = TESTCASE_COMMAND_JUSTRUN;
 					int command_length = error.length() + 1;
 					line.replace (0, command_length, "");
-					
+
 					if (line.empty ())
 					{
 						_errStream << "Invalid syntax for command " << TESTCASE_COMMAND_JUSTRUN;
@@ -2597,7 +2576,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					string error = TESTCASE_COMMAND_IGDATA;
 					int command_length = error.length() + 1;
 					line.replace (0, command_length, "");
-					
+
 					if (line.empty ())
 					{
 						_errStream << "Invalid syntax for command " << TESTCASE_COMMAND_IGDATA;
@@ -2623,7 +2602,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 					/* this means --echo is out of any section i.e. at the beginning of the file before --setup */
 					tmp.cmd = TESTCASE_COMMAND_EXIT;
 					tmp.args = line;
-					_currentSection->push_back (tmp);	
+					_currentSection->push_back (tmp);
 					tmp.cmd = "";
 					tmp.args = "";
 					tmp.subCommands.clear ();
@@ -2694,7 +2673,7 @@ int DefaultExecutor :: parseTestCaseFile (void)
 void DefaultExecutor :: printExecutorEnvironment (void)
 {
 	LOG4CXX_INFO (_logger, "Printing executor Environment : ");
-	
+
 	LOG4CXX_INFO (_logger, "_ie.tcfile : "           << _ie.tcfile);
 	LOG4CXX_INFO (_logger, "_ie.connectionString : " << _ie.connectionString);
 	LOG4CXX_INFO (_logger, "_ie.scidbPort : "        << _ie.scidbPort);
@@ -2725,7 +2704,7 @@ void DefaultExecutor :: printExecutorEnvironment (void)
 int DefaultExecutor :: createLogger (void)
 {
 	assert (_ie.log_file.length () > 0);
-	bfs::remove (_ie.log_file);	
+	bfs::remove (_ie.log_file);
 
 	_logger = log4cxx :: Logger :: getLogger (_ie.logger_name);
     _logger->setAdditivity (0);
@@ -2780,7 +2759,7 @@ int DefaultExecutor :: createLogger (void)
 int DefaultExecutor :: validateParameters (void)
 {
 	try
-	{ 
+	{
 		if (_ie.connectionString.empty ())
 			throw ConfigError (FILE_LINE_FUNCTION, ERR_CONFIG_SCIDBCONNECTIONSTRING_EMPTY);
 
@@ -2860,13 +2839,13 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 		return FAILURE;
 
 	createLogger ();
-	
+
     //------------------------------------------------------------------------
     // Introduce test-specific environment variables (see function definition
     // for details).
     //------------------------------------------------------------------------
     addTestSpecificVariables();
-    
+
 	//printExecutorEnvironment ();
 
 	if (parseTestCaseFile () == FAILURE)
@@ -2884,7 +2863,7 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 		LOG4CXX_INFO (_logger, "EXECUTOR returning FAILURE to the caller.");
 		if (_precisionSet == true)
 		{
-			scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+			scidb::ArrayWriter::setPrecision(_precisionDefaultValue);
 			_precisionSet = false;
 		}
 		return FAILURE;
@@ -2894,7 +2873,7 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 		LOG4CXX_INFO (_logger, "EXECUTOR returning FAILURE to the caller.");
 		if (_precisionSet == true)
 		{
-			scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+			scidb::ArrayWriter::setPrecision(_precisionDefaultValue);
 			_precisionSet = false;
 		}
 		return ERROR_CODES_DIFFER;
@@ -2903,7 +2882,7 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 	LOG4CXX_INFO (_logger, "EXECUTOR returning SUCCESS to the caller.");
 	if (_precisionSet == true)
 	{
-		scidb::DBLoader::defaultPrecision = _precisionDefaultValue;
+		scidb::ArrayWriter::setPrecision(_precisionDefaultValue);
 		_precisionSet = false;
 	}
 	return SUCCESS;

@@ -2,7 +2,7 @@
 --start-query-logging
 # Ticket number: 1950
 # Testing INSERT operator on 1D arrays.
-# Test covers inserting on empty arrays, filled arrays and negative tests
+# Test covers inserting on arrays, filled arrays and negative tests
 
 create array A <val:double> [x=0:3,2,0]
 create array B <val:double> [x=0:3,2,0]
@@ -11,8 +11,8 @@ create array D <sal:double> [x=0:3,4,0]
 
 
 --test
-insert(build_sparse(A,(5*x+3.9/x), x=1 or x=2),A)
-insert(build_sparse(A,(5*x+3.9/x), x=0 or x=3),A)
+insert(filter(build(A,(5*x+3.9/x)), x=1 or x=2),A)
+insert(filter(build(A,(5*x+3.9/x)), x=0 or x=3),A)
 insert(build(B,2*x),A)
 
 insert(B,A)

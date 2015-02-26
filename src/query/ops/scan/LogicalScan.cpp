@@ -74,6 +74,37 @@ public:
         ADD_PARAM_IN_ARRAY_NAME2(PLACEHOLDER_ARRAY_NAME_VERSION|PLACEHOLDER_ARRAY_NAME_INDEX_NAME); //0
     }
 
+    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    {
+        LogicalOperator::inferArrayAccess(query);
+
+        assert(!_parameters.empty());
+        assert(_parameters.front()->getParamType() == PARAM_ARRAY_REF);
+
+        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters.front())->getObjectName();
+
+        assert(arrayName.find('@') == std::string::npos);
+
+        ArrayDesc srcDesc;
+        SystemCatalog::getInstance()->getArrayDesc(arrayName,srcDesc);
+        if (srcDesc.isTransient())
+        {
+            boost::shared_ptr<SystemCatalog::LockDesc> lock(boost::make_shared<SystemCatalog::LockDesc>(arrayName,
+                                                                                         query->getQueryID(),
+                                                                                         Cluster::getInstance()->getLocalInstanceId(),
+                                                                                         SystemCatalog::LockDesc::COORD,
+                                                                                         SystemCatalog::LockDesc::WR));
+            boost::shared_ptr<SystemCatalog::LockDesc> resLock(query->requestLock(lock));
+
+            assert(resLock);
+            assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
+        }
+        else
+        {
+            LogicalOperator::inferArrayAccess(query); // take read lock as per usual
+        }
+    }
+
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);

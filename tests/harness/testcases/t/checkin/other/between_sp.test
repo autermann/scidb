@@ -1,12 +1,12 @@
 --setup
 --aql create array xyz <a:double> [x=0:1999,100,0, y=0:1999,100,0]
-load(xyz,'../tests/harness/testcases/data/xyz_small.txt')
+load(xyz,'${TEST_DATA_DIR}/xyz_small.txt')
 create array bar <val:int64> [x=0:1000000000,1,0,y=0:1000000000,1,0]
 store(merge(merge(between(build(bar, x+y),10,10,10,10), between(build(bar,x+y), 123456,123456,123456,123456) ), between(build(bar,x+y),10000000,10,10000000,10)), bar)
 create array bar2 <val:int64>[x=0:1000000000,1,0,y=0:1000000000,1,0,z=0:1000000000,1,0]
 store(merge(between(build(bar2,x+y),10,10,10,10,10,10), between(build(bar2,x+y),123456,123456,123456,123456,123456,123456)),bar2)
 create array evil_matrix<int32_attr:int32,int64_attr:int64,double_attr:double> [I=0:1130,1028,0,J=0:1130,1028,0]
---igdata "load(evil_matrix, '../tests/harness/testcases/data/evil_matrix.txt')"
+--igdata "load(evil_matrix, '${TEST_DATA_DIR}/evil_matrix.txt')"
 
 --test
 between(xyz, 0, 0, 1000, 1000)

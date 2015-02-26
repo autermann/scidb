@@ -1,5 +1,6 @@
 --setup
 --start-query-logging
+load_library('dense_linear_algebra')
 
 # NOTE: some notation for the array names
 #
@@ -62,7 +63,7 @@ store(build(intRows21nzc32, 1+(r-13)*1+(c-17)),      intRows21nzc32)
 
 # load same array as SciDB mutliply() test uses
 create array fileDense66c33 <a: double >   [r=0:5,3,0, c=0:5,3,0]
-load(fileDense66c33,'../tests/harness/testcases/data/dense.txt')
+--shell  --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(fileDense66c33,'${TEST_DATA_DIR}/dense.txt')""
 
 # and to make it output list in order
 create array output66c66 <a: double > [r=0:5,6,0, c=0:5,6,0]

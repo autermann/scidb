@@ -137,7 +137,9 @@ public:
 
         for (size_t i = nDims, j=_parameters.size(); i<j; i++)
         {
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], inputDesc, outSchema);
+            bool isInOrderAggregation = false;
+            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], inputDesc, outSchema,
+                    isInOrderAggregation);
         }
 
         AttributeDesc et ((AttributeID) outSchema.getAttributes().size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);

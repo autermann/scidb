@@ -8,8 +8,8 @@
 
 create array A <val:int64> [x=-100:199,10,2,y=-10:289,20,3]
 create array B <val:double> [x=-10:100,10,2,y=0:100,20,3]
-store(build_sparse(A, x+100*y, x=-90+y),A)
-store(build_sparse(B, x+100*y, (x=-10 and y=0) or (x=100 and y=100)),B)
+store(filter(build(A, x+100*y), x=-90+y),A)
+store(filter(build(B, x+100*y), (x=-10 and y=0) or (x=100 and y=100)),B)
 
 
 --test
@@ -22,10 +22,10 @@ between(B,-10,0,100,0)
 between(B,-10,50,0,99)
 
 show(A)
-store(subarray(A),AAA)
+store(subarray(A,null,null,null,null),AAA)
 show(AAA)
 show(B)
-store(subarray(B),BBB)
+store(subarray(B,null,null,null,null),BBB)
 show(BBB)
 subarray(A,171,261,191,281)
 subarray(A,0,0,10,100)

@@ -111,7 +111,7 @@
   </itemizedlist>
 
   <para>We describe these different types of array aggregates in more detail
-  in the following sections, as well as in <xref linkend="scidbAggregateReference"/>.</para>
+  in the following sections, as well as in <xref linkend="Aggregates"/>.</para>
 
   <para>Most examples in this chapter use the following example arrays:
   <code>m4x4</code> and <code>m4x4_2attr</code>, which have the following

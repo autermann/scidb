@@ -46,8 +46,12 @@ class NodeOf : public Node
 {
  public:                   // Construction
                               NodeOf(type t,const location& w,value v)
-                               : Node(t,w),
-                                 _value(v)               {assert(boost::has_trivial_destructor<type>());}
+                               : Node(t,w,cnodes()),
+                                 _value(v)               {}
+
+ public:                   // Allocation
+            void*             operator new(size_t n,Arena& a){return ::operator new(n,a,finalizer<NodeOf>());}
+            void              operator delete(void*,Arena&)  {}
 
  public:                   // Operations
             value             getValue()           const {return _value;}
@@ -56,31 +60,6 @@ class NodeOf : public Node
  private:                  // Representation
             value      const  _value;                    // The constant value
 };
-
-/**
- *  Construct a node to represent an application expression of the form:
- *
- *      <name> ( <operand_1> , .. , <operand_n> )
- *
- *  where 'name' names an operator if it begins with an upper case letter, and
- *  a scalar valued function if not,  and that is associated with the location
- *  'w' in the orginal source text.
- *
- *  This function provides the underlying implementation for the newApp family
- *  of overloaded member functions.
- */
-Node* newapp(Factory& f,name n,const location& w,Node* operands)
-{
-    assert(n!=0 && operands!=0);                         // Validate arguments
-
-    bool scalar = !isalpha(*n) || islower(*n);           // A scalar function?
-
-    return f.newNode(application,w,                      // ...application
-           f.newString(w,n),                             // ...operator name
-           operands,                                     // ...operands list
-           0,                                            // ...no alias here
-           f.newBoolean(w,scalar));                      // ...scalar valued?
-}
 
 /****************************************************************************/
 }
@@ -111,14 +90,14 @@ Node* newapp(Factory& f,name n,const location& w,Node* operands)
  *  destructors.
  *
  *  2) the range of child nodes is placed at the end of the node itself by the
- *  class specific operator new() provided by class Node.
+ *  class specific allocator Node::operator new().
  *
  *  This function provides the underlying implementation for most of the other
- *  overloaded factory functions.
+ *  overloaded factory functions defined below.
  */
 Node* Factory::newNode(type t,const location& w,cnodes children)
 {
-    return new(_arena,children) Node(t,w);               // Allocate on arena
+    return new(_arena,children) Node(t,w,children);      // Allocate off arena
 }
 
 /**
@@ -127,7 +106,7 @@ Node* Factory::newNode(type t,const location& w,cnodes children)
  */
 Node* Factory::newNode(type t,const location& w)
 {
-    return new(_arena,cnodes()) Node(t,w);               // Allocate on arena
+    return new(_arena,cnodes()) Node(t,w,cnodes());      // Allocate off arena
 }
 
 /**
@@ -139,8 +118,6 @@ Node* Factory::newNode(type t,const location& w)
  */
 Node* Factory::newCopy(const Node* n,origin o)
 {
-    assert(n != 0);                                      // Validate arguments
-
     struct copier : Visitor
     {
         copier(Factory* f,origin o)
@@ -172,13 +149,21 @@ Node* Factory::newCopy(const Node* n,origin o)
         bool     const _xfr;                             // Transferring out?
     };
 
+    if (n == 0)                                          // Nothing to copy?
+    {
+        return 0;                                        // ...that was easy
+    }
+
     return copier(this,o)(const_cast<Node*&>(n));        // Run the copier
 }
 
 /**
- *  Construct a node to represent a constant null. Later on we plan to support
- *  a variety of different kinds of null but for now all nulls are essentially
- *  the same so we can simply use a generic node to represent the constant.
+ *  Construct a node to represent a constant null that is associated with the
+ *  source location 'w'.
+ *
+ *  We hope to eventually support a variety of different nulls, but at present
+ *  all nulls are essentially the same, so we can simply use a generic node to
+ *  represent this constant.
  */
 Node* Factory::newNull(const location& w)
 {
@@ -202,15 +187,15 @@ Node* Factory::newString(const location& w,string s)
 /**
  *  Construct a node to represent the lambda abstraction:
  *  @code
- *      fn (<parameter_1> , .. , <parameter_n>) { <body> }
+ *      fn (<formal_1> , .. , <formal_n>) { <body> }
  *  @endcode
- *  and that is associated with the location 'w' in the orginal source text.
+ *  that is associated with the location 'w' in the original source text.
  */
-Node* Factory::newAbs(const location& w,Node* parameters,Node* body)
+Node* Factory::newAbs(const location& w,Node* formals,Node* body)
 {
-    assert(parameters!=0 && body!=0);                    // Validate arguments
+    assert(formals!=0 && body!=0);                       // Validate arguments
 
-    return newNode(abstraction,w,parameters,body);       // Create abstraction
+    return newNode(abstraction,w,formals,body);          // Create abstraction
 }
 
 /**
@@ -218,11 +203,40 @@ Node* Factory::newAbs(const location& w,Node* parameters,Node* body)
  *  @code
  *      <name> ( )
  *  @endcode
- *  and that is associated with the location 'w' in the orginal source text.
+ *  that is associated with the location 'w' in the original source text.
  */
-Node* Factory::newApp(const location& w,name n)
+Node* Factory::newApp(const location& w,name name)
 {
-    return newapp(*this,n,w,this->newNode(list,w));      // Create application
+    return newApp(w,name,cnodes());                      // Create application
+}
+
+/**
+ *  Construct a node to represent the application expression:
+ *  @code
+ *      <name> ( operand[1] , .. , operand[n] )
+ *  @endcode
+ *  that is associated with the location 'w' in the original source text.
+ */
+Node* Factory::newApp(const location& w,name name,cnodes operands)
+{
+    return newApp(w,newString(w,name),operands);         // Create application
+}
+
+/**
+ *  Construct a node to represent the application expression:
+ *  @code
+ *      <name> ( operand[1] , .. , operand[n] )
+ *  @endcode
+ *  that is associated with the location 'w' in the original source text.
+ */
+Node* Factory::newApp(const location& w,Name* name,cnodes operands)
+{
+    assert(name!=0 && name->is(cstring));                // Validate arguments
+
+    Node* v = newVar(w,name);                            // The operator expr
+    Node* l = newNode(list,w,operands);                  // The operands list
+
+    return newNode(application,w,v,l,0);                 // Create application                                           // ...no alias here
 }
 
 /**
@@ -230,13 +244,13 @@ Node* Factory::newApp(const location& w,name n)
  *  @code
  *      fix { <binding_1> ; .. ; <binding_n>) } in <body>
  *  @endcode
- *  and that is associated with the location 'w' in the orginal source text.
+ *  that is associated with the location 'w' in the original source text.
  */
 Node* Factory::newFix(const location& w,Node* bindings,Node* body)
 {
     assert(bindings!=0 && body!=0);                      // Validate arguments
 
-    if (bindings->isEmpty())                             // Trivial bindings?
+    if (bindings->isEmpty())                             // No actual bindings?
     {
         return body;                                     // ...a special case
     }
@@ -249,13 +263,13 @@ Node* Factory::newFix(const location& w,Node* bindings,Node* body)
  *  @code
  *      let { <binding_1> ; .. ; <binding_n>) } in <body>
  *  @endcode
- *  and that is associated with the location 'w' in the orginal source text.
+ *  that is associated with the location 'w' in the original source text.
  */
 Node* Factory::newLet(const location& w,Node* bindings,Node* body)
 {
     assert(bindings!=0 && body!=0);                      // Validate arguments
 
-    if (bindings->isEmpty())                             // Trivial bindings?
+    if (bindings->isEmpty())                             // No actual bindings?
     {
         return body;                                     // ...a special case
     }
@@ -264,9 +278,69 @@ Node* Factory::newLet(const location& w,Node* bindings,Node* body)
 }
 
 /**
+ *  Construct a node to represent the  occurrence of either an array qualified
+ *  or version qualified reference within an expression:
+ *  @code
+ *      <av> . <name> <order>                            // Array qualified
+ *   or
+ *      <name> [ <av> [ <order> ] ]                      // Version qualified
+ *  @endcode
+ *  that is associated with the location 'w' in the original source text.
+ */
+Node* Factory::newRef(const location& w,Name* name,Node* av,Node* order)
+{
+    assert(name!=0 && name->is(cstring));                // Validate arguments
+
+    Node* n = newVar(name->getWhere(),name);             // The reference name
+    Node* a = 0;                                         // Array   qualifier
+    Node* v = 0;                                         // Version qualifier
+
+    if (av!=0 && av->is(cstring))                        // Has an array name?
+    {
+        a = newVar(av->getWhere(),av);                   // ...set qualifier
+    }
+    else                                                 // Missing array name
+    {
+        v = av;                                          // ...set qualifier
+    }
+
+    return newNode(reference,w,n,a,v,order,0);           // Create a reference
+}
+
+/**
+ *  Construct a node to represent the occurrence of an unqualified name within
+ *  an expression:
+ *  @code
+ *      <name>
+ *  @endcode
+ *  that is associated with the location 'w' in the original source text.
+ */
+Node* Factory::newVar(const location& w,name name)
+{
+    assert(name != 0);                                   // Validate arguments
+
+    return newNode(variable,w,newString(w,name),0);      // Create a variable
+}
+
+/**
+ *  Construct a node to represent the occurrence of an unqualified name within
+ *  an expression:
+ *  @code
+ *      <name>
+ *  @endcode
+ *  that is associated with the location 'w' in the original source text.
+ */
+Node* Factory::newVar(const location& w,Name* name)
+{
+    assert(name!=0 && name->is(cstring));                // Validate arguments
+
+    return newNode(variable,w,name,0);                   // Create a variable
+}
+
+/**
  *  Allocate a node of type 'list' that is associated with the source location
  *  'w' and that carries pointers to the 'items' children currently sitting at
- *  the top of the shadow stack.
+ *  the top of the parser shadow stack.
  */
 Node* Factory::newList(const location& w,size_t items)
 {
@@ -274,7 +348,7 @@ Node* Factory::newList(const location& w,size_t items)
 }
 
 /**
- *  Push the given node onto the parser shadow stack.
+ *  Push the given node onto the top of the parser shadow stack.
  */
 void Factory::push(Node* node)
 {
@@ -320,22 +394,22 @@ boolean Node::getBoolean()const {assert(is(cboolean));return downcast<const Node
 integer Node::getInteger()const {assert(is(cinteger));return downcast<const NodeOf<integer>*>(this)->getValue();}
 
 /** @cond ********************************************************************
- * We use the preprocessor to automate creation of the remaining overloads..*/
-#define SCIDB_NEW_NODE(_,i,__)                                                  \
-                                                                                \
-Node* Factory::newNode(type t,const location& w,BOOST_PP_ENUM_PARAMS(i,Node*n)) \
-{                                                                               \
-    Node* c[] = {BOOST_PP_ENUM_PARAMS(i,n)};                                    \
-                                                                                \
-    return newNode(t,w,c);                                                      \
-}                                                                               \
-                                                                                \
-Node* Factory::newApp(const location& w,name n,BOOST_PP_ENUM_PARAMS(i,Node* n)) \
-{                                                                               \
-    Node* c[] = {BOOST_PP_ENUM_PARAMS(i,n)};                                    \
-                                                                                \
-    return newapp(*this,n,w,this->newNode(list,w,c));                           \
-}                                                                               \
+ * We use the preprocessor to automatically create the remaining overloads..*/
+#define SCIDB_NEW_NODE(_,i,__)                                                 \
+                                                                               \
+Node* Factory::newNode(type t,const location& w,BOOST_PP_ENUM_PARAMS(i,Node*n))\
+{                                                                              \
+    Node* c[] = {BOOST_PP_ENUM_PARAMS(i,n)};                                   \
+                                                                               \
+    return newNode(t,w,c);                                                     \
+}                                                                              \
+                                                                               \
+Node* Factory::newApp(const location& w,name n,BOOST_PP_ENUM_PARAMS(i,Node*n)) \
+{                                                                              \
+    Node* c[] = {BOOST_PP_ENUM_PARAMS(i,n)};                                   \
+                                                                               \
+    return newApp(w,n,c);                                                      \
+}                                                                              \
 
 BOOST_PP_REPEAT_FROM_TO(1,8,SCIDB_NEW_NODE,"")           // Emit the overloads
 #undef SCIDB_NEW_NODE                                    // And clean up after

@@ -246,10 +246,12 @@ bool readProcName(const std::string& pid, std::string& procName)
     }
     struct scidb::FdCleaner fdCleaner(fd);
 
-    const size_t readSize(1024);
+    const size_t readSize(1*KiB);
     std::vector<char> buf(readSize);
     size_t off(0);
 
+    // read the /proc/<pid>/cmdline file until the first '\0'
+    // that should give us the process name
     while(true) {
         buf.resize(off+readSize);
         char *start = &buf[off];
@@ -262,7 +264,7 @@ bool readProcName(const std::string& pid, std::string& procName)
         }
         char *end = reinterpret_cast<char*>(memchr(&buf[off], '\0', n));
         if (end != NULL) {
-            assert(end>start);
+            assert(end>=start);
             const ssize_t tail = (end-start);
             assert(tail < n);
             off += tail;

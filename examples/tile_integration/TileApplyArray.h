@@ -215,7 +215,7 @@ class TileApplyArray : public DelegateArray
 
 /**
  * Chunk for TileApplyArray.
- * It wrapps TileApplyChunkIterator into BufferedConstChunkIterator
+ * It wraps TileApplyChunkIterator into BufferedConstChunkIterator
  * to make sure it generates one tile at time (vs one value at at time)
  */
 

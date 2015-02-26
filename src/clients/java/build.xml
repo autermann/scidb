@@ -130,7 +130,7 @@
         <mkdir dir="${doc_dir}" />
 
         <presetdef name="javac">
-            <javac includeantruntime="false" debug="${debug}" target="1.6" source="1.6">
+            <javac includeantruntime="true" debug="true" debuglevel="lines,vars,source" target="1.6" source="1.6">
                 <compilerarg line="-Xlint:deprecation"/>
             </javac>
         </presetdef>
@@ -149,7 +149,7 @@
     <!-- Build scidb4j -->
     <target name="build.scidb4j" depends="gen.protocol" description="Compile module 'scidb4j'">
         <depend srcdir="src/main/java/scidb4j" destdir="${scidb4j.output.dir}" cache="${deps_dir}" />
-        <javac srcdir="src/main/java/scidb4j" destdir="${scidb4j.output.dir}" classpath="${protobuf_lib}" />
+        <javac srcdir="src/main/java/scidb4j" destdir="${scidb4j.output.dir}" classpath="${protobuf_lib}"/>
         <jar jarfile="${scidb4j.jar}" basedir="${scidb4j.output.dir}" />
     </target>
 

@@ -336,4 +336,40 @@ void ListLibrariesArrayBuilder::addToArray(LibraryInformation const& item)
     _outCIters[BUILD_TYPE]->writeItem(v);
 }
 
+Attributes ListQueriesArrayBuilder::getAttributes() const
+{
+    Attributes attrs(NUM_ATTRIBUTES);
+    attrs[QUERY_ID]      = AttributeDesc(QUERY_ID,       "query_id",       TID_UINT64, 0, 0);
+    attrs[COORDINATOR]   = AttributeDesc(COORDINATOR,    "coordinator",    TID_UINT64, 0, 0);
+    attrs[QUERY_STR]     = AttributeDesc(QUERY_STR,      "query_string",   TID_STRING, 0, 0);
+    attrs[CREATION_TIME] = AttributeDesc(CREATION_TIME,  "creation_time",  TID_DATETIME, 0, 0);
+    attrs[ERROR_CODE]    = AttributeDesc(ERROR_CODE,     "error_code",     TID_INT32, 0, 0);
+    attrs[ERROR]         = AttributeDesc(ERROR,          "error",          TID_STRING, 0, 0);
+    attrs[IDLE]          = AttributeDesc(IDLE,           "idle",           TID_BOOL, 0, 0);
+    attrs[EMPTY_INDICATOR] = AttributeDesc(EMPTY_INDICATOR,
+                                           DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+                                           TID_INDICATOR,
+                                           AttributeDesc::IS_EMPTY_INDICATOR, 0);
+    return attrs;
+}
+
+void ListQueriesArrayBuilder::addToArray(shared_ptr<Query> const& query)
+{
+    Value v;
+    v.setString(query->queryString.c_str());
+    _outCIters[QUERY_STR]->writeItem(v);
+    v.setUint64(query->getQueryID());
+    _outCIters[QUERY_ID]->writeItem(v);
+    v.setUint64(query->getCoordinatorPhysicalInstanceID());
+    _outCIters[COORDINATOR]->writeItem(v);
+    v.setDateTime(query->getCreationTime());
+    _outCIters[CREATION_TIME]->writeItem(v);
+    v.setInt32(query->getErrorCode());
+    _outCIters[ERROR_CODE]->writeItem(v);
+    v.setString(query->getErrorDescription().c_str());
+    _outCIters[ERROR]->writeItem(v);
+    v.setBool(query->idle());
+    _outCIters[IDLE]->writeItem(v);
+}
+
 }

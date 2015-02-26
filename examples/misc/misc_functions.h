@@ -127,6 +127,7 @@ void injectRemoteErrorForQuery(std::deque<scidb::QueryID>& idList, long int errC
         boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
         boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
         errorMessage->setQueryID(queryID);
+        errorRecord->set_cluster_uuid(Cluster::getInstance()->getUuid());
         errorRecord->set_type(1);
         errorRecord->set_errors_namespace("scidb");
         errorRecord->set_short_error_code(SCIDB_SE_INJECTED_ERROR);
@@ -201,5 +202,35 @@ void injectError(const Value** args, Value* res, void*)
    res->setInt64(errID);
    err->inject();
 }
+
+void setMemCap(const Value** args, Value* res, void*)
+{
+   InstanceID instanceID = static_cast<InstanceID>(args[0]->getInt64());
+   int64_t  maxMem  = args[1]->getInt32();
+   res->setInt64(-1);
+
+   if (Cluster::getInstance()->getLocalInstanceId() != instanceID) {
+      return;
+   }
+
+   if (maxMem<0) {
+       maxMem = RLIM_INFINITY;
+   }
+
+   struct rlimit rlim;
+   if (getrlimit(RLIMIT_AS, &rlim) != 0) {
+       LOG4CXX_ERROR(log4cxx::Logger::getRootLogger(),
+                     " getrlimit call failed with errno "<<errno<<"; memory cap not set.");
+       return;
+   }
+   rlim.rlim_cur = maxMem;
+   if (setrlimit(RLIMIT_AS, &rlim) != 0) {
+       LOG4CXX_ERROR(log4cxx::Logger::getRootLogger(),
+                     " setrlimit call failed with errno "<<errno<<"; memory cap not set.");
+       return;
+   }
+   res->setInt64(instanceID);
+}
+
 
 #endif // MISC_FUNCTIONS_H

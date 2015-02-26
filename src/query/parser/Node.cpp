@@ -30,14 +30,18 @@ namespace scidb { namespace parser {
 
 /**
  *  Complete the construction for a node of type 't', associated with location
- *  'w' in the original source text. Its children have already been written to
- *  the end of this node earlier by the associated 'new' operator, so all that
- *  remains for us to do is to save the type and location fields.
+ *  'w' in the original source text, whose children are specified in the range
+ *  'c'.
+ *
+ *  Our specialised 'new' operator has cunningly arranged for additional space
+ *  to be allocated at the end of the object, and has even copied the children
+ *  into this special space for us, so all that remains for us to do now is to
+ *  initialize our fixed size data members, as per usual.
  */
-    Node::Node(type t,const location& w)
+    Node::Node(type t,const location& w,cnodes c)
         : _type(t),
           _where(w),
-          _size(_size)
+          _size(c.size())
 {}
 
 /**
@@ -47,7 +51,8 @@ namespace scidb { namespace parser {
  *  b)  by not carrying a container, our destructor need no longer be invoked.
  *  As a result, the entire abstract syntax tree can be cheaply created in the
  *  caller's resetting arena and simply flushed in one go once the translation
- *  is complete: no need to recurse back over the tree calling destructors.
+ *  is complete: there is no need to recurse back over the tree just to invoke
+ *  destructors.
  */
 void* Node::operator new(size_t n,Arena& a,cnodes c)
 {
@@ -62,12 +67,78 @@ void* Node::operator new(size_t n,Arena& a,cnodes c)
 
 /**
  *  Allocate and return a shallow copy of this node; that is, a new allocation
- *  whose contents is identical to this node, and that, in particular, carries
- *  pointers to exactly the same children.
+ *  whose contents are identical to this one, and that, in particular, carries
+ *  pointers to exactly the same children as we do.
  */
 Node* Node::copy(Factory& f) const
 {
     return new(f.getArena(),getList()) Node(*this);      // Allocate new copy
+}
+
+/**
+ * Return a string representation of the node formatted as source text.
+ *
+ * Don't expect to be able to parse the resulting string: the function is only
+ * provided to facilitate inspecting from within a debugger.
+ */
+string Node::dump() const
+{
+    ostringstream o;                                     // New string stream
+    o << this;                                           // Drop node into it
+    return o.str();                                      // And return string
+}
+
+/**
+ *  Return any optional alias that may be associated with the expression 'pn'.
+ *
+ *  Aliases are currently represented as part of the syntactic structure of an
+ *  operator application or array reference;  what would make more sense would
+ *  be to treat the alias as a binary operator that endows Any expression with
+ *  an optional alias (which can subsequently be ignored, perhaps).
+ */
+Name* getAlias(const Node* pn)
+{
+    if (pn->is(application))                             // Is an application?
+    {
+        return pn->get(applicationArgAlias);             // ...retrieve alias
+    }
+    else
+    if (pn->is(reference))                               // Is it a reference?
+    {
+        return pn->get(referenceArgAlias);               // ...retrieve alias
+    }
+
+    return 0;                                           // No, it has no alias
+}
+
+/**
+ *  Assign the alias 'pa' to the expression 'pn'.
+ *
+ *  Aliases are currently represented as part of the syntactic structure of an
+ *  operator application or array reference;  what would make more sense would
+ *  be to treat the alias as a binary operator that endows Any expression with
+ *  an optional alias (which can subsequently be ignored, perhaps).
+ */
+Node*& setAlias(Node*& pn,Name* pa)
+{
+    assert(pn != 0);                                     // Validate the node
+    assert(pa==0 || pa->is(cstring));                    // Validate the alias
+
+    if (pn->is(application))                             // Is an application?
+    {
+        pn->set(applicationArgAlias,pa);                 // ...assign an alias
+    }
+    else
+    if (pn->is(reference))                               // Is it a reference?
+    {
+        pn->set(referenceArgAlias,pa);                   // ...assign an alias
+    }
+    else                                                 // Is something else?
+    {
+                                                         // ...just ignore it
+    }
+
+    return pn;                                           // Return parent node
 }
 
 /****************************************************************************/

@@ -284,7 +284,7 @@ class PhysicalSaveBmp: public PhysicalOperator
         Chunk& outChunk2 = daiter2->newChunk(outPos);
         shared_ptr<ChunkIterator>dciter2 = outChunk2.getIterator(query);
         dciter2->setPosition(outPos);
-        outValue.setDouble(fileSize * 1.0 / (1024*1024));
+        outValue.setDouble(fileSize * 1.0 / MiB);
         dciter2->writeItem(outValue);
         dciter2->flush();
 

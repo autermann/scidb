@@ -29,11 +29,11 @@ scidbLoadCsv.sh -a ID,AffyID,Response -D ID,AffyID -m '1:4,1:4' -c 4,4 int32,int
 
 set -x
 iquery -aq "show(tmpA)"
-iquery -aq "count(tmpA)"
+iquery -aq "aggregate(tmpA,count(*))"
 #iquery -aq "scan(tmpA)"
 
 iquery -aq "show(tmpB)"
-iquery -aq "count(tmpB)"
+iquery -aq "aggregate(tmpB,count(*))"
 #iquery -aq "scan(tmpB)"
 
 iquery -aq "scan(tmpA)" > /tmp/tmpA.txt
@@ -55,8 +55,8 @@ if false ; then
     iquery    -aq "show(tmpD)"
     iquery    -aq "store(project(tmpD, d), tmpR)"
     iquery    -aq "show(tmpR)"
-    iquery    -aq "count(tmpR)"
-    iquery    -aq "sum(tmpR)"
+    iquery    -aq "aggregate(tmpR,count(*))"
+    iquery    -aq "aggregate(tmpR,sum(d))"
 fi
 
 # failure cases that should diagnose the user:

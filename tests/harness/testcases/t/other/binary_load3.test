@@ -17,7 +17,7 @@ save(MAT, 'matrix.bin', 0, '(double,string,double)')
 load(MAT_UB, 'matrix.bin', 0, '(double,string,double)')
 save(MAT_UB, 'mat.txt', -1)
 
-load(Matrix_date, '../tests/harness/testcases/data/matdate.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(Matrix_date, '${TEST_DATA_DIR}/matdate.txt')""
 save(Matrix_date, 'matdate.out', 0, '(double,string,double,datetime)')
 show(Matrix_date)
 show(MAT_UB)

@@ -132,8 +132,8 @@ namespace scidb {
     _currLPosInTile(-1),
     _currTileIndex(0)
     {
-        assert(! (_tiledChunkIterator->getMode() & TILE_MODE));
         assert(_tiledChunkIterator);
+        assert(! (_tiledChunkIterator->getMode() & TILE_MODE));
 
 #ifndef SCIDB_CLIENT
         int tsize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
@@ -554,8 +554,8 @@ namespace scidb {
     _tileFactory(TileFactory::getInstance()),
     _passThru(true)
     {
-        assert(! (_itemChunkIterator->getMode() & TILE_MODE));
         assert(_itemChunkIterator);
+        assert(! (_itemChunkIterator->getMode() & TILE_MODE));
     }
 
     template<typename ItemChunkIterator>
@@ -709,6 +709,9 @@ namespace scidb {
             assert(!coords.empty());
 
             if (!_itemChunkIterator->setPosition(coords)) {
+                // Reset OUT pointers: there's no data here, move along.
+                tileData.reset();
+                tileCoords.reset();
                 return position_t(-1);
             }
         }
@@ -753,6 +756,9 @@ namespace scidb {
         assert(! (getMode() & TILE_MODE));
 
         if (offset.empty() || !_itemChunkIterator->setPosition(offset)) {
+            // Reset OUT pointers: there's no data here, move along.
+            tileData.reset();
+            tileCoords.reset();
             offset.clear();
             return offset;
         }
@@ -776,7 +782,7 @@ namespace scidb {
 
         tileData.swap(dataTile);
         if (coordCtx) {
-            assert(dataTile->size() == coordTile->size());
+            assert(tileData->size() == coordTile->size());
             tileCoords.swap(coordTile);
         }
         return offset;

@@ -39,11 +39,11 @@
 
 
 // scidb internals
-#include <linear_algebra/blas/initMathLibs.h>
-#include <linear_algebra/dlaScaLA/slaving/pdgesvdSlave.hpp>
-#include <linear_algebra/dlaScaLA/slaving/pdgemmSlave.hpp>
-#include <linear_algebra/scalapackUtil/test/slaving/mpiCopySlave.hpp>
-#include <linear_algebra/scalapackUtil/test/slaving/mpiRankSlave.hpp>
+#include <dense_linear_algebra/blas/initMathLibs.h>
+#include <dense_linear_algebra/dlaScaLA/slaving/pdgesvdSlave.hpp>
+#include <dense_linear_algebra/dlaScaLA/slaving/pdgemmSlave.hpp>
+#include <dense_linear_algebra/scalapackUtil/test/slaving/mpiCopySlave.hpp>
+#include <dense_linear_algebra/scalapackUtil/test/slaving/mpiRankSlave.hpp>
 #include <network/BaseConnection.h>
 #include <network/proto/scidb_msg.pb.h>
 

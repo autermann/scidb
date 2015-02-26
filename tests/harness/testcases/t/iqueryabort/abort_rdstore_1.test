@@ -2,9 +2,9 @@
 --start-query-logging
 
 CREATE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,10,0, y=0:1999,10,0]
-CREATE EMPTY ARRAY ABRREDIM <x:int64>[a(double)=*,20,0]
+CREATE array ABRREDIM <x:int64>[a(double)=*,20,0]
 
-#load(ABRLOAD,'../tests/harness/testcases/data/xyz_small.txt')
+#load(ABRLOAD,'${TEST_DATA_DIR}/xyz_small.txt')
 --test 
 
 --start-igdata
@@ -15,17 +15,17 @@ aggregate(ABRLOAD,count(*))
 aggregate(ABRREDIM,count(*))
 
 --echo "killquery redimension_store (signal 2)"
---shell --command "../utils/killquery.sh -afl 2 1 'store(redimension(ABRLOAD, ABRREDIM), ABRREDIM)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
+--shell  --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 2 1 'store(redimension(ABRLOAD, ABRREDIM), ABRREDIM)' 1> /tmp/${HPID}_1.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_1.stdout"
 
 --echo "killquery redimension_store (signal 15)"
---shell --command "../utils/killquery.sh -afl 15 1 'store(redimension(ABRLOAD, ABRREDIM), ABRREDIM)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 15 1 'store(redimension(ABRLOAD, ABRREDIM), ABRREDIM)' 1> /tmp/${HPID}_2.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_2.stdout"
 
 --echo "killquery redimension_store (signal 9)"
---shell --command "../utils/killquery.sh -afl 9 1 'store(redimension(ABRLOAD, ABRREDIM), ABRREDIM)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 9 1 'store(redimension(ABRLOAD, ABRREDIM), ABRREDIM)' 1> /tmp/${HPID}_3.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_3.stdout"
 

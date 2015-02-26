@@ -37,41 +37,33 @@
 namespace scidb
 {
 
-#define ERRMSG(code, message) __errorMap__[code] = message;
-
 ErrorsLibrary::ErrorsLibrary()
 {
-    #define __errorMap__ _builtinShortErrorsMsg
-    #include "system/ShortErrorsList.h"
+    #define X(_name, _code, _msg) _builtinShortErrorsMsg[_name] = _msg ;
+    #include "system/ShortErrors.inc"
+    #undef X
 
-    #undef __errorMap__
-    #define __errorMap__ _builtinLongErrorsMsg
-    #include "system/LongErrorsList.h"
-
-    #undef __errorMap__
+    #define X(_name, _code, _msg) _builtinLongErrorsMsg[_name] = _msg ;
+    #include "system/LongErrors.inc"
+    #undef X
 
     registerErrors("scidb", &_builtinLongErrorsMsg);
 }
 
-void ErrorsLibrary::registerErrors(const std::string &errorsNamespace, ErrorsMessages* errrosMessages)
+void ErrorsLibrary::registerErrors(const std::string &errorsNamespace, ErrorsMessages* msgMap)
 {
     ScopedMutexLock lock(_lock);
+    int badErrorNumber = 0;
 
     if (_errorNamespaces.find(errorsNamespace) != _errorNamespaces.end())
         throw SYSTEM_EXCEPTION(SCIDB_SE_ERRORS_MGR, SCIDB_LE_ERRNS_ALREADY_REGISTERED) << errorsNamespace;
 
-    //Check error codes consistency. All system codes must be equal or less than 0xFF and user codes must be
-    //greater than 0xFF
-    if ("scidb" == errorsNamespace)
+    if ("scidb" != errorsNamespace)
     {
-        for (ErrorsMessages::const_iterator it = errrosMessages->begin(); it != errrosMessages->end(); ++it)
-        {
-            assert(it->first <= SCIDB_MAX_SYSTEM_ERROR);
-        }
-    }
-    else
-    {
-        for (ErrorsMessages::const_iterator it = errrosMessages->begin(); it != errrosMessages->end(); ++it)
+        // Check that non-SciDB error numbers are all > SCIDB_MAX_SYSTEM_ERROR.
+        // (If there is more than one "foreign" error space, they still
+        // might collide however.  Bummer.)
+        for (ErrorsMessages::const_iterator it = msgMap->begin(); it != msgMap->end(); ++it)
         {
             if (it->first <= SCIDB_MAX_SYSTEM_ERROR)
             {
@@ -80,9 +72,28 @@ void ErrorsLibrary::registerErrors(const std::string &errorsNamespace, ErrorsMes
             }
         }
     }
+    else {
+        // Check that SciDB system error numbers are all <= SCIDB_MAX_SYSTEM_ERROR.
+        for (ErrorsMessages::const_iterator it = msgMap->begin(); it != msgMap->end(); ++it)
+        {
+            if (it->first > SCIDB_MAX_SYSTEM_ERROR)
+            {
+                badErrorNumber = it->first;
+                break;
+            }
+        }
+    }
 
+    _errorNamespaces[errorsNamespace] = msgMap;
 
-    _errorNamespaces[errorsNamespace] = errrosMessages;
+    // Have to wait for SciDB errors to get registered (previous line)
+    // before we throw one!  Assuming SCIDB_LE_INVALID_SYSTEM_ERROR_CODE
+    // is itself valid.... ;-D
+    if (badErrorNumber) {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_ERRORS_MGR,
+                               SCIDB_LE_INVALID_SYSTEM_ERROR_CODE)
+            << badErrorNumber << SCIDB_MAX_SYSTEM_ERROR;
+    }
 }
 
 void ErrorsLibrary::unregisterErrors(const std::string &errorsNamespace)
@@ -101,8 +112,8 @@ const std::string ErrorsLibrary::getShortErrorMessage(int32_t shortError)
 
     if (_builtinShortErrorsMsg.end() == _builtinShortErrorsMsg.find(shortError))
     {
-        return boost::str(boost::format("!!!Can not obtain short error message for short error code"
-            " '%1%' because it does not registered!!!") % shortError);
+        return boost::str(boost::format("!!!Cannot obtain short error message for short error code"
+            " '%1%' because it was not registered!!!") % shortError);
     }
 
     return _builtinShortErrorsMsg[shortError];
@@ -115,15 +126,15 @@ const std::string ErrorsLibrary::getLongErrorMessage(const std::string &errorsNa
     ErrorsNamespaces::const_iterator nsIt = _errorNamespaces.find(errorsNamespace);
     if (_errorNamespaces.end() == nsIt)
     {
-        return boost::str(boost::format("!!!Can not obtain long error message for long error code '%1%' because "
-            "errors namespace '%2%' does not registered!!!") % longError % errorsNamespace);
+        return boost::str(boost::format("!!!Cannot obtain long error message for long error code '%1%' because "
+            "errors namespace '%2%' was not registered!!!") % longError % errorsNamespace);
     }
 
     ErrorsMessages::const_iterator errIt = nsIt->second->find(longError);
     if (nsIt->second->end() == errIt)
     {
-        return boost::str(boost::format("!!!Can not obtain error message for error code '%1%'"
-            " from errors namespace '%2%' because error code '%1%' does not registered!!!")
+        return boost::str(boost::format("!!!Cannot obtain error message for error code '%1%'"
+            " from errors namespace '%2%' because error code '%1%' was not registered!!!")
             % longError % errorsNamespace);
     }
 

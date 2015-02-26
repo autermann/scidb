@@ -85,8 +85,8 @@ public:
     {
         _properties.tile = false;  // we dont run in the old tile mode
         ADD_PARAM_INPUT()
-        ADD_PARAM_OUT_ATTRIBUTE_NAME("void")//0
-        ADD_PARAM_EXPRESSION("void")        //1
+        ADD_PARAM_OUT_ATTRIBUTE_NAME(TID_VOID)//0
+        ADD_PARAM_EXPRESSION(TID_VOID)        //1
         ADD_PARAM_VARIES()
     }
 
@@ -95,14 +95,15 @@ public:
         return false; // we dont run in the old tile mode
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
         std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() % 2 == 0) {
-            res.push_back(PARAM_OUT_ATTRIBUTE_NAME("void"));
+            res.push_back(PARAM_OUT_ATTRIBUTE_NAME(TID_VOID));
         } else {
-            res.push_back(PARAM_EXPRESSION("void"));
+            res.push_back(PARAM_EXPRESSION(TID_VOID));
         }
         return res;
     }

@@ -5,7 +5,7 @@
 --aql create  array T < x: double > [ i=1:13,11,0, j=1:21,17,0 ]
 --aql create array E < x: double null > [ i=0:0,1,0 ]
 --aql create array R < x: double null > [ i=0:0,1,0 ]
-store(build_sparse(T,i+j,j-2<i and i<j+2),T)
+store(filter(build(T,i+j),j-2<i and i<j+2),T)
 store(build(E,iif(0=1, 2, 0 )),E)
 store(repart(aggregate(T, min(x)),R),R)
 --stop-igdata

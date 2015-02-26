@@ -30,8 +30,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 
-#include "network/MessageUtils.h"
-#include "query/ParsingContext.h"
+#include <system/Cluster.h>
+#include <network/MessageUtils.h>
+#include <query/ParsingContext.h>
 
 using namespace boost;
 
@@ -47,6 +48,8 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
     boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
     errorMessage->setQueryID(queryID);
+
+    errorRecord->set_cluster_uuid(Cluster::getInstance()->getUuid());
 
     errorRecord->set_file(e.getFile());
     errorRecord->set_function(e.getFunction());
@@ -89,11 +92,13 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
 boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID)
 {
     boost::shared_ptr<MessageDesc> okMessage = boost::make_shared<MessageDesc>(mtError);
+    boost::shared_ptr<scidb_msg::Error> okRecord = okMessage->getRecord<scidb_msg::Error>();
     okMessage->setQueryID(queryID);
-    okMessage->getRecord<scidb_msg::Error>()->set_type(0);
-    okMessage->getRecord<scidb_msg::Error>()->set_errors_namespace("scidb");
-    okMessage->getRecord<scidb_msg::Error>()->set_short_error_code(SCIDB_E_NO_ERROR);
-    okMessage->getRecord<scidb_msg::Error>()->set_long_error_code(SCIDB_E_NO_ERROR);
+    okRecord->set_cluster_uuid(Cluster::getInstance()->getUuid());
+    okRecord->set_type(0);
+    okRecord->set_errors_namespace("scidb");
+    okRecord->set_short_error_code(SCIDB_E_NO_ERROR);
+    okRecord->set_long_error_code(SCIDB_E_NO_ERROR);
 
     return okMessage;
 }
@@ -133,7 +138,7 @@ boost::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID)
    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtAbort);
    boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
    msg->setQueryID(queryID);
-
+   record->set_cluster_uuid(Cluster::getInstance()->getUuid());
    return msg;
 }
 
@@ -142,8 +147,26 @@ boost::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID)
    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtCommit);
    boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
    msg->setQueryID(queryID);
-
+   record->set_cluster_uuid(Cluster::getInstance()->getUuid());
    return msg;
+}
+
+boost::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID)
+{
+    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtWait);
+    boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
+    msg->setQueryID(queryID);
+    record->set_cluster_uuid(Cluster::getInstance()->getUuid());
+    return msg;
+}
+
+boost::shared_ptr<MessageDesc> makeNotifyMessage(QueryID queryID)
+{
+    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtNotify);
+    boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
+    msg->setQueryID(queryID);
+    record->set_cluster_uuid(Cluster::getInstance()->getUuid());
+    return msg;
 }
 
 bool parseQueryLiveness(shared_ptr<InstanceLiveness>& queryLiveness,

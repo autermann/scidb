@@ -5,7 +5,7 @@
 --shell --command "echo size-list=SMALLEST_SIZE_LIST >> /tmp/dla_driver.cfg"
 
 --test
---shell --command "python ../../bin/dla_driver.py /tmp/dla_driver.cfg 2>&1" --store
+--shell --command "python ${TEST_BIN_DIR}/dla_driver.py /tmp/dla_driver.cfg 2>&1" --store
 
 --cleanup
 --shell --command "rm /tmp/dla_driver.cfg"

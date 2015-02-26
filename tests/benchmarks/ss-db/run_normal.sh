@@ -97,13 +97,13 @@ init(){
  # Redimension the Group array and precompute the groups centers
  iquery -naq "create array temp<check:bool NULL>[oid=0:*,1000,0]"
  iquery -naq "create array normal_groups_dim<x:int64 NULL,y:int64 NULL> [group=0:*,1000,0,oid=0:*,1000,0,observation=0:*,20,0]"
- iquery -naq "redimension_store(normal_groups,normal_groups_dim)"
+ iquery -naq "store(redimension(normal_groups,normal_groups_dim),normal_groups_dim)"
  iquery -naq "store(aggregate(normal_groups,avg(x),avg(y),group),normal_groups_centers)"
 }
 
 q1(){
  START=$(date +%s)
- iquery -r /dev/null -aq "avg(between(normal,0,0,0,19,$U1,$U1),a)"
+ iquery -r /dev/null -aq "aggregate(between(normal,0,0,0,19,$U1,$U1),avg(a))"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Q1: $DIFF seconds"
@@ -119,7 +119,7 @@ q2(){
 
 q3(){
  START=$(date +%s)
- #iquery -r /dev/null -aq "avg(thin(window(between(project(normal_reparted,a), 0,0,0,19,$U1,$U1),1,4,4,avg(a)),0,1,2,3,2,3))"
+ #iquery -r /dev/null -aq "aggregate(thin(window(between(project(normal_reparted,a), 0,0,0,19,$U1,$U1),1,4,4,avg(a)),0,1,2,3,2,3),avg(a_avg))"
  iquery -r /dev/null -aq "thin(window(repart(subarray(project(normal,a),0,0,0,19,7499,7499),<a:int32>[Z=0:19,1,0,J=0:7499,7500,2,I=0:7499,7500,2]),1,4,4,avg(a)),0,1,2,3,2,3)"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
@@ -129,7 +129,7 @@ q3(){
 q4(){
   START=$(date +%s)
   for (( i=0; i < 20 ; i++ )) do
-    iquery -r /dev/null -o csv+ -aq  "avg(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),sumPixel)" 
+    iquery -r /dev/null -o csv+ -aq  "aggregate(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),avg(sumPixel))" 
   done
   wait
   END=$(date +%s)
@@ -176,7 +176,7 @@ q8(){
 (3,${XSTARTS[$ind]},$[${YSTARTS[$ind]}+$U3])
 ]" > /tmp/Points.dat
   iquery -naq "remove(Points)"
-  iquery -naq "create empty array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]"
+  iquery -naq "create array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]"
   iquery -naq "load(Points,'/tmp/Points.dat')"
 
   START=$(date +%s)
@@ -189,7 +189,7 @@ q8(){
 q9(){
   START=$(date +%s)
   #for (( i=0; i < 20 ; i++ )) do
-   #iquery -r /dev/null -o csv+ -aq  "cross_join(cross_join(normal_groups_dim, redimension_store(project(apply(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U3,${YSTARTS[$ind]}+$U3),polygon is not null),check,true),oid,check), temp) as b, normal_groups_dim.oid,b.oid) as A,normal_groups_centers as C,A.group,C.group)"
+   #iquery -r /dev/null -o csv+ -aq  "cross_join(cross_join(normal_groups_dim, store(redimension(project(apply(filter(between(normal_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U3,${YSTARTS[$ind]}+$U3),polygon is not null),check,true),oid,check), temp), temp) as b, normal_groups_dim.oid,b.oid) as A,normal_groups_centers as C,A.group,C.group)"
   #done
   python scripts/q9.py $ind
   END=$(date +%s)

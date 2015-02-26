@@ -35,19 +35,22 @@
 #include "array/Array.h"
 #include "array/FileArray.h"
 #include "query/Network.h"
-
-//misc
-#define ANALYZE_CHUNK_SIZE          1000
-#define ANALYZE_ATTRIBUTES          5
-
-//limits
-#define ANALYZE_MAX_MEMORY_PER_THREAD_BYTES 1024 * 1024
-#define ANALYZE_MAX_PRECISE_COUNT   4000
+#include "system/Constants.h"
 
 namespace scidb {
 
 using namespace boost;
 using namespace std;
+
+enum {
+    //misc
+ANALYZE_CHUNK_SIZE = 1000,
+    ANALYZE_ATTRIBUTES = 5,
+
+    //limits
+    ANALYZE_MAX_MEMORY_PER_THREAD_BYTES = 1*MiB,
+    ANALYZE_MAX_PRECISE_COUNT = 4000
+};
 
 struct AnalyzeData
 {

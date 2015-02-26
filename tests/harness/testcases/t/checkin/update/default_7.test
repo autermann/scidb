@@ -5,8 +5,8 @@ create array Ti <a:int32 default 10> [x=0:2,3,0,y=2:5,2,1]
 create array Ts <b:string default 'b_default'> [x=0:2,3,0,y=2:5,2,1]
 
 --test
---aql select * into Ti from build_sparse(Ti,x+y+3,x<>1)
---aql select * into Ts from build_sparse(Ts,'b_'+string(x+y+3),x<>1)
+--aql select * into Ti from filter(build(Ti,x+y+3),x<>1)
+--aql select * into Ts from filter(build(Ts,'b_'+string(x+y+3)),x<>1)
 --aql select * into A from Ti,Ts
 
 --aql update A set a = a + 1
@@ -20,8 +20,8 @@ create array Ts <b:string default 'b_default'> [x=0:2,3,0,y=2:5,2,1]
 --aql update A set a = a * 10
 --aql update A set a = a / 10
 --aql update A set a = a / 2
---aql select * into Ti from build_sparse(Ti,x+y+3,x<>1)
---aql select * into Ts from build_sparse(Ts,'b_'+string(x+y+3),x<>1)
+--aql select * into Ti from filter(build(Ti,x+y+3),x<>1)
+--aql select * into Ts from filter(build(Ts,'b_'+string(x+y+3)),x<>1)
 --aql select * into A from Ti,Ts
 
 

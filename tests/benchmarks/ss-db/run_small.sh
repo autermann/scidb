@@ -94,7 +94,7 @@ init(){
 
 q1(){
  START=$(date +%s)
- iquery -r /dev/null -aq "avg(subarray(small,0,0,0,19,$U1,$U1),a)"
+ iquery -r /dev/null -aq "aggregate(subarray(small,0,0,0,19,$U1,$U1),avg(a))"
  END=$(date +%s)
  DIFF=$(( $END - $START ))
  echo "Q1: $DIFF seconds"
@@ -119,7 +119,7 @@ q3(){
 q4(){
   START=$(date +%s)
   for (( i=0; i < 20 ; i++ )) do
-    iquery -r /dev/null -aq  "avg(filter(subarray(small_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),sumPixel)" &
+    iquery -r /dev/null -aq  "aggregate(filter(subarray(small_obs_`printf $i`,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2),center is not null),avg(sumPixel))" &
   done
   wait
   END=$(date +%s)
@@ -166,7 +166,7 @@ q8(){
 (3,${XSTARTS[$ind]},$[${YSTARTS[$ind]}+$U2])
 ]" > /tmp/Points.dat
   iquery -naq "remove(Points)"
-  iquery -naq "create empty array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]"
+  iquery -naq "create array Points<ID:int64,x:int64,y:int64>[INDEX=0:3,4,0]"
   iquery -naq "load(Points,'/tmp/Points.dat')"
 
 
@@ -175,10 +175,10 @@ q8(){
        aggregate(
           cross_join(small_groups,
           filter(
-                sum ( 
+                aggregate ( 
                         project ( 
                                 apply ( 
-                                        cross ( 
+                                        cross_join ( 
                                                 subarray ( Points, 0,3 ),
                                                 join ( 
                                                         subarray (small_groups, NULL,NULL,NULL,18) AS Pi,
@@ -193,7 +193,7 @@ q8(){
                                 ),
                                 crosses
                         ),
-                        crosses,Pj.group
+                        sum(crosses),Pj.group
                 ),
            crosses_sum > 0)
         ),
@@ -205,7 +205,7 @@ q8(){
 
 q9(){
   START=$(date +%s)
-  iquery -r /dev/null -o csv+ -aq  "Aggregate(filter(filter(cross(subarray(small_obs_0,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2) as A, small_groups),A.polygon is not null), A.oid=small_groups.oid),avg(small_groups.x),avg(small_groups.y),small_groups.group)"
+  iquery -r /dev/null -o csv+ -aq  "Aggregate(filter(filter(cross_join(subarray(small_obs_0,${XSTARTS[$ind]},${YSTARTS[$ind]},${XSTARTS[$ind]}+$U2,${YSTARTS[$ind]}+$U2) as A, small_groups),A.polygon is not null), A.oid=small_groups.oid),avg(small_groups.x),avg(small_groups.y),small_groups.group)"
   END=$(date +%s)
   DIFF=$(( $END - $START ))
   echo "Q9: $DIFF seconds"

@@ -46,6 +46,10 @@ else(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   message(STATUS "CMAKE_INSTALL_PREFIX not Initialized to default keeping: " ${CMAKE_INSTALL_PREFIX})
 endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo) # Default value
+endif(NOT CMAKE_BUILD_TYPE)
+
 find_package(Subversion)
 if (${CMAKE_VERSION} VERSION_GREATER 2.8 OR ${CMAKE_VERSION} VERSION_EQUAL 2.8)
     find_package(Git)
@@ -137,14 +141,84 @@ set(GENERAL_HARNESSTEST_DIRECTORY "${CMAKE_BINARY_DIR}/tests/harness")
 
 set(PYTHON_SAMPLE_DIRECTORY "${CMAKE_BINARY_DIR}/bin/pythonexamples")
 
-# We not overriding RPATH for all binaries. Just setting some handy paths.
-set(DEFAULT_RPATH "$ORIGIN") # This for working from developer catalog
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-if("${isSystemDir}" STREQUAL "-1")
-    #This one for installed binaries. Note if system prefix used RPATH is not set
-    set (DEFAULT_RPATH "${DEFAULT_RPATH}:${CMAKE_INSTALL_PREFIX}/lib")
-    message(WARNING: "executable will have RPATH set to ${DEFAULT_RPATH}")
-endif("${isSystemDir}" STREQUAL "-1")
+################################################################
+# Setting DT_RUNPATH in the elf header:
+#
+# A. review of library resolution steps
+#
+# From "man ld.so":
+##The shared libraries needed by the program are searched for in the following order:
+##
+## 1. (ELF only) Using the directories specified in the DT_RPATH dynamic section attribute of the binary if
+## present and DT_RUNPATH attribute does not exist. Use of DT_RPATH is deprecated.
+##
+## 2. Using the environment variable LD_LIBRARY_PATH. Except if the executable is a set-user-ID/set-group-ID
+## binary, in which case it is ignored.
+##
+## 3. (ELF only) Using the directories specified in the DT_RUNPATH dynamic section attribute of the binary if
+## present.
+##
+## 4. From the cache file /etc/ld.so.cache which contains a compiled list of candidate libraries previously
+## found in the augmented library path. If, however, the binary was linked with the -z nodeflib linker
+## option, libraries in the default library paths are skipped.
+##
+## 5. In the default path /lib, and then /usr/lib. If the binary was linked with the -z nodeflib linker
+## option, this step is skipped.
+#
+# NOTE:
+#  a. We set DT_RUNPATH so (1) does not apply.
+#  b. If the user sets LD_LIBRARY_PATH, then (2) applies, and it is the user's repsonsibility.
+#  c. Resolution is normally via step (3).
+#  d. Only if that fails, (5) and (6) do apply [we do not use -z nodeflib at this time.]
+#
+# B. $ORIGIN
+#
+# From "man ld.so":
+##RPATH TOKEN EXPANSION
+## The runtime linker provides a number of tokens that can be used in an rpath specification (DT_RPATH or DT_RUNPATH).
+##
+## $ORIGIN
+## ld.so understands the string $ORIGIN (or equivalently ${ORIGIN}) in an rpath specification to mean the directory
+## containing the application executable. Thus, an application located in somedir/app could be compiled with
+## gcc -Wl,-rpath,'$ORIGIN/../lib' so that it finds an associated shared library in somedir/lib no matter where
+## somedir is located in the directory hierarchy.
+#
+# NOTE:
+#   We use $ORIGIN to find the locations
+#      ../scidb/<version>/lib and
+#      ../scidb/<version>/lib/scidb/plugins
+#   from
+#        either location above or
+#      ../scidb/<version>/bin.
+#
+# by setting it to "$ORIGIN/../lib:$ORIGIN/../.."
+#
+# NOTE:
+#  this also allows resolution to ../scidb/<version>.  This will be fixed at a later point.
+#
+# C. CMAKE macros and the linker
+#
+# It should be noted that there is no command to the linker to set RUNPATH directly.
+# Instead we set RPATH and pass --enable-new-dtags to the linker.
+# The linker then sets DT_RUNPATH rather than DT_RPATH.
+#
+#  Setting CMAKE_SHARED_LINKER_FLAGS to "-Wl,--enable-new-dtags"
+#    means CMAKE macros that set RPATH for shared objects results in RUNPATH being set.
+#  Setting CMAKE_EXE_LINKER_FLAGS to "-Wl,--enable-new-dtags"
+#    means CMAKE macros that set RPATH for programs results in RUNPATH being set.
+#  Setting CMAKE_SKIP_BUILD_RPATH to FALSE
+#    assures us that CMAKE sets RPATH at build time.
+#  Setting CMAKE_BUILD_WITH_INSTALL_RPATH to TRUE tells CMAKE the object is built with the install time RPATH
+#    (which for our purpose is the same as build time) so it will not re-instrument at install time.
+#  Setting CMAKE_INSTALL_RPATH_USE_LINK_PATH to TRUE tells CMAKE to add any linkages that were used at build time
+#    as absolute paths. This applies to boost objects in /opt/scidb/<version>/3rdparty/boost/lib.
+#
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib:$ORIGIN/../../")
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--enable-new-dtags")
+set(CMAKE_EXE_LINKER_FLAGS "-Wl,--enable-new-dtags")
 
 include(FindPkgConfig)
 #
@@ -153,19 +227,27 @@ include(FindPkgConfig)
 include(LinuxDistroVersion)
 message(STATUS "DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
 
-# Set option for static linking
+#
+# CENTOS check
+#
 if(${DISTRO_NAME_VER} MATCHES "RedHat-6")
  message(FATAL_ERROR "We do not support RedHat build. Use CentOS instead")
 endif()
 
+#
+# LIBRT config
+#
+find_package(LibRT REQUIRED)
+
+#
+# BOOST CONFIG
+#
 set(BOOST_ROOT /opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/boost)
 set(Boost_NO_SYSTEM_PATHS TRUE)
 set(Boost_NO_BOOST_CMAKE TRUE)
 
-#
-# BOOST
-#
-find_package(Boost REQUIRED system program_options serialization regex filesystem thread)
+find_package(Boost REQUIRED system program_options serialization regex filesystem thread date_time)
+
 if(NOT Boost_FOUND)
  message(FATAL_ERROR "Could not find any version of boost (1.54 required)")
 endif(NOT Boost_FOUND)
@@ -176,6 +258,10 @@ if(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND
 endif(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND
            ${Boost_MINOR_VERSION} EQUAL 54))
 
+#
+# PROTOBUF CONFIG
+#
+# outputs PROTOBUF_LIBRARY, not _LIBRARIES as documented
 find_package(Protobuf REQUIRED)
 find_package(Log4CXX REQUIRED)
 find_package(Doxygen)
@@ -200,20 +286,16 @@ if (APPLE)
     ENDIF()
 
     if (NOT WITHOUT_PYTHON_BINDING)
-        message(WARNING "Python binding broken on Mac! Forcing WITHOUT_PYTHON_BINDING=1")
+        message(FATAL_ERROR "Python binding broken on Mac!")
     endif()
-    set(WITHOUT_PYTHON_BINDING 1)
 else ()
     pkg_check_modules(CPPUNIT cppunit)
 
-    find_package(LibRT REQUIRED)
-
     if (NOT WITHOUT_PYTHON_BINDING)
-        find_package(SWIG "2.0")
+        find_package(SWIG2 "2.0")
         find_package(PythonLibs)
-        if (NOT SWIG_FOUND OR NOT PYTHONLIBS_FOUND)
-	        message(WARNING "SWIG 2 and Python headers required for building Python API bindings. You can set proper SWIG executable with argument -DSWIG_EXECUTABLE=/path/to/swig2.0")
-            set(WITHOUT_PYTHON_BINDING 1)
+        if (NOT SWIG2_FOUND OR NOT PYTHONLIBS_FOUND)
+	        message(FATAL_ERROR "SWIG 2 and Python headers required for building Python API bindings. You can set proper SWIG executable with argument -DSWIG_EXECUTABLE=/path/to/swig2.0")
         endif()
     endif()
 endif()
@@ -229,7 +311,10 @@ set(LIBREADLINE_STATIC OFF)
 find_package(LibReadline REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PythonInterp REQUIRED)
+
+#
 # configure BLAS & LAPACK
+#
 # set BLA_VENDOR (see Find{BLAS,LAPACK}.cmake) to experiment
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
@@ -246,10 +331,15 @@ else()
     set(BUILD_USER_DOC 0)
 endif()
 
-# System specific constants. Result will be written into src/system/System.h
+#
+# Function Check
+#
 include(CheckFunctionExists)
 check_function_exists(malloc_stats HAVE_MALLOC_STATS)
 
+#
+# INCLUDE DIRECTORIES
+#
 include_directories("${CMAKE_SOURCE_DIR}/src")
 include_directories("${CMAKE_SOURCE_DIR}/include")
 include_directories("${CMAKE_SOURCE_DIR}/utils")
@@ -278,6 +368,7 @@ set (LINK_APR_LIBS "")
 set(DEBUG_SYMBOLS_DIRECTORY ".debug")
 set(DEBUG_SYMBOLS_EXTENSION "${DEBUG_SYMBOLS_DIRECTORY}")
 
+# TODO: should probably factor to a xxxxx.cmake file in scidb
 macro(extractDebugInfo input_dir input_file targ)
     if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 		if (NOT APPLE)
@@ -315,11 +406,15 @@ ENABLE_TESTING()
 INCLUDE(CTest)
 
 if (CDASH_CONFIG)
-  ADD_TEST(NightlyTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/build_install_test.sh ${CDASH_CONFIG})
+  ADD_TEST(NightlyTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/build_install_test.sh ${CDASH_CONFIG} "prepare_run")
+  ADD_TEST(NightlyTestResult "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "collect_cleanup")
 else()
   ADD_TEST(NightlyTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash/SciDB_Build-Packages_Install_Test.sh)
 endif()
 
+#
+# TEST TIMEOUT
+#
 if (NOT HARNESS_TEST_TIMEOUT)
   set(HARNESS_TEST_TIMEOUT 32000)
 endif(NOT HARNESS_TEST_TIMEOUT)
@@ -352,13 +447,21 @@ add_library(misc_files EXCLUDE_FROM_ALL examples/point/point.cpp ${MISC_FILES_SR
 
 #
 # all outputs must go to CMAKE_BINARY_DIR to support out-of-tree build and test
+#
 # TODO: these should be done at make time, not cmake time, so a developer need
 #       not do a full rebuild when only changing a test or doc file.
 #       (HINT add CMakeLists.txt files, with targets with ADD_CUSTOM_COMMAND()s intead of execute_process()
 #
+
+#
+# COPY CDASH
+#
+message(STATUS "copying ${CMAKE_SOURCE_DIR}/cdash to ${CMAKE_BINARY_DIR}/cdash")
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/cdash
                                                            ${CMAKE_BINARY_DIR}/cdash)
-
+#
+# COPY DOC
+#
     # NOTE: doc must be copied before tests, so long as test/examples is a link into
     # doc. This does not seem to cause a problem when the source and destination
     # are in the same volume.
@@ -375,21 +478,29 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/c
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/doc
                                                            ${CMAKE_BINARY_DIR}/doc)
 
-
+#
+# COPY TESTS
+#
+message(STATUS "copying ${CMAKE_SOURCE_DIR}/tests to ${CMAKE_BINARY_DIR}/tests")
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/tests
                                                            ${CMAKE_BINARY_DIR}/tests)
 
 # Remove the actual test cases and expected results from the build area:
 # they will be accessed directly from the SVN tree.
+message(STATUS "copying ${CMAKE_SOURCE_DIR}/tests/harness/testcases/t to ${CMAKE_BINARY_DIR}/tests/harness/testcases/t")
 execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/tests/harness/testcases/t)
 execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/tests/harness/testcases/data)
 
-
+#
+# COPY VERSION
+#
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/version
                                                  ${CMAKE_BINARY_DIR}/version)
 
 
-# Installation module include
+#
+# INSTALL
+#
 include(install.cmake)
 
 message(STATUS "****************** END CMakeLists.txt ******************")

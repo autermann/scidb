@@ -41,6 +41,7 @@ set(query_parser_src
     parser/Keywords.cpp
     parser/Unparser.cpp
     parser/Translator.cpp
+    parser/ListMacros.cpp
     parser/ParsingContext.cpp
 )
 
@@ -113,6 +114,8 @@ set(qproc_src
     RemoteArray.cpp
     Operator.cpp
     SGChunkReceiver.cpp
+    PullSGContext.cpp
+    PullSGArray.cpp
 )
 
 set_source_files_properties(${query_parser_src} ${lexer_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses")

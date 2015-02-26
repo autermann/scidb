@@ -90,7 +90,8 @@ public:
             str[length-1] = 0;
             value.setString(&str[0]);
         } else {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) << "UnitTestDeepChunkMergePhysical" << "genRandomValue";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
+                << "UnitTestDeepChunkMergePhysical" << "genRandomValue";
         }
         return value;
     }
@@ -98,7 +99,7 @@ public:
     /**
      * Given a value, return a human-readable string for its value.
      * @note This should eventually be factored out to the include/ directory.
-     * @see DBLoader
+     * @see ArrayWriter
      */
    inline string valueToString(Value const& value, TypeId const& type)
     {
@@ -113,7 +114,8 @@ public:
         } else if (type==TID_STRING) {
             ss << value.getString();
         } else {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) << "UnitTestDeepChunkMergePhysical" << "value2string";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
+                << "UnitTestDeepChunkMergePhysical" << "value2string";
         }
         return ss.str();
     }

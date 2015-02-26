@@ -46,7 +46,6 @@
 #include "smgr/io/Storage.h"
 #include "util/PluginManager.h"
 #include "util/Notification.h"
-#include "query/Statistics.h"
 #include "system/Constants.h"
 #include <system/Utils.h>
 
@@ -121,7 +120,7 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
     const string& storageConfigPath = cfg->getOption<string>(CONFIG_STORAGE_URL);
 
     StorageManager::getInstance().open(storageConfigPath,
-                                       cfg->getOption<int>(CONFIG_CACHE_SIZE)*MB);
+                                       cfg->getOption<int>(CONFIG_CACHE_SIZE)*MiB);
     _selfInstanceID = StorageManager::getInstance().getInstanceId();
 
     if (registerInstance) {
@@ -133,7 +132,7 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
             throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NON_FQ_PATH_ERROR) << storageConfigPath);
         }
         _selfInstanceID = catalog->addInstance(InstanceDesc(address, port, storageConfigDir));
-        StatisticsScope sScope;
+
         StorageManager::getInstance().setInstanceId(_selfInstanceID);
         LOG4CXX_DEBUG(logger, "Registered instance # " << _selfInstanceID);
         return;
@@ -287,7 +286,7 @@ void NetworkManager::handleMessage(shared_ptr< Connection > connection, const sh
          }
          else
          {
-             shared_ptr<MessageHandleJob> job = make_shared<MessageHandleJob>(messageDesc);
+             shared_ptr<MessageHandleJob> job = make_shared<ServerMessageHandleJob>(messageDesc);
              job->dispatch(_requestQueue,_workQueue);
          }
          handler = bind(&NetworkManager::publishMessage, _1);
@@ -661,7 +660,6 @@ shared_ptr<SharedBuffer> NetworkManager::receive(InstanceID sourceInstanceID, sh
 
 void NetworkManager::_handleReconnect()
 {
-   StatisticsScope scope;
    set<InstanceID> brokenInstances;
    ScopedMutexLock mutexLock(_mutex);
    if (_shutdown) {
@@ -767,7 +765,6 @@ void NetworkManager::_handleAlive(const boost::system::error_code& error)
     if (error == boost::asio::error::operation_aborted) {
        return;
     }
-    StatisticsScope scope;
 
     shared_ptr<MessageDesc> messageDesc = make_shared<MessageDesc>(mtAlive);
 
@@ -804,7 +801,7 @@ void NetworkManager::handleClientDisconnect(const QueryID& queryId,
    }
 
    LOG4CXX_WARN(logger, str(format("Client for query %lld disconnected") % queryId));
-   shared_ptr<Query> query = Query::getQueryByID(queryId, false, false);
+   shared_ptr<Query> query = Query::getQueryByID(queryId, false);
 
    if (!query) {
        return;
@@ -848,7 +845,7 @@ void NetworkManager::handleConnectionError(const QueryID& queryID)
    LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
                          "Conection error in query " << queryID);
 
-   shared_ptr<Query> query = Query::getQueryByID(queryID, false, false);
+   shared_ptr<Query> query = Query::getQueryByID(queryID, false);
 
    if (!query) {
       return;

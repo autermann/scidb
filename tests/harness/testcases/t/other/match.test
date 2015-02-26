@@ -2,8 +2,8 @@
 --start-query-logging
 create array catalog<luminicity:float>[ra=0:999,1000,10, decl=0:999,1000,10]
 create array sky<luminicity:float>[ra=0:999,1000,10, decl=0:999,1000,10]
-load(catalog, '../tests/harness/testcases/data/catalog.txt')
-load(sky, '../tests/harness/testcases/data/sky.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(catalog, '${TEST_DATA_DIR}/catalog.txt')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(sky, '${TEST_DATA_DIR}/sky.txt')""
 load_library('match')
 load_library('bestmatch')
 

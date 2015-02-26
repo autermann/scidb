@@ -5,8 +5,9 @@ Maintainer: SciDB support list <support@lists.scidb.org>
 Build-Depends: debhelper (>= 8.0.0), cmake, bison, flex, libcppunit-dev, libbz2-dev, libpqxx3-dev,
                libprotobuf-dev, protobuf-compiler, zlib1g-dev, liblog4cxx10-dev, openssh-client,
                libreadline6-dev, fop, xsltproc, doxygen, python, subversion, ant, ant-contrib,
-	       ant-optional, libprotobuf-java, protobuf-compiler, openjdk-6-jdk, junit,
-               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev, 
+	       ant-optional, libprotobuf-java, protobuf-compiler, openjdk-6-jdk, junit, git, libpam-dev,
+               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev,
+	       libcsv,
                scidb-VERSION_MAJOR.VERSION_MINOR-libmpich2-dev       (=1.2.1.1-4),
                scidb-VERSION_MAJOR.VERSION_MINOR-mpich2              (=1.2.1.1-4),
                scidb-VERSION_MAJOR.VERSION_MINOR-libboost1.54-all-dev,
@@ -37,7 +38,7 @@ Description: SciDB client library (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-utils
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (>= ${source:Upstream-Version}~)
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (>= ${source:Upstream-Version}~), libcsv
 Description: SciDB querying tool and other utilities
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-utils-dbg
@@ -87,7 +88,7 @@ Description: SciDB documentation
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-jdbc
 Architecture: all
-Depends: openjdk-6-jdk, libprotobuf-java
+Depends: openjdk-6-jdk, libprotobuf-java, junit
 Description: SciDB Java connector
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-all

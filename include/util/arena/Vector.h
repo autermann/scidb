@@ -63,8 +63,8 @@ class vector : public SCIDB_MANAGED_BASE(boost::container,vector,V)
     template<class it>  vector(const allocator_type& a,it i,it e                   ) : base_type(i,e,a){}
 
  public:             // Operations
-    V const&            operator[](size_type i)    const {return isDebug() ? at(i) : base_type::operator[](i);}
-    V&                  operator[](size_type i)          {return isDebug() ? at(i) : base_type::operator[](i);}
+    V const&            operator[](size_type i)    const {return isDebug() ? base_type::at(i) : base_type::operator[](i);}
+    V&                  operator[](size_type i)          {return isDebug() ? base_type::at(i) : base_type::operator[](i);}
 };
 
 /**

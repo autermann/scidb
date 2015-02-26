@@ -48,8 +48,6 @@ private:
     /* The "Set" flags are used to warn the user not to set the same parameter multiple times */
     bool _dumpDataToLog;
     bool _dumpDataToLogSet;
-    bool _includeOverlaps;
-    bool _includeOverlapsSet;
     bool _global;
     bool _globalSet;
 
@@ -88,7 +86,7 @@ public:
     /**
      * The operator won't accept more than this number of optional parameters.
      */
-    static const size_t MAX_PARAMETERS = 3;
+    static const size_t MAX_PARAMETERS = 2;
 
     /**
      * Parse and create the settings; throw an exception if any of the given parameters are not valid.
@@ -101,13 +99,10 @@ public:
                           shared_ptr<Query>& query):
        _dumpDataToLog(false),
        _dumpDataToLogSet(false),
-       _includeOverlaps(false),
-       _includeOverlapsSet(false),
        _global(false),
        _globalSet(false)
     {
         string const logParamHeader     = "log=";
-        string const overlapParamHeader = "include_overlap=";
         string const globalParamHeader  = "global=";
         size_t nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
@@ -138,10 +133,6 @@ public:
             {
                 parseBooleanParameter(parameterString, logParamHeader, _dumpDataToLog, _dumpDataToLogSet);
             }
-            else if (starts_with(parameterString, overlapParamHeader))
-            {
-                parseBooleanParameter(parameterString, overlapParamHeader, _includeOverlaps, _includeOverlapsSet);
-            }
             else if (starts_with(parameterString, globalParamHeader))
             {
                 parseBooleanParameter(parameterString, globalParamHeader, _global, _globalSet);
@@ -161,14 +152,6 @@ public:
     bool dumpDataToLog() const
     {
         return _dumpDataToLog;
-    }
-
-    /**
-     * @return true if chunk overlaps should be included in the calculation, false otherwise.
-     */
-    bool includeOverlaps() const
-    {
-        return _includeOverlaps;
     }
 
     /**

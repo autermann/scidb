@@ -14,7 +14,7 @@ store(A,B)
 --test
 
 # load a diff macro module
-load_module('../tests/harness/testcases/data/diff_macro_module.txt')
+load_module('${TEST_DATA_DIR}/diff_macro_module.txt')
 
 --set-format csv
 --start-query-logging

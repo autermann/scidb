@@ -19,7 +19,7 @@ project(apply(A,z,a+10),z)
 reverse(A)
 reshape(A,<a:int32 null> [x=0:8,2,0])
 repart(A,<a:int32 null> [x=0:8,2,0])
---igdata "sample(A,0.5,1)"
+--igdata "bernoulli(A,0.5,1)"
 --igdata "bernoulli(A,0.5,1)"
 lookup(build(<a:int32>[x=0:2,3,0],x+1),A)
 slice(A)

@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 #export DH_VERBOSE=1
-export DH_OPTIONS
+export DH_OPTIONS=--exclude=shim
 
 CMAKE ?= cmake
 BUILD_DIR ?= build
@@ -19,6 +19,9 @@ CMAKE_FLAGS := -DSWIG_EXECUTABLE=/usr/bin/swig2.0 -DSCIDB_DOC_TYPE=API -DBUILD_U
 
 %:
 	dh $@
+
+override_dh_installdeb:
+	dh_installdeb
 
 override_dh_auto_configure:
 	-test $(INSOURCE) -eq 0 && mkdir -p $(BUILD_DIR) && cd $(BUILD_DIR) && $(CMAKE) $(CMAKE_FLAGS) ..

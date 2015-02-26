@@ -53,8 +53,10 @@ namespace scidb { namespace parser {
 class Table
 {
  public:                   // Operations
+    virtual size_t            size()           const = 0;// Number of bindings
     virtual Table*            getParent()      const = 0;// Return the parent
-    virtual const Node*       get(const Name*) const = 0;// Search the table
+    virtual Node const*       get(const Name*) const = 0;// Search the table
+    virtual void              accept(Visitor&) const = 0;// Visit each binding
 };
 
 /****************************************************************************/

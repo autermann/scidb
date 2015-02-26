@@ -159,7 +159,7 @@ function waitUntilArrayGone { local name="$1" ; local maxWaitSecs="$2"
         echo "    cat /tmp/foo | scidbLoadCsv.sh -a fruit,price -D price string,double fruitPrices"
         echo 
         echo '        will create an array using the AFL statement:'
-        echo '            CREATE EMPTY ARRAY <fruit:string, price:double> fruitPrices[]'
+        echo '            CREATE ARRAY <fruit:string, price:double> fruitPrices[]'
         echo '        and the array will be filled with data imported from the csv data'
 
         exit 1
@@ -636,7 +636,7 @@ debug 2 "LOAD_FIFO is $LOAD_FIFO"
 TMP_LOAD="${PROG_NAME}_load_${$}"
 
 aflQuery   "" 0 "remove( ${TMP_LOAD} )" 2> /dev/null
-aflQueryChecked "" 0 "CREATE EMPTY ARRAY ${TMP_LOAD}${LOAD_ATTRIBUTES}[INDEX=0:*,$LOAD_CHUNK_SIZE,0]"
+aflQueryChecked "" 0 "CREATE ARRAY ${TMP_LOAD}${LOAD_ATTRIBUTES}[INDEX=0:*,$LOAD_CHUNK_SIZE,0]"
 debug 2 "temporary array created";
 
 # we can't use aflQueryChecked, because the command is backgrounded -- status is only available after the wait
@@ -704,8 +704,8 @@ fi
 TMP_REDIM_STORE_ARRAY=${PROG_NAME}_redim_${$}
 aflQuery "" 0 "remove(${TMP_REDIM_STORE_ARRAY})" 2> /dev/null
 
-debug 1              "CREATE EMPTY ARRAY ${TMP_REDIM_STORE_ARRAY} ${POST_REDIM_ATTRIBUTES} ${POST_REDIM_DIMENSIONS}"
-aflQueryChecked "" 0 "CREATE EMPTY ARRAY ${TMP_REDIM_STORE_ARRAY} ${POST_REDIM_ATTRIBUTES} ${POST_REDIM_DIMENSIONS}"
+debug 1              "CREATE ARRAY ${TMP_REDIM_STORE_ARRAY} ${POST_REDIM_ATTRIBUTES} ${POST_REDIM_DIMENSIONS}"
+aflQueryChecked "" 0 "CREATE ARRAY ${TMP_REDIM_STORE_ARRAY} ${POST_REDIM_ATTRIBUTES} ${POST_REDIM_DIMENSIONS}"
 #aflQueryChecked "" 0 "show($TMP_LOAD)"
 #aflQueryChecked "" 0 "show($TMP_REDIM_STORE_ARRAY)"
 aflQueryChecked "-n" 1 "store ( redimension ( ${TMP_LOAD}, ${TMP_REDIM_STORE_ARRAY} ), ${TMP_REDIM_STORE_ARRAY} )"

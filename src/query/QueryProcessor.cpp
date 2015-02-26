@@ -40,13 +40,16 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <log4cxx/logger.h>
 
-#include "query/QueryProcessor.h"
-#include "query/Parser.h"
-#include "smgr/io/Storage.h"
-#include "network/NetworkManager.h"
-#include "system/SciDBConfigOptions.h"
-#include "system/SystemCatalog.h"
-#include "array/ParallelAccumulatorArray.h"
+#include <query/QueryProcessor.h>
+#include <query/Parser.h>
+#include <smgr/io/Storage.h>
+#include <network/MessageUtils.h>
+#include <network/NetworkManager.h>
+#include <system/SciDBConfigOptions.h>
+#include <system/SystemCatalog.h>
+#include <system/Cluster.h>
+#include <array/ParallelAccumulatorArray.h>
+#include <util/Thread.h>
 
 using namespace std;
 using namespace boost;
@@ -68,16 +71,16 @@ private:
     void postSingleExecute(boost::shared_ptr<PhysicalQueryPlanNode> node, boost::shared_ptr<Query> query);
     // Synchronization methods
     /**
-     * Worker notifies coordinator about finishing work.
-     * Coordinator wait notifications.
+     * Worker notifies coordinator about its state.
+     * Coordinator waits for worker notifications.
      */
-    void notify(boost::shared_ptr<Query> query);
+    void notify(boost::shared_ptr<Query>& query, uint64_t timeoutNanoSec=0);
 
     /**
-     * Worker waits notification.
-     * Coordinator send out notifications.
+     * Worker waits for a notification from coordinator.
+     * Coordinator sends out notifications to all workers.
      */
-    void wait(boost::shared_ptr<Query> query);
+    void wait(boost::shared_ptr<Query>& query);
 
 public:
     boost::shared_ptr<Query> createQuery(string queryString, QueryID queryId);
@@ -300,6 +303,19 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
 {
     LOG4CXX_INFO(logger, "Executing query(" << query->getQueryID() << "): " << query->queryString <<
                  "; from program: " << query->programOptions << ";")
+
+    // Make sure ALL instance are ready to run. If the coordinator does not hear
+    // from the workers within a timeout, the query is aborted. This is done to prevent a deadlock
+    // caused by thread starvation. XXX TODO: In a long term we should solve the problem of thread starvation
+    // using for example asynchronous execution techniques.
+    int deadlockTimeoutSec = Config::getInstance()->getOption<int>(CONFIG_DEADLOCK_TIMEOUT);
+    if (deadlockTimeoutSec <= 0) {
+        deadlockTimeoutSec = 10;
+    }
+    static const uint64_t NANOSEC_PER_SEC = 1000 * 1000 * 1000;
+    notify(query, static_cast<uint64_t>(deadlockTimeoutSec)*NANOSEC_PER_SEC);
+    wait(query);
+
     Query::validateQueryPtr(query);
 
     boost::shared_ptr<PhysicalQueryPlanNode> rootNode = query->getCurrentPhysicalPlan()->getRoot();
@@ -334,35 +350,53 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
     query->setCurrentResultArray(currentResultArray);
 }
 
+namespace {
+bool validateQueryWithTimeout(uint64_t startTime,
+                              uint64_t timeout,
+                              boost::shared_ptr<Query>& query)
+{
+    bool rc = query->validate();
+    assert(rc);
+    if (hasExpired(startTime, timeout)) {
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_RESOURCE_BUSY)
+               << "not enough resources to start a query");
+    }
+    return rc;
+}
+}
 
-void QueryProcessorImpl::notify(boost::shared_ptr<Query> query)
+void QueryProcessorImpl::notify(boost::shared_ptr<Query>& query, uint64_t timeoutNanoSec)
 {
    if (query->getCoordinatorID() != COORDINATOR_INSTANCE)
     {
         QueryID queryID = query->getQueryID();
         LOG4CXX_DEBUG(logger, "Sending notification in queryID: " << queryID << " to coord instance #" << query->getCoordinatorID())
-        boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtNotify);
-        messageDesc->setQueryID(queryID);
+        boost::shared_ptr<MessageDesc> messageDesc = makeNotifyMessage(queryID);
+
         NetworkManager::getInstance()->send(query->getCoordinatorID(), messageDesc);
     }
     else
     {
         const size_t instancesCount = query->getInstancesCount() - 1;
         LOG4CXX_DEBUG(logger, "Waiting notification in queryID from " << instancesCount << " instances")
-        Semaphore::ErrorChecker errorChecker = bind(&Query::validate, query);
+        Semaphore::ErrorChecker errorChecker;
+        if (timeoutNanoSec > 0) {
+            errorChecker = bind(&validateQueryWithTimeout, getTimeInNanoSecs(), timeoutNanoSec, query);
+        } else {
+            errorChecker = bind(&Query::validate, query);
+        }
         query->results.enter(instancesCount, errorChecker);
     }
 }
 
-
-void QueryProcessorImpl::wait(boost::shared_ptr<Query> query)
+void QueryProcessorImpl::wait(boost::shared_ptr<Query>& query)
 {
    if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
     {
         QueryID queryID = query->getQueryID();
         LOG4CXX_DEBUG(logger, "Send message from coordinator for waiting instances in queryID: " << query->getQueryID())
-        boost::shared_ptr<MessageDesc> messageDesc = boost::make_shared<MessageDesc>(mtWait);
-        messageDesc->setQueryID(queryID);
+        boost::shared_ptr<MessageDesc> messageDesc = makeWaitMessage(queryID);
+
         NetworkManager::getInstance()->sendOutMessage(messageDesc);
     }
     else
@@ -372,7 +406,6 @@ void QueryProcessorImpl::wait(boost::shared_ptr<Query> query)
         query->results.enter(errorChecker);
     }
 }
-
 
 /**
  * QueryProcessor static method implementation

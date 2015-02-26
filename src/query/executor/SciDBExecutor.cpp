@@ -95,14 +95,14 @@ class SciDBExecutor: public scidb::SciDB
                       void* connection) const
     {
         // Parsing query string
-        if (Query::getQueryByID(queryResult.queryID, false, false)) {
+        if (Query::getQueryByID(queryResult.queryID, false)) {
             assert(false);
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "SciDBExecutor::prepareQuery";
         }
 
         size_t querySize = queryString.size();
-        int maxSize = Config::getInstance()->getOption<int>(CONFIG_QUERY_MAX_SIZE);
-        if (querySize > static_cast<size_t>(maxSize < 0 ? 0 : maxSize)) {
+        size_t maxSize = Config::getInstance()->getOption<size_t>(CONFIG_QUERY_MAX_SIZE);
+        if (querySize > maxSize) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_TOO_BIG) << querySize << maxSize;
         }
 
@@ -257,25 +257,20 @@ class SciDBExecutor: public scidb::SciDB
                     serializeQueryLiveness(queryLiveness, preparePhysicalPlanRecord);
 
                     uint32_t redundancy = Config::getInstance()->getOption<int>(CONFIG_REDUNDANCY);
-                    shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
+                    Cluster* cluster = Cluster::getInstance();
+                    assert(cluster);
+                    shared_ptr<const InstanceMembership> membership(cluster->getInstanceMembership());
                     assert(membership);
                     if ((membership->getViewId() != queryLiveness->getViewId()) ||
                         ((instancesCount + redundancy) < membership->getInstances().size())) {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
                     }
+                    preparePhysicalPlanRecord->set_cluster_uuid(cluster->getUuid());
                     networkManager->sendOutMessage(preparePhysicalPlanMsg);
                     LOG4CXX_DEBUG(logger, "Prepare physical plan was sent out");
                     LOG4CXX_DEBUG(logger, "Waiting confirmation about preparing physical plan in queryID from "
                                   << instancesCount - 1 << " instances")
-
-                    Semaphore::ErrorChecker ec = bind(&Query::validate, query);
-                    query->results.enter(instancesCount-1, ec);
-                    boost::shared_ptr<MessageDesc> executePhysicalPlanMsg = boost::make_shared<MessageDesc>(mtExecutePhysicalPlan);
-                    executePhysicalPlanMsg->setQueryID(query->getQueryID());
-                    networkManager->sendOutMessage(executePhysicalPlanMsg);
-                    LOG4CXX_DEBUG(logger, "Execute physical plan was sent out");
                 }
-
                 try {
                     // Execution of local part of physical plan
                     queryProcessor->execute(query);

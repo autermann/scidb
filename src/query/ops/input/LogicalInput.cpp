@@ -161,7 +161,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
                 instancesList << instancesWithoutFile[i] << (i == count - 1 ? "" : ", ");
             }
             LOG4CXX_WARN(oplogger, "File " << path << " not found on instances " << instancesList.str());
-            query->postWarning(SCIDB_WARNING(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES) << path << instancesList.str());
+            query->postWarning(SCIDB_WARNING(SCIDB_LE_FILE_NOT_FOUND_ON_INSTANCES) << path << instancesList.str());
         }
     }
     else if (instanceID == COORDINATOR_INSTANCE_MASK)
@@ -196,12 +196,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
     PartitioningSchema partitioningSchema = instanceID == ALL_INSTANCES_MASK ? psUndefined : psLocalInstance;
     if (!SystemCatalog::getInstance()->containsArray(inputArrayName))
     {
-        size_t tmpArrayNo = 0;
-        do {
-            std::stringstream ss;
-            ss << "tmp_input_array_" << ++tmpArrayNo;
-            inputArrayName = ss.str();
-        } while (query->getTemporaryArray(inputArrayName));
+        inputArrayName = "tmp_input_array";
     }
     else
     {

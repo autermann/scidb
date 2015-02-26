@@ -74,10 +74,8 @@ class Indent
 
 inline std::ostream& operator<<(std::ostream& str, IndentBy const& indent)
 {
-    for (int i = 0; i < indent.count; ++i)
-    {
-        str << indent.by;
-    }
+    std::string pad(indent.count, indent.by);
+    str << pad;
     return str;
 }
 

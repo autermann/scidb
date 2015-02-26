@@ -29,9 +29,9 @@
  */
 
 #include "query/Operator.h"
+#include "smgr/io/ArrayWriter.h"
 #include "system/Exceptions.h"
 #include "system/SystemCatalog.h"
-
 
 using namespace std;
 using namespace boost;
@@ -51,8 +51,11 @@ namespace scidb
  * @par Input:
  *   - srcArray: the source array to save from.
  *   - file: the file to save to.
- *   - instanceId: positive number means an instance ID on which file will be saved. -1 means to save file on every instance. -2 - on coordinator.
- *   - format: format in which file will be stored. Possible values are 'store', 'lcsv+', 'lsparse', 'dcsv', 'opaque', '(<custom plugin>)'
+ *   - instanceId: positive number means an instance ID on which file will be saved.
+ *                 -1 means to save file on every instance. -2 - on coordinator.
+ *   - format: @c ArrayWriter format in which file will be stored
+ *
+ * @see ArrayWriter::isSupportedFormat
  *
  * @par Output array:
  *   the srcArray is returned
@@ -81,7 +84,8 @@ public:
 		ADD_PARAM_VARIES();          //2
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
         std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
@@ -105,27 +109,21 @@ public:
         assert(_parameters.size() >= 1);
         
         if (_parameters.size() >= 3) { 
-            string const& format = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
-                                                query, TID_STRING).getString();
-            if (format[0] != '(' 
-                && !format.empty()
-                && compareStringsIgnoreCase(format, "opaque") != 0
-                && compareStringsIgnoreCase(format, "text") != 0
+            Value v = evaluate(
+                ((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
+                query, TID_STRING);
+            string const& format = v.getString();
+
+            if (!format.empty()
                 && compareStringsIgnoreCase(format, "auto") != 0
-                && compareStringsIgnoreCase(format, "text") != 0
-                && compareStringsIgnoreCase(format, "csv") != 0
-                && compareStringsIgnoreCase(format, "csv+") != 0
-                && compareStringsIgnoreCase(format, "lcsv+") != 0
-                && compareStringsIgnoreCase(format, "lsparse") != 0
-                && compareStringsIgnoreCase(format, "sparse") != 0
-                && compareStringsIgnoreCase(format, "dense") != 0
-                && compareStringsIgnoreCase(format, "store") != 0
-                && compareStringsIgnoreCase(format, "dcsv") != 0)
+                && !ArrayWriter::isSupportedFormat(format))
             {
-                throw  USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNSUPPORTED_FORMAT, _parameters[2]->getParsingContext()) << format;
+                throw  USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
+                                            SCIDB_LE_UNSUPPORTED_FORMAT,
+                                            _parameters[2]->getParsingContext())
+                    << format;
             }
         }
-
 
         return inputSchemas[0];
     }

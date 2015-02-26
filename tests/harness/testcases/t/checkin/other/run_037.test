@@ -1,6 +1,6 @@
 --setup
 CREATE ARRAY v10 <a: double > [x=1:10,10,0]
-load(v10,'../tests/harness/testcases/data/v10.txt')
+load(v10,'${TEST_DATA_DIR}/v10.txt')
 
 --test
 normalize(v10)

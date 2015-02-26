@@ -1,8 +1,8 @@
 --test
-store(aggregate(build_sparse(<a:string>[i=0:10,1,0], '1', i%2=1),count(*)), anonymous_schema_001)
+store(aggregate(filter(build(<a:string>[i=0:10,1,0], '1'), i%2=1),count(*)), anonymous_schema_001)
 
 show(anonymous_schema_001)
-store(aggregate(build_sparse(empty <a:string>[i=0:10,1,0], '1', i%2=1),count(*)), anonymous_schema_002)
+store(aggregate(filter(build(<a:string>[i=0:10,1,0], '1'), i%2=1),count(*)), anonymous_schema_002)
 
 show(anonymous_schema_002)
 store(build(<a:int64>[x=0:8,3,0], x*2), anonymous_schema_003)
@@ -13,7 +13,7 @@ store(cast(build(<a:int64>[x=0:8,3,0], x*2), <b:int64>[i=0:8,3,0]), anonymous_sc
 
 show(anonymous_schema_004)
 
-store(redimension(build(<a:int64>[x=0:8,3,0], x), empty <x:int64>[a=0:8,3,0]), anonymous_schema_005)
+store(redimension(build(<a:int64>[x=0:8,3,0], x), <x:int64>[a=0:8,3,0]), anonymous_schema_005)
 
 show(anonymous_schema_005)
 

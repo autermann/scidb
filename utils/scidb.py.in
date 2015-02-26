@@ -766,6 +766,14 @@ def initAll(force=False):
          printError("SciDB is still running.")
          sys.exit(1)
 
+   try:
+      checkMaxPostgresConns()
+   except Exception as pgException:
+      if (not force):
+         raise pgException
+      else:
+         printError(pgException)
+
    if (not force):
            if (confirm('This will delete all data and reinitialize storage', False) == False):
                    sys.exit(1)
@@ -858,39 +866,26 @@ def init( srv, liid, dt):
                  cmdList.extend([daemonClause])
          # end if
 
-         if gCtx._configOpts.get('rle-chunk-format') in ['false', 'False', 'off', 'Off']:
-                 rlechunkClause = "--rle-chunk-format=False"
-                 cmdList.extend([rlechunkClause])
-         else:
-                 rlechunkClause = "--rle-chunk-format=True"
-                 cmdList.extend([rlechunkClause])
-         # end if
-
-         if gCtx._configOpts.get('chunk-segment-size'):
-                 clusterClauseOld = "--chunk-segment-size-old=%s" % gCtx._configOpts.get('chunk-segment-size')
-                 cmdList.extend([clusterClauseOld])
-         # end if
-
-         if gCtx._configOpts.get('chunk-segment-size-in-mb'):
-                 clusterClause = "--chunk-segment-size-in-mb=%s" % gCtx._configOpts.get('chunk-segment-size-in-mb')
-                 cmdList.extend([clusterClause])
-         # end if
-
          if gCtx._configOpts.get('chunk-reserve'):
                  reserveClause = "--chunk-reserve=%s" % gCtx._configOpts.get('chunk-reserve')
                  cmdList.extend([reserveClause])
+         # end if
+
+         if gCtx._configOpts.get('install_root'):
+                 installPathClause = "--install_root=%s" % gCtx._configOpts.get('install_root')
+                 cmdList.extend([installPathClause])
          # end if
 
          executeIt(cmdList, srv, liid,
                    stdoutFile="init-stdout.log", stderrFile="init-stderr.log")
 # end def init
 
-def check_scidb_ready(srv, liid):
+def check_scidb_ready(coordinator,liid):
    global gCtx
    # listing queries should very cheap
-   cmdList = [gCtx._installPath + "/bin/iquery", "-c", "localhost", "-p", str(gCtx._basePort),
+   cmdList = [gCtx._installPath + "/bin/iquery", "-c", coordinator[1], "-p", str(gCtx._basePort),
               "-naq", "\"list(\'queries\')\"", "1>/dev/null", "2>/dev/null"]
-   (ret,out,err)=executeIt(cmdList, srv, liid,
+   (ret,out,err)=executeIt(cmdList, coordinator, liid,
                            useConnstr=False,
                            nocwd=True,
                            ignoreError=True,
@@ -1164,6 +1159,12 @@ def start(srv, liid, dryRun=False):
           tmpPathClause = ''
    # end if
 
+   if gCtx._configOpts.get('install_root'):
+          installPathClause = "--install_root=%s" % gCtx._configOpts.get('install_root')
+   else:
+          installPathClause = ''
+   # end if
+
    if gCtx._configOpts.get('merge-sort-buffer'):
           mergeSortClause = "--merge-sort-buffer=%s" % gCtx._configOpts.get('merge-sort-buffer')
    else:
@@ -1210,28 +1211,10 @@ def start(srv, liid, dryRun=False):
           netbuffClause = ''
    # end if
 
-   if gCtx._configOpts.get('save-ram') in ['true', 'True', 'on', 'On']:
-          saveRamClause = "--save-ram"
-   else:
-          saveRamClause = ''
-   # end if
-
    if gCtx._configOpts.get('daemon-mode') in ['true', 'True', 'on', 'On']:
           daemonClause = "--daemon"
    else:
           daemonClause = ''
-   # end if
-
-   if gCtx._configOpts.get('rle-chunk-format') in ['false', 'False', 'off', 'Off']:
-          rlechunkClause = "--rle-chunk-format=False"
-   else:
-          rlechunkClause = "--rle-chunk-format=True"
-   # end if
-
-   if gCtx._configOpts.get('parallel-sort') in ['false', 'False', 'off', 'Off']:
-          plsortClause = "--parallel-sort=False"
-   else:
-          plsortClause = "--parallel-sort=True"
    # end if
 
    if gCtx._configOpts.get('liveness-timeout'):
@@ -1240,22 +1223,10 @@ def start(srv, liid, dryRun=False):
           liveness = ''
    # end if
 
-   if gCtx._configOpts.get('repart-algorithm'):
-          repartAlgo = "--repart-algorithm=%s" % gCtx._configOpts.get('repart-algorithm')
+   if gCtx._configOpts.get('deadlock-timeout'):
+          deadlock = "--deadlock-timeout=%s" % gCtx._configOpts.get('deadlock-timeout')
    else:
-          repartAlgo = ''
-   # end if
-
-   if gCtx._configOpts.get('repart-dense-open-once') in ['true', 'True', 'on', 'On']:
-          repartDenseOpenOnce = "--repart-dense-open-once"
-   else:
-          repartDenseOpenOnce = ''
-   # end if
-
-   if gCtx._configOpts.get('repart-disable-tile-mode') in ['true', 'True', 'on', 'On']:
-      repartDisableTileMode = "--repart-disable-tile-mode"
-   else:
-      repartDisableTileMode = ''
+          deadlock = ''
    # end if
 
  # Shared pool
@@ -1276,18 +1247,6 @@ def start(srv, liid, dryRun=False):
  # Per-query queue of chunks, will consume memory
    if gCtx._configOpts.get('result-prefetch-queue-size'):
           threadsClause = threadsClause + " -q  %s" % gCtx._configOpts.get('result-prefetch-queue-size')
-   # end if
-
-   if gCtx._configOpts.get('chunk-segment-size'):
-          clusterClauseOld = "--chunk-segment-size-old=%s" % gCtx._configOpts.get('chunk-segment-size')
-   else:
-          clusterClauseOld = ''
-   # end if
-
-   if gCtx._configOpts.get('chunk-segment-size-in-mb'):
-          clusterClause = "--chunk-segment-size-in-mb=%s" % gCtx._configOpts.get('chunk-segment-size-in-mb')
-   else:
-          clusterClause = ''
    # end if
 
    if gCtx._configOpts.get('chunk-reserve'):
@@ -1345,6 +1304,20 @@ def start(srv, liid, dryRun=False):
           repRecvQSize = ''
    # end if
 
+
+   if gCtx._configOpts.get('sg-send-queue-size'):
+          sgSendQSize = "--sg-send-queue-size=%s" % gCtx._configOpts.get('sg-send-queue-size')
+   else:
+          sgSendQSize = ''
+   # end if
+
+   if gCtx._configOpts.get('sg-receive-queue-size'):
+          sgRecvQSize = "--sg-receive-queue-size=%s" % gCtx._configOpts.get('sg-receive-queue-size')
+   else:
+          sgRecvQSize = ''
+   # end if
+
+
    if gCtx._configOpts.get('requests'):
            requests = "--requests=%s" % gCtx._configOpts.get('requests')
    else:
@@ -1393,17 +1366,49 @@ def start(srv, liid, dryRun=False):
       upgradeClause = ''
    # end if
 
-   #relink_binary(srv, liid)
-   print "Starting SciDB server."
-   libDir = gCtx._installPath+"/lib"
-   cmdList = [ "LD_LIBRARY_PATH="+libDir+":"+libDir+"/scidb/plugins:" + os.environ.get("LD_LIBRARY_PATH", "") + " ", "exec" ]
-
+   want_valgrind = None
    @CONFIGURE_SCIDB_PY_VALGRIND@
+
+   #relink_binary(srv, liid)
+   print "Starting SciDB server%s."%(" with valgrind" if want_valgrind else "")
+   libDir = gCtx._installPath+"/lib"
+   cmdList = [ ''.join(("LD_LIBRARY_PATH=",
+                        libDir, ":",
+                        libDir, "/scidb/plugins:",
+                        os.environ.get("LD_LIBRARY_PATH", ""),
+                        " ")),
+               "exec" ]
+
+   if want_valgrind:
+      assert os.path.exists('/usr/bin/valgrind'), "Missing /usr/bin/valgrind"
+      if not noWatchDogClause:
+         noWatchDogClause = '--no-watchdog'
+      # Name compatibility for z_valgrind test, which expects only 1 instance.
+      vg_log = ('/tmp/valgrind.%s.log' % liid) if liid else '/tmp/valgrind.log'
+      # WARNING: Place only tool-agnostic options here!  See below.
+      vg_cmd = [ '/usr/bin/valgrind',
+                 '-v',
+                 '--num-callers=50',
+                 '--log-file=%s' % vg_log
+                 ]
+      # If config.ini contains 'vg-foo-bar = baz', then add
+      # '--foo-bar=baz' option to valgrind.
+      for key in gCtx._configOpts.keys():
+         if key[:3] == 'vg-':
+            vg_opt = key[3:]
+            vg_val = gCtx._configOpts.get(key)
+            vg_cmd.append('--%s=%s' % (vg_opt, vg_val))
+      # Not all valgrind tools allow all options, be careful!
+      # E.g. only memcheck allows --track-origins.
+      vg_tool = gCtx._configOpts.get('vg-tool')
+      if not vg_tool or vg_tool.lower() == 'memcheck':
+         if 'vg-track-origins' not in gCtx._configOpts:
+            vg_cmd.append('--track-origins=yes')
+      cmdList += vg_cmd
 
    cmdList += [ getInstanceDataPath(srv,liid)+'/'+binFile(srv, liid),
                 "-i", srv[1],
                 "-p", str(gCtx._basePort+liid),
-                saveRamClause,
                 mergeSortClause,
                 mergeSortNstreamClause,
                 mergeSortPipelineLimitClause,
@@ -1417,23 +1422,20 @@ def start(srv, liid, dryRun=False):
                 "--plugins", pluginsdir,
                 redundancy,
                 tmpPathClause,
+                installPathClause,
                 mpiClause,
                 mpiTypeClause,
                 preallocateShmClause,
                 materializeWindowThreshholdTypeClause,
                 memArrayClause] + threadsClause.split() + [ netbuffClause,
-                plsortClause,
-                rlechunkClause,
-                clusterClause,
-                clusterClauseOld,
                 reserveClause,
                 liveness,
-                repartAlgo,
-                repartDenseOpenOnce,
-                repartDisableTileMode,
+                deadlock,
                 memLimit,
                 repSendQSize,
                 repRecvQSize,
+                sgSendQSize,
+                sgRecvQSize,
                 requests,
                 malloc_mmap_threshold,
                 mmap_count_limit,
@@ -1469,7 +1471,6 @@ def stopAll(force=False):
 def stopSomeServers(servers,force=False):
    kwargs = {'force':force}
    map(lambda x: stop(x,**kwargs),servers)
-# end def stopAll
 
  # Collect debug
  # loop through all srvs and instances, coordinator last
@@ -1599,13 +1600,28 @@ def getScidbPidsCmd(srv, liid):
 #.............................................................................
 # getAllScidbPidsCmd: returns a "ps"-type command to get pids of all running
 #                     scidb processes.  The returned command is for one
-#                     server: it finds all scidbs running on that machine
-#                     Returned value is a simple string.
+#                     server: it finds all scidbs running on that machine.
+#
+#                     Returned value is a string that does *not* end
+#                     in a newline (since caller typically wants to
+#                     pipe this into xargs or whatever).
 def getAllScidbPidsCmd(srv):
    global gCtx
    path = "%s/%03d/"%(gCtx._baseDataPath, srv[0])
-   return ('ps --no-headers -e -o pid,cmd | awk \'{print $1 \" \" $2}\' | grep "' +
-           path +'*"' + ' | awk \'{print $1}\'')
+   want_valgrind = None
+   @CONFIGURE_SCIDB_PY_VALGRIND@
+   if want_valgrind:
+      # When using valgrind, 'path' will not match the first cmd token... so
+      # the awk script searches for 'path' anywhere in the line.
+      return ''.join(('ps --no-headers -e -o pid,cmd |',
+                      '''awk 'BEGIN { pat = "''', path, '''" ;
+                                      gsub("/", "\\/", pat) }
+                              /awk/ { next }
+                              $0 ~ pat { print $1 }' ''')) # No newline!
+   else:
+      # Easy, the 'path' is the first cmd token so return that pid.
+      return ('ps --no-headers -e -o pid,cmd | awk \'{print $1 \" \" $2}\' | grep "' +
+              path +'*"' + ' | awk \'{print $1}\'')
 
 # stop a particular server
 def stop(srv, force=False):
@@ -1634,6 +1650,92 @@ def checkLocks():
            gCtx._configOpts.get('db_passwd'), gCtx._configOpts.get('db_user'), gCtx._configOpts.get('db_name'))]
    executeIt(cmdList, coordinator, 0, useConnstr=False, nocwd=True, useShell=True)
 
+def checkMaxPostgresConns():
+   """checkMaxPostgresConns: test if user requested more scidb instances than
+   max number of connections allowed by Postgres.  The function will raise an
+   exception in these situations:
+   1) Postgres is unreachable/not running
+   2) it cannot determine Postgres max_connections setting by querying Postgres
+   3) max_connections value is less than the total number of scidb instances
+      requested in config.ini
+   """
+   global gCtx
+   coordinator = gCtx._srvList[gCtx._coordSrvId]
+   coordinatorHost = coordinator[1]
+   cmd_list = [ 'export PGPASSWORD=%s;psql -h <coordinator> -p <pgport> --username %s --dbname %s -t -c "SELECT * FROM pg_settings WHERE name = \'max_connections\';"' % (
+           gCtx._configOpts.get('db_passwd'), gCtx._configOpts.get('db_user'), gCtx._configOpts.get('db_name'))]
+
+   cmd_list[0] = cmd_list[0].replace('<coordinator>',coordinatorHost) # Insert coordinator hostname into the command.
+   cmd_list[0] = cmd_list[0].replace('<pgport>',str(gCtx._pgPort)) # Insert Postgres port into the command.
+
+   postgresErrMsgs = [
+      'Please make sure that Postgres max_connections value is ' + \
+       'greater than the total number of scidb instances in config.ini.',
+      'To modify max number of Postgres connections, locate postgresql.conf file and alter max_connections value there.',
+      'For more information please consult this Postgres web site: https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server.',
+      'Note that after changing the max_connections setting, Postgres service must be restarted.'
+      ]
+   postgresErrMsg = '\n'.join(postgresErrMsgs)
+
+   ret,out,err = executeIt( # Run Postgres query command.
+      cmd_list,
+      coordinator,
+      0,
+      useConnstr=False,
+      useSSH4Local=True,
+      nocwd=True,
+      useShell=True,
+      silent=True
+      )
+
+   if (ret != 0):
+      msgs = [
+         'Error: Postgres max_connections query failed!',
+         postgresErrMsg
+         ]
+      raise Exception('\n'.join(msgs))
+
+   line = out.split('\n')[0] # Take the first line from the output.
+   line = line.strip()
+
+   if (len(line) <= 0):
+      msgs = [
+         'Error: cannot extract result of Postgres max_connections query!',
+         postgresErrMsg
+         ]
+      raise Exception('\n'.join(msgs))
+
+   tokens = [t.strip() for t in line.split('|')] # Split the line into individual values.
+
+   if (tokens[0] != 'max_connections'):
+      msgs = [
+         'Error: could not extract value for Postgres max_connections!',
+         postgresErrMsg
+         ]
+      raise Exception('\n'.join(msgs))
+
+   max_conns = -1
+
+   try:
+      max_conns = int(tokens[1]) # Convert the max_connections value into a number.
+   except:
+      msgs = [
+         'Error: non-integer value found in Postgres max_connections - {0}!'.format(tokens[1]),
+         postgresErrMsg
+         ]
+      raise Exception('\n'.join(msgs))
+
+   # Sum up the number of instances requested in config.ini for all hosts (servers).
+   n_instances = sum([srv[2] for srv in gCtx._srvList])
+   n_instances += 1 # Increment the sum because coordinator instance number is off by one.
+
+   if (max_conns < n_instances):
+      msgs = [
+         "Cannot create {0} scidb instances: Postgres (max_connections) currently allows only {1} connections!".format(n_instances,max_conns),
+         postgresErrMsg
+         ]
+      raise Exception('\n'.join(msgs))
+
 def checkRedundancy():
    global gCtx
    if gCtx._configOpts.get('redundancy'):
@@ -1661,7 +1763,7 @@ def purgeBackup(srv, inst, ndays):
  # Display SciDB installation version
 def displayVersion():
    global gCtx
-   cmdList = [ os.path.join(self._ctx._installPath, "bin", "scidbconf"), '-A' ]
+   cmdList = [ os.path.join(gCtx._installPath, "bin", "scidbconf"), '-A' ]
    p = subprocess.Popen(cmdList)
    p.wait()
    if p.returncode != 0 :
@@ -1732,9 +1834,9 @@ class CmdExecutor:
        initAll(force=True)
 
     def start_all(self):
-       coordinator=self._ctx._srvList[self._ctx._coordSrvId]
        startAllServers()
        attempts=0
+       coordinator=self._ctx._srvList[self._ctx._coordSrvId]
        while not check_scidb_ready(coordinator,0):
           attempts += 1
           if attempts>30:
@@ -1781,7 +1883,6 @@ def parseOptions(ctx):
       #print "Parsing %s section." % (section_name)
       for (key, value) in config.items(section_name):
          ctx._configOpts[key] = value
-         # end for
          # make a srv & instance list
          # srv 0 hosts the coordinator
          # format: server-N=ip, number of local workers
@@ -1806,11 +1907,12 @@ def parseOptions(ctx):
 def getContext(args):
    ctx = Context()
    ctx._args=args
-   if args.subparser_name == "version" :
-      return ctx
 
    installPath = os.path.dirname(os.path.abspath(os.path.dirname(sys.argv[0])))
-   if args.subparser_name == "service_add" or args.subparser_name == "service_remove":
+
+   if args.subparser_name == "service_add" or \
+          args.subparser_name == "service_remove" or \
+          args.subparser_name == "version":
       ctx._installPath = installPath
       printDebug("Installation path: %s"%(ctx._installPath))
       return ctx
@@ -1915,12 +2017,12 @@ def handle(superParser, superArgs, cmdArgs=[]):
    subParser.add_argument('config_file', default=None, nargs='?', help="config.ini file to use, default is /opt/scidb/<version>/etc/config.ini")
    subParser.set_defaults(func=cmdExec.start_all)
 
-   subParser = subparsers.add_parser('stop_all', description="Start all SciDB instances")
+   subParser = subparsers.add_parser('stop_all', description="Stop all SciDB instances")
    subParser.add_argument('scidb_name', help="SciDB name as specified in config.ini")
    subParser.add_argument('config_file', default=None, nargs='?', help="config.ini file to use, default is /opt/scidb/<version>/etc/config.ini")
    subParser.set_defaults(func=cmdExec.stop_all)
 
-   subParser = subparsers.add_parser('stopall', description="Start all SciDB instances. DEPRECATED, use stop_all")
+   subParser = subparsers.add_parser('stopall', description="Stop all SciDB instances. DEPRECATED, use stop_all")
    subParser.add_argument('scidb_name', help="SciDB name as specified in config.ini")
    subParser.add_argument('config_file', default=None, nargs='?', help="config.ini file to use, default is /opt/scidb/<version>/etc/config.ini")
    subParser.set_defaults(func=cmdExec.stop_all)
@@ -1991,7 +2093,7 @@ def handle(superParser, superArgs, cmdArgs=[]):
 
 def main():
    parser = argparse.ArgumentParser(add_help=False, usage="%(prog)s [-m MODULE] [-v] module-specific-options")
-   parser.add_argument('-m','--module', help="module for requested functionality, defualt is scidb")
+   parser.add_argument('-m','--module', help="module for requested functionality, default is scidb")
    parser.add_argument('-v','--verbose', action='store_true', help="display verbose output")
    (args, modArgs) = parser.parse_known_args()
 

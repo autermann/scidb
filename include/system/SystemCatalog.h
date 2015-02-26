@@ -142,6 +142,12 @@ public:
     };
 
     /**
+     * Add the 'INVALID' flag to all array entries in the catalog currently
+     * marked as being 'TRANSIENT'.
+     */
+    void invalidateTempArrays();
+
+    /**
      * Rename old array (and all of its versions) to the new name
      * @param[in] old_array_name
      * @param[in] new array_name
@@ -190,19 +196,29 @@ public:
             std::list< boost::shared_ptr<LockDesc> >& workerLocks);
 
     /**
-     * Delete all arrays locks from the catalog on a given instance.
+     * Delete all arrays locks created as coordinator from the catalog on a given instance.
      * @param[in] instanceId
      * @return number of locks deleted
      */
-    uint32_t deleteArrayLocks(InstanceID instanceId);
+    uint32_t deleteCoordArrayLocks(InstanceID instanceId);
 
     /**
-     * Delete all arrays locks from the catalog for a given query on a given instance.
+     * Delete all arrays locks created as coordinator from the catalog for a given query on a given instance.
      * @param[in] instanceId
      * @param[in] queryId
      * @return number of locks deleted
      */
-    uint32_t deleteArrayLocks(InstanceID instanceId, QueryID queryId);
+    uint32_t deleteWorkerArrayLocks(InstanceID instanceId);
+
+    /**
+     * Delete all arrays locks from the catalog for a given query on a given instance, and role
+     * @param[in] instanceId
+     * @param[in] queryId
+     * @param[in] instance role (coord or worker), if equals LockDesc::INVALID_ROLE, it is ignored
+     * @return number of locks deleted
+     */
+    uint32_t deleteArrayLocks(InstanceID instanceId, QueryID queryId,
+                              LockDesc::InstanceRole role = LockDesc::INVALID_ROLE);
 
     /**
      * Check if a coordinator lock for given array name and query ID exists in the catalog
@@ -211,7 +227,7 @@ public:
      * @return the lock found in the catalog possibly empty
      */
     boost::shared_ptr<LockDesc> checkForCoordinatorLock(const std::string& arrayName,
-            QueryID queryId);
+                                                        QueryID queryId);
 
     /**
      * Populate PostgreSQL database with metadata, generate cluster UUID and return
@@ -282,7 +298,7 @@ public:
     ArrayID findArrayByName(const std::string &array_name);
 
     /**
-     * Returns array metadata using the array name. If throwException is true then 
+     * Returns array metadata using the array name. If throwException is true then
      * you will get returned exception in the 4th parameter.
      * You should check that exception: if you did not expect it - rethrow it.
      * Otherwise handle it as you need.
@@ -342,6 +358,14 @@ public:
     bool deleteArray(const std::string &array_name);
 
     /**
+     * Delete all versions prior to given version from array with given name
+     * @param[in] array_name Array name
+     * @param[in] array_version Array version prior to which all versions should be deleted.
+     * @return true if array versions were deleted, false if array did not exist
+     */
+    bool deleteArrayVersions(const std::string &array_name, const VersionID array_version);
+
+    /**
      * Delete array from persistent system catalog manager by its ID
      * @param[in] id array identifier
      */
@@ -368,6 +392,13 @@ public:
      * @return identifier of last array version or 0 if this array has no versions
      */
     VersionID getLastVersion(const ArrayID id);
+
+    /**
+     * Get array id of oldest version of array
+     * @param[in] id array ID
+     * @return array id of oldest version of array or 0 if array has no versions
+     */
+    ArrayID getOldestArrayVersion(const ArrayID id);
 
     /**
      * Get the latest version preceeding specified timestamp
@@ -514,6 +545,7 @@ private:
     SystemCatalog();
     virtual ~SystemCatalog();
 
+    void _invalidateTempArrays();
     void _renameArray(const std::string &old_array_name, const std::string &new_array_name);
     bool _lockArray(const boost::shared_ptr<LockDesc>&  lockDesc, ErrorChecker& errorChecker);
     bool _unlockArray(const boost::shared_ptr<LockDesc>& lockDesc);
@@ -521,7 +553,7 @@ private:
     void _readArrayLocks(const InstanceID instanceId,
             std::list< boost::shared_ptr<LockDesc> >& coordLocks,
             std::list< boost::shared_ptr<LockDesc> >& workerLocks);
-    uint32_t _deleteArrayLocks(InstanceID instanceId, QueryID queryId);
+    uint32_t _deleteArrayLocks(InstanceID instanceId, QueryID queryId, LockDesc::InstanceRole role);
     boost::shared_ptr<LockDesc> _checkForCoordinatorLock(const std::string& arrayName,
             QueryID queryId);
     void _initializeCluster();
@@ -534,10 +566,12 @@ private:
     boost::shared_ptr<ArrayDesc> _getArrayDesc(const ArrayID id);
     PartitioningSchema _getPartitioningSchema(const ArrayID arrayId);
     bool _deleteArrayByName(const std::string &array_name);
+    bool _deleteArrayVersions(const std::string &array_name, const VersionID array_version);
     void _deleteArrayById(const ArrayID id);
     VersionID _createNewVersion(const ArrayID id, const ArrayID version_array_id);
     void _deleteVersion(const ArrayID arrayID, const VersionID versionID);
     VersionID _getLastVersion(const ArrayID id);
+    ArrayID _getOldestArrayVersion(const ArrayID id);
     VersionID _lookupVersionByTimestamp(const ArrayID id, const uint64_t timestamp);
     std::vector<VersionDesc> _getArrayVersions(const ArrayID array_id);
     Coordinates _getHighBoundary(const ArrayID array_id);

@@ -56,7 +56,7 @@
     <code>cast()</code>, <code>build()</code>, <code>redimension()</code>, and
     so on. Here, we discuss schemas within the context of creating
     arrays.<programlisting><emphasis>create_array_statement</emphasis> ::= <emphasis
-          role="bold">CREATE ARRAY</emphasis> <emphasis>array_name schema</emphasis>
+          role="bold">CREATE  [ TEMP ]  ARRAY</emphasis> <emphasis>array_name schema</emphasis>
 <emphasis>schema </emphasis>                ::= <emphasis role="bold">&lt;</emphasis> <emphasis>attributes</emphasis> <emphasis
           role="bold">&gt;</emphasis> <emphasis role="bold">[</emphasis> <emphasis>dimensions</emphasis> <emphasis
           role="bold">]</emphasis></programlisting>To create an array, you
@@ -65,9 +65,21 @@
     dimensions.</para>
 
     <note>
-      <para>The <command>CREATE ARRAY</command> keywords are allowed in both
-      AFL and AQL.</para>
+      <para>The keywords <command>CREATE</command>, <command>TEMP</command>,
+      and <command>ARRAY</command> are allowed in both AFL and AQL.</para>
     </note>
+
+    <para>Use the optional <command>TEMP</command> keyword to create a
+    temporary array. Temporary arrays can improve performance for some
+    iterative algorithms, but they do not offer the transactional guarantees
+    of persistent arrays. Like other SciDB arrays, temporary arrays are
+    visible to all SciDB users and remain available until they are explicitly
+    deleted. However, temporary arrays are not generally written to disk. This
+    means that temporary arrays become corrupted if a SciDB instance fails. In
+    fact, whenever the SciDB cluster is restarted, all temporary arrays are
+    marked as unavailable. In addition, temporary arrays do not have versions.
+    That is, any update to a temporary array will overwrite existing attribute
+    values.</para>
 
     <para>The array attributes describe the types of data contained in each
     cell of the array. Each attribute is defined as follows:<programlisting><emphasis>attribute</emphasis> ::= <emphasis>attribute_name</emphasis> <emphasis
@@ -216,7 +228,7 @@
   </section>
 
   <section>
-    <title>Creating a sparse array</title>
+    <title>Creating a Sparse Array</title>
 
     <para><indexterm>
         <primary>sparse arrays</primary>
@@ -317,10 +329,41 @@
   </section>
 
   <section id="dropArray">
-    <title>Deleting an Array</title>
+    <title>Deleting Arrays</title>
 
-    <para>You can remove an array and its attendant schema definition from the
-    SciDB database. You can do this using either AQL or AFL.</para>
+    <para>There are several ways to remove arrays from the SciDB
+    database:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>In AQL or AFL, the <code><command>DROP ARRAY</command></code>
+        statement removes all versions of an array and its attendant schema
+        definition from the SciDB database. For details, see below.</para>
+      </listitem>
+
+      <listitem>
+        <para>In AFL, the <code><command>remove()</command></code> operator
+        performs the equivalent of the <code><command>DROP
+        ARRAY</command></code> statement. See <xref linkend="removeOperator"/>
+        for details.</para>
+      </listitem>
+
+      <listitem>
+        <para>In AFL, the <code><command>remove_versions()</command></code>
+        operator removes all versions of an array older than the version
+        number you supply. See <xref linkend="removeVersionsOperator"/> for
+        details.</para>
+      </listitem>
+
+      <listitem>
+        <para>From the Linux command prompt, the
+        <code><command>remove_arrays.py</command></code> program removes all
+        versions of any array whose name matches a regular expression you
+        supply. For details, see below. Note that the program provides a
+        switch that lets you remove all temporary arrays without affecting any
+        other arrays.</para>
+      </listitem>
+    </itemizedlist>
 
     <para><indexterm>
         <primary>AQL</primary>
@@ -330,14 +373,32 @@
     ARRAY</command></code> statement: <programlisting language="test">--aql DROP ARRAY A; --show-output=no
 </programlisting></para>
 
-    <para>To delete an array with AFL, use the
-    <code><literal>remove</literal></code> operator: <programlisting
-    language="test">--afl create array default_1 &lt;v:int64&gt;[i]; --show-query=no --show-output=no
---afl remove(default_1) --show-output=no
+    <para>To remove any array whose name begins with "TEST", use the
+    <code><command>remove_arrays.py</command></code> program and supply a
+    regular expression describing all names that begin with "TEST":
+    <programlisting>remove_arrays.py 'TEST.*'
+
+The following arrays are about to be removed:
+['TEST_01', 'TESTBACKUP', 'TEST20071117']
+Are you sure you want to remove? [n]|y: 
 </programlisting></para>
 
-    <para>If you want to remove some versions of your arrays to save space,
-    see <xref linkend="arrayVersions"/>.</para>
+    <para>To remove all temporary arrays, use the
+    <code><command>remove_arrays.py</command></code> program with the
+    <command>--temp_only</command> switch and supply a regular expression
+    describing all possible array names: <programlisting>remove_arrays.py --temp_only  '.*'
+
+The following arrays are about to be removed:
+['TEST_01', 'myTemporaryArray', 'iterationArray']
+Are you sure you want to remove? [n]|y: 
+</programlisting></para>
+
+    <para>For complete documentation of the syntax of the program, use the
+    --help switch: <programlisting>remove_arrays.py --help 
+</programlisting></para>
+
+    <para>To use the <command>remove_arrays.py</command> program, iquery must
+    be on your path.</para>
   </section>
 
   <section id="arrayAttributes">
@@ -676,15 +737,15 @@ or
           <secondary>default size</secondary>
         </indexterm>The default chunk size is set based on the number of
       dimensions that do not have a specified chunk size. SciDB attempts to
-      set the total chunk size to approximately 500,000, which is the product
-      of all the dimensions.</para>
+      set the total chunk size -- the product of all the dimension chunk sizes
+      -- to approximately 1,000,000.</para>
 
       <para>Here is an example where we create three dimensions, two using the
       defaults:<programlisting language="test">--aql CREATE ARRAY default_2 &lt;val:double&gt;[i=0:999,200,0, j,k]; --show-output=no
 --schema default_2</programlisting>Array <literal>default_2</literal> has
       three dimensions: multiply the chunk size for each of the dimensions,
-      and the product is 500,000:
-      50<symbol>x</symbol>50<symbol>x</symbol>200.</para>
+      and the product is 980,000:
+      70<symbol>x</symbol>70<symbol>x</symbol>200.</para>
     </section>
 
     <section id="dimensionExpressions">
@@ -866,7 +927,7 @@ $ export CHNKSIZE=100</programlisting><programlisting>$ iquery -aq "create array
       too large or too small, it will negatively impact performance.</para>
 
       <para>To optimize performance of your SciDB array, you want each chunk
-      to contain roughly 10 to 20 MB of data. So, for example, if your data
+      to contain between 10 and 20 MB of data. So, for example, if your data
       set consists entirely of double-precision numbers, you would want a
       chunk size that contains somewhere between 500,000 and 1 million
       elements (assuming 8 bytes for every double-precision number).</para>
@@ -880,6 +941,16 @@ $ export CHNKSIZE=100</programlisting><programlisting>$ iquery -aq "create array
       arrays where every dimension has a fixed number of cells and every cell
       has a value you can do a straightforward calculation to find the correct
       chunk size.</para>
+
+      <para>SciDB includes an external utility that can help you choose chunk
+      sizes for your dimensions. To learn about this utility, enter the
+      following command at the linux command line prompt:<programlisting>$ calculate_chunk_length.py --help</programlisting></para>
+
+      <note>
+        <para>To use the chunk-length calculator, your <literal>PATH</literal>
+        environment variable must include the <literal>/bin</literal>
+        directory under the SciDB installation directory.</para>
+      </note>
 
       <para>When the density of the data in a data set is highly skewed, that
       is, when the data is not evenly distributed along array dimensions, the

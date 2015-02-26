@@ -19,14 +19,14 @@ create array Rdata_right <a:int64> [x=0:11,4,0 , y=0:11,4,0]
 store(build(Ldata_small, 100*x-19*y), Ldata_small)
 store(build(Ldata_large, 50*x-10*y), Ldata_large)
 
-store(build_sparse(Ldata_left,  50*x-10*y, x < 5), Ldata_left)
-store(build_sparse(Ldata_right, 50*x-10*y, x > 4), Ldata_right)
+store(filter(build(Ldata_left,  50*x-10*y), x < 5), Ldata_left)
+store(filter(build(Ldata_right, 50*x-10*y), x > 4), Ldata_right)
 
 store(build(Rdata_small, 100*x-19*y), Rdata_small)
 store(build(Rdata_large, 50*x-10*y), Rdata_large)
 
-store(build_sparse(Rdata_left, 50*x-10*y, x < 5), Rdata_left)
-store(build_sparse(Rdata_right, 50*x-10*y, x > 4), Rdata_right)
+store(filter(build(Rdata_left, 50*x-10*y), x < 5), Rdata_left)
+store(filter(build(Rdata_right, 50*x-10*y), x > 4), Rdata_right)
 
 # case 1. s -> l
 store(Ldata_small, L)

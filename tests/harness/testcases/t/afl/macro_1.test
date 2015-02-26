@@ -5,15 +5,25 @@ store(apply(A,w,v*v),B)
 
 --test
 
+# Check that the prelude is loaded, and that the op_count macro is defined:
+op_count(B)
+
 # load a sample module and invoke the various macros it defines:
 
-load_module('../tests/harness/testcases/data/module_1.txt')
+load_module('${TEST_DATA_DIR}/module_1.txt')
+
+# Check that the prelude is Still loaded, and that the Count macro is Still
+# available:
+op_count(B)
 
 discard(chunk_skew())
 discard(cnt(list()))
 map(A,d,distance(v,-v,1,2))
 map(B,t,dts(v,w))
 map(A,w,i * v)
+
+# check that an alias on the macro is not dropped: see #3970
+discard(filter(cnt(list()) AS alias,alias.count))
 
 # let bindings - currently undocumented
 

@@ -5,7 +5,7 @@ create array A <a:int32 default 10> [x=0:2,3,0,y=2:5,2,1]
 --test
 --aql select * into A from build(A,x+9)
 --aql update A set a = a + 1
---aql select * into A from build_sparse(A,x+y+3,x<>1)
+--aql select * into A from filter(build(A,x+y+3),x<>1)
 --aql update A set a = a + 1
 --aql update A set a = a + 20
 --aql update A set a = a - 21

@@ -24,12 +24,15 @@
  * PhysicalConsume.cpp
  *
  *  Created on: Aug 6, 2013
- *      Author: sfridella
+ *      Author: Tigor, sfridella
  */
 
+#include <log4cxx/logger.h>
 #include <query/Operator.h>
 #include <array/Array.h>
+#include <array/RLE.h>
 #include <util/MultiConstIterators.h>
+#include <array/TileIteratorAdaptors.h>
 
 using namespace std;
 using namespace boost;
@@ -45,15 +48,6 @@ public:
     {
     }
 
-    /***
-     * Consume scans the input array in order to materialize all chunks.  It produces an empty result,
-     * so it can be used to wrap a complex expression in order to benchmark the expressions performance
-     * without including any data transfers.  Along with the input array, it receives an interger parameter
-     * that determines the width of the vertical slice of attributes for the scan.  If the param is 1,
-     * the scan is purely vertical, scanning each attribute entirely in turn.  If the param is equal to
-     * the number of attributes, the scan is horizontal, scanning chunks across all attributes.
-     *
-     */
     shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
@@ -67,34 +61,26 @@ public:
             ? ((shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getUint64()
             : 1;
 
-        /* If the array is fully materialized, do nothing
-         */
         shared_ptr<Array>& array = inputArrays[0];
-        if (array->isMaterialized())
-        {
-            return shared_ptr<Array>();
-        }
 
         /* Scan through the array in vertical slices of width "attrStrideSize"
          */
         size_t numRealAttrs = _schema.getAttributes(true).size();
         size_t baseAttr = 0;
 
-        attrStrideSize = (attrStrideSize < 1) ? 1 : attrStrideSize;
-        attrStrideSize = (attrStrideSize > numRealAttrs) ? numRealAttrs : attrStrideSize;
+        attrStrideSize = std::max(attrStrideSize,uint64_t(1));
+        attrStrideSize = std::min(attrStrideSize,numRealAttrs);
 
         while (baseAttr < numRealAttrs)
         {
             /* Get iterators for this vertical slice
              */
-            size_t sliceSize = (numRealAttrs - baseAttr) > attrStrideSize
-                ? attrStrideSize
-                : numRealAttrs - baseAttr;
+            size_t sliceSize = std::min(numRealAttrs - baseAttr,attrStrideSize);
             std::vector<shared_ptr<ConstIterator> > arrayIters(sliceSize);
 
             for (size_t i = baseAttr;
                  i < (baseAttr + sliceSize);
-                 i++)
+                 ++i)
             {
                 arrayIters[i - baseAttr] = array->getConstIterator(i);
             }
@@ -110,23 +96,48 @@ public:
                 /* Get list of all iters where current chunk position is not empty
                  */
                 multiIters.getIDsAtMinPosition(minIds);
-                for (size_t i = 0; i < minIds.size(); i++)
-                {
+                for (size_t i = 0; i < minIds.size(); i++)  {
+
                     shared_ptr<ConstArrayIterator> currentIter =
-                        static_pointer_cast<ConstArrayIterator, ConstIterator> (arrayIters[minIds[i]]);
+                       static_pointer_cast<ConstArrayIterator, ConstIterator > (arrayIters[ minIds[i] ] );
                     const ConstChunk& chunk = currentIter->getChunk();
 
-                    if (!chunk.isMaterialized()) {
-                        shared_ptr<ConstChunkIterator> chunkIter =
-                            chunk.getConstIterator(ConstChunkIterator::INTENDED_TILE_MODE |
-                                                   ConstChunkIterator::IGNORE_EMPTY_CELLS);
+                    int configTileSize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
+                    int iterMode = ConstChunkIterator::INTENDED_TILE_MODE;
+                    shared_ptr<ConstChunkIterator> chunkIter =
+                    chunk.getConstIterator(iterMode |
+                                           ConstChunkIterator::IGNORE_EMPTY_CELLS);
+                    iterMode = chunkIter->getMode();
 
-                        while (!chunkIter->end()) {
-                            Value& v = chunkIter->getItem();
-
-                            v.isNull();                      // suppress compiler warning
-                            ++(*chunkIter);
+                    if ((iterMode & ConstChunkIterator::TILE_MODE)==0) {
+                        // new tile mode
+                        if (chunkIter->end()) {
+                            continue;
                         }
+                        chunkIter = boost::make_shared<
+                           TileConstChunkIterator<
+                              boost::shared_ptr<ConstChunkIterator> > >(chunkIter, query);
+                        assert(configTileSize>0);
+                        consumeTiledChunk(chunkIter, size_t(configTileSize));
+                        continue;
+                    }
+
+                    while (!chunkIter->end()) {
+                        Value& v = chunkIter->getItem();
+
+                        if (ConstRLEPayload* tile = v.getTile()) {
+                            // old tile mode
+                            ConstRLEPayload::iterator piter = tile->getIterator();
+                            while (!piter.end()) {
+                                Value tv;
+                                piter.getItem(tv);
+                                ++(piter);
+                            }
+                        } else {
+                            chunkIter->getPosition();
+                            v.isNull(); // suppress compiler warning
+                        }
+                        ++(*chunkIter);
                     }
                 }
 
@@ -139,8 +150,30 @@ public:
              */
             baseAttr += sliceSize;
         }
-
         return shared_ptr<Array>();
+    }
+    void consumeTiledChunk(boost::shared_ptr<ConstChunkIterator>& chunkIter, size_t tileSize)
+    {
+        ASSERT_EXCEPTION( ! chunkIter->end(), "consumeTiledChunk must be called with a valid chunkIter" );
+        Value v;
+        scidb::Coordinates coords;
+        position_t nextPosition = chunkIter->getLogicalPosition();
+        assert(nextPosition >= 0);
+        while(nextPosition >= 0) {
+            boost::shared_ptr<BaseTile> tile;
+            boost::shared_ptr<BaseTile> cTile;
+            nextPosition = chunkIter->getData(nextPosition, tileSize, tile, cTile);
+            if (tile) {
+                assert(cTile);
+                Tile<Coordinates, ArrayEncoding >* coordsTyped =
+                    safe_dynamic_cast< Tile<Coordinates, ArrayEncoding >* >(cTile.get());
+
+                for (size_t i = 0, n = tile->size(); i < n ; ++i) {
+                    tile->at(i, v);
+                    coordsTyped->at(i,coords);
+                }
+            }
+        }
     }
 };
 

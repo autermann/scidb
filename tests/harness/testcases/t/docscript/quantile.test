@@ -5,13 +5,13 @@
 --set-format dcsv
 create array quantile_array <val:int64>[i=0:10,11,0] 
 --set-format dense
-load(quantile_array,'../tests/harness/testcases/data/doc/11numbers.scidb')  
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odense -aq "load(quantile_array,'${TEST_DATA_DIR}/doc/11numbers.scidb')""
 quantile(quantile_array,2)  
 --set-format dcsv
 --start-igdata
 create array m25 <val:int32>[i=0:24,25,0]  
 create array m5x5 <val:int32>[i=0:4,5,0, j=0:4,5,0]  
-load(m25,'../tests/harness/testcases/data/doc/25ints.scidb')  
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odcsv -naq "load(m25,'${TEST_DATA_DIR}/doc/25ints.scidb')""
 --stop-igdata
 show(m5x5) 
 --set-format dense

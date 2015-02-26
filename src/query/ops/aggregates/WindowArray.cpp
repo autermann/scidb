@@ -836,7 +836,7 @@ namespace scidb
 
                 size_t maxMaterializedChunkSize = (
                     Config::getInstance()->getOption<int>(CONFIG_MATERIALIZED_WINDOW_THRESHOLD)
-                    * MB);   // All config.ini params are in Megabytes.
+                    * MiB);   // All config.ini params are in Mebibytes.
 
                 if ( materializedChunkSize <= maxMaterializedChunkSize )
                 {

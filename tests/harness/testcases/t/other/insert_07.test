@@ -7,13 +7,13 @@
 
 create array R <val:int64> [x=0:10000,5000,0,y=0:10000,5000,0]
 create array L <val:int64> [x=0:10000,5000,0,y=0:10000,5000,0]
-load(L, '../tests/harness/testcases/data/sparse_insert.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(L, '${TEST_DATA_DIR}/sparse_insert.txt')""
 
 create array RU <val:int64> [x=0:*,5000,0,y=0:*,5000,0]
 create array RU1 <val:int64> [x=0:10000,5000,0,y=0:10000,5000,0]
 create array RU2 <val:int64> [x=0:10000,5000,0,y=0:*,5000,0]
 create array LU <val:int64> [x=0:*,5000,0,y=0:*,5000,0]
-load(LU, '../tests/harness/testcases/data/sparse_insert.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(LU, '${TEST_DATA_DIR}/sparse_insert.txt')""
 
 
 

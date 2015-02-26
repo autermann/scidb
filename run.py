@@ -38,7 +38,7 @@ import copy
 import argparse
 
 _DBG = os.environ.get("SCIDB_DBG",False)
- 
+
 # not order preserving
 # should be O(n log n) or O(n) depending on
 # whether set uses hashing or trees
@@ -217,6 +217,8 @@ def rm_rf(path,force=False,throw=True):
     if not force and not confirm("WARNING: about to delete *all* contents of "+path, True):
         if throw:
             raise Exception("Cannot continue without removing the contents of "+path)
+        else:
+            return
 
     cmdList=["/bin/rm", "-rf", path]
     ret = executeIt(cmdList,
@@ -280,8 +282,8 @@ def pluginSetup(scidbEnv):
     runSetup(
         scidbEnv.args.force,
         scidbEnv.args.path,
-        pluginBuildPath, 
-        scidbEnv.install_path, 
+        pluginBuildPath,
+        scidbEnv.install_path,
         defs,
         name=scidbEnv.args.name
         )
@@ -330,6 +332,7 @@ def pluginMakePackages(scidbEnv):
     pluginPath=getRecordedVar(pluginBuildPath,"CMAKE_HOME_DIRECTORY")
     buildType=getRecordedVar(pluginBuildPath,"CMAKE_BUILD_TYPE")
     packagePath=scidbEnv.args.package_path
+    scidbBinPath=scidbEnv.args.scidb_bin_path
     if not packagePath:
         packagePath=os.path.join(pluginBuildPath, "packages")
 
@@ -338,11 +341,11 @@ def pluginMakePackages(scidbEnv):
     binPath=os.path.join(pluginPath,"deployment/deploy.sh")
     curr_dir=os.getcwd()
 
-    # Usage: plugin-trunk/deployment/deploy.sh build <Debug|RelWithDebInfo> <packages_path> <scidb_source_path>
+    # Usage: plugin-trunk/deployment/deploy.sh build <Debug|RelWithDebInfo> <packages_path> <scidb_packages_path> <scidb_bin_path>
 
     cmdList=[binPath,
              "build", buildType,
-             packagePath, scidbEnv.source_path ]
+             packagePath, scidbEnv.source_path, scidbBinPath ]
     ret = executeIt(cmdList,
                     cwd=pluginPath)
     os.chdir(curr_dir)
@@ -462,6 +465,29 @@ def getDBPasswd(configFile, dbName):
     configOpts=parseOptions(configFile, dbName)
     return str(configOpts["db_passwd"])
 
+def removeAlternatives(scidbEnv):
+    # remove the local alternatives information
+    # effectively removing all previously installed alternatives
+    altdir=os.path.join(scidbEnv.install_path,"alternatives*")
+    rm_rf(altdir, scidbEnv.args.force, throw=False)
+
+def installAlternatives(scidbEnv, link, name, path, priority):
+    # For local run as user there is no access to the default alternatives directories
+    # (/etc/alternatives, /var/lib/alternatives)
+    # so create our own in the stage/install area
+    altdir=os.path.join(scidbEnv.install_path,"alternatives")
+    if not os.access(altdir, os.R_OK):
+        mkdir_p(altdir)
+    admindir=os.path.join(scidbEnv.install_path,"alternatives_state")
+    if not os.access(admindir, os.R_OK):
+        mkdir_p(admindir)
+    if not os.access(path, os.R_OK):
+        raise Exception("Invalid path %s" % path)
+
+    cmdList=[ "update-alternatives", "--altdir", altdir, "--admindir", admindir,
+              "--install", link, name, path, priority]
+    ret = executeIt(cmdList)
+
 def install(scidbEnv):
     configFile = getConfigFile(scidbEnv)
 
@@ -483,6 +509,23 @@ def install(scidbEnv):
     ret = executeIt(cmdList)
 
     os.chdir(curr_dir)
+    #
+    # This section is for update-alternatives
+    # It MUST be kept in sync with the scidb.spec file
+    #
+    if scidbEnv.args.light:
+        # remove all links to the "alternative" libraries
+        # thus, allow for the scidb libraries to be loaded again after
+        # installAlternatives() is run
+        printInfo("Removing linker metadata for alternative plugins/libraries, please confirm");
+        removeAlternatives(scidbEnv)
+
+    link=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/libdense_linear_algebra.so")
+    path=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/libdense_linear_algebra-scidb.so")
+    installAlternatives(scidbEnv, link, 'dense_linear_algebra', path, '10')
+    link=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/liblinear_algebra.so")
+    path=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/liblinear_algebra-scidb.so")
+    installAlternatives(scidbEnv, link, 'linear_algebra', path, '10')
 
     if scidbEnv.args.light:
         return
@@ -559,6 +602,16 @@ def pluginInstall(scidbEnv):
     ret = executeIt(cmdList, cwd=pluginBuildPath)
 
     os.chdir(curr_dir)
+    #
+    # This section is for update-alternatives
+    # It MUST be kept in sync with the p4.spec file
+    #
+    link=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/libdense_linear_algebra.so")
+    path=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/libdense_linear_algebra-p4.so")
+    installAlternatives(scidbEnv, link, 'dense_linear_algebra', path, '20')
+    link=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/liblinear_algebra.so")
+    path=os.path.join(scidbEnv.install_path,"lib/scidb/plugins/liblinear_algebra-p4.so")
+    installAlternatives(scidbEnv, link, 'linear_algebra', path, '20')
 
 def start(scidbEnv):
     db_name=os.environ.get("SCIDB_NAME","mydb")
@@ -614,7 +667,7 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
     binPath = os.path.join(scidbEnv.install_path,"bin")
     testEnv = os.path.join(scidbEnv.build_path,"tests","harness","scidbtestharness_env.sh")
     testBin = os.path.join(scidbEnv.install_path,"bin","scidbtestharness")
-    
+
     #...........................................................................
     # Add paths to PYTHONPATH.
     pythonPath = ':'.join(
@@ -646,7 +699,7 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
     scratchDir = os.path.join(testsPath,'testcases')
     skipTests = os.path.join(testsPath,'testcases','disable.tests')
     #.........................................................................
-    # Wipe out *.expected files from the scratch folder to ensure 
+    # Wipe out *.expected files from the scratch folder to ensure
     # the harness pulls everything from the source tree.
     #.........................................................................
     cmdList.extend(['find',scratchDir,'-name','"*.expected"','-print0',
@@ -710,7 +763,7 @@ def pluginTests(scidbEnv):
         contents = fd.read()
 
     pluginSourceTestsPath = os.path.join(contents.strip(),'test','testcases')
-    
+
     pluginTestEnv = os.path.join(pluginBuildPath,'test','scidbtestharness_env.sh')
 
     commands=[]
@@ -781,12 +834,12 @@ SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
     subParser = subparsers.add_parser('plugin_setup', usage=
                                       "%(prog)s [-h | options]\n"+
 "\nCreates the %s directory for an out-of-tree plugin build and runs cmake there."%(pluginBuildPathStr)+
-"\nThe plugin in in the directory specified by --path must conform to the following rules:"
+"\nThe plugin in the directory specified by --path must conform to the following rules:"
 "\n1. It is based on cmake."+
 "\n2. The plugin build directory %s must be configurable by \'cmake -DCMAKE_INSTALL_PREFIX=<scidb_installation_dir>  -DSCIDB_SOURCE_DIR=<scidb_source_dir> ...\'"%(pluginBuildPathStr)+
 "\n3. Running \'make\' in that directory must build all the deliverables."+
 "\n4. Running \'make install\' in that directory must install all the deliverables into the scidb installation."+
-"\n5. Running \'./deployment/deploy.sh build $SCIDB_BUILD_TYPE <packages_path> %s\' in the directory specified by --path must generate installable plugin packages. See \'plugin_make_packages --help\'"%(scidbEnv.bin_path)+
+"\n5. Running \'./deployment/deploy.sh build $SCIDB_BUILD_TYPE <package_path> <scidb_bin_path> %s\' in the directory specified by --path must generate installable plugin packages. See \'plugin_make_packages --help\'"%(scidbEnv.bin_path)+
 "\n6. \'scidbtestharness --rootdir=PATH/test/tescases --scratchDir=$SCIDB_BUILD_DIR/tests/harness/testcases ...\' must be runnable in %s."%(pluginBuildPathStr+"/$SCIDB_PLUGIN_TESTS")+
 """\nEnvironment variables:
 SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
@@ -847,6 +900,9 @@ Currently, the plugin packages are allowed to be generated from scratch (not fro
     subParser.add_argument('package_path',
                            nargs='?', help=
                            "full directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/external_plugins/<name>/packages")
+    subParser.add_argument('scidb_bin_path', default=os.path.join(scidbEnv.build_path,"bin"),
+                           nargs='?', help=
+                           "full path for scidb bin directory, default is $SCIDB_BUILD_PATH/bin")
     subParser.add_argument('-f','--force', action='store_true', help=
                            "automatically confirm any old state/directory cleanup")
     subParser.set_defaults(func=pluginMakePackages)
@@ -897,7 +953,6 @@ SCIDB_NO_WATCHDOG - do not start a watch-dog process, default is false
     group.add_argument('-l','--light', action='store_true', help=
                        "just install new binaries, no changes to configuration are made")
     subParser.set_defaults(func=install)
-
 
     subParser = subparsers.add_parser('start', usage=
     """%(prog)s [-h]\n

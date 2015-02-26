@@ -34,7 +34,7 @@ endif()
 
 if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
   # CentOS 6.x
-  set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH} "/usr/lib64/openmpi")
+  set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH} "/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/mpich2")
 endif()
 
 if(${DISTRO_NAME_VER} MATCHES "Ubuntu-12")

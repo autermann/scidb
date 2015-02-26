@@ -1,4 +1,24 @@
 #!/usr/bin/python
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2014 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 #-------------------------------------------------------------------------------
 # Imports:
 import argparse
@@ -14,16 +34,6 @@ import unittest
 
 from CommandRunner import CommandRunner
 
-CREATE_800x40_ARRAYS = [
-    'iquery',
-    '-c',
-    os.environ['IQUERY_HOST'],
-    '-p',
-    os.environ['IQUERY_PORT'],
-    '-naq',
-    'store(build(<a:double NULL>[i=0:799,8000,0,j=0:39,8000,0],random()%10),<name>)'
-    ]
-
 CREATE_400x400_ARRAYS = [
     'iquery',
     '-c',
@@ -31,7 +41,7 @@ CREATE_400x400_ARRAYS = [
     '-p',
     os.environ['IQUERY_PORT'],
     '-naq',
-    'store(build(<a:double NULL>[i=0:399,50,0,j=0:399,50,0],random()%10),<name>)'
+    'store(build(<a:double NULL>[i=0:399,101,0,j=0:399,101,0],random()%10),<name>)'
     ]
 
 CREATE_200x200_ARRAYS = [
@@ -41,7 +51,7 @@ CREATE_200x200_ARRAYS = [
     '-p',
     os.environ['IQUERY_PORT'],
     '-naq',
-    'store(build(<a:double NULL>[i=0:199,50,0,j=0:199,50,0],random()%10),<name>)'
+    'store(build(<a:double NULL>[i=0:199,53,0,j=0:199,53,0],random()%10),<name>)'
     ]
 
 ##############################################################################
@@ -57,7 +67,7 @@ class BkpTestHelper:
         self._scidbUser = scidbUser
         self._hosts = hosts
         self._nInst = nInst
-        self._createQuery = CREATE_800x40_ARRAYS
+        self._createQuery = CREATE_200x200_ARRAYS
         self._cmdRunner = CommandRunner()
         self.__bkpFolder = bkpFolder
         self.__allArrays = allArrays
@@ -71,16 +81,34 @@ class BkpTestHelper:
             R = [a + '@' + str(i+1) for a in R for i in range(versions)]
         return R
 
-    def createArrays(self,arrays,iRange=[5],backup=False):
+    def createArrays(self,arrays,iRange=[5],backup=False,temp=False):
+        # For regular arrays - different store and backup queries
         storeQueries = [
             [x.replace('<name>',n).replace('<i>',str(i)) for x in self._createQuery] for n in arrays for i in iRange
             ]
-
+        
         bkpStoreQueries = [
             ['iquery','-naq','store(' + n + ',' + n + '_bkp)'] for n in arrays for i in iRange
             ]
+            
+        createQueries = itertools.cycle([[]])
 
-        for qz in zip(storeQueries,bkpStoreQueries):
+        if (temp): 
+            # Create queries are strictly for temp arrays.
+            schema = re.compile('\<[^\]]+\]').search(self._createQuery[-1])
+            createQueries = [
+                self._createQuery[:-1] + ['create temp array ' + n + ' ' + schema.group()] for n in arrays
+                ]
+
+        for qz in zip(storeQueries,bkpStoreQueries,createQueries):
+            if (len(qz[2]) > 0):
+                R0 = self._cmdRunner.waitForProcesses(
+                    self._cmdRunner.runSubProcesses(
+                        [qz[2]]
+                        ),
+                    outputs=False
+                    )
+                
             R = self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSubProcesses(
                     [qz[0]]
@@ -95,14 +123,26 @@ class BkpTestHelper:
                         ),
                     outputs=False
                     )
-    def reCreateArrays(self,arrays,versions=0):
+    def reCreateArrays(self,arrays,versions=0,temp=False):
         bkpNames = [[name + '_bkp@' + str(v+1) for v in range(versions)] for name in arrays]
+        
+        if (temp):
+            bkpNames = [[name + '_bkp'] for name in arrays]
+            # Create queries are strictly for temp arrays.
+            schema = re.compile('\<[^\]]+\]').search(self._createQuery[-1])
         
         for pair in zip(arrays,bkpNames):
             name = pair[0]
             bkps = pair[1]
             for bkp in bkps:
+                if (temp):
+                    createQ = ['iquery','-aq','create temp array ' + name + ' ' + schema.group()]
+                    R0 = self._cmdRunner.waitForProcesses(
+                        self._cmdRunner.runSubProcesses([createQ]),outputs=True
+                        )                
+                
                 storeQ = ['iquery','-naq','store(' + bkp + ',' + name + ')']
+
                 R = self._cmdRunner.waitForProcesses(
                     self._cmdRunner.runSubProcesses([storeQ]),outputs=True
                     )                
@@ -217,14 +257,12 @@ class BkpTestHelper:
                     ),
                 outputs=True
                 )
-
             R = self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSubProcesses(
                     [cpBkp]
                     ),
                 outputs=True
                 )
-
             R = self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSubProcesses(
                     [compQ]

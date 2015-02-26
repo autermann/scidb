@@ -296,7 +296,7 @@ namespace scidb
         }
         const uint64_t launchId = result->launch_id();
 
-        boost::shared_ptr<scidb::Query> query = Query::getQueryByID(queryId, false, true);
+        boost::shared_ptr<scidb::Query> query = Query::getQueryByID(queryId, true);
         assert(query);
         try {
             processMessage(launchId, cliMsg, query);
@@ -369,9 +369,10 @@ namespace scidb
          * Check if a process with a given pid belongs to this cluster/instance
          * @param installPath this instance install/data path
          * @param pid of the process to check
+         * @param queryId the current query ID or 0
          * @return true if procName is an MPI slave started by this SciDB instance
          *              or it is an MPI launcher/daemon started by this cluster and
-         *              does not belong to any existing query;
+         *              (does not belong to any existing query or does belong to the one with queryId);
          *         false otherwise
          * @note this method can produce false positives (for example because pids wrap around)
          * @todo XXX this method does not work correctly under OMPI
@@ -379,7 +380,8 @@ namespace scidb
          */
         bool canRecognizeProc(const std::string& installPath,
 			      const std::string& clusterUuid,
-			      pid_t pid);
+			      pid_t pid,
+                              QueryID queryId);
     public:
         explicit MpiManager();
         virtual ~MpiManager() {}
@@ -470,13 +472,15 @@ namespace scidb
          * @param installPath this instance install/data path
          * @param clusterUuid SciDB cluster UUID
          * @param pid of the process to kill
+         * @param queryId the current query ID or INVALID_QUERY_ID (default)
          * @return true if the process with pid is a valid SciDB process
          *         and ::kill() either succeeded or failed unexpectedly;
          *         otherwise false
          */
         static bool killProc(const std::string& installPath,
                              const std::string& clusterUuid,
-                             pid_t pid);
+                             pid_t pid,
+                             QueryID queryId=INVALID_QUERY_ID);
         /**
          * Read the launcher pid (=pgrp) from the file and try to kill
          * launcher's process group. If any procs exist, the file is removed.
@@ -493,10 +497,12 @@ namespace scidb
          * @param installPath this instance install/data path
          * @param clusterUuid SciDB cluster UUID
          * @param fileName of the MPI slave
+         * @param queryId the current query ID or INVALID_QUERY_ID (default)
          */
         static void cleanupSlavePidFile(const std::string& installPath,
                                         const std::string& clusterUuid,
-                                        const std::string& fileName);
+                                        const std::string& fileName,
+                                        QueryID queryId=INVALID_QUERY_ID);
 
         private:
         MpiErrorHandler(const MpiErrorHandler&);

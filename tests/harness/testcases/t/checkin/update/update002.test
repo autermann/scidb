@@ -3,9 +3,9 @@ CREATE  ARRAY simple01c < COL000N: int32,COL001C: char,COL002S: string > [a=0:99
 --sleep 2
 CREATE  ARRAY simple01b < COL000N: int32,COL001C: char,COL002S: string > [a=0:99,10,0,b=0:1,2,0]
 --sleep 2
---aql load simple01c from '../tests/harness/testcases/data/simple01c.txt'
+--aql load simple01c from '${TEST_DATA_DIR}/simple01c.txt'
 --sleep 4
---aql load simple01b from '../tests/harness/testcases/data/simple01b.txt'
+--aql load simple01b from '${TEST_DATA_DIR}/simple01b.txt'
 --sleep 4
 
 --test

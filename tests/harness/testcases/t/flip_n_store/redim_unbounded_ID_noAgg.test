@@ -1,6 +1,6 @@
 --setup
 
-CREATE EMPTY ARRAY Raw_Test_Data < I : int64, J : int64, V : double NULL > [ Line=0:*,100,0 ]
+CREATE array Raw_Test_Data < I : int64, J : int64, V : double NULL > [ Line=0:*,100,0 ]
 load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data2.txt')
 
 --test

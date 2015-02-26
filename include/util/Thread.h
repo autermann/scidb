@@ -73,6 +73,12 @@ public:
         static void nanoSleep(uint64_t nanoSec);
 };
 
+
+/// @return current time in nanoseconds
+uint64_t getTimeInNanoSecs();
+/// @return return (getTimeInNanoSecs() - startTimeNanoSec >= timeoutNanoSec && timeoutNanoSec > 0)
+bool hasExpired(uint64_t startTimeNanoSec, uint64_t timeoutNanoSec);
+
 /**
  * class Functor_tt
  * {

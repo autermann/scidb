@@ -5,6 +5,7 @@
 %define libscidbclient      libscidbclient-VERSION_MAJOR.VERSION_MINOR
 %define scidb_boost         scidb-VERSION_MAJOR.VERSION_MINOR-libboost
 %define scidb_boost_version 1.54.0-VERSION_PATCH
+%define scidb_mpich2        scidb-VERSION_MAJOR.VERSION_MINOR-mpich2
 %define debug_package %{nil}
 Name: %{scidb}
 Version: VERSION_PATCH
@@ -17,16 +18,17 @@ Group: Applications/Databases
 Summary: SciDB - database for extra large data processing
 License: GPLv3
 #Some packages versions which we build by ourself forced to avoid using versions from CentOS or EPEL
-BuildRequires: cmake = 2.8.10-1
+BuildRequires: cmake
 BuildRequires: make
 BuildRequires: gcc-c++
 BuildRequires: gcc-gfortran
 BuildRequires: flex
+BuildRequires: flex-devel
 BuildRequires: bison
 BuildRequires: swig2 = 2.0.8-1
 BuildRequires: %{scidb_boost}-devel = %{scidb_boost_version}
 BuildRequires: protobuf-devel = 2.4.1-2
-BuildRequires: log4cxx-devel = 0.10.0-1
+BuildRequires: log4cxx-devel
 BuildRequires: libpqxx-devel = 3.1-1
 BuildRequires: bzip2-devel
 BuildRequires: zlib-devel
@@ -36,7 +38,7 @@ BuildRequires: doxygen
 BuildRequires: fop
 BuildRequires: docbook-style-xsl
 BuildRequires: libxslt
-BuildRequires: mpich2-devel
+BuildRequires: %{scidb_mpich2}-devel
 BuildRequires: lapack-devel
 BuildRequires: blas-devel
 BuildRequires: openssh-clients
@@ -49,6 +51,10 @@ BuildRequires: protobuf-compiler
 BuildRequires: protobuf-java
 BuildRequires: java-1.6.0-openjdk-devel
 BuildRequires: junit
+BuildRequires: git
+BuildRequires: pam-devel
+BuildRequires: libcsv-devel
+Requires: %{scidb_boost}-date-time       = %{scidb_boost_version}
 Requires: %{scidb_boost}-filesystem      = %{scidb_boost_version}
 Requires: %{scidb_boost}-serialization   = %{scidb_boost_version}
 Requires: %{scidb_boost}-system          = %{scidb_boost_version}
@@ -60,9 +66,13 @@ Requires: python-crypto
 Requires: python-argparse
 Requires: postgresql >= 8.4, postgresql < 8.5
 Requires: openssh-clients
-Requires: mpich2
+Requires: %{scidb_mpich2}
 Requires: lapack
 Requires: blas
+Requires: libcsv
+Requires(post): %{_sbindir}/update-alternatives
+Requires(postun): %{_sbindir}/update-alternatives
+
 %description
 SciDB - database for extra large data processing
 
@@ -171,6 +181,7 @@ Summary: SciDB Java connector
 Group: Applications/Databases
 Requires: protobuf-java
 Requires: java-1.6.0-openjdk-devel
+Requires: junit
 %description -n %{scidb}-jdbc
 SciDB Java connector
 
@@ -203,7 +214,7 @@ Install entire SciDB and PostgreSQL
 
 %if %{without insource}
 %prep
-%setup -c
+%setup -c -q
 %endif
 
 %build
@@ -245,6 +256,18 @@ done
 
 %files -n %{scidb}-plugins -f /tmp/rpm-%{scidb}-plugins-files
 %defattr(-,root,root,-)
+
+%post -n %{scidb}-plugins
+%{_sbindir}/update-alternatives --install /opt/scidb/VERSION_MAJOR.VERSION_MINOR/lib/scidb/plugins/libdense_linear_algebra.so \
+  dense_linear_algebra /opt/scidb/VERSION_MAJOR.VERSION_MINOR/lib/scidb/plugins/libdense_linear_algebra-scidb.so 10
+%{_sbindir}/update-alternatives --install /opt/scidb/VERSION_MAJOR.VERSION_MINOR/lib/scidb/plugins/liblinear_algebra.so \
+  linear_algebra /opt/scidb/VERSION_MAJOR.VERSION_MINOR/lib/scidb/plugins/liblinear_algebra-scidb.so 10
+
+%postun -n %{scidb}-plugins
+if [ $1 -eq 0 ] ; then
+  %{_sbindir}/update-alternatives --remove dense_linear_algebra /opt/scidb/VERSION_MAJOR.VERSION_MINOR/lib/scidb/plugins/libdense_linear_algebra-scidb.so
+  %{_sbindir}/update-alternatives --remove linear_algebra /opt/scidb/VERSION_MAJOR.VERSION_MINOR/lib/scidb/plugins/liblinear_algebra-scidb.so
+fi
 
 %files -n %{scidb}-plugins-dbg -f /tmp/rpm-%{scidb}-plugins-dbg-files
 %defattr(-,root,root,-)

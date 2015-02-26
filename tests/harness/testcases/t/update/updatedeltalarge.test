@@ -8,9 +8,9 @@
 
 --test
 --start-igdata
---aql load delta_timing from '../tests/harness/testcases/data/large_single_chunk.txt'
---aql load dense_delta_timing from '../tests/harness/testcases/data/large_single_chunk.txt'
---aql load nondelta_timing from '../tests/harness/testcases/data/large_single_chunk.txt'
+--aql load delta_timing from '${TEST_DATA_DIR}/large_single_chunk.txt'
+--aql load dense_delta_timing from '${TEST_DATA_DIR}/large_single_chunk.txt'
+--aql load nondelta_timing from '${TEST_DATA_DIR}/large_single_chunk.txt'
 
 --start-timer update_delta_timing_1
 --aql update delta_timing set x = x + 1 where i = 1 and j = 1

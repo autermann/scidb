@@ -99,7 +99,7 @@ struct ArenaTests : public CppUnit::TestFixture
  */
 void ArenaTests::testOptions()
 {
-    cout << Options("A").pagesize(1*KB).locking(false) << endl;
+    cout << Options("A").pagesize(1*KiB).locking(false) << endl;
     cout << Options("B").resetting(true).locking(true) << endl;
 }
 
@@ -179,8 +179,8 @@ void ArenaTests::testRootArena()
  */
 void ArenaTests::testLimitedArena()
 {
-    arena(*newArena(Options("limited 1").limit(1*GB)));
-    arena(*newArena(Options("limited 2").limit(1*GB).debugging(true)));
+    arena(*newArena(Options("limited 1").limit(1*GiB)));
+    arena(*newArena(Options("limited 2").limit(1*GiB).debugging(true)));
 }
 
 /**
@@ -565,15 +565,15 @@ void ArenaTests::anExample()
     but either way this would give us an arena with a preset limit already in
     place. But for this example, let's just build the arena explicitly...*/
 
-        ArenaPtr parent(newArena(Options("Foo").limit(1*GB)));
+        ArenaPtr parent(newArena(Options("Foo").limit(1*GiB)));
 
  /* Imagine further that wish we to track  two distinct groups of allocations
     made from within the call to Foo, say groups 'A' and 'B', and furthermore,
     that, for reasons of our own, we wish to prevent group 'B' from exceeding,
-    say, 1MB. So, we attach two more local arenas to our parent, like so...*/
+    say, 1MiB. So, we attach two more local arenas to our parent, like so...*/
 
     ArenaPtr A(newArena(Options("A")));
-    ArenaPtr B(newArena(Options("B").limit(1*MB)));
+    ArenaPtr B(newArena(Options("B").limit(1*MiB)));
 
  /* One code path within Foo allocates from 'A' using various standard library
     containers. By and large, the managed containers have identical interfaces
@@ -723,19 +723,19 @@ void ArenaTests::anExample()
 
  /* At any point we can ask our arenas how they are doing...*/
 
-    if (A->available() > 1*GB)
+    if (A->available() > 1*GiB)
     {
         //...
     }
 
-    if (B->allocated() < 1*GB)
+    if (B->allocated() < 1*GiB)
     {
         //...
     }
 
  /* And, of course, we can always inquire after the parent...*/
 
-    if (A->parent()->available() > 1*GB)
+    if (A->parent()->available() > 1*GiB)
     {
         //...
     }

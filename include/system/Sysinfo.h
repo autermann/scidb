@@ -31,18 +31,26 @@
 #ifndef SYSINFO_H
 #define SYSINFO_H
 
+#include "system/Constants.h"
+
 namespace scidb
 {
 
 class Sysinfo
 {
 public:
-	enum CacheLevel
-	{
-		CPU_CACHE_L1 = 1,
-		CPU_CACHE_L2 = 2,
-		CPU_CACHE_L3 = 4
-	};
+    enum CacheLevel
+    {
+        CPU_CACHE_L1 = 1,
+        CPU_CACHE_L2 = 2,
+        CPU_CACHE_L3 = 4
+    };
+
+    enum {
+        INTEL_L1_DATA_CACHE_BYTES = 32*KiB      // This hasn't changed for Intel for years and years.
+                                                // (We don't have access from Linux to the L1 size,
+                                                // only the last-level-cache size.)
+    };
 
     static int getNumberOfCPUs();
     static int getCPUCacheSize(int level);

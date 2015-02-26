@@ -1,8 +1,8 @@
 --setup
-create empty array A <a:string,b:string null> [x=0:*,2,0,y=0:*,2,0]
-create empty array B <b:string> [a(string)=*,2,0]
-create empty array C <b:string> [a(string)=2,2,0]
-load(A,'../tests/harness/testcases/data/redimension_2.txt')
+create array A <a:string,b:string null> [x=0:*,2,0,y=0:*,2,0]
+create array B <b:string> [a(string)=*,2,0]
+create array C <b:string> [a(string)=2,2,0]
+load(A,'${TEST_DATA_DIR}/redimension_2.txt')
 
 --test
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension(A,B)"

@@ -2,13 +2,13 @@
 --test
 --start-query-logging
 
---shell  --command="cat $DOC_DATA/raw.csv " --store
+--shell --store --command="cat $DOC_DATA/raw.csv "
 --set-format dcsv
 --start-igdata
 --aql CREATE ARRAY raw <pos: int64, device: int64, val: float> [offset=0:*,5,0]  
 --shell  --command="csv2scidb -p NNN -s 1 < $DOC_DATA/raw.csv > $DOC_DATA/raw.scidb "
 --stop-igdata
---aql LOAD raw FROM '../tests/harness/testcases/data/doc/raw.scidb'  
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD raw FROM '${TEST_DATA_DIR}/doc/raw.scidb'""
 --start-igdata
 --aql create array A <val: float> [device=1:5,5,0, pos=1:5,5,0]  
 --stop-igdata
@@ -31,4 +31,3 @@ redimension(A,Position, min(val) as minVal, avg(val) as avgVal, max(val) as maxV
 remove(raw)
 remove(A)
 remove(Position)
---shell  --command="rm -f $DOC_DATA/raw.scidb "

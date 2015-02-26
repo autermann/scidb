@@ -35,6 +35,8 @@ set (util_src
     arena/LimitedArena.cpp
     arena/RootArena.cpp
     arena/ScopedArena.cpp
+    isnumber.cpp
+    tsvparse.cpp
     Job.cpp
     JobQueue.cpp
     Semaphore.cpp
@@ -43,14 +45,14 @@ set (util_src
     PluginManager.cpp
     FileIO.cpp
     PluginObjects.cpp
-    na.cpp
-    naInternal.cpp
     require.cpp
     InjectedError.cpp
     BufferedFileInput.cpp
     shm/SharedMemoryIpc.cpp
     MultiConstIterators.cpp
     WorkQueue.cpp
+    DataStore.cpp
+    SpatialType.cpp
 )
 
 file(GLOB util_include "*.h")

@@ -40,6 +40,7 @@
 #include "query/TypeSystem.h"
 #include "array/Metadata.h"
 #include "system/SystemCatalog.h"
+#include "system/Utils.h"
 #include "smgr/io/Storage.h"
 #include "array/Compressor.h"
 
@@ -126,7 +127,7 @@ bool ObjectNames::hasNameAndAlias(const std::string &name, const std::string &al
 
     if (nameIt != _names.end())
     {
-        if (alias == "")
+        if (alias.empty())
             return true;
         else
             return ( (*nameIt).second.find(alias) != (*nameIt).second.end() );
@@ -170,6 +171,71 @@ void printNames (std::ostream& stream, const ObjectNames::NamesType &ob)
             stream << ", ";
         }
         stream << (*nameIt).first;
+    }
+}
+
+/*
+ * Class DimensionVector
+ */
+
+DimensionVector& DimensionVector::operator+= (const DimensionVector& rhs)
+{
+    if (isEmpty())
+    {
+        _data = rhs._data;
+    }
+    else
+    if (!rhs.isEmpty())
+    {
+        assert(numDimensions() == rhs.numDimensions());
+
+        for (size_t i=0, n=numDimensions(); i!=n; ++i)
+        {
+            _data[i] += rhs._data[i];
+        }
+    }
+
+    return *this;
+}
+
+DimensionVector& DimensionVector::operator-= (const DimensionVector& rhs)
+{
+    if (!isEmpty() && !rhs.isEmpty())
+    {
+        assert(numDimensions() == rhs.numDimensions());
+
+        for (size_t i=0, n=numDimensions(); i!=n; ++i)
+        {
+            _data[i] -= rhs._data[i];
+        }
+    }
+
+    return *this;
+}
+/**
+ * Retrieve a human-readable description.
+ * Append a human-readable description of this onto str. Description takes up
+ * one or more lines. Append indent spacer characters to the beginning of
+ * each line.
+ * @param[out] str buffer to write to
+ * @param[in] indent number of spacer characters to start every line with.
+ */
+void DimensionVector::toString (std::ostringstream &str, int indent) const
+{
+    if (indent > 0)
+    {
+        str << std::string(indent,' ');
+    }
+
+    if (isEmpty())
+    {
+        str << "[empty]";
+    }
+    else
+    {
+        str << '[';
+        insertRange(str,_data,' ');
+        str << ']';
     }
 }
 
@@ -267,11 +333,6 @@ ArrayDesc& ArrayDesc::operator = (ArrayDesc const& other)
     return *this;
 }
 
-ArrayDesc::~ArrayDesc()
-{
-    assert(_accessCount == 0);
-}
-
 void ArrayDesc::initializeDimensions()
 {
     Coordinate logicalChunkSize = 1;
@@ -348,6 +409,13 @@ void ArrayDesc::getChunkPositionFor(Coordinates& pos) const
             pos[i] -= (pos[i] - dims[i].getStart()) % dims[i].getChunkInterval();
         }
     }
+}
+
+bool ArrayDesc::isAChunkPosition(Coordinates const& pos) const
+{
+    Coordinates chunkPos = pos;
+    getChunkPositionFor(chunkPos);
+    return coordinatesCompare(pos, chunkPos) == 0;
 }
 
 void ArrayDesc::getChunkBoundaries(Coordinates const& chunkPosition,
@@ -749,13 +817,13 @@ void AttributeDesc::addAlias(const string& alias)
 
 bool AttributeDesc::hasAlias(const std::string& alias) const
 {
-    if (alias == "")
+    if (alias.empty())
         return true;
     else
         return (_aliases.find(alias) != _aliases.end());
 }
 
- TypeId AttributeDesc::getType() const
+TypeId AttributeDesc::getType() const
 {
     return _type;
 }
@@ -811,6 +879,37 @@ const std::string& AttributeDesc::getDefaultValueExpr() const
     return _defaultValueExpr;
 }
 
+/**
+ * Retrieve a human-readable description.
+ * Append a human-readable description of this onto str. Description takes up
+ * one or more lines. Append indent spacer characters to the beginning of
+ * each line. Call toString on interesting children. Terminate with newline.
+ * @param[out] str buffer to write to
+ * @param[in] indent number of spacer characters to start every line with.
+ */
+void AttributeDesc::toString(std::ostringstream &str, int indent) const
+{
+    if (indent > 0)
+    {
+        str<<std::string(indent,' ');
+    }
+
+    str<< "[attDesc] id " << _id
+       << " name " << _name
+       << " aliases {";
+
+    BOOST_FOREACH(const std::string& alias,_aliases)
+    {
+        str << _name << "." << alias << ", ";
+    }
+
+    str<< "} type " << _type
+       << " flags " << _flags
+       << " compression " << _defaultCompressionMethod
+       << " reserve " << _reserve
+       << " default " << ValueToString(_type,_defaultValue);
+}
+
 std::ostream& operator<<(std::ostream& stream,const Attributes& atts)
 {
     return insertRange(stream,atts,',');
@@ -820,10 +919,11 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
 {
     //don't print NOT NULL because it default behaviour
     stream << att.getName() << ':' << att.getType()
-                 << (att.getFlags() & AttributeDesc::IS_NULLABLE ? " NULL" : "");
+           << (att.getFlags() & AttributeDesc::IS_NULLABLE ? " NULL" : "");
     try
     {
-        if (!att.getDefaultValue().isDefault(att.getType())) {
+        if (!att.getDefaultValue().isDefault(att.getType()))
+        {
             stream << " DEFAULT " << ValueToString(att.getType(), att.getDefaultValue());
         }
     }
@@ -836,7 +936,8 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
 
         stream << " DEFAULT UNKNOWN";
     }
-    if (att.getDefaultCompressionMethod() != CompressorFactory::NO_COMPRESSION) {
+    if (att.getDefaultCompressionMethod() != CompressorFactory::NO_COMPRESSION)
+    {
         stream << " COMPRESSION '" << CompressorFactory::getInstance().getCompressors()[att.getDefaultCompressionMethod()]->getName() << "'";
     }
     return stream;
@@ -958,11 +1059,6 @@ Coordinate DimensionDesc::getHighBoundary() const
     return _endMax;
 }
 
-Coordinate DimensionDesc::getStart() const
-{
-    return _startMin;
-}
-
 uint64_t DimensionDesc::getLength() const
 {
     return _startMin == MIN_COORDINATE || _endMax == MAX_COORDINATE ? INFINITE_LENGTH : (_endMax - _startMin + 1);
@@ -999,34 +1095,29 @@ uint64_t DimensionDesc::getCurrLength() const
     }
 }
 
-Coordinate DimensionDesc::getStartMin() const
+/**
+ * Retrieve a human-readable description.
+ * Append a human-readable description of this onto str. Description takes up
+ * one or more lines. Append indent spacer characters to the beginning of
+ * each line. Call toString on interesting children. Terminate with newline.
+ * @param[out] str buffer to write to
+ * @param[in] indent number of spacer characters to start every line with.
+ */
+void DimensionDesc::toString (std::ostringstream &str,int indent) const
 {
-    return _startMin;
-}
+    if (indent > 0)
+    {
+        str<<std::string(indent,' ');
+    }
 
-Coordinate DimensionDesc::getCurrStart() const
-{
-    return _currStart;
-}
-
-Coordinate DimensionDesc::getCurrEnd() const
-{
-    return _currEnd;
-}
-
-Coordinate DimensionDesc::getEndMax() const
-{
-    return _endMax;
-}
-
-int64_t DimensionDesc::getChunkInterval() const
-{
-    return _chunkInterval;
-}
-
-int64_t DimensionDesc::getChunkOverlap() const
-{
-    return _chunkOverlap;
+    str<<"[dimDesc] names "<<_names
+       <<" startMin "<<_startMin
+       <<" currStart "<<_currStart
+       <<" currEnd "<<_currEnd
+       <<" endMax "<<_endMax
+       <<" chnkInterval "<<_chunkInterval
+       <<" chnkOverlap "<<_chunkOverlap
+       << "\n";
 }
 
 void DimensionDesc::validate() const
@@ -1037,7 +1128,7 @@ void DimensionDesc::validate() const
     }
 }
 
-void printSchema (std::ostream& stream,const Dimensions& dims)
+void printSchema(std::ostream& stream,const Dimensions& dims)
 {
     for (size_t i=0,n=dims.size(); i<n; i++)
     {
@@ -1070,7 +1161,7 @@ std::ostream& operator<<(std::ostream& stream,const DimensionDesc& dim)
     return stream;
 }
 
-void printSchema (std::ostream& stream,const DimensionDesc& dim)
+void printSchema(std::ostream& stream,const DimensionDesc& dim)
 {
     Coordinate start = dim.getStart();
     stringstream ssstart;
@@ -1086,13 +1177,11 @@ void printSchema (std::ostream& stream,const DimensionDesc& dim)
            << dim.getChunkInterval() << "," << dim.getChunkOverlap();
 }
 
-
 /*
  * Class InstanceDesc
  */
 InstanceDesc::InstanceDesc() :
     _instance_id(0),
-    _host(""),
     _port(0),
     _online(~0)
 {}
@@ -1117,31 +1206,6 @@ InstanceDesc::InstanceDesc(uint64_t instance_id, const std::string &host,
     _path = p.normalize().string();
 }
 
-uint64_t InstanceDesc::getInstanceId() const
-{
-    return _instance_id;
-}
-
-const std::string& InstanceDesc::getHost() const
-{
-    return _host;
-}
-
-const std::string& InstanceDesc::getPath() const
-{
-    return _path;
-}
-
-uint16_t InstanceDesc::getPort() const
-{
-    return _port;
-}
-
-uint64_t InstanceDesc::getOnlineSince() const
-{
-    return _online;
-}
-
 std::ostream& operator<<(std::ostream& stream,const InstanceDesc& instance)
 {
     stream << "instance { id = " << instance.getInstanceId()
@@ -1153,4 +1217,3 @@ std::ostream& operator<<(std::ostream& stream,const InstanceDesc& instance)
 }
 
 } // namespace
-

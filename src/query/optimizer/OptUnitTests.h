@@ -237,23 +237,22 @@ public:
         systemCat->deleteArray(_dummyFlippedId);
         systemCat->deleteArray(_dummyReplicatedArrayId);
     }
-    
+
     boost::shared_ptr<Query> getQuery()
     {
-        boost::shared_ptr<Query> query = Query::createDetached();
+        boost::shared_ptr<Query> query;
         boost::shared_ptr<const InstanceLiveness> liveness(Cluster::getInstance()->getInstanceLiveness());
-        try {
-            query->init(0, 0, 0, liveness);
-        } catch (const scidb::SystemException& e) {
-            if (e.getLongErrorCode() != SCIDB_LE_INVALID_FUNCTION_ARGUMENT) {
+        int32_t longErrorCode = SCIDB_E_NO_ERROR;
+        query = Query::createFakeQuery(0, 0, liveness, &longErrorCode);
+        if (longErrorCode != SCIDB_E_NO_ERROR &&
+            longErrorCode != SCIDB_LE_INVALID_FUNCTION_ARGUMENT) {
                 // NetworkManger::createWorkQueue() may complain about null queue
                 // we can ignore that error because NetworkManager is not used
-                throw;
-            }
+            throw SYSTEM_EXCEPTION(SCIDB_LE_UNKNOWN_ERROR, longErrorCode);
         }
         return query;
     }
- 
+
     boost::shared_ptr<PhysicalPlan> habilis_d_generatePPlanFor(const char* queryString)
     {
         boost::shared_ptr<Query> query = getQuery();
@@ -944,10 +943,8 @@ public:
         leftChild = leftChild->getChildren()[0];
         ASSERT_OPERATOR(leftChild, "physicalSubArray");
         leftChild = leftChild->getChildren()[0];
-        if (Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT)) {
-            ASSERT_OPERATOR(leftChild, "impl_materialize");
-            leftChild = leftChild->getChildren()[0];
-        }
+	ASSERT_OPERATOR(leftChild, "impl_materialize");
+	leftChild = leftChild->getChildren()[0];
         ASSERT_OPERATOR(leftChild, "physicalProject");
         CPPUNIT_ASSERT(leftChild->getDataWidth() == leftChild->getChildren()[0]->getDataWidth() / 2.0 );
         leftChild = leftChild->getChildren()[0];

@@ -47,7 +47,7 @@ log4cxx::LoggerPtr BaseConnection::logger(log4cxx::Logger::getLogger("scidb.serv
  * @param binary a pointer to buffer that will be used for reading or writing
  * binary data. Can be ommited when the message has no binary data
  */
-MessageDesc::MessageDesc(MessageID messageType, boost::shared_ptr<SharedBuffer> binary)
+MessageDesc::MessageDesc(MessageID messageType, const boost::shared_ptr<SharedBuffer>& binary)
 : _binary(binary)
 {
    init(messageType);
@@ -60,7 +60,7 @@ MessageDesc::MessageDesc(MessageID messageType)
 {
    init(messageType);
 }
-MessageDesc::MessageDesc(boost::shared_ptr<SharedBuffer> binary)
+MessageDesc::MessageDesc(const boost::shared_ptr<SharedBuffer>& binary)
 : _binary(binary)
 {
    init(mtNone);
@@ -162,7 +162,6 @@ MessagePtr MessageDesc::createRecordByType(MessageID messageType)
     case mtAlive:
     case mtReplicaSyncRequest:
     case mtReplicaSyncResponse:
-    case mtExecutePhysicalPlan:
     case mtAbort:
     case mtCommit:
     case mtCompleteQuery:
@@ -192,7 +191,6 @@ bool MessageDesc::validate()
     case mtPrepareQuery:
     case mtExecuteQuery:
     case mtPreparePhysicalPlan:
-    case mtExecutePhysicalPlan:
     case mtFetch:
     case mtChunk:
     case mtRecoverChunk:

@@ -4,9 +4,9 @@ create array A <a:int64> [x=0:*,3,0]
 create array B <b:int64> [x=0:*,2,0]
 create array C <b:int64> [x=0:*,3,1]
 create array D <b:int64> [y=0:*,2,2]
-create empty array E <b:int64> [x=0:*,2,0]
-create empty array F <b:int64> [x=0:*,3,1]
-create empty array G <b:int64> [y=0:*,2,2]
+create array E <b:int64> [x=0:*,2,0]
+create array F <b:int64> [x=0:*,3,1]
+create array G <b:int64> [y=0:*,2,2]
 
 --test
 --aql select * into A from build(<a:int64> [x=0:2,3,0],x+10)

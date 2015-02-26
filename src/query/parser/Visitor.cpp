@@ -59,15 +59,16 @@ Node*& Visitor::visit(Node*& pn)
         default:          this->onNode       (pn);  break;// ...basic node
         case abstraction: this->onAbstraction(pn);  break;// ...abstraction
         case application: this->onApplication(pn);  break;// ...application
+        case fix:         this->onFix        (pn);  break;// ...fix expression
+        case let:         this->onLet        (pn);  break;// ...let expression
+        case reference:   this->onReference  (pn);  break;// ...reference
+        case schema:      this->onSchema     (pn);  break;// ...schema
+        case variable:    this->onVariable   (pn);  break;// ...variable
         case cnull:       this->onNull       (pn);  break;// ...null
         case creal:       this->onReal       (pn);  break;// ...real
         case cstring:     this->onString     (pn);  break;// ...string
         case cboolean:    this->onBoolean    (pn);  break;// ...boolean
         case cinteger:    this->onInteger    (pn);  break;// ...integer
-        case fix:         this->onFix        (pn);  break;// ...fix expression
-        case let:         this->onLet        (pn);  break;// ...let expression
-        case reference:   this->onReference  (pn);  break;// ...reference
-        case schema:      this->onSchema     (pn);  break;// ...schema
         case module:      this->onModule     (pn);  break;// ...module
         case insertArray: this->onInsertArray(pn);  break;// ...insert array
         case selectArray: this->onSelectArray(pn);  break;// ...select array
@@ -114,6 +115,56 @@ void Visitor::onAbstraction(Node*& pn)
 void Visitor::onApplication(Node*& pn)
 {
     assert(pn!=0 && pn->is(application));                // Validate arguments
+
+    this->onExpression(pn);                              // Visit 'base class'
+}
+
+/**
+ *  Visit the given fix expression.
+ */
+void Visitor::onFix(Node*& pn)
+{
+    assert(pn!=0 && pn->is(fix));                        // Validate arguments
+
+    this->onExpression(pn);                              // Visit 'base class'
+}
+
+/**
+ *  Visit the given let expression.
+ */
+void Visitor::onLet(Node*& pn)
+{
+    assert(pn!=0 && pn->is(let));                        // Validate arguments
+
+    this->onExpression(pn);                              // Visit 'base class'
+}
+
+/**
+ *  Visit the given reference expression.
+ */
+void Visitor::onReference(Node*& pn)
+{
+    assert(pn!=0 && pn->is(reference));                  // Validate arguments
+
+    this->onExpression(pn);                              // Visit 'base class'
+}
+
+/**
+ *  Visit the given schema expression.
+ */
+void Visitor::onSchema(Node*& pn)
+{
+    assert(pn!=0 && pn->is(schema));                     // Validate arguments
+
+    this->onExpression(pn);                              // Visit 'base class'
+}
+
+/**
+ *  Visit the given variable expression.
+ */
+void Visitor::onVariable(Node*& pn)
+{
+    assert(pn!=0 && pn->is(variable));                   // Validate arguments
 
     this->onExpression(pn);                              // Visit 'base class'
 }
@@ -176,46 +227,6 @@ void Visitor::onInteger(Node*& pn)
     assert(pn!=0 && pn->is(cinteger));                   // Validate arguments
 
     this->onConstant(pn);                                // Visit 'base class'
-}
-
-/**
- *  Visit the given fix expression.
- */
-void Visitor::onFix(Node*& pn)
-{
-    assert(pn!=0 && pn->is(fix));                        // Validate arguments
-
-    this->onExpression(pn);                              // Visit 'base class'
-}
-
-/**
- *  Visit the given let expression.
- */
-void Visitor::onLet(Node*& pn)
-{
-    assert(pn!=0 && pn->is(let));                        // Validate arguments
-
-    this->onExpression(pn);                              // Visit 'base class'
-}
-
-/**
- *  Visit the given reference expression.
- */
-void Visitor::onReference(Node*& pn)
-{
-    assert(pn!=0 && pn->is(reference));                  // Validate arguments
-
-    this->onExpression(pn);                              // Visit 'base class'
-}
-
-/**
- *  Visit the given schema expression.
- */
-void Visitor::onSchema(Node*& pn)
-{
-    assert(pn!=0 && pn->is(schema));                     // Validate arguments
-
-    this->onExpression(pn);                              // Visit 'base class'
 }
 
 /**

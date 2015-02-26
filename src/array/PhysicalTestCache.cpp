@@ -229,7 +229,7 @@ public:
 
         try
         {
-            size_t newMaxSize = 20 * MB;
+            size_t newMaxSize = 20 * MiB;
             SharedMemCache::getInstance().setMemThreshold(newMaxSize);
             //blow the cache by creating a larger array. ensure the cache size is still under limit
             arr = makeInt64Array((newMaxSize+ 10 * sizeof(int64_t))/ sizeof(int64_t), query);

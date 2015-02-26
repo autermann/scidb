@@ -33,23 +33,75 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <stdint.h>
+#include <array/Metadata.h>
 #include <util/Job.h>
 #include <util/JobQueue.h>
 #include <util/WorkQueue.h>
 #include <query/Query.h>
-#include "network/proto/scidb_msg.pb.h"
-#include <array/Metadata.h>
-#include "network/Connection.h"
-#include "network/NetworkManager.h"
+#include <network/proto/scidb_msg.pb.h>
+#include <network/Connection.h>
+#include <network/NetworkManager.h>
 
 namespace scidb
 {
     class InstanceLiveness;
+    /**
+     * The class created by network message handler for adding to queue to be processed
+     * by thread pool and handle message from client.
+     */
     class MessageHandleJob: public Job, public boost::enable_shared_from_this<MessageHandleJob>
     {
     public:
-        MessageHandleJob(const boost::shared_ptr<MessageDesc>& messageDesc);
-        virtual ~MessageHandleJob();
+        MessageHandleJob(const boost::shared_ptr<MessageDesc>& messageDesc)
+        : Job(boost::shared_ptr<Query>()),
+        _messageDesc(messageDesc)
+        {
+        }
+        /**
+         * Based on its contents this message is prepared and scheduled to run
+         * on an appropriate queue.
+         * @param requestQueue a system queue for running jobs that may block waiting for events from other jobs
+         * @param workQueue a system queue for running jobs that are guaranteed to make progress
+         */
+        virtual void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
+                              boost::shared_ptr<WorkQueue>& workQueue) = 0;
+    protected:
+        boost::shared_ptr<MessageDesc> _messageDesc;
+        boost::shared_ptr<boost::asio::deadline_timer> _timer;
+
+        /// Reschedule this job if array locks are not taken
+        void reschedule(uint64_t delayMicroSec);
+
+        /**
+         * Validate remote message information identifying a chunk
+         * @throws scidb::SystemException if the Job::_query is invalid or the arguments are invalid
+         * @note in Debug build invalid arguments will cause an abort()
+         * @param array to which the chunk corresponds
+         * @param msgType message ID
+         * @param arrayType 'objType' identifier used in some messages or ~0
+         * @param attId the chunk's attribute ID
+         * @param physInstanceID physical instance ID of message source
+         */
+        void validateRemoteChunkInfo(const Array* array,
+                                     const MessageID msgID,
+                                     const uint32_t arrayType,
+                                     const AttributeID attId,
+                                     const InstanceID physInstanceID);
+
+    private:
+        /// Handler for for the array lock timeout. It reschedules the current job
+        static void handleRescheduleTimeout(boost::shared_ptr<Job>& job,
+                                            boost::shared_ptr<WorkQueue>& toQueue,
+                                            boost::shared_ptr<SerializationCtx>& sCtx,
+                                            boost::shared_ptr<boost::asio::deadline_timer>& timer,
+                                            const boost::system::error_code& error);
+    };
+
+    class ServerMessageHandleJob : public MessageHandleJob
+    {
+    public:
+        ServerMessageHandleJob(const boost::shared_ptr<MessageDesc>& messageDesc);
+        virtual ~ServerMessageHandleJob();
 
         /**
          * Based on its contents this message is prepared and scheduled to run
@@ -57,8 +109,8 @@ namespace scidb
          * @param requestQueue a system queue for running jobs that may block waiting for events from other jobs
          * @param workQueue a system queue for running jobs that are guaranteed to make progress
          */
-        void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
-                      boost::shared_ptr<WorkQueue>& workQueue);
+        virtual void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
+                              boost::shared_ptr<WorkQueue>& workQueue);
 
     protected:
         /// Implementation of Job::run()
@@ -66,12 +118,11 @@ namespace scidb
         virtual void run();
 
     private:
-        boost::shared_ptr<MessageDesc> _messageDesc;
         NetworkManager& networkManager;
         size_t sourceId;
         bool _mustValidateQuery;
 
-        typedef void(MessageHandleJob::*MsgHandler)();
+        typedef void(ServerMessageHandleJob::*MsgHandler)();
         static MsgHandler _msgHandlers[scidb::mtSystemMax];
 
         void sgSync();
@@ -100,6 +151,7 @@ namespace scidb
 
         void handleRemoteChunk();
         void handleFetchChunk();
+        void handleSGFetchChunk();
         void handleSyncRequest();
         void handleSyncResponse();
         void handleError();

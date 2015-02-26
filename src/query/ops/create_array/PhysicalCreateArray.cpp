@@ -29,41 +29,58 @@
  */
 
 #include "query/Operator.h"
+#include "array/TransientCache.h"
 #include "system/SystemCatalog.h"
 
 namespace scidb
 {
 
-class PhysicalCreateArray: public PhysicalOperator
+struct PhysicalCreateArray: PhysicalOperator
 {
-public:
-    PhysicalCreateArray(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
-    {
-    }
+    PhysicalCreateArray(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+      : PhysicalOperator(logicalName, physicalName, parameters, schema)
+    {}
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    PhysicalBoundaries getOutputBoundaries(const vector<PhysicalBoundaries> & inputBoundaries,
+                                           const vector< ArrayDesc>         & inputSchemas) const
     {
         return PhysicalBoundaries::createEmpty(
-            ((boost::shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema().getDimensions().size());
+            ((shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema().getDimensions().size());
     }
 
-    void preSingleExecute(boost::shared_ptr<Query> query)
+    void preSingleExecute(shared_ptr<Query> query)
     {
-        assert(_parameters.size() == 2);
-        const string &name = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName();
-        ArrayDesc schema = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema();
+        assert(_parameters.size() >= 2);
+        const string name(((shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName());
+        ArrayDesc  schema(((shared_ptr<OperatorParamSchema>&)        _parameters[1])->getSchema());
+
         schema.setName(name);
+
+        if (_parameters.size() >= 3)                    // 'temp' flag given?
+        {
+            schema.setTransient(true);                  // ...so mark schema
+        }
+
         SystemCatalog::getInstance()->addArray(schema, psHashPartitioned);
     }
 
-    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
-            boost::shared_ptr<Query> query)
+    shared_ptr< Array> execute(vector< shared_ptr< Array> >& inputArrays,shared_ptr<Query> query)
     {
-        assert(inputArrays.size() == 0);
-        // It's DDL command and should not return a value
-        return boost::shared_ptr<Array>();
+        assert(inputArrays.empty());
+
+        if (_parameters.size() >= 3) // 'transient' flag supplied?
+        {
+            ArrayDesc       schema;
+            string    const name(((shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName());
+
+            SystemCatalog::getInstance()->getArrayDesc(name,schema,false);
+
+            transient::record(MemArrayPtr(new MemArray(schema,query)));
+        }
+
+     // DDL commands do not return values:
+
+        return shared_ptr<Array>();
     }
 };
 

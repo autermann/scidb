@@ -18,10 +18,10 @@ create array Yb <b:int64>[x=0:*,5,0]
 create array Yc <c:int64>[x=0:*,5,0]
 create array Yd <d:int64>[x=0:*,5,0]
 
-load(Ya, '../tests/harness/testcases/data/unbounded_cross.txt')
-load(Yb, '../tests/harness/testcases/data/unbounded_cross.txt')
-load(Yc, '../tests/harness/testcases/data/unbounded_cross.txt')
-load(Yd, '../tests/harness/testcases/data/unbounded_cross.txt')
+load(Ya, '${TEST_DATA_DIR}/unbounded_cross.txt')
+load(Yb, '${TEST_DATA_DIR}/unbounded_cross.txt')
+load(Yc, '${TEST_DATA_DIR}/unbounded_cross.txt')
+load(Yd, '${TEST_DATA_DIR}/unbounded_cross.txt')
 
 store(join(Ya, Yb), Y1)
 store(join(Y1, Yc), Y2)

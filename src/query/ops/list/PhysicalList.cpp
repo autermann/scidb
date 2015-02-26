@@ -31,9 +31,11 @@
 #include <string.h>
 #include <sstream>
 
+#include "query/Parser.h"
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
 #include "array/TupleArray.h"
+#include "array/TransientCache.h"
 #include "system/SystemCatalog.h"
 #include "query/UDT.h"
 #include "query/TypeSystem.h"
@@ -71,7 +73,8 @@ public:
 
     bool coordinatorOnly() const
     {
-        if(getMainParameter() == "chunk descriptors" || getMainParameter() == "chunk map" || getMainParameter() == "libraries")
+        if(getMainParameter() == "chunk descriptors" || getMainParameter() == "chunk map" ||
+           getMainParameter() == "libraries" || getMainParameter() == "queries")
         {
             return false;
         }
@@ -134,13 +137,19 @@ public:
             ArrayDesc desc;
             stringstream ss;
             for (size_t i = 0; i < tuples.size(); i++) {
-                Tuple& tuple = *new Tuple(4);
+                Tuple& tuple = *new Tuple(5);
                 tuples[i] = boost::shared_ptr<Tuple>(&tuple);
                 tuple[0].setString(list[i].c_str());
 
                 bool available = true;
                 boost::shared_ptr<Exception> exception;
                 SystemCatalog::getInstance()->getArrayDesc(list[i], desc, false, exception);
+
+                if (desc.isInvalid())
+                {
+                    available = false;
+                }
+                else
                 if (exception.get())
                 {
                     if (exception->getLongErrorCode() == SCIDB_LE_TYPE_NOT_REGISTERED ||
@@ -153,14 +162,13 @@ public:
                         exception->raise();
                     }
                 }
-
                 tuple[1].setInt64(desc.getId());
 
                 ss.str("");
                 printSchema(ss, desc);
                 tuple[2].setString(ss.str().c_str());
-
                 tuple[3].setBool(available);
+                tuple[4].setBool(desc.isTransient());
             }
             return boost::shared_ptr<Array>(new TupleArray(_schema, tuples));
         } else if (what == "operators") {
@@ -226,18 +234,15 @@ public:
             tuple2[2].setBool(true);
             tuple2[3].setString("scidb");
             return shared_ptr<Array>(new TupleArray(_schema, tuples));
+        } else if (what == "macros") {
+            return physicalListMacros(); // see Parser.h
         } else if (what == "queries") {
-            vector<boost::shared_ptr<Tuple> > tuples;
-
-            boost::function<void (const boost::shared_ptr<scidb::Query>&)> f;
-            // pre-allocate the tuples vector
-            tuples.reserve(scidb::Query::listQueries(f));
-
-            // populate the tuples vector
-            f = boost::bind(&PhysicalList::listQuery, &tuples, _1);
+            ListQueriesArrayBuilder builder;
+            builder.initialize(query);
+            boost::function<void (const boost::shared_ptr<scidb::Query>&)> f
+            = boost::bind(&ListQueriesArrayBuilder::listElement, &builder, _1);
             scidb::Query::listQueries(f);
-
-            return shared_ptr<Array>(new TupleArray(_schema, tuples));
+            return builder.getArray();
          } else if (what == "instances") {
            return listInstances(query);
          } else if (what == "chunk descriptors") {
@@ -262,21 +267,6 @@ public:
 
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "PhysicalList::execute";
         return boost::shared_ptr<Array>();
-    }
-
-    static void listQuery(vector<boost::shared_ptr<Tuple> > *tuples,
-                          const boost::shared_ptr<Query>& q)
-    {
-        const Query& query = *q;
-        shared_ptr<Tuple> tuplePtr(new Tuple(6));
-        tuples->push_back(tuplePtr);
-        Tuple& tuple = *tuplePtr;
-        tuple[0].setString(query.queryString.c_str());
-        tuple[1].setInt64(query.getQueryID());
-        tuple[2].setDateTime(query.getCreationTime());
-        tuple[3].setInt32(query.getErrorCode());
-        tuple[4].setString(query.getErrorDescription().c_str());
-        tuple[5].setBool(query.idle());
     }
 
    boost::shared_ptr<Array> listInstances(const boost::shared_ptr<Query>& query)

@@ -118,7 +118,9 @@ public:
         //add aggregate calls first
         for (size_t i = 1; i < _parameters.size(); i++)
         {
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc);
+            bool isInOrderAggregation = false;
+            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc,
+                    isInOrderAggregation);
             string aggName =  aggregationDesc.getAttributes()[aggregationDesc.getAttributes().size()-1].getName();
             bool aggFound = false;
             BOOST_FOREACH(const AttributeDesc &dstAttr, dstDesc.getAttributes()) { 

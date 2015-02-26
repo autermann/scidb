@@ -405,27 +405,71 @@
       </step>
 
       <step>
-        <para>Load array <literal>datetime1</literal> with values in the
-        SciDB-formatted file, <emphasis role="bold">dates</emphasis>:</para>
+        <para><indexterm>
+            <primary>SciDB-formatted text file example</primary>
+          </indexterm>Load array <literal>datetime1</literal> with values in
+        the SciDB-formatted file, <emphasis
+        role="bold">dates</emphasis>:</para>
 
         <programlisting>$ cat dates</programlisting>
 
-        <programlisting language="test">--shell --command=cat $DOC_DATA/dateformats.scidb --show-query=no
---afl load(datetime1,'../tests/harness/testcases/data/doc/dateformats.scidb'); --show-query=no --show-output=no
-</programlisting>
+        <programlisting>[
+("11/25/2009 16:11:19"),
+("25.11.2009 16:11:19"),
+("2009-11-25 16:11:19.7612"),
+("2009-11-25 16.11.19.76"),
+("2009-11-25 16.11.19"),
+("2009-11-25 16:11:19"),
+("11/25/2009 16:11"),
+("25.11.2009 16:11"),
+("2009-11-25 16:11"),
+("25Nov2009:16:11:19"),
+("25-Nov-2009 4.11.19 PM"),
+("25-Nov-2009 4.11.19 AM"),
+("2009-11-25"),
+("11/25/2009"),
+("25.11.2009"),
+]</programlisting>
 
         <programlisting>%AFL load(datetime1,'./dates');</programlisting>
 
-        <programlisting language="test">--afl scan(datetime1) --show-query=no --output-format=csv+</programlisting>
+        <programlisting>i,dt
+0,'2009-11-25 16:11:19'
+1,'2009-11-25 16:11:19'
+2,'2009-11-25 16:11:19'
+3,'2009-11-25 16:11:19'
+4,'2009-11-25 16:11:19'
+5,'2009-11-25 16:11:19'
+6,'2009-11-25 16:11:00'
+7,'2009-11-25 16:11:00'
+8,'2009-11-25 16:11:00'
+9,'2009-11-25 16:11:19'
+10,'2009-11-25 16:11:19'
+11,'2009-11-25 04:11:19'
+12,'2009-11-25 00:00:00'
+13,'2009-11-25 00:00:00'
+14,'2009-11-25 00:00:00'</programlisting>
       </step>
 
       <step>
         <para>Load array <literal>datetime2</literal> with values in the
         SciDB-formatted file, <emphasis role="bold">dates_TZ</emphasis>
-        (containing date/time values with offsets):<programlisting>$ cat dates_TZ</programlisting><programlisting
-        language="test">--shell --command=cat $DOC_DATA/dateformatsTZ.scidb --show-query=no
---afl load(datetime2,'../tests/harness/testcases/data/doc/dateformatsTZ.scidb'); --show-query=no --show-output=no</programlisting><programlisting>%AFL load(datetime1,'./dates_TZ');</programlisting><programlisting
-        language="test">--afl scan(datetime2) --show-query=no --output-format=csv+</programlisting></para>
+        (containing date/time values with offsets):<programlisting>$ cat dates_TZ</programlisting><programlisting>[
+("11/25/2009 16:11:19 +10:01"),
+("25.11.2009 16:11:19 +09:02"),
+("2009-11-25 16:11:19.76 +08:03"),
+("2009-11-25 16.11.19.76 +07:04"),
+("2009-11-25 16.11.19 +06:05"),
+("2009-11-25 16:11:19 +05:06"),
+("25-Nov-2009 4.11.19 PM +00:11")
+]</programlisting><programlisting>%AFL load(datetime1,'./dates_TZ');</programlisting><programlisting>i,dtz
+0,'2009-11-25 16:11:19 +10:01'
+1,'2009-11-25 16:11:19 +09:02'
+2,'2009-11-25 16:11:19 +08:03'
+3,'2009-11-25 16:11:19 +07:04'
+4,'2009-11-25 16:11:19 +06:05'
+5,'2009-11-25 16:11:19 +05:06'
+6,'2009-11-25 16:11:19 +00:11'</programlisting> </para>
       </step>
     </procedure>
   </section>

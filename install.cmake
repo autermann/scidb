@@ -28,10 +28,25 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/iquery" DESTINATION bin COMPONENT 
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/gen_matrix" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/benchGen" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/csv2scidb" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/tsv2scidb" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/ssdbgen" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbLoadCsv.sh" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/osplitcsv" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/splitcsv" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/loadcsv.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/loadpipe.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/calculate_chunk_length.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/remove_arrays.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/PSF_license.txt" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/__init__.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_math.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_progress.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_schema.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_afl.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/statistics.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/util.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/counter.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_psf.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 
 #scidb-jdbc package
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/scidb4j.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
@@ -42,6 +57,8 @@ install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/jdbctest.jar" DESTINATION jdbc C
 #scidb-dev-tools package
 install(PROGRAMS "${CMAKE_BINARY_DIR}/tests/unit/unit_tests" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestharness" DESTINATION bin COMPONENT scidb-dev-tools)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/shim" DESTINATION bin COMPONENT scidb-dev-tools)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/shimsvc" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/arg_separator" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestprep.py" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/mu_admin.py" DESTINATION bin COMPONENT scidb-dev-tools)
@@ -49,6 +66,9 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/daemon.py" DESTINATION etc COMPONE
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/mu_config.ini" DESTINATION etc COMPONENT scidb-dev-tools)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/log4j.properties" DESTINATION etc COMPONENT scidb-dev-tools)
 
+#
+# P L U G I N S
+#
 #scidb-plugins package
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libpoint${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmatch${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
@@ -63,11 +83,23 @@ install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfindstars${CMAKE_SHARED_LI
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libgroupstars${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
-install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
+
+foreach(LIB dense_linear_algebra linear_algebra)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/lib${LIB}${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins RENAME "lib${LIB}-scidb${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endforeach()
+
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libexample_udos${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 if (TARGET mpi_slave_scidb)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/mpi_slave_scidb" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 endif ()
+
+#
+# S C R I P T S
+#
+# scripts -- package is plugins because these are extensions of the linear_algebra plugin
+foreach(SCRIPT bellman_ford_example.sh pagerank_example.sh)
+    install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT}" DESTINATION bin COMPONENT scidb-plugins)
+endforeach()
 
 #scidb package
 if (NOT WITHOUT_SERVER)
@@ -85,7 +117,9 @@ if (NOT WITHOUT_SERVER)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/scidb-sample.conf" DESTINATION etc COMPONENT scidb)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/sample_config.ini" DESTINATION etc COMPONENT scidb)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/config.ini.planet" DESTINATION etc COMPONENT scidb)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/config.ini.ec2" DESTINATION etc COMPONENT scidb)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/config.ini.ec2"    DESTINATION etc COMPONENT scidb)
+
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/prelude.txt"       DESTINATION lib/scidb/modules COMPONENT scidb)
 endif()
 
 if(SWIG_FOUND AND PYTHONLIBS_FOUND AND NOT APPLE)
@@ -120,7 +154,9 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo" AND NOT APPLE)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/gen_matrix${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/benchGen${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/csv2scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
+    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/tsv2scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/ssdbgen${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
+    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/osplitcsv${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/splitcsv${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
 
     #scidb-dev-tools-dbg package
@@ -147,7 +183,11 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo" AND NOT APPLE)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libgroupstars${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libfindstars${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
+
+    foreach(LIB dense_linear_algebra linear_algebra)
+        install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/lib${LIB}${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg RENAME "lib${LIB}-scidb${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}")
+    endforeach()
+
     if (TARGET mpi_slave_scidb)
         install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/mpi_slave_scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_EXTENSION} COMPONENT scidb-plugins-dbg)
     endif ()

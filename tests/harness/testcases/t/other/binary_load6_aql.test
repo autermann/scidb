@@ -11,7 +11,7 @@ create array CString <name:string> [x=1:*,100000,0,y=1:*,100000,0,z=1:*,100000,0
 
 --test
 
-load(C, '../tests/harness/testcases/data/bsp1.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(C, '${TEST_DATA_DIR}/bsp1.txt')""
 --aql save C into current instance 'Csparse1.bin' as '(double)'
 --aql load C1 from current instance 'Csparse1.bin' as '(double)'
 --aql load C2 from current instance 'Csparse1.bin' as '(double)'

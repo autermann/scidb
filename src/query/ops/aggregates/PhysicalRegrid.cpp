@@ -35,7 +35,7 @@ namespace scidb
 class PhysicalRegrid: public AggregatePartitioningOperator
 {
   private:
-     vector<int> _grid;
+     vector<uint64_t> _grid;
 
   public:
      PhysicalRegrid(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):

@@ -108,8 +108,6 @@ public:
         string arrayName = ((shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         ArrayDesc const& srcDesc = schemas[0];
 
-        //query->exclusiveLock(arrayName);
-
         //Ensure attributes names uniqueness.
         ArrayDesc dstDesc;
         if (!SystemCatalog::getInstance()->getArrayDesc(arrayName, dstDesc, false))
@@ -126,7 +124,7 @@ public:
                 }
                 else
                 {
-                    while (true) { 
+                    while (true) {
                         stringstream ss;
                         ss << attr.getName() << "_" << ++attrsMap[attr.getName()];
                         if (attrsMap.count(ss.str()) == 0) {
@@ -150,26 +148,26 @@ public:
                 if (!dimsMap.count(dim.getBaseName()))
                 {
                     dimsMap[dim.getBaseName()] = 1;
-                    newDim = DimensionDesc(dim.getBaseName(), 
-                                           dim.getStartMin(), 
-                                           dim.getCurrStart(), 
-                                           dim.getCurrEnd(), 
-                                           dim.getEndMax(), 
-                                           dim.getChunkInterval(), 
+                    newDim = DimensionDesc(dim.getBaseName(),
+                                           dim.getStartMin(),
+                                           dim.getCurrStart(),
+                                           dim.getCurrEnd(),
+                                           dim.getEndMax(),
+                                           dim.getChunkInterval(),
                                            dim.getChunkOverlap());
                 }
                 else
                 {
-                    while (true) { 
+                    while (true) {
                         stringstream ss;
                         ss << dim.getBaseName() << "_" << ++dimsMap[dim.getBaseName()];
                         if (dimsMap.count(ss.str()) == 0) {
-                            newDim = DimensionDesc(ss.str(), 
-                                                   dim.getStartMin(), 
-                                                   dim.getCurrStart(), 
-                                                   dim.getCurrEnd(), 
-                                                   dim.getEndMax(), 
-                                                   dim.getChunkInterval(), 
+                            newDim = DimensionDesc(ss.str(),
+                                                   dim.getStartMin(),
+                                                   dim.getCurrStart(),
+                                                   dim.getCurrEnd(),
+                                                   dim.getEndMax(),
+                                                   dim.getChunkInterval(),
                                                    dim.getChunkOverlap());
                             dimsMap[ss.str()] = 1;
                             break;
@@ -179,7 +177,11 @@ public:
 
                 outDims.push_back(newDim);
             }
-            return ArrayDesc(arrayName, outAttrs, outDims, srcDesc.getFlags());
+
+         /* Notice that when storing to a non-existant array, we do not propagate the 
+            transience of the source array to to the target ...*/
+
+            return ArrayDesc(arrayName, outAttrs, outDims, srcDesc.getFlags() & (~ArrayDesc::TRANSIENT));
         }
         else
         {
@@ -192,8 +194,8 @@ public:
             for (size_t i = 0, n = srcDims.size(); i < n; i++)
             {
                 if (!(srcDims[i].getStartMin() == dstDims[i].getStartMin()
-                           && (srcDims[i].getEndMax() == dstDims[i].getEndMax() 
-                               || (srcDims[i].getEndMax() < dstDims[i].getEndMax() 
+                           && (srcDims[i].getEndMax() == dstDims[i].getEndMax()
+                               || (srcDims[i].getEndMax() < dstDims[i].getEndMax()
                                    && ((srcDims[i].getLength() % srcDims[i].getChunkInterval()) == 0
                                        || srcDesc.getEmptyBitmapAttribute() != NULL)))
                            && srcDims[i].getChunkInterval() == dstDims[i].getChunkInterval()
@@ -209,12 +211,12 @@ public:
             if (srcAttrs.size() != dstAttrs.size())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
 
-            for (size_t i = 0, n = srcAttrs.size(); i < n; i++) { 
+            for (size_t i = 0, n = srcAttrs.size(); i < n; i++) {
                 if(srcAttrs[i].getType() != dstAttrs[i].getType() || (!dstAttrs[i].isNullable() && srcAttrs[i].isNullable()))
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
             Dimensions newDims(dstDims.size());
-            for (size_t i = 0; i < dstDims.size(); i++) { 
+            for (size_t i = 0; i < dstDims.size(); i++) {
                 DimensionDesc const& dim = dstDims[i];
                 newDims[i] = DimensionDesc(dim.getBaseName(),
                                            dim.getNamesAndAliases(),

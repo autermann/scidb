@@ -68,7 +68,7 @@ public class JDBCBasicTestCase extends TestCase
     public void testSelectiveQuery() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<a:string null, c: char null>[x=0:3,2,0], '[(\"1\",\"1\")(\"\", null)][(\"2\")]')");
+        ResultSet res = st.executeQuery("select * from array(<a:string null, c: char null>[x=0:3,2,0], '[(\"1\",\"1\")(\"\", null)][(\"2\")]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
@@ -97,7 +97,7 @@ public class JDBCBasicTestCase extends TestCase
     public void testSignedIntegerDataTypes() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<i8:int8 null, i16: int16 null, i32: int32 null, " +
+        ResultSet res = st.executeQuery("select * from array(<i8:int8 null, i16: int16 null, i32: int32 null, " +
                 "i64: int64 null>[x=0:3,2,0], '[(1, 260, 67000, 10000000), (-1, -260, -67000, -10000000)]" +
                 "[(null, null, null, null)]')");
         ResultSetMetaData meta = res.getMetaData();
@@ -154,7 +154,7 @@ public class JDBCBasicTestCase extends TestCase
     public void testUnsignedIntegerDataTypes() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<i8:uint8, i16: uint16, i32: uint32, i64: uint64>" +
+        ResultSet res = st.executeQuery("select * from array(<i8:uint8, i16: uint16, i32: uint32, i64: uint64>" +
                 "[x=0:3,2,0], '[(1, 260, 67000, 10000000)][]')");
         ResultSetMetaData meta = res.getMetaData();
 
@@ -208,7 +208,7 @@ public class JDBCBasicTestCase extends TestCase
     public void testFloatDataTypes() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<f:float, d: double>[x=0:3,2,0], " +
+        ResultSet res = st.executeQuery("select * from array(<f:float, d: double>[x=0:3,2,0], " +
                 "'[(3.141592653589793238, 3.141592653589793238)][]')");
         ResultSetMetaData meta = res.getMetaData();
 
@@ -240,7 +240,7 @@ public class JDBCBasicTestCase extends TestCase
     public void testNonEmptyCoordinates() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(not empty<a:int32>[x=0:3,2,0], '[10,9][8,7]')");
+        ResultSet res = st.executeQuery("select * from array(<a:int32>[x=0:3,2,0], '[10,9][8,7]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
@@ -267,7 +267,7 @@ public class JDBCBasicTestCase extends TestCase
     public void testNonEmptyCoordinatesDefaults() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(not empty<a:int32>[x=0:3,2,0], '[(10)()][(8)()]')");
+        ResultSet res = st.executeQuery("select * from array(<a:int32>[x=0:3,2,0], '[(10)()][(8)()]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
@@ -288,13 +288,13 @@ public class JDBCBasicTestCase extends TestCase
             sbMain.append(res.getLong("x") + ":" + res.getInt("a") + ",");
             res.next();
         }
-        assertEquals("0:10,1:0,2:8,3:0,", sbMain.toString());
+	assertEquals("0:10,2:8,", sbMain.toString());
     }
 
     public void testBooleanTypes() throws SQLException
     {
         Statement st = conn.createStatement();
-        ResultSet res = st.executeQuery("select * from array(empty<b:bool null>[x=0:3,2,0], '[(null),(true)][(false),(null)]')");
+        ResultSet res = st.executeQuery("select * from array(<b:bool null>[x=0:3,2,0], '[(null),(true)][(false),(null)]')");
         ResultSetMetaData meta = res.getMetaData();
 
         assertEquals("build", meta.getTableName(0));
@@ -355,8 +355,8 @@ public class JDBCBasicTestCase extends TestCase
     public void testBatchExecutionMultipleResults() throws SQLException
     {
         Statement st = conn.createStatement();
-        st.addBatch("select * from array(empty<a:int32>[x=0:2,3,0], '[1,2,3]')");
-        st.addBatch("select * from array(empty<b:int32>[y=0:2,3,0], '[4,5,6]')");
+        st.addBatch("select * from array(<a:int32>[x=0:2,3,0], '[1,2,3]')");
+        st.addBatch("select * from array(<b:int32>[y=0:2,3,0], '[4,5,6]')");
         st.executeBatch();
 
         StringBuilder sbMain = new StringBuilder();

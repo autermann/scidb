@@ -3,8 +3,8 @@
 --test
 --start-query-logging
 
-create empty array unbounded <a:int64>[x=0:*,5,0]
-load(unbounded,'../tests/harness/testcases/data/unbounded_empty.txt')
+create array unbounded <a:int64>[x=0:*,5,0]
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(unbounded,'${TEST_DATA_DIR}/unbounded_empty.txt')""
 
 
  

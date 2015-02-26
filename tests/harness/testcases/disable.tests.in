@@ -28,11 +28,12 @@ checkin.scalapack.31_svd_doSvdWithMetrics_verySmall
 data_model
 # re-enable after solving #3406
 doc.redimension_2
-# re-enable after solving #3407
-doc.ug_loadingData_CSV
-doc.ug_loadingData_binary
 # #2131: This only works on one instance! Need to edit fits loader to not throw errors on multiple instances!
 fits.fits_input
+# 2 suites of performance tests, too slow for running as 4 instances
+linalg/spgemm/64instance
+linalg/spgemm/performance
+# 
 # NEED COMMENT
 perf.repart
 # 40_svd_tickets @ 18min is too slow to leave enabled during functional freeze
@@ -68,6 +69,9 @@ scalapack.gesvd_01
 
 #re-enable after solving ticket 2232
 docscript.allversions
+
+#re-enable after solving ticket 4273
+other.parse_int64
 
 #re-enable after solving ticket 1849
 other.random_check
@@ -139,8 +143,6 @@ checkin.scalapack.21_svd_neg
 compression.compression_47
 doc.redimension_1
 doc.redimension_store_1
-doc.ug_loadingData_binary
-doc.ug_loadingData_CSV
 doc.ug_loadingData_opaque
 flip_n_store.between_sub_nid
 flip_n_store.complex_query_nid

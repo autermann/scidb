@@ -3,8 +3,8 @@
 create array A <a:int32 null,b:int64 null> [x=0:8,3,0,y=0:2,3,0]
 create array T1 <a:int32> [x=0:8,3,0,y=0:2,3,0]
 create array T2 <b:int64> [x=0:8,3,0,y=0:2,3,0]
-store(build_sparse(T1,x+10+y,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12+y,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10+y),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12+y),x<>2 and x<>5),T2)
 store(join(T1,T2),A)
 
 --test
@@ -18,8 +18,8 @@ regrid(A,1,1,count(*))
 regrid(A,1,1,stdev(a))
 regrid(A,1,1,var(a))
 
-store(build_sparse(T1,x-10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x-12,x<>2 and x<>5),T2)
+store(filter(build(T1,x-10),x<>2 and x<>5),T1)
+store(filter(build(T2,x-12),x<>2 and x<>5),T2)
 store(join(T1,T2),A)
 --aql update A set a=null where x=0
 regrid(A,18,4,sum(a),max(a))
@@ -40,8 +40,8 @@ regrid(A,1,1,count(*))
 regrid(A,1,1,stdev(b))
 regrid(A,1,1,var(b))
 
-store(build_sparse(T1,x+10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12),x<>2 and x<>5),T2)
 store(join(T1,T2),A)
 --aql update A set b=null where y=0
 regrid(A,18,18,sum(b),max(b))

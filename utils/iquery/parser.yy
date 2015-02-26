@@ -47,16 +47,16 @@
 %error-verbose
 
 %union {
-	int64_t int64Val;
-	double realVal;	
+    int64_t int64Val;
+    double realVal; 
     std::string* stringVal;
-	class IqueryCmd* node;
-	bool boolean;
-	const char* constString;
+    class IqueryCmd* node;
+    bool boolean;
+    const char* constString;
 }
 
-%type <node> start commands set setlang setfetch settimer setverbose help quit knownerror afl_help
-             setformat
+%type <node> start commands set setlang setfetch settimer setverbose help quit
+             knownerror afl_help setformat
 
 %type <constString> format
 
@@ -66,13 +66,14 @@
 
 %token SET LANG AFL AQL NO FETCH VERBOSE TIMER HELP QUIT FORMAT
        AUTO OPAQUE CSV CSV_PLUS LCSV_PLUS DENSE LSPARSE SPARSE TEXT DCSV
+       TSV TSV_PLUS LTSV_PLUS
 
-%token	EOQ     	0 "end of query"
-%token	EOL			"end of line"
-%token <stringVal> 	IDENTIFIER	"identifier"
-%token <int64Val>	INTEGER "integer"
-%token <realVal>	REAL "real"
-%token <stringVal>	STRING_LITERAL "string"
+%token  EOQ             0 "end of query"
+%token  EOL             "end of line"
+%token <stringVal>      IDENTIFIER "identifier"
+%token <int64Val>       INTEGER "integer"
+%token <realVal>        REAL "real"
+%token <stringVal>      STRING_LITERAL "string"
 
 %{
 #include "iquery/iquery_parser.h"
@@ -86,7 +87,7 @@
 start:
     commands
     {
-        //This is well-parsed iquery command, mark it
+        // This is a well-parsed iquery command, mark it.
         glue._iqueryCommand = true;
         glue._cmd = $1;
     }
@@ -108,8 +109,10 @@ commands:
 knownerror:
     SET error
     {
-        // This is syntax error, but it clearly iquery command, so we mark it and later not sending
-        // to server as AQL/AFL query showing iquery's error message instead.
+        // This is syntax error, but it clearly iquery command, so we
+        // mark it and later not sending to server as AQL/AFL query
+        // showing iquery's error message instead.
+
         glue._iqueryCommand = true;
         $$ = NULL;
         YYABORT;
@@ -227,6 +230,18 @@ format:
     {
         $$ = "dcsv";
     }
+    | TSV
+    {
+        $$ = "tsv";
+    }
+    | TSV_PLUS
+    {
+        $$ = "tsv+";
+    }
+    | LTSV_PLUS
+    {
+        $$ = "ltsv+";
+    }
     ;
 
 help:
@@ -256,7 +271,7 @@ afl_help:
 %%
 
 void yy::Parser::error(const yy::Parser::location_type& loc,
-	const std::string& msg)
+                       const std::string& msg)
 {
-	glue.error(loc, msg);
+    glue.error(loc, msg);
 }

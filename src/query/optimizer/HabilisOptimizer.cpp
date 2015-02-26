@@ -63,10 +63,7 @@ HabilisOptimizer::HabilisOptimizer(): _root(),
                    | REWRITE_STORING_SG
          )
 {
-    if (Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT))
-    {
-        _featureMask |= INSERT_MATERIALIZATION;
-    }
+    _featureMask |= INSERT_MATERIALIZATION;
 
     const char* path = "/tmp/scidb_optimizer_override";
     std::ifstream inFile (path);
@@ -94,8 +91,7 @@ PhysPlanPtr HabilisOptimizer::optimize(const boost::shared_ptr<Query>& query,
     if (!logicalRoot)
     {   return PhysPlanPtr(new PhysicalPlan(_root)); }
 
-    bool tileMode = Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT)
-        && Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE) > 1;
+    bool tileMode = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE) > 1;
     _root = tw_createPhysicalTree(logicalRoot, tileMode);
 
     if (!logicalPlan->getRoot()->isDdl())

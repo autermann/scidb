@@ -28,6 +28,7 @@
  * List operator for listing data from external files into array
  */
 
+#include "query/Parser.h"
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
 #include "system/Exceptions.h"
@@ -110,7 +111,7 @@ public:
         assert(inputSchemas.size() == 0);
 
         vector<AttributeDesc> attributes(1);
-        attributes[0] = AttributeDesc((AttributeID)0, "name",  TID_STRING, 0, 0);
+        attributes[0] = AttributeDesc(0,"name",TID_STRING,0,0);
         vector<DimensionDesc> dimensions(1);
 
         string what;
@@ -139,9 +140,10 @@ public:
             vector<string> arrays;
             SystemCatalog::getInstance()->getArrays(arrays);
 
-            attributes.push_back(AttributeDesc((AttributeID)1, "id",  TID_INT64, 0, 0));
-            attributes.push_back(AttributeDesc((AttributeID)2, "schema",  TID_STRING, 0, 0));
-            attributes.push_back(AttributeDesc((AttributeID)3, "availability",  TID_BOOL, 0, 0));
+            attributes.push_back(AttributeDesc(1,"id",            TID_INT64,0,0));
+            attributes.push_back(AttributeDesc(2,"schema",        TID_STRING,0,0));
+            attributes.push_back(AttributeDesc(3,"availability",  TID_BOOL,0,0));
+            attributes.push_back(AttributeDesc(4,"temporary",     TID_BOOL,0,0));
 
             if (!showSystem)
             {
@@ -167,10 +169,10 @@ public:
             vector<string> names;
             OperatorLibrary::getInstance()->getLogicalNames(names);
             size = names.size();
-            attributes.push_back(AttributeDesc((AttributeID)1, "library",  TID_STRING, 0, 0));
+            attributes.push_back(AttributeDesc(1,"library",TID_STRING,0,0));
         } else if (what == "types") {
             size =  TypeLibrary::typesCount();
-            attributes.push_back(AttributeDesc((AttributeID)1, "library",  TID_STRING, 0, 0));
+            attributes.push_back(AttributeDesc(1,"library",TID_STRING,0,0));
         } else if (what == "functions") {
             funcDescNamesMap& funcs = FunctionLibrary::getInstance()->getFunctions();
             for (funcDescNamesMap::const_iterator i = funcs.begin(); i != funcs.end(); ++i)
@@ -178,25 +180,22 @@ public:
                 size += i->second.size();
             }
             size += 2; // for hardcoded iif and missing_reason
-            attributes.push_back(AttributeDesc((AttributeID)1, "profile",  TID_STRING, 0, 0));
-            attributes.push_back(AttributeDesc((AttributeID)2, "deterministic",  TID_BOOL, 0, 0));
-            attributes.push_back(AttributeDesc((AttributeID)3, "library",  TID_STRING, 0, 0));
+            attributes.push_back(AttributeDesc(1,"profile",      TID_STRING, 0,0));
+            attributes.push_back(AttributeDesc(2,"deterministic",TID_BOOL,   0,0));
+            attributes.push_back(AttributeDesc(3,"library",      TID_STRING, 0,0));
+        } else if (what == "macros") {
+            return logicalListMacros(); // see Parser.h
         } else if (what == "queries") {
-            attributes.push_back(AttributeDesc(1, "query_id",  TID_INT64, 0, 0));
-            attributes.push_back(AttributeDesc(2, "creation_time",  TID_DATETIME, 0, 0));
-            attributes.push_back(AttributeDesc(3, "error_code",  TID_INT32, 0, 0));
-            attributes.push_back(AttributeDesc(4, "error",  TID_STRING, 0, 0));
-            attributes.push_back(AttributeDesc(5, "idle",  TID_BOOL, 0, 0));
-            boost::function<void(const shared_ptr<scidb::Query>&)> f;
-            size = Query::listQueries(f);
+            ListQueriesArrayBuilder builder;
+            return builder.getSchema(query);
         } else if (what == "instances") {
             boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
             size = queryLiveness->getNumInstances();
             attributes.reserve(5);
-            attributes.push_back(AttributeDesc(1, "port",  TID_UINT16, 0, 0));
-            attributes.push_back(AttributeDesc(2, "instance_id",  TID_UINT64, 0, 0));
-            attributes.push_back(AttributeDesc(3, "online_since",  TID_STRING, 0, 0));
-            attributes.push_back(AttributeDesc(4, "instance_path",  TID_STRING, 0, 0));
+            attributes.push_back(AttributeDesc(1, "port",         TID_UINT16,0,0));
+            attributes.push_back(AttributeDesc(2, "instance_id",  TID_UINT64,0,0));
+            attributes.push_back(AttributeDesc(3, "online_since", TID_STRING,0,0));
+            attributes.push_back(AttributeDesc(4, "instance_path",TID_STRING,0,0));
         } else if (what == "chunk descriptors" ) {
             ListChunkDescriptorsArrayBuilder builder;
             return builder.getSchema(query);

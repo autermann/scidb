@@ -26,9 +26,8 @@
  *  Created on: Feb 1, 2012
  *      Author: egor.pugin@gmail.com
  */
-
-#include "query/Operator.h"
-#include "system/Exceptions.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
 #include "PhysicalAnalyze.h"
 
 using namespace std;
@@ -36,7 +35,6 @@ using namespace boost;
 
 namespace scidb
 {
-
 /**
  * @brief The operator: analyze().
  *
@@ -91,14 +89,14 @@ namespace scidb
 class LogicalAnalyze : public LogicalOperator
 {
 public:
-	LogicalAnalyze(const std::string& logicalName, const std::string& alias)
-        : LogicalOperator(logicalName, alias)
-	{
-		ADD_PARAM_INPUT()
-		ADD_PARAM_VARIES()
-	}
+    LogicalAnalyze(const std::string& logicalName, const std::string& alias)
+    : LogicalOperator(logicalName, alias)
+    {
+        ADD_PARAM_INPUT();
+        ADD_PARAM_VARIES();
+    }
 
-	vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const vector<ArrayDesc> &schemas)
+    vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const vector<ArrayDesc> &schemas)
     {
         std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
@@ -117,25 +115,23 @@ public:
         atts.push_back(AttributeDesc(4, "non_null_count", TID_UINT64, 0, 0));
 
         const AttributeDesc *emptyIndicator = schemas[0].getEmptyBitmapAttribute();
+        Attributes inputAtts = schemas[0].getAttributes();
+        assert(!emptyIndicator || inputAtts.size()-1 == emptyIndicator->getId());
 
-        set<string> a_s;
-        for (size_t i = 0; i < _parameters.size(); i++)
-        {
-            string attName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
-                        
-            if (emptyIndicator && emptyIndicator->getName() == attName)
-                continue;
-
-            a_s.insert(attName);
+        size_t attsCount(0);
+        if (_parameters.empty()) {
+            attsCount = emptyIndicator ? inputAtts.size()-1 : inputAtts.size();
+        } else {
+            attsCount = _parameters.size();
         }
-
-        size_t attsCount = (a_s.size() == 0 ? (emptyIndicator ? schemas[0].getAttributes().size() - 1 : schemas[0].getAttributes().size()) : a_s.size()) - 1;
+        assert(attsCount <= inputAtts.size());
 
         Dimensions dims;
         dims.push_back(DimensionDesc("attribute_number", 0, attsCount, ANALYZE_CHUNK_SIZE, 0));
 
-        return ArrayDesc(schemas[0].getName() + "_analyze", atts, dims);
-	}
+        ArrayDesc arrDesc(schemas[0].getName() + "_analyze", addEmptyTagAttribute(atts), dims);
+        return arrDesc;
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalAnalyze, "analyze")

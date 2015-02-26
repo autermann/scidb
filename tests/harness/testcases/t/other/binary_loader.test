@@ -4,7 +4,7 @@ create array foo<i:int64,r:double,s:string>[x=1:20,10,0]
 create array foo2<i:int64,r:double,s:string>[x=1:20,10,0]
 create array foo3<i:int64,r:double,s:string>[x=1:20,10,0]
 create array foo4<i:int64,r:double,s:string>[x=1:20,10,0]
-create array foo5<i:double,s:string_10>[x=1:20,10,0]
+create array foo5<i:double,s:string>[x=1:20,10,0]
 create array foo6<i:int64,r:double,s:string>[x=1:20,10,0]
 create array foo_null<i:int64 null,r:double null,s:string null>[x=1:20,10,0]
 create array foo2_null<i:int64 null,r:double null,s:string null>[x=1:20,10,0]
@@ -18,13 +18,13 @@ create array table<x:int64>[i=1:10,2,0]
 --test
 --set-format csv+
 
-load(foo, '../tests/harness/testcases/data/foo.txt')
+load(foo, '${TEST_DATA_DIR}/foo.txt')
 save(foo, 'foo.out', -2, '(int32,float,string)')
 load(foo2, 'foo.out', -2, '(int32,float,string)')
 
 # This test case fails even if I use int64 instead of int32. 
 # Also, the int32 specifies the contents of the file.
-load(foo_null, '../tests/harness/testcases/data/foo_null.txt')
+load(foo_null, '${TEST_DATA_DIR}/foo_null.txt')
 save(foo_null, 'foo_null.out', -2, '(int32 null,float null,string null)')
 save(foo_null, 'foo_null.txt', -1)
 load(foo2_null, 'foo_null.out', -2, '(int32 null,float null,string null)')
@@ -47,7 +47,7 @@ save(foo5, 'foo.out', -2, '(float,string(10))')
 load(foo5, 'foo.out', -2, '(float,string(10))')
 
 --start-igdata
-store(build_sparse(spa, x, x = y and x % 200 = 0), spa)
+store(filter(build(spa, x), x = y and x % 200 = 0), spa)
 save(spa, 'spa.out', -1, 'opaque')
 load(spa2, 'spa.out', -1, 'opaque')
 --stop-igdata

@@ -80,7 +80,6 @@ bool isAFLKeyword(chars text,chars& lexeme,int& token)
         {"create",      Token::CREATE     },
         {"default",     Token::DEFAULT    },
         {"desc",        Token::DESC       },
-        {"empty",       Token::EMPTY      },             // ...reserved
         {"fn",          Token::FN         },             // ...reserved
         {"in",          Token::IN         },             // ...reserved
         {"is",          Token::IS         },
@@ -90,6 +89,7 @@ bool isAFLKeyword(chars text,chars& lexeme,int& token)
         {"or",          Token::OR         },             // ...reserved
         {"reserve",     Token::RESERVE    },
         {"select",      Token::SELECT     },             // ...reserved
+        {"temp",        Token::TEMP       },
         {"where",       Token::WHERE      },             // ...reserved
     };
 
@@ -118,7 +118,6 @@ bool isAQLKeyword(chars text,chars& lexeme,int& token)
         {"default",     Token::DEFAULT    },
         {"desc",        Token::DESC       },
         {"drop",        Token::DROP       },
-        {"empty",       Token::EMPTY      },             // ...reserved
         {"errors",      Token::ERRORS     },
         {"fixed",       Token::FIXED      },             // ...reserved
         {"fn",          Token::FN         },             // ...reserved
@@ -154,6 +153,7 @@ bool isAQLKeyword(chars text,chars& lexeme,int& token)
         {"shadow",      Token::SHADOW     },
         {"start",       Token::START      },
         {"step",        Token::STEP       },
+        {"temp",        Token::TEMP       },
         {"thin",        Token::THIN       },
         {"to",          Token::TO         },
         {"unbound",     Token::UNBOUND    },

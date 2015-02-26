@@ -25,10 +25,11 @@
  *
  * @author paul@scidb.org
  *
- * @brief Shared library that loads into SciDB a collection of 
- *        misc functions and utilities. 
+ * @brief Shared library that loads into SciDB a collection of
+ *        misc functions and utilities.
  */
-
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <vector>
 #include <boost/assign.hpp>
 
@@ -84,6 +85,7 @@ public:
         _functionDescs.push_back(FunctionDescription("killInstance", list_of(TID_INT64)(TID_INT32)(TID_BOOL), TID_INT64, &killInstance));
         _functionDescs.push_back(FunctionDescription("postWarning", list_of(TID_INT64), TID_INT64, &postWarning));
         _functionDescs.push_back(FunctionDescription("injectError", list_of(TID_INT64)(TID_INT64), TID_INT64, &injectError));
+        _functionDescs.push_back(FunctionDescription("setMemCap", list_of(TID_INT64)(TID_INT64), TID_INT64, &setMemCap));
 
         _errors[MISC_FUNCTIONS_ERROR1] = "Generating trap to force transaction abort";
         _errors[MISC_FUNCTIONS_WARNING] = "Posting warning from instance '%1%'";

@@ -28,6 +28,7 @@
 #include <new>                                           // For operator new
 #include <assert.h>                                      // For assert()
 #include <sstream>
+#include <vector>
 #include <system/Exceptions.h>
 
 /****************************************************************************/
@@ -158,6 +159,47 @@ inline bool iff(bool a,bool b)
 {
     return a == b;                                       // 'a' <=> 'b'
 }
+
+/**
+ * @brief Behold the One True TSV Parser.
+ *
+ * @description
+ * This routine parses lines of "tab separated values" text.  It
+ * modifies the input line in-place to unescape TSV escape characters.
+ * It returns a vector of pointers to individual fields in the
+ * modified line.
+ *
+ * The only possible error is caused by a backslash tab sequence,
+ * which is illegal.
+ *
+ * @note If you choose a field delimiter other than TAB (ascii 0x09),
+ * be certain that your data columns do not contain that character, or
+ * you will get unexpected results.  Use of non-TAB delimiters is
+ * discouraged for this reason.
+ *
+ * @param line modifiable null-terminated input line
+ * @param fields vector of pointers into the modified line
+ * @param delim alternate field delimiter
+ * @return true iff line was successfully parsed
+ *
+ * @see http://dataprotocols.org/linear-tsv/
+ */
+extern bool tsv_parse(char *line,
+                      std::vector<char*>& fields,
+                      char delim = '\t');
+
+/**
+ * @brief Match an integer, floating point number, or "nan".
+ * @note Leading and trailing whitespace in @c val are ignored.
+ * @param val NULL-terminated string to search for a number
+ * @return true iff an integer, floating point number, or "nan" is found
+ * @throws runtime_error on regex compilation failure (should not happen)
+ *
+ * @note The initial call compiles a regular expression and so is not
+ * thread-safe.  To get thread safety, call once from main() before
+ * launching threads.  Subsequent calls are fine.
+ */
+extern bool isnumber(const char* val);
 
 /****************************************************************************/
 }

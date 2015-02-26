@@ -3,13 +3,13 @@
 create array A <a:float,b:int32> [x=-3:7,3,2,y=0:2,3,2]
 create array T1 <a:float> [x=-3:7,3,2,y=0:2,3,2]
 create array T2 <b:int32> [x=-3:7,3,2,y=0:2,3,2]
-store(build_sparse(T1,x+10.6+y,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12+y,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10.6+y),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12+y),x<>2 and x<>5),T2)
 store(join(T1,T2),A)
 
 --test
-store(build_sparse(T1,x-10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x-12,x<>2 and x<>5),T2)
+store(filter(build(T1,x-10),x<>2 and x<>5),T1)
+store(filter(build(T2,x-12),x<>2 and x<>5),T2)
 store(join(T1,T2),A)
 window(A,8,9,2,3,sum(a),max(a))
 window(A,1,1,1,2,max(a),var(a),stdev(a),count(a),sum(a),min(a))
@@ -20,8 +20,8 @@ window(A,1,1,4,4,count(*),sum(a))
 window(A,2,2,1,2,stdev(a),avg(a))
 window(A,4,4,0,1,var(a),stdev(a))
 
-store(build_sparse(T1,x+10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12),x<>2 and x<>5),T2)
 store(join(T1,T2),A)
 window(A,8,9,0,1,sum(b),max(b))
 window(A,1,1,2,3,max(a),var(b),stdev(a),count(a),sum(b),min(a))

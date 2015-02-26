@@ -68,7 +68,7 @@ def main():
     for z in range(20):
             x,y=slabs[idx]
             #print "processing polygons in", z, " for Slab :", x,y
-	    query="project(cross_join(cross_join(normal_groups_dim, redimension_store(project(apply(filter(between(normal_obs_%d,%d,%d,%d,%d),polygon is not null),check,true),oid,check), temp) as b, normal_groups_dim.oid,b.oid) as A,normal_groups_centers as C,A.group,C.group),x_avg,y_avg)"  %(z,x,y,x+U3,y+U3) 
+	    query="project(cross_join(cross_join(normal_groups_dim, store(redimension(project(apply(filter(between(normal_obs_%d,%d,%d,%d,%d),polygon is not null),check,true),oid,check), temp), temp) as b, normal_groups_dim.oid,b.oid) as A,normal_groups_centers as C,A.group,C.group),x_avg,y_avg)"  %(z,x,y,x+U3,y+U3) 
 	    #print query
 	    result=db.executeQuery(query,"afl")
 	    xlist=[]

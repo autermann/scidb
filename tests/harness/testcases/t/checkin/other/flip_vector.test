@@ -1,7 +1,7 @@
 --setup
 CREATE ARRAY vector<x:int64, y:int64>[i=1:4,2,0]
-create empty array matrix<i:int64>[x=0:9,5,0, y=0:9,5,0]
-load(vector, '../tests/harness/testcases/data/vector.txt')
+create array matrix<i:int64>[x=0:9,5,0, y=0:9,5,0]
+load(vector, '${TEST_DATA_DIR}/vector.txt')
 create array A < val:int64> [x=1:10000,1000,0, y=1:10000,1000,0]
 aggregate(store(between(build(A, x+y), 1234, 5678, 2345, 6789), A), count(*), sum(val), avg(val))
 

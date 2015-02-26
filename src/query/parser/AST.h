@@ -38,17 +38,20 @@ enum type
 
     abstraction,
     application,
-  //constant
-     cnull,
-     creal,
-     cstring,
-     cboolean,
-     cinteger,
     fix,
     let,
     reference,
     schema,
+    variable,
     olapAggregate,
+
+ // Constants:
+
+    cnull,
+    creal,
+    cstring,
+    cboolean,
+    cinteger,
 
  // Statements:
 
@@ -68,7 +71,7 @@ enum type
     updateArray,
      update,
 
-// Other syntactic odds and ends:
+ // Miscellaneous:
 
     binding,
     attribute,
@@ -84,10 +87,9 @@ enum child
     abstractionArgBody,
 
  // application
-    applicationArgName                  = 0,
+    applicationArgOperator              = 0,
     applicationArgOperands,
     applicationArgAlias,
-    applicationArgIsScalar,
 
  // fix
     fixArgBindings                      = 0,
@@ -98,8 +100,8 @@ enum child
     letArgBody,
 
  // reference
-    referenceArgArrayName               = 0,
-    referenceArgName,
+    referenceArgName                    = 0,
+    referenceArgArray,
     referenceArgVersion,
     referenceArgOrder,
     referenceArgAlias,
@@ -107,7 +109,10 @@ enum child
  // schema
     schemaArgAttributes                 = 0,
     schemaArgDimensions,
-    schemaArgEmpty,
+
+ // variable
+    variableArgName                     = 0,
+    variableArgBinding,
 
  // olapAggregate
     olapAggregateArgApplication         = 0,
@@ -243,6 +248,7 @@ class Node
             cnodes            getList()            const {return cnodes(_size,(Node**)(this+1));}
             cnodes            getList(child c)     const {return get(c)->getList();}
             Node*             get(child c)         const {return getList()[c];}
+            string            dump()               const;
 
  public:                   // Operations
             real              getReal()            const;
@@ -257,8 +263,8 @@ class Node
             Node*             set(child c,Node* n)       {getList()[c] = n;return this;}
 
  protected:                // Construction
-                              Node(type,const location&);
-            void*             operator new  (size_t,Arena&,cnodes = cnodes());
+                              Node   (type,const location&,cnodes);
+            void*             operator new  (size_t,Arena&,cnodes);
             void              operator delete(void*,Arena&,cnodes) {}
     virtual Node*             copy (Factory&)      const;// Create shallow copy
             friend            class Factory;             // Manages allocation
@@ -312,9 +318,14 @@ class Factory
             Node*             newApp    (const location&,name,Node*,Node*,Node*,Node*,Node*,Node*);
             Node*             newApp    (const location&,name,Node*,Node*,Node*,Node*,Node*,Node*,Node*);
             Node*             newApp    (const location&,name,Node*,Node*,Node*,Node*,Node*,Node*,Node*,Node*);
+            Node*             newApp    (const location&,name, cnodes);
+            Node*             newApp    (const location&,Name*,cnodes);
             Node*             newAbs    (const location&,Node* bindings,Node* body);
             Node*             newFix    (const location&,Node* bindings,Node* body);
             Node*             newLet    (const location&,Node* bindings,Node* body);
+            Node*             newRef    (const location&,Name*,Node* av = 0,Node* order = 0);
+            Node*             newVar    (const location&,Name*);
+            Node*             newVar    (const location&,name);
             Node*             newList   (const location&,size_t);
 
  public:                   // Shadow Stack
@@ -355,16 +366,19 @@ class Visitor
     virtual void              onExpression (Node*&);
     virtual void              onAbstraction(Node*&);
     virtual void              onApplication(Node*&);
+    virtual void              onFix        (Node*&);
+    virtual void              onLet        (Node*&);
+    virtual void              onReference  (Node*&);
+    virtual void              onSchema     (Node*&);
+    virtual void              onVariable   (Node*&);
+
+ protected:                // Constants
     virtual void              onConstant   (Node*&);
     virtual void              onNull       (Node*&);
     virtual void              onReal       (Node*&);
     virtual void              onString     (Node*&);
     virtual void              onBoolean    (Node*&);
     virtual void              onInteger    (Node*&);
-    virtual void              onFix        (Node*&);
-    virtual void              onLet        (Node*&);
-    virtual void              onReference  (Node*&);
-    virtual void              onSchema     (Node*&);
 
  protected:                // Statements
     virtual void              onStatement  (Node*&);
@@ -382,6 +396,9 @@ class Visitor
 /****************************************************************************/
 ostream&                      operator<<(ostream&,order);
 ostream&                      operator<<(ostream&,const Node*);
+/****************************************************************************/
+Name*                         getAlias  (const Node*);
+Node*&                        setAlias  (Node*&,Name*);
 /****************************************************************************/
 }}
 /****************************************************************************/

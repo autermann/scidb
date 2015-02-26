@@ -1,4 +1,24 @@
 #!/usr/bin/python
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2014 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 #-------------------------------------------------------------------------------
 # Imports:
 import argparse
@@ -41,7 +61,8 @@ allTests = [
     'test_opaque_parallel_allVersions_zip',
     'test_text',
     'test_binary',
-    'test_opaque'
+    'test_opaque',
+    'test_neg_binary'
     ]
 parallelTests = [
     'test_text_parallel',
@@ -74,9 +95,6 @@ class RestoreTest(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(RestoreTest, self).__init__(*args, **kwargs)
 
-    def setBackupHelper(self,bh):
-        self.bkpHelper = bh
-
     def setUp(self):
         self.bkpHelper.removeBackup(BACKUP)
         self.bkpHelper.removeArrays(self.bkpHelper.getAllArrayNames())
@@ -101,11 +119,13 @@ class RestoreTest(unittest.TestCase):
             [self._cmdRunner.runSubProcess(saveCmd,useShell=True)],
             True
             )
+
         self.bkpHelper.removeArrays(self.bkpHelper.getAllArrayNames())
         exits,outs = self._cmdRunner.waitForProcesses(
             [self._cmdRunner.runSubProcess(restoreCmd,useShell=True)],
             True
             )
+
         restored = self.bkpHelper.getDBArrays(versions)
 
         self.assertTrue(
@@ -906,6 +926,70 @@ class RestoreTest(unittest.TestCase):
 
         self.commonTestBody(toRestore,saveCmd,restoreCmd)
 
+    # "Litmus" test to make sure the testing infrastructure is working
+    # as advertized: the test intentionally overwrites the restored
+    # arrays and makes sure that they do NOT macth the original arrays.
+    @testWatchdog
+    def test_neg_binary(self):
+        toRestore = self.bkpHelper.getAllArrayNames() # All arrays should be restored.
+        saveCmd = [
+            BACKUP,
+            '--host',
+            '$IQUERY_HOST',
+            '--port',
+            '$IQUERY_PORT',
+            '--save',
+            'binary',
+            self.bkpHelper.getBackupFolder(),
+            '-f',
+            '"[A|B|C][^_]+$"'
+            ]
+        restoreCmd = [
+            BACKUP,
+            '--host',
+            '$IQUERY_HOST',
+            '--port',
+            '$IQUERY_PORT',
+            '--restore',
+            'binary',
+            self.bkpHelper.getBackupFolder(),
+            '-f',
+            '"[A|B|C][^_]+$"'
+            ]
+
+        sys.stderr.write('\n' + ' '.join(restoreCmd) + '\n')
+        exits,outs=self._cmdRunner.waitForProcesses(
+            [self._cmdRunner.runSubProcess(saveCmd,useShell=True)],
+            True
+            )
+        self.bkpHelper.removeArrays(self.bkpHelper.getAllArrayNames())
+        exits,outs = self._cmdRunner.waitForProcesses(
+            [self._cmdRunner.runSubProcess(restoreCmd,useShell=True)],
+            True
+            )
+        restored = self.bkpHelper.getDBArrays(versions=False)
+
+        self.assertTrue(
+            set(toRestore) == set(restored),
+            'Restored arrays do not match initial conditions!'
+            )
+
+        # Mess up the data in the restored arrays.
+        iqueryCmd = ['iquery','-c','$IQUERY_HOST','-p','$IQUERY_PORT','-naq']
+        for a_pair in [('A1','A2'),('B1','B2'),('C1','C2')]:
+            cmd = iqueryCmd + ['\"store(' + a_pair[0] + ',' + a_pair[1] + ')\"']
+            exits,outs = self._cmdRunner.waitForProcesses(
+                [self._cmdRunner.runSubProcess(cmd,useShell=True)],
+                True
+                )
+
+        # Check that the arrays are NOT the same.
+        self.assertTrue(
+            not self.bkpHelper.checkArrayData(toRestore),
+            'Restored array data should not match initial conditions!'
+            )
+
+
 def getTestSuite(tests,user,hosts,ninst,bh,q=None):
 
     suite = unittest.TestSuite()
@@ -918,17 +1002,12 @@ def getTestSuite(tests,user,hosts,ninst,bh,q=None):
     return suite
 
 def getFullTestSuite(user,hosts,ninst,bh,q=None):
-    return getTestSuite(allTests,user,hosts,ninst,bh,q=None)
+    return getTestSuite(allTests,user,hosts,ninst,bh,q)
 
 def getParallelTestSuite(user,hosts,ninst,bh,q=None):
-    return getTestSuite(parallelTests,user,hosts,ninst,bh,q=None)
+    tests = [t for t in allTests if 'parallel' in t]
+    return getTestSuite(tests,user,hosts,ninst,bh,q)
 
 def getNonParallelTestSuite(user,hosts,ninst,bh,q=None):
-    return getTestSuite(
-        set(allTests) - set(parallelTests),
-        user,
-        hosts,
-        ninst,
-        bh,
-        q=None
-        )
+    tests = [t for t in allTests if 'parallel' not in t]
+    return getTestSuite(tests,user,hosts,ninst,bh,q)

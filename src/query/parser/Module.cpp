@@ -78,8 +78,10 @@ Table* TheModule::getTable() const
 {
     static struct empty : Table
     {
-        Table*      getParent()      const {return 0;}   // We have no parent
-        const Node* get(const Name*) const {return 0;}   // We have no bindings
+        size_t      size()           const {return 0;}   // Has no bindings
+        Table*      getParent()      const {return 0;}   // Has no parent
+        const Node* get(const Name*) const {return 0;}   // Has no bindings
+        void        accept(Visitor&) const {}            // Has no bindings
     } empty;                                             // The default table
 
     return _table==0 ? &empty : _table;                  // The current table
@@ -175,7 +177,7 @@ void Module::load(Log& log,const Node* bindings)
 /**
  *  Return the root table of bindings provided by the currently loaded module.
  */
-Table* newTable()
+Table* getTable()
 {
     return TheModule::getInstance()->getTable();         // The current table
 }

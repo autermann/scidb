@@ -31,11 +31,11 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "network/proto/scidb_msg.pb.h"
-#include "network/BaseConnection.h"
-#include "array/Array.h"
-#include "system/Exceptions.h"
-#include "query/Query.h"
+#include <network/proto/scidb_msg.pb.h>
+#include <network/BaseConnection.h>
+#include <array/Array.h>
+#include <system/Exceptions.h>
+#include <query/Query.h>
 
 namespace scidb
 {
@@ -47,6 +47,8 @@ boost::shared_ptr<MessageDesc> makeErrorMessage(int code, const std::string& err
 boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID = 0);
 boost::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID);
 boost::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID);
+boost::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID);
+boost::shared_ptr<MessageDesc> makeNotifyMessage(QueryID queryID);
 
 bool parseQueryLiveness(boost::shared_ptr<InstanceLiveness>& queryLiveness,
                         boost::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);

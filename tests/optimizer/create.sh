@@ -284,13 +284,4 @@ XMIN=0
 YMIN=0
 build_fat_array
 
-#ARR_NAME="opt_sparse_quad_small"	
-#iquery -a -q "remove($ARR_NAME)" > /dev/null 2>&1
-#iquery -anq "store(build_sparse(opt_dense_quad_small_1, X+Y, X>=197 and X<=205 and Y>=198 and Y<=210), $ARR_NAME)" > /dev/null 2>&1
-#check_exit_status $?
-
-#ARR_NAME="opt_sparse_quad_small_2"	
-#iquery -a -q "remove($ARR_NAME)" > /dev/null 2>&1
-#iquery -anq "store(build_sparse(opt_dense_quad_small_1, X+Y, X>=194 and X<=203 and Y>=199 and Y<=211), $ARR_NAME)" > /dev/null 2>&1
-#check_exit_status $?
 

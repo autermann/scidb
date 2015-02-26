@@ -1,17 +1,17 @@
 --setup
 --start-query-logging
-create empty array teeth_u <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
-load(teeth_u, '../tests/harness/testcases/data/teeth.txt')
+create array teeth_u <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
+--shell --store --command "iquery -c ${IQUERY_HOST} -p ${IQUERY_PORT} -aq "load(teeth_u,'${TEST_DATA_DIR}/teeth.txt')""
 
 --test
 cumulate(build(<v:double>[i=0:9,10,0,j=1:10,10,0],i+j), count(*), j)
 
-cumulate(build_sparse(<v:double>[i=0:9,1,0],1,(i/2)=i/2.0), sum(v), i)
+cumulate(filter(build(<v:double>[i=0:9,1,0],1),(i/2)=i/2.0), sum(v), i)
 
-store(build_sparse(<v:double>[i=0:9,1,0],1,(i/2)=i/2.0), x)
+store(filter(build(<v:double>[i=0:9,1,0],1),(i/2)=i/2.0), x)
 cumulate(x, sum(v), i)
 
-store(build_sparse(<v:double null>[i=0:9,1,0],iif(i=4,NULL,1),(i/2)=i/2.0), z)
+store(filter(build(<v:double null>[i=0:9,1,0],iif(i=4,NULL,1)),(i/2)=i/2.0), z)
 cumulate(z, sum(v), i)
 
 store(build(<v:double>[i=0:4,1,0],iif(i=2,0,1)),y)

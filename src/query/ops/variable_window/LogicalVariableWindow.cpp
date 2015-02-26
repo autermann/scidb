@@ -149,7 +149,9 @@ public:
         ArrayDesc output (schemas[0].getName(), Attributes(), outDims);
         for(size_t i =3; i<_parameters.size(); i++)
         {
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], schemas[0], output);
+            bool isInOrderAggregation = true;
+            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], schemas[0], output,
+                    isInOrderAggregation);
         }
 
         if ( schemas[0].getEmptyBitmapAttribute())

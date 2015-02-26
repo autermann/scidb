@@ -9,9 +9,9 @@
 
 create array m5x5_sparse < val : double > [ x=0:4,5,0, y=0:4,5,0]
 # Filling up only 1st row ie x=0
-store(build_sparse(m5x5_sparse, (3*x*x-4*y)/(3.5),x=0 ),m5x5_sparse)
+store(filter(build(m5x5_sparse, (3*x*x-4*y)/(3.5)),x=0 ),m5x5_sparse)
 create array m5x5_array <val:double> [x=0:4,5,0,y=0:4,5,0]
-store(build_sparse(m5x5_array, x+100*y, x=y),m5x5_array)
+store(filter(build(m5x5_array, x+100*y), x=y),m5x5_array)
 #Here {0,0} is not considered as we cannot have 0=0 so we do update.
 --aql update m5x5_array set val=420 where x=0 and y=0
 

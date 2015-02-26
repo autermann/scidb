@@ -6,9 +6,9 @@
 # Arrays with different chunk size and overlaps
 
 create array a1 <r:string NULL>[x=10:17,2,0]
-store(build_sparse(a1,20*x+1,x>13),a1)
+store(filter(build(a1,20*x+1),x>13),a1)
 create array d1 <a1: double NULL> [x=0:4,3,0, y=-2:1,2,1]
-store(build_sparse(d1, 1.0*x+100.0*y, x<>y),d1)
+store(filter(build(d1, 1.0*x+100.0*y), x<>y),d1)
 
 --test
 cross_join(a1,d1)

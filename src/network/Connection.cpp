@@ -31,10 +31,9 @@
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 
-#include "NetworkManager.h"
-#include "Connection.h"
+#include <network/NetworkManager.h>
+#include <network/Connection.h>
 #include <system/Exceptions.h>
-#include <query/executor/SciDBExecutor.h>
 #include <util/Notification.h>
 
 using namespace std;
@@ -98,17 +97,18 @@ void Connection::handleReadMessage(const boost::system::error_code& error, size_
       return;
    }
 
-   if(!_messageDesc->validate()) {
-      LOG4CXX_ERROR(logger, "Network error in handleReadMessage: unknown message, closing connection");
+   if(!_messageDesc->validate() ||
+      _messageDesc->_messageHeader.sourceInstanceID == _sourceInstanceID) {
+      LOG4CXX_ERROR(logger, "Connection::handleReadMessage: unknown/malformed message, closing connection");
       if (_connectionState == CONNECTED) {
          abortMessages();
          disconnectInternal();
       }
       return;
    }
+
    assert(bytes_transferr == sizeof(_messageDesc->_messageHeader));
    assert(_messageDesc->_messageHeader.sourceInstanceID != _sourceInstanceID);
-   // TODO: This must not be an assert but exception of correct handled backward compatibility
    assert(_messageDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER);
 
    async_read(_socket, _messageDesc->_recordStream.prepare(_messageDesc->_messageHeader.recordSize),
@@ -116,7 +116,7 @@ void Connection::handleReadMessage(const boost::system::error_code& error, size_
                    shared_from_this(),  asio::placeholders::error,
                    asio::placeholders::bytes_transferred));
 
-   LOG4CXX_TRACE(logger, "handleReadMessage: messageType=" << _messageDesc->_messageHeader.messageType
+   LOG4CXX_TRACE(logger, "Connection::handleReadMessage: messageType=" << _messageDesc->_messageHeader.messageType
                  << "; instanceID="<< _messageDesc->_messageHeader.sourceInstanceID <<
                  " ; recordSize=" << _messageDesc->_messageHeader.recordSize <<
                  " ; messageDesc.binarySize=" << _messageDesc->_messageHeader.binarySize);
@@ -129,10 +129,6 @@ void Connection::handleReadRecordPart(const boost::system::error_code& error, si
       handleReadError(error);
       return;
    }
-
-   // It's better to know an operator for which this message came
-   // TODO: it we need to move queryID or maybe some other fields into MessageHeader
-   StatisticsScope sScope;
 
    assert(_messageDesc->validate());
    assert(_messageDesc->_messageHeader.recordSize == bytes_transferr);
@@ -230,7 +226,7 @@ boost::shared_ptr<MessageDesc> Connection::popMessage()
 }
 
 void Connection::setRemoteQueueState(NetworkManager::MessageQueueType mqt,  uint64_t size,
-                                     uint64_t localGenId, uint64_t remoteGenId, 
+                                     uint64_t localGenId, uint64_t remoteGenId,
                                      uint64_t localSn, uint64_t remoteSn)
 {
     assert(mqt != NetworkManager::mqtNone);
@@ -359,7 +355,7 @@ void Connection::pushNextMessage()
    vector<asio::const_buffer> constBuffers;
    boost::shared_ptr< std::list<shared_ptr<MessageDesc> > >  msgs(new std::list<shared_ptr<MessageDesc> >());
    size_t size(0);
-   const size_t maxSize(32*1024);
+   const size_t maxSize(32*KiB);
 
    while (true) {
        shared_ptr<MessageDesc> messageDesc = popMessage();
@@ -406,8 +402,6 @@ void Connection::pushNextMessage()
                           asio::placeholders::bytes_transferred,
                           msgs, size));
    _isSending = true;
-   currentStatistics->sentSize += size;
-   currentStatistics->sentMessages += msgs->size();
 }
 
 MessagePtr
@@ -765,7 +759,7 @@ shared_ptr<MessageDesc> Connection::getControlMessage()
     assert(record);
     {
         ScopedMutexLock mutexLock(_mutex);
- 
+
         localGenId = _messageQueue.getLocalGenId();
         record->set_local_gen_id(localGenId);
 

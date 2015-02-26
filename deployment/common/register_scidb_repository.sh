@@ -24,8 +24,8 @@ function centos6()
 {
 (echo <<EOF "[scidb]
 name=SciDB repository
-baseurl=http://downloads.paradigm4.com/centos6.3/${release}
-gpgkey=http://downloads.paradigm4.com/key
+baseurl=https://downloads.paradigm4.com/centos6.3/${release}
+gpgkey=https://downloads.paradigm4.com/key
 gpgcheck=1
 enabled=0"
 EOF
@@ -37,9 +37,9 @@ yum clean all
 
 function ubuntu1204()
 {
-wget -O- http://downloads.paradigm4.com/key | apt-key add -
-echo "deb http://downloads.paradigm4.com/ ubuntu12.04/${release}/" > scidb.list
-echo "deb-src http://downloads.paradigm4.com/ ubuntu12.04/${release}/" >> scidb.list
+wget -O- https://downloads.paradigm4.com/key | apt-key add -
+echo "deb https://downloads.paradigm4.com/ ubuntu12.04/${release}/" > scidb.list
+echo "deb-src https://downloads.paradigm4.com/ ubuntu12.04/${release}/" >> scidb.list
 cat scidb.list
 
 REPO_FILE=/etc/apt/sources.list.d/scidb.list

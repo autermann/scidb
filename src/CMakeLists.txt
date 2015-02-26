@@ -26,6 +26,7 @@ add_subdirectory("system")
 add_subdirectory("smgr")
 add_subdirectory("util")
 add_subdirectory("mpi")
+add_subdirectory("dense_linear_algebra")
 add_subdirectory("linear_algebra")
 add_subdirectory("clients/java")
 
@@ -37,8 +38,10 @@ if (NOT WITHOUT_SERVER)
     file(GLOB include_src "../include/*.h" "../include/array/*.h" "../include/system/*.h"
             "../include/query/*.h" "../include/util/*.h")
 
-    add_executable(scidb network/entry.cpp linear_algebra/blas/initMathLibs.cpp ${include_src})
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+    add_executable(scidb network/entry.cpp dense_linear_algebra/blas/initMathLibs.cpp ${include_src})
 
+    # removes the symbols from scidb and puts them in a separate file
     extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "scidb" scidb)
     set_target_properties(scidb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
     target_link_libraries(scidb network_lib util_lib system_lib qproc_lib array_lib

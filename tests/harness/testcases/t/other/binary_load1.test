@@ -17,11 +17,11 @@ create array PQR1 <a:int64,b:string> [x=0:3,4,0,y=0:3,4,0]
 --test
 --set-format csv+
 
-load(AB, '../tests/harness/testcases/data/abc.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+ -aq "load(AB, '${TEST_DATA_DIR}/abc.txt')""
 save(AB, 'abc.out', 0, '(int32,string,double)')
 load(AB, 'abc.out', 0, '(int32,string,double)')
 load(ABC, 'abc.out', 0, '(int32,string,double)')
-load(ABC_null, '../tests/harness/testcases/data/abc_null.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+ -aq "load(ABC_null, '${TEST_DATA_DIR}/abc_null.txt')""
 save(ABC_null, 'abc_null.out', 0, '(int32 null,string null,double null)')
 save(ABC_null, 'abc_null.txt')
 load(ABC2_null, 'abc_null.txt')

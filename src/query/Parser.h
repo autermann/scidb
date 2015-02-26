@@ -32,16 +32,25 @@ namespace scidb {
 /****************************************************************************/
 
 class Query;
+class Array;
+class ArrayDesc;
 class LogicalExpression;
 class LogicalQueryPlanNode;
 
-boost::shared_ptr<LogicalQueryPlanNode>
-parseStatement(const boost::shared_ptr<Query>&,bool afl);
+/****************************************************************************/
 
-boost::shared_ptr<LogicalExpression>
-parseExpression(const std::string&);
+boost::shared_ptr<LogicalQueryPlanNode> parseStatement (const boost::shared_ptr<Query>&,bool afl);
+boost::shared_ptr<LogicalExpression>    parseExpression(const std::string&);
 
-void loadModule(const std::string&);
+/****************************************************************************/
+
+void                                    loadPrelude();
+void                                    loadModule(const std::string&);
+
+/****************************************************************************/
+
+ArrayDesc                               logicalListMacros ();
+boost::shared_ptr<Array>                physicalListMacros();
 
 /****************************************************************************/
 }

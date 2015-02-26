@@ -21,7 +21,7 @@ sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays')
 
 
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
---igdata "store(build_sparse(half, x, x % 2 = 0), half)"
+--igdata "store(filter(build(half, x), x % 2 = 0), half)"
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
 
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half_redimension_store'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
@@ -33,7 +33,7 @@ sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays')
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
 
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'us_presidents'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn and attid = 0), nelem), nelem)
---igdata "load(us_presidents, '../tests/harness/testcases/data/us_presidents.txt')"
+--igdata "load(us_presidents, '${TEST_DATA_DIR}/us_presidents.txt')"
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'us_presidents'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn and attid = 0), nelem), nelem)
 
 --stop-query-logging

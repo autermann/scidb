@@ -34,22 +34,22 @@ namespace scidb
 {
 
 /**
- * @brief Implements create_array() operator.
+ * @brief Implements the create_array() operator.
  *
- * @par Synopsis
+ * @par Synopsis:
  *
  *  @code
- *      create_array ( array_name, array_schema )
+ *      create_array ( array_name, array_schema [,'TEMP'] )
  *  @endcode
  *  or
  *  @code
- *      CREATE ARRAY   array_name  array_schema
+ *      CREATE ['TEMP'] ARRAY array_name  array_schema
  *  @endcode
  *
- * @par Summary
+ * @par Summary:
  *      Creates an array with the given name and schema and adds it to the database.
  *
- * @par Input
+ * @par Input:
  *      - array_name:      an identifier that names the new array.
  *      - array_schema:    a multidimensional array schema that describes the rank
  *                          and shape of the array to be created, as well as the types
@@ -143,12 +143,22 @@ public:
         _properties.ddl = true;
         ADD_PARAM_OUT_ARRAY_NAME()
         ADD_PARAM_SCHEMA()
+        ADD_PARAM_VARIES()
+    }
+
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    {
+        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > v(2);
+        v[0] = END_OF_VARIES_PARAMS();
+        v[1] = PARAM_CONSTANT(TID_STRING);
+        return v;
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
-        assert(_parameters.size() == 2);
+        assert(_parameters.size() >= 2);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
         assert(_parameters[1]->getParamType() == PARAM_SCHEMA);
 
@@ -158,6 +168,16 @@ public:
         {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_ALREADY_EXIST,
                 _parameters[0]->getParsingContext()) << name;
+        }
+
+        if (_parameters.size() >= 3)
+        {
+            std::string s(evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),query,TID_STRING).getString());
+
+            if (compareStringsIgnoreCase(s,"temp") != 0)
+            {
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,SCIDB_LE_UNSUPPORTED_FORMAT,_parameters[2]->getParsingContext()) << s;
+            }
         }
 
         return ArrayDesc();

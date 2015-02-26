@@ -12,7 +12,7 @@ create array UNB5 <a:double>[x=0:*,5,0]
 create array UNB6 <a:double>[x=0:*,5,0]
 
 --test
-load(UNB, '../tests/harness/testcases/data/ub_binload.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(UNB, '${TEST_DATA_DIR}/ub_binload.txt')""
 save(UNB, 'unb.out', 0, '(double,string)')
 save(UNB, 'unb.txt', 0, '(double,string)')
 load(UNB1,'unb.out', 0, '(double,string)')

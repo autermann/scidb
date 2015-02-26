@@ -5,10 +5,10 @@ CREATE ARRAY gesvd_test8_12 <a:double> [x=0:7,2,0, y=0:11,4,0]
 CREATE ARRAY gesvd_test12_8 <a:double> [x=0:11,4,0, y=0:7,2,0]
 create array gesvd_test8_8 <x:double>[i=0:7,4,0, j=0:7,2,0]
 
-load( gesvd_10x10, '../tests/harness/testcases/data/svd_10x10.txt', 0)
-load( gesvd_test10_10, '../tests/harness/testcases/data/svd_test1.txt', 0)
-load( gesvd_test8_12, '../tests/harness/testcases/data/svd_test2.txt', 0)
-load( gesvd_test12_8, '../tests/harness/testcases/data/svd_test3.txt', 0)
+load( gesvd_10x10, '${TEST_DATA_DIR}/svd_10x10.txt', 0)
+load( gesvd_test10_10, '${TEST_DATA_DIR}/svd_test1.txt', 0)
+load( gesvd_test8_12, '${TEST_DATA_DIR}/svd_test2.txt', 0)
+load( gesvd_test12_8, '${TEST_DATA_DIR}/svd_test3.txt', 0)
 store(build(gesvd_test8_8,iif(j-i<2,iif(i<=j,pow(10,j-i),0),0)),gesvd_test8_8)
 
 CREATE ARRAY gesvd_test10_10bsq <a:double> [x=0:9,1,0, y=0:9,1,0]

@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
 create array A <a:int32 null default 99> [x=0:8,6,0,y=-2:6,8,1]
-store(build_sparse(A,x+10,x<>2 and x<>6),A)
+store(filter(build(A,x+10),x<>2 and x<>6),A)
 
 --test
 thin(A,0,1,-2,1)

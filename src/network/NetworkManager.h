@@ -30,21 +30,20 @@
 #ifndef NETWORKMANAGER_H_
 #define NETWORKMANAGER_H_
 
-#include "boost/asio.hpp"
-#include "log4cxx/logger.h"
+#include <boost/asio.hpp>
+#include <log4cxx/logger.h>
 
-#include "util/Singleton.h"
-#include "util/JobQueue.h"
-#include "util/WorkQueue.h"
-#include "util/Network.h"
-#include "array/Metadata.h"
-#include "query/QueryProcessor.h"
+#include <array/Metadata.h>
+#include <query/QueryProcessor.h>
+#include <network/ThrottledScheduler.h>
 #include <system/Cluster.h>
-#include "ThrottledScheduler.h"
+#include <util/Singleton.h>
+#include <util/JobQueue.h>
+#include <util/WorkQueue.h>
+#include <util/Network.h>
 
 namespace scidb
 {
- class Statistics;
  class Connection;
 
 /***

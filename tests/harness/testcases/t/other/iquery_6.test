@@ -2,9 +2,9 @@
 --start-query-logging
 
 create array A <a:int32, b:string, c:string> [x=0:2,3,0,y=4:5,1,0]
-create empty array A2 <a:int32, b:string> [c(string)=6,2,0]
-create empty array A3 <c:string, a:int32> [b(string)=6,2,0,x=0:2,3,0]
-load(A,'../tests/harness/testcases/data/iquery_5.txt')
+create array A2 <a:int32, b:string> [c(string)=6,2,0]
+create array A3 <c:string, a:int32> [b(string)=6,2,0,x=0:2,3,0]
+load(A,'${TEST_DATA_DIR}/iquery_5.txt')
 
 --test
 

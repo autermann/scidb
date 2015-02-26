@@ -25,7 +25,7 @@ load ( RawDataForDorfs, '../tests/harness/testcases/data/RemoveBugDataExamples.d
 #
 #
 
-CREATE EMPTY ARRAY Dorfs < detail : string, qty : double > [ name(string)=7,7,0, item(string)=4,4,0 ]
+CREATE array Dorfs < detail : string, qty : double > [ name(string)=7,7,0, item(string)=4,4,0 ]
 
 #
 # 5. redimension_store() the 1D array into the target. 

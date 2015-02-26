@@ -66,7 +66,7 @@ done
 #
 #	SELECT COUNT(*) FROM Big; 
 #
-QS1="count ( Big )"
+QS1="aggregate ( Big, count(*) )"
 #
 #   SELECT * FROM Big A WHERE A.I BETWEEN :I1 AND :I2 AND A.J BETWEEN :J1 AND :J2;
 #
@@ -81,18 +81,18 @@ QS3="filter ( subarray ( Big, 500, 500, 510, 510 ), C1 = 'X')"
 #     WHERE A.I BETWEEN :I1 AND :I2 AND A.J BETWEEN :J1 AND :J2
 #    GROUP BY A.I;
 #
-QS4="count ( subarray ( Big, 500, 500, 510, 510 ), I)"
+QS4="aggregate ( subarray ( Big, 500, 500, 510, 510 ), sum(A1), I)"
 #
 #    SELECT COUNT(*) FROM Big 
 #     WHERE A.I BETWEEN :I1 AND :I2 AND A.J BETWEEN :J1 AND :J2
 #       AND C1 = char('X')
 #    GROUP BY A.I;
 #
-QS5="count ( filter ( subarray ( Big, 500, 500, 510, 510 ), C1 = 'X'), I)"
+QS5="aggregate ( filter ( subarray ( Big, 500, 500, 510, 510 ), C1 = 'X'), count(*), I)"
 #
 #  Bigger box? 
 #
-QS6="count ( filter ( subarray ( Big, 490, 490, 530, 530 ), C1 = 'X'), I)"
+QS6="aggregate ( filter ( subarray ( Big, 490, 490, 530, 530 ), C1 = 'X'), count(*), I)"
 #
 #
 QS7="
@@ -113,7 +113,7 @@ project (
 #
 #
 QS8="
-count ( 
+aggregate ( 
 	filter ( 
 		project ( 
   			apply ( 
@@ -128,7 +128,7 @@ count (
 		),
 	Diff > 0
 	)
-)"
+, count(*))"
 # SELECT * FROM
 # ( SELECT Ar.B1 - Ar2.B1 AS Diff
 #   FROM Big AS Ar1, Big AS Ar2
@@ -143,7 +143,7 @@ count (
 QS9="
 apply ( 
 	join ( 
-		count ( 
+		aggregate ( 
 			filter ( 
 				project ( 
   					apply ( 
@@ -158,8 +158,8 @@ apply (
 				),
 				Diff > 0
 			)
-		) AS N,
-   	count ( 
+		, count(*)) AS N,
+   	aggregate ( 
         	project (  
             	apply ( 
                 	join ( 
@@ -171,7 +171,7 @@ apply (
             	), 
         	Diff
         	)
-    	) AS D
+    	, count(*)) AS D
 	),
 	P,
 	abs(N.count) / abs(D.count)
@@ -197,7 +197,7 @@ apply (
 QS10="
 apply ( 
     join ( 
-        count ( 
+        aggregate ( 
             filter ( 
                 project ( 
 					filter (
@@ -215,8 +215,8 @@ apply (
                 ),
                 Diff > 0
             )
-        ) AS N,
-    	count ( 
+        , count(*)) AS N,
+    	aggregate ( 
         	project (  
 		    	filter ( 
                 	apply ( 
@@ -231,7 +231,7 @@ apply (
 				),
         	Diff
 			),
-    	) AS D
+    	, count(*)) AS D
     ),
     P,
     abs(N.count) / abs(D.count)

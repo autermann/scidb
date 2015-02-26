@@ -63,8 +63,12 @@ protected:
 
 public:
     ExpressionAggregate(const string& name, Type const& aggregateType, Type const& stateType, Type const& resultType,
-                        const string& accumulateOp, const string& mergeOp, bool initByFirstValue = false):
-        Aggregate(name, aggregateType, resultType), _stateType(stateType), _accumulateOp(accumulateOp), _mergeOp(mergeOp), _initByFirstValue(initByFirstValue)
+                        const string& accumulateOp, const string& mergeOp, bool initByFirstValue = false)
+        : Aggregate(name, aggregateType, resultType)
+        , _stateType(stateType)
+        , _accumulateOp(accumulateOp)
+        , _mergeOp(mergeOp)
+        , _initByFirstValue(initByFirstValue)
     {
         vector<string> names(2);
         names[0] = "a";
@@ -82,12 +86,28 @@ public:
 
     virtual AggregatePtr clone() const
     {
-        return AggregatePtr(new ExpressionAggregate(getName(), getAggregateType(), getStateType(), getResultType(), _accumulateOp, _mergeOp, _initByFirstValue));
+        return AggregatePtr(new ExpressionAggregate(
+                                getName(),
+                                getAggregateType(),
+                                getStateType(),
+                                getResultType(),
+                                _accumulateOp,
+                                _mergeOp,
+                                _initByFirstValue));
     }
 
     AggregatePtr clone(Type const& aggregateType) const
     {
-        return AggregatePtr(new ExpressionAggregate(getName(), aggregateType, aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType, _accumulateOp, _mergeOp, _initByFirstValue));
+        return AggregatePtr(new ExpressionAggregate(
+                                getName(),
+                                aggregateType,
+                                aggregateType,
+                                (_resultType.typeId() == TID_VOID
+                                    ? aggregateType
+                                    : _resultType),
+                                _accumulateOp,
+                                _mergeOp,
+                                _initByFirstValue));
     }
 
     bool ignoreNulls() const

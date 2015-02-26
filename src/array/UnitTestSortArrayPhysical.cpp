@@ -25,6 +25,7 @@
 #include <system/Cluster.h>
 #include <query/Query.h>
 #include <boost/make_shared.hpp>
+#include <boost/foreach.hpp>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
 #include <log4cxx/logger.h>
@@ -90,7 +91,8 @@ public:
             str[length-1] = 0;
             value.setString(&str[0]);
         } else {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) << "UnitTestSortArrayPhysical" << "genRandomValue";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
+                << "UnitTestSortArrayPhysical" << "genRandomValue";
         }
         return value;
     }
@@ -98,9 +100,9 @@ public:
     /**
      * Given a value, return a human-readable string for its value.
      * @note This should eventually be factored out to the include/ directory.
-     * @see DBLoader
+     * @see ArrayWriter
      */
-   inline string valueToString(Value const& value, TypeId const& type)
+    string valueToString(Value const& value, TypeId const& type)
     {
         std::stringstream ss;
 
@@ -113,7 +115,8 @@ public:
         } else if (type==TID_STRING) {
             ss << value.getString();
         } else {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) << "UnitTestSortArrayPhysical" << "value2string";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
+                << "UnitTestSortArrayPhysical" << "value2string";
         }
         return ss.str();
     }
@@ -129,13 +132,13 @@ public:
         Coordinates coord(1);
         coord[0] = 0;
         vector< shared_ptr<ArrayIterator> > arrayIters(array.getArrayDesc().getAttributes(true).size());
-        vector< shared_ptr<ChunkIterator> > chunkIters(arrayIters.size()); 
+        vector< shared_ptr<ChunkIterator> > chunkIters(arrayIters.size());
 
         for (size_t i = 0; i < arrayIters.size(); i++)
         {
             arrayIters[i] = array.getIterator(i);
-            chunkIters[i] = 
-                ((MemChunk&)arrayIters[i]->newChunk(coord)).getIterator(query, 
+            chunkIters[i] =
+                ((MemChunk&)arrayIters[i]->newChunk(coord)).getIterator(query,
                                                                         ChunkIterator::SEQUENTIAL_WRITE);
         }
 
@@ -147,8 +150,8 @@ public:
                 {
                     chunkIters[i]->flush();
                     chunkIters[i].reset();
-                    chunkIters[i] = 
-                        ((MemChunk&)arrayIters[i]->newChunk(coord)).getIterator(query, 
+                    chunkIters[i] =
+                        ((MemChunk&)arrayIters[i]->newChunk(coord)).getIterator(query,
                                                                                 ChunkIterator::SEQUENTIAL_WRITE);
                     chunkIters[i]->setPosition(coord);
                 }
@@ -179,10 +182,10 @@ public:
      *
      * @throw SCIDB_SE_INTERNAL::SCIDB_LE_UNITTEST_FAILED
      */
-    void testOnce_SortArray(boost::shared_ptr<Query>& query, 
+    void testOnce_SortArray(boost::shared_ptr<Query>& query,
                             TypeId const& type,
-                            Coordinate start, 
-                            Coordinate end, 
+                            Coordinate start,
+                            Coordinate end,
                             size_t nattrs,
                             bool ascent,
                             uint32_t chunkInterval)
@@ -192,7 +195,7 @@ public:
         const int missingReason = 0;
 
         LOG4CXX_DEBUG(logger, "SortArray UnitTest Attempt [type=" << type << "][start=" << start << "][end=" << end <<
-                      "][nattrs=" << nattrs << "][ascent=" << ascent << "]");                
+                      "][nattrs=" << nattrs << "][ascent=" << ascent << "]");
 
         // Array schema
         vector<AttributeDesc> attributes(nattrs);
@@ -210,13 +213,13 @@ public:
         vector<Key> sortKeys;
         Key k;
         k.columnNo = 0;
-        k.ascent = ascent; 
+        k.ascent = ascent;
         sortKeys.push_back(k);
 
         // Define the array to sort
         shared_ptr<MemArray> arrayInst(new MemArray(schema,query));
         shared_ptr<Array> baseArrayInst = static_pointer_cast<MemArray, Array>(arrayInst);
-        
+
         // Generate source data
         CoordValueMap mapInst;
         Value value;
@@ -244,7 +247,7 @@ public:
             constArrayIter->reset();
             while (!constArrayIter->end())
             {
-                shared_ptr<ConstChunkIterator> constChunkIter = 
+                shared_ptr<ConstChunkIterator> constChunkIter =
                     constArrayIter->getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
                 while (!constChunkIter->end())
                 {
@@ -259,9 +262,9 @@ public:
                         if (tcomp->compare(t1, t2) > 0)
                         {
                             stringstream ss;
-                            
+
                             ss << "elements in attr " << j << " are out of order";
-                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) << 
+                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) <<
                                 "UnitTestSortArray" << ss.str();
                         }
                     }
@@ -272,15 +275,15 @@ public:
             {
                 stringstream ss;
 
-                ss << "wrong # of elements in attr " << j << " expected: " << mapInst.size() << 
+                ss << "wrong # of elements in attr " << j << " expected: " << mapInst.size() <<
                     " got: " << itemCount;
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) << 
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) <<
                     "UnitTestSortArray" << ss.str();
             }
         }
 
         LOG4CXX_DEBUG(logger, "SortArray UnitTest Success [type=" << type << "][start=" << start << "][end=" << end <<
-                      "][nattrs=" << nattrs << "][ascent=" << ascent << "]");                
+                      "][nattrs=" << nattrs << "][ascent=" << ascent << "]");
     }
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)

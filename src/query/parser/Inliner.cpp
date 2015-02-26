@@ -81,8 +81,8 @@ namespace scidb { namespace parser { namespace {
  *                  [[ t ]]
  *
  *              denotes the translation of a term 't' effected by running this
- *              visitor recursively over it.  The [[ ]] are known as 'semantic
- *              brackets'.
+ *              visitor recursively over it.  The [[ ]] are variously known as
+ *              'Oxford', 'Scott', or 'semantic', brackets.
  *
  *              The notation:
  *
@@ -164,7 +164,7 @@ class Inliner : public Visitor
            : _fac(f),
              _log(l),
              _mem("parser::Inliner"),
-             _tbl(newTable()),
+             _tbl(getTable()),
              _nil(Factory(_mem).newNull(location()))
 {}
 
@@ -228,7 +228,7 @@ void Inliner::onApplication(Node*& pn)
 {
     assert(pn!=0 && pn->is(application));                // Validate arguments
 
-    Name* n(pn->get(applicationArgName));                // Fetch the operator
+    Name* n(pn->get(applicationArgOperator));            // Fetch the operator
     nodes o(pn->get(applicationArgOperands)->getList()); // Fetch the operands
 
     visit(o);                                            // Assign oi = [[oi]]
@@ -247,9 +247,13 @@ void Inliner::onApplication(Node*& pn)
             return;                                      // ....leave it alone
         }
 
+        Node* const a = getAlias(pn);                    // ...save any alias
+
         m  = _fac.newCopy(m);                            // ...copy the macro
         pn = m->get(abstractionArgBody);                 // ...take its body
         m  = m->get(abstractionArgBindings);             // ...and its formals
+
+        setAlias(pn,_fac.newCopy(a));                    // ...apply the alias
 
      /* Build the extension n1:=o1 ; .. ; nn:=on of the lexical environment E
         by rebinding copies of 'm's formal parameters in place...*/
@@ -401,19 +405,29 @@ void Inliner::onLet(Node*& pn)
  *  to its binding in the current substitution - if, in fact, it has one - but
  *  leave it alone if it is array-qualified, since the latter must necessarily
  *  refer to a global entity.
+ *
+ *  Notice how we transfer any optional alias that may be associated with this
+ *  reference over to the expression to which the reference refers.
  */
 void Inliner::onReference(Node*& pn)
 {
     assert(pn!=0 && pn->is(reference));                  // Validate arguments
 
-    if (pn->has(referenceArgArrayName))                  // Is name qualified?
+    if (pn->has(referenceArgArray))                      // Is name qualified?
     {
         return;                                          // ...then its global
     }
 
     if (Node* n = getBody(pn->get(referenceArgName)))    // Has local binding?
     {
-        pn = _fac.newCopy(n);                            // ...then replace it
+        n = _fac.newCopy(n);                             // ...reuse the body
+
+        if (const Name* a = pn->get(referenceArgAlias))  // ...was it aliased?
+        {
+            setAlias(n,_fac.newCopy(a));                 // ....transfer alias
+        }
+
+        pn = n;                                          // ...update argument
     }
 }
 
@@ -466,7 +480,9 @@ void Inliner::onModule(Node*& pn)
  */
 Node* Inliner::getBody(const Name* name) const
 {
-    assert(name!=0 && name->is(cstring));                // Validate arguments
+    assert(name!=0 && name->is(variable));               // Validate arguments
+
+    name = name->get(variableArgName);                   // Get variable name
 
     if (const Node* b = _tbl->get(name))                 // Has local binding?
     {

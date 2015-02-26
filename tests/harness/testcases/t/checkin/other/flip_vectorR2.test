@@ -1,7 +1,7 @@
 --setup
-create empty array matrixR2<i:int64>[x=0:9,5,0, y=0:9,5,0]
+create array matrixR2<i:int64>[x=0:9,5,0, y=0:9,5,0]
 CREATE ARRAY vectorR2<x:double, y:double>[i=1:8,4,0]
-load(vectorR2, '../tests/harness/testcases/data/vectorR2.txt')
+load(vectorR2, '${TEST_DATA_DIR}/vectorR2.txt')
 
 --test
 store(redimension(vectorR2, matrixR2), matrixR2)

@@ -28,12 +28,14 @@ import functools
 import sys
 import time
 import os
+import re
 
-# Consume query template.
+# Consume query template
 CONSUME_QUERY = 'consume(<query>)'
 
-# Message that is returned upon successful completion of a consume query.
-SUCCESS_MSG = 'Query was executed successfully'
+# Message contained in case of an Error
+ERROR_MSG = 'Error id:'
+
 
 def loadLibQueries():
     
@@ -134,7 +136,6 @@ def getOpTestQueries(dbq):
          'bernoulli('              + defBuild + ',0.31459,12345)',
          'between('                + defBuild + ',1,1,88,88)',
          defBuild, # simple build command (so, default string is ok)
-         'build_sparse('           + dbq.schema(r=[(0,199)])+ ',1,i=j)',
          'cast('                   + dbq.build(t=['int64'],r=[(0,199)]) + ',' + dbq.schema(a=['attr2'],t=['int64'],d=['i','jj'],r=[(0,199)])+ ')',
          'concat('                 + dbq.build(r=[(0,199)]) + ',' + dbq.build(r=[(0,199)])+ ')',
          'aggregate('              + dbq.build(r=[(0,199)])+ ',count(*))',
@@ -157,7 +158,7 @@ def getOpTestQueries(dbq):
          'lookup(join('            + dbq.build(a=['v1'],d=['i'],r=[(0,3)],i=1) + ',' + dbq.build(a=['v2'],d=['i'],r=[(0,3)],i='i') + '),' + defBuild + ')',
          'materialize('            + defBuild + ',1)',
          'aggregate('              + defBuild + ',max(attr1))',
-         'merge(build_sparse('     + defSchema + ',1,i=j),build_sparse(' + dbq.schema(a=['attr2'])+ ',1,i=0))',
+         'merge(filter(build('     + defSchema + ',1),i=j),filter(build(' + dbq.schema(a=['attr2'])+ ',1),i=0))',
          'aggregate('              + defBuild + ',min(attr1))',
          'mstat()',
          'normalize('              + dbq.build(d=['i']) + ')',
@@ -171,7 +172,6 @@ def getOpTestQueries(dbq):
          'repart('                 + defBuild + ',array_for_repart_test)',
          'reshape('                + dbq.build(r=[(0,9)]) + ',array_for_reshape_test)',
          'reverse('                + defBuild + ')',
-         'sample('                 + defBuild + ',0.33)',
          'save('                   + defBuild + ',\'test1.txt\')',
          'scan(array_for_reshape_test)',
          'setopt(\'mem-array-threshold\')',
@@ -195,14 +195,19 @@ def getOpTestQueries(dbq):
          'xgrid('                  + dbq.build(r=[(0,3)]) + ',2,2)'
          ]
     return OP_TEST_QUERIES
+
+
 # Test case class.
-class igor1TestCase(testCase):
+class myTestCase(testCase):
     #-------------------------------------------------------------------------
     # Constructor:
-    def __init__(self):
-        super(igor1TestCase,self).__init__() # Important: call the superclass constructor.
+    def __init__(self,queries,stopOnError=False):
+        super(myTestCase,self).__init__() # Important: call the superclass constructor.
         self.registerCleaner(ArrayCleaner()) # Register the cleaner class to remove arrays
                                              # created by this test.
+        self.queries = queries
+        self.stopOnError = stopOnError
+
         try:
             dataPath = os.path.join(
                 os.environ['SCIDB_DATA_PATH'],
@@ -238,7 +243,7 @@ class igor1TestCase(testCase):
             endTime = time.time()
             queryTime = time.strftime('%H:%M:%S',time.gmtime(endTime-startTime))
 
-            if ((exitCode != 0) or not (SUCCESS_MSG in stdoutData)):
+            if ((exitCode != 0) or (ERROR_MSG in stderrData) or (ERROR_MSG in stdoutData)):
                 msg =  'Error during query: {0}'.format(q)
                 if (queryException):
                     msg =  'Exception during query: {0}'.format(q)
@@ -270,28 +275,39 @@ class igor1TestCase(testCase):
         # See definition of the class on explanation of parameters.
         dbq = defaultBuildQuery()
         
-        # Execute all of the array creation queries first.
-        self.exitCode = self.runQueries(getArrayCreateQueries(dbq),stopOnError=True)
-        
-        if (self.exitCode != 0):
-            print 'Cannot proceed: array creation queries did not complete successfully!'
-            return
-        
-        # Now, run the main list of consume queries.
-        self.exitCode = self.runQueries([CONSUME_QUERY.replace('<query>',x) for x in getOpTestQueries(dbq)])
-        
-        # Load some libraries.
-        self.exitCode += self.runQueries(loadLibQueries(),stopOnError=True)
+        self.exitCode = self.runQueries(self.queries,self.stopOnError)
 
-        # Run a few extra queries from the additional libraries.
-        self.exitCode += self.runQueries([CONSUME_QUERY.replace('<query>',x) for x in getPluginOpTestQueries(dbq)])
+
+def generateQueries(dType):
+    QUERIES = []
+    stopOnError = False
+    dbq = defaultBuildQuery()
+
+    if dType == 'checkin':
+        QUERIES = getArrayCreateQueries(dbq) + \
+            [CONSUME_QUERY.replace('<query>',x) for x in getOpTestQueries(dbq)]
+        stopOnError = True
+
+    elif dType == 'load_lib':
+        QUERIES = loadLibQueries()
+        stopOnError = True
+
+    elif dType == 'checkin_plugin':
+        QUERIES = [CONSUME_QUERY.replace('<query>',x) for x in getPluginOpTestQueries(dbq)]
+
+    return [QUERIES, stopOnError]
+
 
 #-----------------------------------------------------------------------------
 # Main entry point into the script.
 if __name__ == '__main__':
-    it = igor1TestCase() # Create the test case object
-    it.runTest() # Call the method that wraps the test with setup and cleanup.
+
+    for dType in ['checkin', 'load_lib', 'checkin_plugin']:
+        print '\n\n*** Running "' + dType + '" queries ***\n'
+        it = myTestCase(*generateQueries(dType))
+        it.runTest()
+        if (it.exitCode != 0):
+            print 'Error(s) occurred.'
+            sys.exit(it.exitCode) # Signal to test harness pass or failure.
     print 'All done.'
-    if (it.exitCode != 0):
-        sys.exit(it.exitCode) # Signal to test harness pass or failure.
-    
+

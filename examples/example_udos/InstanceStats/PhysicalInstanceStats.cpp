@@ -52,14 +52,14 @@ public:
         /* Self-explanatory; see LogicalInstanceStats.cpp for more info. */
         size_t chunkCount;
         size_t cellCount;
-        size_t nonNullCount;
-        double sum;
+        size_t minCellsPerChunk;
+        size_t maxCellsPerChunk;
 
         Stats():
             chunkCount(0),
             cellCount(0),
-            nonNullCount(0),
-            sum(0)
+            minCellsPerChunk(std::numeric_limits<size_t>::max()),
+            maxCellsPerChunk(0)
         {}
 
         /**
@@ -80,10 +80,10 @@ public:
             ++ptr;
             cellCount = *ptr;
             ++ptr;
-            nonNullCount = *ptr;
+            minCellsPerChunk = *ptr;
             ++ptr;
-            double* dptr = reinterpret_cast<double*> (ptr);
-            sum = *dptr;
+            maxCellsPerChunk = *ptr;
+            ++ptr;
         }
 
         /**
@@ -98,10 +98,10 @@ public:
             ++ptr;
             *ptr = cellCount;
             ++ptr;
-            *ptr = nonNullCount;
+            *ptr = minCellsPerChunk;
             ++ptr;
-            double* dptr = reinterpret_cast<double*> (ptr);
-            *dptr = sum;
+            *ptr = maxCellsPerChunk;
+            ++ptr;
             return result;
         }
 
@@ -110,7 +110,7 @@ public:
          */
         static size_t getMarshalledSize()
         {
-            return 3*sizeof(size_t) + sizeof(double);
+            return 4*sizeof(size_t);
         }
 
         /**
@@ -121,8 +121,14 @@ public:
         {
             chunkCount += other.chunkCount;
             cellCount += other.cellCount;
-            nonNullCount += other.nonNullCount;
-            sum += other.sum;
+            if (other.minCellsPerChunk < minCellsPerChunk)
+            {
+                minCellsPerChunk = other.minCellsPerChunk;
+            }
+            if (other.maxCellsPerChunk > maxCellsPerChunk)
+            {
+                maxCellsPerChunk = other.maxCellsPerChunk;
+            }
         }
     };
 
@@ -142,13 +148,6 @@ public:
      */
     Stats computeLocalStats(shared_ptr<Array>& inputArray, InstanceStatsSettings const& settings)
     {
-        /*
-         * This flag is passed to the chunk.getConstIterator() method. When reading data from arrays, the option
-         * IGNORE_EMPTY_CELLS must always be set; not providing it may lead to indeterminate results. The option
-         * IGNORE_OVERLAPS will not iterate over the overlap region of the chunk.
-         */
-        int iterationMode = settings.includeOverlaps() ? ChunkIterator::IGNORE_EMPTY_CELLS :
-                                               ChunkIterator::IGNORE_EMPTY_CELLS | ChunkIterator::IGNORE_OVERLAPS;
         Stats result;
 
         /* The ConstArrayIterator allows one to read the array data, one attribute at a time.
@@ -159,42 +158,21 @@ public:
         {
             /* The ConstArrayIterator will iterate once for every chunk in the array, in row-major order */
             ++result.chunkCount;
-
-            /* Get the current chunk and construct a ConstChunkIterator over it */
-            shared_ptr<ConstChunkIterator> chunkIter = arrayIter->getChunk().getConstIterator(iterationMode);
-            while (!chunkIter->end())
+            size_t const cellsInChunk  = arrayIter->getChunk().count();
+            result.cellCount += cellsInChunk;
+            if (cellsInChunk > result.maxCellsPerChunk)
             {
-                /* the ConstChunkIterator will iterate once for every cell in the chunk, in row-major order */
-                ++result.cellCount;
-
-                /* Get the coordinates of the current cell */
-                Coordinates const& position = chunkIter->getPosition();
-
-                /* Get the value of the current cell's attribute 0 */
-                Value const& item = chunkIter->getItem();
-
-                if (settings.dumpDataToLog())
-                {
-                    ostringstream logOutput;
-                    logOutput<<CoordsToStr(position)<<" -> ";
-                    if (item.isNull()) /* covers all the possible SciDB null codes */
-                    {
-                        logOutput<<"NULL";
-                    }
-                    else
-                    {
-                        logOutput<<item.getDouble();
-                    }
-                    LOG4CXX_DEBUG(logger, logOutput.str());
-                }
-                if (!item.isNull())
-                {
-                    ++result.nonNullCount;
-                    result.sum += item.getDouble();
-                }
-                ++(*chunkIter); /* advance chunk iterator */
+                result.maxCellsPerChunk = cellsInChunk;
+            }
+            if (cellsInChunk < result.minCellsPerChunk)
+            {
+                result.minCellsPerChunk = cellsInChunk;
             }
             ++(*arrayIter); /* advance array iterator */
+
+            /* Note: implementations of this function in previous releases had an example of iterating over values
+             * inside a chunk and checking for nulls. See previous versions of the source tree.
+             */
         }
 
         /* Note: both ConstArrayIterator and ConstChunkIterator support a setPosition() method for random-access reading
@@ -222,6 +200,8 @@ public:
          *
          * Note: since there's only one cell to write, SEQUENTIAL_WRITE is not so relevant, though it is faster.
          */
+
+        //chunk count
         shared_ptr<ChunkIterator> outputChunkIter = outputArrayIter->newChunk(position).getIterator(query,
                                                                                        ChunkIterator::SEQUENTIAL_WRITE);
         outputChunkIter->setPosition(position);
@@ -229,6 +209,8 @@ public:
         value.setUint32(stats.chunkCount);
         outputChunkIter->writeItem(value);
         outputChunkIter->flush();
+
+        //cell count
         outputArrayIter = outputArray->getIterator(1);
         outputChunkIter = outputArrayIter->newChunk(position).getIterator(query, ChunkIterator::SEQUENTIAL_WRITE |
                                                                                  ChunkIterator::NO_EMPTY_CHECK);
@@ -236,24 +218,51 @@ public:
         value.setUint64(stats.cellCount);
         outputChunkIter->writeItem(value);
         outputChunkIter->flush();
+
+        //min cells per chunk
         outputArrayIter = outputArray->getIterator(2);
         outputChunkIter = outputArrayIter->newChunk(position).getIterator(query, ChunkIterator::SEQUENTIAL_WRITE |
                                                                                  ChunkIterator::NO_EMPTY_CHECK);
         outputChunkIter->setPosition(position);
-        value.setUint64(stats.nonNullCount);
+        if (stats.cellCount > 0)
+        {
+            value.setUint64(stats.minCellsPerChunk);
+        }
+        else
+        {
+            value.setNull();
+        }
         outputChunkIter->writeItem(value);
         outputChunkIter->flush();
+
+        //max cells per chunk
         outputArrayIter = outputArray->getIterator(3);
         outputChunkIter = outputArrayIter->newChunk(position).getIterator(query, ChunkIterator::SEQUENTIAL_WRITE |
                                                                                  ChunkIterator::NO_EMPTY_CHECK);
         outputChunkIter->setPosition(position);
-        if (stats.nonNullCount > 0)
+        if (stats.cellCount > 0)
         {
-            value.setDouble(stats.sum / stats.nonNullCount);
+            value.setUint64(stats.maxCellsPerChunk);
         }
         else
         {
-            value.setNull(0);
+            value.setNull();
+        }
+        outputChunkIter->writeItem(value);
+        outputChunkIter->flush();
+
+        //avg cells per chunk
+        outputArrayIter = outputArray->getIterator(4);
+        outputChunkIter = outputArrayIter->newChunk(position).getIterator(query, ChunkIterator::SEQUENTIAL_WRITE |
+                                                                                 ChunkIterator::NO_EMPTY_CHECK);
+        outputChunkIter->setPosition(position);
+        if (stats.cellCount > 0)
+        {
+            value.setDouble(stats.cellCount * 1.0 / stats.chunkCount);
+        }
+        else
+        {
+            value.setNull();
         }
         outputChunkIter->writeItem(value);
         outputChunkIter->flush();
@@ -296,7 +305,20 @@ public:
     shared_ptr<Array> execute(vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
         InstanceStatsSettings settings(_parameters, false, query);
-        Stats stats = computeLocalStats(inputArrays[0], settings);
+        shared_ptr<Array> inputArray = inputArrays[0];
+        if ( settings.dumpDataToLog())
+        {
+            /* Most arrays in the system allow the user to iterate over them multiple times, and in arbitrary order.
+             * However, some arrays do not. This function will, if necessary, convert our input array to an object
+             * that does.
+             */
+            inputArray = ensureRandomAccess(inputArray, query);
+
+            /* A useful helper for debugging
+             */
+            dumpArrayToLog(inputArray, logger);
+        }
+        Stats stats = computeLocalStats(inputArray, settings);
         if (settings.global())
         {
             /* Exchange data between instances */
@@ -316,8 +338,6 @@ public:
             /* Just return local stats*/
             return writeStatsToMemArray(stats, query);
         }
-
-
     }
 };
 

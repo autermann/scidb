@@ -86,6 +86,29 @@ void MPIPhysical::setQuery(const boost::shared_ptr<Query>& query)
     _ctx = MpiManager::getInstance()->checkAndSetCtx(query,_ctx);
 }
 
+void MPIPhysical::postSingleExecute(shared_ptr<Query> query)
+{
+    // On a non-participating launcher instance it is difficult
+    // to determine when the launch is complete without a sync point.
+    // postSingleExecute() is run after all instances report success of their execute() phase,
+    // that is effectively a sync point.
+    assert(query->getCoordinatorID() == COORDINATOR_INSTANCE);
+    assert(_mustLaunch);
+    assert(_ctx);
+    const uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
+
+    boost::shared_ptr<MpiLauncher> launcher(_ctx->getLauncher(lastIdInUse));
+    assert(launcher);
+    if (launcher && launcher == _launcher) {
+        LOG4CXX_DEBUG(logger, "MPIPhysical::postSingleExecute: destroying last launcher for launch = " << lastIdInUse);
+        assert(lastIdInUse == _launchId);
+
+        launcher->destroy();
+        _launcher.reset();
+    }
+    _ctx.reset();
+}
+
 bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves)
 {
     LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(query, maxSlaves: " << maxSlaves << ") called.");
@@ -93,44 +116,60 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
     assert(maxSlaves <= query->getInstancesCount());
 
     // This barrier guarantees MPIPhysical::setQuery is called on all instances
-    // before any slaves are launched. It can be removed when we stop serializing MPI queries.
+    // before any slaves are launched.
+    // It also makes sure a non-participating launcher waits for the current launch to finish before starting a new one.
     syncBarrier(0, query);
     syncBarrier(1, query);
 
     _launchId = _ctx->getNextLaunchId(); // bump the launch ID by 1
 
+    Cluster* cluster = Cluster::getInstance();
+    const boost::shared_ptr<const InstanceMembership> membership = cluster->getInstanceMembership();
+    const string& installPath = MpiManager::getInstallPath(membership);
+
+    uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
+    assert(lastIdInUse < _launchId);
+
+    boost::shared_ptr<MpiSlaveProxy> slave;
+
     // check if our logical ID is within the set of instances that will have a corresponding slave
     InstanceID iID = query->getInstanceID();
     if ( iID < maxSlaves) {
-
-        uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
-        assert(lastIdInUse < _launchId);
-
-        Cluster* cluster = Cluster::getInstance();
-        const boost::shared_ptr<const InstanceMembership> membership =
-           cluster->getInstanceMembership();
-        const string& installPath = MpiManager::getInstallPath(membership);
-
-        boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(_launchId, query, installPath));
+        slave = boost::make_shared<MpiSlaveProxy>(_launchId, query, installPath);
         _ctx->setSlave(slave);
+    }
 
-        _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
-        if (_mustLaunch) {
-            _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
-            _ctx->setLauncher(_launcher);
-            std::vector<std::string> args;
-            _launcher->launch(args, membership, maxSlaves);
+    _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
+    if (_mustLaunch) {
+
+        boost::shared_ptr<MpiLauncher> oldLauncher = _ctx->getLauncher(lastIdInUse);
+        if (oldLauncher) {
+            assert(lastIdInUse == oldLauncher->getLaunchId());
+            LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): destroying last launcher for launch = " << lastIdInUse);
+            oldLauncher->destroy();
+            oldLauncher.reset();
         }
+        _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
+        _ctx->setLauncher(_launcher);
+        std::vector<std::string> args;
+        _launcher->launch(args, membership, maxSlaves);
+    }
+
+    if ( iID < maxSlaves) {
+        assert(slave);
 
         //-------------------- Get the handshake
         LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): slave->waitForHandshake() 1 called.");
         slave->waitForHandshake(_ctx);
         LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): slave->waitForHandshake() 1 returned.");
+    }
 
+    if ( iID < maxSlaves || _mustLaunch) {
         // After the handshake the old slave must be gone
         LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves():"
-                               << " lastLaunchIdInUse=" << lastIdInUse
-                               << " launchId=" << _launchId);
+                      << " lastLaunchIdInUse=" << lastIdInUse
+                      << " launchId=" << _launchId);
+
 
         boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(lastIdInUse);
         if (oldSlave) {
@@ -140,6 +179,9 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
             oldSlave.reset();
         }
         _ctx->complete(lastIdInUse);
+    }
+
+    if ( iID < maxSlaves) {
 
         _ipcName = mpi::getIpcName(installPath, cluster->getUuid(), query->getQueryID(),
                                    cluster->getLocalInstanceId(), _launchId);
@@ -147,7 +189,6 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
         LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << " slave started.");
         return true;
     } else {
-        assert(query->getCoordinatorID() != COORDINATOR_INSTANCE);
         LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): instance " << iID << " slave bypass.");
         return false;
     }

@@ -9,17 +9,17 @@ cumulate(A, min(a), y)
 
 store( build(A,x/2.0), A )
 cumulate(A, avg(a), count(a), max(a), min(a), sum(a), stdev(a), var(a) )
-store( build_sparse(A,x/2.0,x+y=3), A )
+store( filter(build(A,x/2.0),x+y=3), A )
 cumulate(A, avg(a), count(a), max(a), min(a), sum(a), stdev(a), var(a) )
 
 store( build(B,x/2.0), B )
 cumulate(B, avg(a), count(a), max(a), min(a), sum(a), stdev(a), var(a) )
-store( build_sparse(B,x/2.0,x+y=3), B )
+store( filter(build(B,x/2.0),x+y=3), B )
 cumulate(B, avg(a), count(a), max(a), min(a), sum(a), stdev(a), var(a) )
 
 store( build(A,x/2.0), A )
 cumulate(A, avg(a), count(a), max(a), min(a), sum(a), stdev(a), var(a), y )
-store( build_sparse(A,x/2.0,x+y=3), A )
+store( filter(build(A,x/2.0),x+y=3), A )
 cumulate(A, avg(a), count(a), max(a), min(a), sum(a), stdev(a), var(a), y )
 
 store( apply(A, b, a+1), C)

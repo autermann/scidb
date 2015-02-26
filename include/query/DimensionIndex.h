@@ -74,7 +74,7 @@ class AttributeComparator
     }
 
   private:
-    FunctionPointer const _less;
+    FunctionPointer _less;
 };
 
 // Set of attribute values.

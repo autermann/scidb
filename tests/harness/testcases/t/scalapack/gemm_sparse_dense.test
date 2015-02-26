@@ -18,7 +18,7 @@ create ARRAY M5x5<a:double> [x=0:4,32,0,y=0:4,32,0]
 store ( build (M5x5_dense, 5*I + J ), M5x5_dense)
 store ( build (M5x5, 5*x + y ), M5x5)
 # diagonal only, 0, 101, 202, 303, 404
-store ( build_sparse(M5x5_Sparse, 1.0*x+100.0*y, x=y), M5x5_Sparse)
+store ( filter(build(M5x5_Sparse, 1.0*x+100.0*y), x=y), M5x5_Sparse)
 
 
 # similar to above block
@@ -27,7 +27,7 @@ CREATE ARRAY M5x5_Sparse_c2<a1: double> [x=0:4,32,0,y=0:4,32,0]
 create array M5x5_c2<a:double> [x=0:4,32,0,y=0:4,32,0]
 store ( build (M5x5_dense_c2, 5*I + J ), M5x5_dense_c2)
 store ( build (M5x5_c2, 5*x + y ), M5x5_c2)
-store ( build_sparse(M5x5_Sparse_c2, 1.0*x+100.0*y, x=y), M5x5_Sparse_c2)
+store ( filter(build(M5x5_Sparse_c2, 1.0*x+100.0*y), x=y), M5x5_Sparse_c2)
 
 # similar to above block, but dimensions not numbered from zero
 # NOTE: the behavior of gemm given arrays that are not numbered
@@ -40,14 +40,14 @@ CREATE ARRAY M4x4_Sparse_nzd<a1: double> [x=1:4,32,0,y=1:4,32,0]
 create array M4x4_nzd<a:double> [x=1:4,32,0,y=1:4,32,0]
 store ( build (M4x4_dense_nzd, 5*I + J ), M4x4_dense_nzd)
 store ( build (M4x4_nzd, 5*x + y ), M4x4_nzd)
-store ( build_sparse(M4x4_Sparse_nzd, 1.0*x+100.0*y, x=y), M4x4_Sparse_nzd)
+store ( filter(build(M4x4_Sparse_nzd, 1.0*x+100.0*y), x=y), M4x4_Sparse_nzd)
 
 
 # rectangular matrices
 CREATE ARRAY M5x2_dense_new<a: double >[I=0:4,32,0,J=0:1,32,0]
 CREATE ARRAY M2x5_Sparse<a1: double> [x=0:1,32,0,y=0:4,32,0]
 store ( build (M5x2_dense_new, 5*I+J ), M5x2_dense_new)
-store ( build_sparse(M2x5_Sparse, 1.0*x+100.0*y, x=y), M2x5_Sparse)
+store ( filter(build(M2x5_Sparse, 1.0*x+100.0*y), x=y), M2x5_Sparse)
 
 --test
 

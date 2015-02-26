@@ -2,7 +2,7 @@
 --aql create array Q<a:string>[i=1:2,2,0]
 
 --test
---aql load Q from '../tests/harness/testcases/data/quotes.txt'
+--aql load Q from '${TEST_DATA_DIR}/quotes.txt'
 --aql select * from Q
 --aql select * from array(Q, '[("fo\"o"), ("bar")]')
 --aql select * from array(Q, '[(\'fo\\'o\'), (\'ba\\'r\')]')

@@ -25,63 +25,96 @@
 import optparse
 import csv
 import cStringIO
+import StringIO as pyStringIO
+import fcntl
 import subprocess
 import signal
 import os
+import re
+import shutil
 import sys
+import tempfile
 import time
 import traceback
 import socket
 import select
 
-#############################
-# Get command line options. #
-#############################
-parser = optparse.OptionParser(description="SciDB Parallel CSV Loader")
-parser.add_option("-d", help="SciDB Coordinator Hostname or IP Address (Default = \"localhost\")", action="store", dest="db_address", default="localhost")
-parser.add_option("-p", help="SciDB Coordinator Port (Default = 1239)", action="store", dest="db_port", type=int, default=1239)
-parser.add_option("-r", help="SciDB Installation Root Folder (Default = \"@CMAKE_INSTALL_PREFIX@\")", action="store", dest="db_root", default="@CMAKE_INSTALL_PREFIX@")
-parser.add_option("-i", help="CSV Input File (Default = stdin)", action="store", dest="input_file")
-parser.add_option("-n", help="# Lines to Skip (Default = 0)", action="store", dest="skip", type=int, default=0)
-parser.add_option("-t", help="CSV Field Types Pattern: N number, S string, s nullable-string, C char (e.g., \"NNsCS\")", action="store", dest="type_pattern")
-parser.add_option("-D", help="Delimiter (Default = \",\")", action="store", dest="delimiter", default=",")
-parser.add_option("-f", help="Starting Coordinate (Default = 0)", action="store", dest="starting_coordinate", type=long, default=0)
-parser.add_option("-c", help="Chunk Size (Default = 500000)", action="store", dest="chunk_size", type=long, default=500000)
-parser.add_option("-o", help="Output File Base Name (Default = INPUT_FILE or \"stdin.csv\")", action="store", dest="output_base")
-parser.add_option("-m", help="Create Intermediate CSV Files (not FIFOs)", action="store_true", dest="use_csv_files")
-parser.add_option("-l", help="Leave Intermediate CSV Files", action="store_true", dest="leave_csv_files")
-parser.add_option("-M", help="Create Intermediate DLF Files (not FIFOs)", action="store_true", dest="use_dlf_files")
-parser.add_option("-L", help="Leave Intermediate DLF Files", action="store_true", dest="leave_dlf_files")
-parser.add_option("-P", help="SSH Port (Default = System Default)", action="store", dest="ssh_port", type=int)
-parser.add_option("-u", help="SSH Username", action="store", dest="ssh_username")
-parser.add_option("-k", help="SSH Key/Identity File", action="store", dest="ssh_keyfile")
-parser.add_option("-b", help="SSH Bypass Strict Host Key Checking", action="store_true", dest="ssh_bypass_key_check")
-parser.add_option("-a", help="Load Array Name", action="store", dest="load_name")
-parser.add_option("-s", help="Load Array Schema", action="store", dest="load_schema")
-parser.add_option("-w", help="Shadow Array Name", action="store", dest="shadow_name")
-parser.add_option("-e", help="# Load Errors Allowed per Instance (Default = 0)", action="store", dest="errors_allowed", type=int, default=0)
-parser.add_option("-x", help="Remove Load and Shadow Arrays Before Loading (if they exist)", action="store_true", dest="remove_load_arrays")
-parser.add_option("-A", help="Target Array Name", action="store", dest="target_name")
-parser.add_option("-S", help="Target Array Schema", action="store", dest="target_schema")
-parser.add_option("-X", help="Remove Target Array Before Loading (if it exists)", action="store_true", dest="remove_target_array")
-parser.add_option("-z", help=optparse.SUPPRESS_HELP, action="store", type="choice", choices=["RSL", "RSI", "IRL", "IRI"], default="RSL", dest="transform")
-parser.add_option("-v", help="Display Verbose Messages", action="store_true", dest="verbose")
-parser.add_option("-V", help="Display SciDB Version Information", action="store_true", dest="show_version")
-parser.add_option("-q", help="Quiet Mode", action="store_true", dest="quiet")
-(opts, args) = parser.parse_args()
+from scidblib import scidb_schema
 
-# Specifying "~/" in path can cause issues. Expanding it out takes care of them.
-if opts.input_file:
-    opts.input_file = os.path.expanduser(opts.input_file)
-if opts.output_base:
-    opts.output_base = os.path.expanduser(opts.output_base)
+####################
+# Module Variables #
+####################
+opts = None
+inputFile = sys.stdin
+childProcesses = []
+instances = []
+outputBase = ""
+dlfFragmentName = ""
+sciDbBinFolder = ""
+hostAddresses = ""
+tmpDir = ""
+runId = ""
+devNull = None
+loadAttrs = []
+loadDims = []
+
+def setupModuleVariables():
+
+    global inputFile, childProcesses, instances, outputBase, dlfFragmentName, \
+        sciDbBinFolder, hostAddresses, tmpDir, runId, devNull
+
+    # Options should have been parsed by now.
+    assert opts is not None
+
+    # Reset to initial values.
+    inputFile = sys.stdin
+    childProcesses = []
+    instances = []
+    outputBase = ""
+    dlfFragmentName = ""
+    sciDbBinFolder = ""
+    hostAddresses = ""
+    if devNull is None:
+        devNull = open('/dev/null', 'rb+')
+
+    # Unique per-run tmpDir and runId let many loadcsv calls all use stdin.
+    parent = opts.temp_dir if opts.temp_dir else '/tmp'
+    prefix = 'loadcsv.'
+    suffix = '.d'
+    tmpDir = tempfile.mkdtemp(suffix=suffix, prefix=prefix, dir=parent)
+    runId = tmpDir[len(os.sep.join((parent, prefix))):-len(suffix)]
+
+    if opts.output_base:
+        # User specified something for the output base file name.
+        if os.path.basename(opts.output_base):
+            # Output file was specified.
+            outputBase = opts.output_base
+        else:
+            # Only an output folder was provided. No filename.
+            if opts.input_file and isinstance(opts.input_file, basestring):
+                outputBase += os.path.basename(opts.input_file)
+            else:
+                outputBase += "stdin.csv"
+    else:
+        # User did not specify an output base file name.
+        if not opts.use_csv_files:
+            outputBase = tmpDir + '/'
+        if opts.input_file and isinstance(opts.input_file, basestring):
+            # Just use the same name as the input file as our base.
+            outputBase += os.path.basename(opts.input_file)
+        else:
+            # Use a generic name (input data is coming from stdin).
+            outputBase += "stdin.csv"
+    dlfFragmentName = '.'.join((os.path.basename(outputBase), runId, "dlf"))
+    sciDbBinFolder = opts.db_root + "/bin/"
+    hostAddresses = getHostAddresses()
 
 ###########
 # flatten #
 ###########
 def flatten(collection):
     result = []
-    for item in collection: 
+    for item in collection:
         if isinstance(item, (tuple, list)):
             result.extend(flatten(item))
         else:
@@ -99,42 +132,6 @@ def getHostAddresses():
         addresses.append(socket.gethostname())
     return addresses
 
-####################
-# Global Variables #
-####################
-dataLoaded = False
-exceptionEncountered = False
-childProcesses = []
-instances = []
-outputBase = ""
-if opts.output_base:
-    # User specified something for the output base file name.
-    if os.path.basename(opts.output_base):
-        # Output file was specified.
-        outputBase = opts.output_base
-    else:
-        # Only an output folder was provided. No filename.
-        if opts.input_file:
-            outputBase += os.path.basename(opts.input_file)
-        else:
-            outputBase += "stdin.csv"
-else:
-    # User did not specify an output base file name.
-    if not opts.use_csv_files:
-        outputBase = "/tmp/"
-    if opts.input_file:
-        # Just use the same name as the input file as our base.
-        outputBase += os.path.basename(opts.input_file)
-    else:
-        # Use a generic name (input data is coming from stdin).
-        outputBase += "stdin.csv"
-
-dlfFragmentName = os.path.basename(outputBase) + ".dlf"
-sciDbBinFolder = opts.db_root + "/bin/"
-hostAddresses = getHostAddresses()
-csvFragmentsCreated = False
-dlfFragmentsCreated = False
-
 ###############
 # showVersion #
 ###############
@@ -151,19 +148,20 @@ def showVersion():
             raise Exception(err)
         print(p.stdout.read());
 
-################
-# setChunkSize #
-################
-def setChunkSize():
-    cs = opts.chunk_size
+#################
+# getLoadSchema #
+#################
+def getLoadSchema():
+    global loadAttrs, loadDims
     if opts.load_schema:
-        logNormal("Parsing chunk size from provided load schema.")
-        cs = long(opts.load_schema.split("[")[1].split(",")[1])
+        loadAttrs, loadDims = scidb_schema.parse(opts.load_schema)
     elif opts.load_name:
-        # Need to query SciDB for the schema.
-        logNormal("Retrieving load array schema from SciDB and parsing it to determine load array chunk size.")
-        cmd = "\"%siquery\" -c %s -p %d -o text -aq \"show(%s)\"" % (sciDbBinFolder, opts.db_address, opts.db_port, opts.load_name)
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, close_fds=True, preexec_fn=os.setsid)
+        # Query SciDB for the schema.
+        logNormal("Retrieving load array schema from SciDB.")
+        cmd = "\"%siquery\" -c %s -p %d -o text -aq \"show(%s)\"" % (
+            sciDbBinFolder, opts.db_address, opts.db_port, opts.load_name)
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                             shell=True, close_fds=True, preexec_fn=os.setsid)
         childProcesses.append(p)
         retVal = p.wait()
         if retVal != 0:
@@ -171,17 +169,59 @@ def setChunkSize():
             if p and p.stderr:
                 err = "%s\n%s" % (err, p.stderr.read())
             raise Exception(err)
-        arrayDef = p.stdout.read()     
-        logVerbose("Result: " + arrayDef.rstrip("\n"))   
-        cs = long(arrayDef.split("[")[2].split(",")[1])
+        arrayDef = p.stdout.read()
+        m = re.search(r'<[^>]+>\s*\[[^\]]+\]', arrayDef)
+        if not m:
+            err = "Schema obtained from load array is corrupt: %s" % arrayDef.rstrip("\n")
+            if p and p.stderr:
+                err = "%s\n%s" % (err, p.stderr.read())
+            raise Exception(err)
+        logVerbose("Result: %s" % m.group(0))
+        loadAttrs, loadDims = scidb_schema.parse(m.group(0))
+
+################
+# setChunkSize #
+################
+def setChunkSize():
+    assert loadAttrs and loadDims
+    assert len(loadDims) == 1
+    cs = loadDims[0].chunk
     if cs != opts.chunk_size:
         logVerbose("Using chunk size of %d for load array based on load array schema definition." % cs)
         opts.chunk_size = cs
 
+##################
+# setTypePattern #
+##################
+def setTypePattern():
+    """Compute a 'type pattern' based on the load schema."""
+    # The only real use of the type pattern is to dictate quoting
+    # behavior.  This behavior should be driven by the load schema,
+    # not by command line arguments---so we override those.
+    logNormal("Computing type-pattern from load schema.")
+    assert loadAttrs and loadDims
+    assert len(loadDims) == 1
+    old_pattern = opts.type_pattern
+    pattern = ''
+    for attr in loadAttrs:
+        if 'string' in attr.type:
+            # Unclear if "nullable vs. not" matters, but don't lose the info.
+            pattern += 's' if attr.nullable else 'S'
+        elif 'char' in attr.type:
+            pattern += 'c' if attr.nullable else 'C'
+        else:
+            pattern += 'N'
+    if old_pattern and pattern != old_pattern:
+        # The only reason for leaving -t (opts.type_pattern) around is
+        # so customer scripts don't have to change.  Ignore it but warn.
+        print "Warning: type pattern %s conflicts with load schema, using %s instead" % (
+            old_pattern, pattern)
+    opts.type_pattern = pattern
+
 #################
 # getSshCommand #
 #################
-# Generic function to construct SSH commands. 
+# Generic function to construct SSH commands.
 def getSshCommand(username, keyfile, host, port, bypass_key_check, command):
     sshCommand = "ssh -c arcfour256 "
     if bypass_key_check:
@@ -258,7 +298,7 @@ def removeDlfFragments(raiseExceptions=True):
         else:
             logNormal("Removing DLF fragment FIFOs.")
 
-        # Start a process to remove the specified DLF fragment file/FIFO on each instance.        
+        # Start a process to remove the specified DLF fragment file/FIFO on each instance.
         tasks = []
         for instance in instances:
             cmd = "rm -f \"%s\"" % instance["dlf_fragment"]
@@ -322,7 +362,7 @@ def removeCsvFragments(raiseExceptions=True):
             logNormal("Removing CSV fragment files.")
         else:
             logNormal("Removing CSV fragmemt FIFOs.")
-        for instance in instances:            
+        for instance in instances:
             try:
                 os.remove(instance["csv_fragment"])
                 logVerbose("\"%s\" removed." % instance["csv_fragment"])
@@ -347,14 +387,43 @@ def createCsvFragments():
 def split():
     logNormal("Starting CSV splitting process.")
 
+    # Need a new pipe if inputFile is in-memory StringIO buffer.
+    stringio_input = isinstance(inputFile, pyStringIO.StringIO)
+    stdin = subprocess.PIPE if stringio_input else inputFile
+
     # Split the input file.
-    cmd = "\"%ssplitcsv\" -n %d -c %d -s %d -o \"%s\"" % (sciDbBinFolder, len(instances), opts.chunk_size, opts.skip, outputBase)
-    logVerbose(cmd)
-    p = subprocess.Popen(cmd, stdin=sys.stdin, stdout=subprocess.PIPE, stderr=sys.stderr, shell=True, close_fds=True, preexec_fn=os.setsid)
+    rawCmd = [ ''.join((sciDbBinFolder, 'splitcsv')),
+               '-n', len(instances),
+               '-c', opts.chunk_size,
+               '-s', opts.skip,
+               '-o', outputBase
+               ]
+    if opts.delimiter:
+        rawCmd.extend(['-d', opts.delimiter])
+    if opts.type_pattern:
+        rawCmd.extend(['-t', opts.type_pattern])
+    if not os.getenv("SCIDB_USE_CSV"):
+        # With the new conversion program, prefer TSV intermediate format.
+        rawCmd.append('--format=tsv')
+    cmd = map(str, rawCmd)
+    logVerbose(' '.join(cmd))
+    p = subprocess.Popen(cmd, stdin=stdin, stdout=devNull,
+                         stderr=sys.stderr, close_fds=True,
+                         preexec_fn=os.setsid)
     childProcesses.append(p)
 
+    # If we made a new pipe, we need to feed it!  (Since stdout above
+    # is /dev/null we need not worry about deadlocks.)
+    if stringio_input:
+        nbytes = 0
+        for line in inputFile:
+            nbytes += len(line)
+            p.stdin.write(line)
+        p.stdin.close()
+        logVerbose("Shoved %d bytes down splitcsv pipe" % nbytes)
+
     # If we are using files, wait until the split is complete.
-    if opts.use_csv_files:        
+    if opts.use_csv_files:
         retCode = p.wait()
         if retCode != 0:
             err = "Failed to split input CSV file."
@@ -367,23 +436,35 @@ def distributeAndConvert():
     logNormal("Starting CSV distribution and conversion processes.")
     tasks = []
     startingCoordinate = opts.starting_coordinate
+    if os.getenv("SCIDB_USE_CSV"):
+        # Old conversion program, if you insist.
+        converter = "csv2scidb"
+        local_delim = opts.delimiter if opts.delimiter else ','
+    else:
+        converter = "tsv2scidb"
+        local_delim = "\\t" # because we used splitcsv --format=tsv option
+    logNormal("Converter is %s" % converter)
     for instance in instances:
-        cmd = "\"%scsv2scidb\"" % sciDbBinFolder
+        cmd = "\"%s%s\"" % (sciDbBinFolder, converter)
         if opts.type_pattern:
             cmd = "%s -p \"%s\"" % (cmd, opts.type_pattern)
-        cmd = "%s -c %d -f %d -n %d -d \"%s\" -o \"%s\"" % (cmd, opts.chunk_size, startingCoordinate, len(instances), opts.delimiter, instance["dlf_fragment"])
+        cmd = "%s -c %d -f %d -n %d -d \"%s\" -o \"%s\"" % (
+            cmd, opts.chunk_size, startingCoordinate, len(instances),
+            local_delim, instance["dlf_fragment"])
         if instance["name"] in hostAddresses:
             pipedCmd = "cat \"%s\" | %s" % (instance["csv_fragment"], cmd)
         else:
-            sshCmd = getSshCommand(opts.ssh_username, opts.ssh_keyfile, instance["name"], opts.ssh_port, opts.ssh_bypass_key_check, cmd)
+            sshCmd = getSshCommand(opts.ssh_username, opts.ssh_keyfile,
+                                   instance["name"], opts.ssh_port, opts.ssh_bypass_key_check, cmd)
             pipedCmd = "cat \"%s\" | %s" % (instance["csv_fragment"], sshCmd)
         logVerbose(pipedCmd)
-        p = subprocess.Popen(pipedCmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr, shell=True, close_fds=True, preexec_fn=os.setsid)
+        p = subprocess.Popen(pipedCmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=sys.stderr, shell=True, close_fds=True, preexec_fn=os.setsid)
         childProcesses.append(p)
         tasks.append({"process": p, "csv_fragment": instance["csv_fragment"]})
         startingCoordinate += opts.chunk_size
     if opts.use_dlf_files:
-        # If we are using files, wait until they are converted. 
+        # If we are using files, wait until they are converted.
         for task in tasks:
             p = task["process"]
             retCode = p.wait()
@@ -455,7 +536,7 @@ def load():
             if opts.transform == "RSL":
                 # redimension_store(load).
                 logNormal("Loading data into \"%s\" array using redimension_store of load (may take a while for large input files)." % opts.target_name)
-                if opts.load_name:            
+                if opts.load_name:
                     # Load array name was provided.
                     loadCmd = "load(%s, '%s', -1, 'text', %d" % (opts.load_name, dlfFragmentName, opts.errors_allowed)
                 else:
@@ -476,11 +557,11 @@ def load():
                     err = "Load failed."
                     if p and p.stderr:
                         err += "\n" + p.stderr.read()
-                    raise Exception(err)            
+                    raise Exception(err)
             elif opts.transform == "RSI":
                 # Using redimension_store(input).
                 logNormal("Loading data into \"%s\" array using redimension_store of input (may take a while for large input files)." % opts.target_name)
-                if opts.load_name:            
+                if opts.load_name:
                     # Load array name was provided.
                     inputCmd = "input(%s, '%s', -1, 'text', %d" % (opts.load_name, dlfFragmentName, opts.errors_allowed)
                 else:
@@ -501,11 +582,11 @@ def load():
                     err = "Load failed."
                     if p and p.stderr:
                         err += "\n" + p.stderr.read()
-                    raise Exception(err)            
+                    raise Exception(err)
             elif opts.transform == "IRL":
                 # insert(redimension(load))
-                logNormal("Loading data into \"%s\" array using insert of redimension of load (may take a while for large input files)." % opts.target_name)            
-                if opts.load_name:            
+                logNormal("Loading data into \"%s\" array using insert of redimension of load (may take a while for large input files)." % opts.target_name)
+                if opts.load_name:
                     # Load array name was provided.
                     loadCmd = "load(%s, '%s', -1, 'text', %d" % (opts.load_name, dlfFragmentName, opts.errors_allowed)
                 else:
@@ -526,11 +607,11 @@ def load():
                     err = "Load failed."
                     if p and p.stderr:
                         err += "\n" + p.stderr.read()
-                    raise Exception(err)            
+                    raise Exception(err)
             elif opts.transform == "IRI":
                 # insert(redimension(input))
-                logNormal("Loading data into \"%s\" array using insert of redimension of input (may take a while for large input files)." % opts.target_name)            
-                if opts.load_name:            
+                logNormal("Loading data into \"%s\" array using insert of redimension of input (may take a while for large input files)." % opts.target_name)
+                if opts.load_name:
                     # Load array name was provided.
                     inputCmd = "input(%s, '%s', -1, 'text', %d" % (opts.load_name, dlfFragmentName, opts.errors_allowed)
                 else:
@@ -551,13 +632,13 @@ def load():
                     err = "Load failed."
                     if p and p.stderr:
                         err += "\n" + p.stderr.read()
-                    raise Exception(err)            
+                    raise Exception(err)
         else:
             raise Exception("When specifying a target array name, a load array name and/or load array schema must also be provided.")
     else:
         if opts.load_name:
             # We are only going to load (no re-dimensioning).
-            logNormal("Loading data into \"%s\" array (may take a while for large input files). 1-D load only since no target array name was provided." % opts.load_name)            
+            logNormal("Loading data into \"%s\" array (may take a while for large input files). 1-D load only since no target array name was provided." % opts.load_name)
             cmd = "\"%siquery\" -c %s -p %d -anq \"load(%s, '%s', -1, 'text', %d" % (sciDbBinFolder, opts.db_address, opts.db_port, opts.load_name, dlfFragmentName, opts.errors_allowed)
             if opts.shadow_name:
                 cmd = "%s, %s)\"" % (cmd, opts.shadow_name)
@@ -571,69 +652,150 @@ def load():
                 err = "Load failed."
                 if p and p.stderr:
                     err = "%s\n%s" % (err, p.stderr.read())
-                raise Exception(err)            
+                raise Exception(err)
 
-#############################
-# Coordinate all operations #
-#############################
-try:
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
+    #############################
+    # Get command line options. #
+    #############################
+
+    # Note that changes here may need to be reflected in
+    # loadpipe.py's DISALLOWED_LOADCSV_OPTIONS list.
+    parser = optparse.OptionParser(description="SciDB Parallel CSV Loader")
+    parser.add_option("-d", help="SciDB Coordinator Hostname or IP Address (Default = \"localhost\")", action="store", dest="db_address", default="localhost")
+    parser.add_option("-p", help="SciDB Coordinator Port (Default = 1239)", action="store", dest="db_port", type=int, default=1239)
+    parser.add_option("-r", help="SciDB Installation Root Folder (Default = \"@CMAKE_INSTALL_PREFIX@\")", action="store", dest="db_root", default="@CMAKE_INSTALL_PREFIX@")
+    parser.add_option("-i", help="CSV Input File (Default = stdin)", action="store", dest="input_file")
+    parser.add_option("-n", help="# Lines to Skip (Default = 0)", action="store", dest="skip", type=int, default=0)
+    parser.add_option("-t", action="store", dest="type_pattern",
+                      help=' '.join(("CSV Field Types Pattern: N number, S string, s nullable-string, C char",
+                                    "(e.g., \"NNsCS\").  Use of this flag is deprecated.")))
+    parser.add_option("-D", help="Delimiter (Default = guessed from input)", action="store", dest="delimiter",
+                      default=None)
+    parser.add_option("-f", help="Starting Coordinate (Default = 0)", action="store", dest="starting_coordinate", type=long, default=0)
+    parser.add_option("-c", help="Chunk Size (Default = 500000)", action="store", dest="chunk_size", type=long, default=500000)
+    parser.add_option("-o", help="Output File Base Name (Default = INPUT_FILE or \"stdin.csv\")", action="store", dest="output_base")
+    parser.add_option("-m", help="Create Intermediate CSV Files (not FIFOs)", action="store_true", dest="use_csv_files")
+    parser.add_option("-l", help="Leave Intermediate CSV Files", action="store_true", dest="leave_csv_files")
+    parser.add_option("-M", help="Create Intermediate DLF Files (not FIFOs)", action="store_true", dest="use_dlf_files")
+    parser.add_option("-L", help="Leave Intermediate DLF Files", action="store_true", dest="leave_dlf_files")
+    parser.add_option("-P", help="SSH Port (Default = System Default)", action="store", dest="ssh_port", type=int)
+    parser.add_option("-u", help="SSH Username", action="store", dest="ssh_username")
+    parser.add_option("-k", help="SSH Key/Identity File", action="store", dest="ssh_keyfile")
+    parser.add_option("-b", help="SSH Bypass Strict Host Key Checking", action="store_true", dest="ssh_bypass_key_check")
+    parser.add_option("-a", help="Load Array Name", action="store", dest="load_name")
+    parser.add_option("-s", help="Load Array Schema", action="store", dest="load_schema")
+    parser.add_option("-w", help="Shadow Array Name", action="store", dest="shadow_name")
+    parser.add_option("-e", help="# Load Errors Allowed per Instance (Default = 0)", action="store", dest="errors_allowed", type=int, default=0)
+    parser.add_option("-x", help="Remove Load and Shadow Arrays Before Loading (if they exist)", action="store_true", dest="remove_load_arrays")
+    parser.add_option("-A", help="Target Array Name", action="store", dest="target_name")
+    parser.add_option("-S", help="Target Array Schema", action="store", dest="target_schema")
+    parser.add_option("-T", help="Directory for temporary files", action="store", dest="temp_dir")
+    parser.add_option("-X", help="Remove Target Array Before Loading (if it exists)", action="store_true", dest="remove_target_array")
+    parser.add_option("-z", help=optparse.SUPPRESS_HELP, action="store", type="choice", choices=["RSL", "RSI", "IRL", "IRI"], default="RSL", dest="transform")
+    parser.add_option("-v", help="Display Verbose Messages", action="store_true", dest="verbose")
+    parser.add_option("-V", help="Display SciDB Version Information", action="store_true", dest="show_version")
+    parser.add_option("-q", help="Quiet Mode", action="store_true", dest="quiet")
+
+    global opts, inputFile
+    (opts, args) = parser.parse_args(argv[1:])
+    setupModuleVariables()
+
+    # Specifying "~/" in path can cause issues. Expanding it out takes care of them.
+    wantClose = False
+    if opts.input_file and isinstance(opts.input_file, basestring):
+        opts.input_file = os.path.expanduser(opts.input_file)
+        wantClose = True
+    if opts.output_base:
+        opts.output_base = os.path.expanduser(opts.output_base)
+
+    #############################
+    # Coordinate all operations #
+    #############################
+    dataLoaded = False
+    exceptionEncountered = False
+    csvFragmentsCreated = False
+    dlfFragmentsCreated = False
+    exitStatus = 0
     try:
-        start = time.time()
-        showVersion()
-        setChunkSize()
-        if opts.input_file:
-            sys.stdin = file(opts.input_file)
-        if select.select([sys.stdin],[],[])[0]:
-            getInstances()
-            createCsvFragments()
-            csvFragmentsCreated = True
-            createDlfFragments()
-            dlfFragmentsCreated = True
-            split()
-            distributeAndConvert()
-            load()
-            dataLoaded = True
+        try:
+            start = time.time()
+            showVersion()
+            getLoadSchema()
+            setChunkSize()
+            setTypePattern()
+            if opts.input_file:
+                if isinstance(opts.input_file, basestring):
+                    inputFile = file(opts.input_file)
+                else:
+                    # It's a StringIO passed from a calling module.
+                    inputFile = opts.input_file
+            if isinstance(inputFile, pyStringIO.StringIO) \
+                    or select.select([inputFile],[],[])[0]:
+                getInstances()
+                createCsvFragments()
+                csvFragmentsCreated = True
+                createDlfFragments()
+                dlfFragmentsCreated = True
+                split()
+                distributeAndConvert()
+                load()
+                dataLoaded = True
+            else:
+                print("Warning: No input data was found.")
+        except Exception, e:
+            exceptionEncountered = True
+            print("\n##### ERROR ##################")
+            print(e)
+            #traceback.print_exc()
+            print("##############################\n")
+    finally:
+        logVerbose("Performing cleanup tasks.", False)
+        if inputFile is not sys.stdin and wantClose:
+            inputFile.close()
+
+        # Kill any child processes that might be running... just in case.
+        for p in childProcesses:
+            retCode = p.poll()
+            if retCode == None:
+                logVerbose("Terminating child process with pid = %d." % p.pid)
+                os.killpg(p.pid, signal.SIGTERM)
+                p.wait()
+
+        # Remove temporary fragment files/FIFOs.
+        if csvFragmentsCreated:
+            removeCsvFragments(False)
+        if dlfFragmentsCreated:
+            removeDlfFragments(False)
+        shutil.rmtree(tmpDir, ignore_errors=True)
+
+        # Calculate total elapsed time.
+        stop = time.time()
+        totalTime = stop - start
+
+        #################
+        # Report Status #
+        #################
+        # Print the total time.
+        printElapsed("Total Elapsed Time", totalTime)
+
+        # Status
+        if exceptionEncountered:
+            logNormal("Failure: Error Encountered.\n")
+            exitStatus = 2
         else:
-            print("Warning: No input data was found.")        
-    except Exception, e:
-        exceptionEncountered = True
-        print("\n##### ERROR ##################")
-        print(e)        
-        #traceback.print_exc()
-        print("##############################\n")
-finally:
-    logVerbose("Performing cleanup tasks.", False)
+            if dataLoaded:
+                logNormal("Success: Data Loaded.\n")
+            else:
+                logNormal("No Data Loaded.\n")
+                exitStatus = 1
 
-    # Kill any child processes that might be running... just in case.
-    for p in childProcesses:
-        retCode = p.poll()
-        if retCode == None:
-            logVerbose("Terminating child process with pid = %d." % p.pid)
-            os.killpg(p.pid, signal.SIGTERM)
-            p.wait()
+    return exitStatus
 
-    # Remove temporary fragment files/FIFOs.
-    if csvFragmentsCreated:
-        removeCsvFragments(False)
 
-    if dlfFragmentsCreated:
-        removeDlfFragments(False)
-
-    # Calculate total elapsed time.
-    stop = time.time()
-    totalTime = stop - start
-
-    #################
-    # Report Status #
-    #################
-    # Print the total time.
-    printElapsed("Total Elapsed Time", totalTime)
-
-    # Status
-    if exceptionEncountered:
-        logNormal("Failure: Error Encountered.\n")
-    else:
-        if dataLoaded:
-            logNormal("Success: Data Loaded.\n")
-        else:
-            logNormal("No Data Loaded.\n")
+if __name__ == '__main__':
+    sys.exit(main())

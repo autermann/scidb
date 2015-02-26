@@ -29,7 +29,7 @@ pushd "$(dirname "$0")"
 script_dir="`pwd`"
 popd
 
-baseurl="http://downloads.paradigm4.com/ubuntu12.04/3rdparty_sources"
+baseurl="https://downloads.paradigm4.com/ubuntu12.04/3rdparty_sources"
 
 echo Preparing dirs
 mkdir -p "${build_dir}" "${source_dir}" "${chroot_result_dir}" || die

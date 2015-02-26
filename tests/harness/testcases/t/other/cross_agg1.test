@@ -13,8 +13,8 @@ scan(a)
 scan(b)
 aggregate(a,sum(x))
 aggregate(a,avg(x))
-# array b is an empty array
-# Note: sum of an empty array is 0 but the average is null.
+# array b is an array
+# Note: sum of an array is 0 but the average is null.
 aggregate(b,sum(x))
 aggregate(b,avg(x))
 cross_join(a,aggregate(a,sum(x)))

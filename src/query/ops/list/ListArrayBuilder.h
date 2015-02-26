@@ -153,9 +153,6 @@ private:
     virtual void addToArray(pair<ChunkDescriptor, bool> const& value);
 
 public:
-    ListChunkDescriptorsArrayBuilder(): ListArrayBuilder < pair<ChunkDescriptor, bool> >() {}
-    virtual ~ListChunkDescriptorsArrayBuilder() {}
-
     /**
      * Get the attributes of the array.
      * @return the attribute descriptors
@@ -231,9 +228,6 @@ private:
     virtual void addToArray(ChunkMapEntry const& value);
 
 public:
-    ListChunkMapArrayBuilder(): ListArrayBuilder <ChunkMapEntry>() {}
-    virtual ~ListChunkMapArrayBuilder() {}
-
     /**
      * Get the attributes of the array
      * @return the attribute descriptors
@@ -322,9 +316,42 @@ private:
     virtual void addToArray(LibraryInformation const& item);
 
 public:
-    ListLibrariesArrayBuilder(): ListArrayBuilder <LibraryInformation>() {}
-    virtual ~ListLibrariesArrayBuilder() {}
+    /**
+     * Get the attributes of the array
+     * @return the attribute descriptors
+     */
+    virtual Attributes getAttributes() const;
+};
 
+/**
+ * A ListArrayBuilder for listing Query objects.
+ */
+class ListQueriesArrayBuilder : public ListArrayBuilder < boost::shared_ptr<Query> >
+{
+private:
+    /**
+     * Verbose names of all the attributes output by list('queries') for internal consistency and dev readability.
+     */
+    enum Attrs
+    {
+    QUERY_ID=0,
+    COORDINATOR,
+    QUERY_STR,
+    CREATION_TIME,
+    ERROR_CODE,
+    ERROR,
+    IDLE,
+    EMPTY_INDICATOR,
+    NUM_ATTRIBUTES // must be last
+    };
+
+    /**
+     * Add information about a Query to the array.
+     * @param item query to add
+     */
+    virtual void addToArray(boost::shared_ptr<Query> const& item);
+
+public:
     /**
      * Get the attributes of the array
      * @return the attribute descriptors

@@ -1,8 +1,8 @@
 --setup
 --aql CREATE  ARRAY delta_timing_small < COL000N: int32 COMPRESSION 'null suppression',COL001C: char COMPRESSION 'null filter',COL002S: string COMPRESSION 'zlib'> [a=0:99,10,0,b=0:1,1,0]
 --aql CREATE  ARRAY nondelta_timing_small <COL000N: int32 COMPRESSION 'bzlib' reserve 0,COL001C: char COMPRESSION 'zlib' reserve 0,COL002S: string reserve 0  > [a=0:99,10,0,b=0:1,1,0]
---aql load delta_timing_small from '../tests/harness/testcases/data/simple01a.txt'
---aql load nondelta_timing_small from '../tests/harness/testcases/data/simple01a.txt'
+--aql load delta_timing_small from '${TEST_DATA_DIR}/simple01a.txt'
+--aql load nondelta_timing_small from '${TEST_DATA_DIR}/simple01a.txt'
 --test
 --start-timer create_delta_1
 --aql update delta_timing_small set COL000N = 99 where COL001C = 'R'

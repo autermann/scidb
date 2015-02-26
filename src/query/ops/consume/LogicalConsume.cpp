@@ -24,13 +24,13 @@
  * LogicalConsume.cpp
  *
  *  Created on: Aug 6, 2013
- *      Author: Fridella
+ *      Author: Tigor, Fridella
  */
 
-#include "query/Operator.h"
-#include "system/SystemCatalog.h"
-#include "system/Exceptions.h"
-#include "array/Metadata.h"
+#include <query/Operator.h>
+#include <system/SystemCatalog.h>
+#include <system/Exceptions.h>
+#include <array/Metadata.h>
 
 using namespace std;
 
@@ -44,7 +44,7 @@ namespace scidb
  *   consume( array [, numAttrsToScanAtOnce] )
  *
  * @par Summary:
- *   Causes array parameter to be materialized if not already.
+ *   Accesses each cell of an input array, if possible, by extracting tiles and iterating over tiles.
  *   numAttrsToScanAtOnce determines the number of attributes to scan as a group.
  *   Setting this value to "1" will result in a "vertical" scan---all chunks of
  *   the current attribute will be scanned before moving on to the next attribute.
@@ -82,6 +82,7 @@ public:
         LogicalOperator(logicalName, alias),
         _numVaryParam(0)
     {
+        _properties.tile = true;
         ADD_PARAM_INPUT()
         ADD_PARAM_VARIES()
     }

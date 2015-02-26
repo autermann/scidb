@@ -96,9 +96,7 @@ class BernoulliArrayIterator : public DelegateArrayIterator
       probability(prob), seed(rndGenSeed), threshold((int)(RAND_MAX*probability)),
       nops(rndGenSeed),
       inputDesc(array.getInputArray()->getArrayDesc()),
-      isPlainArray(inputDesc.getEmptyBitmapAttribute() == NULL 
-                   && (Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT) // NULLs are never ignored WITH NEW CHUNK FORMAT
-                       || !array.getArrayDesc().getAttributes()[attrID].isNullable()))
+      isPlainArray(inputDesc.getEmptyBitmapAttribute() == NULL)
     {
         isNewEmptyIndicator = attrID >= array.getInputArray()->getArrayDesc().getAttributes().size();
         reset();

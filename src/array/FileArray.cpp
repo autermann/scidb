@@ -229,14 +229,7 @@ namespace scidb
 
 shared_ptr<Array> createTmpArray(ArrayDesc const& arr, boost::shared_ptr<Query>& query)
 {
-    if (Config::getInstance()->getOption<bool>(CONFIG_SAVE_RAM))
-    {
-        return shared_ptr<Array>(new FileArray(arr, query));
-    }
-    else
-    {
-        return shared_ptr<Array>(new MemArray(arr, query));
-    }
+  return shared_ptr<Array>(new MemArray(arr, query));
 }
 
 }

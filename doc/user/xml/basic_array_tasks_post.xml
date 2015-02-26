@@ -217,8 +217,8 @@ val_b:double &gt;
     aliases array A to a1 and a2, then uses dot notation to use the attribute
     <code>val_a</code> in two different expressions. <para><programlisting>AQL% <command>SELECT</command> a1.val_a,a2.val_a+2 <command>FROM</command> A <command>AS</command> a1,A <command>AS</command> a2;  </programlisting><screen>[(1,3),(2,4),(3,5),(4,6),(5,7),(6,8),(7,9),(8,10),(9,11),(10,12)]
 </screen> The aliasing rules apply to other join operators as well,
-    including merge, cross, and cross_join. See the section "Aliases" below
-    for more information on aliases.</para></para></para>
+    including merge and cross_join. See the section "Aliases" below for more
+    information on aliases.</para></para></para>
 
     <para><indexterm>
         <primary>AQL</primary>
@@ -352,15 +352,5 @@ j=1:3,3,0]</screen><screen>[
     <code>bernoulli</code> operator to randomly sample data from an array one
     element at a time. The syntax of <code>bernoulli</code> is:
     <programlisting>bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
-
-    <para>The <code>sample</code> command allows you to randomly sample data
-    one array chunk at a time:<programlisting>sample(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting>The
-    probability is a double between 0 and 1. The commands work by generating a
-    random number for each cell or chunk in the array and scaling it to the
-    probability. If the random number is within the probability, the
-    cell/chunk is included. Both commands allow you to produce repeatable
-    results by seeding the random number generator. All calls to the random
-    number generator with the same seed produce the same random number. The
-    seed must be a 64-bit integer.</para>
   </section>
 </chapter>

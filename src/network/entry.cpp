@@ -27,7 +27,6 @@
  *      Author: roman.simakov@gmail.com
  */
 
-// include log4cxx header files.
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
 #include <log4cxx/propertyconfigurator.h>
@@ -46,12 +45,10 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#ifndef __APPLE__
 #include <malloc.h>
-#endif
 #include <fstream>
 
-#include <linear_algebra/blas/initMathLibs.h>
+#include <dense_linear_algebra/blas/initMathLibs.h>
 #include "network/NetworkManager.h"
 #include "system/SciDBConfigOptions.h"
 #include "system/Config.h"
@@ -59,9 +56,9 @@
 #include "util/ThreadPool.h"
 #include "system/Constants.h"
 #include "query/QueryProcessor.h"
-#include "query/executor/SciDBExecutor.h"
 #include "util/PluginManager.h"
 #include "smgr/io/Storage.h"
+#include "query/Parser.h"
 #include <util/InjectedError.h>
 #include <util/Utility.h>
 #include <smgr/io/ReplicationManager.h>
@@ -127,7 +124,7 @@ void runSciDB()
 
    if (cfg->getOption<int>(CONFIG_MAX_MEMORY_LIMIT) > 0)
    {
-       size_t maxMem = ((int64_t) cfg->getOption<int>(CONFIG_MAX_MEMORY_LIMIT)) * 1024 * 1024;
+       size_t maxMem = ((int64_t) cfg->getOption<int>(CONFIG_MAX_MEMORY_LIMIT)) * MiB;
        LOG4CXX_DEBUG(logger, "Capping maximum memory:");
 
        struct rlimit rlim;
@@ -183,8 +180,12 @@ void runSciDB()
    }
 
 #ifndef __APPLE__
-   const int memThreshold = Config::getInstance()->getOption<int>(CONFIG_MEM_ARRAY_THRESHOLD);
-   SharedMemCache::getInstance().setMemThreshold(memThreshold * MB);
+   const size_t memThreshold = Config::getInstance()->getOption<size_t>(CONFIG_MEM_ARRAY_THRESHOLD);
+   std::string memArrayBasePath = cfg->getOption<string>(CONFIG_TMP_PATH);
+
+   memArrayBasePath += "/memarray";
+   SharedMemCache::getInstance().initSharedMemCache(memThreshold * MiB,
+                                                    memArrayBasePath.c_str());
 
    int largeMemLimit = cfg->getOption<int>(CONFIG_LARGE_MEMALLOC_LIMIT);
    if (largeMemLimit>0 && (0==mallopt(M_MMAP_MAX, largeMemLimit))) {
@@ -192,7 +193,7 @@ void runSciDB()
        LOG4CXX_WARN(logger, "Failed to set large-memalloc-limit");
    }
 
-   int smallMemSize = cfg->getOption<int>(CONFIG_SMALL_MEMALLOC_SIZE);
+   size_t smallMemSize = cfg->getOption<size_t>(CONFIG_SMALL_MEMALLOC_SIZE);
    if (smallMemSize>0 && (0==mallopt(M_MMAP_THRESHOLD, smallMemSize))) {
 
        LOG4CXX_WARN(logger, "Failed to set small-memalloc-size");
@@ -227,6 +228,8 @@ void runSciDB()
            catalog->initializeCluster();
        }
 
+       catalog->invalidateTempArrays();
+
        TypeLibrary::registerBuiltInTypes();
 
        FunctionLibrary::getInstance()->registerBuiltInFunctions();
@@ -235,6 +238,8 @@ void runSciDB()
        OperatorLibrary::getInstance();
 
        PluginManager::getInstance()->preLoadLibraries();
+
+       loadPrelude();  // load built in macros
 
        // Pull in the injected error library symbols
        InjectedErrorLibrary::getLibrary()->getError(0);

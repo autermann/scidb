@@ -26,11 +26,10 @@ build(<a:float, b:double default 3.1427, c:string> [x=100:103,4,0], '[(1.2,,x),(
 build(<a:float, b:double default 3.1427, c:string null> [x=100:103,4,0], '[(1.2,,x),(0.2,,y),(3,,z),(,9,)]', true)
 
 build(<a:string> [x=0:2,3,0], '[(2.124),(1.045),(4.98)]', true)
-build(<a:string_20> [x=0:2,3,0], '[(allegory),(repetition),(Onomatopoeia)]', true)
+build(<a:string> [x=0:2,3,0], '[(allegory),(repetition),(Onomatopoeia)]', true)
 
 ### Size specified in string_* shall be actual length of string plus 1
-build(<a:string_11> [x=0:2,3,0], '[(allegory),(repetition),(Onomatopoe)]', true)
---error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "build(<a:string_10> [x=0:2,3,0], '[(allegory),(repetition),(Onomatopoe)]', true)"
+build(<a:string> [x=0:2,3,0], '[(allegory),(repetition),(Onomatopoe)]', true)
 
 
 build(<a:datetime> [x=0:2,3,0], '[("2012-07-13 18:41:14"),("2011-12-13 18:41:14"),("2012-12-13 18:41:14")]', true)

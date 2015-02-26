@@ -21,7 +21,7 @@
 
     <para>SciDB aggregates are functions of several values that produce a
     scalar value. They are used together with the
-    <literal>aggregate</literal>, <literal>redimension_store</literal>, and
+    <literal>aggregate</literal> and
     <literal>redimension</literal> operators to compute data aggregations,
     optionally grouped along a specified dimension or dimensions.</para>
 

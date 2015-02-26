@@ -77,7 +77,7 @@ public:
             _parameters[0])->getExpression(), query, TID_INT64).getInt64();
         try
         {
-            query->getQueryByID(queryID, false, true);
+            query->getQueryByID(queryID, true);
         }
         catch(const Exception& e)
         {

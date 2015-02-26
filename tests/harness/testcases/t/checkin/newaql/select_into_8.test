@@ -1,10 +1,10 @@
 --setup
 --start-query-logging
 create array A <a:int32,b:string> [x=0:2,3,0,y=0:9,2,0]
-create empty array B <c:int32,d:string> [x=0:2,3,0,y=0:9,2,0]
-create empty array C <c:int32,d:string> [x=0:2,1,0,y=0:9,2,0]
-create empty array D <c:int32,d:string> [x=0:2,3,1,y=0:9,3,1]
-create empty array E <c:int32,d:string> [x=0:2,2,1,y=0:9,3,1]
+create array B <c:int32,d:string> [x=0:2,3,0,y=0:9,2,0]
+create array C <c:int32,d:string> [x=0:2,1,0,y=0:9,2,0]
+create array D <c:int32,d:string> [x=0:2,3,1,y=0:9,3,1]
+create array E <c:int32,d:string> [x=0:2,2,1,y=0:9,3,1]
 
 --test
 --aql select * into A from build(<a:int32>[x=0:2,3,0,y=0:9,2,0],x+y+1),build(<a:string>[x=0:2,3,0,y=0:9,2,0],'b_'+string(x+y+1))

@@ -22,12 +22,13 @@
 
 function centos6()
 {
-(echo <<EOF "[scidb3rdparty]
+(cat <<EOF
+[scidb3rdparty]
 name=SciDB 3rdparty repository
-baseurl=http://downloads.paradigm4.com/centos6.3/3rdparty
-gpgkey=http://downloads.paradigm4.com/key
+baseurl=https://downloads.paradigm4.com/centos6.3/3rdparty
+gpgkey=https://downloads.paradigm4.com/key
 gpgcheck=1
-enabled=0"
+enabled=0
 EOF
 ) | tee scidb3rdparty.repo
 REPO_FILE=/etc/yum.repos.d/scidb3rdparty.repo
@@ -37,8 +38,8 @@ yum clean all
 
 function ubuntu1204()
 {
-wget -O- http://downloads.paradigm4.com/key | apt-key add -
-echo "deb http://downloads.paradigm4.com/ ubuntu12.04/3rdparty/" | tee scidb3rdparty.list
+wget -O- https://downloads.paradigm4.com/key | apt-key add -
+echo "deb https://downloads.paradigm4.com/ ubuntu12.04/3rdparty/" | tee scidb3rdparty.list
 REPO_FILE=/etc/apt/sources.list.d/scidb3rdparty.list
 mv scidb3rdparty.list ${REPO_FILE}
 apt-get update

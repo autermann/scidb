@@ -176,7 +176,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 			{
 				tmp.replace (0, found, "");
 //				url = "http://" + cdashclntip + "/" + scidbtestresultsURL + "/" + tmp;
-				url = trac_url + "r/" + tmp + revisionURL;
+				url = trac_url + "t/" + tmp + revisionURL; // Changed the location of the expected files from r/ to t/ (ticket #3663).
 			}
 			else
 				url = trac_url + tmp + revisionURL;

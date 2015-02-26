@@ -85,7 +85,7 @@ private:
     uint64_t _lastResourceCollectorId;
 
     friend class Singleton<Resources>;
-    friend class MessageHandleJob;
+    friend class ServerMessageHandleJob;
 };
 
 }

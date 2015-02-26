@@ -233,8 +233,8 @@
           <para><indexterm>
               <primary>coordinator server</primary>
             </indexterm>In a configuration that has multiple servers, exactly
-          one server functions as the coordinator, and contains the
-          <emphasis>coordinator instance</emphasis>.</para>
+          one server functions as the default coordinator, and contains the
+          default <emphasis>coordinator instance</emphasis>.</para>
         </listitem>
       </varlistentry>
 
@@ -262,10 +262,11 @@
               <secondary>coordinator</secondary>
             </indexterm><indexterm>
               <primary>coordinator instance</primary>
-            </indexterm>A SciDB instance that resides on the coordinator
-          server. There is a single coordinator instance for a SciDB cluster.
-          A coordinator instance coordinates query activity in addition to
-          participating in query execution.</para>
+            </indexterm>A SciDB instance that coordinates activity of a query.
+          There is a single default coordinator instance for a SciDB cluster;
+          it resides on the coordinator server. A coordinator instance
+          coordinates query activity in addition to participating in query
+          execution.</para>
         </listitem>
       </varlistentry>
 
@@ -281,7 +282,7 @@
               <secondary>worker</secondary>
             </indexterm><indexterm>
               <primary>worker instance</primary>
-            </indexterm>A SciDB instance that only participates in query
+            </indexterm>A SciDB instance that participates in query
           execution.</para>
         </listitem>
       </varlistentry>
@@ -304,8 +305,8 @@
         </term>
 
         <listitem>
-          <para>A collection of SciDB instances (one coordinator and zero or
-          more worker instances) form a SciDB cluster.</para>
+          <para>A collection of SciDB instances (one default coordinator and
+          zero or more worker instances) form a SciDB cluster.</para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -340,8 +341,8 @@
     execution and result fetching. It is the responsibility of the coordinator
     instance to mediate all communication between the SciDB external client
     and the entire SciDB cluster. The rest of the system instances are
-    referred to as <emphasis>worker</emphasis> instances and work on behalf of
-    the coordinator for query processing.</para>
+    referred to as <emphasis>worker</emphasis> instances because they work on
+    behalf of the coordinator to process the query.</para>
 
     <para>SciDB's scale-out architecture is ideally suited for hardware grids
     as well as clouds, where additional severs may be added to scale the total
@@ -371,14 +372,16 @@
         <listitem>
           <para>There are two types of instances: <emphasis>coordinator
           instances</emphasis> and <emphasis>worker instances</emphasis>. A
-          cluster has exactly one coordinator instance, and zero or more
-          worker instances.</para>
+          cluster has exactly one default coordinator instance, and zero or
+          more worker instances. For any query, the client can choose any
+          instance to serve as the coordinator (in effect overriding the
+          default coordinator).</para>
         </listitem>
 
         <listitem>
           <para>Note the difference between a server and an instance: the
           server may contain several instances. The server is a computer (or
-          VM), while the instances areLinux processes.</para>
+          VM), while the instances are Linux processes.</para>
         </listitem>
 
         <listitem>
@@ -390,7 +393,7 @@
 
         <listitem>
           <para>Postgres communicates with all of the instances, but only
-          resides on the coordinator.</para>
+          resides on the default coordinator.</para>
         </listitem>
 
         <listitem>
@@ -420,6 +423,16 @@
     analytic operations on very large data sets. SciDB distributes the data
     automatically—you do not need to manage chunk distribution beyond
     specifying chunk size.</para>
+
+    <para>SciDB includes an external utility that can help you choose chunk
+    sizes for your dimensions. To learn about this utility, enter the
+    following command at the linux command line prompt:<programlisting>$ calculate_chunk_length.py --help</programlisting></para>
+
+    <note>
+      <para>To use the chunk-length calculator, your <literal>PATH</literal>
+      environment variable must include the
+      <literal>/opt/scidb/14.7/bin</literal> directory.</para>
+    </note>
 
     <para>Data is split into regular, rectilinear chunks, and distributed
     between instances. In this diagram, we assume a 4-instance cluster, and

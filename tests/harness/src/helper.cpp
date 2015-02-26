@@ -360,14 +360,9 @@ string converttoid (string rootdir, string filename)
     while ((slash = filename.find ('/')) != string::npos)
         filename.replace (slash, 1, ".");
 
-#if (BOOST_FS_VER==2)
-	string file_extension = (bfs::path (filename)).extension();
-#else
-	string file_extension = (bfs::path (filename)).extension().string();
-#endif
-	int file_extensionLength = file_extension.length();
-	filename.replace (filename.find (file_extension), file_extensionLength, "");
-	filename.replace (0, 1, "");
+    // remove '.test' from the end
+    filename = filename.substr (0, filename.find_last_of ("."));
+    filename.replace (0, 1, "");
 
     return filename;
 }
@@ -1049,23 +1044,17 @@ void prepare_filepaths (InfoForExecutor &ie, int internally_called)
 		tmp_testdir = tmp_testdir + "/" + DEFAULT_TEST_CASE_DIR;
 		tmp_resultdir = tmp_resultdir + "/" + DEFAULT_RESULT_DIR;
 
-		/* find "/t/" in ie.tcfile, replace it with "/r/" and also remove all the string after "/r/" */
+		/* find "/t/" in ie.tcfile, replace it with "/r/" */
 		string tmp = ie.tcfile;
 		size_t found = tmp.find (tmp_testdir);
 		int len = tmp_testdir.length ();
 		tmp.replace (found, len, tmp_resultdir); /* here it will be ...../r/1.test */
 
-		ie.expected_rfile = tmp;
+		ie.expected_rfile = ie.tcfile; // Expected files are now in the same location as test files.
 		ie.actual_rfile = tmp;
 		ie.timerfile = tmp;
 		ie.diff_file = tmp;
 		ie.log_file = tmp;
-
-		/* create result directory for newly added tests */
-		boost::filesystem::path p(tmp);
-		boost::filesystem::path dir = p.parent_path();
-		if (!exists(dir))
-			boost::filesystem::create_directories(dir);
 	}
 	else
 	{

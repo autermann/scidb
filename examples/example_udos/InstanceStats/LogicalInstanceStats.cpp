@@ -32,45 +32,40 @@
  *
  * @par Synopsis: instance_stats( input_array
  *                                [,'log=true/false']
- *                                [,'include_overlap=true/false']
  *                                [,'global=true/false'] )
  *
  * @par Examples:
  *   <br> instance_stats (my_array, 'log=true', 'global=true')
- *   <br> instance_stats (project(big_array, double_attribute), 'include_overlap=true', 'log=true')
+ *   <br> instance_stats (project(big_array, double_attribute), 'log=true')
  *
  * @par Summary:
  *   <br>
- *   The input array must have one double attribute and any number of dimensions. There are 3 optional string "flag"
- *   parameters: log, include_overlap and global. They are all set to false by default. If log is true, all the
- *   local data from the input array is saved to scidb.log on each instance. If include_overlap is true, the operator
- *   will include data from the array overlaps into the calculation, otherwise overlaps are ignored. If global is true,
+ *   There are 2 optional string "flag" parameters: log, and global. They are all set to false by default.
+ *   If log is true, all the  local data from the input array is saved to scidb.log on each instance. If global is true,
  *   the operator returns a single summary for the entire array. Else, it returns a per-instance summary of the data
  *   located on each instance.
+ *
+ *   Note: if the array has overlaps, the result may or may not include overlaps - an inconsistency in the count()
+ *   function that ought to be addressed soon.
  *
  * @par Input: array <attribute:double> [*]
  *
  * @par Output array:
  *   <br> If global is true:
  *   <br> <
- *   <br>   num_chunks: uint32          --the total number of chunks in the array
- *   <br>   num_cells: uint64           --the total number of cells in the array
- *   <br>   num_non_null_cells: uint64  --the total number of cells that are not null
- *   <br>   average_value: double       --the average value of all the cells (null if none)
+ *   <br>   num_chunks: uint64          --the total number of chunks in the array
+ *   <br>   num_cells:  uint64          --the total number of cells in the array
+ *   <br>   min_cells_per_chunk: uint64 --the number of cells in the smallest chunk (null if num_cells is 0)
+ *   <br>   max_cells_per_chunk: uint64 --the number of cells in the largest chunk (null if num_cells is 0)
+ *   <br>   avg_cells_per_chunk: double --num_cells divided by num_chunks (null if num_cells is 0)
  *   <br> >
  *   <br> [
  *   <br>   i = 0:0,1,0                 --single cell
  *   <br> ]
  *   <br>
- *   <br> If global is false:
- *   <br> <
- *   <br>   num_chunks: uint32          --the total number of chunks on this instance
- *   <br>   num_cells: uint64           --the total number of cells on this instance
- *   <br>   num_non_null_cells: uint64  --the total number of cells that are not null on this instance
- *   <br>   average_value: double       --the average value of all the cells on this instance (null if none)
- *   <br> >
+ *   <br> If global is false the values returned are per-instance and the dimension is:
  *   <br> [
- *   <br>   instance_no = 0:INSTANCE_COUNT,1,0  --one cell per instance
+ *   <br>   instance_no = 0:INSTANCE_COUNT-1,1,0  --one cell per instance
  *   <br> ]
  *
  * The code assumes familiarity with the concepts described in hello_instances. Consider reading that operator first if
@@ -105,7 +100,7 @@ public:
      * @param schemas the shapes of the input arrays
      * @return the list of possible types of the next parameters
      */
-    vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const& schemas)
+    vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const&)
     {
         /* A list of all possble things that the next parameter could be. */
         vector<shared_ptr<OperatorParamPlaceholder> > res;
@@ -124,38 +119,19 @@ public:
     /**
      * @note all the parameters are assembled in the _parameters member variable
      */
-    ArrayDesc inferSchema(vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc>, shared_ptr< Query> query)
     {
-        ArrayDesc const& inputSchema = schemas[0];
-
-        /* Throw an error if the input array schema does not match our needs.
-         * This error will cleanly abort the entire query. Throwing it here is useful as query execution has not yet
-         * begun. The error code system uses a short code, followed by a long code, followed by a human-readable error
-         * description. The codes are numeric values created to facilitate error recognition by client software. Many
-         * error codes are available and new error codes may be added from plugins.
-         *
-         * The call to getAttributes(true) excludes the empty tag if any.
-         */
-        if (inputSchema.getAttributes(true).size() != 1 ||
-            inputSchema.getAttributes(true)[0].getType() != TID_DOUBLE)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ILLEGAL_OPERATION)
-                  << "Operator instance_stats accepts an array with a single attribute of type double";
-        }
-
         /* Construct the settings object that parses and validates the other parameters. */
         InstanceStatsSettings settings (_parameters, true, query);
 
-        /* Make the output schema based on the parameters. Here we illustrate the potential flexibility of operator
-         * behavior, based on arguments.
+        /* Make the output schema.
          */
         Attributes outputAttributes;
-
-        /* Note: attribute 3 may contain null values */
-        outputAttributes.push_back( AttributeDesc(0, "num_chunks", TID_UINT32, 0, 0));
-        outputAttributes.push_back( AttributeDesc(1, "num_cells", TID_UINT64, 0, 0));
-        outputAttributes.push_back( AttributeDesc(2, "num_non_null_cells", TID_UINT64, 0, 0));
-        outputAttributes.push_back( AttributeDesc(3, "average_value", TID_DOUBLE, AttributeDesc::IS_NULLABLE, 0));
+        outputAttributes.push_back( AttributeDesc(0, "num_chunks", TID_UINT64, 0, 0));
+        outputAttributes.push_back( AttributeDesc(1, "num_cells",  TID_UINT64, 0, 0));
+        outputAttributes.push_back( AttributeDesc(2, "min_cells_per_chunk", TID_UINT64, AttributeDesc::IS_NULLABLE, 0));
+        outputAttributes.push_back( AttributeDesc(3, "max_cells_per_chunk", TID_UINT64, AttributeDesc::IS_NULLABLE, 0));
+        outputAttributes.push_back( AttributeDesc(4, "avg_cells_per_chunk", TID_DOUBLE, AttributeDesc::IS_NULLABLE, 0));
         outputAttributes = addEmptyTagAttribute(outputAttributes);
         Dimensions outputDimensions;
         if(settings.global())

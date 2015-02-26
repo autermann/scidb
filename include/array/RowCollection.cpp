@@ -161,11 +161,11 @@ template<class Group, class Hash>
 RowCollection<Group,Hash>::RowCollection(boost::shared_ptr<Query> const& query, const string& name, const Attributes& attributes, size_t chunkSize)
 : _query(query), _attributes(attributes), _chunkSize(chunkSize), _sizeBuffered(0), _mode(RowCollectionModeAppend)
 {
-    assert(attributes.size() >= 1);
+    assert(!attributes.empty());
     assert(chunkSize >= 2);
 
     // Use (CONFIG_MEM_ARRAY_THRESHOLD / 10) as the #bytes the unflushed items may have.
-    _maxSizeBuffered = static_cast<size_t>(Config::getInstance()->getOption<int>(CONFIG_MEM_ARRAY_THRESHOLD)) * MB / 10;
+    _maxSizeBuffered = Config::getInstance()->getOption<size_t>(CONFIG_MEM_ARRAY_THRESHOLD) * MiB / 10;
 
     // Push the empty tag
     Attributes attributesWithET(attributes);
@@ -176,7 +176,7 @@ RowCollection<Group,Hash>::RowCollection(boost::shared_ptr<Query> const& query, 
     Dimensions dims(2);
     dims[0] = DimensionDesc("Row", 0, MAX_COORDINATE, 1, 0);
     dims[1] = DimensionDesc("Column", 0, MAX_COORDINATE, _chunkSize, 0);
-    ArrayDesc schema(name, attributesWithET, dims, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY);
+    ArrayDesc schema(name, attributesWithET, dims);
 
     // create a MemArray
     _theArray = make_shared<MemArray>(schema,query);
@@ -235,9 +235,9 @@ template<class Group, class Hash>
 void RowCollection<Group,Hash>::getWholeRow(size_t rowId, Items& items, bool separateNull, uint32_t attrId, Items* pNullItems) {
     assert(_mode==RowCollectionModeRead);
     assert(separateNull || (pNullItems==NULL));
-    assert(items.size()==0);
+    assert(items.empty());
     if (pNullItems!=NULL) {
-        assert(pNullItems->size()==0);
+        assert(pNullItems->empty());
     }
 
     boost::scoped_ptr<MyRowIterator> rowIterator(openRow(rowId));

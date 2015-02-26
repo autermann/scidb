@@ -32,15 +32,15 @@
 
 #include <deque>
 #include <map>
-#include "stdint.h"
-#include "boost/asio.hpp"
-#include "boost/enable_shared_from_this.hpp"
+#include <stdint.h>
+#include <boost/asio.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
-#include "util/Mutex.h"
-#include "array/Metadata.h"
-#include "network/proto/scidb_msg.pb.h"
-#include "network/BaseConnection.h"
-#include "network/NetworkManager.h"
+#include <util/Mutex.h>
+#include <array/Metadata.h>
+#include <network/proto/scidb_msg.pb.h>
+#include <network/BaseConnection.h>
+#include <network/NetworkManager.h>
 
 namespace scidb
 {
@@ -245,7 +245,7 @@ namespace scidb
             {
                 return _remoteGenId;
             }
-            
+
             /// Abort enqued messages and their queries
             void abortMessages();
             void swap(MultiChannelQueue& other);
@@ -272,7 +272,7 @@ namespace scidb
                 const uint64_t billion = 1000000000;
 #ifdef __APPLE__
                 struct timeval tv;
-                if (gettimeofday(&tv, NULL) == -1) { 
+                if (gettimeofday(&tv, NULL) == -1) {
                     assert(false);
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
                 }

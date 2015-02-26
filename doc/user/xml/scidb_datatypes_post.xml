@@ -401,31 +401,34 @@
         <para><programlisting>AFL% create array datetime1 &lt;dt:datetime&gt;[i=0:*,100,0];  </programlisting><programlisting>AFL% create array datetime2 &lt;dtz:datetimetz&gt;[i=0:*,100,0];  </programlisting></para></step>
 
       <step>
-        <para>Load array <literal>datetime1</literal> with values in the
-        SciDB-formatted file, <emphasis role="bold">dates</emphasis>:</para>
+        <para><indexterm>
+            <primary>SciDB-formatted text file example</primary>
+          </indexterm>Load array <literal>datetime1</literal> with values in
+        the SciDB-formatted file, <emphasis role="bold">dates</emphasis>:</para>
 
         <programlisting>$ cat dates</programlisting>
 
-        <para><screen>[
- ("11/25/2009 16:11:19"),
- ("25.11.2009 16:11:19"),
- ("2009-11-25 16:11:19.7612"),
- ("2009-11-25 16.11.19.76"),
- ("2009-11-25 16.11.19"),
- ("2009-11-25 16:11:19"),
- ("11/25/2009 16:11"),
- ("25.11.2009 16:11"),
- ("2009-11-25 16:11"),
- ("25Nov2009:16:11:19"),
- ("25-Nov-2009 4.11.19 PM"),
- ("25-Nov-2009 4.11.19 AM"),
- ("2009-11-25"),
- ("11/25/2009"),
- ("25.11.2009"),
-]
-</screen><programlisting>%AFL load(datetime1,'./dates');</programlisting>
+        <programlisting>[
+("11/25/2009 16:11:19"),
+("25.11.2009 16:11:19"),
+("2009-11-25 16:11:19.7612"),
+("2009-11-25 16.11.19.76"),
+("2009-11-25 16.11.19"),
+("2009-11-25 16:11:19"),
+("11/25/2009 16:11"),
+("25.11.2009 16:11"),
+("2009-11-25 16:11"),
+("25Nov2009:16:11:19"),
+("25-Nov-2009 4.11.19 PM"),
+("25-Nov-2009 4.11.19 AM"),
+("2009-11-25"),
+("11/25/2009"),
+("25.11.2009"),
+]</programlisting>
 
-        <para><screen>i,dt
+        <programlisting>%AFL load(datetime1,'./dates');</programlisting>
+
+        <programlisting>i,dt
 0,'2009-11-25 16:11:19'
 1,'2009-11-25 16:11:19'
 2,'2009-11-25 16:11:19'
@@ -440,30 +443,28 @@
 11,'2009-11-25 04:11:19'
 12,'2009-11-25 00:00:00'
 13,'2009-11-25 00:00:00'
-14,'2009-11-25 00:00:00'
-</screen></para></para></step>
+14,'2009-11-25 00:00:00'</programlisting>
+      </step>
 
       <step>
         <para>Load array <literal>datetime2</literal> with values in the
         SciDB-formatted file, <emphasis role="bold">dates_TZ</emphasis>
-        (containing date/time values with offsets):<programlisting>$ cat dates_TZ</programlisting><para><screen>[
- ("11/25/2009 16:11:19 +10:01"),
- ("25.11.2009 16:11:19 +09:02"),
- ("2009-11-25 16:11:19.76 +08:03"),
- ("2009-11-25 16.11.19.76 +07:04"),
- ("2009-11-25 16.11.19 +06:05"),
- ("2009-11-25 16:11:19 +05:06"),
- ("25-Nov-2009 4.11.19 PM +00:11")
-]
-</screen><programlisting>%AFL load(datetime1,'./dates_TZ');</programlisting><para><screen>i,dtz
+        (containing date/time values with offsets):<programlisting>$ cat dates_TZ</programlisting><programlisting>[
+("11/25/2009 16:11:19 +10:01"),
+("25.11.2009 16:11:19 +09:02"),
+("2009-11-25 16:11:19.76 +08:03"),
+("2009-11-25 16.11.19.76 +07:04"),
+("2009-11-25 16.11.19 +06:05"),
+("2009-11-25 16:11:19 +05:06"),
+("25-Nov-2009 4.11.19 PM +00:11")
+]</programlisting><programlisting>%AFL load(datetime1,'./dates_TZ');</programlisting><programlisting>i,dtz
 0,'2009-11-25 16:11:19 +10:01'
 1,'2009-11-25 16:11:19 +09:02'
 2,'2009-11-25 16:11:19 +08:03'
 3,'2009-11-25 16:11:19 +07:04'
 4,'2009-11-25 16:11:19 +06:05'
 5,'2009-11-25 16:11:19 +05:06'
-6,'2009-11-25 16:11:19 +00:11'
-</screen></para></para></para>
+6,'2009-11-25 16:11:19 +00:11'</programlisting> </para>
       </step>
     </procedure>
   </section>
@@ -780,9 +781,9 @@
     between the datetime data type and the datetime with timezone, datetimetz
     data type. The date time with time zone data type, datetimetz, uses a
     timezone offset relative to GMT. You can cast datetime to datetimetz by
-    appending an offset using the following example: <para><programlisting>AFL% create array T&lt;td: datetime&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(build(T, now()), T);  </programlisting><screen>[('2014-03-25 16:43:32')]
+    appending an offset using the following example: <para><programlisting>AFL% create array T&lt;td: datetime&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(build(T, now()), T);  </programlisting><screen>[('2014-07-21 22:15:11')]
 </screen><programlisting>AFL% apply(T, dst, append_offset(td, 3600));  </programlisting><screen>{i} td,dst
-{0} '2014-03-25 16:43:32','2014-03-25 16:43:32 +01:00'
+{0} '2014-07-21 22:15:11','2014-07-21 22:15:11 +01:00'
 </screen></para></para>
 
     <para>To append an offset and apply it to the time, use the
@@ -790,15 +791,15 @@
     datetime by subtracting the offset timezone value, and stores the result
     as datetimetz including the offset timezone value. The offset must be
     expressed in seconds. <para><programlisting>AFL% create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(project(apply(T,dst,apply_offset(td,3600)),dst),T1);  </programlisting><screen>{i} t
-{0} '2014-03-25 17:43:32 +01:00'
+{0} '2014-07-21 23:15:11 +01:00'
 </screen>
     To return the datetime portion of a datetimetz value, use the
     <code>strip_offset </code>function: <para><programlisting>AFL% apply(T1,dst,strip_offset(t));  </programlisting><screen>{i} t,dst
-{0} '2014-03-25 17:43:32 +01:00','2014-03-25 17:43:32'
+{0} '2014-07-21 23:15:11 +01:00','2014-07-21 23:15:11'
 </screen>
     To apply the offset to the datetime and return a GMT datetime, use the
     <code>togmt</code> function: <para><programlisting>AFL% apply(T1,dst,togmt(t))  </programlisting><screen>{i} t,dst
-{0} '2014-03-25 17:43:32 +01:00','2014-03-25 16:43:32'
+{0} '2014-07-21 23:15:11 +01:00','2014-07-21 22:15:11'
 </screen></para></para></para></para>
 
     <para>For more details on the SciDB temporal functions, see <xref linkend="temporalFunctions"/>.</para>

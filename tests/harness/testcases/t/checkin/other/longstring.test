@@ -1,7 +1,7 @@
 --setup
 
-CREATE EMPTY ARRAY LongString < I : int64, J : int64, V : double NULL, W : string > [ Line=0:*,6,0 ]
-load ( LongString, '../tests/harness/testcases/data/longstring.txt')
+CREATE array LongString < I : int64, J : int64, V : double NULL, W : string > [ Line=0:*,6,0 ]
+load ( LongString, '${TEST_DATA_DIR}/longstring.txt')
 
 --test
 --start-query-logging

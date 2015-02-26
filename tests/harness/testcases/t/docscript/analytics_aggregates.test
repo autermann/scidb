@@ -100,9 +100,7 @@ remove(winners)
 rename(Farquar,winners)  
 --stop-igdata
 show(winners)
---set-format lcsv+
 scan(winners) 
---set-format dcsv
 --start-igdata
 CREATE ARRAY perCountryMedalCount <country:string, medalCount: uint64 null> [country_id=0:*,20,0]  
 --stop-igdata

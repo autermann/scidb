@@ -114,7 +114,8 @@ namespace scidb
                     dst->setVectorMode(vectorMode);
                     size_t count = 0;
                     while (!src->end()) {
-                        if (dst->setPosition(src->getPosition())) {
+                        const Coordinates& srcPos = src->getPosition();
+                        if (dst->setPosition(srcPos)) {
                             Value& v = src->getItem();
                             dst->writeItem(v);
                             count += 1;

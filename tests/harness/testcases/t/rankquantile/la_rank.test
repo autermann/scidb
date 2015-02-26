@@ -1,6 +1,6 @@
 --setup
-create empty array teeth <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
-load( teeth, '../tests/harness/testcases/data/teeth.txt', 0)
+create array teeth <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
+load( teeth, '${TEST_DATA_DIR}/teeth.txt', 0)
 
 --test
 rank(teeth)

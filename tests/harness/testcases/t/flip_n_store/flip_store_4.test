@@ -1,10 +1,10 @@
 --setup
 --start-query-logging
 create array A <a:int64> [x=0:2,3,0]
-create empty array B <x:int64> [a=0:14,3,0]
-create empty array D <a:int64> [x=0:2,3,0]
+create array B <x:int64> [a=0:14,3,0]
+create array D <a:int64> [x=0:2,3,0]
 store(build(A,x+10),A)
-store(build_sparse(D,x+5,x<>1),D)
+store(filter(build(D,x+5),x<>1),D)
 store(B,C)
 
 --test

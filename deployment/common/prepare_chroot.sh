@@ -48,14 +48,31 @@ echo "Cmnd_Alias RMSCIDB_PACKAGING = /bin/rm -rf /tmp/scidb_packaging.*" >> ${CH
 echo "${username} ALL = NOPASSWD:/usr/sbin/pbuilder, NOPASSWD:/bin/which, NOPASSWD:RMSCIDB_PACKAGING" >> ${CHROOT_SUDOERS}
 chmod a-wx,o-r,ug+r ${CHROOT_SUDOERS}
 }
+#
+# Need to add apt-get install apt-transport-https
+# before the othermirror (https://downloads.paradigm4.com)
+# is loaded.
+#
+# This creates a pbuilder --create hook that loads the https transport into apt-get.
+# It will be found by pbuilder because the flag "--hookdir /var/cache/pbuilder/hook.d"
+# has been added to the class UbuntuChroot(): init function in utils/chroot_build.py
+#
+function pbuilder_apt-transport-https ()
+{
+    mkdir -p /var/cache/pbuilder/hook.d/
+    echo "#!/bin/sh" > /var/cache/pbuilder/hook.d/G01https
+    echo "apt-get install -y apt-transport-https" >> /var/cache/pbuilder/hook.d/G01https
+    echo "apt-get install -y ca-certificates" >> /var/cache/pbuilder/hook.d/G01https
+    chmod 555 /var/cache/pbuilder/hook.d/G01https
+}
 
 function ubuntu1204 ()
 {
 apt-get update
-apt-get install -y build-essential dpkg-dev pbuilder debhelper m4 cdbs quilt
+apt-get install -y build-essential dpkg-dev pbuilder debhelper m4 cdbs quilt apt-transport-https
 chroot_sudoers_pbuilder
+pbuilder_apt-transport-https
 }
-
 
 function redhat63 ()
 {

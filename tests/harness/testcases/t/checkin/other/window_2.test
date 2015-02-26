@@ -2,15 +2,15 @@
 #
 # even division of array length, chunk length and overlap 
 create array win1<x:double>[i=1:30,10,5, j=1:30,10,5]
-store ( build_sparse ( win1, 1.0, ((i*30+j) * 15485863) % 7 = 0), win1)
+store ( filter(build( win1, 1.0), ((i*30+j) * 15485863) % 7 = 0), win1)
 #
 # array length and chunk length co-prime, overlaps divides chunk length
 create array win2<x:double>[i=1:31,10,5, j=1:31,10,5]
-store ( build_sparse ( win2, 1.0, ((i*31+j) * 15485863) % 7 = 0), win2)
+store ( filter(build( win2, 1.0), ((i*31+j) * 15485863) % 7 = 0), win2)
 #
 # array length, chunk length and overlaps all co-prime 
 create array win3<x:double>[i=1:61,17,7, j=1:61,17,7]
-store ( build_sparse ( win3, 1.0, ((i*36+j) * 15485863) % 7 = 0), win3)
+store ( filter(build( win3, 1.0), ((i*36+j) * 15485863) % 7 = 0), win3)
 
 --test
 

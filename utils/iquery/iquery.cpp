@@ -58,7 +58,7 @@
 #include "system/Exceptions.h"
 #include "system/ErrorCodes.h"
 #include "system/Config.h"
-#include "smgr/io/DBLoader.h"
+#include "smgr/io/ArrayWriter.h"
 #include "util/PluginManager.h"
 
 #include "iquery_parser.h"
@@ -204,7 +204,10 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
                 cout << "Result size (bytes): " << totalSize;
                 if (numCells)
                 {
-                    cout<< " chunks: " << numChunks << " cells: "<<numCells<<" cells/chunk: "<<(double) numCells / numChunks << endl;
+                    cout<< " chunks: " << numChunks
+                        << " cells: " << numCells
+                        << " cells/chunk: "
+                        << static_cast<double>(numCells) / numChunks << endl;
                 }
                 else
                 {
@@ -214,12 +217,13 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
         }
         else
         {
-            scidb::DBLoader::defaultPrecision = cfg->getOption<int>(CONFIG_PRECISION);
+            scidb::ArrayWriter::setPrecision(cfg->getOption<int>(CONFIG_PRECISION));
 
             boost::shared_ptr<scidb::Query> emptyQuery; //query is not validated on the client side
-            scidb::DBLoader::save(*queryResult.array, cfg->getOption<string>(CONFIG_RESULT_FILE),
-                                  emptyQuery,
-                                  format, !iqueryState.firstSaving);
+            scidb::ArrayWriter::save(*queryResult.array,
+                                     cfg->getOption<string>(CONFIG_RESULT_FILE),
+                                     emptyQuery,
+                                     format, !iqueryState.firstSaving);
             iqueryState.firstSaving = false;
         }
 
@@ -282,155 +286,164 @@ void executeSciDBQuery(const string &queryString)
 void executeCommandOrQuery(const string &query)
 {
     string trimmedQuery = query;
-	boost::trim(trimmedQuery);
-	if (trimmedQuery == "" || (trimmedQuery.size() >= 2 && trimmedQuery[0] == '-'
-                               && trimmedQuery[1] == '-' &&  trimmedQuery.find('\n') == string::npos))
+    boost::trim(trimmedQuery);
+    if (trimmedQuery == ""
+        || (trimmedQuery.size() >= 2
+            && trimmedQuery[0] == '-'
+            && trimmedQuery[1] == '-'
+            &&  trimmedQuery.find('\n') == string::npos))
     {
-		return;
+        return;
     }
 
-	try
-	{
-	    IqueryParser p;
-	    // Trying to parse command with iquery's parser
-	    if (p.parse(query))
-	    {
-	        // We got error. Possible it was iquery command with wrong syntax?
-	        if (!p.isIqueryCommand())
-	        {
-	            // Nope. Trying to execute query on server.
-			    executeSciDBQuery(query);
-			}
-			else
-			{
+    try
+    {
+        IqueryParser p;
+        // Trying to parse command with iquery's parser
+        if (p.parse(query))
+        {
+            // We got error. Possible it was iquery command with wrong syntax?
+            if (!p.isIqueryCommand())
+            {
+                // Nope. Trying to execute query on server.
+                executeSciDBQuery(query);
+            }
+            else
+            {
                 // Yep. Show message.
                 if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
-                    cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) << "' near line " << iqueryState.queryStart << endl;
-                cerr << "Unknown command '" << query << "' .\nType 'help;' for iquery internal commands reference." << endl;
+                    cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE)
+                         << "' near line " << iqueryState.queryStart << endl;
+                cerr << "Unknown command '" << query << "' .\n"
+                    "Type 'help;' for iquery internal commands reference."
+                     << endl;
                 return;
-			}
-	    }
-	    else
-	    {
-	        // Parsed correctly now let's execute command;
-	        assert(p.getResult());
+            }
+        }
+        else
+        {
+            // Parsed correctly now let's execute command;
+            assert(p.getResult());
             switch (p.getResult()->getCmdType())
             {
-                case IqueryCmd::HELP:
-                    cout <<
-                        "set            - List current options" << endl <<
-                        "set lang afl   - Set AFL as querying language" << endl <<
-                        "set lang aql   - Set AQL as querying language" << endl <<
-                        "set fetch      - Start retrieving query results" << endl <<
-                        "set no fetch   - Stop retrieving query results" << endl <<
-                        "set timer      - Start reporting query setup time" << endl <<
-                        "set no timer   - Stop reporting query setup time" << endl <<
-                        "set verbose    - Start reporting details from engine" << endl <<
-                        "set no verbose - Stop reporting details from engine" << endl <<
-                        "set format auto|csv|dense|csv+|lcsv+|text|sparse|lsparse|store|text|opaque|dcsv - Switch output format." << endl <<
-                        "quit or exit   - End iquery session" << endl;
-                    break;
+            case IqueryCmd::HELP:
+                cout <<
+                    "set            - List current options\n"
+                    "set lang afl   - Set AFL as querying language\n"
+                    "set lang aql   - Set AQL as querying language\n"
+                    "set fetch      - Start retrieving query results\n"
+                    "set no fetch   - Stop retrieving query results\n"
+                    "set timer      - Start reporting query setup time\n"
+                    "set no timer   - Stop reporting query setup time\n"
+                    "set verbose    - Start reporting details from engine\n"
+                    "set no verbose - Stop reporting details from engine\n"
+                    "set format auto|csv|dense|csv+|lcsv+|tsv|tsv+|ltsv+|"
+                        "text|sparse|lsparse|store|text|opaque|dcsv"
+                        " - Switch output format.\n"
+                    "quit or exit   - End iquery session"
+                     << endl;
+                break;
 
-                case IqueryCmd::SET:
-                    cout <<
-                        "Lang:    " << (iqueryState.aql ? "AQL" : "AFL") << endl <<
-                        "Fetch:   " << (iqueryState.nofetch ? "NO" : "YES") << endl <<
-                        "Timer:   " << (iqueryState.timer ? "YES" : "NO") << endl <<
-                        "Verbose: " << (iqueryState.verbose ? "YES" : "NO") << endl <<
-                        "Format:  " << iqueryState.format << endl;
-                    break;
+            case IqueryCmd::SET:
+                cout <<
+                    "Lang:    " << (iqueryState.aql ? "AQL" : "AFL") <<
+                    "\nFetch:   " << (iqueryState.nofetch ? "NO" : "YES") <<
+                    "\nTimer:   " << (iqueryState.timer ? "YES" : "NO") <<
+                    "\nVerbose: " << (iqueryState.verbose ? "YES" : "NO") <<
+                    "\nFormat:  " << iqueryState.format << endl;
+                break;
 
-                case IqueryCmd::FETCH:
-                    iqueryState.nofetch = !((const IntIqueryCmd*)p.getResult())->getValue();
-                    break;
+            case IqueryCmd::FETCH:
+                iqueryState.nofetch = !((const IntIqueryCmd*)p.getResult())->getValue();
+                break;
 
-                case IqueryCmd::VERBOSE:
-                    iqueryState.verbose = ((const IntIqueryCmd*)p.getResult())->getValue();
-                    break;
+            case IqueryCmd::VERBOSE:
+                iqueryState.verbose = ((const IntIqueryCmd*)p.getResult())->getValue();
+                break;
 
-                case IqueryCmd::TIMER:
-                    iqueryState.timer = ((const IntIqueryCmd*)p.getResult())->getValue();
-                    break;
+            case IqueryCmd::TIMER:
+                iqueryState.timer = ((const IntIqueryCmd*)p.getResult())->getValue();
+                break;
 
-                case IqueryCmd::QUIT:
-                    saveHistory();
-                    exit(0);
-                    break;
+            case IqueryCmd::QUIT:
+                saveHistory();
+                exit(0);
+                break;
 
-                case IqueryCmd::LANG:
-                    iqueryState.aql = (((const IntIqueryCmd*)p.getResult())->getValue() == 0) ? true : false;
-                    break;
+            case IqueryCmd::LANG:
+                iqueryState.aql = (((const IntIqueryCmd*)p.getResult())->getValue() == 0) ? true : false;
+                break;
 
-                case IqueryCmd::FORMAT:
-                    iqueryState.format = ((const StrIqueryCmd*)p.getResult())->getValue();
-                    break;
+            case IqueryCmd::FORMAT:
+                iqueryState.format = ((const StrIqueryCmd*)p.getResult())->getValue();
+                break;
 
-                case IqueryCmd::BINARY_FORMAT:
-                {
-                    string fmt = ((const StrIqueryCmd*)p.getResult())->getValue();
-                    boost::trim(fmt);
-                    if (fmt[0] != '(' || fmt[fmt.size() - 1] != ')')
-                    {
-                        cerr << "Binary format template should be surrounded by parentheses" << endl;
-                    }
-                    else
-                    {
-                        iqueryState.format = fmt;
-                    }
-                    break;
-                }
-
-                default:
-                    assert(0);
-            }
-	    }
-	}
-	catch (const scidb::Exception& e)
-	{
-            //Eat scidb exceptions, cleanup query, print error message and continue, if in interactive mode
-            const scidb::SciDB& sciDB = scidb::getSciDB();
-
-            //Don't try to cancel query if we have connection problems!
-            if (iqueryState.currentQueryID && iqueryState.connection
-                && !(e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK))
+            case IqueryCmd::BINARY_FORMAT:
             {
-                try
+                string fmt = ((const StrIqueryCmd*)p.getResult())->getValue();
+                boost::trim(fmt);
+                if (fmt[0] != '(' || fmt[fmt.size() - 1] != ')')
                 {
-                    sciDB.cancelQuery(iqueryState.currentQueryID, iqueryState.connection);
+                    cerr << "Binary format template should be surrounded by parentheses" << endl;
                 }
-                catch (const scidb::Exception& e)
+                else
                 {
-                    if (e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND
-                        && e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND2) {
-                        cerr << "Error during query canceling: " << endl << e.what() << endl << endl;
-                    }
+                    iqueryState.format = fmt;
                 }
+                break;
             }
 
-            iqueryState.currentQueryID = 0;
+            default:
+                assert(0);
+            }
+        }
+    }
+    catch (const scidb::Exception& e)
+    {
+        //Eat scidb exceptions, cleanup query, print error message and continue, if in interactive mode
+        const scidb::SciDB& sciDB = scidb::getSciDB();
+
+        //Don't try to cancel query if we have connection problems!
+        if (iqueryState.currentQueryID && iqueryState.connection
+            && !(e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK))
+        {
+            try
+            {
+                sciDB.cancelQuery(iqueryState.currentQueryID, iqueryState.connection);
+            }
+            catch (const scidb::Exception& e)
+            {
+                if (e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND
+                    && e.getLongErrorCode() != scidb::SCIDB_LE_QUERY_NOT_FOUND2) {
+                    cerr << "Error during query canceling: " << endl << e.what() << endl << endl;
+                }
+            }
+        }
+
+        iqueryState.currentQueryID = 0;
             
-            if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
-            {
-                cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE)
-                     << "' near line " << iqueryState.queryStart << endl;
-            }
-            cerr << e.what() << endl;
+        if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
+        {
+            cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE)
+                 << "' near line " << iqueryState.queryStart << endl;
+        }
+        cerr << e.what() << endl;
 
-            if ((!iqueryState.interactive && !iqueryState.ignoreErrors)
-                || e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK)
-            {
-                exit(1);
-            }
-	}
-	catch (const std::exception& e)
-	{
-            // Eat all other exceptions exception in interactive mode, 
-            // but exit with error in non-interactive
-            cerr << szExecName << ": Exception caught " << e.what() << endl;
-            if (!iqueryState.interactive) {
-                exit(1);
-            }
-	}
+        if ((!iqueryState.interactive && !iqueryState.ignoreErrors)
+            || e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK)
+        {
+            exit(1);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        // Eat all other exceptions exception in interactive mode, 
+        // but exit with error in non-interactive
+        cerr << szExecName << ": Exception caught " << e.what() << endl;
+        if (!iqueryState.interactive) {
+            exit(1);
+        }
+    }
 }
 
 void termination_handler(int signum)
@@ -504,7 +517,10 @@ int main(int argc, char* argv[])
             (CONFIG_NO_FETCH, 'n', "no-fetch", "", "", scidb::Config::BOOLEAN,
                 "Skip data fetching. Disabled by default'", false, false)
             (CONFIG_RESULT_FORMAT, 'o', "format", "format", "", scidb::Config::STRING,
-                "Output format: auto, csv, dense, csv+, lcsv+, text, sparse, lsparse, store, text, opaque, dcsv. Default is 'dcsv'.", string("dcsv"), false)
+                "Output format: auto, csv, dense, csv+, lcsv+, text, sparse,"
+                " lsparse, store, text, opaque, tsv, tsv+, ltsv+, dcsv."
+                " Default is 'dcsv'.",
+                 string("dcsv"), false)
             (CONFIG_PLUGINS_DIRECTORY, 'u', "plugins", "plugins", "", scidb::Config::STRING,
                 "Path to the plugins directory",
                 string(scidb::SCIDB_INSTALL_PREFIX()) + string("/lib/scidb/plugins"),
@@ -758,6 +774,10 @@ bool getConfigPath(const string& fileName, string &path, bool &exists)
         exists = bfs::exists(path) && !bfs::is_directory(path);
     }
     catch (const boost::exception&)
+    {
+        return false;
+    }
+    catch (const std::exception&)
     {
         return false;
     }

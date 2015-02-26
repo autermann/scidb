@@ -30,10 +30,7 @@
           <para><parameter>merge-sort-buffer </parameter>(megabytes). The
           maximum amount of memory that the <command>sort() </command>operator
           can consume, per thread. Note that each thread of the operator will
-          consume up to this amount. The number of threads in <command>sort()
-          </command> is controlled by the <literal>parallel-sort
-          </literal>and<parameter> result-prefetch-queue-size
-          parameters.</parameter></para>
+          consume up to this amount. </para>
         </listitem>
 
         <listitem>

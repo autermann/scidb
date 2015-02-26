@@ -113,7 +113,7 @@ public:
     void pos2coord(position_t pos, Coordinates& coord) const
     {
         assert(pos>=0);
-        assert(_origin.size()>0);
+        assert(!_origin.empty());
         assert(_nDims>0);
         coord.resize(_nDims);
 

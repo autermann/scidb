@@ -1,8 +1,8 @@
 --setup
 create array dense <a: double > [x=0:5,3,0, y=0:5,3,0]
 create array pattern <x:int64, y:int64>[i=1:2,2,0, j=1:2,2,0]
-load(dense,'../tests/harness/testcases/data/dense.txt')
-load(pattern,'../tests/harness/testcases/data/pattern.txt')
+load(dense,'${TEST_DATA_DIR}/dense.txt')
+load(pattern,'${TEST_DATA_DIR}/pattern.txt')
 
 --test
 lookup(pattern, dense)

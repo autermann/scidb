@@ -24,7 +24,7 @@ package scidb_msg;
 
 option java_package = "org.scidb.io.network";
 /**
- *  Add creating new object according to new message type in 
+ *  Add creating new object according to new message type in
  *  MessageDesc::createRecordByType (../src/BaseConnection.cpp)
  *
  * Example of message (more detail: http://code.google.com/apis/protocolbuffers/docs/proto.html):
@@ -56,8 +56,10 @@ message Fetch
 {
     optional uint32 attribute_id = 2;
     optional bool position_only = 3;
-    optional uint32 obj_type = 4; // 0 - for remote array; 1 - for merged array. Should be copy to Chunk message field.
+    optional uint32 obj_type = 4; // 0 - for remote array; 1 - for merged array, 2 - for pull-sg. Same as the Chunk::obj_type message field.
     optional string array_name = 5; // a name of mapping array to fetch: result array or mapping array
+    optional uint32 prefetch_size = 6; // the number of chunks/items the sender is willing to accept in response
+    optional uint64 fetch_id = 7; // this message id
 }
 
 /**
@@ -75,9 +77,12 @@ message Chunk
     optional uint64 decompressed_size = 8;
     optional bool has_next = 9;
     repeated int64 next_coordinates = 10;
-    optional uint32 obj_type = 11; // 0 - for remote array; 1 - for merged array. Should be copy from Fetch message field.
+    optional uint32 obj_type = 11; // Same as the Fetch::obj_type message field.
     optional uint32 count  = 12;
-    optional bool tombstone = 13 [default = false]; 
+    optional bool tombstone = 13 [default = false];
+    optional uint64 dest_instance = 14;
+    optional uint64 next_dest_instance = 15;
+    optional uint64 fetch_id = 16; // last fetch_id received by the sender
 
     message Warning
     {
@@ -90,7 +95,7 @@ message Chunk
         required string strings_namespace = 7;
     }
 
-    repeated Warning warnings = 16;//warnings posted during execution
+    repeated Warning warnings = 17;//warnings posted during execution
 }
 
 /**
@@ -108,7 +113,7 @@ message QueryResult
 	    required int32 default_missing_reason = 6;
 	    required bytes default_value = 7;
 	}
-	
+
 	message DimensionDesc
 	{
             required string name = 1;
@@ -151,17 +156,18 @@ message PhysicalPlan
 	required string physical_plan = 2;
         required uint64 view_id = 3;
         message InstanceListEntry
-        { 
+        {
           required uint64 instance_id = 2;
-          required uint64 gen_id = 3; 
+          required uint64 gen_id = 3;
         }
         message InstanceList
-        { 
+        {
           repeated InstanceListEntry instance_entry = 2;
         }
         required InstanceList dead_list = 4;
         required InstanceList live_list = 5;
-} 
+        required string cluster_uuid = 6;
+}
 
 /**
  * Message with error description
@@ -180,7 +186,7 @@ message Error
     optional string stringified_short_error_code = 9;
     optional string stringified_long_error_code = 10;
 
-    
+
     //UserQueryException part
     message ParsingContext
     {
@@ -190,8 +196,9 @@ message Error
         required uint32 line_end = 4;
         required uint32 col_end = 5;
     }
-    
+
     optional ParsingContext parsing_context = 11;
+    optional string cluster_uuid = 12;
 }
 
 /**
@@ -201,7 +208,8 @@ message Error
  */
  message DummyQuery
  {
-    optional uint64  payload_id = 2;
+    optional uint64 payload_id = 2;
+    optional string cluster_uuid = 3;
  }
 
 
@@ -233,7 +241,7 @@ message Control
     required uint64 remote_sn = 4;
   }
   required uint64 local_gen_id = 1;
-  required uint64 remote_gen_id = 2; 
+  required uint64 remote_gen_id = 2;
   repeated Channel channels = 3;
 }
 

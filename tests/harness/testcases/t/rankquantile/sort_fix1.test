@@ -13,7 +13,7 @@ create array Z <val:double NULL> [x=0:5,3,0]
 store(build(Z,iif(x=1,-5.0/(2.0-2.0),iif(x=3 or x=4,null,5.0/(2.0-2.0)))),Z)
 
 create array SortNanNullInf < I : int64, V : double NULL > [ Line=0:*,6,0 ]
-load ( SortNanNullInf, '../tests/harness/testcases/data/sort_nan_null_inf.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load ( SortNanNullInf, '${TEST_DATA_DIR}/sort_nan_null_inf.txt')""
 
 
 --test

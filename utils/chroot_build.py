@@ -109,7 +109,7 @@ class UbuntuChroot():
     distroname = 'ubuntu'
     pbuilder_tgz_dir='/var/cache/pbuilder'
     ubuntu_mirror='deb http://archive.ubuntu.com/ubuntu/ %s restricted main multiverse universe'
-    scidb_3rdparty_mirror='deb http://downloads.paradigm4.com/ ubuntu12.04/3rdparty/'
+    scidb_3rdparty_mirror='deb https://downloads.paradigm4.com/ ubuntu12.04/3rdparty/'
 
     def __init__(self, release, arch, temp_dir):
         info('Will use pbuilder for chrooting. Checking environment...')
@@ -127,6 +127,7 @@ class UbuntuChroot():
             '--basetgz', self.tgz,
             '--architecture', self.arch,
             '--othermirror', self.mirror,
+            '--hookdir', '/var/cache/pbuilder/hook.d',
             '--allow-untrusted',
             '--distribution', self.release,
             '--override-config',

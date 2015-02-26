@@ -6,12 +6,12 @@
 --start-igdata
 --aql create array aFlat <row:int64, col:int64, value:string null> [csvRow=0:5,6,0] 
 --shell  --command="csv2scidb -s 1 -p NNs < $DOC_DATA/aInsert.csv > $DOC_DATA/aInsert.scidb "
---aql load aFlat from '../tests/harness/testcases/data/doc/aInsert.scidb' 
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "load aFlat from '${TEST_DATA_DIR}/doc/aInsert.scidb'""
 --aql create array A <value:string null> [row=1:3,3,0, col=1:3,3,0] 
 store(redimension(aFlat,A),A) 
 --aql create array bFlat <row:int64, col:int64, value:string null> [csvRow=0:5,6,0] 
 --shell  --command="csv2scidb -s 1 -p NNs < $DOC_DATA/bInsert.csv > $DOC_DATA/bInsert.scidb "
---aql load bFlat from '../tests/harness/testcases/data/doc/bInsert.scidb' 
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "load bFlat from '${TEST_DATA_DIR}/doc/bInsert.scidb'""
 --aql create array B <value:string null> [row=1:3,3,0, col=1:3,3,0] 
 store(redimension(bFlat,B),B) 
 --aql insert into B select * from A 
@@ -35,7 +35,7 @@ store(redimension(bFlat,B),B)
 --start-igdata
 --aql create array cFlat <row:int64, col:int64, value:string null, value2:string null> [csvRow=0:8,9,0] 
 --shell  --command="csv2scidb -s 1 -p NNsS < $DOC_DATA/cInsert.csv > $DOC_DATA/cInsert.scidb "
---aql load cFlat from '../tests/harness/testcases/data/doc/cInsert.scidb' 
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "load cFlat from '${TEST_DATA_DIR}/doc/cInsert.scidb'""
 --aql create array C <value:string null, value2:string null> [row=1:3,3,0, col=1:3,3,0] 
 store(redimension(cFlat,C),C) 
 --stop-igdata

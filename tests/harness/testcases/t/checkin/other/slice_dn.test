@@ -1,6 +1,6 @@
 --setup
 CREATE ARRAY dense <a: double > [x=0:5,3,0, y=0:5,3,0]
-load(dense,'../tests/harness/testcases/data/dense.txt')
+load(dense,'${TEST_DATA_DIR}/dense.txt')
 
 --test
 slice(dense, y, 3)

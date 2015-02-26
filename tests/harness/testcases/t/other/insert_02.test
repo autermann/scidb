@@ -7,13 +7,13 @@
 
 
 create array A <val:double> [x=1:*,4,0]
-load(A, '../tests/harness/testcases/data/unbound_ins.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A, '${TEST_DATA_DIR}/unbound_ins.txt')""
 
 create array B <val:double> [x=1:20,4,0]
 store(build(B,101.5*x+100),B)
 
 create array AA <a:string> [x=0:*,4,0, y=0:*,2,0]
-load(AA, '../tests/harness/testcases/data/unbound_string')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(AA, '${TEST_DATA_DIR}/unbound_string')""
 
 create array ZZ <a:string> [x=0:3,4,0, y=0:3,2,0]
 create array BB <a:string, b:string> [x=0:*,4,0, y=0:*,2,0]
@@ -28,8 +28,8 @@ insert(B@1,B)
 insert(B@2,A)
 
 --error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_CANT_ACCESS_ARRAY_VERSION "insert(B@1,B@2)"
-insert(build_sparse(ZZ, string(3+y)+'amigos!1-insert ', x=0 and y=0),AA)
-insert(store(build_sparse(ZZ, string(3+y)+'amigos!2-insert ', x=0 and y=2),ZZ),AA)
+insert(filter(build(ZZ, string(3+y)+'amigos!1-insert '), x=0 and y=0),AA)
+insert(store(filter(build(ZZ, string(3+y)+'amigos!2-insert '), x=0 and y=2),ZZ),AA)
 scan(ZZ)
 insert(ZZ,ZZ)
 insert(join(ZZ,AA),BB)

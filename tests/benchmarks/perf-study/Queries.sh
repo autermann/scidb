@@ -84,7 +84,7 @@ ps -eo comm,%mem | grep SciDB-000-0
 #
 #  Q1: redimension_store the raw load array into the 2D arrat.
 #
-CMD="redimension_store ( Test_Array_Raw, Test_Array )"
+CMD="store ( redimension ( Test_Array_Raw, Test_Array ), Test_Array )"
 #
 echo "${CMD}"
 /usr/bin/time -f "Q1 %e" iquery --port $Port -naq "$CMD;"
@@ -98,12 +98,12 @@ ps -eo comm,%mem | grep SciDB-000-0
 #        10 times. 
 #
 CMD="join ( 
-    count ( Test_Array ), 
+    aggregate ( Test_Array, count(*) ), 
     join ( 
-        sum ( Test_Array, int_attr_1 ),
+        aggregate ( Test_Array, sum(int_attr_1) ),
         join ( 
-            sum ( Test_Array, int_attr_2 ),
-            sum ( Test_Array, double_attr )
+            aggregate ( Test_Array, sum(int_attr_2) ),
+            aggregate ( Test_Array, sum(double_attr) )
         )
     )
 )"
@@ -1209,7 +1209,7 @@ date;
 ps -eo comm,%mem | grep SciDB-000-0
 #
 # Q17: redimension_store()
-CMD="CREATE EMPTY ARRAY Test_Array_3 
+CMD="CREATE ARRAY Test_Array_3 
     <
       int_attr_1  : int64,
       int_attr_2  : int64,
@@ -1222,13 +1222,13 @@ CMD="CREATE EMPTY ARRAY Test_Array_3
 time -p iquery --port $Port -aq "${CMD}"
 #
 #
-CMD="redimension_store ( 
+CMD="store ( redimension ( 
   join ( 
     apply ( Test_Array, X, int64(int_attr_1 % 30) * 11),
     apply ( Test_Array, Y, int64(int_attr_2 % 30) * 13)
   ),
   Test_Array_3 
-)"
+), Test_Array_3)"
 #
 echo "${CMD}"
 #

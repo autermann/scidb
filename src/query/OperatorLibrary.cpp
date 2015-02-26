@@ -31,11 +31,12 @@
 #include <map>
 #include <string>
 
-#include "log4cxx/logger.h"
-#include "log4cxx/basicconfigurator.h"
-#include "log4cxx/helpers/exception.h"
+#include <log4cxx/logger.h>
+#include <log4cxx/basicconfigurator.h>
+#include <log4cxx/helpers/exception.h>
 
-#include "boost/shared_ptr.hpp"
+#include <boost/shared_ptr.hpp>
+#include <boost/foreach.hpp>
 
 #include "query/OperatorLibrary.h"
 #include "system/Exceptions.h"
@@ -93,13 +94,13 @@ boost::shared_ptr<PhysicalOperator> OperatorLibrary::createPhysicalOperator(cons
         const std::string& physicalName, const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema)
 {
     LOG4CXX_TRACE(logger, "Creating physical operator: " << physicalName << " for logical operator: " << logicalName);
-    
+
     PhysicalOperatorFactoriesMap::const_iterator lOpIt = _physicalOperatorFactories.find(logicalName);
-    
+
     if (lOpIt != _physicalOperatorFactories.end())
     {
         PhysicalOperatorFactories::const_iterator pOpIt = (*lOpIt).second.find(physicalName);
-        
+
         if (pOpIt != (*lOpIt).second.end())
         {
             return (*pOpIt).second->createPhysicalOperator(parameters, schema);
@@ -170,7 +171,7 @@ void OperatorLibrary::getPhysicalNames(const string& logicalName,
     }
 
     physicalOperatorsNames.reserve(_physicalOperatorFactories.size());
-    
+
     BOOST_FOREACH(const PhysicalOperatorFactoriesPair &pOpFactory, (*pOpIt).second)
     {
         physicalOperatorsNames.push_back(pOpFactory.first);

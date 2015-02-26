@@ -6,6 +6,12 @@
 
   <para>This appendix contains troubleshooting information.</para>
 
+  <note>
+    <para><!--If fixed for next release, re-enter this sentence: This step is only required if you are setting up a cluster environment,
+ and can be skipped for single-server installations.-->For troubleshooting
+    about installation issues, see <xref linkend="troubleInstall"/> .</para>
+  </note>
+
   <section id="mpiTrouble">
     <title>MPI Issues</title>
 

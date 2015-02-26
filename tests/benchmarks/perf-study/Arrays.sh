@@ -102,7 +102,7 @@ gen_matrix -rb $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe &
 #  DML 1: How many cells in this array?
 CMD="join ( 
         build ( < s : string > [ I=0:0,1,0 ], 'Size_Count_For ${LABEL}'),
-        count ( Test_Array_Raw )
+        aggregate ( Test_Array_Raw, count(*) )
 )";
 #
 echo $CMD

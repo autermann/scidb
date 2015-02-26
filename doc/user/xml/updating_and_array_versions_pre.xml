@@ -38,12 +38,12 @@
   category—that is, AQL statements that perform write-in-place updates to
   stored array data.</para>
 
-  <para>When you modify the contents of an array, SciDB uses a "no overwrite"
-  storage model. No overwrite means that data in an array can be updated but
-  previous values can be accessed for as long as the array exists in the SciDB
-  namespace. Every time you update data in a stored array, SciDB creates a new
-  array version, much like source control systems for software
-  development.</para>
+  <para>When you modify the contents of a persistent array (that is, an array
+  created without the TEMP keyword), SciDB uses a "no overwrite" storage
+  model. No overwrite means that data can be updated but previous values can
+  be accessed for as long as the array exists in the SciDB namespace. Every
+  time you update data in a persistent array, SciDB creates a new array
+  version, much like source control systems for software development.</para>
 
   <para>This chapter describes the following AQL statements that perform
   in-place updates:<itemizedlist>
@@ -101,13 +101,13 @@
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNs 
-            &lt; $DOC_DATA/aInsert.csv &gt; 
-              $DOC_DATA/aInsert.scidb
+            &lt; ${DOC_DATA}/aInsert.csv &gt; 
+              ${DOC_DATA}/aInsert.scidb
  --show-query=no
  --show-output=no
 
 --aql load aFlat 
-      from '../tests/harness/testcases/data/doc/aInsert.scidb'
+      from '${DOC_DATA}/aInsert.scidb'
  --show-query=no
  --show-output=no
 
@@ -128,12 +128,12 @@
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNs 
-                   &lt; $DOC_DATA/bInsert.csv &gt; 
-                   $DOC_DATA/bInsert.scidb
+                   &lt; ${DOC_DATA}/bInsert.csv &gt; 
+                   ${DOC_DATA}/bInsert.scidb
  --show-query=no
  --show-output=no
 
---aql load bFlat from '../tests/harness/testcases/data/doc/bInsert.scidb'
+--aql load bFlat from '${DOC_DATA}/bInsert.scidb'
  --show-query=no
  --show-output=no
 
@@ -168,11 +168,9 @@
     same number of dimensions and attributes, same data-types and
     null/not-null setting on each corresponding pair of attributes, and
     restrictions on dimension starting indexes, chunk sizes, and chunk
-    overlaps. In addition, the current release of SciDB requires that every
-    dimension of either array must have datatype int64. For the complete list
-    of compatibility rules for insertion operations, see the <link
-    linkend="insertOperator">insert operator</link> AFL reference
-    topic.</para>
+    overlaps. For the complete list of compatibility rules for insertion
+    operations, see the <link linkend="insertOperator">insert operator</link>
+    AFL reference topic.</para>
 
     <para>Here is the schema for array A:</para>
 
@@ -275,13 +273,13 @@
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNsS 
-            &lt; $DOC_DATA/cInsert.csv &gt; 
-              $DOC_DATA/cInsert.scidb
+            &lt; ${DOC_DATA}/cInsert.csv &gt; 
+              ${DOC_DATA}/cInsert.scidb
  --show-query=no
  --show-output=no
 
 --aql load cFlat 
-      from '../tests/harness/testcases/data/doc/cInsert.scidb'
+      from '${DOC_DATA}/cInsert.scidb'
  --show-query=no
  --show-output=no
 
@@ -412,12 +410,12 @@
         <primary>versions</primary>
 
         <secondary>arrays</secondary>
-      </indexterm>When an array is updated, a new array version is created.
-    SciDB stores the array versions. For example, in the previous section,
-    SciDB stored every version of m4x4 created by the
+      </indexterm>When a persistent array is updated, a new array version is
+    created. SciDB stores the array versions. For example, in the previous
+    section, SciDB stored every version of m4x4 created by the
     <code><command>UPDATE</command></code> command. Use the
-    <code>version()</code> operator to see a list of the existing versions for
-    an array:<programlisting language="test">--afl versions(m4x4); --show-output-in-test-file=no</programlisting>You
+    <code>versions()</code> operator to see a list of the existing versions
+    for an array:<programlisting language="test">--afl versions(m4x4); --show-output-in-test-file=no</programlisting>You
     can see the contents of any previous version of the array by using the
     version number:<programlisting language="test">--afl scan(m4x4@1); --show-output-in-test-file=no --output-format=dense --chunkify=yes</programlisting>Or
     the array timestamp:<programlisting>AQL% <command>SELECT</command> * <command>FROM</command> scan(m4x4@datetime('2012-11-19 1:20:50'));</programlisting><screen>[
@@ -430,42 +428,9 @@
     <para>You can use the array version name in any query. The unqualified
     name of the array always refers to the most recent version as of the start
     of the query.</para>
-  </section>
 
-  <section>
-    <title>Deleting Array Versions</title>
-
-    <para><indexterm>
-        <primary>arrays</primary>
-
-        <secondary>deleting versions</secondary>
-      </indexterm>You can remove array versions, and keep only one version of
-    an array. This can be useful if need to recover disk space.</para>
-
-    <para>Let's say you have 5 versions of array <emphasis
-    role="bold">stocks</emphasis>:<programlisting language="test">--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],1),stocks); --show-query=no --show-output=no
---afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],2),stocks); --show-query=no --show-output=no
---afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],3),stocks); --show-query=no --show-output=no
---afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],4),stocks); --show-query=no --show-output=no
---afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],5),stocks); --show-query=no --show-output=no
---afl project(versions(stocks), version_id); --output-format=dcsv</programlisting></para>
-
-    <para>If you want to keep only the latest version of the array, you can
-    perform the following steps to remove all other versions:<programlisting
-    language="test">--afl store(stocks,stocks_tmp); --show-output=no
---afl remove(stocks); --show-output=no
---afl rename(stocks_tmp,stocks); --show-output=no</programlisting></para>
-
-    <para>To verify, use the <code>versions()</code> operator
-    again:<programlisting language="test">--afl project(versions(stocks), version_id); --output-format=dcsv</programlisting></para>
-
-    <para>To keep one of the intermediate versions of <emphasis
-    role="bold">stocks</emphasis>, rather than the latest, use the version
-    syntax when specifying the array in the <code>store()</code> query. For
-    example, to save the second version of <emphasis
-    role="bold">stocks</emphasis>, you would run the following
-    query:<programlisting language="test">--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],2),stocks); --show-query=no --show-output=no
---afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],3),stocks); --show-query=no --show-output=no
---afl store(stocks@2,stocks_tmp); --show-output=no</programlisting></para>
+    <para>The AFL operator <command>remove_versions()</command> removes all
+    versions of an array older than the version you specify. See <xref
+    linkend="removeVersionsOperator"/> for details.</para>
   </section>
 </chapter>

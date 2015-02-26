@@ -43,7 +43,6 @@
 namespace scidb
 {
 
-
 /**
  * Node of logical plan of query. Logical node keeps logical operator to
  * perform inferring result type and validate types.
@@ -51,30 +50,25 @@ namespace scidb
 class LogicalQueryPlanNode
 {
 public:
-    LogicalQueryPlanNode(
-            boost::shared_ptr<ParsingContext> const& parsingContext,
-            boost::shared_ptr<LogicalOperator> const& logicalOperator);
+    LogicalQueryPlanNode(boost::shared_ptr<ParsingContext>  const&,
+                         boost::shared_ptr<LogicalOperator> const&);
 
-    LogicalQueryPlanNode(
-            boost::shared_ptr<ParsingContext> const& parsingContext,
-            boost::shared_ptr<LogicalOperator> const& logicalOperator,
-            std::vector<boost::shared_ptr<LogicalQueryPlanNode> > const &childNodes);
+    LogicalQueryPlanNode(boost::shared_ptr<ParsingContext>  const&,
+                         boost::shared_ptr<LogicalOperator> const&,
+                         std::vector<boost::shared_ptr<LogicalQueryPlanNode> > const &children);
 
     void addChild(const boost::shared_ptr<LogicalQueryPlanNode>& child)
     {
         _childNodes.push_back(child);
     }
 
-    bool isLeaf() const
+    boost::shared_ptr<LogicalOperator> getLogicalOperator()
     {
-        return _childNodes.size();
-    }
-
-    boost::shared_ptr<LogicalOperator> getLogicalOperator(){
         return _logicalOperator;
     }
 
-    std::vector<boost::shared_ptr<LogicalQueryPlanNode> >& getChildren(){
+    std::vector<boost::shared_ptr<LogicalQueryPlanNode> >& getChildren()
+    {
         return _childNodes;
     }
 
@@ -88,14 +82,13 @@ public:
         return _logicalOperator->getProperties().tile;
     }
 
-    const ArrayDesc& inferTypes(boost::shared_ptr< Query> query);
-
-    void inferArrayAccess(boost::shared_ptr<Query>& query);
-
     boost::shared_ptr<ParsingContext> getParsingContext() const
     {
         return _parsingContext;
     }
+
+    const ArrayDesc& inferTypes      (boost::shared_ptr<Query>);
+    void             inferArrayAccess(boost::shared_ptr<Query>&);
 
     /**
      * Retrieve a human-readable description.
@@ -106,21 +99,17 @@ public:
      * @param[in] indent number of spacer characters to start every line with.
      * @param[in] children print or not children.
      */
-    void toString(std::ostream &str, int indent = 0, bool children = true) const;
+    void toString(std::ostream &,int indent = 0,bool children = true) const;
 
   private:
-    boost::shared_ptr<LogicalOperator> _logicalOperator;
-
+    boost::shared_ptr<LogicalOperator>                    _logicalOperator;
     std::vector<boost::shared_ptr<LogicalQueryPlanNode> > _childNodes;
-
-    boost::shared_ptr<ParsingContext> _parsingContext;
+    boost::shared_ptr<ParsingContext>                     _parsingContext;
 };
 
-
-typedef boost::shared_ptr<PhysicalOperator> PhysOpPtr;
 class PhysicalQueryPlanNode;
+typedef boost::shared_ptr<PhysicalOperator>      PhysOpPtr;
 typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
-
 
 /*
  *  Currently LogicalQueryPlanNode and PhysicalQueryPlanNode have similar structure.
@@ -130,8 +119,7 @@ class PhysicalQueryPlanNode : boost::noncopyable
 {
   public:
     PhysicalQueryPlanNode()
-    {
-    }
+    {}
 
     PhysicalQueryPlanNode(PhysOpPtr const& physicalOperator,
                           bool agg, bool ddl, bool tile);
@@ -141,8 +129,7 @@ class PhysicalQueryPlanNode : boost::noncopyable
                           bool agg, bool ddl, bool tile);
 
     virtual ~PhysicalQueryPlanNode()
-    {
-    }
+    {}
 
     void addChild(const PhysNodePtr & child)
     {
@@ -192,11 +179,13 @@ class PhysicalQueryPlanNode : boost::noncopyable
         assert(removed); removed = removed; // Eliminate warnings
     }
 
-    PhysOpPtr getPhysicalOperator() {
+    PhysOpPtr getPhysicalOperator()
+    {
         return _physicalOperator;
     }
 
-    std::vector<PhysNodePtr>& getChildren() {
+    std::vector<PhysNodePtr>& getChildren()
+    {
         return _childNodes;
     }
 
@@ -335,11 +324,14 @@ class PhysicalQueryPlanNode : boost::noncopyable
       */
     bool subTreeOutputFullChunks() const
     {
-        if (isSgNode()) {
+        if (isSgNode())
+        {
             return true;
         }
-        for (size_t i = 0, count = _childNodes.size(); i< count; ++i) {
-            if (!_childNodes[i]->subTreeOutputFullChunks()) {
+        for (size_t i = 0, count = _childNodes.size(); i< count; ++i)
+        {
+            if (!_childNodes[i]->subTreeOutputFullChunks())
+            {
                 return false;
             }
         }
@@ -532,7 +524,6 @@ private:
     boost::shared_ptr<LogicalQueryPlanNode> _root;
 };
 
-
 /**
  * The PhysicalPlan is produced by Optimizer or in simple cases directly by query processor (DDL).
  * It has ready to execution operator nodes and will be passed to an executor.
@@ -542,14 +533,16 @@ class PhysicalPlan
 public:
     PhysicalPlan(const boost::shared_ptr<PhysicalQueryPlanNode>& root);
 
-    boost::shared_ptr<PhysicalQueryPlanNode> getRoot() {
+    boost::shared_ptr<PhysicalQueryPlanNode> getRoot()
+    {
         return _root;
     }
 
-    bool empty() const {
+    bool empty() const
+    {
         return _root == boost::shared_ptr<PhysicalQueryPlanNode>();    // _root is NULL
     }
-    
+
     bool isDdl() const
     {
     	assert(!empty());
@@ -583,7 +576,6 @@ private:
 };
 
 typedef boost::shared_ptr<PhysicalPlan> PhysPlanPtr;
-
 
 } // namespace
 

@@ -1076,28 +1076,33 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
 
     envVars.push_back(mpi::getScidbMPIEnvVar(mpi::getShmIpcType(), clusterUuid, queryId, launchId));
 
+    map<InstanceID,const InstanceDesc*>::const_iterator myIter = sortedInstances.find(myId);
+
+    ASSERT_EXCEPTION((myIter != sortedInstances.end()), "Cannot find myself in the membership");
+
+    // the launcher does not have to participate in the launch
+    {
+        const InstanceDesc* desc = myIter->second;
+        assert(args[0].empty());
+        setInstallPath(desc->getPath());
+
+        ipcNameHosts = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_hosts";
+        ipcNameExec  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_exec";
+
+        args[0] = MpiManager::getInstance()->getLauncherBinFile(getInstallPath());
+        validateLauncherArg(args[0]);
+        args[EXEC_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
+        validateLauncherArg(args[EXEC_INDX]);
+        args[HOST_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameHosts);
+        validateLauncherArg(args[HOST_INDX]);
+    }
+
     // loop over all the instances
     size_t count = 0;
     for (map<InstanceID,const InstanceDesc*>::const_iterator i = sortedInstances.begin();
          i !=  sortedInstances.end() && count<maxSlaves; ++i,++count) {
 
         const InstanceDesc* desc = i->second;
-        InstanceID currId = desc->getInstanceId();
-
-        if (currId == myId) {
-            assert(args[0].empty());
-            setInstallPath(desc->getPath());
-
-            ipcNameHosts = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_hosts";
-            ipcNameExec  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_exec";
-
-            args[0] = MpiManager::getInstance()->getLauncherBinFile(getInstallPath());
-            validateLauncherArg(args[0]);
-            args[EXEC_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
-            validateLauncherArg(args[EXEC_INDX]);
-            args[HOST_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameHosts);
-            validateLauncherArg(args[HOST_INDX]);
-        }
         addPerInstanceArgsMPICH(myId, desc, clusterUuid, queryId,
                                 launchId, slaveArgs, args, *hosts, false);
     }
@@ -1170,6 +1175,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
            iter!=args.end(); ++iter) {
         string& arg = (*iter);
         sizeArgs += arg.size();
+        LOG4CXX_TRACE(logger, "MPI launcher argument = " << arg);
       }
       LOG4CXX_TRACE(logger, "MPI launcher arguments size = " << sizeArgs);
     }

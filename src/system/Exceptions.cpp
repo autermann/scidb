@@ -60,15 +60,8 @@ Exception::Exception(const char* file, const char* function, int32_t line,
     _stringified_long_error_code(stringified_long_error_code),
     _query_id(query_id)
 {
-#ifndef SCIDB_CLIENT
-    //If in server automatically adjust query id to current if it set to zero.
-    if (_query_id == 0) {
-        _query_id = Query::getCurrentQueryID();
-    }
-#endif
-
     _formatter = boost::format(ErrorsLibrary::getInstance()->getLongErrorMessage(_errors_namespace,
-        _long_error_code));
+                                                                                 _long_error_code));
 }
 
 const string& Exception::getErrorsNamespace() const
@@ -148,6 +141,11 @@ std::string Exception::getErrorMessage() const
 uint64_t Exception::getQueryId() const
 {
     return _query_id;
+}
+
+void Exception::setQueryId(uint64_t queryId)
+{
+    _query_id = queryId;
 }
 
 /*

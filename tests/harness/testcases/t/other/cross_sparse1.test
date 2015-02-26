@@ -6,8 +6,8 @@
 
 create array A <a:int32>[x=0:3,2,0 , y=0:3,2,0 ]
 create array B <a:int32>[x=0:3,2,0 , y=0:3,2,0 ]
-store(build_sparse(A,x*y+100,x<>1),A)
-store(build_sparse(B,x*y+10,x<>2),A)
+store(filter(build(A,x*y+100),x<>1),A)
+store(filter(build(B,x*y+10),x<>2),A)
 
 --test
 cross_join(A,B)

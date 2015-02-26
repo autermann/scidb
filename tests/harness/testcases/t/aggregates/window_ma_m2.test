@@ -1,15 +1,15 @@
 --setup
 --start-query-logging
-create empty array A <a:int32,b:double> [x=0:7,3,2,y=0:2,3,3]
+create array A <a:int32,b:double> [x=0:7,3,2,y=0:2,3,3]
 create array T1 <a:int32> [x=0:7,3,2,y=0:2,3,3]
 create array T2 <b:double> [x=0:7,3,2,y=0:2,3,3]
-store(build_sparse(T1,x+10-y,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12.2-y,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10-y),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12.2-y),x<>2 and x<>5),T2)
 store(filter(join(T1,T2),1),A)
 
 --test
-store(build_sparse(T1,x-10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x-12,x<>2 and x<>5),T2)
+store(filter(build(T1,x-10),x<>2 and x<>5),T1)
+store(filter(build(T2,x-12),x<>2 and x<>5),T2)
 store(filter(join(T1,T2),1),A)
 window(A,8,9,4,5,sum(a),max(a))
 window(A,1,1,1,1,max(a),var(a),stdev(a),count(a),sum(a),min(a))
@@ -20,8 +20,8 @@ window(A,1,1,4,4,count(*),sum(a))
 window(A,2,2,2,3,stdev(a),avg(a))
 window(A,4,4,2,2,var(a),stdev(a))
 
-store(build_sparse(T1,x+10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12),x<>2 and x<>5),T2)
 store(filter(join(T1,T2),1),A)
 window(A,8,9,0,0,sum(b),max(b))
 window(A,1,1,1,1,max(a),var(b),stdev(a),count(a),sum(b),min(a))

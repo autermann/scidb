@@ -35,7 +35,7 @@ pushd "$(dirname "$0")"
 script_dir="`pwd`"
 popd
 
-baseurl="http://downloads.paradigm4.com/centos6.3/3rdparty_sources"
+baseurl="https://downloads.paradigm4.com/centos6.3/3rdparty_sources"
 
 # original URLs stored in ${base_url}/original.txt
 sources="

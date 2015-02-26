@@ -20,11 +20,10 @@
 ########################################
 
 set (io_src
-    DBLoader.cpp
+    ArrayWriter.cpp
     TemplateParser.cpp
     Storage.cpp
     ReplicationManager.cpp
-    DataStore.cpp
 )
 
 file(GLOB io_include "*.h")

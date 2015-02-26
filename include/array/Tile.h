@@ -85,6 +85,10 @@ namespace scidb {
         {
             return _data.size();
         }
+        bool empty() const
+        {
+            return _data.empty();
+        }
         void reserve(size_t n)
         {
             assert(n>0);
@@ -330,6 +334,12 @@ namespace scidb {
                 }
             }
             return result;
+        }
+
+        /// @return true iff the encoding is empty
+        bool empty () const
+        {
+            return _segments.empty();
         }
 
         /**
@@ -804,7 +814,7 @@ namespace scidb {
             _currPos(_currSeg->getStartPosition())
             {
                 assert(_data);
-                assert(e._segments.size() >0);
+                assert(!e._segments.empty());
                 assert(!start || _currPos == 0);
             }
         const_iterator()
@@ -1304,6 +1314,11 @@ namespace scidb {
             return _encoding.size();
         }
         /// @see BaseTile
+        bool empty() const
+        {
+            return _encoding.empty();
+        }
+        /// @see BaseTile
         size_t typeSize() const
         {
             return _encoding.typeSize();
@@ -1445,6 +1460,12 @@ namespace scidb {
         size_t size() const
         {
             return _encoding.size();
+        }
+
+        /// @see BaseTile
+        bool empty() const
+        {
+            return _encoding.empty();
         }
 
         /// @see BaseTile
@@ -1593,6 +1614,12 @@ namespace scidb {
         size_t size() const
         {
             return _encoding.size();
+        }
+
+        /// @see BaseTile
+        bool empty() const
+        {
+            return _encoding.empty();
         }
 
         /// @see BaseTile

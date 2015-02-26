@@ -35,7 +35,6 @@ public class Chunk implements IChunk
     private long arrayId;
     private boolean eof;
     private boolean rle;
-    private boolean sparse;
 
     // Fields for RLE chunk header
     private ByteBuffer chunkData;
@@ -63,7 +62,6 @@ public class Chunk implements IChunk
         arrayId = record.getArrayId();
         eof = record.getEof();
         rle = record.getRle();
-        sparse = record.getSparse();
 
         if (!eof)
         {
@@ -103,11 +101,6 @@ public class Chunk implements IChunk
             if (!rle)
             {
                 throw new Error("Non RLE chunks not yet supported");
-            }
-
-            if (sparse)
-            {
-                throw new Error("Sparse chunks not yet supported");
             }
 
             header = new Header(chunkData);
@@ -154,11 +147,6 @@ public class Chunk implements IChunk
     public boolean endOfArray()
     {
         return eof;
-    }
-
-    public boolean isSparse()
-    {
-        return sparse;
     }
 
     public boolean isRle()

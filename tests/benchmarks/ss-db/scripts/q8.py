@@ -59,7 +59,7 @@ def within(xin,yin):
                 fetch(int(xin-x),int(yin-y),int(z))
 
 def main():
-    query="aggregate(cross_join(normal_groups,filter(sum(project(apply(cross(subarray ( Points, 0,3 ),join(subarray(normal_groups, NULL,NULL,NULL,18) AS Pi,subarray(normal_groups, NULL,1,NULL,NULL) AS Pj)),crosses,iif (((((Pi.y <= Points.y) AND (Pj.y > Points.y)) OR ((Pi.y > Points.y) AND (Pj.y <= Points.y))) AND (Points.x < Pi.x + ((Points.y - Pi.y) / (Pj.y - Pi.y)) * (Pj.x - Pi.x)) AND (Pi.x is not null and Pi.y is not null and Pj.x is not null and Pj.y is not null)), 1, 0)),crosses),crosses,Pj.group), crosses_sum > 0)),avg(normal_groups.x),avg(normal_groups.y),normal_groups.group)"
+    query="aggregate(cross_join(normal_groups,filter(sum(project(apply(cross_join(subarray ( Points, 0,3 ),join(subarray(normal_groups, NULL,NULL,NULL,18) AS Pi,subarray(normal_groups, NULL,1,NULL,NULL) AS Pj)),crosses,iif (((((Pi.y <= Points.y) AND (Pj.y > Points.y)) OR ((Pi.y > Points.y) AND (Pj.y <= Points.y))) AND (Points.x < Pi.x + ((Points.y - Pi.y) / (Pj.y - Pi.y)) * (Pj.x - Pi.x)) AND (Pi.x is not null and Pi.y is not null and Pj.x is not null and Pj.y is not null)), 1, 0)),crosses),crosses,Pj.group), crosses_sum > 0)),avg(normal_groups.x),avg(normal_groups.y),normal_groups.group)"
     result=db.executeQuery(query,"afl")
     xlist=[]
     ylist=[]

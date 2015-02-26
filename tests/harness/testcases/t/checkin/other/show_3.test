@@ -2,16 +2,16 @@
 
 --setup
 --start-query-logging
-create empty array Ts <a:string> [x=-2:3,2,1]
-create empty array Tsn <a:string compression 'no compression'> [x=-2:3,2,1]
-create empty array Ts_rle <a:string  default 'test' compression 'rle'> [x=-2:3,2,1]
-create empty array Ts_d <a:int32 compression 'dictionary'> [x=-2:3,2,1]
-create empty array Ts_ns <a:int64 compression 'null suppression'> [x=-2:3,2,1]
-create empty array Ts_be <a:bool compression 'bitmap encoding'> [x=-2:3,2,1]
-create empty array Ts_z <a:float compression 'zlib'> [x=-2:3,2,1]
-create empty array Ts_bz <a:double compression 'bzlib'> [x=-2:3,2,1]
-create empty array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,1]
-create empty array T2 <b:int32 default 4 compression 'bitmap encoding', a:string default 'test'> [x=-2:3,2,1]
+create array Ts <a:string> [x=-2:3,2,1]
+create array Tsn <a:string compression 'no compression'> [x=-2:3,2,1]
+create array Ts_rle <a:string  default 'test' compression 'rle'> [x=-2:3,2,1]
+create array Ts_d <a:int32 compression 'dictionary'> [x=-2:3,2,1]
+create array Ts_ns <a:int64 compression 'null suppression'> [x=-2:3,2,1]
+create array Ts_be <a:bool compression 'bitmap encoding'> [x=-2:3,2,1]
+create array Ts_z <a:float compression 'zlib'> [x=-2:3,2,1]
+create array Ts_bz <a:double compression 'bzlib'> [x=-2:3,2,1]
+create array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,1]
+create array T2 <b:int32 default 4 compression 'bitmap encoding', a:string default 'test'> [x=-2:3,2,1]
 
 --test
 show(Ts)

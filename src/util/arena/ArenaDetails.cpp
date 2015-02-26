@@ -22,8 +22,8 @@
 
 /****************************************************************************/
 
-#include <system/Constants.h>                            // For kB, MB, and GB
-#include "ArenaDetails.h"                                // For implementation
+#include <system/Constants.h>                        // For KiB, MiB, and GiB
+#include "ArenaDetails.h"                            // For implementation
 
 /****************************************************************************/
 namespace scidb { namespace arena {
@@ -52,19 +52,19 @@ std::ostream& operator<<(std::ostream& o,bytes_t bytes)
         return o << "unlimited";                         // ...as 'unlimited'
     }
     else
-    if (bytes >= GB)                                     // In gigabyte range?
+    if (bytes >= GiB)                                    // In gibibyte range?
     {
-        return o << float(bytes)/GB << "GB";             // ...as gigabytes
+        return o << float(bytes)/GiB << "GiB";           // ...as gibibytes
     }
     else
-    if (bytes >= MB)                                     // In megabyte range?
+    if (bytes >= MiB)                                    // In mebibyte range?
     {
-        return o << float(bytes)/MB << "MB";             // ...as megabytes
+        return o << float(bytes)/MiB << "MiB";           // ...as mebibytes
     }
     else
-    if (bytes >= KB)                                     // In kilobyte range?
+    if (bytes >= KiB)                                    // In kibibyte range?
     {
-        return o << float(bytes)/KB << "KB";             // ...as kilobytes
+        return o << float(bytes)/KiB << "KiB";           // ...as kibibytes
     }
     else                                                 // No special prefix
     {

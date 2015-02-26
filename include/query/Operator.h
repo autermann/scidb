@@ -51,16 +51,16 @@
 #include <boost/serialization/export.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "array/Array.h"
-#include "array/MemArray.h"
-#include "query/TypeSystem.h"
-#include "query/LogicalExpression.h"
-#include "query/Expression.h"
-#include "query/Query.h"
-#include "system/Config.h"
-#include "query/DimensionIndex.h"
-#include "util/InjectedError.h"
-#include "util/ThreadPool.h"
+#include <array/Array.h>
+#include <array/MemArray.h>
+#include <query/TypeSystem.h>
+#include <query/LogicalExpression.h>
+#include <query/Expression.h>
+#include <query/Query.h>
+#include <system/Config.h>
+#include <query/DimensionIndex.h>
+#include <util/InjectedError.h>
+#include <util/ThreadPool.h>
 #include <query/SGChunkReceiver.h>
 
 namespace scidb
@@ -2438,23 +2438,56 @@ const InstanceID COORDINATOR_INSTANCE_MASK = -2;
  * @param psData    a pointer to the data that is specific to the particular partitioning schema
  * @return pointer to new local array with part of array after repart.
  */
-boost::shared_ptr< Array> redistribute(boost::shared_ptr< Array> inputArray, boost::shared_ptr< Query> query,
+boost::shared_ptr< Array> redistribute(boost::shared_ptr< Array> inputArray,
+                                       boost::shared_ptr< Query> query,
                                        PartitioningSchema ps,
                                        const std::string& resultArrayName = "",
                                        InstanceID instanceID = ALL_INSTANCES_MASK,
                                        boost::shared_ptr<DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper> (),
                                        size_t shift = 0,
-                                       PartitioningSchemaData* psData = NULL
-                                       );
+                                       PartitioningSchemaData* psData = NULL );
+
+/**
+ * @note IMPORTANT: FOR INTERNAL USE ONLY. It does not support all the functionality provided by redistribute().
+ * Reistribute (i.e S/G) a given array without full materialization.
+ * It returns an array that streams data when pulled (via an ArrayIterator).
+ * @note IMPORTANT: Each attribute needs to be pulled *completely* (one at a time) before pullRedistribute()/redistribute()
+ * can be called again. An attribute must either be pulled completely or not at all.
+ * After all selected attributes are completely consumed,
+ * the SynchableArray::sync() method must be called on the returned array.
+ * @param inputArray to redistribute, must support at least MULTI_PASS access
+ * @param query context
+ * @param ps new partitioning schema, psReplication is not supported
+ * @param instanceIDMask
+ * @param distMapper
+ * @param shift
+ * @param psData a pointer to the data that is specific to the particular partitioning schema
+ * @return a new SynchableArray if inputArray needs redistribution; inputArray otherwise
+ */
+shared_ptr<Array> pullRedistribute(boost::shared_ptr<Array>& inputArray,
+                                   const boost::shared_ptr<Query>& query,
+                                   PartitioningSchema ps,
+                                   InstanceID instanceIDMask,
+                                   const boost::shared_ptr<DistributionMapper>& distMapper,
+                                   size_t shift,
+                                   const boost::shared_ptr<PartitioningSchemaData>& psData);
 
 AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
                               Attributes const& inputAttributes,
                               AttributeID* inputAttributeID = NULL,
                               string* outputName = NULL);
 
+/**
+ * This function is called by a LogicalOperator's inferSchema, if the operator takes aggregated attributes.
+ * @param aggregateCall   an aggregate call, as a parameter to the operator.
+ * @param inputDesc       the schema of the input array.
+ * @param outputDesc      the schema of the output array.
+ * @param operatorDoesAggregateInOrder  whether the operator guarantees to make aggregate calls in some deterministic order of the values.
+ */
 void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
                              ArrayDesc const& inputDesc,
-                             ArrayDesc& outputDesc);
+                             ArrayDesc& outputDesc,
+                             bool operatorDoesAggregationInOrder);
 
 void syncBarrier(uint64_t barrierId, boost::shared_ptr<scidb::Query> query);
 
@@ -2476,46 +2509,6 @@ boost::shared_ptr<MemArray> redistributeAggregate(boost::shared_ptr<MemArray> in
 PhysicalBoundaries findArrayBoundaries(shared_ptr<Array> srcArray,
                                        boost::shared_ptr<Query> query,
                                        bool global = true);
-
-/**
- * It is common practice that in implementing some PhysicalOperator's execute() method, some code is extracted to a sub-routine.
- * This structure defines some commonly used variables.
- * The expected use case is that a CommonVariablesInExecute object is defined in execute(), and passed by reference to the sub-routine.
- */
-struct CommonVariablesInExecute
-{
-    shared_ptr<Array>& _inputArray;
-    shared_ptr<Array>& _outputArray;
-    shared_ptr<Query>& _query;
-
-    ArrayDesc const& _inputSchema;
-    Attributes const& _inputAttrsWithET;
-    Attributes const& _inputAttrsWithoutET;
-    Dimensions const& _inputDims;
-
-    ArrayDesc const& _outputSchema;
-    Attributes const& _outputAttrsWithET;
-    Attributes const& _outputAttrsWithoutET;
-    Dimensions const& _outputDims;
-
-    CommonVariablesInExecute(
-            shared_ptr<Array>& inputArray,
-            shared_ptr<Array>& outputArray,
-            shared_ptr<Query>& query
-            )
-    : _inputArray(inputArray),
-      _outputArray(outputArray),
-      _query(query),
-      _inputSchema(inputArray->getArrayDesc()),
-      _inputAttrsWithET(inputArray->getArrayDesc().getAttributes(false)),
-      _inputAttrsWithoutET(inputArray->getArrayDesc().getAttributes(true)),
-      _inputDims(inputArray->getArrayDesc().getDimensions()),
-      _outputSchema(outputArray->getArrayDesc()),
-      _outputAttrsWithET(outputArray->getArrayDesc().getAttributes(false)),
-      _outputAttrsWithoutET(outputArray->getArrayDesc().getAttributes(true)),
-      _outputDims(outputArray->getArrayDesc().getDimensions())
-    {}
-};
 
 } // namespace
 

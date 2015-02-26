@@ -74,7 +74,7 @@ namespace scidb {
             }
         }
     public:
-        /// Destuctor
+        /// Destructor
         virtual ~BaseEncoding() {}
 
         /// @return this encoding's ID
@@ -121,6 +121,9 @@ namespace scidb {
 
         /// @return number of data elements in the tile
         virtual size_t size() const = 0;
+
+        /// @return true iff the tile is empty
+        virtual bool empty() const = 0;
 
         /// @return the size in bytes of each data element in the tile, or 0 if variable
         virtual size_t typeSize() const = 0;

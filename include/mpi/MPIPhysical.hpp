@@ -112,6 +112,9 @@ public:
     {
     }
     virtual void setQuery(const boost::shared_ptr<Query>& query);
+
+    virtual void postSingleExecute(shared_ptr<Query> query);
+
 protected:
     // TODO James : speak to Tigor about whether these methods might be implemented on the _ctx instead of around it.
 
@@ -141,12 +144,19 @@ protected:
      * @param resultIpcIndx index into shmIpc of the region which must stay mapped (because it is used in the array/query pipeline)
      */
     void releaseMPISharedMemoryInputs(std::vector<MPIPhysical::SMIptr_t>& shmIpc, size_t resultIpcIndx);
+
+    /// Cleanup the context created by launchMPISlaves()
     void unlaunchMPISlaves() {
-        if (_mustLaunch) {
-            _launcher->destroy();   // need to have saved the launcher?
+        if (!_mustLaunch) {
+            _ctx.reset();
+            assert(!_launcher);
         }
     }
-    void resetMPI() { _ctx.reset(); }
+
+    /// Cleanup the context created by launchMPISlaves() on the instance not participating in the launch
+    void unlaunchMPISlavesNonParticipating() {
+        unlaunchMPISlaves();
+    }
 
     // TODO JHM  to discuss with Tigor
     // it takes these 5 variables for an operator to launch an manage a slave.
@@ -161,7 +171,7 @@ protected:
     uint64_t                              _launchId;	// would like the MpiOperatorContext to track this
     std::string				  _ipcName;
     boost::shared_ptr<MpiOperatorContext> _ctx;
-private:
+    private:
     bool				  _mustLaunch;  // would like the MpiOperatorContext to track this
     boost::shared_ptr<MpiLauncher>        _launcher;    // move to MpiOperatorContext
 };

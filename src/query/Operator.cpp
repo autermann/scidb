@@ -41,6 +41,7 @@
 #include <network/MessageUtils.h>
 #include <system/SystemCatalog.h>
 #include <array/DBArray.h>
+#include <array/TransientCache.h>
 #include <array/FileArray.h>
 #include <query/QueryProcessor.h>
 #include <system/BlockCyclic.h>
@@ -1145,7 +1146,7 @@ boost::shared_ptr<MemArray> redistributeAggregate(boost::shared_ptr<MemArray> in
     //TODO: what we can do here is build a map of all local chunks, send all maps to coordinator, then coordinator
     //can determine in fact the worst-case divisor for this equation. We can do this because our input should always
     //be materialized here.
-    size_t networkBufferLimit = Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER)*MB / instanceCount;
+    size_t networkBufferLimit = std::abs(Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER))*MiB / instanceCount;
 
     if (instanceCount == 1)
     {
@@ -1359,7 +1360,7 @@ AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>cons
 
             if (inputAttributeID)
             {
-                *inputAttributeID = (AttributeID) -1;
+                *inputAttributeID = INVALID_ATTRIBUTE_ID;
             }
             if (outputName)
             {
@@ -1406,11 +1407,19 @@ AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>cons
     return AggregatePtr();
 }
 
-void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall, ArrayDesc const& inputDesc, ArrayDesc& outputDesc)
+void addAggregatedAttribute (
+        boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
+        ArrayDesc const& inputDesc,
+        ArrayDesc& outputDesc,
+        bool operatorDoesAggregationInOrder)
 {
     string outputName;
 
     AggregatePtr agg = resolveAggregate(aggregateCall, inputDesc.getAttributes(), 0, &outputName);
+
+    if ( !operatorDoesAggregationInOrder && agg->isOrderSensitive() ) {
+        throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_AGGREGATION_ORDER_MISMATCH) << agg->getName();
+    }
 
     outputDesc.addAttribute( AttributeDesc(outputDesc.getAttributes().size(),
                                            outputName,
@@ -1419,18 +1428,16 @@ void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const
                                            0));
 }
 
-namespace {
 /**
- * @return true if there are no values in the chunk body or in the ovelap
+ * Record the array 't' in the transient array cache. Implements a callback
+ * that is suitable for use as a query finalizer.
  */
-bool isEmpty(const ConstChunk* chunk)
+static void recordTransient(const MemArrayPtr& t,const QueryPtr& query)
 {
-    assert(chunk);
-    shared_ptr<ConstChunkIterator> ci =
-       chunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS); // but do not ignore the overlap
-    assert(ci);
-    return (ci->end());
-}
+    if (query->wasCommitted())                           // Was committed ok?
+    {
+        transient::record(t);                            // ...record in cache
+    }
 }
 
 boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
@@ -1446,7 +1453,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
 
     uint64_t totalBytesSent = 0;
     uint64_t totalBytesSynced = 0;
-    size_t networkBufferLimit = Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER)*MB;
+    size_t networkBufferLimit = std::abs(Config::getInstance()->getOption<int>(CONFIG_NETWORK_BUFFER))*MiB;
 
     /**
      * Creating result array with the same descriptor as the input one
@@ -1488,23 +1495,39 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
 
     boost::shared_ptr<Array> outputArray;
     ArrayID resultArrayId = 0;
-    SystemCatalog* catalog = NULL;
     PhysicalBoundaries bounds = PhysicalBoundaries::createEmpty(nDims);
     boost::shared_ptr<JobQueue> incomingQueue;
 
-    if (resultArrayName.empty()) {
+    if (resultArrayName.empty())
+    {
         outputArray = createTmpArray(desc, query);
+
         LOG4CXX_DEBUG(logger, "Temporary array was opened")
-    } else {
-        outputArray = boost::shared_ptr<Array>(DBArray::newDBArray(resultArrayName, query));
-        resultArrayId = outputArray->getHandle();
-        query->getReplicationContext()->enableInboundQueue(resultArrayId, outputArray);
-        incomingQueue = PhysicalOperator::getGlobalQueueForOperators();
-        catalog = SystemCatalog::getInstance();
-        LOG4CXX_DEBUG(logger, "Array " << resultArrayName << " was opened")
+    }
+    else
+    {
+        ArrayDesc outputDesc;
+        SystemCatalog::getInstance()->getArrayDesc(resultArrayName, outputDesc, false);
+
+        if (outputDesc.isTransient())
+        {
+            outputArray.reset(new MemArray(outputDesc,query));
+            resultArrayId = outputDesc.getUAId();
+            query->pushFinalizer(bind(&recordTransient,outputArray,_1));
+        }
+        else
+        {
+            outputArray = boost::shared_ptr<Array>(DBArray::newDBArray(resultArrayName, query));
+            resultArrayId = outputArray->getHandle();
+            query->getReplicationContext()->enableInboundQueue(resultArrayId, outputArray);
+            incomingQueue = PhysicalOperator::getGlobalQueueForOperators();
+            LOG4CXX_DEBUG(logger, "Array " << resultArrayName << " was opened")
+         }
     }
 
     ArrayDesc const& dstDesc = outputArray->getArrayDesc();
+
+    ASSERT_EXCEPTION( (!query->getOperatorContext()), "SG");
 
     barrier(0, networkManager, query, instanceCount);
     /**
@@ -1541,7 +1564,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
         const ConstChunk& firstAttrChunk = inputIters[0]->getChunk();
 
         // Check if the chunks have any values
-        bool chunkHasElems = (!firstAttrChunk.isRLE()) || (!isEmptyable) || (!isEmpty(&firstAttrChunk));
+        bool chunkHasElems = (!firstAttrChunk.isRLE()) || (!isEmptyable) || (!firstAttrChunk.isEmpty());
 
         for (AttributeID attrId = nAttrs; attrId-- != 0;)
         {
@@ -1575,7 +1598,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
                     if (!attributeDesc.isEmptyIndicator()) {
                         emptyBitmap = sharedEmptyBitmap;
                     }
-                    assert(chunkHasElems != isEmpty(&chunk));
+                    assert(chunkHasElems != chunk.isEmpty());
                 }
 
                 // Sending current chunk to instanceID instance or saving locally
@@ -1653,18 +1676,22 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
     }
 
     if (resultArrayId != 0) {
-        catalog->updateArrayBoundaries(dstDesc, bounds);
-        if (sgCtx->_targetVersioned)
-        {   //storing sg and array is mutable - insert tombstones:
-            StorageManager::getInstance().removeDeadChunks(outputArray->getArrayDesc(), sgCtx->_newChunks, query);
+        SystemCatalog::getInstance()->updateArrayBoundaries(dstDesc, bounds);
+
+        if (!dstDesc.isTransient())
+        {
+            if (sgCtx->_targetVersioned)
+            {   //storing sg and array is mutable - insert tombstones:
+                StorageManager::getInstance().removeDeadChunks(outputArray->getArrayDesc(), sgCtx->_newChunks, query);
+            }
+
+            // XXX TODO: at this point the replicas can still be arriving to this instance
+            // so the flush is a bit premature.
+            query->getReplicationContext()->replicationSync(resultArrayId);
+            query->getReplicationContext()->removeInboundQueue(resultArrayId);
+
+            StorageManager::getInstance().flush();
         }
-
-        // XXX TODO: at this point the replicas can still be arriving to this instance
-        // so the flush is a bit premature.
-        query->getReplicationContext()->replicationSync(resultArrayId);
-        query->getReplicationContext()->removeInboundQueue(resultArrayId);
-
-        StorageManager::getInstance().flush();
     }
     LOG4CXX_DEBUG(logger, "Finishing SCATTER/GATHER work; sent " << totalBytesSent << " bytes.");
     return outputArray;
@@ -1939,7 +1966,7 @@ bool StoreJob::hasValues(ConstChunk const& srcChunk)
 
     // XXX TODO: until we have the single RLE? data format,
     //           we need to filter out other depricated formats (e.g. dense/sparse/nonempyable)
-    bool chunkHasVals = (!srcChunk.isRLE()) || (!isSrcEmptyable) || (!isEmpty(&srcChunk));
+    bool chunkHasVals = (!srcChunk.isRLE()) || (!isSrcEmptyable) || (!srcChunk.isEmpty());
     return chunkHasVals;
 }
 

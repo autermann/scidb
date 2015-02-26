@@ -119,7 +119,7 @@ public:
         if (i < nDims * 2) {
             res.push_back( PARAM_CONSTANT(TID_INT64));
         }
-        if (i == 0 || i >= nDims * 2) {
+        else {
             res.push_back(END_OF_VARIES_PARAMS());
         }
         return res;
@@ -147,49 +147,39 @@ public:
         Coordinates lowPos(nDims);
         Coordinates highPos(nDims);
 
-        if (_parameters.size() == 0) {
-            for (size_t i = 0; i < nDims; i++) {
-                lowPos[i] = dims[i].getLowBoundary();
-                highPos[i] = dims[i].getHighBoundary();
+        for (size_t i = 0; i < nDims; i++) {
+            Value const& low =
+                evaluate(
+                    ((boost::shared_ptr<
+                        OperatorParamLogicalExpression>&) _parameters[i])->getExpression(), query, TID_INT64);
+            if ( low.isNull()  || low.getInt64() < dims[i].getStart())
+            {
+                lowPos[i] = dims[i].getStart();
             }
-        } else {
-            for (size_t i = 0; i < nDims; i++) {
-                Value const& low =
-                        evaluate(
-                                ((boost::shared_ptr<
-                                        OperatorParamLogicalExpression>&) _parameters[i])->getExpression(),
-                                query, TID_INT64);
-                if (low.isNull()) {
-                    lowPos[i] = dims[i].getLowBoundary();
-                } else {
-                    lowPos[i] = low.getInt64();
-                    if (dims[i].getStart() != MIN_COORDINATE
-                            && lowPos[i] < dims[i].getStart()) {
-                        lowPos[i] = dims[i].getStart();
-                    }
-                }
-                Value const& high =
-                        evaluate(
-                                ((boost::shared_ptr<
-                                        OperatorParamLogicalExpression>&) _parameters[i
-                                        + nDims])->getExpression(), query,
-                                TID_INT64);
-                if (high.isNull()) {
-                    highPos[i] = dims[i].getHighBoundary();
-                } else {
-                    highPos[i] = high.getInt64();
-                    if (highPos[i] > dims[i].getEndMax()) {
-                        highPos[i] = dims[i].getEndMax();
-                    }
-                }
-                if (lowPos[i] > highPos[i]) {
-                    highPos[i] = lowPos[i] - 1;
-                    /*
+            else
+            {
+                lowPos[i] = low.getInt64();
+            }
+            Value const& high =
+                evaluate(
+                    ((boost::shared_ptr<
+                        OperatorParamLogicalExpression>&) _parameters[i + nDims])->getExpression(), query, TID_INT64);
+            if ( high.isNull() || high.getInt64() > dims[i].getEndMax())
+            {
+                highPos[i] = dims[i].getEndMax();
+            }
+            else
+            {
+                highPos[i] = high.getInt64();
+            }
+            if (lowPos[i] > highPos[i])
+            {
+                highPos[i] = lowPos[i] - 1;
+                /*
                      throw USER_QUERY_EXCEPTION(SCIDB_E_WRONG_SYNTAX,
                      "Invalid coordinate range",
                      _parameters[i]->getParsingContext());
-                     */
-                }
+                 */
             }
         }
 

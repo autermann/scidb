@@ -51,31 +51,37 @@
         </listitem>
       </itemizedlist></para>
 
-    <para>For example, if you are upgrading from 13.12 to
-    &scidb_version;:<itemizedlist>
+    <para>For example, if you are upgrading from 14.3 to 14.7:<itemizedlist>
         <listitem>
-          <para><emphasis role="bold">scidbOldVersion</emphasis> =
-          13.12</para>
+          <para><emphasis role="bold">scidbOldVersion</emphasis> = 14.3</para>
         </listitem>
 
         <listitem>
-          <para><emphasis role="bold">scidbNewVersion</emphasis> =
-          &scidb_version;</para>
+          <para><emphasis role="bold">scidbNewVersion</emphasis> = 14.7</para>
         </listitem>
       </itemizedlist></para>
 
-    <para>The preferred way to upgrade SciDB is to use the supplied backup
+    <note>
+      <para>The upgrade procedure requires that you update packages on all
+      hosts in the SciDB cluster. If any host accommodates other software
+      besides SciDB, the upgrade to packages might cause version skew.
+      Remember, it is recommended that all nodes in the SciDB cluster be
+      devoted exclusively to SciDB.</para>
+    </note>
+
+    <para>Before upgrading SciDB, you should back up your data using the
     script, <code>scidb_backup.py</code>. This file is in the
-    /opt/scidb/&scidb_version;/bin folder. Perform the following tasks:</para>
+    /opt/scidb/14.7/bin folder. Perform the following tasks:</para>
 
     <procedure>
       <step>
-        <para>Backup your data before upgrading—upgrading to 14.3 cannot be
-        done in-place. From the <emphasis role="bold">scidb</emphasis> user
-        account, run the backup script. As an example, the following command
-        creates a folder, <emphasis role="bold">./mySavedArrays</emphasis>,
-        and save all of your arrays, using the OPAQUE format, into that
-        folder:<programlisting>$ /opt/scidb/&scidb_version;/bin/scidb_backup.py -s opaque mySavedArrays</programlisting>For
+        <para>Backup your data before upgrading—upgrading to 14.7 cannot be
+        done in-place. First, confirm that you have enough storage space,
+        because the following command will backup all your SciDB arrays. From
+        the <emphasis role="bold">scidb</emphasis> user account, run the
+        backup script. As an example, the following command creates a folder,
+        <emphasis role="bold">./mySavedArrays</emphasis>, and save all of your
+        arrays, using the OPAQUE format, into that folder:<programlisting>$ /opt/scidb/14.7/bin/scidb_backup.py -s opaque mySavedArrays</programlisting>For
         usage details of the backup script, see <xref
         linkend="upgradeBackup"/>.</para>
       </step>
@@ -102,58 +108,8 @@
 
       <step>
         <para><emphasis role="bold">Upgrade. </emphasis>Perform the following
-        steps to upgrade to the latest version of SciDB.<note>
-            <para>In a cluster, this step must be performed on all
-            servers.</para>
-          </note><orderedlist numeration="loweralpha">
-            <listitem>
-              <para>Append the repository URL to the correct
-              file:<itemizedlist>
-                  <listitem>
-                    <para><emphasis role="bold">Ubuntu: </emphasis>Append the
-                    following lines to the
-                    <code>/etc/apt/sources.list.d/scidb.list</code>
-                    file:<programlisting>deb  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/
-deb-src  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/</programlisting></para>
-                  </listitem>
-
-                  <listitem>
-                    <para><emphasis role="bold">CentOS / RHEL:
-                    </emphasis>Append the following line to the
-                    <code>/etc/yum.repos.d/scidb.repo</code>
-                    file:<programlisting>baseurl=http://downloads.paradigm4.com/centos6.3/&scidb_version;/</programlisting></para>
-                  </listitem>
-                </itemizedlist></para>
-            </listitem>
-
-            <listitem>
-              <para>Run the update and install commands:<itemizedlist>
-                  <listitem>
-                    <para><emphasis
-                    role="bold">Ubuntu:</emphasis><programlisting>sudo apt-get update
-sudo apt-get install scidb-&scidb_version;-all</programlisting></para>
-                  </listitem>
-
-                  <listitem>
-                    <para><emphasis role="bold">CentOS /
-                    RHEL:</emphasis><programlisting>sudo yum clean all
-sudo yum update
-sudo yum install scidb-&scidb_version;-all</programlisting></para>
-                  </listitem>
-                </itemizedlist>For more details, see <xref
-              linkend="PackageInstall"/>.</para>
-            </listitem>
-
-            <listitem>
-              <para>Update your environment variables to refer to the new
-              version of SciDB. Make sure to change your SciDB Version
-              variable from its current value to the <emphasis
-              role="bold">scidbNewVersion</emphasis>. Old
-              version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbOldVersion</emphasis> # This should be set in your environment.</programlisting>Set
-              to new version:<programlisting>export SCIDB_VER=&scidb_version;</programlisting>For
-              details, see <xref linkend="environmentVariables"/>.</para>
-            </listitem>
-
+        steps to upgrade to the latest version of SciDB.<orderedlist
+            numeration="loweralpha">
             <listitem>
               <para>Set up your configuration file, including setting the
               <code> enable-catalog-upgrade </code>parameter to
@@ -161,19 +117,23 @@ sudo yum install scidb-&scidb_version;-all</programlisting></para>
               <emphasis role="bold">scidbOldVersion</emphasis> to <emphasis
               role="bold">scidbNewVersion</emphasis>. After you edit the file,
               copy it to the
-              <literal>/opt/scidb/&scidb_version;</literal><literal>/etc/</literal>
+              <literal>/opt/scidb/14.7</literal><literal>/etc/</literal>
               folder.</para>
 
               <para>Typically, the following settings are
-              affected:<programlisting>install_root=/opt/scidb/13.12
-pluginsdir=/opt/scidb/13.12/lib/scidb/plugins
-logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
+              affected:<programlisting>install_root=/opt/scidb/14.3
+pluginsdir=/opt/scidb/14.3/lib/scidb/plugins
+logconf=/opt/scidb/14.3/share/scidb/log4cxx.properties</programlisting></para>
 
               <para>Also, make sure to add the following setting to the
               configuration file (if it does not already
               exist):<programlisting>enable-catalog-upgrade=true</programlisting>For
               more details about the configuration file, see <xref
               linkend="ConfiguringSciDB"/>.</para>
+            </listitem>
+
+            <listitem>
+              <para>Run the cluster install procedure.</para>
             </listitem>
 
             <listitem>
@@ -197,7 +157,7 @@ logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
         version of SciDB running, restore any data that you backed up in step
         1. For example, if you used the command in step 1 to backup your
         arrays, you would run the following command to restore
-        them:<programlisting>$ /opt/scidb/&scidb_version;/bin/scidb_backup.py -r opaque mySavedArrays</programlisting></para>
+        them:<programlisting>$ /opt/scidb/14.7/bin/scidb_backup.py -r opaque mySavedArrays</programlisting></para>
       </step>
     </procedure>
   </section>
@@ -237,8 +197,8 @@ logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
 
               <listitem>
                 <para>On the second server: <emphasis
-                role="bold">backup.1</emphasis> and <emphasis
-                role="bold">backup.2</emphasis></para>
+                role="bold">backup.2</emphasis> and <emphasis
+                role="bold">backup.3</emphasis></para>
               </listitem>
             </itemizedlist></para>
         </listitem>
@@ -336,8 +296,8 @@ logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
           <para>The OPAQUE save/load format is the most efficient way to back
           up your array data. It is guaranteed to work between consecutive
           versions. For example, if you save your arrays (in Opaque format)
-          from version 13.12, you can use Opaque load to load them directly
-          into version 14.3, without needing to perform a redimension. Make
+          from version 14.3, you can use Opaque load to load them directly
+          into version 14.7, without needing to perform a redimension. Make
           sure to reload the saved array into the a SciDB installation with
           identical database configuration parameters.</para>
         </listitem>
@@ -360,45 +320,69 @@ logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
     <section id="manualbackup">
       <title>Manually Backup Your Arrays</title>
 
-      <para>If you are upgrading to 14.3 from an earlier version than 13.12
-      (e.g. 13.9 or 13.6), and backing up manually, then we recommend that you
-      use binary save/load. The following steps walk through saving and then
-      restoring a small example array.</para>
+      <para>If you are upgrading to 14.7 from an earlier version than 14.3
+      (e.g. 13.12 or 13.9), and backing up manually, then we recommend that
+      you use binary save/load. The following steps walk through saving and
+      then restoring a small example array.</para>
 
       <procedure>
         <step>
           <para>Assume you have the following array in SciDB, in version
-          13.12.<programlisting language="test">--afl CREATE ARRAY intensityFlat &lt; exposure:string, elapsedTime:int64,
-      measuredIntensity:int64 null &gt; [i=0:24,5,0]; --show-query=no --show-output=no
---afl load(intensityFlat,'../tests/harness/testcases/data/doc/intensity_data.bin',-2,
-      '(string, int64, int64 null)'); --show-query=no --show-output=no
---afl store(build(&lt;elevation:int64&gt;[i=0:24,5,0],random()%1000),plus);
-      --show-query=no --show-output=no --show-output-in-test-file=no
---afl store(join(intensityFlat,plus),saveExample);
-      --show-query=no --show-output=no --show-output-in-test-file=no
+          14.3.<programlisting>AFL% show(notFlat)
+ 
+notFlat
 
---afl create array notFlat&lt;exposure:string,measuredIntensity:int64
-      NULL DEFAULT null&gt; [elevation=0:999,100,0,elapsedTime=0:15,16,0];
-      --show-output=no --show-query=no
---schema notFlat
---afl store(redimension(saveExample, notFlat),notFlat); --show-query=no
-      --show-output-in-test-file=no
+&lt; exposure:string,
+measuredIntensity:int64 NULL DEFAULT null &gt;
+
+[elevation=0:999,100,0,
+elapsedTime=0:15,16,0]
+</programlisting><programlisting>{elevation,elapsedTime} exposure,measuredIntensity
+{21,6} 'Low',35
+{29,2} 'Medium',89
+{51,4} 'Medium',null
+{89,1} 'Medium',95
+{191,3} 'High',99
+{222,5} 'Low',41
+{238,5} 'High',97
+{288,3} 'Medium',null
+{320,1} 'High',100
+{378,0} 'Low',100
+{390,7} 'Low',29
+{490,3} 'Low',60
+{549,2} 'Low',71
+{583,0} 'Medium',100
+{629,0} 'High',100
+{632,7} 'High',null
+{670,5} 'Medium',80
+{787,7} 'Medium',77
+{800,4} 'Low',50
+{834,6} 'High',null
+{838,1} 'Low',85
+{850,6} 'Medium',78
+{890,2} 'High',99
+{999,4} 'High',98
 </programlisting></para>
         </step>
 
         <step>
           <para>We need to unpack this data into a 1-dimensional array, and
-          then save it.<programlisting language="test">--afl save(unpack(notFlat,myDim), 'notFlat_saved.bin', -2, '(int64,int64,string, int64 null)');
-      --show-output=no</programlisting>This saves the array data into a 1-D
-          binary array on the coordinator instance.</para>
+          then save it.<programlisting>AFL% save(unpack(notFlat,myDim), 
+'notFlat_saved.bin', -2, 
+'(int64,int64,string, int64 null)');
+</programlisting>This saves the array data into a 1-D binary array on the
+          coordinator instance.</para>
         </step>
 
         <step>
           <para>To restore, you will need to recreate the 1-D intermediate
           array. The following query returns the schema we
-          need.<programlisting language="test">--afl show('unpack(notFlat,myDim)','afl'); --show-output=no
---afl store(unpack(notFlat,myDim),notFlat_unpacked); --show-query=no --show-output=no
---schema notFlat_unpacked --show-query=no --anon=yes</programlisting></para>
+          need.<programlisting>AFL% show('unpack(notFlat,myDim)','afl');:</programlisting><programlisting>&lt; elevation:int64,
+elapsedTime:int64,
+exposure:string,
+measuredIntensity:int64 NULL DEFAULT null &gt;
+
+[myDim=0:*,16000,0]</programlisting></para>
         </step>
       </procedure>
     </section>
@@ -424,8 +408,8 @@ logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
 
         <step>
           <para>Now, we can load the saved data into our new 1-D
-          array.<programlisting language="test">--afl load(restored_1D_Array, 'notFlat_saved.bin', -2,
-      '(int64, int64, string, int64 null)'); --show-output=no</programlisting></para>
+          array.<programlisting>AFL% load(restored_1D_Array, 'notFlat_saved.bin', -2,
+      '(int64, int64, string, int64 null)'); </programlisting></para>
         </step>
 
         <step>
@@ -436,7 +420,34 @@ logconf=/opt/scidb/13.12/share/scidb/log4cxx.properties</programlisting></para>
 
         <step>
           <para>Finally, redimension the 1-D array into the target
-          array.<programlisting language="test">--afl store(redimension(restored_1D_Array, restoredFinal),restoredFinal); --show-output-in-test-file=no</programlisting></para>
+          array.<programlisting>AFL% store(redimension(restored_1D_Array, restoredFinal),
+           restoredFinal);
+
+{elevation,elapsedTime} exposure,measuredIntensity
+{21,6} 'Low',35
+{29,2} 'Medium',89
+{51,4} 'Medium',null
+{89,1} 'Medium',95
+{191,3} 'High',99
+{222,5} 'Low',41
+{238,5} 'High',97
+{288,3} 'Medium',null
+{320,1} 'High',100
+{378,0} 'Low',100
+{390,7} 'Low',29
+{490,3} 'Low',60
+{549,2} 'Low',71
+{583,0} 'Medium',100
+{629,0} 'High',100
+{632,7} 'High',null
+{670,5} 'Medium',80
+{787,7} 'Medium',77
+{800,4} 'Low',50
+{834,6} 'High',null
+{838,1} 'Low',85
+{850,6} 'Medium',78
+{890,2} 'High',99
+{999,4} 'High',98</programlisting></para>
         </step>
       </procedure>
     </section>

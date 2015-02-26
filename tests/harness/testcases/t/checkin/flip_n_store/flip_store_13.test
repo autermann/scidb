@@ -1,18 +1,18 @@
 --setup
-create empty array A <a:int64,b:int64>[x=0:2,3,0]
-create empty array T <a:int64>[x=0:2,3,0]
-create empty array B <b:int64>[a=0:3,1,0]
+create array A <a:int64,b:int64>[x=0:2,3,0]
+create array T <a:int64>[x=0:2,3,0]
+create array B <b:int64>[a=0:3,1,0]
 
 --test
-store(join(build_sparse(T,x+1,x=1),build_sparse(T,x+10,x=1)),A)
+store(join(filter(build(T,x+1),x=1),filter(build(T,x+10),x=1)),A)
 store(redimension(A,B),B)
 unpack(B,row)
 
-store(join(build_sparse(T,x+1,x<>1),build_sparse(T,x+10,x<>1)),A)
+store(join(filter(build(T,x+1),x<>1),filter(build(T,x+10),x<>1)),A)
 store(redimension(A,B),B)
 unpack(B,row)
 
-store(join(build_sparse(T,x+1,x<>2),build_sparse(T,x+10,x<>2)),A)
+store(join(filter(build(T,x+1),x<>2),filter(build(T,x+10),x<>2)),A)
 store(redimension(A,B),B)
 unpack(B,row)
 

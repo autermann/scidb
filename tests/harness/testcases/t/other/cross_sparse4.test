@@ -7,7 +7,7 @@ create  array A <a:char,b:char>[x=0:3,2,0]
 create array B <b:char>[a(char)=4,2,0]
 create array C <a:char>[b(char)=4,2,0]
 create array T <a:char>[x=0:3,2,0]
-store(join(build_sparse(T,string(x+1),x<>2),build_sparse(T,string(x+5),x<>0)),A)
+store(join(filter(build(T,string(x+1)),x<>2),filter(build(T,string(x+5)),x<>0)),A)
 
 
 --test

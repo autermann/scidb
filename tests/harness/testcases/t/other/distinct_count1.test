@@ -7,7 +7,7 @@ create array A1 <val1:double> [x=0:3,2,0,y=0:3,2,0]
 store(build(A1,x+y+2.5),A1)
 
 create array A2 <val1:double> [x=0:3,2,0,y=0:3,2,0]
-load(A2,'../tests/harness/testcases/data/adc1.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A2,'${TEST_DATA_DIR}/adc1.txt')""
 
 create array A3 <val1:int32> [x=0:3,2,0,y=0:3,2,0]
 store(build(A3,x+y+1),A3)
@@ -23,7 +23,7 @@ store(build(A6,x+y+1.5),A6)
 
 load_library ('rational')
 create array A7 <val1:rational> [x=0:3,2,0,y=0:3,2,0]
-load(A7,'../tests/harness/testcases/data/adc2.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A7,'${TEST_DATA_DIR}/adc2.txt')""
 
 
 --test

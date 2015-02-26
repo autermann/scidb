@@ -6,9 +6,9 @@
 create array b <sum: double>[k=1:4,2,1]
 store(build(b, 1.0/k), b)
 CREATE ARRAY d1 <a1: double NULL> [x=0:4,3,0, y=-2:1,2,1]
-store(build_sparse(d1, 1.0*x+100.0*y, x<>y),d1)
+store(filter(build(d1, 1.0*x+100.0*y), x<>y),d1)
 CREATE ARRAY d2 <a1: double NULL> [x=0:3,3,2, y=-2:1,2,1]
-store(build_sparse(d2, 1.0*x+100.0*y, x<>y),d2)
+store(filter(build(d2, 1.0*x+100.0*y), x<>y),d2)
 
 
 --test

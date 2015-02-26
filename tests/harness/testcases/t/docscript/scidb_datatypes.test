@@ -2,27 +2,27 @@
 --test
 --start-query-logging
 
+--set-format dcsv
+--start-igdata
+create array datetime1 <dt:datetime>[i=0:*,100,0]  
+create array datetime2 <dtz:datetimetz>[i=0:*,100,0]  
+--shell --store --command="cat $DOC_DATA/dateformats.scidb "
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(datetime1,'${TEST_DATA_DIR}/doc/dateformats.scidb')""
+--set-format csv+
+--stop-igdata
+scan(datetime1) 
+--shell --store --command="cat $DOC_DATA/dateformatsTZ.scidb "
+--set-format dcsv
+--start-igdata
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(datetime2,'${TEST_DATA_DIR}/doc/dateformatsTZ.scidb')""
+--set-format csv+
+--stop-igdata
+scan(datetime2) 
 --set-format dense
 store(build(<a1: int32>[i=0:0,1,0],2),A)  
 --set-format dcsv
 apply(A, a2, double(a1))  
 apply(A, a2, string(a1))  
---start-igdata
-create array datetime1 <dt:datetime>[i=0:*,100,0]  
-create array datetime2 <dtz:datetimetz>[i=0:*,100,0]  
---shell  --command="cat $DOC_DATA/dateformats.scidb " --store
-load(datetime1,'../tests/harness/testcases/data/doc/dateformats.scidb')  
---set-format csv+
---stop-igdata
-scan(datetime1) 
---shell  --command="cat $DOC_DATA/dateformatsTZ.scidb " --store
---set-format dcsv
---start-igdata
-load(datetime2,'../tests/harness/testcases/data/doc/dateformatsTZ.scidb')  
---set-format csv+
---stop-igdata
-scan(datetime2) 
---set-format dcsv
 --start-igdata
 create array T<td: datetime>[i=0:0,1,0]  
 --set-format dense
@@ -50,8 +50,8 @@ apply(T1,dst,togmt(t))
 
 --cleanup
 
-remove(A)
 remove(datetime1)
 remove(datetime2)
+remove(A)
 remove(T)
 remove(T1)

@@ -27,6 +27,7 @@
  *      Author: Knizhnik
  */
 
+#include <boost/foreach.hpp>
 #include "query/Operator.h"
 #include "system/SystemCatalog.h"
 #include "system/Exceptions.h"
@@ -95,8 +96,8 @@ class LogicalJoin: public LogicalOperator
         size_t totalAttributes = leftAttributes.size() + rightAttributes.size();
         int nBitmaps = 0;
         nBitmaps += (leftArrayDesc.getEmptyBitmapAttribute() != NULL);
-        nBitmaps += (rightArrayDesc.getEmptyBitmapAttribute() != NULL); 
-        if (nBitmaps == 2) { 
+        nBitmaps += (rightArrayDesc.getEmptyBitmapAttribute() != NULL);
+        if (nBitmaps == 2) {
             totalAttributes -= 1;
         }
 
@@ -119,7 +120,7 @@ class LogicalJoin: public LogicalOperator
                 attr.getDefaultValueExpr());
             joinAttributes[j].addAlias(rightArrayDesc.getName());
         }
-        if (j < totalAttributes) { 
+        if (j < totalAttributes) {
             joinAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR,
                 AttributeDesc::IS_EMPTY_INDICATOR, 0);
         }

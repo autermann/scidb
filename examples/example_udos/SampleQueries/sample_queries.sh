@@ -62,9 +62,9 @@ iquery -aq "create array trades
 
 #Use the index to redimension trades into a new integer dimension symbol_id
 #Note: the lookup array stock_symbols does not have to come from the same data set.
-iquery -anq "redimension_store(
+iquery -anq "store(redimension(
  index_lookup(trades_flat, stock_symbols, trades_flat.symbol, symbol_id),
- trades
+ trades), trades
 )" > /dev/null
 
 echo

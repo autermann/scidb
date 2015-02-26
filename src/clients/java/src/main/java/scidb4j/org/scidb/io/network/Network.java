@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
 
+import org.scidb.util.InputStreamWithReadall;
+
 /**
  * Class for handling reading and writing arbitrary network messages syncronously
  */
@@ -96,7 +98,7 @@ public class Network
      */
     public Message read() throws org.scidb.client.Error, IOException
     {
-        return Message.parseFromStream(sock.getInputStream());
+        return Message.parseFromStream(new InputStreamWithReadall(sock.getInputStream()));
     }
 
     /**

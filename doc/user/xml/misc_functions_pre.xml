@@ -246,28 +246,7 @@
     <title>Examples</title>
 
     <informalexample>
-      <para>These examples illustrates the miscellaneous functions.</para>
-    </informalexample>
-
-    <informalexample>
-      <para>Use the <literal>instanceid</literal> function to check the
-      distribution of chunks for array A1 over the instances. This example
-      assumes that your SciDB cluster contains four instances.</para>
-
-      <procedure>
-        <step>
-          <para>Construct an array that contains 1 million random integers
-          from 0 to 999.<programlisting>create array A1 &lt;val:int32&gt; [i=0:999,100,0, j=0:999,100,0];
-store(build(A1,random()/999),A1);</programlisting>The dimension sizes are both
-          1000; thus the array contains 1 million values, split into 100
-          chunks.</para>
-        </step>
-
-        <step>
-          <para>We can filter on the instance ID, and then count the number of
-          elements on each instance.<programlisting>count(filter(apply(A1,instanceid, instanceid()),instanceid=0));</programlisting><screen>[(260000)]</screen><programlisting>count(filter(apply(A1,instanceid, instanceid()),instanceid=1));</programlisting><screen>[(260000)]</screen><programlisting>count(filter(apply(A1,instanceid, instanceid()),instanceid=2));</programlisting><screen>[(260000)]</screen><programlisting>count(filter(apply(A1,instanceid, instanceid()),instanceid=3));</programlisting><screen>[(260000)]</screen></para>
-        </step>
-      </procedure>
+      <para>These examples illustrate the miscellaneous functions.</para>
     </informalexample>
 
     <informalexample>

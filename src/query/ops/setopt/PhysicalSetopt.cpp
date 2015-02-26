@@ -28,12 +28,16 @@
  * Physical implementation of SETOPT operator for setopting data from text files
  */
 
-#include <string.h>
-
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
 #include "array/TupleArray.h"
 #include "system/Config.h"
+
+#include <log4cxx/logger.h>
+
+// Logger for operator. static to prevent visibility of variable outside of file
+static log4cxx::LoggerPtr logger(
+    log4cxx::Logger::getLogger("scidb.query.ops.setopt"));
 
 using namespace std;
 using namespace boost;
@@ -44,29 +48,50 @@ namespace scidb
 class PhysicalSetopt: public PhysicalOperator
 {
   public:
-    PhysicalSetopt(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
-    {
-    }
+    PhysicalSetopt(const string& logicalName,
+                   const string& physicalName,
+                   const Parameters& parameters,
+                   const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
+    { }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
     {
-        std::string name = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
-        vector< boost::shared_ptr<Tuple> > tuples(1);        
+        string oldValue;
+        vector< shared_ptr<Tuple> > tuples(1);        
+
+        shared_ptr<OperatorParamPhysicalExpression> p0 =
+            (shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0];
+        string name = p0->getExpression()->evaluate().getString();
+
         if (_parameters.size() == 2) { 
-            std::string newValue = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
-            std::string oldValue = Config::getInstance()->setOptionValue(name, newValue);
+            shared_ptr<OperatorParamPhysicalExpression> p1 =
+                (shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1];
+            string newValue = p1->getExpression()->evaluate().getString();
+
+            try {
+                oldValue =
+                    Config::getInstance()->setOptionValue(name, newValue);
+            }
+            catch (std::exception& e) {
+                LOG4CXX_WARN(logger, "Cannot set option '" << name << "' to '"
+                             << newValue << "': " << e.what());
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION,
+                                     SCIDB_LE_ERROR_NEAR_CONFIG_OPTION)
+                    << e.what() << name;
+            }
+
             Tuple& tuple = *new Tuple(2);
             tuple[0].setString(oldValue.c_str());
             tuple[1].setString(newValue.c_str());
-            tuples[0] = boost::shared_ptr<Tuple>(&tuple);
+            tuples[0] = shared_ptr<Tuple>(&tuple);
         } else { 
-            std::string oldValue = Config::getInstance()->getOptionValue(name);
+            oldValue = Config::getInstance()->getOptionValue(name);
             Tuple& tuple = *new Tuple(1);
             tuple[0].setString(oldValue.c_str());
-            tuples[0] = boost::shared_ptr<Tuple>(&tuple);
+            tuples[0] = shared_ptr<Tuple>(&tuple);
         }
-        return boost::shared_ptr<Array>(new TupleArray(_schema, tuples, Coordinate(query->getInstanceID())));
+        return shared_ptr<Array>(new TupleArray(_schema, tuples, Coordinate(query->getInstanceID())));
     }
 };
 

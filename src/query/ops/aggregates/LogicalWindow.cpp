@@ -204,8 +204,12 @@ PARAM_AGGREGATE_CALL)
 
             switch ( param->getParamType() ) { 
                case PARAM_AGGREGATE_CALL:
-                   addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) param, desc, output);
-                break;
+               {
+                   bool isInOrderAggregation = true;
+                   addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) param, desc, output,
+                           isInOrderAggregation);
+                   break;
+               }
                case PARAM_LOGICAL_EXPRESSION:
                { 
                    //

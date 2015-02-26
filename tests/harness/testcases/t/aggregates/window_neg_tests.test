@@ -3,7 +3,7 @@
 create array A1 < v : double null > [ x=0:9,5,0, y=0:9,5,0 ]
 create array A2 < v : double null > [ x=0:9,5,2, y=0:9,5,2 ]
 
-store(build_sparse( A1, x+10*y, x <> y ), A1 )
+store(filter(build( A1, x+10*y), x <> y ), A1 )
 store(redimension( A1, A2 ), A2 )
 
 --test

@@ -45,13 +45,12 @@ namespace scidb
         return SystemCatalog::getInstance()->getArrayDesc(_desc.getId())->getName();
     }
 
-    DBArray::DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query) 
+    DBArray::DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query)
     : _desc(desc)
     {
         assert(query);
         _query = query;
         _desc.setPartitioningSchema(SystemCatalog::getInstance()->getPartitioningSchema(desc.getId()));
-        query->sharedLock(getRealName());
     }
 
     DBArray::DBArray(std::string const& name, const boost::shared_ptr<Query>& query)
@@ -59,7 +58,6 @@ namespace scidb
         assert(query);
         _query = query;
         SystemCatalog::getInstance()->getArrayDesc(name, _desc);
-        query->sharedLock(name);
     }
 
     std::string const& DBArray::getName() const

@@ -211,6 +211,27 @@ namespace scidb
         }
 
         /*
+         * Append a \x escape sequence to the end of stringBuf.
+         */
+        void AppendEscaped(int ch) {
+            switch (ch) {
+            case 'n':
+                Append('\n');
+                break;
+            case 't':
+                Append('\t');
+                break;
+            case 'r':
+                Append('\r');
+                break;
+            default:
+                // Allow embedded special chars like []{} etc.
+                Append(ch);
+                break;
+            }
+        }
+
+        /*
          * The get() function is reengineered so as to process the most frequent characters first.
          * The frequency information below is based on a real customer input file.
          *
@@ -243,20 +264,31 @@ namespace scidb
         {
             int ch;
 
-            while ((ch = getChar()) != EOF && isspace(ch)); // ignore whitespaces
+            while ((ch = getChar()) != EOF && isspace(ch))
+                ; // ignore whitespaces
 
-            if (ch>='0' && ch<='9') {
+            if (isdigit(ch)) {
 CommonCase:
                 nStringBuf = 0;
                 tmpValue.clear();
 
                 while (true) {
-                    if (ch>='0' && ch<='9') {
+                    if (isdigit(ch)) {
                         Append(ch);
                         ch = getChar();
                         continue;
                     }
-                    else if (ch==',' || isspace(ch) || ch=='(' || ch==')' || ch == ']' || ch == '}' || ch == '{' || ch == '[' || ch == '*' || ch==EOF) {
+                    else if (ch == '\\') {
+                        ch = getChar();
+                        if (ch == EOF)
+                            break;
+                        AppendEscaped(ch);
+                        ch = getChar();
+                        continue;
+                    }
+                    else if (ch==',' || isspace(ch) || ch=='(' || ch==')'
+                             || ch == ']' || ch == '}' || ch == '{' || ch == '['
+                             || ch == '*' || ch==EOF) {
                         break;
                     }
                     Append(ch);
@@ -265,7 +297,9 @@ CommonCase:
                 if (nStringBuf==0 && tmpValue.size()==0)
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR14);
                 ungetChar(ch);
-                if (nStringBuf==4 && tmpValue.size()==0 && stringBuf[0]=='n' && stringBuf[1]=='u' && stringBuf[2]=='l' && stringBuf[3]=='l') {
+                if (nStringBuf==4 && tmpValue.size()==0 &&
+                    stringBuf[0]=='n' && stringBuf[1]=='u' && stringBuf[2]=='l' && stringBuf[3]=='l')
+                {
                     missingReason = 0;
                 }
                 else {

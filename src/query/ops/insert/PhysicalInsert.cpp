@@ -34,6 +34,7 @@
 #include "array/Metadata.h"
 #include "array/Array.h"
 #include "array/DBArray.h"
+#include "array/TransientCache.h"
 #include "system/SystemCatalog.h"
 #include "network/NetworkManager.h"
 #include "smgr/io/Storage.h"
@@ -78,7 +79,7 @@ public:
     * Find the descriptor for the previous version and populate placeHolder with it.
     * @param[out] placeholder the returned descriptor
     */
-    inline void fillPreviousDesc(ArrayDesc& placeholder) const
+    void fillPreviousDesc(ArrayDesc& placeholder) const
     {
        string arrayName = ((shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
        if(_schema.getId() == 0) //new version (our version) was not created yet
@@ -116,6 +117,18 @@ public:
     }
 
     /**
+     * Record the array 't' in the transient array cache. Implements a callback
+     * that is suitable for use as a query finalizer.
+     */
+    static void recordTransient(const MemArrayPtr& t,const QueryPtr& query)
+    {
+        if (query->wasCommitted())                       // Was committed ok?
+        {
+            transient::record(t);                        // ...record in cache
+        }
+    }
+
+    /**
     * Take necessary locks and perform catalog changes. Initialize the internal _schema field to
     * the proper descriptor of the target array.
     * @param query the query context
@@ -130,22 +143,31 @@ public:
            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
        }
 
-       string const& arrayName = _schema.getName();
-       _lock = shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(arrayName,
+       _lock = make_shared<SystemCatalog::LockDesc>(_schema.getName(),
                                                    query->getQueryID(),
                                                    Cluster::getInstance()->getLocalInstanceId(),
                                                    SystemCatalog::LockDesc::COORD,
-                                                   SystemCatalog::LockDesc::WR));
+                                                   SystemCatalog::LockDesc::WR);
 
        shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
        query->pushErrorHandler(ptr);
 
        ArrayDesc parentDesc;
-       SystemCatalog::getInstance()->getArrayDesc(arrayName, parentDesc, false); //Must exist, checked at logical phase
+       SystemCatalog::getInstance()->getArrayDesc(_schema.getName(), parentDesc, false); //Must exist, checked at logical phase
+
+       if (parentDesc.isTransient())
+       {
+           _schema.setIds(parentDesc.getId(),parentDesc.getUAId(),0);
+           _lock->setArrayId       (parentDesc.getUAId());
+           _lock->setArrayVersion  (0);
+           _lock->setArrayVersionId(parentDesc.getId());
+           BOOST_VERIFY(SystemCatalog::getInstance()->updateArrayLock(_lock));
+           return;
+       }
+
        VersionID newVersion = SystemCatalog::getInstance()->getLastVersion(parentDesc.getId()) + 1;
 
-       ArrayUAID uaid = parentDesc.getUAId();
-       _lock->setArrayId(uaid);
+       _lock->setArrayId(parentDesc.getUAId());
        _lock->setArrayVersion(newVersion);
        bool rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
        SCIDB_ASSERT(rc);
@@ -155,7 +177,7 @@ public:
        //It also mutates the _schema field! After this, _schema's name changes to a versioned string and _schema's IDs are set.
        //Note also that this is called BEFORE the plan is sent to remote nodes. So in fact THIS is how remote instances find out what the
        //new array ID and name is!
-       _schema = ArrayDesc(ArrayDesc::makeVersionedName(arrayName, newVersion), parentDesc.getAttributes(), parentDesc.getDimensions());
+       _schema = ArrayDesc(ArrayDesc::makeVersionedName(_schema.getName(), newVersion), parentDesc.getAttributes(), parentDesc.getDimensions());
        SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
        _lock->setArrayVersionId(_schema.getId());
        rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
@@ -169,7 +191,11 @@ public:
     virtual void postSingleExecute(shared_ptr<Query> query)
     {
         assert(_lock);
-        SystemCatalog::getInstance()->createNewVersion(_schema.getUAId(), _schema.getId());
+
+        if (!_schema.isTransient())
+        {
+            SystemCatalog::getInstance()->createNewVersion(_schema.getUAId(), _schema.getId());
+        }
     }
 
     /**
@@ -215,7 +241,7 @@ public:
      * @param pos the position where to write the element
      * @param flag variable that is set to true after writing
      */
-    inline void writeFrom(shared_ptr<ConstChunkIterator>& sourceIter, shared_ptr<ChunkIterator>& outputIter, Coordinates const* pos, bool& flag)
+    void writeFrom(shared_ptr<ConstChunkIterator>& sourceIter, shared_ptr<ChunkIterator>& outputIter, Coordinates const* pos, bool& flag)
     {
         outputIter->setPosition(*pos);
         outputIter->writeItem(sourceIter->getItem());
@@ -298,9 +324,24 @@ public:
                                        size_t const nDims)
     {
         size_t nAttrs = _schema.getAttributes().size();
-        shared_ptr<DBArray> dstArray(DBArray::newDBArray(_schema.getName(), query));
+
+        shared_ptr<Array> dstArray;
+
+        if (_schema.isTransient())
+        {
+            dstArray = transient::lookup(_schema,query);
+
+            transient::remove(_schema);
+
+            query->pushFinalizer(bind(&recordTransient,static_pointer_cast<MemArray>(dstArray),_1));
+        }
+        else
+        {
+            dstArray = DBArray::newDBArray(_schema.getName(), query);
+        }
+
         SCIDB_ASSERT(dstArray->getArrayDesc().getAttributes(true).size() == inputArray->getArrayDesc().getAttributes(true).size());
-        assert(dstArray->getArrayDesc().getId() == _schema.getId());
+        assert(dstArray->getArrayDesc().getId()   == _schema.getId());
         assert(dstArray->getArrayDesc().getUAId() == _schema.getUAId());
 
         query->getReplicationContext()->enableInboundQueue(_schema.getId(), dstArray);
@@ -366,9 +407,13 @@ public:
         }
 
         SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
-        query->getReplicationContext()->replicationSync(_schema.getId());
-        query->getReplicationContext()->removeInboundQueue(_schema.getId());
-        StorageManager::getInstance().flush();
+
+        if (!_schema.isTransient())
+        {
+            query->getReplicationContext()->replicationSync(_schema.getId());
+            query->getReplicationContext()->removeInboundQueue(_schema.getId());
+            StorageManager::getInstance().flush();
+        }
 
         return dstArray;
     }
@@ -383,9 +428,14 @@ public:
         assert(inputArrays.size() == 1);
         VersionID version = _schema.getVersionId();
         string baseArrayName = ArrayDesc::makeUnversionedName(_schema.getName());
-        query->exclusiveLock(baseArrayName);
 
-        if (!_lock) {
+        if (_schema.isTransient())
+        {
+            inputArrays[0].reset(new MemArray(inputArrays[0],query));
+        }
+
+        if (!_lock && !_schema.isTransient())
+        {
            _lock = shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(baseArrayName,
                                                                                    query->getQueryID(),
                                                                                    Cluster::getInstance()->getLocalInstanceId(),
@@ -408,8 +458,7 @@ public:
         Coordinates currentLo(nDims, MAX_COORDINATE);
         Coordinates currentHi(nDims, MIN_COORDINATE);
 
-        ArrayDesc const* previousDesc = getPreviousDesc();
-        if ( previousDesc != NULL )
+        if (const ArrayDesc* previousDesc = getPreviousDesc())
         {
             currentLo = SystemCatalog::getInstance()->getLowBoundary(previousDesc->getId());
             currentHi = SystemCatalog::getInstance()->getHighBoundary(previousDesc->getId());

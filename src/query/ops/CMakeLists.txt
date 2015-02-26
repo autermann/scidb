@@ -28,8 +28,6 @@ set(ops_lib_src
     project/PhysicalProject.cpp
     scan/LogicalScan.cpp
     scan/PhysicalScan.cpp
-    sample/LogicalSample.cpp
-    sample/PhysicalSample.cpp
     bernoulli/LogicalBernoulli.cpp
     bernoulli/PhysicalBernoulli.cpp
     bernoulli/NumericOps.cpp
@@ -39,6 +37,8 @@ set(ops_lib_src
     between/BetweenArray.cpp
     between/LogicalBetween.cpp
     between/PhysicalBetween.cpp
+    between/LogicalCrossBetween.cpp
+    between/PhysicalCrossBetween.cpp
     filter/FilterArray.cpp
     filter/LogicalFilter.cpp
     filter/PhysicalFilter.cpp
@@ -119,9 +119,6 @@ set(ops_lib_src
     build/LogicalBuild.cpp
     build/PhysicalBuild.cpp
     build/BuildArray.cpp
-    build_sparse/LogicalBuildSparse.cpp
-    build_sparse/PhysicalBuildSparse.cpp
-    build_sparse/BuildSparseArray.cpp
     transpose/PhysicalTranspose.cpp
     transpose/LogicalTranspose.cpp
     transpose/TransposeArray.cpp
@@ -129,6 +126,8 @@ set(ops_lib_src
     cast/PhysicalCast.cpp
     remove/LogicalRemove.cpp
     remove/PhysicalRemove.cpp
+    remove/LogicalRemoveVersions.cpp
+    remove/PhysicalRemoveVersions.cpp
     merge/LogicalMerge.cpp
     merge/PhysicalMerge.cpp
     merge/MergeArray.cpp
@@ -201,6 +200,9 @@ set(ops_lib_src
     rankquantile/LogicalAverageRank.cpp
     rankquantile/PhysicalAverageRank.cpp
     rankquantile/RankCommon.cpp
+    unfold/LogicalUnfold.cpp
+    unfold/PhysicalUnfold.cpp
+    unfold/UnfoldArray.cpp
     variable_window/LogicalVariableWindow.cpp
     variable_window/PhysicalVariableWindow.cpp
     insert/LogicalInsert.cpp

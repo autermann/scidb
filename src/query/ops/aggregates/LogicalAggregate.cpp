@@ -32,8 +32,7 @@
 #include "query/LogicalExpression.h"
 #include "query/TypeSystem.h"
 #include "query/Aggregate.h"
-
-#include <log4cxx/logger.h>
+#include "util/arena/Set.h"
 
 namespace scidb {
 
@@ -93,45 +92,46 @@ using namespace boost;
 class LogicalAggregate: public  LogicalOperator
 {
 public:
-	LogicalAggregate(const std::string& logicalName, const std::string& alias):
-	    LogicalOperator(logicalName, alias)
-	{
+    LogicalAggregate(const std::string& logicalName, const std::string& alias):
+        LogicalOperator(logicalName, alias)
+    {
         _properties.tile = true;
-		ADD_PARAM_INPUT()
-		ADD_PARAM_VARIES()
-	}
+        ADD_PARAM_INPUT()
+        ADD_PARAM_VARIES()
+    }
 
-	std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
-	{
-		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-		res.push_back(END_OF_VARIES_PARAMS());
-		if (_parameters.size() == 0)
-		{
-			res.push_back(PARAM_AGGREGATE_CALL());
-		}
-		else
-		{
-			boost::shared_ptr<OperatorParam> lastParam = _parameters[_parameters.size() - 1];
-			if (lastParam->getParamType() == PARAM_AGGREGATE_CALL)
-			{
-				res.push_back(PARAM_AGGREGATE_CALL());
-				res.push_back(PARAM_IN_DIMENSION_NAME());
-			}
-			else if (lastParam->getParamType() == PARAM_DIMENSION_REF)
-			{
-				res.push_back(PARAM_IN_DIMENSION_NAME());
-			}
-		}
+    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    {
+        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        res.push_back(END_OF_VARIES_PARAMS());
+        if (_parameters.size() == 0)
+        {
+            res.push_back(PARAM_AGGREGATE_CALL());
+        }
+        else
+        {
+            boost::shared_ptr<OperatorParam> lastParam = _parameters[_parameters.size() - 1];
+            if (lastParam->getParamType() == PARAM_AGGREGATE_CALL)
+            {
+                res.push_back(PARAM_AGGREGATE_CALL());
+                res.push_back(PARAM_IN_DIMENSION_NAME());
+            }
+            else if (lastParam->getParamType() == PARAM_DIMENSION_REF)
+            {
+                res.push_back(PARAM_IN_DIMENSION_NAME());
+            }
+        }
 
-		return res;
-	}
+        return res;
+    }
 
-	void addDimension(Dimensions const& inputDims,
-	                  Dimensions& outDims,
-	                  shared_ptr<OperatorParam> const& param)
-	{
-	    boost::shared_ptr<OperatorParamReference> const& reference =
-	                            (boost::shared_ptr<OperatorParamReference> const&) param;
+    void addDimension(Dimensions const& inputDims,
+                      Dimensions& outDims,
+                      shared_ptr<OperatorParam> const& param)
+    {
+        boost::shared_ptr<OperatorParamReference> const& reference =
+            (boost::shared_ptr<OperatorParamReference> const&) param;
 
         string const& dimName = reference->getObjectName();
         string const& dimAlias = reference->getArrayName();
@@ -153,7 +153,7 @@ public:
             }
         }
         throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_DIMENSION_NOT_EXIST) << dimName;
-	}
+    }
 
     ArrayDesc inferSchema(vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
     {
@@ -170,11 +170,13 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2) << "aggregate";
         }
 
-        for (size_t i =0, n = _parameters.size(); i<n; i++)
+        removeDuplicateDimensions();
+
+        for (size_t i = 0, n = _parameters.size(); i < n; ++i)
         {
             if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)
             {
-                addDimension(inputDims, outDims, _parameters[i]);
+                    addDimension(inputDims, outDims, _parameters[i]);
             }
         }
 
@@ -182,29 +184,68 @@ public:
         if (outDims.size() == 0)
         {
             outDims.push_back(DimensionDesc("i", 0, 0, 0, 0, 1, 0));
-        } 
-        else 
+        }
+        else
         {
             _properties.tile = false;
             grand = false;
         }
 
-		ArrayDesc outSchema(input.getName(), Attributes(), outDims);
-		for (size_t i =0, n = _parameters.size(); i<n; i++)
-		{
-		    if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
-		    {
-		        addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], input, outSchema);
-		    }
-		}
+        ArrayDesc outSchema(input.getName(), Attributes(), outDims);
+        for (size_t i =0, n = _parameters.size(); i<n; i++)
+        {
+            if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
+            {
+                bool isInOrderAggregation = false;
+                addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], input,
+                                        outSchema, isInOrderAggregation);
+            }
+        }
 
-		if(!grand)
-		{
-	        AttributeDesc et ((AttributeID) outSchema.getAttributes().size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
-	        outSchema.addAttribute(et);
-		}
-		return outSchema;
-	}
+        if(!grand)
+        {
+            AttributeDesc et ((AttributeID) outSchema.getAttributes().size(),
+                              DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+                              TID_INDICATOR,
+                              AttributeDesc::IS_EMPTY_INDICATOR,
+                              0);
+            outSchema.addAttribute(et);
+        }
+        return outSchema;
+    }
+
+private:
+
+    /**
+     * Remove duplicate dimension references from the parameter list.
+     */
+    void removeDuplicateDimensions()
+    {
+        typedef std::pair<std::string, std::string> NameAndAlias;
+        typedef mgd::set<NameAndAlias> DimNameSet;
+
+        DimNameSet seen;
+        LogicalOperator::Parameters tmp;
+        tmp.reserve(_parameters.size());
+
+        for (size_t i = 0; i < _parameters.size(); ++i) {
+            if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF) {
+                const OperatorParamDimensionReference* dimRef =
+                    safe_dynamic_cast<OperatorParamDimensionReference*>(_parameters[i].get());
+                NameAndAlias key(dimRef->getObjectName(), dimRef->getArrayName());
+                DimNameSet::iterator pos = seen.find(key);
+                if (pos == seen.end()) {
+                    tmp.push_back(_parameters[i]);
+                    seen.insert(key);
+                }
+                // ...else a duplicate, ignore it.
+            } else {
+                tmp.push_back(_parameters[i]);
+            }
+        }
+
+        _parameters.swap(tmp);
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalAggregate, "aggregate")

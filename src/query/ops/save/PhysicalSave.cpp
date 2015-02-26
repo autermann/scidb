@@ -33,7 +33,7 @@
 
 #include "query/Operator.h"
 #include "array/Array.h"
-#include "smgr/io/DBLoader.h"
+#include "smgr/io/ArrayWriter.h"
 #include "array/DBArray.h"
 #include "query/QueryProcessor.h"
 #include "system/Config.h"
@@ -43,19 +43,28 @@ using namespace std;
 using namespace boost;
 using namespace scidb;
 
+// Useful local shorthand.
+#define Parm(_n) \
+    ((shared_ptr<OperatorParamPhysicalExpression>&)_parameters[(_n)])
+#define ParmExpr(_n)    (Parm(_n)->getExpression())
+
 namespace scidb
 {
 
 class PhysicalSave: public PhysicalOperator
 {
 public:
-    PhysicalSave(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalSave(const std::string& logicalName,
+                 const std::string& physicalName,
+                 const Parameters& parameters,
+                 const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(
+        const std::vector<PhysicalBoundaries> & inputBoundaries,
+        const std::vector< ArrayDesc> & inputSchemas) const
     {
         return inputBoundaries[0];
     }
@@ -65,9 +74,9 @@ public:
         if (_parameters.size() >= 2)
         {
             assert(_parameters[1]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
-            boost::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1];
-            assert(paramExpr->isConstant());
-            return paramExpr->getExpression()->evaluate().getInt64();
+            boost::shared_ptr<OperatorParamPhysicalExpression> parm1 = Parm(1);
+            assert(parm1->isConstant());
+            return parm1->getExpression()->evaluate().getInt64();
         }
         // return ALL_INSTANCES_MASK; -- old behaviour
         return COORDINATOR_INSTANCE_MASK; // new behaviour compatible with LOAD/INPUT
@@ -83,7 +92,10 @@ public:
         else
         {
             vector<ArrayDistribution> requiredDistribution(1);
-            requiredDistribution[0] = ArrayDistribution(psLocalInstance, boost::shared_ptr<DistributionMapper>(), sourceInstanceID);
+            requiredDistribution[0] = ArrayDistribution(
+                psLocalInstance,
+                boost::shared_ptr<DistributionMapper>(),
+                sourceInstanceID);
             return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
         }
     }
@@ -96,10 +108,10 @@ public:
         assert(_parameters.size() >= 1);
 
         assert(_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
-        const string fileName = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+        const string fileName = ParmExpr(0)->evaluate().getString();
         string format = "store";
         if (_parameters.size() >= 3) {
-            format = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getString();
+            format = ParmExpr(2)->evaluate().getString();
         }
         InstanceID sourceInstanceID = getSourceInstanceID();
         if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) {
@@ -107,9 +119,10 @@ public:
         }
         InstanceID myInstanceID = query->getInstanceID();
         if (sourceInstanceID == ALL_INSTANCES_MASK || sourceInstanceID == myInstanceID) {
-            DBLoader::defaultPrecision = Config::getInstance()->getOption<int>(CONFIG_PRECISION);
-            DBLoader::save(*inputArrays[0], fileName, query, format);
+            ArrayWriter::setPrecision(Config::getInstance()->getOption<int>(CONFIG_PRECISION));
+            ArrayWriter::save(*inputArrays[0], fileName, query, format);
         }
+
         return inputArrays[0];
     }
 };

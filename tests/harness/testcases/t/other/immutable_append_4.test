@@ -1,14 +1,14 @@
 --setup
 
 create array bounded <a:int64>[x=0:170,5,0]
-load(bounded,'../tests/harness/testcases/data/unbounded.txt')
+load(bounded,'${TEST_DATA_DIR}/unbounded.txt')
 
 --test
 --start-query-logging
 
-store(input(bounded,  '../tests/harness/testcases/data/append.txt'), bounded)
-store(input(bounded,  '../tests/harness/testcases/data/append2.txt'), bounded)
-store(input(bounded,  '../tests/harness/testcases/data/append2.txt'), bounded)
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "store(input(bounded,  '${TEST_DATA_DIR}/append.txt'), bounded)""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "store(input(bounded,  '${TEST_DATA_DIR}/append2.txt'), bounded)""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "store(input(bounded,  '${TEST_DATA_DIR}/append2.txt'), bounded)""
   
 scan(bounded)  
 

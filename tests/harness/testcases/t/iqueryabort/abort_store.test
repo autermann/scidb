@@ -2,13 +2,13 @@
 --start-query-logging
 --test
 
---shell --command "../utils/killquery.sh -afl 2  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 2  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${HPID}_1.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_1.stdout"
---shell --command "../utils/killquery.sh -afl 15 2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 15 2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${HPID}_2.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_2.stdout"
---shell --command "../utils/killquery.sh -afl 9  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 9  2 'store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)' 1> /tmp/${HPID}_3.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_3.stdout"
 

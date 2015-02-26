@@ -49,6 +49,7 @@ from glob import glob
 IQUERY_PORT=1239
 SHOW_QUERY='yes'
 SHOW_OUTPUT='yes'
+QUERY_LOGGING='yes'
 SHOW_OUTPUT_IN_TEST_FILE='yes'
 CWD='.'
 CHUNKIFY='no'
@@ -60,7 +61,7 @@ TEST_DIR_PATH='../../../tests/harness/testcases/t/docscript/'         # path for
 
 validCommands = ["--aql", "--afl", "--shell", "--schema"]
 
-validOptions = ["show-query", "show-output", "command", "query", "output-format", "chunkify", "anon", "show-output-in-test-file", "cwd"]
+validOptions = ["show-query", "show-output", "command", "query", "output-format", "chunkify", "anon", "show-output-in-test-file", "cwd", "query-logging"]
 
 reservedKeywords = ["SELECT", "INTO", "FROM", "WHERE", "REGRID", "VARIABLE WINDOW", "FIXED WINDOW", "WINDOW", "JOIN", "PARTITION BY", "PRECEDING", "FOLLOWING", "UPDATE", "SET", "AS", "GROUP BY", "AND", "CREATE ARRAY", "LOAD", "SAVE", "CURRENT INSTANCE", "ERRORS", "SHADOW ARRAY", "DROP ARRAY"]
 
@@ -382,18 +383,24 @@ def add_to_test_file(iqCmdList,fname):
   global ERROR_OCCURRED
   global showOutput
   global currOutputFormat
+  queryLoggingDisabled = False
+
   if fname == 'ERROR':
     return
   try:
     testFile = open(fname,'a')
     for iqCmd in iqCmdList:
       stmt = ''
+      if iqCmd['query-logging'] == 'no':
+        testFile.write('\n--stop-query-logging')
+        queryLoggingDisabled = True
       if iqCmd['queryType'] == '--shell':
-        stmt = '--shell  --command="' + initialize_string(iqCmd['command']) + '"'
+        stmt = '--shell'
         if iqCmd['cwd'] != '.':
           stmt = stmt + ' --cwd=' + iqCmd['cwd']
         if iqCmd['show-output'] == 'yes' and iqCmd['show-output-in-test-file'] == 'yes':
           stmt = stmt + ' --store'
+        stmt = stmt + ' --command="' + initialize_string(iqCmd['command']) + '"'
       else:
         if iqCmd['output-format'] != currOutputFormat:
           testFile.write('\n--set-format ' + iqCmd['output-format'])
@@ -421,6 +428,9 @@ def add_to_test_file(iqCmdList,fname):
         stmt = stmt + initialize_string(iqCmd['query'])
         stmt = stmt.replace(';',' ')
       testFile.write('\n'+stmt)
+      if queryLoggingDisabled == True:
+        testFile.write('\n--start-query-logging')
+        queryLoggingDisabled = False
     testFile.close()
   except Exception, inst:
     log_it("ScriptException in add_to_test_file",1)
@@ -480,6 +490,7 @@ def getCmdOptions(cmdStr):
   iqCmd['show-output'] = SHOW_OUTPUT
   iqCmd['show-output-in-test-file'] = SHOW_OUTPUT_IN_TEST_FILE
   iqCmd['show-query'] = SHOW_QUERY
+  iqCmd['query-logging'] = QUERY_LOGGING
   iqCmd['output-format'] = OUTPUT_FORMAT
   iqCmd['chunkify'] = CHUNKIFY
   iqCmd['anon'] = ANON
@@ -505,6 +516,7 @@ def getCmdOptions(cmdStr):
   iqCmd['show-output'] = initialize_string(iqCmd['show-output'].strip())
   iqCmd['show-output-in-test-file'] = initialize_string(iqCmd['show-output-in-test-file'].strip())
   iqCmd['show-query'] = initialize_string(iqCmd['show-query'].strip())
+  iqCmd['query-logging'] = initialize_string(iqCmd['query-logging'].strip())
   iqCmd['output-format'] = initialize_string(iqCmd['output-format'].strip())
   iqCmd['chunkify'] = initialize_string(iqCmd['chunkify'].strip())
   iqCmd['anon'] = initialize_string(iqCmd['anon'].strip())

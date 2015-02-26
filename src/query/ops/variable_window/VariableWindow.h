@@ -409,13 +409,6 @@ public:
     }
 };
 
-static inline std::string coordsToString(Coordinates const& coords)
-{
-    std::ostringstream str;
-    str<<coords;
-    return str.str();
-}
-
 class ChunkEdge : public unordered_map< Coordinates, shared_ptr<WindowEdge> >
 {
     friend std::ostream& operator<<(std::ostream& stream, const ChunkEdge& edge)
@@ -425,7 +418,7 @@ class ChunkEdge : public unordered_map< Coordinates, shared_ptr<WindowEdge> >
         {
             Coordinates const& coords = iter->first;
             shared_ptr<WindowEdge> const& edge = iter->second;
-            stream<<coordsToString(coords)<<":"<<(*edge)<<"; ";
+            stream<<CoordsToStr(coords)<<":"<<(*edge)<<"; ";
             iter++;
         }
         return stream;
@@ -494,7 +487,7 @@ struct VariableWindowMessage
         {
             Coordinates const& coords = iter->first;
             shared_ptr<ChunkEdge> const& edge = iter->second;
-            stream<<"   "<<coordsToString(coords)<<": "<<(*edge)<<"\n";
+            stream<<"   "<<CoordsToStr(coords)<<": "<<(*edge)<<"\n";
             iter++;
         }
         stream<<"Computed Value Chunks: "<<message._computedValues.size()<<"\n";
@@ -502,14 +495,14 @@ struct VariableWindowMessage
         while(iter2 != message._computedValues.end())
         {
             Coordinates const& coords = iter2->first;
-            stream<<"   "<<coordsToString(coords)<<": ";
+            stream<<"   "<<CoordsToStr(coords)<<": ";
             shared_ptr< unordered_map <Coordinates, vector<Value> > > const& valChunk = iter2->second;
             unordered_map <Coordinates, vector<Value> >::const_iterator iter3 = valChunk->begin();
             while(iter3!=valChunk->end())
             {
                 Coordinates const& coords2 = iter3->first;
                 vector<Value> const& vals = iter3->second;
-                stream<<coordsToString(coords2)<<":{";
+                stream<<CoordsToStr(coords2)<<":{";
                 for(size_t j=0; j<vals.size(); j++)
                 {
                     stream<<vals[j].size()<<","<<vals[j].getMissingReason()<<" ";

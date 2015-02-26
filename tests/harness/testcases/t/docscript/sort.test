@@ -33,7 +33,7 @@ create array numbers <number:int64 null>[i=0:4,5,0]
 --shell  --command="csv2scidb -s 1 -p N < $DOC_DATA/mostNumbers.csv > $DOC_DATA/mostNumbers.scidb "
 --set-format dense
 --stop-igdata
-load(numbers,'../tests/harness/testcases/data/doc/mostNumbers.scidb')  
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odense -aq "load(numbers,'${TEST_DATA_DIR}/doc/mostNumbers.scidb')""
 sort(numbers, number asc)  
 sort(numbers, number desc)  
 

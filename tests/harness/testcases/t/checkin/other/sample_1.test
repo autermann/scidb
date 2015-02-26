@@ -7,17 +7,17 @@ aggregate(A,count(*))
 aggregate(filter(A,a<>0),count(*))
 
 --echo verify results for unique seed value
---igdata --aql="select * into t1 from sample(A,0.001,2011)"
+--igdata --aql="select * into t1 from bernoulli(A,0.001,2011)"
 --sleep 2
---igdata --aql="select * into t2 from sample(A,0.001,2011)"
+--igdata --aql="select * into t2 from bernoulli(A,0.001,2011)"
 --igdata "store(join(t1,t2),t3)"
 aggregate(filter(t3,a<>a_2),count(*))
 
 
 --echo test if samples actually have different output
---igdata "store(sample(A,0.001),s1)"
+--igdata "store(bernoulli(A,0.001),s1)"
 --sleep 2
---igdata "store(sample(A,0.001),s2)"
+--igdata "store(bernoulli(A,0.001),s2)"
 --igdata "store(join(s1,s2),s3)"
 --igdata "store(join(join(aggregate(filter(s1,a<>0),count(*)),aggregate(filter(s2,a<>0),count(*))),aggregate(filter(project(apply(filter(s3,a<>0 and a_2<>0),a_3,a-a_2),a_3),a_3=0),count(*))),r)"
 

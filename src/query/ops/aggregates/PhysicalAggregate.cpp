@@ -38,10 +38,12 @@ class PhysicalAggregate: public AggregatePartitioningOperator
      DimensionGrouping     _grouping;
 
   public:
-	PhysicalAggregate(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-	    AggregatePartitioningOperator(logicalName, physicalName, parameters, schema)
-	{
-	}
+    PhysicalAggregate(const string& logicalName,
+                      const string& physicalName,
+                      const Parameters& parameters,
+                      const ArrayDesc& schema)
+        : AggregatePartitioningOperator(logicalName, physicalName, parameters, schema)
+    { }
 
     void initializeOperator(ArrayDesc const& inputSchema)
     {
@@ -70,6 +72,10 @@ class PhysicalAggregate: public AggregatePartitioningOperator
 
     virtual void transformCoordinates(Coordinates const & inPos, Coordinates & outPos)
     {
+        // Now that #3709 is fixed, we can safely assert that...
+        assert(!outPos.empty());
+        assert(outPos.size() <= inPos.size());
+
         _grouping.reduceToGroup(inPos, outPos);
     }
 };

@@ -29,7 +29,9 @@
  */
 
 #include "BetweenArray.h"
-#include "system/Exceptions.h"
+#include <system/Exceptions.h>
+#include <util/SpatialType.h>
+#include <system/Utils.h>
 
 namespace scidb
 {
@@ -41,19 +43,6 @@ namespace scidb
     boost::shared_ptr<ConstChunkIterator> BetweenChunk::getConstIterator(int iterationMode) const
     {
         AttributeDesc const& attr = getAttributeDesc();
-        if (tileMode) { 
-            iterationMode |= ChunkIterator::TILE_MODE;
-        } else { 
-            if (iterationMode & ChunkIterator::TILE_MODE) {
-                BetweenChunk* self = (BetweenChunk*)this;
-                self->tileMode = true;
-                AttributeDesc const* emptyAttr = array.getInputArray()->getArrayDesc().getEmptyBitmapAttribute();
-                if (emptyAttr != NULL) { 
-                    self->emptyBitmapIterator = array.getInputArray()->getConstIterator(emptyAttr->getId());
-                }
-            }
-            // iterationMode &= ~ChunkIterator::TILE_MODE;
-        }        
         iterationMode &= ~ChunkIterator::INTENDED_TILE_MODE;
         return boost::shared_ptr<ConstChunkIterator>(
             attr.isEmptyIndicator()
@@ -71,43 +60,27 @@ namespace scidb
 
     BetweenChunk::BetweenChunk(BetweenArray const& arr, DelegateArrayIterator const& iterator, AttributeID attrID)
     : DelegateChunk(arr, iterator, attrID, false),
-      array(arr)
-    {    
-        if (array.tileMode) {
-            tileMode = true;
-            AttributeDesc const* emptyAttr = array.getInputArray()->getArrayDesc().getEmptyBitmapAttribute();
-            if (emptyAttr != NULL) { 
-                emptyBitmapIterator = array.getInputArray()->getConstIterator(emptyAttr->getId());
-            }
-        } else { 
-            tileMode = false;
-        }
+      array(arr),
+      myRange(arr.getArrayDesc().getDimensions().size()),
+      fullyInside(false),
+      fullyOutside(false)
+    {
+        tileMode = false;
     }
      
     void BetweenChunk::setInputChunk(ConstChunk const& inputChunk)
     {
         DelegateChunk::setInputChunk(inputChunk);
-        firstPos = inputChunk.getFirstPosition(true);        
-        lastPos = inputChunk.getLastPosition(true);     
-        fullyInside = true;
-        fullyOutside = false;
-        Dimensions const& dims = array.dims;
-        for (size_t i = 0, nDims = dims.size(); i < nDims; i++) { 
-            if (firstPos[i] < array.lowPos[i]) {
-                firstPos[i] = array.lowPos[i];
-                fullyInside = false;
-                if (firstPos[i] > lastPos[i]) { 
-                    fullyOutside = true;
-                }
-            }
-            if (lastPos[i] > array.highPos[i]) {
-                lastPos[i] = array.highPos[i];
-                fullyInside = false;
-                if (lastPos[i] < firstPos[i]) {
-                    fullyOutside = true;
-                }
-            }
-        }
+        myRange._low = inputChunk.getFirstPosition(true);
+        myRange._high = inputChunk.getLastPosition(true);
+
+        // TO-DO: the fullyInside computation is simple but not optimal.
+        // It is possible that the current chunk is fully inside the union of the specified ranges,
+        // although not fully contained in any of them.
+        size_t dummy = 0;
+        fullyInside  =  array._spatialRangesPtr->findOneThatContains(myRange, dummy);
+        fullyOutside = !array._spatialRangesPtr->findOneThatIntersects(myRange, dummy);
+
         isClone = fullyInside && attrID < array.getInputArray()->getArrayDesc().getAttributes().size();
         if (emptyBitmapIterator) { 
             if (!emptyBitmapIterator->setPosition(inputChunk.getFirstPosition(false)))
@@ -115,182 +88,19 @@ namespace scidb
         }
     }
 
-
-    //
-    // Between chunk iterator methods
-    //
-    int BetweenChunkIterator::getMode()
-    {
-        return mode;
-    }
-
-    Value& BetweenChunkIterator::buildBitmap()
-    {
-        Coordinates coord = inputIterator->getPosition();
-        if (!emptyBitmapIterator->setPosition(coord)) 
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-
-        if (chunk.fullyInside) { 
-            return emptyBitmapIterator->getItem();
-        }
-        RLEPayload* emptyBitmap = emptyBitmapIterator->getItem().getTile();
-        RLEPayload::append_iterator appender(tileValue.getTile(type));
-        Value trueVal, falseVal;
-        trueVal.setBool(true);
-        falseVal.setBool(false);
-
-        if (chunk.fullyOutside) {
-            appender.add(falseVal, emptyBitmap->count());                    
-        } else { 
-            position_t pos = coord2pos(coord);
-            size_t nDims = coord.size();
-        
-            RLEPayload::iterator ei(emptyBitmap);
-            while (!ei.end()) {
-                uint64_t count = ei.getRepeatCount();
-                Value* boolVal = &falseVal;
-                if (ei.checkBit()) { 
-                    pos2coord(pos, coord); 
-                    size_t i = 0; 
-                    while (i < nDims && coord[i] >= chunk.firstPos[i]) { 
-                        if (coord[i] > chunk.lastPos[i]) { 
-                            do { 
-                                if (i == 0) {
-                                    position_t count = emptyBitmap->count();
-                                    if (count > pos) {
-                                        appender.add(falseVal, count - pos);
-                                    }
-                                    goto EndOfTile;
-                                }
-                                i -= 1;
-                            } while (++coord[i] > chunk.lastPos[i]);
-                            i += 1;
-                            break;
-                        }
-                        i += 1;
-                    }
-                    while (i < nDims) {
-                        coord[i] = chunk.firstPos[i];
-                        i += 1;
-                    }
-                    position_t nextPos = coord2pos(coord);
-                    assert(nextPos >= pos);
-                    uint64_t skip = nextPos - pos;
-                    if (skip != 0) {
-                        count = min(count, skip);
-                    } else {
-                        assert(chunk.lastPos[nDims-1] >= coord[nDims-1]);
-                        uint64_t tail = chunk.lastPos[nDims-1] - coord[nDims-1] + 1;
-                        count = min(tail, count);
-                        boolVal = &trueVal;
-                    }
-                }
-                appender.add(*boolVal, count);                    
-                ei += count;
-                pos += count;
-            }
-        }
-      EndOfTile:
-        appender.flush();
-        return tileValue;
-    }
-
     Value& BetweenChunkIterator::getItem()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         Value& value = inputIterator->getItem();
-        if (mode & TILE_MODE) {  
-            if (chunk.fullyInside) {
-                return value;
-            }
-            RLEPayload* inputPayload = value.getTile();
-            RLEPayload::append_iterator appender(tileValue.getTile(type));
-            if (!chunk.fullyOutside) {
-                RLEPayload::iterator vi(inputPayload);
-                Coordinates coord = inputIterator->getPosition();
-                if (!emptyBitmapIterator->setPosition(coord)) 
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-                RLEPayload* emptyBitmap = emptyBitmapIterator->getItem().getTile();
-                RLEPayload::iterator ei(emptyBitmap);
-                Value v;
-                position_t pos = coord2pos(coord);
-                size_t nDims = coord.size();
-
-                while (!ei.end()) {
-                    uint64_t count = ei.getRepeatCount();
-                    if (ei.checkBit()) { 
-                        pos2coord(pos, coord); 
-                        size_t i = 0; 
-                        while (i < nDims && coord[i] >= chunk.firstPos[i]) { 
-                            if (coord[i] > chunk.lastPos[i]) { 
-                                do { 
-                                    if (i == 0) { 
-                                        goto EndOfTile;
-                                    }
-                                    i -= 1;
-                                } while (++coord[i] > chunk.lastPos[i]);
-                                i += 1;
-                                break;
-                            }
-                            i += 1;
-                        }
-                        while (i < nDims) {
-                            coord[i] = chunk.firstPos[i];
-                            i += 1;
-                        }
-                        position_t nextPos = coord2pos(coord);
-                        assert(nextPos >= pos);
-                        uint64_t skip = nextPos - pos;
-                        if (skip != 0) {
-                            pos += skip;
-                            vi += ei.skip(skip);
-                            continue;
-                        }
-                        assert(chunk.lastPos[nDims-1] >= coord[nDims-1]);
-                        uint64_t tail = chunk.lastPos[nDims-1] - coord[nDims-1] + 1;
-                        nextPos += tail;
-                        count = appender.add(vi, min(tail, count));
-                        
-                        while (position_t(pos + count) < nextPos) { 
-                            ei += count;
-                            pos += count;
-                            tail -= count;
-                            if (ei.end()) { 
-                                goto EndOfTile;
-                            }
-                            count = ei.getRepeatCount();
-                            if (ei.checkBit()) { 
-                                count = appender.add(vi, min(tail, count));
-                            }
-                        }
-                    }
-                    ei += count;
-                    pos += count;
-                }
-            }
-          EndOfTile:
-            appender.flush();
-            return tileValue;
-        }
         return value;
-    }
-
-    inline bool BetweenChunkIterator::between() const
-    { 
-        for (size_t i = 0, n = array.dims.size(); i < n; i++) { 
-            if (currPos[i] < array.lowPos[i] || currPos[i] > array.highPos[i]) { 
-                return false;
-            }
-        }
-        return true;
     }
 
     bool BetweenChunkIterator::isEmpty()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        return inputIterator->isEmpty() || !between();
+        return inputIterator->isEmpty() || !array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges);
     }
 
     bool BetweenChunkIterator::end()
@@ -300,40 +110,22 @@ namespace scidb
 
     void BetweenChunkIterator::operator ++()
     {
-        if ((mode & (IGNORE_EMPTY_CELLS|TILE_MODE)) == IGNORE_EMPTY_CELLS) { 
-            if (isSparse) {
-                while (true) { 
-                    ++(*inputIterator);
-                    if (!inputIterator->end()) { 
-                        currPos = inputIterator->getPosition();
-                        if (between()) { 
-                            hasCurrent = true;
-                            return;
-                        }
-                    } else { 
-                        break;
-                    }
-                }  
-                hasCurrent = false;                                                    
-            } else { 
-                Coordinates const& first = chunk.firstPos;
-                Coordinates const& last = chunk.lastPos;
-                size_t nDims = currPos.size();
-                while (true) {
-                    size_t i = nDims-1;
-                    while (++currPos[i] > last[i]) { 
-                        currPos[i] = first[i];
-                        if (i-- == 0) { 
-                            hasCurrent = false;
-                            return;
-                        }
-                    }
-                    if (inputIterator->setPosition(currPos)) { 
+        if (_ignoreEmptyCells) {
+            while (true) {
+                ++(*inputIterator);
+                if (!inputIterator->end()) {
+                    Coordinates const& pos = inputIterator->getPosition();
+
+                    if (array._spatialRangesPtr->findOneThatContains(pos, _hintForSpatialRanges)) {
+                        currPos = pos;
                         hasCurrent = true;
                         return;
                     }
+                } else {
+                    break;
                 }
             }
+            hasCurrent = false;
         } else { 
             ++(*inputIterator);
             hasCurrent = !inputIterator->end();
@@ -342,41 +134,40 @@ namespace scidb
 
     Coordinates const& BetweenChunkIterator::getPosition() 
     {
-        return (mode & (TILE_MODE|IGNORE_EMPTY_CELLS)) == IGNORE_EMPTY_CELLS ? currPos : inputIterator->getPosition();
+        return _ignoreEmptyCells ? currPos : inputIterator->getPosition();
     }
 
     bool BetweenChunkIterator::setPosition(Coordinates const& pos)
     {
-        if ((mode & (TILE_MODE|IGNORE_EMPTY_CELLS)) == IGNORE_EMPTY_CELLS) { 
-            for (size_t i = 0, n = currPos.size(); i < n; i++) { 
-                if (pos[i] < chunk.firstPos[i] || pos[i] > chunk.lastPos[i]) { 
-                    return hasCurrent = false;
-                }
+        if ( _ignoreEmptyCells ) {
+            if ( array._spatialRangesPtr->findOneThatContains(pos, _hintForSpatialRanges) ) {
+                currPos = pos;
+                hasCurrent = true;
+                return true;
             }
-            currPos = pos;
+            hasCurrent = false;
+            return false;
         }
         return hasCurrent = inputIterator->setPosition(pos);
     }
 
     void BetweenChunkIterator::reset()
     {
-        if ((mode & (TILE_MODE|IGNORE_EMPTY_CELLS)) == IGNORE_EMPTY_CELLS) { 
-            if (isSparse) { 
-                inputIterator->reset();
-                if (!inputIterator->end()) { 
-                    currPos = inputIterator->getPosition();
-                    if (!between()) { 
-                        ++(*this);
-                    } else { 
-                        hasCurrent = true;
-                    }
-                } else { 
-                    hasCurrent = false;
+        if ( _ignoreEmptyCells ) {
+            inputIterator->reset();
+            if (!inputIterator->end()) {
+                Coordinates const& pos = inputIterator->getPosition();
+                if (array._spatialRangesPtr->findOneThatContains(pos, _hintForSpatialRanges)) {
+                    currPos = pos;
+                    hasCurrent = true;
+                    return;
                 }
-            } else { 
-                currPos = chunk.firstPos;
-                currPos[currPos.size()-1] -= 1; 
-                ++(*this);
+                else {
+                    ++(*this);  // The operator++() will skip the cells outside all the requested ranges.
+                }
+            }
+            else {
+                hasCurrent = false;
             }
         } else { 
             inputIterator->reset();
@@ -394,24 +185,13 @@ namespace scidb
       array(aChunk.array),
       chunk(aChunk),
       inputIterator(aChunk.getInputChunk().getConstIterator(iterationMode & ~INTENDED_TILE_MODE)),
-      currPos(array.dims.size()),
-      isSparse(inputIterator->getChunk().isSparse()),
-      mode(iterationMode),
-      type(chunk.getAttributeDesc().getType())
+      currPos(array.getArrayDesc().getDimensions().size()),
+      _mode(iterationMode & ~INTENDED_TILE_MODE & ~TILE_MODE),
+      _ignoreEmptyCells((iterationMode & IGNORE_EMPTY_CELLS) == IGNORE_EMPTY_CELLS),
+      type(chunk.getAttributeDesc().getType()),
+      _hintForSpatialRanges(0)
     {
-        if (iterationMode & TILE_MODE) { 
-            if (chunk.emptyBitmapIterator) {
-                emptyBitmapIterator = chunk.emptyBitmapIterator->getChunk().getConstIterator((iterationMode & IGNORE_OVERLAPS)|TILE_MODE|IGNORE_EMPTY_CELLS);
-            } else { 
-                ArrayDesc const& arrayDesc = chunk.getArrayDesc();
-                Address addr(arrayDesc.getEmptyBitmapAttribute()->getId(), chunk.getFirstPosition(false));
-                shapeChunk.initialize(&array, &arrayDesc, addr, 0);
-                emptyBitmapIterator = shapeChunk.getConstIterator((iterationMode & IGNORE_OVERLAPS)|TILE_MODE|IGNORE_EMPTY_CELLS);
-            }
-            hasCurrent = !inputIterator->end();
-        } else {
-            reset();
-        }
+        reset();
     }
 
     //
@@ -419,15 +199,15 @@ namespace scidb
     //
      Value& ExistedBitmapBetweenChunkIterator::getItem()
     { 
-        if (mode & TILE_MODE) { 
-            return buildBitmap();
-        }
-        _value.setBool(inputIterator->getItem().getBool() && between());
+        _value.setBool(
+                inputIterator->getItem().getBool() &&
+                array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges));
         return _value;
     }
 
     ExistedBitmapBetweenChunkIterator::ExistedBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode)
-    : BetweenChunkIterator(chunk, iterationMode), _value(TypeLibrary::getType(TID_BOOL))
+    : BetweenChunkIterator(chunk, iterationMode),
+      _value(TypeLibrary::getType(TID_BOOL))
     {
     }
     
@@ -436,15 +216,13 @@ namespace scidb
     //
     Value& NewBitmapBetweenChunkIterator::getItem()
     { 
-        if (mode & TILE_MODE) { 
-            return buildBitmap();
-        }
-        _value.setBool(between());
+        _value.setBool(array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges));
         return _value;
     }
 
     NewBitmapBetweenChunkIterator::NewBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode) 
-    : BetweenChunkIterator(chunk, iterationMode), _value(TypeLibrary::getType(TID_BOOL))
+    : BetweenChunkIterator(chunk, iterationMode),
+      _value(TypeLibrary::getType(TID_BOOL))
     {
         ((DelegateChunk&)chunk).overrideSparse();
     }
@@ -454,11 +232,6 @@ namespace scidb
     //
     Value& EmptyBitmapBetweenChunkIterator::getItem()
     { 
-        if (mode & TILE_MODE) { 
-            if (!emptyBitmapIterator->setPosition(inputIterator->getPosition())) 
-                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-            return emptyBitmapIterator->getItem();
-        }
         return _value;
     }
 
@@ -476,77 +249,20 @@ namespace scidb
     //
     // Between array iterator methods
     //
-    BetweenArrayIterator::BetweenArrayIterator(BetweenArray const& arr, AttributeID attrID, AttributeID inputAttrID, bool doReset)
+    BetweenArrayIterator::BetweenArrayIterator(BetweenArray const& arr, AttributeID attrID, AttributeID inputAttrID)
     : DelegateArrayIterator(arr, attrID, arr.inputArray->getConstIterator(inputAttrID)),
       array(arr), 
-      lowPos(arr.lowPos),
-      highPos(arr.highPos),
-      pos(arr.dims.size())
-      
+      pos(arr.getArrayDesc().getDimensions().size()),
+      _hintForSpatialRanges(0)
     {
-        ArrayDesc const& desc = arr.getArrayDesc();
-        desc.getChunkPositionFor(lowPos);
-        desc.getChunkPositionFor(highPos);
-        if ( doReset )
-        {
-            reset();
-        }
+        _spatialRangesChunkPosIteratorPtr = shared_ptr<SpatialRangesChunkPosIterator>(
+                new SpatialRangesChunkPosIterator(array._spatialRangesPtr, array.getArrayDesc()));
+        reset();
 	}
 
 	bool BetweenArrayIterator::end()
 	{
         return !hasCurrent;
-    }
-
-	bool BetweenArrayIterator::insideBox(Coordinates const& coords) const
-	{
-	    Dimensions const& dims = array.dims;
-	    size_t nDims = dims.size();
-	    for(size_t i=0; i<nDims; i++)
-	    {
-	        if(coords[i]<lowPos[i] || coords[i] >= highPos[i] + dims[i].getChunkInterval())
-	        {
-	            return false;
-	        }
-	    }
-	    return true;
-	}
-
-	void BetweenArrayIterator::operator ++()
-    {
-        Dimensions const& dims = array.dims;
-        size_t nDims = dims.size();
-        chunkInitialized = false;
-        hasCurrent = false;
-        ++(*inputIterator);
-        if(inputIterator->end()) { return; }
-
-        Coordinates const& currPos = inputIterator->getPosition();
-        if (insideBox(currPos))
-        {
-            pos=currPos;
-            hasCurrent = true;
-            return;
-        }
-        while (true)
-        { 
-            size_t i = nDims-1;
-            while ((pos[i] += dims[i].getChunkInterval()) > highPos[i])
-            {
-                if (i == 0)
-                {
-                    hasCurrent = false;
-                    return;
-                }
-                pos[i]  = lowPos[i];
-                i -= 1;
-            }
-            if (inputIterator->setPosition(pos))
-            {
-                hasCurrent = true;
-                return;
-            }
-        }
     }
 
     Coordinates const& BetweenArrayIterator::getPosition()
@@ -558,100 +274,169 @@ namespace scidb
 
 	bool BetweenArrayIterator::setPosition(Coordinates const& newPos)
 	{
-        const Dimensions& dims = array.dims;
-        for (size_t i = 0, n = array.dims.size(); i < n; i++) { 
-            if (newPos[i] < lowPos[i] || newPos[i] >= highPos[i] + dims[i].getChunkInterval()) { 
-                return hasCurrent = false;
-            }
+        assert(array.getArrayDesc().isAChunkPosition(newPos));
+
+	    if (pos == newPos) {
+	        return hasCurrent;
+	    }
+
+        // If cannot set position in the inputIterator, fail.
+        if (! inputIterator->setPosition(newPos)) {
+            hasCurrent = false;
+            return false;
         }
+
+        // If the position does not correspond to a chunk intersecting some query range, fail.
+	    if (!array._extendedSpatialRangesPtr->findOneThatContains(newPos, _hintForSpatialRanges)) {
+	        hasCurrent = false;
+	        return false;
+	    }
+
+	    // Set position there.
+	    hasCurrent = true;
         chunkInitialized = false;
         pos = newPos;
-        array.getArrayDesc().getChunkPositionFor(pos);
-        return hasCurrent = inputIterator->setPosition(pos);
+        if (_spatialRangesChunkPosIteratorPtr->end() || _spatialRangesChunkPosIteratorPtr->getPosition() > pos) {
+            _spatialRangesChunkPosIteratorPtr->reset();
+        }
+        _spatialRangesChunkPosIteratorPtr->advancePositionToAtLeast(pos);
+        assert(_spatialRangesChunkPosIteratorPtr->getPosition() == pos);
+
+        return true;
 	}
 
-	void BetweenArrayIterator::reset()
+	void BetweenArrayIterator::advanceToNextChunkInRange()
 	{
- 		chunkInitialized = false;
+        assert(!inputIterator->end() && !_spatialRangesChunkPosIteratorPtr->end());
+
         hasCurrent = false;
-        const Dimensions& dims = array.dims;
-        size_t nDims = dims.size();
-        for (size_t i = 0; i < nDims; i++) {
-            pos[i] = lowPos[i];
-        }
-        pos[nDims-1] -= dims[nDims-1].getChunkInterval();
-        if(!inputIterator->end())
+        chunkInitialized = false;
+
+        while (!inputIterator->end())
         {
-            Coordinates const& currPos = inputIterator->getPosition();
-            hasCurrent = insideBox(currPos);
-            if(!hasCurrent)
-            {
-                ++(*this);
+            // Increment inputIterator.
+            ++(*inputIterator);
+            if (inputIterator->end()) {
+                assert(hasCurrent == false);
+                return;
             }
-            else
-            {
-                pos = currPos;
+            pos = inputIterator->getPosition();
+            if (array._extendedSpatialRangesPtr->findOneThatContains(pos, _hintForSpatialRanges)) {
+                hasCurrent = true;
+                _spatialRangesChunkPosIteratorPtr->advancePositionToAtLeast(pos);
+                assert(_spatialRangesChunkPosIteratorPtr->getPosition() == pos);
+                return;
+            }
+
+            // Incrementing inputIterator led to a position outside the spatial ranges.
+            // We could keep incrementing inputIterator till we find a chunkPos inside a query range, but that
+            // can be too slow.
+            // So let's try to increment spatialRangesChunkPosIterator also, in every iteration.
+            // Whenever one of them (inputIterator or spatialRangesChunkPosIterator) gets there first
+            // (i.e. finds a position the other one "like"), the algorithm declares victory.
+            //
+            // Another note:
+            // If advancePositionToAtLeast(pos) advances to a position > pos, we cannot increment spatialRangesChunkPosIterator.
+            // The reason is that this new position has not been checked against inputIterator for validity yet, and it will
+            // be a mistake to blindly skip it.
+            //
+            bool advanced = _spatialRangesChunkPosIteratorPtr->advancePositionToAtLeast(pos);
+            if (_spatialRangesChunkPosIteratorPtr->end()) {
+                assert(hasCurrent == false);
+                return;
+            }
+            if (! (advanced && _spatialRangesChunkPosIteratorPtr->getPosition() > pos)) {
+                ++(*_spatialRangesChunkPosIteratorPtr);
+                if (_spatialRangesChunkPosIteratorPtr->end()) {
+                    assert(hasCurrent == false);
+                    return;
+                }
+            }
+            Coordinates const& myPos = _spatialRangesChunkPosIteratorPtr->getPosition();
+            if (inputIterator->setPosition(myPos)) {
+                // The position suggested by _spatialRangesChunkPosIterator exists in inputIterator.
+                // Declare victory!
+                pos = myPos;
+                hasCurrent = true;
+                return;
+            }
+            else {
+                // The setPosition, even though unsuccessful, may brought inputInterator to a bad state.
+                // Restore to its previous valid state (even though not in any query range).
+                bool restored = inputIterator->setPosition(pos);
+                SCIDB_ASSERT(restored);
             }
         }
 	}
-    
-	BetweenArraySequentialIterator::BetweenArraySequentialIterator(BetweenArray const& between, AttributeID attrID, AttributeID inputAttrID):
-        BetweenArrayIterator(between, attrID, inputAttrID, false)
+
+	void BetweenArrayIterator::operator ++()
     {
-	    //need to call this class's reset, not parent's.
-	    reset();
+        assert(!end());
+        assert(!inputIterator->end() && hasCurrent && !_spatialRangesChunkPosIteratorPtr->end());
+        assert(_spatialRangesChunkPosIteratorPtr->getPosition() == inputIterator->getPosition());
+
+        advanceToNextChunkInRange();
     }
     
-    void BetweenArraySequentialIterator::operator ++()
-    {
-        hasCurrent = false;
-        chunkInitialized = false;
-        while (!hasCurrent && !inputIterator->end())
-        {
-            ++(*inputIterator);
-            if(inputIterator->end()) { return; }
-            pos = inputIterator->getPosition();
-            hasCurrent = insideBox(pos);
-        }
-    }
-    
-    void BetweenArraySequentialIterator::reset()
+    void BetweenArrayIterator::reset()
     {
         chunkInitialized = false;
         inputIterator->reset();
+        _spatialRangesChunkPosIteratorPtr->reset();
 
-        if (inputIterator->end())
+        // If any of the two iterators is invalid, fail.
+        if (inputIterator->end() || _spatialRangesChunkPosIteratorPtr->end())
         {
             hasCurrent = false;
+            return;
         }
-        else
-        {
-            pos = inputIterator->getPosition();
-            hasCurrent = insideBox(pos);
-            if(!hasCurrent)
-            {
-                ++(*this);
+
+        // Is inputIterator pointing to a position intersecting some query range?
+        pos = inputIterator->getPosition();
+        hasCurrent = array._extendedSpatialRangesPtr->findOneThatContains(pos, _hintForSpatialRanges);
+        if (hasCurrent) {
+            assert(pos >= _spatialRangesChunkPosIteratorPtr->getPosition());
+            if (pos > _spatialRangesChunkPosIteratorPtr->getPosition()) {
+                _spatialRangesChunkPosIteratorPtr->advancePositionToAtLeast(pos);
+                assert(!_spatialRangesChunkPosIteratorPtr->end() && pos == _spatialRangesChunkPosIteratorPtr->getPosition());
             }
+            return;
         }
+
+        // Is spatialRangesChunkPosIterator pointing to a position that has data?
+        Coordinates const& myPos = _spatialRangesChunkPosIteratorPtr->getPosition();
+        if (inputIterator->setPosition(myPos)) {
+            // The position suggested by _spatialRangesChunkPosIterator exists in inputIterator.
+            // Declare victory!
+            pos = myPos;
+            hasCurrent = true;
+            return;
+        }
+        else {
+            // The setPosition, even though unsuccessful, may brought inputInterator to a bad state.
+            // Restore to its previous valid state (even though not in any query range).
+            bool restored = inputIterator->setPosition(pos);
+            SCIDB_ASSERT(restored);
+        }
+
+        advanceToNextChunkInRange();
     }
     
     //
     // Between array methods
     //
-    BetweenArray::BetweenArray(ArrayDesc const& array, Coordinates const& from, Coordinates const& till, boost::shared_ptr<Array> const& input, bool const& tile)
+    BetweenArray::BetweenArray(ArrayDesc const& array, SpatialRangesPtr const& spatialRangesPtr, boost::shared_ptr<Array> const& input)
     : DelegateArray(array, input), 
-      lowPos(from), 
-      highPos(till),
-      dims(desc.getDimensions()),
-      tileMode(tile)
+      _spatialRangesPtr(spatialRangesPtr)
 	{
-        double numChunksInBox = 1;
-        ArrayDesc const& inputDesc = input->getArrayDesc();
-        for (size_t i=0, n = inputDesc.getDimensions().size(); i<n; i++)
-        {
-            numChunksInBox *= inputDesc.getNumChunksAlongDimension(i, lowPos[i], highPos[i]);
+        // Copy _spatialRangesPtr to extendedSpatialRangesPtr, but reducing low by (interval-1) to cover chunkPos.
+        _extendedSpatialRangesPtr = make_shared<SpatialRanges>(_spatialRangesPtr->_numDims);
+        _extendedSpatialRangesPtr->_ranges.reserve(_spatialRangesPtr->_ranges.size());
+        for (size_t i=0; i<_spatialRangesPtr->_ranges.size(); ++i) {
+            Coordinates newLow = _spatialRangesPtr->_ranges[i]._low;
+            array.getChunkPositionFor(newLow);
+            _extendedSpatialRangesPtr->_ranges.push_back(SpatialRange(newLow, _spatialRangesPtr->_ranges[i]._high));
         }
-        useSequentialIterator = (numChunksInBox > BETWEEN_SEQUENTIAL_ITERATOR_THRESHOLD );
     }
     
     DelegateArrayIterator* BetweenArray::createArrayIterator(AttributeID attrID) const
@@ -660,17 +445,8 @@ namespace scidb
         if (inputAttrID >= inputArray->getArrayDesc().getAttributes().size()) {
             inputAttrID = 0;
         }
-
-        if(useSequentialIterator)
-        {
-            return new BetweenArraySequentialIterator(*this, attrID, inputAttrID);
-        }
-        else
-        {
-            return new BetweenArrayIterator(*this, attrID, inputAttrID);
-        }
+        return new BetweenArrayIterator(*this, attrID, inputAttrID);
     }
-
 
     DelegateChunk* BetweenArray::createChunk(DelegateArrayIterator const* iterator, AttributeID attrID) const
     {

@@ -72,59 +72,61 @@ PhysicalAnalyze::PhysicalAnalyze(const string& logicalName, const string& physic
 
 boost::shared_ptr<Array> PhysicalAnalyze::execute(vector<boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
 {
-    map<string /*name*/, size_t /*id*/> atts_id;
-    Attributes atts = inputArrays[0]->getArrayDesc().getAttributes();
+    Attributes inputAtts = inputArrays[0]->getArrayDesc().getAttributes();
     boost::shared_ptr<Array> resultArray = createTmpArray(_schema, query);
     const AttributeDesc *emptyIndicator = inputArrays[0]->getArrayDesc().getEmptyBitmapAttribute();
+    set<AttributeID> requestedAtts;
 
-    for (size_t i = 0; i < _parameters.size(); i++)
-    {
-        string attName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
+    if (!_parameters.empty()) {
 
-        if (emptyIndicator && emptyIndicator->getName() == attName)
-            continue;
+        for (size_t i = 0, n = _parameters.size(); i < n ;  ++i)
+        {
+            AttributeID attIndex = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
 
-        atts_id[attName] = 0;
+            assert(attIndex < inputAtts.size());
+            assert (!emptyIndicator || emptyIndicator->getId() != attIndex);
+
+            const AttributeDesc& att = inputAtts[attIndex];
+            assert(att.getId() == attIndex);
+            assert(att.getName() == ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName());
+            bool rc = requestedAtts.insert(attIndex).second;
+            assert(rc); rc=rc;
+        }
+    } else {
+        size_t attsCount = emptyIndicator ? inputAtts.size()-1 : inputAtts.size();
+        for (size_t i=0; i < attsCount; ++i) {
+            bool rc = requestedAtts.insert(i).second;
+            assert(rc); rc=rc;
+        }
+
     }
 
-    size_t attributesCount = atts_id.size() == 0 ? (emptyIndicator ? atts.size() - 1 : atts.size()) : atts_id.size();
-
-    if (!atts_id.empty())
-    {
-        for (size_t i = 0; i < atts.size(); i++)
-        {
-            const string& name = atts[i].getName();            
-            if (atts_id.find(name) != atts_id.end())
-            {
-                atts_id[name] = atts[i].getId();
-            }
-        }
-    }        
-    else
-    {
-        for (size_t i = 0; i < atts.size(); i++)
-        {
-            if (emptyIndicator && atts[i].getId() == emptyIndicator->getId())
-                continue;
-
-            atts_id[atts[i].getName()] = atts[i].getId();
-        }
-    }
-
-    LOG4CXX_DEBUG(logger, "Starting analyze");
+    LOG4CXX_DEBUG(logger, "Starting analyze output desc="<<resultArray->getArrayDesc());
+    assert(resultArray->getArrayDesc().getEmptyBitmapAttribute() != NULL);
 
     // main loop
     size_t index = 0;
-    vector<AnalyzeData> data(attributesCount);
-    for (map<string, size_t>::iterator attributeId = atts_id.begin(); attributeId != atts_id.end(); attributeId++, index++)
+    vector<AnalyzeData> data(requestedAtts.size());
+
+    for (set<AttributeID>::const_iterator iter = requestedAtts.begin();
+         iter != requestedAtts.end();
+         ++iter, ++index)
     {
-        LOG4CXX_DEBUG(logger, "Analyzing " << (*attributeId).first << " attribute");
+        assert(*iter < inputAtts.size());
+        const AttributeDesc& att = inputAtts[*iter];
+        const AttributeID attId = att.getId();
+        assert(attId == *iter);
+        assert(!emptyIndicator || attId != emptyIndicator->getId());
+        const string& attName = att.getName();
 
-        data[index].attribute_name = (*attributeId).first;
-        boost::shared_ptr<ConstArrayIterator> arrIt = inputArrays[0]->getConstIterator((*attributeId).second);
+        LOG4CXX_DEBUG(logger, "Analyzing " << attName << " attribute attId="<<attId);
 
-        TypeId typeId = atts[(*attributeId).second].getType();
-        bool builtInType = isBuiltinType(typeId);
+        assert(index < data.size());
+        data[index].attribute_name = attName;
+        boost::shared_ptr<ConstArrayIterator> arrIt = inputArrays[0]->getConstIterator(attId);
+
+        const TypeId typeId = att.getType();
+        const bool builtInType = isBuiltinType(typeId);
 
         if (builtInType && typeId != TID_STRING)
         {
@@ -137,77 +139,98 @@ boost::shared_ptr<Array> PhysicalAnalyze::execute(vector<boost::shared_ptr<Array
     }
     // end of main loop
 
-    if (query->getInstanceID() != 0)
+    if (!query->isCoordinator())
     {
         return resultArray;
     }
-        
+
     // output
     vector<boost::shared_ptr<ArrayIterator> > resultIterator(ANALYZE_ATTRIBUTES);
     vector<boost::shared_ptr<ChunkIterator> > cIter(ANALYZE_ATTRIBUTES);
     for (size_t i = 0; i < ANALYZE_ATTRIBUTES; i++)
-    {            
+    {
         resultIterator[i] = resultArray->getIterator(i);
     }
 
-    for (size_t i = 0; i < attributesCount; i++)
+    LOG4CXX_TRACE(logger, "data size ="<<data.size());
+    LOG4CXX_TRACE(logger, "chunk size ="<<ANALYZE_CHUNK_SIZE);
+
+    for (size_t i = 0; i < data.size(); i++)
     {
         if (i % ANALYZE_CHUNK_SIZE == 0)
         {
             for (size_t j = 0; j < ANALYZE_ATTRIBUTES; j++)
             {
-                if (cIter[j])
+                if (cIter[j]) {
                     cIter[j]->flush();
-
+                }
                 Chunk& chunk = resultIterator[j]->newChunk(Coordinates(1, i));
                 chunk.setRLE(true);
                 chunk.setSparse(false);
-                cIter[j] = chunk.getIterator(query);
+                assert(chunk.getBitmapChunk());
+                if (j!=0 ) {
+                    cIter[j] = chunk.getIterator(query, ConstChunkIterator::NO_EMPTY_CHECK);
+                } else {
+                    cIter[j] = chunk.getIterator(query, 0);
+                }
             }
         }
 
         Value v;
-                        
+
         v = Value(TypeLibrary::getType(TID_STRING));
         v.setString(data[i].attribute_name.c_str());
+        LOG4CXX_TRACE(logger, "data "<<i<< " attr.name="<<data[i].attribute_name.c_str());
+
         cIter[0]->writeItem(v);
         ++(*cIter[0]);
         if(data[i].non_null_count != 0)
         {
             v.setString(data[i].min.c_str());
+            LOG4CXX_TRACE(logger, "data "<<i<< " min="<<data[i].min.c_str());
         }
         else
         {
             v.setNull();
+            LOG4CXX_TRACE(logger, "data "<<i<< " min="<<"NULL");
         }
         cIter[1]->writeItem(v);
+
+
+
         ++(*cIter[1]);
         if(data[i].non_null_count != 0)
         {
+            LOG4CXX_TRACE(logger, "data "<<i<< " max="<<data[i].max.c_str());
             v.setString(data[i].max.c_str());
         }
         else
         {
             v.setNull();
+            LOG4CXX_TRACE(logger, "data "<<i<< " max="<<"NULL");
         }
         cIter[2]->writeItem(v);
         ++(*cIter[2]);
-        v = Value(TypeLibrary::getType(TID_UINT64));            
+        v = Value(TypeLibrary::getType(TID_UINT64));
         v.setUint64(data[i].distinct_count);
+        LOG4CXX_TRACE(logger, "data "<<i<< " distinct="<<data[i].distinct_count);
+
         cIter[3]->writeItem(v);
         ++(*cIter[3]);
 
         v.setUint64(data[i].non_null_count);
+        LOG4CXX_TRACE(logger, "data "<<i<< " non_null="<<data[i].non_null_count);
         cIter[4]->writeItem(v);
         ++(*cIter[4]);
     }
 
     for (size_t j = 0; j < ANALYZE_ATTRIBUTES; j++)
+    {
         cIter[j]->flush();
+    }
     // end of output
 
     LOG4CXX_DEBUG(logger, "Analyze is finished");
-
     return resultArray;
 }
 
@@ -241,8 +264,8 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
 
     while (!arrIt->end())
     {
-        boost::shared_ptr<ConstChunkIterator> cIter = arrIt->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS    | 
-                                                                                         ConstChunkIterator::IGNORE_EMPTY_CELLS | 
+        boost::shared_ptr<ConstChunkIterator> cIter = arrIt->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS    |
+                                                                                         ConstChunkIterator::IGNORE_EMPTY_CELLS |
                                                                                          ConstChunkIterator::IGNORE_NULL_VALUES);
 
         if (!useDC)
@@ -307,7 +330,7 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
         else
         {
             while (!cIter->end())
-            {                    
+            {
                 Value &v = cIter->getItem();
 
                 if (v.isNull() || (isReal == 2 && isnan(v.getDouble())) || (isReal == 1 && isnan(v.getFloat())))
@@ -324,7 +347,7 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
                 }
 
                 DC.addValue(hash(*(uint64_t *)v.data()));
-                    
+
                 //min/max checks
                 eContext[0] = v;
 
@@ -349,12 +372,19 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
     LOG4CXX_DEBUG(logger, "Send/receive stage");
 
     //send/receive
-    size_t nInstances = query->getInstancesCount();
 
-    if (query->getInstanceID() == 0)
+    const InstanceID coord = query->getCoordinatorInstanceID();
+    if (query->isCoordinator())
     {
-        for (size_t i = 1; i < nInstances; i++)
-        {                
+        const size_t nInstances = query->getInstancesCount();
+        assert(coord == query->getInstanceID());
+
+        for (size_t i = 0; i < nInstances; i++)
+        {
+            if (i == coord) {
+                continue;
+            }
+
             //receive non_null_count
             uint64_t non_null_count;
             Receive((void*)&query, i, &non_null_count, sizeof(uint64_t));
@@ -368,7 +398,7 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
             {
                 Value minValue(TypeLibrary::getType(typeId));
                 Value maxValue(TypeLibrary::getType(typeId));
-            
+
                 Receive((void*)&query, i, minValue.data(), sizeof(uint64_t));
                 Receive((void*)&query, i, maxValue.data(), sizeof(uint64_t));
 
@@ -453,8 +483,10 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
     //send
     else
     {
+        assert(coord != query->getInstanceID());
+
         //send non_null_count
-        Send((void*)&query, 0, &data->non_null_count, sizeof(uint64_t));
+        Send((void*)&query, coord, &data->non_null_count, sizeof(uint64_t));
 
         //send min, max
         size_t sendMinMax = 1;
@@ -464,18 +496,18 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
             sendMinMax = 0;
         }
 
-        Send((void*)&query, 0, &sendMinMax, sizeof(size_t));
+        Send((void*)&query, coord, &sendMinMax, sizeof(size_t));
 
         if (sendMinMax == 1)
         {
-            Send((void*)&query, 0, (uint64_t *)min.data(), sizeof(uint64_t));
-            Send((void*)&query, 0, (uint64_t *)max.data(), sizeof(uint64_t));
+            Send((void*)&query, coord, (uint64_t *)min.data(), sizeof(uint64_t));
+            Send((void*)&query, coord, (uint64_t *)max.data(), sizeof(uint64_t));
         }
 
         //send DC
         //send type
         size_t type = useDC;
-        Send((void*)&query, 0, &type, sizeof(size_t));
+        Send((void*)&query, coord, &type, sizeof(size_t));
 
         if (!useDC)
         {
@@ -491,12 +523,12 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
             }
             valueContainer.clear();
 
-            Send((void*)&query, 0, &size, sizeof(size_t));
+            Send((void*)&query, coord, &size, sizeof(size_t));
 
             if (size != 0)
             {
-                Send((void*)&query, 0, bufVal.get(), size * sizeof(uint64_t));
-                Send((void*)&query, 0, bufHash.get(), size * sizeof(size_t));
+                Send((void*)&query, coord, bufVal.get(), size * sizeof(uint64_t));
+                Send((void*)&query, coord, bufHash.get(), size * sizeof(size_t));
             }
         }
         else
@@ -504,11 +536,11 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
             size_t size;
             boost::shared_array<uint8_t>& dc = DC.getDC(&size);
 
-            Send((void*)&query, 0, &size, sizeof(size_t));
+            Send((void*)&query, coord, &size, sizeof(size_t));
 
             if (size != 0)
             {
-                Send((void*)&query, 0, dc.get(), size * sizeof(uint8_t));
+                Send((void*)&query, coord, dc.get(), size * sizeof(uint8_t));
             }
         }
     }
@@ -540,8 +572,8 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
 
     while (!arrIt->end())
     {
-        boost::shared_ptr<ConstChunkIterator> cIter = arrIt->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS    | 
-                                                                                         ConstChunkIterator::IGNORE_EMPTY_CELLS | 
+        boost::shared_ptr<ConstChunkIterator> cIter = arrIt->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS    |
+                                                                                         ConstChunkIterator::IGNORE_EMPTY_CELLS |
                                                                                          ConstChunkIterator::IGNORE_NULL_VALUES);
         if (!useDC)
         {
@@ -607,7 +639,7 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
         else
         {
             while (!cIter->end())
-            {                    
+            {
                 Value &v = cIter->getItem();
 
                 if (v.isNull())
@@ -624,7 +656,7 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
                 }
 
                 DC.addValue(hash((uint8_t *)v.data(), v.size()));
-                    
+
                 //min/max checks
                 eContext[0] = v;
 
@@ -649,12 +681,19 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
     LOG4CXX_DEBUG(logger, "Send/receive stage");
 
     //send/receive
-    size_t nInstances = query->getInstancesCount();
 
-    if (query->getInstanceID() == 0)
+    const InstanceID coord = query->getCoordinatorInstanceID();
+    if (query->isCoordinator())
     {
-        for (size_t i = 1; i < nInstances; i++)
-        {                
+        const size_t nInstances = query->getInstancesCount();
+        assert(coord == query->getInstanceID());
+
+        for (size_t i = 0; i < nInstances; i++)
+        {
+            if (i == coord) {
+                continue;
+            }
+
             //receive non_null_count
             uint64_t non_null_count;
             Receive((void*)&query, i, &non_null_count, sizeof(uint64_t));
@@ -775,8 +814,10 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
     //send
     else
     {
+        assert(coord != query->getInstanceID());
+
         //send non_null_count
-        Send((void*)&query, 0, &data->non_null_count, sizeof(uint64_t));
+        Send((void*)&query, coord, &data->non_null_count, sizeof(uint64_t));
 
         //send min, max
         size_t sendMinMax = 1;
@@ -786,46 +827,47 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
             sendMinMax = 0;
         }
 
-        Send((void*)&query, 0, &sendMinMax, sizeof(size_t));
+        Send((void*)&query, coord, &sendMinMax, sizeof(size_t));
 
         if (sendMinMax == 1)
         {
             size_t sz;
-            
+
             sz = min.size();
-            Send((void*)&query, 0, &sz, sizeof(size_t));
+            Send((void*)&query, coord, &sz, sizeof(size_t));
             if (sz != 0)
             {
-                Send((void*)&query, 0, (uint8_t *)min.data(), min.size());
+                Send((void*)&query, coord, (uint8_t *)min.data(), min.size());
             }
 
             sz = max.size();
-            Send((void*)&query, 0, &sz, sizeof(size_t));
+            Send((void*)&query, coord, &sz, sizeof(size_t));
             if (sz != 0)
             {
-                Send((void*)&query, 0, (uint8_t *)max.data(), max.size());
+                Send((void*)&query, coord, (uint8_t *)max.data(), max.size());
             }
         }
 
         //send DC
         //send type
         size_t type = useDC;
-        Send((void*)&query, 0, &type, sizeof(size_t));
+        Send((void*)&query, coord, &type, sizeof(size_t));
 
         if (!useDC)
         {
             size_t size = valueContainerForStrings.size();
-            Send((void*)&query, 0, &size, sizeof(size_t));
+            Send((void*)&query, coord, &size, sizeof(size_t));
 
             if (size != 0)
             {
-                for (boost::unordered_map<vector<uint8_t>, size_t>::iterator i = valueContainerForStrings.begin(); i != valueContainerForStrings.end(); i++)
+                for (boost::unordered_map<vector<uint8_t>, size_t>::iterator i = valueContainerForStrings.begin();
+                     i != valueContainerForStrings.end(); i++)
                 {
                     size_t sz = (*i).first.size();
-                    Send((void*)&query, 0, &sz, sizeof(size_t));
+                    Send((void*)&query, coord, &sz, sizeof(size_t));
                     if (sz != 0)
                     {
-                        Send((void*)&query, 0, (*i).first.data(), (*i).first.size());
+                        Send((void*)&query, coord, (*i).first.data(), (*i).first.size());
                     }
                 }
                 valueContainerForStrings.clear();
@@ -836,10 +878,10 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
             size_t size;
             boost::shared_array<uint8_t>& dc = DC.getDC(&size);
 
-            Send((void*)&query, 0, &size, sizeof(size_t));
+            Send((void*)&query, coord, &size, sizeof(size_t));
             if (size != 0)
             {
-                Send((void*)&query, 0, dc.get(), size * sizeof(uint8_t));
+                Send((void*)&query, coord, dc.get(), size * sizeof(uint8_t));
             }
         }
     }

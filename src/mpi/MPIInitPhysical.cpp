@@ -72,7 +72,6 @@ class MPIInitPhysical: public MPIPhysical
         slave->sendCommand(cmd, _ctx);
         slave->waitForExit(_ctx); // wait for the slave to disconnect
         unlaunchMPISlaves();
-        resetMPI();
         return shared_ptr<Array> (new MemArray(_schema,query));
     }
 };

@@ -83,6 +83,7 @@ namespace scidb
          * Default constructor
          */
         StorageAddress():
+            Address(0, Coordinates()),
             arrId(0)
         {}
 
@@ -158,11 +159,27 @@ namespace scidb
         {
             return !(*this == other);
         }
+
+        /**
+         * Check for same base Addr
+         * @param other another argument of comparison
+         * @return true if "this" is equal to "other" notwithstanding
+         *         different arrId (version)
+         */
+        inline bool sameBaseAddr(StorageAddress const& other) const
+        {
+            if(attId != other.attId)
+            {
+                return false;
+            }
+            return (coords == other.coords);
+        }
     };
 
     class ListChunkDescriptorsArrayBuilder;
     class ListChunkMapArrayBuilder;
     class PersistentChunk;
+    class DataStores;
 
     /**
      * Storage manager interface
@@ -236,15 +253,24 @@ namespace scidb
         virtual InstanceID getInstanceId() const = 0;
 
         /**
-         * Remove a persistent array from the system. Does nothing if the
+         * Remove all versions prior to lastLiveArrId from the storage. If 
+         * lastLiveArrId is 0, removes all versions. Does nothing if the
          * specified array is not present.
-         * This routine must be called on either all versions of uaId in sequence
-         * (as in "remove(array)") or on the last version of uaId only (as in "rollback").
-         * If uaId==arrId, all chunks for uaId are removed.
          * @param uaId the Unversioned Array ID
-         * @param arrId the Versioned Array ID
+         * @param lastLiveArrId the Versioned Array ID of last version to preserve
          */
-        virtual void remove(ArrayUAID uaId, ArrayID arrId) = 0;
+        virtual void removeVersions(QueryID queryId,
+                                    ArrayUAID uaId,
+                                    ArrayID lastLiveArrId) = 0;
+
+        /**
+         * Remove a version of a persistent array from the in-memory
+         * chunk-map.  Called for arrays that have been cleaned-up via
+         * "rollback"
+         * @param uaId the Unversioned Array ID
+         * @param arrId the ID of the versioned array that should be removed
+         */
+        virtual void removeVersionFromMemory(ArrayUAID uaId, ArrayID arrId) = 0;
 
         /**
          * Rollback uncompleted updates
@@ -441,6 +467,11 @@ namespace scidb
           * @param query the query context
           */
          virtual void removeDeadChunks(ArrayDesc const& arrayDesc, set<Coordinates, CoordinatesLess> const& liveChunks, boost::shared_ptr<Query>& query) = 0;
+
+         /**
+          * Return DataStores object used by storage manager to store data
+          */
+         virtual DataStores& getDataStores() = 0;
     };
 
     /**

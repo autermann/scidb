@@ -37,4 +37,6 @@ if [ "${SCIDB_BUILD_PATH}" != "" -a "${SCIDB_DATA_PATH}" != "" ] ; then
    export DOC_DATA="${SCIDB_SOURCE_PATH}/tests/harness/testcases/data/doc"
    export TESTCASES_DIR="${SCIDB_BUILD_PATH}/tests/harness/testcases/"
    export TEST_DATA_DIR="${SCIDB_DATA_PATH}/000/tests/harness/testcases/data"
+   export TEST_UTILS_DIR="${SCIDB_SOURCE_PATH}/tests/utils"
+   export TEST_BIN_DIR="${SCIDB_BUILD_PATH}/bin"
 fi

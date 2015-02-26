@@ -4,8 +4,8 @@ create array C <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
 store(build(A,x+10),B)
 store(build(C,x+100),C)
-create empty array teeth_u <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
-load(teeth_u, '../tests/harness/testcases/data/teeth.txt')
+create array teeth_u <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
+load(teeth_u, '${TEST_DATA_DIR}/teeth.txt')
 
 --test
 cross_join(A,B)

@@ -2,7 +2,7 @@
 
 --setup
 create array A <a:int32> [x=0:2,3,0]
-create empty array B <x:int32>[a(int32)=3,3,0]
+create array B <x:int32>[a(int32)=3,3,0]
 
 --test
 --aql select * into A from build(A,x+10)

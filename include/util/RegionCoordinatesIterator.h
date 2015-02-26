@@ -32,58 +32,10 @@
 #define REGIONCOORDINATESITERATOR_H_
 
 #include <array/Array.h>
+#include <vector>
 
 namespace scidb
 {
-
-/**
- * Less than.
- */
-inline bool operator< (const Coordinates& c1, const Coordinates& c2) {
-    assert(c1.size()==c2.size());
-    for (size_t i=0; i<c1.size(); ++i) {
-        if (c1[i]<c2[i]) {
-            return true;
-        } else if (c1[i]>c2[i]) {
-            return false;
-        }
-    }
-    return false;
-}
-
-/**
- * Equal.
- */
-inline bool operator== (const Coordinates& c1, const Coordinates& c2) {
-    assert(c1.size()==c2.size());
-    for (size_t i=0; i<c1.size(); ++i) {
-        if (c1[i] != c2[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
- * Less than or equal.
- */
-inline bool operator<= (const Coordinates& c1, const Coordinates& c2) {
-    return c1<c2 || c1==c2;
-}
-
-/**
- * Greater than or equal.
- */
-inline bool operator>=(const Coordinates& c1, const Coordinates& c2) {
-    return !(c1<c2);
-}
-
-/**
- * Greater than.
- */
-inline bool operator>(const Coordinates& c1, const Coordinates& c2) {
-    return !(c1<=c2);
-}
 
 /**
  * RegionCoordinatesIteratorParam: parameters to the constructor of RegionCoordinatesIterator.
@@ -92,7 +44,7 @@ struct RegionCoordinatesIteratorParam
 {
     Coordinates _low;
     Coordinates _high;
-    vector<size_t> _intervals;
+    std::vector<size_t> _intervals;
 
     RegionCoordinatesIteratorParam(size_t size): _low(size), _high(size), _intervals(size)
     {}
@@ -106,13 +58,13 @@ class RegionCoordinatesIterator: public ConstIterator
     Coordinates _low;
     Coordinates _high;
     Coordinates _current;
-    vector<size_t> _intervals;
+    std::vector<size_t> _intervals;
 
 public:
     /**
      * Constructor.
      */
-    RegionCoordinatesIterator(const Coordinates& low, const Coordinates& high, const vector<size_t>& intervals) {
+    RegionCoordinatesIterator(const Coordinates& low, const Coordinates& high, const std::vector<size_t>& intervals) {
         init(low, high, intervals);
     }
 
@@ -127,8 +79,8 @@ public:
      * By default, every interval is 1.
      */
     RegionCoordinatesIterator(const Coordinates& low, const Coordinates& high) {
-        vector<size_t> intervals(low.size());
-        for (size_t i=0; i<intervals.size(); ++i) {
+        std::vector<size_t> intervals(low.size());
+        for (size_t i=0, n=intervals.size(); i<n; ++i) {
             intervals[i] = 1;
         }
         init(low, high, intervals);
@@ -143,7 +95,7 @@ public:
     /**
      * Initialize the low and high coordinates.
      */
-    void init(const Coordinates& low, const Coordinates& high, const vector<size_t>& intervals) {
+    void init(const Coordinates& low, const Coordinates& high, const std::vector<size_t>& intervals) {
         assert(low.size()==high.size());
         assert(intervals.size()==high.size());
         assert(low.size()>0);
@@ -179,6 +131,88 @@ public:
     }
 
     /**
+     * Advance to the smallest position >= a given newPos.
+     * @param newPos  the position to reach or exceed.
+     * @return whether any advancement is made.
+     */
+    bool advanceToAtLeast(Coordinates const& newPos) {
+        if (_current >= newPos) {
+            return false;
+        }
+        _current = newPos;
+
+        if (end() || inBox()) {
+            return true;
+        }
+
+        // I will scan all dimension from nDims-1 downto 1.
+        // For each dimension, I will make sure current[i] is between low[i] and high[i].
+        // If I have to increase current[i], not a problem: the new position is "advancing".
+        // But if I have to decrease current[i], there is a "carryover" in that some later (i.e. smaller) dimension has to increase.
+        // I'll use this variable to indicate whether there is a carryover.
+        bool needToInc = false;
+
+        for (size_t i=_current.size()-1; i>=1; --i) {
+            if (_current[i] < _low[i]) {
+                // No action needed to satisfy needToInc from before, because we have to increase dim i anyways.
+
+                // Make sure the i'th dim is inside low[i], high[i]:
+                _current[i] = _low[i];
+
+                // No request from me to increase later dimensions.
+                needToInc = false;
+            }
+            else if (_current[i] > _high[i]) {
+                // We have to reduce _current[i], and increase some later dimension, whatsoever.
+                // So we should directly reduce to _low[i].
+                _current[i] = _low[i];
+                needToInc = true;
+            }
+            else {
+                // Good, this dimension is in range.
+
+                // Try to deal with earlier needToInc.
+                if (needToInc) {
+                    if (_current[i]+(Coordinate)_intervals[i] <= _high[i]) {
+                        _current[i] = _current[i] + _intervals[i];
+                        needToInc = false;
+                    }
+                }
+
+                // If I cannot handle previous needToInc, reduce to low[i] and let later dimensions deal with it.
+                if (needToInc) {
+                    _current[i] = _low[i];
+                }
+
+                // There is no problem with previous needToInc now.
+                else {
+                    // Shortcut! If inBox(), done with advancing!
+                    if (inBox()) {
+                        return true;
+                    }
+
+                    // Not inBox() means some future dimensions will need to increase.
+                    // So I'll try to set myself to _low[i].
+                    if (_current[i] > _low[i]) {
+                        _current[i] = _low[i];
+                        needToInc = true;
+                    }
+                }
+            }
+        } // end for
+
+        // Now is the time to process dimension 0.
+        if (needToInc) {
+            _current[0] += _intervals[0];
+        }
+        if (_current[0] < _low[0]) {
+            _current[0] = _low[0];
+        }
+
+        return true;
+    }
+
+    /**
      * Get coordinates of the current element.
      */
     virtual Coordinates const& getPosition() {
@@ -193,7 +227,7 @@ public:
      */
     virtual bool setPosition(Coordinates const& pos) {
         assert(pos.size()==_current.size());
-        for (size_t i=0; i<pos.size(); ++i) {
+        for (size_t i=0, n=pos.size(); i<n; ++i) {
             // Out of bound?
             if (pos[i]<_low[i] || pos[i]>_high[i]) {
                 return false;
@@ -214,6 +248,20 @@ public:
      */
     virtual void reset() {
         _current = _low;
+    }
+
+private:
+    /**
+     * Whether _current is inside the box specified by _low and _high.
+     */
+    bool inBox()
+    {
+        for (size_t i=0, n = _current.size(); i<n; ++i) {
+            if (_current[i] < _low[i] || _current[i] > _high[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 };
 

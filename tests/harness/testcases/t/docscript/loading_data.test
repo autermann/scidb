@@ -2,13 +2,14 @@
 --test
 --start-query-logging
 
---shell  --command="cat $DOC_DATA/olympic_data.csv " --store
---shell  --command="csv2scidb -h " --store
---shell  --command="cat $DOC_DATA/olympic_data.scidb " --store
+--shell --store --command="cat $DOC_DATA/olympic_data.csv "
+--shell --store --command="csv2scidb -h "
+--shell --store --command="cat $DOC_DATA/olympic_data.scidb "
 --set-format dcsv
 --start-igdata
 --aql CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]  
---aql LOAD winnersFlat FROM '../tests/harness/testcases/data/doc/olympic_data.scidb'  
+#--aql LOAD winnersFlat FROM '${TEST_DATA_DIR}/doc/olympic_data.scidb'
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "LOAD winnersFlat FROM '${TEST_DATA_DIR}/doc/olympic_data.scidb'""
 --stop-igdata
 --aql SELECT * FROM analyze(winnersFlat)  
 --start-igdata
@@ -24,7 +25,7 @@ scan(winners)
 --start-igdata
 --aql SELECT * FROM list('types')  
 --aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
---aql LOAD intensityFlat FROM '../tests/harness/testcases/data/doc/intensity_data.bin' AS '(string, int64, int64 null)'  
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "LOAD intensityFlat FROM '${TEST_DATA_DIR}/doc/intensity_data.bin' AS '(string, int64, int64 null)'""
 --stop-igdata
 --aql SELECT exposure, strlen(exposure) FROM intensityFlat  
 --aql SELECT * FROM analyze(intensityFlat) 
@@ -38,43 +39,43 @@ store(redimension (project (index_lookup (intensityFlat,exposure_index,intensity
 --aql SELECT * INTO intensity FROM intensityFlat  
 remove(intensityFlat)  
 --aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
---aql LOAD intensityFlat FROM '../tests/harness/testcases/data/doc/intensity_data.bin' AS '(string, int64, int64 null)'  
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "LOAD intensityFlat FROM '${TEST_DATA_DIR}/doc/intensity_data.bin' AS '(string, int64, int64 null)'""
 --aql CREATE ARRAY intensityFlat_NoExposure < elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
---aql LOAD intensityFlat_NoExposure FROM '../tests/harness/testcases/data/doc/intensity_data.bin' AS '(skip, int64, int64 null)'  
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "LOAD intensityFlat_NoExposure FROM '${TEST_DATA_DIR}/doc/intensity_data.bin' AS '(skip, int64, int64 null)'""
 --aql CREATE ARRAY intensityFlat_NoTime_NoMeasurement < exposure:string > [i=0:*,1000000,0]  
---aql LOAD intensityFlat_NoTime_NoMeasurement FROM '../tests/harness/testcases/data/doc/intensity_data.bin' AS '(string, skip(8), skip(8) null)'  
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "LOAD intensityFlat_NoTime_NoMeasurement FROM '${TEST_DATA_DIR}/doc/intensity_data.bin' AS '(string, skip(8), skip(8) null)'""
 --stop-igdata
 show(intensity)
 --start-igdata
 --aql CREATE ARRAY intensityCopy < measuredIntensity:int64 NULL > [duration=0:40000,10000,0, exposure_id=0:3,3,0] 
---shell  --command="cat $DOC_DATA/v4.scidb" --store
+--shell --store --command="cat $DOC_DATA/v4.scidb"
 --aql CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0] 
 --set-format dense
 --stop-igdata
---aql LOAD v4 FROM '../tests/harness/testcases/data/doc/v4.scidb' 
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -olcsv -q "LOAD v4 FROM '${TEST_DATA_DIR}/doc/v4.scidb'""
 --set-format dcsv
 --start-igdata
 --aql CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0] 
 --set-format dense
 --stop-igdata
---aql LOAD v4_dflt FROM '../tests/harness/testcases/data/doc/v4.scidb' 
---shell  --command="cat $DOC_DATA/v4_null.scidb" --store
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -olcsv -q "LOAD v4_dflt FROM '${TEST_DATA_DIR}/doc/v4.scidb'""
+--shell --store --command="cat $DOC_DATA/v4_null.scidb"
 --set-format dcsv
 --start-igdata
 --aql CREATE ARRAY v4_null <val1:int8,val2:int8 NULL> [i=0:3,4,0]  
---aql LOAD v4_null FROM '../tests/harness/testcases/data/doc/v4_null.scidb'  
+--shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -nq "LOAD v4_null FROM '${TEST_DATA_DIR}/doc/v4_null.scidb'""
 --aql CREATE ARRAY v6_dflt <val1:int8,val2:int8 default 111> [i=0:5,6,0] 
 --set-format dense
 --stop-igdata
---aql LOAD v6_dflt FROM '../tests/harness/testcases/data/doc/v4.scidb' 
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -olcsv -q "LOAD v6_dflt FROM '${TEST_DATA_DIR}/doc/v4.scidb'""
 --set-format dcsv
 --start-igdata
 remove(intensityFlat)  
 --aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:6,1000000,0]  
---shell  --command="cat $DOC_DATA/csv-errors.txt" --store
---shell  --command="cat $DOC_DATA/int4error.scidb " --store
+--shell --store --command="cat $DOC_DATA/csv-errors.txt"
+--shell --store --command="cat $DOC_DATA/int4error.scidb "
 --stop-igdata
---aql LOAD intensityFlat FROM '../tests/harness/testcases/data/doc/int4error.scidb' AS 'text' ERRORS 99 SHADOW ARRAY intensityFlatShadow  
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD intensityFlat FROM '${TEST_DATA_DIR}/doc/int4error.scidb' AS 'text' ERRORS 99 SHADOW ARRAY intensityFlatShadow""
 show(intensityFlatShadow)
 --aql SELECT * FROM intensityFlatShadow  
 --aql SELECT * FROM intensityFlat  

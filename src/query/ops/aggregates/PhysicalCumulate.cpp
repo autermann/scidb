@@ -31,6 +31,7 @@
 #include <boost/foreach.hpp>
 #include <util/CoordinatesToKey.h>
 #include <query/Operator.h>
+#include <util/SchemaUtils.h>
 
 using namespace std;
 using namespace boost;
@@ -240,22 +241,22 @@ public:
         for (size_t i=0; i<myVars._numAggrs; ++i) {
             attrsEdge[i] = AttributeDesc(
                     i,
-                    commonVars._outputAttrsWithoutET[i].getName(),
+                    commonVars._output._attrsWithoutET[i].getName(),
                     myVars._aggregates[i]->getStateType().typeId(),
-                    commonVars._outputAttrsWithoutET[i].getFlags(),
-                    commonVars._outputAttrsWithoutET[i].getDefaultCompressionMethod()
+                    commonVars._output._attrsWithoutET[i].getFlags(),
+                    commonVars._output._attrsWithoutET[i].getDefaultCompressionMethod()
                     );
         }
 
         shared_ptr<MemArray> localEdges = make_shared<MemArray>(
-            ArrayDesc(commonVars._outputSchema.getName(),addEmptyTagAttribute(attrsEdge),commonVars._outputDims),
+            ArrayDesc(commonVars._output._schema.getName(),addEmptyTagAttribute(attrsEdge),commonVars._output._dims),
             commonVars._query
             );
 
         // Fill in data.
         //
         for (AttributeID outputAttr = 0; outputAttr < myVars._numAggrs; ++outputAttr) {
-            shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._inputArray->getConstIterator(myVars._inputAttrIDs[outputAttr]);
+            shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._input._array->getConstIterator(myVars._inputAttrIDs[outputAttr]);
             shared_ptr<ArrayIterator> localEdgesArrayIter = localEdges->getIterator(outputAttr);
 
             while (!inputArrayIter->end()) {
@@ -263,7 +264,7 @@ public:
 
                 // skip, if this chunk is at the end of the aggrDim
                 //
-                if (inputChunkPos[myVars._aggrDim] + commonVars._inputDims[myVars._aggrDim].getChunkInterval() > commonVars._inputDims[myVars._aggrDim].getEndMax()) {
+                if (inputChunkPos[myVars._aggrDim] + commonVars._input._dims[myVars._aggrDim].getChunkInterval() > commonVars._input._dims[myVars._aggrDim].getEndMax()) {
                     ++(*inputArrayIter);
                     continue;
                 }
@@ -358,7 +359,7 @@ public:
     shared_ptr<MapOfVectorsOfChunkPos> buildMapOfVectorsInInputArray(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
     {
         shared_ptr<MapOfVectorsOfChunkPos> mapOfVectorsInInputArray = make_shared<MapOfVectorsOfChunkPos>(myVars._aggrDim);
-        shared_ptr<CoordinateSet> chunkPosInputArray = commonVars._inputArray->findChunkPositions();
+        shared_ptr<CoordinateSet> chunkPosInputArray = commonVars._input._array->findChunkPositions();
 
         for (CoordinateSet::const_iterator itSet=chunkPosInputArray->begin(); itSet!=chunkPosInputArray->end(); ++itSet) {
             mapOfVectorsInInputArray->append(*itSet);
@@ -381,9 +382,9 @@ public:
             // array iterators
             //
             AttributeID inputAttr = myVars._inputAttrIDs[outputAttr];
-            shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._inputArray->getConstIterator(inputAttr);
+            shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._input._array->getConstIterator(inputAttr);
             shared_ptr<ConstArrayIterator> remoteEdgesArrayIter = myVars._allEdges->getConstIterator(outputAttr);
-            shared_ptr<ArrayIterator> outputArrayIter = commonVars._outputArray->getIterator(outputAttr);
+            shared_ptr<ArrayIterator> outputArrayIter = commonVars._output._array->getIterator(outputAttr);
 
             // for every vector of input chunks
             //
@@ -505,7 +506,7 @@ public:
         // get the aggregate dimension
         //
         MyVariablesInExecute myVars;
-        myVars._numAggrs = commonVars._outputAttrsWithoutET.size();
+        myVars._numAggrs = commonVars._output._attrsWithoutET.size();
         myVars._aggrDim = 0;
 
         shared_ptr<OperatorParam>& lastParam = _parameters[_parameters.size()-1];
@@ -514,8 +515,8 @@ public:
 
             string aggrDimName =  dynamic_pointer_cast<OperatorParamDimensionReference>(lastParam)->getObjectName();
             bool found = false;
-            for (size_t j = 0; j < commonVars._inputDims.size(); j++) {
-                if (commonVars._inputDims[j].hasNameAndAlias(aggrDimName)) {
+            for (size_t j = 0; j < commonVars._input._dims.size(); j++) {
+                if (commonVars._input._dims[j].hasNameAndAlias(aggrDimName)) {
                     found = true;
                     myVars._aggrDim = j;
                     break;
@@ -536,7 +537,7 @@ public:
 
             myVars._aggregates[i] = resolveAggregate(
                     (shared_ptr <OperatorParamAggregateCall> const&) _parameters[i],
-                    commonVars._inputAttrsWithoutET,
+                    commonVars._input._attrsWithoutET,
                     &myVars._inputAttrIDs[i],
                     0);
 

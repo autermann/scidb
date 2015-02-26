@@ -19,6 +19,7 @@
 *
 * END_COPYRIGHT
 */
+#include "system/Utils.h"
 #include "TransposeArray.h"
 
 using namespace scidb;

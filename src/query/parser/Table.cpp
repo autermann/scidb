@@ -69,6 +69,13 @@ Table* newTable(Arena& arena,Log& log,Table* parent,cnodes bindings)
             }
         }
 
+    /*  Return the number of bindings in this frame of the symbol table...*/
+
+        size_t size() const
+        {
+            return map::size();                          // Defer to our base
+        }
+
      /* Return the parent table with which we were constructed...*/
 
         Table* getParent() const
@@ -111,6 +118,16 @@ Table* newTable(Arena& arena,Log& log,Table* parent,cnodes bindings)
             if (!insert(v).second)                       // Failed to insert?
             {
                 log.fail(SCIDB_LE_NAME_REDEFINED,*n);    // ...report an error
+            }
+        }
+
+     /* Apply the given visitor to each binding in the table...*/
+
+        void accept(Visitor& visit) const
+        {
+            for (const_iterator i=begin(),e=end(); i!=e; ++i)
+            {
+                visit(const_cast<Node*&>(i->second));    // ...visit binding
             }
         }
 

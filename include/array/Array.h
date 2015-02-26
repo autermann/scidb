@@ -230,7 +230,7 @@ public:
     virtual bool setPosition(Coordinates const& pos) = 0;
 
     /**
-     * Reset iteratot to the first element
+     * Reset iterator to the first element
      */
     virtual void reset() = 0;
 
@@ -328,7 +328,7 @@ class ConstChunkIterator : public ConstIterator
 
     /**
      * Move forward in the specified direction
-     * @param direction bitmask of of coordinates in which direction movement is performed,
+     * @param direction bitmask of coordinates in which direction movement is performed,
      * for example in case of two dimensional matrix [I=1:10, J=1:100]
      * moveNext(COORD(0)) increments I coordinate, moveNext(COORD(1)) increments J coordinate and
      * moveNext(COORD(0)|COORD(1)) increments both coordinates
@@ -687,6 +687,21 @@ class ConstChunk : public SharedBuffer
 
     virtual void overrideTileMode(bool) {}
 
+    /**
+     * @retun true if the chunk has no cells
+     * @param withOverlap true if the overlap region(s) should be included (default)
+     */
+    bool isEmpty(bool withOverlap=true) const
+    {
+        int iterationMode = ConstChunkIterator::IGNORE_EMPTY_CELLS;
+        if (!withOverlap) {
+            iterationMode |= ConstChunkIterator::IGNORE_OVERLAPS;
+        }
+        boost::shared_ptr<ConstChunkIterator> ci = getConstIterator(iterationMode);
+        assert(ci);
+        return (ci->end());
+    }
+
  protected:
     ConstChunk();
     virtual ~ConstChunk();
@@ -838,7 +853,7 @@ public:
        data directly to it.  getData() should be used for reading data only.  This
        interface can be overridden by classes that need to use getData() as a hook
        for loading data from some other source.
-     */ 
+     */
    virtual void* getDataForLoad()
         { return getData(); }
 };
@@ -1050,10 +1065,21 @@ public:
      * to fit all data.
      * @param first minimal coordinates of extract box
      * @param last maximal coordinates of extract box
+     * @param init EXTRACT_INIT_ZERO or EXTRACT_INIT_NAN
+     *             if buf is floating-point, EXTRACT_INIT_NAN writes a NaN in
+     *             buf for each cell that was empty; otherwise a zero.
+     *             the second option is only meaningful for extracting to arrays of float or double
+     * @param null EXTRACT_NULL_AS_EXCEPTION or EXTRACT_NULL_AS_NAN
+     *             if buf is floating-point, EXTRACT_NULL_AS_NAN writes a NaN in
+     *             buf for each null; otherwise a null is an exception.
+     *             if a floating-point array, whether it should be extracted as a NaN
      * @return number of extracted chunks
      */
     enum extractInit_t { EXTRACT_INIT_ZERO=0, EXTRACT_INIT_NAN };
-    virtual size_t extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last, extractInit_t init=EXTRACT_INIT_ZERO) const;
+    enum extractNull_t { EXTRACT_NULL_AS_EXCEPTION=0, EXTRACT_NULL_AS_NAN };
+    virtual size_t extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last,
+                               extractInit_t init=EXTRACT_INIT_ZERO,
+                               extractNull_t null=EXTRACT_NULL_AS_EXCEPTION) const;
 
     /**
      * Append data from the array
@@ -1105,6 +1131,8 @@ public:
      * DEBUG build only.  Otherwise a nullop
      */
     void printArrayToLogger() const;
+
+    void setQuery(boost::shared_ptr<Query> const& query) {_query = query;}
 
  protected:
     /// The query context for this array

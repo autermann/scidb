@@ -50,10 +50,10 @@ class DelegateChunk : public ConstChunk
   public:
     const ArrayDesc& getArrayDesc() const;
     const AttributeDesc& getAttributeDesc() const;
-    int getCompressionMethod() const;
-    Coordinates const& getFirstPosition(bool withOverlap) const;
-    Coordinates const& getLastPosition(bool withOverlap) const;
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    virtual int getCompressionMethod() const;
+    virtual Coordinates const& getFirstPosition(bool withOverlap) const;
+    virtual Coordinates const& getLastPosition(bool withOverlap) const;
+    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
 
     virtual void setInputChunk(ConstChunk const& inputChunk);
     ConstChunk const& getInputChunk() const;
@@ -107,17 +107,17 @@ class DelegateChunk : public ConstChunk
 class DelegateChunkIterator : public ConstChunkIterator
 {
   public:
-    int getMode();
+    virtual int getMode();
     virtual Value& getItem();
-    bool isEmpty();
-    bool end();
+    virtual bool isEmpty();
+    virtual bool end();
     virtual void operator ++();
-    Coordinates const& getPosition();
+    virtual Coordinates const& getPosition();
     virtual bool setPosition(Coordinates const& pos);
     virtual void reset();
-    ConstChunk const& getChunk();
-    bool supportsVectorMode() const;
-    void setVectorMode(bool enabled);
+    virtual ConstChunk const& getChunk();
+    virtual bool supportsVectorMode() const;
+    virtual void setVectorMode(bool enabled);
 
     DelegateChunkIterator(DelegateChunk const* chunk, int iterationMode);
     virtual ~DelegateChunkIterator() {}

@@ -2,11 +2,11 @@
 --start-query-logging
 
 CREATE ARRAY Data1 < A: int32 > [ X=0:4,5,0]
-CREATE EMPTY ARRAY TEST2 <a:int16,b:int16>[X=0:3,4,0 , Y=0:3,4,0]
+CREATE array TEST2 <a:int16,b:int16>[X=0:3,4,0 , Y=0:3,4,0]
 
 --test
-load(Data1,'../tests/harness/testcases/data/data.txt')
-load(TEST2,'../tests/harness/testcases/data/test2.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(Data1,'${TEST_DATA_DIR}/data.txt')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(TEST2,'${TEST_DATA_DIR}/test2.txt')""
 --igdata "bernoulli (Data1,0.25)"
 --igdata "bernoulli (Data1,.2)"
 --igdata "bernoulli (Data1,.2)"

@@ -1,18 +1,18 @@
 --setup
 --start-query-logging
-create empty array A <a:string null,b:int32 null> [x=-2:8,5,0,y=0:2,3,1]
+create array A <a:string null,b:int32 null> [x=-2:8,5,0,y=0:2,3,1]
 create array T1 <a:string> [x=-2:8,5,0,y=0:2,3,1]
 create array T2 <b:int32> [x=-2:8,5,0,y=0:2,3,1]
-store(build_sparse(T1,x+10*y,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12*y,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10*y),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12*y),x<>2 and x<>5),T2)
 store(filter(join(T1,T2),1),A)
 
 --test
 --aql update A set a=null, b=null where x=0 and y=0
 
 
-store(build_sparse(T1,x-10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x-12,x<>2 and x<>5),T2)
+store(filter(build(T1,x-10),x<>2 and x<>5),T1)
+store(filter(build(T2,x-12),x<>2 and x<>5),T2)
 store(filter(join(T1,T2),1),A)
 --aql update A set a=null where x=0
 window(A,9,8,2,1,sum(a),max(a))
@@ -22,8 +22,8 @@ window(A,1,0,3,2,count(a),count(*))
 window(A,1,1,5,4,count(*),sum(a))
 
 
-store(build_sparse(T1,x+10,x<>2 and x<>5),T1)
-store(build_sparse(T2,x+12,x<>2 and x<>5),T2)
+store(filter(build(T1,x+10),x<>2 and x<>5),T1)
+store(filter(build(T2,x+12),x<>2 and x<>5),T2)
 store(filter(join(T1,T2),1),A)
 --aql update A set b=null where y=0
 window(A,9,8,3,2,sum(b),max(b))

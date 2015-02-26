@@ -12,7 +12,7 @@ create array RAT2 <val1: rational,val2:rational >[ x=0:2,3,0]
 create array RAT3 <fraction: rational > [ x=0:2,3,0]
 
 --test
-load(RAT,'../tests/harness/testcases/data/rat.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(RAT,'${TEST_DATA_DIR}/rat.txt')""
 store(join(RAT,RAT),RAT1)
 save(RAT, 'rational.out', 0, '(rational)')
 save(RAT1, 'ration1.bin', 0, '(rational,rational)')

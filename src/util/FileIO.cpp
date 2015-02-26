@@ -45,7 +45,7 @@ using namespace std;
 namespace scidb
 {
     // Logger for operator. static to prevent visibility of variable outside of file
-    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc"));
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.fileio"));
 
     #ifdef __APPLE__
     #define fdatasync(x) fsync(x)
@@ -80,9 +80,9 @@ namespace scidb
         return err;
     }
     
-    /* Close a directory (private)
+    /* Close a directory
      */
-    int 
+    int
     File::closeDir(const char* dirName, DIR *dirp, bool raise)
     {
         int err = 0;
@@ -97,25 +97,25 @@ namespace scidb
         }
         return err;
     }
-    
+
     /* Read the contents of a directory
      */
     void
     File::readDir(const char* dirName, std::list<std::string>& entries)
     {
         LOG4CXX_TRACE(logger, "File::readDir: " << dirName);
-        
+
         DIR* dirp = ::opendir(dirName); // closedir
-        
+
         if (dirp == NULL) {
             int err = errno;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
-               << "opendir" << "NULL" << err << dirName);
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
+                   << "opendir" << "NULL" << err << dirName);
         }
-        
+
         boost::function<int()> f = boost::bind(&File::closeDir, dirName, dirp, false);
         scidb::Destructor<boost::function<int()> >  dirCloser(f);
-        
+
         struct dirent entry;
         memset(&entry, 0, sizeof(entry));
         /*
@@ -123,11 +123,11 @@ namespace scidb
          * On Linux, the assert should never fail.
          */
         assert((pathconf(dirName, _PC_NAME_MAX) + 1) == sizeof(entry.d_name));
-        
+
         while (true) {
-            
+
             struct dirent *result(NULL);
-            
+
             int rc = ::readdir_r(dirp, &entry, &result);
             if (rc != 0) {
                 int err = errno;
@@ -139,7 +139,7 @@ namespace scidb
                 return;
             }
             assert(result == &entry);
-            
+
             entries.push_back(std::string(entry.d_name));
         }
     }
@@ -721,6 +721,7 @@ namespace scidb
             if (dir.length() != 0 && dir[dir.length()-1] != '/') {
                 dir += '/';
             }
+            dir += "scidb_";
             dir += arrName;
             dir += ".XXXXXX";
             filePath = dir.c_str();
@@ -771,6 +772,60 @@ namespace scidb
         return ret;        
     }
 
+    /* Constructor -- need to ensure that everything in the temp dir
+     * is wiped out (in case we crashed previously)
+     */
+    FileManager::FileManager()
+    {
+        LOG4CXX_TRACE(logger, "FileManager::FileManager");
+
+        /* Try to open the temp dir
+         */
+        std::string dir = Config::getInstance()->getOption<std::string>(CONFIG_TMP_PATH);
+        DIR* dirp = ::opendir(dir.c_str());
+
+        if (dirp == NULL)
+        {
+            LOG4CXX_TRACE(logger, "FileManager::FileManager: failed to open tmp dir, creating it");
+            int rc = ::mkdir(dir.c_str(), (S_IRUSR|S_IWUSR|S_IXUSR));
+            if (rc != 0)
+            {
+                LOG4CXX_ERROR(logger, "FileManager::FileManager: failed to create tmp dir, error: "
+                              << strerror(errno));
+            }
+            return;
+        }
+
+        boost::function<int()> f = boost::bind(&File::closeDir, dir.c_str(), dirp, false);
+        scidb::Destructor<boost::function<int()> >  dirCloser(f);
+
+        struct dirent entry;
+
+        /* For each entry in the temp dir
+         */
+        while (true)
+        {
+            struct dirent *result(NULL);
+
+            int rc = ::readdir_r(dirp, &entry, &result);
+            if (rc != 0 || result == NULL)
+            {
+                return;
+            }
+            assert(result == &entry);
+
+            LOG4CXX_TRACE(logger, "FileManager::FileManager: found entry " << entry.d_name);
+
+            /* If its a temp file, go ahead and try to remove it
+             */
+            if (strncmp(entry.d_name, "scidb_", 6) == 0)
+            {
+                LOG4CXX_TRACE(logger, "FileManager::FileManager: deleting entry " << entry.d_name);
+                std::string fullpath = dir + "/" + entry.d_name;
+                File::remove(fullpath.c_str(), false);
+            }
+        }
+    }
 
     /* Add a new open entry to the lru
      */

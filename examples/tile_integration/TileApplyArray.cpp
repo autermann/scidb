@@ -490,21 +490,28 @@ void TileApplyChunkIterator::setVectorMode(bool enabled)
     assert(!enabled); abort();
 }
 
-TileApplyChunkIterator::TileApplyChunkIterator(TileApplyArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode) :
-DelegateChunkIterator(chunk, iterationMode & ~(TILE_MODE | INTENDED_TILE_MODE | IGNORE_NULL_VALUES | IGNORE_DEFAULT_VALUES)),
-CoordinatesMapper(*chunk),
-_tileFactory(TileFactory::getInstance()),
-_currPosition(-1),
-_array((TileApplyArray&) arrayIterator.array),
-_exp ( (*_array._expressions)[arrayIterator.attr].get() ),
-_needCoordinates(false),
-_bindings(_array._bindingSets[arrayIterator.attr] ? (*_array._bindingSets[arrayIterator.attr]) : _fakeBinding),
-_iterators(_bindings.size()),
-_params(*(*_array._expressions)[arrayIterator.attr]),
-_mode(iterationMode),
-_applied(false),
-_nullable(_array._attributeNullable[arrayIterator.attr]),
-_query(Query::getValidQueryPtr(_array._query))
+TileApplyChunkIterator::TileApplyChunkIterator(TileApplyArrayIterator const& arrayIterator,
+                                               DelegateChunk const* chunk,
+                                               int iterationMode)
+    : DelegateChunkIterator(chunk, iterationMode & ~(TILE_MODE |
+                                                     INTENDED_TILE_MODE |
+                                                     IGNORE_NULL_VALUES |
+                                                     IGNORE_DEFAULT_VALUES))
+    , CoordinatesMapper(*chunk)
+    , _tileFactory(TileFactory::getInstance())
+    , _currPosition(-1)
+    , _array((TileApplyArray&) arrayIterator.array)
+    , _exp ( (*_array._expressions)[arrayIterator.attr].get() )
+    , _needCoordinates(false)
+    , _bindings(_array._bindingSets[arrayIterator.attr]
+                ? (*_array._bindingSets[arrayIterator.attr])
+                : _fakeBinding)
+    , _iterators(_bindings.size())
+    , _params(*(*_array._expressions)[arrayIterator.attr])
+    , _mode(iterationMode)
+    , _applied(false)
+    , _nullable(_array._attributeNullable[arrayIterator.attr])
+    , _query(Query::getValidQueryPtr(_array._query))
 {
     assert(! (_mode & TILE_MODE));
 

@@ -2,9 +2,9 @@
 create array A <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
 create array foo <val:double> [x=1:1000,1,0]
-store(build_sparse(foo, x, x>350), foo)
+store(filter(build(foo, x), x>350), foo)
 create array bar <val:double> [x=1:1000,1,0]
-store(build_sparse(bar, x+2, x<750), bar)
+store(filter(build(bar, x+2), x<750), bar)
 
 
 --test

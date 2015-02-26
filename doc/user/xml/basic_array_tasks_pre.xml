@@ -226,8 +226,8 @@
     <code>val_a</code> in two different expressions. <programlisting
     language="test">--aql SELECT a1.val_a,a2.val_a+2 FROM A as a1,A as a2; --output-format=auto 
 </programlisting> The aliasing rules apply to other join operators as well,
-    including merge, cross, and cross_join. See the section "Aliases" below
-    for more information on aliases.</para>
+    including merge and cross_join. See the section "Aliases" below for more
+    information on aliases.</para>
 
     <para><indexterm>
         <primary>AQL</primary>
@@ -351,15 +351,5 @@
     <code>bernoulli</code> operator to randomly sample data from an array one
     element at a time. The syntax of <code>bernoulli</code> is:
     <programlisting>bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
-
-    <para>The <code>sample</code> command allows you to randomly sample data
-    one array chunk at a time:<programlisting>sample(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting>The
-    probability is a double between 0 and 1. The commands work by generating a
-    random number for each cell or chunk in the array and scaling it to the
-    probability. If the random number is within the probability, the
-    cell/chunk is included. Both commands allow you to produce repeatable
-    results by seeding the random number generator. All calls to the random
-    number generator with the same seed produce the same random number. The
-    seed must be a 64-bit integer.</para>
   </section>
 </chapter>

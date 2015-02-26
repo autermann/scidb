@@ -40,24 +40,22 @@
 #include <stdint.h>
 
 #include <util/Job.h>
-#include "network/proto/scidb_msg.pb.h"
+#include <network/proto/scidb_msg.pb.h>
 #include <array/Metadata.h>
-#include "network/Connection.h"
-#include "query/QueryProcessor.h"
-
+#include <query/QueryProcessor.h>
+#include "Connection.h"
+#include "MessageHandleJob.h"
 
 namespace scidb
 {
 
 class Connection;
 
-
 /**
  * The class created by network message handler for adding to queue to be processed
  * by thread pool and handle message from client.
  */
-class ClientMessageHandleJob: public Job,
-                              public boost::enable_shared_from_this<ClientMessageHandleJob>
+class ClientMessageHandleJob : public MessageHandleJob
 {
  public:
     ClientMessageHandleJob(boost::shared_ptr< Connection > connection,
@@ -68,8 +66,9 @@ class ClientMessageHandleJob: public Job,
      * @param requestQueue a system queue for running jobs that may block waiting for events from other jobs
      * @param workQueue a system queue for running jobs that are guaranteed to make progress
      */
-    void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
-                  boost::shared_ptr<WorkQueue>& workQueue);
+    virtual void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
+                          boost::shared_ptr<WorkQueue>& workQueue);
+
  protected:
 
     /// Implementation of Job::run()
@@ -78,8 +77,6 @@ class ClientMessageHandleJob: public Job,
 
  private:
     boost::shared_ptr<Connection> _connection;
-    boost::shared_ptr<MessageDesc> _messageDesc;
-    boost::shared_ptr<boost::asio::deadline_timer> _timer;
 
     std::string getProgramOptions(const string &programOptions) const;
 
@@ -115,14 +112,68 @@ class ClientMessageHandleJob: public Job,
      *  @param queryResult is a structure containing the current state of the query
      */
     void retryExecuteQuery(scidb::QueryResult& queryResult);
-
     /// Helper routine
-    void executeQueryInternal(scidb::QueryResult& queryResult);
+    void postExecuteQueryInternal(scidb::QueryResult& queryResult);
 
     /**
      * This method sends next chunk to the client.
+     * It may schedule (serially) fetchMergedChunk() to do the actual work.
      */
     void fetchChunk();
+    /**
+     * Fetches partial chunks from some/all instances to produce a complete chunk
+     * to be sent to the client. It never waits, but reschedules and re-executes itself
+     * until a complete chunk is ready or the query is aborted.
+     */
+    void fetchMergedChunk(boost::shared_ptr<RemoteMergedArray>& fetchArray, AttributeID attributeId,
+                          Notification<scidb::Exception>::ListenerID queryErrorListenerID);
+    /// Helper to construct an mtChunk message for the client
+    void populateClientChunk(const std::string& arrayName,
+                             AttributeID attributeId,
+                             const ConstChunk* chunk,
+                             boost::shared_ptr<MessageDesc>& chunkMsg);
+    /**
+     * Used to re-schedule fetchMergedChunk()
+     */
+    void executeSerially(boost::shared_ptr<WorkQueue>& serialQueue,
+                         boost::weak_ptr<WorkQueue>& initialQueue,
+                         const scidb::Exception* error);
+    /**
+     * Functor used for re-scheduling fetchMergedChunk() in response to various events (e.g. partial chunk arrival)
+     */
+    typedef boost::function<void(const scidb::Exception* error)> RescheduleCallback;
+    /**
+     * Generate a RescheduleCallback functor
+     * @param serialQueue [out] the serial work queue where fetchMergedChunk() is to be executed
+     */
+    RescheduleCallback getSerializeCallback(boost::shared_ptr<WorkQueue>& serialQueue);
+    /**
+     * Query error event handler
+     */
+    void handleQueryError(RescheduleCallback& cb,
+                          Notification<scidb::Exception>::MessageTypePtr errPtr);
+
+    /// Internal exception used to cancel any outstanding attempts to run fetchMergedChunk()
+    class CancelChunkFetchException: public SystemException
+    {
+    public:
+      CancelChunkFetchException(const char* file, const char* function, int32_t line)
+      : SystemException(file, function, line, "scidb",
+                        SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR,
+                        "SCIDB_E_INTERNAL", "SCIDB_E_UNKNOWN_ERROR", uint64_t(0))
+      {
+          (*this) << "scidb::ClientMessageHandleJob::CancelChunkFetchException";
+      }
+      ~CancelChunkFetchException() throw () {}
+      void raise() const { throw *this; }
+      virtual Exception::Pointer copy() const
+      {
+          Exception::Pointer ep(boost::make_shared<CancelChunkFetchException>(_file.c_str(),
+                                                                      _function.c_str(),
+                                                                      _line));
+          return ep;
+      }
+   };
 
     /**
      * This method cancels query execution and free context
@@ -147,16 +198,6 @@ class ClientMessageHandleJob: public Job,
 
     /// Helper to send a message to the client on _connection
     void sendMessageToClient(boost::shared_ptr<MessageDesc>& msg);
-
-    /// Reschedule this job if array locks are not taken
-    void reschedule();
-
-    /// Handler for for the array lock timeout. It reschedules the current job
-    static void handleLockTimeout(boost::shared_ptr<Job>& job,
-                                  boost::shared_ptr<WorkQueue>& toQueue,
-                                  boost::shared_ptr<SerializationCtx>& sCtx,
-                                  boost::shared_ptr<boost::asio::deadline_timer>& timer,
-                                  const boost::system::error_code& error);
 };
 
 } // namespace

@@ -3,7 +3,7 @@ create array source <a: int32> [i=0:4999,1000,0,j=0:4999,1000,0]
 create array result <a: int32> [i=0:4999,500,0,j=0:4999,500,0]
 --start-igdata
 --start-timer store
-store(build_sparse(source, i*i+j*j, (i % 1000 = 0) or (j % 1000 = 0)), source)
+store(filter(build(source, i*i+j*j), (i % 1000 = 0) or (j % 1000 = 0)), source)
 --stop-timer store
 --stop-igdata
 --test

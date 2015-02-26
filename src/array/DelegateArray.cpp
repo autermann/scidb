@@ -356,7 +356,7 @@ namespace scidb
         newAttrs[emptyTagID] = AttributeDesc(emptyTagID, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
                                             TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
         desc = ArrayDesc(desc.getName(), newAttrs, desc.getDimensions());
-        rle = Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT);
+        rle = true;
     }
 
     DelegateArrayIterator* NonEmptyableArray::createArrayIterator(AttributeID id) const

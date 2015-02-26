@@ -23,6 +23,7 @@
 #include "stdint.h"
 
 #include "system/Config.h"
+#include "system/Constants.h"
 #include "SciDBConfigOptions.h"
 #include <unistd.h>
 
@@ -56,6 +57,12 @@ void configHook(int32_t configOption)
 void initConfig(int argc, char* argv[])
 {
     Config *cfg = Config::getInstance();
+
+    // WARNING: When using the EIC multipliers (KiB, MiB, GiB, etc.)
+    // or any other size_t 64-bit value, make sure to use Config::SIZE
+    // rather than Config::INTEGER.  Otherwise at runtime you'll get a
+    // boost::bad_any_cast exception when reading the option value
+    // (cannot extract 64-bit unsigned size_t into 32-bit signed int).
 
     cfg->addOption
         (CONFIG_PRECISION, 'w', "precision", "PRECISION", "", scidb::Config::INTEGER,
@@ -101,20 +108,14 @@ void initConfig(int argc, char* argv[])
             "Maximal ratio of filled elements of sparse chunk.", 0.1, false)
         (CONFIG_STRING_SIZE_ESTIMATION, 0, "string-size-estimation", "STRING_SIZE_ESTIMATION", "", Config::INTEGER,
             "Average string size (bytes).", DEFAULT_STRING_SIZE_ESTIMATION, false)
-        (CONFIG_CHUNK_CLUSTER_SIZE_BYTES, 0, "chunk-segment-size-old", "CHUNK_SEGMENT_SIZE_BYTES", "", Config::INTEGER,
-         "Size of chunks segment in bytes.", 0, false)
-        (CONFIG_CHUNK_CLUSTER_SIZE_MB, 0, "chunk-segment-size-in-mb", "CHUNK_SEGMENT_SIZE_MB", "", Config::INTEGER,
-         "Size of chunks segment in megabytes.", 85, false)
         (CONFIG_STORAGE_MIN_ALLOC_SIZE_BYTES, 0, "storage-min-alloc-size-bytes", "STORAGE_MIN_ALLOC_SIZE_BYTES", "", Config::INTEGER,
          "Size of minimum allocation chunk in storage file.", 512, false)
-        (CONFIG_READ_AHEAD_SIZE, 0, "read-ahead-size", "READ_AHEAD_SIZE", "", Config::INTEGER,
-            "Total size of read ahead chunks (bytes).", 64*1024*1024, false)
+        (CONFIG_READ_AHEAD_SIZE, 0, "read-ahead-size", "READ_AHEAD_SIZE", "", Config::SIZE,
+         "Total size of read ahead chunks (bytes).", 64*MiB, false)
         (CONFIG_DAEMONIZE, 'd', "daemon", "", "", Config::BOOLEAN, "Run scidb in background.",
                 false, false)
-        (CONFIG_SAVE_RAM, 0, "save-ram", "", "SAVE_RAM", Config::BOOLEAN, "Minimize memory footprint of SciDB.",
-                false, false)
-        (CONFIG_MEM_ARRAY_THRESHOLD, 'a', "mem-array-threshold", "MEM_ARRAY_THRESHOLD", "", Config::INTEGER,
-                "Maximal size of memory used by temporary in-memory array (Mb)", (int)DEFAULT_MEM_THRESHOLD, false)
+        (CONFIG_MEM_ARRAY_THRESHOLD, 'a', "mem-array-threshold", "MEM_ARRAY_THRESHOLD", "", Config::SIZE,
+                "Maximal size of memory used by temporary in-memory array (MiB)", DEFAULT_MEM_THRESHOLD, false)
         (CONFIG_TMP_PATH, 0, "tmp-path", "", "TMP_PATH", Config::STRING, "Directory for SciDB temporary files",
                 string("./tmp"), false)
         (CONFIG_EXEC_THREADS, 't', "threads", "EXEC_THREADS", "", Config::INTEGER,
@@ -149,62 +150,44 @@ void initConfig(int argc, char* argv[])
        3, false)
         (CONFIG_LIVENESS_TIMEOUT, 0, "liveness-timeout", "LIVENESS_TIMEOUT", "", Config::INTEGER, "Time in seconds to wait before declaring a network-silent instance dead.",
        120, false)
+        (CONFIG_DEADLOCK_TIMEOUT, 0, "deadlock-timeout", "DEADLOCK_TIMEOUT", "", Config::INTEGER,
+         "Time in seconds to wait before declaring a query deadlocked.", 30, false)
         (CONFIG_NO_WATCHDOG, 0, "no-watchdog", "NO_WATCHDOG", "", Config::BOOLEAN, "Do not start a watch-dog process.",
                 false, false)
-        (CONFIG_PARALLEL_SORT, 0, "parallel-sort", "PARALLEL_SORT", "", Config::BOOLEAN, "Performs first phase of merge sort in parallel.",
-                true, false)
-        (CONFIG_RLE_CHUNK_FORMAT, 0, "rle-chunk-format", "RLE_CHUNK_FORMAT", "", Config::BOOLEAN, "Use RLE chunk format.",
-                true, false)
         (CONFIG_TILE_SIZE, 0, "tile-size", "TILE_SIZE", "", Config::INTEGER, "Size of tile", 10000, false)
         (CONFIG_TILES_PER_CHUNK, 0, "tiles-per-chunk", "TILES_PER_CHUNK", "", Config::INTEGER, "Number of tiles per chunk", 100, false)
         (CONFIG_SYNC_IO_INTERVAL, 0, "sync-io-interval", "SYNC_IO_INTERVAL", "", Config::INTEGER, "Interval of time for io synchronization (milliseconds)", 0, false)
         (CONFIG_IO_LOG_THRESHOLD, 0, "io-log-threshold", "IO_LOG_THRESHOLD", "", Config::INTEGER, "Duration above which ios are logged (milliseconds)", -1, false)
         (CONFIG_OUTPUT_PROC_STATS, 0, "output-proc-stats", "OUTPUT_PROC_STATS", "", Config::BOOLEAN, "Output SciDB process statistics such as virtual memory usage to stderr",
                 false, false)
-        (CONFIG_MAX_MEMORY_LIMIT, 0, "max-memory-limit", "MAX_MEMORY_LIMIT", "", Config::INTEGER, "Maximum amount of memory the scidb process can take up (megabytes)", -1, false)
+        (CONFIG_MAX_MEMORY_LIMIT, 0, "max-memory-limit", "MAX_MEMORY_LIMIT", "", Config::INTEGER, "Maximum amount of memory the scidb process can take up (mebibytes)", -1, false)
 
-        (CONFIG_SMALL_MEMALLOC_SIZE, 0, "small-memalloc-size", "SMALL-MEMALLOC-SIZE", "", Config::INTEGER, "Maximum size of a memory allocation request which is considered small (in bytes). Larger memory allocation requests may be allocated according to a different policy.", 64 * 1024, false)
+        (CONFIG_SMALL_MEMALLOC_SIZE, 0, "small-memalloc-size", "SMALL_MEMALLOC_SIZE", "", Config::SIZE, "Maximum size of a memory allocation request which is considered small (in bytes). Larger memory allocation requests may be allocated according to a different policy.", 64*KiB, false)
 
-        (CONFIG_LARGE_MEMALLOC_LIMIT, 0, "large-memalloc-limit", "LARGE-MEMALLOC-LIMIT", "", Config::INTEGER, "Maximum number of large  (vs. small) memory allocations. The policy for doing large memory allocations may be different from the (default) policy used for small memory allocations. This parameter limits the number of outstanding allocations performed using the (non-default) large-size allocation policy.", std::numeric_limits<int>::max(), false)
+        (CONFIG_LARGE_MEMALLOC_LIMIT, 0, "large-memalloc-limit", "LARGE_MEMALLOC_LIMIT", "", Config::INTEGER, "Maximum number of large  (vs. small) memory allocations. The policy for doing large memory allocations may be different from the (default) policy used for small memory allocations. This parameter limits the number of outstanding allocations performed using the (non-default) large-size allocation policy.", std::numeric_limits<int>::max(), false)
 
         (CONFIG_STRICT_CACHE_LIMIT, 0, "strict-cache-limit", "STRICT_CACHE_LIMIT", "", Config::BOOLEAN, "Block thread if cache is overflown", false, false)
-        (CONFIG_REPART_SEQ_SCAN_THRESHOLD, 0, "repart-seq-scan-threshold", "REPART_SEQ_SCAN_THRESHOLD", "", Config::INTEGER, "Number of chunks in array cause repart to use sequential scan through source array", 1000000, false)
-        /*
-          Use query "setopt('repart-algorithm', 'value') where value is
-            * 'dense'
-            * 'sparse'
-            * 'auto'
-          for select repart algorithm
-         */
-        (CONFIG_REPART_ALGORITHM, 0, "repart-algorithm",
-            "REPART_ALGORITHM", "",
-            getDefinition<RepartAlgorithm>(3),
-         "Algorithm for repart", 0, false)
-        (CONFIG_REPART_DENSE_OPEN_ONCE, 0, "repart-dense-open-once",
-         "REPART_DENSE_OPEN_ONCE", "", Config::BOOLEAN,
-         "Dense algorithm of repart will open every source chunk just once",
-         false, false)
-        (CONFIG_REPART_DISABLE_TILE_MODE, 0, "repart-disable-tile-mode",
-         "REPART_DISABLE_TILE_MODE", "", Config::BOOLEAN,
-         "Disable tile mode for repart operator",
-         false, false)
         (CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE, 0, "replication-receive-queue-size", "REPLICATION_RECEIVE_QUEUE_SIZE", "", Config::INTEGER, "The length of incoming replication queue (across all connections)", 1000, false)
         (CONFIG_REPLICATION_SEND_QUEUE_SIZE, 0, "replication-send-queue-size", "REPLICATION_SEND_QUEUE_SIZE", "", Config::INTEGER, "The length of outgoing replication queue (across all connections)", 1000, false)
+
+        (CONFIG_SG_RECEIVE_QUEUE_SIZE, 0, "sg-receive-queue-size", "SG_RECEIVE_QUEUE_SIZE", "", Config::INTEGER, "The length of incoming sg queue (across all connections)", 128, false)
+        (CONFIG_SG_SEND_QUEUE_SIZE, 0, "sg-send-queue-size", "SG_SEND_QUEUE_SIZE", "", Config::INTEGER, "The length of outgoing sg queue (across all connections)", 64, false)
         (CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT, 0, "array-emptyable-by-default", "ARRAY_EMPTYABLE_BY_DEFAULT", "", Config::BOOLEAN, "Be default arrays are emptyable", true, false)
         (CONFIG_LOAD_SCAN_BUFFER, 0, "load-scan-buffer", "LOAD_SCAN_BUFFER", "", Config::INTEGER, "Number of MB for one input buffer used in InputScanner", 1, false)
-        (CONFIG_MATERIALIZED_WINDOW_THRESHOLD, 0, "materialized-window-threshhold", "MATERIALIZED_WINDOW_THRESHHOLD", "", Config::INTEGER, "Size in Megabytes above which we will not materialize the input chunk to a window(...) operation", 128, false)
+        (CONFIG_MATERIALIZED_WINDOW_THRESHOLD, 0, "materialized-window-threshhold", "MATERIALIZED_WINDOW_THRESHHOLD", "", Config::INTEGER, "Size in Mebibytes above which we will not materialize the input chunk to a window(...) operation", 128, false)
         (CONFIG_MPI_DIR, 0, "mpi-dir", "MPI_DIR", "", Config::STRING, "Location of MPI installation.", DEFAULT_MPI_DIR(), false)
         (CONFIG_MPI_IF, 0, "mpi-if", "MPI_IF", "", Config::STRING, "Network interface to use for MPI traffic", string(""), false)
         (CONFIG_MPI_TYPE, 0, "mpi-type", "MPI_TYPE", "", Config::STRING, "MPI installation type [mpich2-1.2 | mpich2-1.4].", DEFAULT_MPI_TYPE(), false)
         (CONFIG_MPI_SHM_TYPE, 0, "mpi-shm-type", "MPI_SHM_TYPE", "", Config::STRING, "MPI shared memory type [SHM | FILE].", string("SHM"), false)
         (CONFIG_CATALOG_RECONNECT_TRIES, 0, "catalog-reconnect-tries", "CONFIG_CATALOG_RECONNECT_TRIES", "", Config::INTEGER, "Count of tries of catalog reconnection", 5, false)
-        (CONFIG_QUERY_MAX_SIZE, 0, "query-max-size", "CONFIG_QUERY_MAX_SIZE", "", Config::INTEGER, "Max number of bytes in query string", 16 * 1024 * 1024, false)
+        (CONFIG_QUERY_MAX_SIZE, 0, "query-max-size", "CONFIG_QUERY_MAX_SIZE", "", Config::SIZE, "Max number of bytes in query string", 16*MiB, false)
         (CONFIG_MAX_REQUESTS, 0, "requests", "MAX_REQUESTS", "", Config::INTEGER,
-         "Max. number of client query requests queued for execution. Any requests in excess of the limit are returned to the client with an error.", 1000, false)
+         "Max. number of client query requests queued for execution. Any requests in excess of the limit are returned to the client with an error.", 256, false)
         (CONFIG_ENABLE_CATALOG_UPGRADE, 0, "enable-catalog-upgrade", "ENABLE_CATALOG_UPGRADE", "", Config::BOOLEAN, "Set to true to enable the automatic upgrade of SciDB catalog", false, false)
-        (CONFIG_REDIM_CHUNKSIZE, 0, "redimension-chunksize", "REDIMENSION_CHUNKSIZE", "", Config::INTEGER, "Chunksize for internal intermediate array used in operator redimension", 10240, false)
+        (CONFIG_REDIM_CHUNKSIZE, 0, "redimension-chunksize", "REDIMENSION_CHUNKSIZE", "", Config::SIZE, "Chunksize for internal intermediate array used in operator redimension", 10*KiB, false)
         (CONFIG_MAX_OPEN_FDS, 0, "max-open-fds", "MAX_OPEN_FDS", "", Config::INTEGER, "Maximum number of fds that will be opened by the storage manager at once", 256, false)
         (CONFIG_PREALLOCATE_SHM, 0, "preallocate-shared-mem", "PREALLOCATE_SHM", "", Config::BOOLEAN, "Make sure shared memory backing (e.g. /dev/shm) is preallocated", true, false)
+        (CONFIG_INSTALL_ROOT, 0, "install_root", "INSTALL_ROOT", "", Config::STRING, "The installation directory from which SciDB runs", string(SCIDB_INSTALL_PREFIX()), false)
         ;
 
     cfg->addHook(configHook);

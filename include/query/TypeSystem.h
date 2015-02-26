@@ -43,24 +43,25 @@
 #include <cmath>
 #include "limits.h"
 
+#include "system/Constants.h"
 #include "system/Exceptions.h"
 #include "util/Singleton.h"
 #include "util/Mutex.h"
 #include "util/StringUtil.h"
 #include "util/PluginObjects.h"
 #include <array/RLE.h>
-#include <util/na.h>
 
 namespace scidb
 {
 
 class LogicalExpression;
 
-const size_t STRIDE_SIZE = 64*1024;
+const size_t STRIDE_SIZE = 64*KiB;
 
 // Type identifier
 typedef std::string TypeId;
 
+const char TID_INVALID[] = "InvalidType";
 const char TID_INDICATOR[] = "indicator";
 const char TID_CHAR[] = "char";
 const char TID_INT8[] = "int8";
@@ -79,7 +80,6 @@ const char TID_DATETIME[] = "datetime";
 const char TID_DATETIMETZ[] = "datetimetz";
 const char TID_VOID[] = "void";
 const char TID_BINARY[] = "binary";
-const char TID_FIXED_STRING[] = "string_*";
 
 /**
  * TypeEnum is provided to have efficient type comparison.
@@ -87,7 +87,8 @@ const char TID_FIXED_STRING[] = "string_*";
  */
 enum TypeEnum
 {
-    TE_INDICATOR,
+    TE_INVALID = -1,
+    TE_INDICATOR = 0,
     TE_CHAR,
     TE_INT8,
     TE_INT16,
@@ -104,14 +105,13 @@ enum TypeEnum
     TE_DATETIME,
     TE_DATETIMETZ,
     TE_VOID,
-    TE_BINARY,
-    TE_FIXED_STRING
+    TE_BINARY
 };
 
 /**
  * Convert TypeId to TypeEnum.
  */
-inline TypeEnum typeId2TypeEnum(TypeId tid)
+inline TypeEnum typeId2TypeEnum(TypeId tid, bool noThrow = false)
 {
     if (tid==TID_INDICATOR) {
         return TE_INDICATOR;
@@ -167,12 +167,16 @@ inline TypeEnum typeId2TypeEnum(TypeId tid)
     else if (tid==TID_BINARY) {
         return TE_BINARY;
     }
-    else if (tid==TID_FIXED_STRING) {
-        return TE_FIXED_STRING;
+    else if (tid==TID_INVALID) {
+        return TE_INVALID;
     }
 
-    assert(false);
-    return TE_VOID;
+    // Probably a user-defined type of some kind.  XXX We need to do a
+    // better job of supporting those here!
+    if (noThrow) {
+        return TE_INVALID;
+    }
+    throw USER_EXCEPTION(SCIDB_SE_TYPE, SCIDB_LE_TYPE_NOT_REGISTERED) << tid;
 }
 
 /**
@@ -218,8 +222,6 @@ inline TypeId typeEnum2TypeId(TypeEnum te)
         return TID_VOID;
     case TE_BINARY:
         return TID_BINARY;
-    case TE_FIXED_STRING:
-        return TID_FIXED_STRING;
     default:
         assert(false);
     }
@@ -247,22 +249,41 @@ template<>  TypeId type2TypeId<uint64_t>();
 template<>  TypeId type2TypeId<float>();
 template<>  TypeId type2TypeId<double>();
 
-#define IS_VARLEN(type) (type==TID_STRING || type==TID_BINARY ? true : false)
+inline bool IS_VARLEN(const TypeId& tid)
+{
+    return tid == TID_STRING || tid == TID_BINARY;
+}
 
-#define BUILTIN_TYPE_CNT 17
+inline bool IS_REAL(const TypeId& tid)
+{
+    return tid == TID_FLOAT || tid == TID_DOUBLE;
+}
 
-#define IS_NUMERIC(type) (\
-    type == TID_INT8 || type == TID_INT16 || type == TID_INT32 || type == TID_INT64\
-    || type == TID_UINT8 || type == TID_UINT16 || type == TID_UINT32 || type == TID_UINT64\
-    || type == TID_FLOAT || type == TID_DOUBLE)
+inline bool IS_INTEGRAL(const TypeId& tid)
+{
+    return tid == TID_INT8
+        || tid == TID_INT16
+        || tid == TID_INT32
+        || tid == TID_INT64
+        || tid == TID_UINT8
+        || tid == TID_UINT16
+        || tid == TID_UINT32
+        || tid == TID_UINT64;
+}
 
-#define IS_REAL(type) (type == TID_FLOAT || type == TID_DOUBLE)
+inline bool IS_NUMERIC(const TypeId& tid)
+{
+    return IS_INTEGRAL(tid) || IS_REAL(tid);
+}
 
-#define IS_INTEGRAL(type) (type == TID_INT8  || type == TID_INT16  || type == TID_INT32  || type == TID_INT64 || \
-                           type == TID_UINT8 || type == TID_UINT16 || type == TID_UINT32 || type == TID_UINT64 )
-
-#define IS_SIGNED(type) (type == TID_INT8 || type == TID_INT16 || type == TID_INT32 || type == TID_INT64\
-    || type == TID_FLOAT || type == TID_DOUBLE)
+inline bool IS_SIGNED(const TypeId& tid)
+{
+    return tid == TID_INT8
+        || tid == TID_INT16
+        || tid == TID_INT32
+        || tid == TID_INT64
+        || IS_REAL(tid);
+}
 
 const size_t STRFTIME_BUF_LEN = 256;
 const char* const DEFAULT_STRFTIME_FORMAT = "%F %T";
@@ -389,7 +410,7 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<TypeId>& ob );
  */
 #define BUILTIN_METHODS(TYPE_NAME, METHOD_NAME) \
     TYPE_NAME get##METHOD_NAME() const { return *static_cast<TYPE_NAME*>((void*)&_builtinBuf); } \
-    void set##METHOD_NAME(TYPE_NAME val) { _missingReason = -1; _size = sizeof(TYPE_NAME); *static_cast<TYPE_NAME*>((void*)&_builtinBuf) = val; }
+    void set##METHOD_NAME(TYPE_NAME val) { _missingReason = MR_DATUM; _size = sizeof(TYPE_NAME); *static_cast<TYPE_NAME*>((void*)&_builtinBuf) = val; }
 
 class Value
 {
@@ -404,22 +425,32 @@ private:
      *
      * _missingReason >= 0 means value is NULL and _missingReason has a code
      *  of reason.
-     * _missingReason = -1 means value is not NULL and data() returns relevant
-     *  buffer with value.
-     * _missingReason = -2 means _data contains linked vector data that should
-     *  not be freed. Methods changing *data() are disallowed.
+     * _missingReason == MR_DATUM (-1) means value is not NULL and data()
+     *  returns relevant buffer with value.
+     * _missingReason == MR_VECTOR (-2) means _data contains linked vector data
+     *  that should not be freed. Methods changing *data() are disallowed.
+     * _missingReason == MR_TILE (-3) means _tile is an RLEPayload.
      */
     int32_t _missingReason;
-        /*
-        ** For variable length data, the size of this data in bytes.
-        */
+
+    enum MissingReason {
+        MR_NULL = 0,
+        MR_DATUM = -1,
+        MR_VECTOR = -2,
+        MR_TILE = -3
+    };
+
+    /*
+    ** For variable length data, the size of this data in bytes.
+    */
     uint32_t _size;
-        /*
-        ** A union type. If _missingReason is -2, or the _size > 8, then the data
-        ** is found in a buffer pointed to out of _data. Otherwise, the data
-        ** associated with this instance of the Value class is found in the
-        ** 8-byte _builtinBuf.
-        */
+
+    /*
+    ** A union type. If _missingReason is MR_VECTOR, or the _size > 8,
+    ** then the data is found in a buffer pointed to out of
+    ** _data. Otherwise, the data associated with this instance of the
+    ** Value class is found in the 8-byte _builtinBuf.
+    */
     union {
         void*   _data;
         builtinbuf_t _builtinBuf;
@@ -446,20 +477,23 @@ private:
 
     void destroy()
     {
-        if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
+        if (_size > sizeof(_builtinBuf) && _missingReason != MR_VECTOR) {
             free(_data);
+            _data = NULL;
         }
         delete _tile;
     }
 
 public:
-    explicit Value() : _missingReason(0), _size(0), _builtinBuf(0), _tile(NULL) {}
+    explicit Value()
+        : _missingReason(MR_NULL), _size(0), _builtinBuf(0), _tile(NULL)
+    {}
 
     /**
      * Construct Value for some size.
      */
     explicit Value(size_t size):
-        _missingReason(-1), _size(size), _builtinBuf(0), _tile(NULL)
+        _missingReason(MR_DATUM), _size(size), _builtinBuf(0), _tile(NULL)
     {
         init();
     }
@@ -468,7 +502,7 @@ public:
      * Construct Value for some Type.
      */
     explicit Value(const Type& type):
-        _missingReason(-1), _size(type.byteSize()), _builtinBuf(0), _tile(NULL)
+        _missingReason(MR_DATUM), _size(type.byteSize()), _builtinBuf(0), _tile(NULL)
     {
         init(type.typeId()!=TID_VOID);
     }
@@ -476,8 +510,11 @@ public:
     /**
      * Construct Value for some Type with tile mode support.
      */
-    explicit Value(const Type& type, bool tile):
-        _missingReason(tile ? -3 : -1), _size(type.byteSize()), _builtinBuf(0), _tile(tile ? new RLEPayload(type) : NULL)
+    explicit Value(const Type& type, bool tile)
+        : _missingReason(tile ? MR_TILE : MR_DATUM)
+        , _size(type.byteSize())
+        , _builtinBuf(0)
+        , _tile(tile ? new RLEPayload(type) : NULL)
     {
         init(type.typeId() != TID_VOID);
     }
@@ -487,14 +524,14 @@ public:
      * @param data a pointer to linked data
      * @param size a size of linked data buffer
      */
-    inline explicit Value(void* data, size_t size, bool isVector = true)
+    explicit Value(void* data, size_t size, bool isVector = true)
     : _size(size), _builtinBuf(0), _tile(NULL)
     {
         if (isVector) {
-            _missingReason = -2;
+            _missingReason = MR_VECTOR;
             _data = data;
         } else {
-            _missingReason = -1;
+            _missingReason = MR_DATUM;
             void* ptr;
             if (size > sizeof(_builtinBuf)) {
                 _data = ptr = malloc(_size);
@@ -512,8 +549,8 @@ public:
      * Copy constructor.
      * @param Value object to be copied.
      */
-    inline Value(const Value& val):
-    _missingReason(-1), _size(0), _builtinBuf(0), _tile(NULL)
+    Value(const Value& val):
+    _missingReason(MR_DATUM), _size(0), _builtinBuf(0), _tile(NULL)
     {
         *this = val;
     }
@@ -521,13 +558,13 @@ public:
     void clear()
     {
         destroy();
-        _missingReason = 0;
+        _missingReason = MR_NULL;
         _size = 0;
         _builtinBuf = 0;
         _tile = NULL;
     }
 
-    inline ~Value()
+    ~Value()
     {
         destroy();
     }
@@ -537,7 +574,7 @@ public:
      * @param dataSize the size of the stored data, in bytes
      * @return the total in-memory footprint that would be occupied by allocating new Value(size)
      */
-    inline static size_t getFootprint(size_t dataSize)
+    static size_t getFootprint(size_t dataSize)
     {
         //if the datatype is smaller than _builtinBuf, it's stored inside _builtinBuf.
         if (dataSize > sizeof(builtinbuf_t ))
@@ -550,12 +587,12 @@ public:
         }
     }
 
-        /**
-         * Link data buffer of some size to the Value object.
-         * @param pointer to data buffer
-         * @param size of data buffer in bytes
-         */
-    inline void linkData(void* data, size_t size)
+    /**
+     * Link data buffer of some size to the Value object.
+     * @param pointer to data buffer
+     * @param size of data buffer in bytes
+     */
+    void linkData(void* data, size_t size)
     {
         if (((NULL != data) || (0 != size)) &&
             ((NULL == data) || (0 == size)))
@@ -563,10 +600,11 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_LINK_DATA_TO_ZERO_BUFFER);
         }
 
-        if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
+        if (_size > sizeof(_builtinBuf) && _missingReason != MR_VECTOR) {
             free(_data);
+            // _data overwritten below, no need to set it to NULL
         }
-        _missingReason = -2;
+        _missingReason = MR_VECTOR;
         _size = size;
         _data = data;
     }
@@ -575,23 +613,24 @@ public:
      * Get (void *) to data contents of Value object.
      * @return (void *) to data
      */
-    inline void* data() const
+    void* data() const
     {
-        return _missingReason != -2 && _size <= sizeof(_builtinBuf) ? (void*)&_builtinBuf : _data;
+        return _missingReason != MR_VECTOR && _size <= sizeof(_builtinBuf) ? (void*)&_builtinBuf : _data;
     }
 
     /**
      * Get size of data contents in bytes.
      * @return size_t length of data in bytes
      */
-    inline size_t size() const {
+    size_t size() const
+    {
         return _size;
     }
     /**
      * Equality operator
      * Very basic, byte-wise equality.
      */
-    inline bool operator == (Value const& other) const
+    bool operator == (Value const& other) const
     {
         return _missingReason == other. _missingReason
                && (_missingReason >= 0
@@ -600,25 +639,28 @@ public:
                                              : _builtinBuf == other._builtinBuf)));
     }
 
-    inline bool operator != (Value const& other) const {
+    bool operator != (Value const& other) const
+    {
         return !(*this == other);
     }
 
     /*
      * Check if data buffer is equal to type's default value
      */
-    inline bool isDefault(const TypeId& typeId) const;
+    bool isDefault(const TypeId& typeId) const;
 
     /**
      * Check if data buffer is filled with 0
      * TODO: (RS) It can be optimized by using comparing of DWORDs
      */
-    inline bool isZero() const
+    bool isZero() const
     {
         char* ptr = (char*)data();
         size_t n = size();
-        while (n-- != 0) {
-            if (*ptr++ != 0) {
+        while (n-- != 0)
+        {
+            if (*ptr++ != 0)
+            {
                 return false;
             }
         }
@@ -628,17 +670,17 @@ public:
     /**
      * Set the Value to zero.
      */
-    inline void setZero()
+    void setZero()
     {
-        if (_missingReason == -2)
+        if (_missingReason == MR_VECTOR)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
                 // TODO: Fix this. Should be able to set a Vector of
                 //       values to default.
-        if (_missingReason == -3)
+        if (_missingReason == MR_TILE)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_SET_VALUE_VECTOR_TO_DEFAULT);
 
-        _missingReason = -1;
+        _missingReason = MR_DATUM;
         if (_size > sizeof(_builtinBuf)) {
             memset(_data, 0, _size);
         } else {
@@ -650,9 +692,9 @@ public:
      * Set up memory to hold a vector of data values in this Value.
      * @param size of the memory to hold the vector in bytes.
      */
-    inline void setVector(const size_t size)
+    void setVector(const size_t size)
     {
-        if (_missingReason == -2)
+        if (_missingReason == MR_VECTOR)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
         if (size > sizeof(_builtinBuf)) {
@@ -660,22 +702,25 @@ public:
             if (_data == NULL) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
             }
-        } else {
-            if (_size > sizeof(_builtinBuf)) {
+        } else
+        {
+            if (_size > sizeof(_builtinBuf))
+            {
                 free(_data);
+                _data = NULL;
             }
         }
         _size = size;
-//        _missingReason = -3;
+//        _missingReason = MR_TILE;
     }
 
     /**
      * Allocate space for value
-         * @param size in bytes of the data buffer.
-         */
-    inline void setSize(const size_t size)
+     * @param size in bytes of the data buffer.
+     */
+    void setSize(const size_t size)
     {
-        if (_missingReason == -2)
+        if (_missingReason == MR_VECTOR)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
         if (size > sizeof(_builtinBuf)) {
@@ -686,22 +731,23 @@ public:
         } else {
             if (_size > sizeof(_builtinBuf)) {
                 free(_data);
+                _data = NULL;
             }
         }
         _size = size;
-        _missingReason = -1;
+        _missingReason = MR_DATUM;
     }
 
-        /**
-         * Copy data buffer into the value object.
+    /**
+     * Copy data buffer into the value object.
      * @param (void *) to data buffer to be copied.
-         * @param size in bytes of the data buffer.
-         */
-    inline void setData(const void* data, size_t size)
+     * @param size in bytes of the data buffer.
+     */
+    void setData(const void* data, size_t size)
     {
         void* ptr;
 
-        if (_missingReason == -2) {
+        if (_missingReason == MR_VECTOR) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
         }
         if (size > sizeof(_builtinBuf)) {
@@ -713,51 +759,57 @@ public:
         } else {
             if (_size > sizeof(_builtinBuf)) {
                 free(_data);
+                // assignment to _builtinBuf below will zero _data too
             }
             ptr = (void*)&_builtinBuf;
             _builtinBuf = 0;
         }
         _size = size;
         memcpy(ptr, data, size);
-        _missingReason = -1;
+        _missingReason = MR_DATUM;
     }
 
     /**
      * Check if value represents 'missing' value
      */
-    inline bool isNull() const {
+    bool isNull() const
+    {
         return _missingReason >= 0;
     }
 
     /**
      * Set 'missing value with optional explanation of value missing reason.
      */
-    inline void setNull(int reason = 0) {
+    void setNull(int reason = 0)
+    {
         _missingReason = reason;
     }
 
     /**
      * Get reason of missing value (if it is previously set by setNull method)
      */
-    inline int32_t getMissingReason() const {
+    int32_t getMissingReason() const
+    {
         return _missingReason;
     }
 
-    inline bool isVector() const {
-        return _missingReason <= -2;
+    bool isVector() const
+    {
+        return _missingReason == MR_VECTOR
+            || _missingReason == MR_TILE;
     }
 
     /**
      * Assignment operator.
      */
-    inline Value& operator=(const Value& val)
+    Value& operator=(const Value& val)
     {
         if (this == &val)
         {
             return *this;
         }
 
-        if (val._missingReason != -2) {
+        if (val._missingReason != MR_VECTOR) {
             // TODO: It's better to have special indicator of using tile mode in vector.
             // I will add it later.
             if (val._tile != NULL) {
@@ -769,7 +821,7 @@ public:
                 delete _tile;
                 _tile = NULL;
             }
-            if (_missingReason == -2)
+            if (_missingReason == MR_VECTOR)
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
             if (val.isNull()) {
@@ -778,6 +830,7 @@ public:
                 if (val._size <= sizeof(_builtinBuf)) {
                     if (_size > sizeof(_builtinBuf)) {
                         free(_data);
+                        // assignment to _builtnBuf below clobbers _data
                     }
                     _builtinBuf = val._builtinBuf;
                     _size = val._size;
@@ -794,24 +847,24 @@ public:
             //      Value object, and free the memory associated with it,
             //      then this second Value will have dodgy data. Can we
             //      make the _Data a boost::shared_ptr<void> ?
-            if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
+            if (_size > sizeof(_builtinBuf) && _missingReason != MR_VECTOR) {
                 free(_data);
             }
             _data = val._data;
             _size = val._size;
-            _missingReason = -2;
+            _missingReason = MR_VECTOR;
         }
         return *this;
     }
 
-    inline void swap(Value& val)
+    void swap(Value& val)
     {
         std::swap(_missingReason,val._missingReason);
         std::swap(_size,val._size);
         std::swap(_data,val._data);
         std::swap(_tile,val._tile);
 
-        assert(_missingReason > -3);
+        assert(isNull() || _missingReason != MR_TILE);
         assert((_size <= sizeof(_builtinBuf)) || _data != NULL);
     }
 
@@ -830,13 +883,15 @@ public:
         if (!isNull()) {
                 char* ptr = NULL;
             if (Archive::is_loading::value) {
-                                ptr =_size > sizeof(_builtinBuf) ? (char*)(_data = malloc(_size)) : (char*)&_builtinBuf;
+                ptr = _size > sizeof(_builtinBuf)
+                    ? (char*)(_data = malloc(_size))
+                    : (char*)&_builtinBuf;
             } else {
-                        ptr = (char*) data();
-                }
+                ptr = (char*) data();
+            }
             for (size_t i = 0, n = _size; i < n; i++) {
-                                ar & ptr[i];
-                        }
+                ar & ptr[i];
+            }
         }
 
         // Serialization payload
@@ -883,12 +938,12 @@ public:
     template<typename Type>
     void set(const Type& val)
     {
-        if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
+        if (_size > sizeof(_builtinBuf) && _missingReason != MR_VECTOR) {
             assert(false);
             free(_data);
             _data=0;
         }
-        _missingReason = -1;
+        _missingReason = MR_DATUM;
         _size = sizeof(Type);
         if (_size > sizeof(_builtinBuf)) {
             assert(false);
@@ -976,50 +1031,58 @@ public:
         return T();
     }
 
-        /**
-        * Return (char *) to to the contents of the Value object
-        */
-    inline const char* getString() const
+    /**
+    * Return (char *) to to the contents of the Value object
+    */
+    const char* getString() const
     {
-        return _size == 0 ? "" : (const char*)data();
+        return _size==0 ? "" : (const char*)data();
     }
 
-        /**
-        * Set the data contents of the
-        * @param Pointer to null terminated 'C' string
-        */
-    inline void setString(const char* str)
+    /**
+    * Set the data contents of the
+    * @param Pointer to null terminated 'C' string
+    */
+    void setString(const char* str)
     {
         //
         // PGB: No, no, no. A string "" is *not* a missing string.
         // if (str && *str) { }
-        if (str) {
+        if (str)
+        {
             setData(str, strlen(str) + 1);
         }
-        else {
+        else
+        {
             setNull();
         }
+    }
+
+    void setString(const std::string& s)
+    {
+        setData(s.c_str(),s.size() + 1);
     }
 
 /**
  * New RLE fields of Value
  */
 public:
-    inline RLEPayload* getTile(TypeId const& type);
+    RLEPayload* getTile(TypeId const& type);
 
-    inline RLEPayload* getTile() const {
+    RLEPayload* getTile() const
+    {
         //XXX disable assert(_tile != NULL);
         //XXX for the hack to enable vectorized execution
-//TODO:        assert(_missingReason == -3);
+//TODO:        assert(_missingReason == MR_TILE);
         return _tile;
     }
 
-    inline void setTile(RLEPayload* payload)
+    void setTile(RLEPayload* payload)
     {
         _size = payload->elementSize();
         delete _tile;
         _tile = payload;
-        _missingReason = -3;
+        _missingReason = MR_TILE;
     }
 };
 
@@ -1098,15 +1161,16 @@ public:
     }
 };
 
-RLEPayload* Value::getTile(TypeId const& type)
+inline RLEPayload* Value::getTile(TypeId const& type)
 {
-    if (_tile == NULL) {
+    if (_tile == NULL)
+    {
         _tile = new RLEPayload(TypeLibrary::getType(type));
     }
     return _tile;
 }
 
-bool Value::isDefault(const TypeId& typeId) const
+inline bool Value::isDefault(const TypeId& typeId) const
 {
     return *this == TypeLibrary::getDefaultValue(typeId);
 }
@@ -1186,39 +1250,34 @@ inline DoubleFloatOther getDoubleFloatOther(TypeId const& type)
 }
 
 /**
- * A value can be in one of below, assuming null < na < nan < regular
+ * A value can be in one of below, assuming null < nan < regular
  */
-enum NullNaNanRegular
+enum NullNanRegular
 {
     NULL_VALUE,
-    NA_VALUE,
     NAN_VALUE,
     REGULAR_VALUE
 };
 
 /**
- * Given a value, tell whether it is Null, Na, Nan, or a regular value.
+ * Given a value, tell whether it is Null, Nan, or a regular value.
  * @param[in] v      a value
  * @param[in] type   an enum DoubleFloatOther
- * @return one constant in NullNaNanRegular
+ * @return one constant in NullNanRegular
  */
-inline NullNaNanRegular getNullNaNanRegular(Value const& v, DoubleFloatOther type)
+inline NullNanRegular getNullNanRegular(Value const& v, DoubleFloatOther type)
 {
     if (v.isNull()) {
         return NULL_VALUE;
     }
     if (type==DOUBLE_TYPE) {
         double d = v.getDouble();
-        if (isNAonly(d)) {
-            return NA_VALUE;
-        } else if (std::isnan(d)) {
+        if (std::isnan(d)) {
             return NAN_VALUE;
         }
     } else if (type==FLOAT_TYPE) {
         float d = v.getFloat();
-        if (isNAonly(d)) {
-            return NA_VALUE;
-        } else if (std::isnan(d)) {
+        if (std::isnan(d)) {
             return NAN_VALUE;
         }
     }

@@ -1,7 +1,7 @@
 --setup
 
 CREATE ARRAY overlap <a: double> [x=0:5,3,1, y=0:5,3,1]
-load(overlap, '../tests/harness/testcases/data/overlap.txt')
+load(overlap, '${TEST_DATA_DIR}/overlap.txt')
 
 --test
 

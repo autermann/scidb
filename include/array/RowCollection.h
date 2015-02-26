@@ -68,8 +68,10 @@
  *  ptr.reset()
  *
  *  Each row is a separate group. So the chunk interval in row is 1.
- *  Each column is one element in some src array, which needs to be regrouped. The chunk interval in column is by default 10240.
- *  A new type of iterator is provided to manipulte access to the array elements.
+ *  Each column is one element in some src array, which needs to be
+ *  regrouped. The chunk interval in column is by default 10 KiB.  A
+ *  new type of iterator is provided to manipulate access to the array
+ *  elements.
  *
  *  The class is a template class, which takes as input a 'Group' class.
  *  The 'Group' class will be used as a key to boost::unordered_map.
@@ -89,6 +91,7 @@
 #include <algorithm>
 #include <exception>
 #include <array/Metadata.h>
+#include <system/Constants.h>
 #include <util/iqsort.h>
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
@@ -106,7 +109,7 @@ template<class Group, class Hash> class RowIterator;
 typedef bool RowCollectionMode;
 const bool RowCollectionModeRead = true;
 const bool RowCollectionModeAppend = false;
-const size_t defaultChunkSize = 10*1024;
+const size_t defaultChunkSize = 10*KiB;
 const size_t UNKNOWN_ROW_ID = static_cast<size_t>(-1);
 
 /**
@@ -152,6 +155,25 @@ private:
     }
 
     /**
+     * @return a position corresponding to the start of a chunk
+     * on which the input position points.
+     */
+    size_t cellColToChunkCol(size_t cellColumn) const {
+        return cellColumn - (cellColumn % _chunkSize);
+    }
+
+    /**
+     * @param atColumn the chunk column computed by cellColToChunkCol
+     * @return true if the chunk iterators exist and the chunk
+     * column is on a chunk for which we have an iterator.
+     */
+    bool haveChunkIterators(size_t atColumn) const {
+        return (_chunkIterators[0] &&
+                (atColumn ==
+                 cellColToChunkCol(_chunkIterators[0]->getPosition()[1])));
+    }
+
+    /**
      * Adjust chunkIterators to match _locInRow.
      *
      * @pre _locInRow was already set
@@ -162,8 +184,9 @@ private:
         ASSERT_EXCEPTION(!end(), "RowIterator::adjustChunkIterators() called but end() is true.");
 
         // Acquire the chunkIterators, if needed.
-        if (!_chunkIterators[0] || _locInRow % _chunkSize != _chunkIterators[0]->getPosition()[1] % _chunkSize) {
-            Coordinates const& chunkPos = toTwoDim(_locInRow % _chunkSize);
+        size_t atColumn = cellColToChunkCol(_locInRow);
+        if (!haveChunkIterators(atColumn)) {
+            Coordinates const& chunkPos = toTwoDim(atColumn);
             _rc.getConstChunkIterators(_chunkIterators, chunkPos);
         }
 
@@ -281,6 +304,14 @@ public:
         if (!end()) {
             adjustChunkIterators();
         }
+    }
+
+    /**
+     * Which row in the RowCollection this iterator is at?
+     */
+    size_t getRowId() const
+    {
+        return _rowId;
     }
 };
 

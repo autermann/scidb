@@ -154,7 +154,6 @@ namespace scidb
          */
         static int openFile(const std::string& fileName, int flags);
 
-    private:
         /**
          * Close directory
          * @param dirName directory name
@@ -343,10 +342,10 @@ namespace scidb
                                   int flags);
 
         /**
-         * Constructor
+         * Constructor -- need to ensure that everything in the temp dir
+         * is wiped out
          */
-        FileManager() : _maxLru(0)
-            {}
+        FileManager();
 
     private:
 

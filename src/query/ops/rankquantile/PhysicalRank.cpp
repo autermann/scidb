@@ -157,7 +157,9 @@ public:
         // if every cell is a separate group, return "all-ranked-one"
         if (groupBy.size() == dims.size()) {
             LOG4CXX_DEBUG(logger, "[Rank] Building AllRankedOneArray, because all the dimensions are involved.");
-            shared_ptr<Array> allRankedOne = make_shared<AllRankedOneArray>(getRankingSchema(inputSchema, rankedAttributeID), inputArray, rankedAttributeID);
+            shared_ptr<Array> allRankedOne = make_shared<AllRankedOneArray>(
+                getRankingSchema(inputSchema, rankedAttributeID),
+                inputArray, rankedAttributeID);
 
             timing.logTiming(logger, "[Rank] Building AllRankedOneArray", false);
             LOG4CXX_DEBUG(logger, "[Rank] finished!")
@@ -186,12 +188,20 @@ public:
         // Extract just the ranking attribute
         AttributeDesc rankedAttribute = inputSchema.getAttributes()[rankedAttributeID];
         Attributes projectAttrs;
-        projectAttrs.push_back(AttributeDesc(0, rankedAttribute.getName(), rankedAttribute.getType(), rankedAttribute.getFlags(), rankedAttribute.getDefaultCompressionMethod()));
+        projectAttrs.push_back(AttributeDesc(0,
+                                             rankedAttribute.getName(),
+                                             rankedAttribute.getType(),
+                                             rankedAttribute.getFlags(),
+                                             rankedAttribute.getDefaultCompressionMethod()));
 
         AttributeDesc const* emptyTag = inputSchema.getEmptyBitmapAttribute();
         if (emptyTag)
         {
-            projectAttrs.push_back(AttributeDesc(1, emptyTag->getName(), emptyTag->getType(), emptyTag->getFlags(), emptyTag->getDefaultCompressionMethod()));
+            projectAttrs.push_back(AttributeDesc(1,
+                                                 emptyTag->getName(),
+                                                 emptyTag->getType(),
+                                                 emptyTag->getFlags(),
+                                                 emptyTag->getDefaultCompressionMethod()));
         }
 
         Dimensions projectDims(dims.size());
@@ -313,10 +323,12 @@ public:
 
         timing.logTiming(logger, "[Rank] Sort");
 
-        size_t numRowsOfFivePercent = rcGroupSorted.numRows()/20;   // To output intermediate timing results no more than 20 lines in the log.
+        // To output intermediate timing results, no more than 20 log lines.
+        size_t numRowsOfFivePercent = rcGroupSorted.numRows()/20;
         if (numRowsOfFivePercent<1) {
             numRowsOfFivePercent = 1;
         }
+
         LOG4CXX_DEBUG(logger, "[Rank] Begin scanning all rows of rcGroupSorted.");
 
         // Define a RowCollection, where each row is a chunk.
@@ -331,7 +343,7 @@ public:
         // Scan rcGroupSorted; determine rank on-the-fly; and append to rcChunk
         AttributeComparator compareValue(outputAttrs[0].getType());
         vector<Value> itemInRowCollectionChunk(2);
-        TypeId strType = rcGroupAttrs[1].getType();
+        TypeId strType = rcGroupAttrs[0].getType();
         DoubleFloatOther type = getDoubleFloatOther(strType);
 
         for (size_t rowId=0; rowId<rcGroupSorted.numRows(); ++rowId) {
@@ -362,8 +374,10 @@ public:
                 size_t chunkID = itemInRowCollectionGroup[2].getUint64();
                 if (!nullEncountered) {
                     itemInRowCollectionChunk[0].setDouble(prevRank);
-                } else {
+                } else if (itemInRowCollectionGroup[0].isNull()) {
                     itemInRowCollectionChunk[0].setNull();
+                } else {
+                    itemInRowCollectionChunk[0].setDouble(NAN);
                 }
                 itemInRowCollectionChunk[1] = itemInRowCollectionGroup[3];    // itemID
                 size_t resultRowId = UNKNOWN_ROW_ID;

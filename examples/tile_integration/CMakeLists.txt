@@ -24,8 +24,6 @@ set (tile_integration_src
     TileApplyArray.cpp
     LogicalTileApply.cpp
     PhysicalTileApply.cpp
-    LogicalTileConsume.cpp
-    PhysicalTileConsume.cpp
 )
 add_library(tile_integration SHARED ${tile_integration_src})
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "libtile_integration${CMAKE_SHARED_LIBRARY_SUFFIX}" tile_integration)

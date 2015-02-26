@@ -4,8 +4,8 @@
 load_library('misc')
 create array C <d:int64> [ X=0:5000000,100000,0]
 create array B <d:int64> [ X=0:5000000,100000,0]
-store(build_sparse(B, random(), X > 2500000), B)
-store(build_sparse(C, random(), X < 2500000), C)
+store(filter(build(B, random()), X > 2500000), B)
+store(filter(build(C, random()), X < 2500000), C)
 
 --test
 # injectError (nodeid, errorid)
@@ -16,7 +16,7 @@ store(build_sparse(C, random(), X < 2500000), C)
 ## ERROR6
 ##
 # coordinator
-build_sparse(C, injectError(0,6), X = 0)
+filter(build(C, injectError(0,6)), X = 0)
 --error "insert(B, C)"
 
 --echo "Restarting SciDB..."

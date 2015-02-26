@@ -102,8 +102,8 @@
         multi-dimensional array that supports your analytics.</para>
 
         <para>For some loading techniques, such rearrangement will typically
-        involve the redimension_store operator and possibly involve the
-        analyze operator. The program loadcsv.py, which is the linchpin of the
+        involve the <code>redimension()</code> operator and possibly involve
+        the <code>analyze()</code> operator. The program <emphasis role="bold">loadcsv.py</emphasis>, which is the linchpin of the
         parallel load technique, can perform this step for you.</para>
       </listitem>
     </orderedlist>
@@ -363,13 +363,13 @@ Note: the -q and -p options are mutually exclusive.
           though you are likely to use the winnersFlat array only briefly and
           perhaps delete it after you populate the target array, the chunk
           size matters because it can affect performance of the load and of
-          the next step: the redimension_store.</para>
+          the next step: the redimension.</para>
         </listitem>
 
         <listitem>
           <para>The chunk overlap (in this case, 0) for the dimension: If you
           are using the load array briefly—only as the target of the load
-          operation and as the source of the subsequent redimension-store
+          operation and as the source of the subsequent redimension
           operation—then there is no need for chunks in the load array to
           overlap at all.</para>
         </listitem>
@@ -382,7 +382,7 @@ Note: the -q and -p options are mutually exclusive.
 
           <secondary>load</secondary>
         </indexterm>After you create the target array, you can populate it
-      with data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> winnersFlat <command>FROM</command> '../tests/harness/testcases/data/doc/olympic_data.scidb';  </programlisting>The data file paths in the AFL and AQL commands are relative
+      with data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> winnersFlat <command>FROM</command> '${DOC_DATA}/olympic_data.scidb';  </programlisting>The data file paths in the AFL and AQL commands are relative
       to the working directory of the server.</para></para>
     </section>
 
@@ -562,7 +562,7 @@ Note: the -q and -p options are mutually exclusive.
       </listitem>
 
       <listitem>
-        <para>You can run redimension_store explicitly, or you can instruct
+        <para>You can run redimension explicitly, or you can instruct
         loadcsv.py to do it for you with the -A command line switch.</para>
       </listitem>
     </orderedlist>
@@ -1031,9 +1031,9 @@ Note: the -q and -p options are mutually exclusive.
       to translate it into the desired array whose shape accommodates your
       analytical needs: the target multi-dimensional array. Because you are
       using loadcsv.py, you have two choices for accomplishing this step. You
-      can use redimension_store after loadcsv.py populates the load array.
-      This step is identical to the analogous step described in the section on
-      the CSV load technique.</para>
+      can use redimension after loadcsv.py populates the load array. This step
+      is identical to the analogous step described in the section on the CSV
+      load technique.</para>
 
       <para>Alternatively, you can instruct loadcsv.py to transform the
       1-dimensional load array into the target multi-dimensional array. To
@@ -1118,6 +1118,27 @@ Note: the -q and -p options are mutually exclusive.
           </listitem>
         </itemizedlist></para>
     </section>
+  </section>
+
+  <section id="loadPipe">
+    <title>Piped Load</title>
+
+    <para><indexterm>
+        <primary>loading data</primary>
+
+        <secondary>piped</secondary>
+      </indexterm><indexterm>
+        <primary>piped load</primary>
+      </indexterm><indexterm>
+        <primary>CSV data</primary>
+
+        <secondary>piped load</secondary>
+      </indexterm>This version of SciDB includes a script that appends
+    external data into an array. The script is called
+    <command>loadpipe.py</command>. For more information, enter the following
+    command:</para>
+
+    <programlisting language=" ">loadpipe.py --help</programlisting>
   </section>
 
   <section id="loadBinary">
@@ -1382,7 +1403,7 @@ Note: the -q and -p options are mutually exclusive.
           though you might use the intensityFlat array only briefly and delete
           it after you establish and populate the target array, the chunk size
           of the load array matters because it can affect performance of the
-          load and of the next step: the redimension_store. The chunk size you
+          load and of the next step: the redimension. The chunk size you
           choose for the load array has no effect on the chunk sizes you will
           eventually choose for the exposure and elapsedTime dimensions of the
           target array.</para>
@@ -1391,8 +1412,8 @@ Note: the -q and -p options are mutually exclusive.
         <listitem>
           <para>The chunk overlap (in this case, 0) for the dimension—For the
           intermediate array that exists only as the target of a load and as
-          the source of a subsequent redimension_store, there is no need for
-          chunks to overlap at all.</para>
+          the source of a subsequent redimension, there is no need for chunks
+          to overlap at all.</para>
 
           <para>For more information about chunk size and overlap, see the
           <link linkend="BasicArchitecture">Basic Architecture</link>
@@ -1405,7 +1426,7 @@ Note: the -q and -p options are mutually exclusive.
 
           <secondary>load</secondary>
         </indexterm>After you create the load array, you can populate it with
-      data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> intensityFlat <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
+      data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> intensityFlat <command>FROM</command> '${DOC_DATA}/intensity_data.bin'
       <command>AS</command> '(string, 
            int64, 
            int64 null)';   </programlisting></para></para>
@@ -1579,7 +1600,7 @@ Note: the -q and -p options are mutually exclusive.
            elapsedTime:int64, 
            measuredIntensity:int64 null &gt;
        [i=0:*,1000000,0];  </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat
-     <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
+     <command>FROM</command> '${DOC_DATA}/intensity_data.bin'
      <command>AS</command>   '(string, 
             int64, 
             int64 null)';  </programlisting> The second pair of statements excludes a string
@@ -1588,14 +1609,14 @@ Note: the -q and -p options are mutually exclusive.
       <para><para><programlisting>AQL% <command>CREATE ARRAY</command> intensityFlat_NoExposure 
  &lt; elapsedTime:int64, measuredIntensity:int64 null &gt; 
  [i=0:*,1000000,0];  </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat_NoExposure
-     <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
+     <command>FROM</command> '${DOC_DATA}/intensity_data.bin'
      <command>AS</command>   '(skip, 
             int64, 
             int64 null)';  </programlisting> The third pair of statements excludes two int64 fields, one
       of which allows null values: <para><programlisting>AQL% <command>CREATE ARRAY</command> intensityFlat_NoTime_NoMeasurement 
  &lt; exposure:string &gt; 
  [i=0:*,1000000,0];   </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat_NoTime_NoMeasurement
-     <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
+     <command>FROM</command> '${DOC_DATA}/intensity_data.bin'
      <command>AS</command>   '(string, 
             skip(8), 
             skip(8) null)';   </programlisting> The preceding pairs of AQL statements illustrate the
@@ -1904,7 +1925,7 @@ exposure_id=0:2,3,0]</screen></para></para>
  (0,100),(1,99),(2,),(3,97)
 ]</screen><para>The load file <code>v4.scidb</code> has a missing value in the third
     cell. If you create an array and load this data set, SciDB will substitute
-    0 for the missing value: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4 <command>FROM</command> '../tests/harness/testcases/data/doc/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,0),(3,97)]
+    0 for the missing value: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4 <command>FROM</command> '${DOC_DATA}/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,0),(3,97)]
 </screen></para></para>
 
     <para><indexterm>
@@ -1919,13 +1940,13 @@ exposure_id=0:2,3,0]</screen></para></para>
     attribute option. This code creates an array <code>v4_dflt</code> with
     default attribute value set to 111:</para>
 
-    <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4_dflt <command>FROM</command> '../tests/harness/testcases/data/doc/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97)]
+    <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4_dflt <command>FROM</command> '${DOC_DATA}/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97)]
 </screen><para>Load files may also contain null values, such as in this file,
     <code>v4_null.scidb</code>: <para><screen>[
  (0,100),(1,99),(2,null),(3,97)
 ]</screen>
     To preserve null values at load time, add the NULL option to the attribute
-    type: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0];  </programlisting><programlisting>AQL% <command>LOAD</command> v4_null <command>FROM</command> '../tests/harness/testcases/data/doc/v4_null.scidb';  </programlisting></para></para></para>
+    type: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0];  </programlisting><programlisting>AQL% <command>LOAD</command> v4_null <command>FROM</command> '${DOC_DATA}/v4_null.scidb';  </programlisting></para></para></para>
   </para></para></section>
 
   <section id="emptyCells">
@@ -1941,7 +1962,7 @@ exposure_id=0:2,3,0]</screen></para></para>
     may also contain completely empty cells. For example, if we load
     <code>v4.scidb</code> into an array with a dimension that is larger than
     the supplied data, the array will contain empty cells:<para><programlisting>AQL% <command>CREATE ARRAY</command> v6_dflt &lt;val1:int8,val2:int8 default 111&gt;
-      [i=0:5,6,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v6_dflt <command>FROM</command> '../tests/harness/testcases/data/doc/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97),(),()]
+      [i=0:5,6,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v6_dflt <command>FROM</command> '${DOC_DATA}/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97),(),()]
 </screen></para></para>
 
     <para>Note that for val2, the supplied default value (111) is used, and
@@ -2092,7 +2113,7 @@ Low,1888,?
         <secondary>errors</secondary>
       </indexterm>To load this file into SciDB using a shadow array to keep
     track of load errors, use this AQL statement:<para><programlisting>AQL% <command>LOAD</command> intensityFlat
-      <command>FROM</command> '../tests/harness/testcases/data/doc/int4error.scidb'
+      <command>FROM</command> '${DOC_DATA}/int4error.scidb'
       <command>AS</command>   'text'
       <command>ERRORS</command> 99
       <command>SHADOW ARRAY</command> intensityFlatShadow; 

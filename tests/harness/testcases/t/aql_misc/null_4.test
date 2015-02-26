@@ -20,125 +20,125 @@ create  array mn_dt 	  <a:datetime null>[x=0:3,2,0]
 --test
 --echo datatype = bool
 
---aql load m_bool from '../tests/harness/testcases/data/null_5.txt'
+--aql load m_bool from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_bool from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_bool from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_bool from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_bool from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_bool from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_bool from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_bool from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_bool from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_bool from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_bool from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_bool from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_bool from '${TEST_DATA_DIR}/null_10.txt'
 
 
 --echo datatype = string
 
---aql load m_string from '../tests/harness/testcases/data/null_5.txt'
+--aql load m_string from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_string from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_string from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_string from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_string from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_string from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_string from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_string from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_string from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_string from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_string from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_string from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_string from '${TEST_DATA_DIR}/null_10.txt'
 
 
 
 --echo datatype = int32
 
---aql load m_i32 from '../tests/harness/testcases/data/null_5.txt'
+--aql load m_i32 from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_i32 from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_i32 from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_i32 from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_i32 from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_i32 from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_i32 from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_i32 from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_i32 from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_i32 from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_i32 from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_i32 from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_i32 from '${TEST_DATA_DIR}/null_10.txt'
 
 
 
 --echo datatype = int8
 
---aql load m_i8 from '../tests/harness/testcases/data/null_5.txt'
+--aql load m_i8 from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_i8 from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_i8 from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_i8 from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_i8 from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_i8 from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_i8 from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_i8 from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_i8 from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_i8 from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_i8 from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_i8 from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_i8 from '${TEST_DATA_DIR}/null_10.txt'
 
 
 
 --echo datatype = int16
 
---aql load m_i16 from '../tests/harness/testcases/data/null_5.txt'
+--aql load m_i16 from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_i16 from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_i16 from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_i16 from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_i16 from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_i16 from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_i16 from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_i16 from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_i16 from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_i16 from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_i16 from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_i16 from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_i16 from '${TEST_DATA_DIR}/null_10.txt'
 
 
 
 --echo datatype = char
 
---aql load m_char from '../tests/harness/testcases/data/null_5.txt'
+--aql load m_char from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_char from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_char from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_char from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_char from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_char from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_char from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_char from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_char from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_char from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_char from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_char from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_char from '${TEST_DATA_DIR}/null_10.txt'
 
 
 --echo datatype = datetime
 #
-#--aql load m_dt from '../tests/harness/testcases/data/null_5.txt'
+#--aql load m_dt from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_dt from '../tests/harness/testcases/data/null_5.txt'
+--aql load mn_dt from '${TEST_DATA_DIR}/null_5.txt'
 
---aql load mn_dt from '../tests/harness/testcases/data/null_6.txt'
+--aql load mn_dt from '${TEST_DATA_DIR}/null_6.txt'
 
---aql load mn_dt from '../tests/harness/testcases/data/null_7.txt'
+--aql load mn_dt from '${TEST_DATA_DIR}/null_7.txt'
 
---aql load mn_dt from '../tests/harness/testcases/data/null_8.txt'
+--aql load mn_dt from '${TEST_DATA_DIR}/null_8.txt'
 
---aql load mn_dt from '../tests/harness/testcases/data/null_9.txt'
+--aql load mn_dt from '${TEST_DATA_DIR}/null_9.txt'
 
---aql load mn_dt from '../tests/harness/testcases/data/null_10.txt'
+--aql load mn_dt from '${TEST_DATA_DIR}/null_10.txt'
 
 
 --cleanup

@@ -510,6 +510,14 @@
 
           <row>
             <entry><literal><link
+            linkend="removeVersionsOperator">remove_versions</link></literal></entry>
+
+            <entry>Removes all versions of an array older than the version
+            number you specify.</entry>
+          </row>
+
+          <row>
+            <entry><literal><link
             linkend="renameOperator">rename</link></literal></entry>
 
             <entry>Changes the array name.</entry>
@@ -667,9 +675,7 @@
 
     <para>The following SciDB operators allow users to rearrange arrays. None
     of these operators change the input array. In most cases, the result array
-    is not stored in the database. The exception is redimension_store, which
-    stores the result array in the database (potentially overwriting the
-    source array).</para>
+    is not stored in the database.</para>
 
     <informaltable frame="all">
       <?dbfo keep-together="auto" ?>
@@ -728,6 +734,17 @@
 
             <entry>Produces a result array that is the transpose of the input
             array.</entry>
+          </row>
+
+          <row>
+            <entry><literal><link
+            linkend="unfoldOperator">unfold</link></literal></entry>
+
+            <entry>From an array with n dimensions and m attributes, produces
+            an array with n+1 dimensions and one attribute. The first n
+            dimensions match those of the original array. The additional
+            dimension has m values (0 to m-1) corresponding to the attributes
+            of the original array.</entry>
           </row>
 
           <row>
@@ -811,14 +828,6 @@
 
             <entry>Produces a result array with the same dimensions as—but a
             subset of the attributes of—a source array.</entry>
-          </row>
-
-          <row>
-            <entry><literal><link
-            linkend="sampleOperator">sample</link></literal></entry>
-
-            <entry>Produces a result array by selecting random chunks of a
-            source array.</entry>
           </row>
 
           <row>

@@ -87,7 +87,7 @@ void Thread::start()
     }
     PAttrEraser onStack(&attr);
 
-    const size_t stackSize = 1024*1024;
+    const size_t stackSize = 1*MiB;
     assert(stackSize > PTHREAD_STACK_MIN);
     rc = pthread_attr_setstacksize(&attr, stackSize);
     if (rc != 0) {
@@ -137,7 +137,7 @@ void Thread::_threadFunction()
             boost::shared_ptr<Job> job = _threadPool.getQueue()->popJob();
             {
                 ScopedMutexLock lock(_threadPool._mutex);
-                if (_threadPool._shutdown) { 
+                if (_threadPool._shutdown) {
                     break;
                 }
                 _threadPool._currentJobs[_index] = job;
@@ -169,34 +169,61 @@ void Thread::_threadFunction()
 
 void Thread::nanoSleep(uint64_t nanoSec)
 {
-  struct timespec ts;
-  if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      assert(false);
-      throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
-  }
-  const uint64_t tenTo9 = 1000000000;
-  ts.tv_sec = ts.tv_sec + static_cast<time_t>(nanoSec / tenTo9);
-  const uint64_t tmp = ts.tv_nsec + (nanoSec % tenTo9);
-  if (tmp < tenTo9) {
-      ts.tv_nsec = static_cast<long>(tmp);
-  } else {
-      ts.tv_sec = ts.tv_sec + static_cast<time_t>(tmp / tenTo9);
-      ts.tv_nsec = static_cast<long>(tmp % tenTo9);
-  }
-  assert(ts.tv_sec>=0);
-  assert(ts.tv_nsec < static_cast<long>(tenTo9));
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+    }
+    static const uint64_t NANOSEC_PER_SEC = 1000000000;
+    ts.tv_sec = ts.tv_sec + static_cast<time_t>(nanoSec / NANOSEC_PER_SEC);
+    const uint64_t tmp = ts.tv_nsec + (nanoSec % NANOSEC_PER_SEC);
+    if (tmp < NANOSEC_PER_SEC) {
+        ts.tv_nsec = static_cast<long>(tmp);
+    } else {
+        ts.tv_sec = ts.tv_sec + static_cast<time_t>(tmp / NANOSEC_PER_SEC);
+        ts.tv_nsec = static_cast<long>(tmp % NANOSEC_PER_SEC);
+    }
+    assert(ts.tv_sec>=0);
+    assert(ts.tv_nsec < static_cast<long>(NANOSEC_PER_SEC));
 
-  while (true) {
-      int rc = ::clock_nanosleep(CLOCK_REALTIME,
-                                 TIMER_ABSTIME,
-                                 &ts, NULL);
-      if (rc==0) { return; }
+    while (true) {
+        int rc = ::clock_nanosleep(CLOCK_REALTIME,
+                                   TIMER_ABSTIME,
+                                   &ts, NULL);
+        if (rc==0) { return; }
 
-      if (rc==EINTR) { continue; }
+        if (rc==EINTR) { continue; }
 
-      assert(false);
-      throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "clock_nanosleep";
-  }
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
+           << "clock_nanosleep" << rc << rc
+           << "CLOCK_REALTIME, TIMER_ABSTIME, &ts, NULL";
+    }
+}
+
+uint64_t getTimeInNanoSecs()
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        int err = errno;
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
+           << "clock_gettime" << -1 << err
+           << "CLOCK_REALTIME, &ts";
+    }
+    static const uint64_t NANOSEC_PER_SEC = 1000000000;
+    return (ts.tv_sec*NANOSEC_PER_SEC + ts.tv_nsec);
+}
+
+bool hasExpired(uint64_t startTimeNanoSec, uint64_t timeoutNanoSec)
+{
+    if (timeoutNanoSec == 0) {
+        return false;
+    }
+    if ((getTimeInNanoSecs() - startTimeNanoSec) >= timeoutNanoSec) {
+        return true;
+    }
+    return false;
 }
 
 } //namespace

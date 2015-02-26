@@ -32,6 +32,11 @@
       </listitem>
 
       <listitem>
+        <para><link linkend="hypergeometricFunctions">Hypergeometric
+        Functions</link></para>
+      </listitem>
+
+      <listitem>
         <para><link linkend="temporalFunctions">Temporal
         Functions</link></para>
       </listitem>
@@ -54,6 +59,9 @@
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="comparison_functions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="hypergeometric_functions_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="temporal_functions_post.xml"

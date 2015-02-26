@@ -58,6 +58,7 @@
 #include <system/SystemCatalog.h>
 #include <util/WorkQueue.h>
 
+// XXX TODO: we should not modify std & boost namespaces
 namespace boost
 {
    bool operator< (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
@@ -155,21 +156,42 @@ class Query : public boost::enable_shared_from_this<Query>
     QueryID _queryID;
 
     /**
-     * The map of queries to keep every query running in a system.
+     * The global list of queries present in the system
      */
     static std::map<QueryID, boost::shared_ptr<Query> > _queries;
 
     /**
-     * Get/insert a query object from/to the list of queries
-     * @param queryID query ID
-     * @param query the query object
-     * @return true if inserted, false if already present
+     * Get/insert a query object from/to the global list of queries
+     * @param query the query object to insert
+     * @return the old query object if it is already on the list;
+     *         otherwise, the newly inserted object specified by the argument
      */
-    static bool insert(QueryID queryID, boost::shared_ptr<Query>& query);
+    static boost::shared_ptr<Query> insert(const boost::shared_ptr<Query>& query);
+
+    /**
+     * Creates new query object detached from global list of queries
+     */
+    static boost::shared_ptr<Query> createDetached(QueryID queryID);
+
+    /**
+     * Initialize a query
+     * @param coordID the "physical" coordinator ID (or COORDINATOR_INSTANCE if on coordinator)
+     * @param localInstanceID  "physical" local instance ID
+     * @param coordinatorLiveness coordinator liveness at the time of query creation
+     */
+    void init(InstanceID coordID,
+              InstanceID localInstanceID,
+              boost::shared_ptr<const InstanceLiveness>& coordinatorLiveness);
+
+    void setCoordinatorLiveness(boost::shared_ptr<const InstanceLiveness>& liveness)
+    {
+       ScopedMutexLock cs(errorMutex);
+       _coordinatorLiveness = liveness;
+    }
+
+    friend class ServerMessageHandleJob;
 
     boost::shared_ptr<OperatorContext> _operatorContext;
-
-    std::map< std::string, boost::shared_ptr<Array> > _temporaryArrays;
 
     /**
      * The physical plan of query. Optimizer generates it for current step of incremental execution
@@ -226,7 +248,10 @@ class Query : public boost::enable_shared_from_this<Query>
 
     friend class UpdateErrorHandler;
     /**
-     * @return true if query is in error state due to a cancel request
+     * This function should only be called if the query is (being) aborted.
+     * @return true if the local query execution finished successfully AND the coordinator was notified;
+     * false otherwise i.e. the local execution failed before notifying the coordinator,
+     * which couldn't possibly commit this query.
      */
     bool isForceCancelled()
     {
@@ -244,21 +269,21 @@ class Query : public boost::enable_shared_from_this<Query>
     std::deque<Finalizer> _finalizers; // last minute actions
 
     /** execution of query completion status */
-    typedef enum {
+    enum CompletionStatus
+    {
         INIT, // query execute() has not started
         START, // query execute() has not completed
         OK,   // query execute() completed with no errors
         ERROR // query execute() completed with errors
-    } CompletionStatus;
-    CompletionStatus _completionStatus;
+    }  _completionStatus;
 
     /** Query commit state */
-    typedef enum {
+    enum CommitState
+    {
         UNKNOWN,
         COMMITTED, // _completionStatus!=ERROR
         ABORTED
-    } CommitState;
-    CommitState _commitState;
+    } _commitState;
 
     /**
      * Queue for MPI-style buffer messages
@@ -335,10 +360,6 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     int _useCounter;
 
-    // XXX TODO: consider removing this locks because PG locks should be sufficient
-    std::map< std::string, boost::shared_ptr<RWLock> > locks;
-    Mutex lockMutex;
-
     void checkNoError() const
     {
         if (SCIDB_E_NO_ERROR != _error->getLongErrorCode())
@@ -374,14 +395,11 @@ class Query : public boost::enable_shared_from_this<Query>
 
  public:
 
-    Query();
+    explicit Query(QueryID querID);
     ~Query();
 
     // Logger for query processor.
     static log4cxx::LoggerPtr _logger;
-
-    void sharedLock(std::string const& arrayName);
-    void exclusiveLock(std::string const& arrayName);
 
     /**
      * @return amount of time to wait before trying to acquire an array lock
@@ -430,29 +448,11 @@ class Query : public boost::enable_shared_from_this<Query>
 
     bool isDDL;
 
-    RWLock queryLock;
-
-    /**
-     * @brief _mappingArrays
-     * This is a map of mapping arrays for sending to the client.
-     * They must be ready for sending and AccumulatorArray.
-     */
-    std::map< std::string, boost::shared_ptr<Array> > _mappingArrays;
-
     /**
      * Program options which is used to run query
      */
     std::string programOptions;
 
-    /**
-     * Initialize a query
-     * @param queryID
-     * @param coordID the "physical" coordinator ID (or COORDINATOR_INSTANCE if on coordinator)
-     * @param localInstanceID  "physical" local instance ID
-     * @param coordinatorLiveness coordinator liveness at the time of query creation
-     */
-    void init(QueryID queryID, InstanceID coordID, InstanceID localInstanceID,
-              boost::shared_ptr<const InstanceLiveness> coordinatorLiveness);
     /**
      * Handle a change in the local instance liveness. If the new livenes is different
      * from this query's coordinator liveness, the query is marked to be aborted.
@@ -476,9 +476,15 @@ class Query : public boost::enable_shared_from_this<Query>
 
     /**
      * Get the "physical" instance ID of the coordinator
-     * @return COORDINATOR_INSTANCE if this instance is the coordinator, else the coordinato instance ID
+     * @return COORDINATOR_INSTANCE if this instance is the coordinator, else the coordinator instance ID
      */
     InstanceID getPhysicalCoordinatorID();
+
+    /**
+     * Get the "physical" instance ID of the coordinator
+     * @return the coordinator instance ID
+     */
+    InstanceID getCoordinatorPhysicalInstanceID();
 
     /**
      * Get logical instance count
@@ -495,6 +501,14 @@ class Query : public boost::enable_shared_from_this<Query>
     arena::ArenaPtr getArena() const
     {
         return _arena;
+    }
+
+    /**
+     *  Return true if the query completed successfully and was committed.
+     */
+    bool wasCommitted() const
+    {
+        return _commitState == COMMITTED;
     }
 
     /**
@@ -667,28 +681,24 @@ class Query : public boost::enable_shared_from_this<Query>
 
     std::vector<PendingRequests> chunkReqs;
 
-    /**
-     * Creates new query object detached from global store. No queryID.
-     */
-    static boost::shared_ptr<Query> createDetached();
-
     /// Create a fake query that does not correspond to a user-generated request
-    /// for internal purposes
+    /// for internal purposes only
     static boost::shared_ptr<Query> createFakeQuery(InstanceID coordID,
                                                     InstanceID localInstanceID,
-                                                    boost::shared_ptr<const InstanceLiveness> liveness);
+                                                    boost::shared_ptr<const InstanceLiveness> liveness,
+                                                    int32_t *longErrorCode=NULL);
     /// Destroy a query generated by createFakeQuery()
     static void destroyFakeQuery(Query* q);
 
     /**
      * Creates new query object and generate new queryID
      */
-    static boost::shared_ptr<Query> create(QueryID queryId);
+    static boost::shared_ptr<Query> create(QueryID queryId, InstanceID instanceId=COORDINATOR_INSTANCE);
 
     /**
-     * Finds query with given queryID and creates it if can't find
+     * Find query with given queryID in the global query list
      */
-    static boost::shared_ptr<Query> getQueryByID(QueryID queryID, bool create = false, bool raise = true);
+    static boost::shared_ptr<Query> getQueryByID(QueryID queryID, bool raise = true);
 
     /**
      * Validates the pointer and the query it points for errors
@@ -730,13 +740,6 @@ class Query : public boost::enable_shared_from_this<Query>
      * @throws exceptions while releasing the lock
      */
     static void releaseLocks(const boost::shared_ptr<Query>& query);
-
-    /**
-     * Get temporary array
-     * @param arrayName temporary array name
-     * @return reference to the temporayr array or null referenec is not exists
-     */
-    boost::shared_ptr<Array> getTemporaryArray(std::string const& arrayName);
 
     /**
      * Get temporary or persistent array
@@ -934,6 +937,11 @@ class Query : public boost::enable_shared_from_this<Query>
                 // more refs indicate that some jobs/iterators are using the query
                 shared_from_this().use_count() < 3);
     }
+
+private:
+     //disable copying
+     Query(const Query&);
+     Query& operator=(const Query&);
  };
 
 class UpdateErrorHandler : public Query::ErrorHandler

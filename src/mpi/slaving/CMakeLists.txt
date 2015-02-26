@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 2.8.5)
 #       and have the dla-scalapack slave include the mpi testing.  This is more legitimate
 #       because that code already depends on the mpi directory tree, and the reverse is
 #       not desireable (general thing: mpi depending on specific thing: dla-scalapack).
-include_directories("${CMAKE_SOURCE_DIR}/src/linear_algebra")
+include_directories("${CMAKE_SOURCE_DIR}/src/dense_linear_algebra")
 
 
 message(STATUS "****************** BEGIN mpi/slaving/CMakeLists.txt ******************")
@@ -56,13 +56,13 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     set (mpi_slave_common_src
     #    NOTE: the following items are to be moved back into their
     #    own slave in the dla area
-         ../../linear_algebra/scalapackUtil/test/slaving/mpiCopySlave.cpp
-         ../../linear_algebra/scalapackUtil/test/slaving/mpiRankSlave.cpp
-         ../../linear_algebra/dlaScaLA/slaving/pdgemmSlave.cpp
-         ../../linear_algebra/dlaScaLA/slaving/pdgesvdSlave.cpp
-         ../../linear_algebra/dlaScaLA/slaving/pdgesvdMasterSlave.cpp
-         ../../linear_algebra/dlaScaLA/slaving/slaveTools.cpp
-         ../../linear_algebra/scalapackUtil/reformat.cpp
+         ../../dense_linear_algebra/scalapackUtil/test/slaving/mpiCopySlave.cpp
+         ../../dense_linear_algebra/scalapackUtil/test/slaving/mpiRankSlave.cpp
+         ../../dense_linear_algebra/dlaScaLA/slaving/pdgemmSlave.cpp
+         ../../dense_linear_algebra/dlaScaLA/slaving/pdgesvdSlave.cpp
+         ../../dense_linear_algebra/dlaScaLA/slaving/pdgesvdMasterSlave.cpp
+         ../../dense_linear_algebra/dlaScaLA/slaving/slaveTools.cpp
+         ../../dense_linear_algebra/scalapackUtil/reformat.cpp
     )
 
     add_library(mpi_slave_common STATIC ${mpi_slave_common_src})
@@ -77,8 +77,8 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     # used as a unit test that avoids all scidb-isms, useful for 1st-level
     # divide-and-conquer if slave problems occur when driven by scidb
     #
-    add_executable(mpi_slave_direct mpi_slave_direct.cpp ../../linear_algebra/blas/initMathLibs.cpp)
-    add_executable(mpi_slave_scidb  mpi_slave_scidb.cpp  ../../linear_algebra/blas/initMathLibs.cpp)
+    add_executable(mpi_slave_direct mpi_slave_direct.cpp ../../dense_linear_algebra/blas/initMathLibs.cpp)
+    add_executable(mpi_slave_scidb  mpi_slave_scidb.cpp  ../../dense_linear_algebra/blas/initMathLibs.cpp)
 
     # Temporary until separate dla-scalapack slave
     target_link_libraries(mpi_slave_direct mpi_slave_common

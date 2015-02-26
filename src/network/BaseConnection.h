@@ -49,10 +49,26 @@
 namespace scidb
 {
 
-const uint32_t NET_PROTOCOL_VER1 = 1;
-const uint32_t NET_PROTOCOL_VER2 = 2;
-const uint32_t NET_PROTOCOL_VER3 = 3;
-const uint32_t NET_PROTOCOL_CURRENT_VER = NET_PROTOCOL_VER3;
+/**
+ * If you are changing the format of the protobuf messages in src/network/protoscidb_msg.proto
+ * (especially by adding required message fields), or any structures like MessageType and/or MessagesHeader
+ * - you must increment this number. Notice that this will impact all the client tools (by breaking backwards compatibility).
+ *
+ * Revision history:
+ *
+ * NET_PROTOCOL_CURRENT_VER = 4:
+ *    Author: tigor
+ *    Date: 7/17/2014
+ *    Ticket: 4138, 3667, ...
+ *
+ *
+ * NET_PROTOCOL_CURRENT_VER = 3:
+ *    Author: ??
+ *    Date: ??
+ *    Ticket: ??
+ *    Note: Initial implementation dating back some time
+ */
+const uint32_t NET_PROTOCOL_CURRENT_VER = 4;
 
 /**
  * Messageg types
@@ -62,7 +78,7 @@ enum MessageType
     mtNone=SYSTEM_NONE_MSG_ID,
     mtExecuteQuery,
     mtPreparePhysicalPlan,
-    mtExecutePhysicalPlan,
+    mtUnusedPlus3,
     mtFetch,
     mtChunk,
     mtChunkReplica,
@@ -111,8 +127,8 @@ class MessageDesc
 public:
    MessageDesc();
    MessageDesc(MessageID messageType);
-   MessageDesc(boost::shared_ptr< SharedBuffer > binary);
-   MessageDesc(MessageID messageType, boost::shared_ptr< SharedBuffer > binary);
+   MessageDesc(const boost::shared_ptr< SharedBuffer >& binary);
+   MessageDesc(MessageID messageType, const boost::shared_ptr< SharedBuffer >& binary);
    virtual ~MessageDesc() {}
    void writeConstBuffers(std::vector<boost::asio::const_buffer>& constBuffers);
    bool parseRecord(size_t bufferSize);
@@ -265,16 +281,16 @@ boost::shared_ptr<MessageDesc_tt> BaseConnection::receive()
         // Reading message description
         size_t readBytes = read(_socket, boost::asio::buffer(&resultDesc->_messageHeader, sizeof(resultDesc->_messageHeader)));
         assert(readBytes == sizeof(resultDesc->_messageHeader));
-        assert(resultDesc->validate());
+        ASSERT_EXCEPTION((resultDesc->validate()), "BaseConnection::receive:");
         // TODO: This must not be an assert but exception of correct handled backward compatibility
-        assert(resultDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER);
+        ASSERT_EXCEPTION((resultDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER), "BaseConnection::receive:");
 
         // Reading serialized structured part
         readBytes = read(_socket, resultDesc->_recordStream.prepare(resultDesc->_messageHeader.recordSize));
         assert(readBytes == resultDesc->_messageHeader.recordSize);
         LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: recordSize=" << resultDesc->_messageHeader.recordSize);
         bool rc = resultDesc->parseRecord(readBytes);
-        if (!rc) assert(false);
+        ASSERT_EXCEPTION(rc, "BaseConnection::receive:");
 
         resultDesc->prepareBinaryBuffer();
 

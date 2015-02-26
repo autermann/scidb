@@ -9,7 +9,7 @@ create array dates <dt:datetime>[i=0:*,10,0]
 --stop-igdata
 show(dates)  
 --set-format dcsv
-load(dates,'../tests/harness/testcases/data/doc/dates.scidb')  
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odcsv -aq "load(dates,'${TEST_DATA_DIR}/doc/dates.scidb')""
 --set-format csv+
 apply(dates, weekday, day_of_week(dt))  
 apply(dates, time_hour, hour_of_day(dt))  

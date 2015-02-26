@@ -1,7 +1,7 @@
 
 --setup
 --start-query-logging
-create empty array A <a:int32, b:string> [x=0:2,3,3]
+create array A <a:int32, b:string> [x=0:2,3,3]
 --aql select * into A from build(<a:int32> [x=0:2,3,3],x),build(<b:string> [x=0:2,3,3],x)
 
 --test

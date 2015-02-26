@@ -1,11 +1,11 @@
 --setup
 --start-query-logging
 
-CREATE EMPTY ARRAY Raw_CSVLoad_1 < symbl : string, time : string, price : double, qry : int64 > [ Offset=0:*,10,0 ]
+CREATE array Raw_CSVLoad_1 < symbl : string, time : string, price : double, qry : int64 > [ Offset=0:*,10,0 ]
 
-CREATE EMPTY ARRAY Raw_CSVLoad_2 < tax_id : int32, gene_id : int64, go_id : string, evidence : string_4, qualifier : int32 NULL, term : string, pubmed_id : int32 NULL, category : string > [ Offset=0:*,10,0 ] 
+CREATE array Raw_CSVLoad_2 < tax_id : int32, gene_id : int64, go_id : string, evidence : string, qualifier : int32 NULL, term : string, pubmed_id : int32 NULL, category : string > [ Offset=0:*,10,0 ] 
 
-CREATE EMPTY ARRAY Raw_CSVLoad_3 < Probe_ID : string, Platform_ID : string, Entrez_Gene_ID : int32, Symbol   : string, Synonyms : string, Description : string, TaxOn_ID : int32, Count_Gene  : int32, Count_RefSeq  : int32, Unique_to_Gene : bool, Unique_to_Genome : bool, Unique_to_RefSeq : bool > [ Line=0:*,10,0]
+CREATE array Raw_CSVLoad_3 < Probe_ID : string, Platform_ID : string, Entrez_Gene_ID : int32, Symbol   : string, Synonyms : string, Description : string, TaxOn_ID : int32, Count_Gene  : int32, Count_RefSeq  : int32, Unique_to_Gene : bool, Unique_to_Genome : bool, Unique_to_RefSeq : bool > [ Line=0:*,10,0]
 
 CREATE ARRAY Raw_CSVLoad_4 < Probe_ID : string, Platform_ID : string, Entrez_Gene_ID : int32, Symbol   : string, Synonyms : string, Description : string, TaxOn_ID : int32, Count_Gene  : int32, Count_RefSeq  : int32, Unique_to_Gene : bool, Unique_to_Genome : bool, Unique_to_RefSeq : bool > [ Line ]
 
@@ -19,7 +19,7 @@ CREATE ARRAY Raw_CSVLoad_8 < attr_2 : string > [ I=0:*,4,0 ]
 
 --test
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load " --store 
+--shell --store --command " cat ${TEST_DATA_DIR}/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load " 
 
 load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load' )
 
@@ -81,13 +81,13 @@ remove ( Raw_CSVLoad_7 )
 
 remove ( Raw_CSVLoad_8 )
 
---shell --command "rm -rf /tmp/csv2scidb_test_1.load " --store 
---shell --command "rm -rf /tmp/csv2scidb_test_2.load " --store
---shell --command "rm -rf /tmp/csv2scidb_test_3.load " --store
---shell --command "rm -rf /tmp/csv2scidb_test_4.load " --store
---shell --command "rm -rf /tmp/csv2scidb_test_5.load " --store 
---shell --command "rm -rf /tmp/csv2scidb_test_6.load " --store
---shell --command "rm -rf /tmp/csv2scidb_test_7.load " --store
---shell --command "rm -rf /tmp/csv2scidb_test_8.load " --store
+--shell --store --command "rm -rf /tmp/csv2scidb_test_1.load " 
+--shell --store --command "rm -rf /tmp/csv2scidb_test_2.load "
+--shell --store --command "rm -rf /tmp/csv2scidb_test_3.load "
+--shell --store --command "rm -rf /tmp/csv2scidb_test_4.load "
+--shell --store --command "rm -rf /tmp/csv2scidb_test_5.load " 
+--shell --store --command "rm -rf /tmp/csv2scidb_test_6.load "
+--shell --store --command "rm -rf /tmp/csv2scidb_test_7.load "
+--shell --store --command "rm -rf /tmp/csv2scidb_test_8.load "
 
 --stop-query-logging

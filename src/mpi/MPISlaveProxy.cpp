@@ -302,8 +302,10 @@ void MpiSlaveProxy::waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx)
 
 void MpiSlaveProxy::destroy(bool error)
 {
+    QueryID queryIdForKill(INVALID_QUERY_ID);
     if (error) {
         _inError=true;
+        queryIdForKill = _queryId;
     }
     const string clusterUuid = Cluster::getInstance()->getUuid();
     // kill the slave proc and its parent orted
@@ -313,13 +315,14 @@ void MpiSlaveProxy::destroy(bool error)
 
         //XXX TODO tigor: kill proceess group (-pid) ?
         LOG4CXX_DEBUG(logger, "MpiSlaveProxy::destroy: killing slave pid = "<<pid);
-        MpiErrorHandler::killProc(_installPath, clusterUuid, pid);
+        MpiErrorHandler::killProc(_installPath, clusterUuid, pid, queryIdForKill);
     }
 
     std::string pidFile = mpi::getSlavePidFile(_installPath, _queryId, _launchId);
     MpiErrorHandler::cleanupSlavePidFile(_installPath,
                                          clusterUuid,
-                                         pidFile);
+                                         pidFile,
+                                         queryIdForKill);
 
     // rm log file
     if (!logger->isTraceEnabled() && !_inError) {

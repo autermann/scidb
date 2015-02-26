@@ -38,7 +38,7 @@ scan(m4x4)
 show(m4x4)
 --start-igdata
 CREATE ARRAY m3x3 < val:double >[i=0:2,3,0,j=0:2,3,0]  
-load(m3x3, '../tests/harness/testcases/data/doc/m3x3.txt')  
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(m3x3, '${TEST_DATA_DIR}/doc/m3x3.txt')""
 --set-format dense
 --stop-igdata
 --aql SELECT * INTO m1 FROM unpack(m3x3,k)  
@@ -105,7 +105,7 @@ show(chunks_part)
 --set-format dcsv
 --start-igdata
 --aql SELECT * INTO chunks_overlap FROM repart(chunks,<val1:double,val2:double> [i=0:999,100,10,j=0:999,100,10])  
-rename(two_dim, Dsp)  
+store(two_dim, Dsp)  
 --stop-igdata
 scan(Dsp) 
 show(Dsp)
@@ -127,7 +127,7 @@ remove(devices)
 remove(probes)
 remove(values)
 remove(device_probe)
-remove(Dsp)
+remove(two_dim)
 remove(first)
 remove(second)
 remove(third)
@@ -143,6 +143,7 @@ remove(m3x3_new_attr)
 remove(chunks)
 remove(chunks_part)
 remove(chunks_overlap)
+remove(Dsp)
 remove(Dsp_slice_0)
 remove(Dsp_slice_1)
 remove(Dsp_slice_2)

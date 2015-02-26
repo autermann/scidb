@@ -6,11 +6,11 @@
 #Test for cross operator with other operator nested like subarray,filter,xgrid,unpack.
 
 create array teeth <val:int64 null> [x=0:*,2,0,y=0:*,2,0]
-load(teeth, '../tests/harness/testcases/data/teeth_na.txt')
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(teeth, '${TEST_DATA_DIR}/teeth_na.txt')""
 create  array A <a:float>[x=-2:2,3,0]
 store(build(A,x+1/2.3),A)
 create array d1 <a1: double NULL> [x=0:4,3,0, y=-2:1,2,1]
-store(build_sparse(d1, 1.0*x+100.0*y, x<>y),d1)
+store(filter(build(d1, 1.0*x+100.0*y), x<>y),d1)
 
 
 

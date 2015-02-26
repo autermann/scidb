@@ -26,10 +26,11 @@
  *  Created on: Oct 28, 2010
  *      Author: knizhnik@garret.ru
  */
+#include <boost/make_shared.hpp>
 #include "query/Operator.h"
+#include "array/TransientCache.h"
 #include "array/DBArray.h"
 #include "array/Metadata.h"
-#include <boost/make_shared.hpp>
 #include "system/SystemCatalog.h"
 
 namespace scidb
@@ -62,11 +63,38 @@ class PhysicalScan: public  PhysicalOperator
         return PhysicalBoundaries(lowBoundary, highBoundary);
     }
 
+    virtual void preSingleExecute(shared_ptr<Query> query)
+    {
+        if (_schema.isTransient())
+        {
+            shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
+
+            if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
+                (membership->getInstances().size() != query->getInstancesCount()))
+            {
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
+            }
+         }
+    }
+
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
                                       boost::shared_ptr<Query> query)
     {
-        boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(_schema.getName());
-        return tmpArray ? tmpArray : boost::shared_ptr<Array>(DBArray::newDBArray(_schema, query));
+        if (_schema.isTransient())
+        {
+            if (MemArrayPtr a = transient::lookup(_schema,query))
+            {
+                return a;                                   // ...temp array
+            }
+            else
+            {
+               return make_shared<MemArray>(_schema,query); // ...empty array
+            }
+        }
+        else
+        {
+            return boost::shared_ptr<Array>(DBArray::newDBArray(_schema, query));
+        }
     }
 
 

@@ -23,8 +23,11 @@
 /****************************************************************************/
 
 #include <system/Exceptions.h>                           // For USER_EXCEPTION
+#include <system/Config.h>                               // For config file
 #include <util/arena/ScopedArena.h>                      // For ScopedArena
 #include <query/ParsingContext.h>                        // For ParsingContext
+#include <log4cxx/logger.h>                              // For logging stuff
+#include <fstream>                                       // For ifstream
 #include "Module.h"                                      // For ModuleLock
 #include "Lexer.h"                                       // For Lexer
 #include "AST.h"                                         // For Node etc.
@@ -32,6 +35,8 @@
 /****************************************************************************/
 namespace scidb { namespace parser { namespace {
 /****************************************************************************/
+
+log4cxx::LoggerPtr log(log4cxx::Logger::getLogger("scidb.qproc.driver"));
 
 typedef shared_ptr<LogicalExpression>    LEPtr;
 typedef shared_ptr<LogicalQueryPlanNode> LQPtr;
@@ -80,9 +85,13 @@ Node* Driver::process(syntax syntax)
 
     parser.parse();
 
+    LOG4CXX_DEBUG(log,"Driver::process(1)\n" << tree);
+
 //  desugar (_fact,*this,tree);
 //  stratify(_fact,*this,tree);
     inliner (_fact,*this,tree);
+
+    LOG4CXX_DEBUG(log,"Driver::process(2)\n" << tree);
 
     return tree;
 }
@@ -134,6 +143,48 @@ void Driver::fail(error e,const location& w,const char* s)
 }
 
 /****************************************************************************/
+
+/**
+ *  Return the path to the AFL 'prelude', a special module of macros that ship
+ *  with, and that the user percevies as being built into, the SciDB system.
+ */
+string getPreludePath()
+{
+    return Config::getInstance()->getOption<string>(CONFIG_INSTALL_ROOT) + "/lib/scidb/modules/prelude.txt";
+}
+
+/**
+ *  Read the contents of the given text file into a string and return it.
+ */
+string read(const string& path)
+{
+    ifstream f(path.c_str());                            // Open for reading
+    string   s((istreambuf_iterator<char>(f)),           // Copy contents to
+                istreambuf_iterator<char>());            //  the string 's'
+
+    if (f.fail())                                        // Failed to read?
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR,SCIDB_LE_FILE_READ_ERROR) << path;
+    }
+
+    return s;                                            // The file contents
+}
+
+/**
+ *  Parse and translate the module statement 'text', and install the resulting
+ *  bindings in the currently loaded module, where other queries can then find
+ *  them.
+ */
+void load(const string& text)
+{
+    Module m(Module::write);                             // Lock for writing
+    Driver d(text);                                      // Create the driver
+    Node*  n(d.process(aflModule));                      // Parse and desugar
+
+    m.load(d,n);                                         // Install the module
+}
+
+/****************************************************************************/
 }}}
 /****************************************************************************/
 
@@ -171,17 +222,31 @@ LQPtr parseStatement(const QueryPtr& query,bool afl)
 }
 
 /**
- *  Parse and translate the module statement 'text', and install the resulting
- *  bindings in the currently loaded module, where other queries can then find
- *  them.
+ *  Parse and translate the prelude module.
  */
-void loadModule(const string& text)
+void loadPrelude()
 {
-    Module m(Module::write);                             // Lock for writing
-    Driver d(text);                                      // Create the driver
-    Node*  n(d.process(aflModule));                      // Parse and desugar
+    load(read(getPreludePath()));                        // Load the prelude
+}
 
-    m.load(d,n);                                         // Install the module
+/**
+ *  Parse and translate the given user module, after concatenating it onto the
+ *  prelude module.
+ */
+void loadModule(const string& module)
+{
+    string p(read(getPreludePath()));                    // Read the prelude
+    string m(read(module));                              // Read user module
+
+    try                                                  // May fail to load
+    {
+        load(p + m);                                     // ...concat and load
+    }
+    catch (UserException&)
+    {
+        load(p);                                         // ...load prelude
+        throw;                                           // ...rethrow error
+    }
 }
 
 /****************************************************************************/

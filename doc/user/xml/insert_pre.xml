@@ -31,15 +31,13 @@
     <para>The insert operator has two effects. One effect is to update the
     target array by inserting values from the source array. This means that
     the <literal>insert</literal> operator is a write operator, like the
-    <literal>store</literal> and <literal>redimension_store</literal>
-    operators.</para>
+    <literal>store()</literal> operator.</para>
 
     <para>The other effect is to produce a result array identical to the
     updated target array. This means that you can use the insert operator as
     an operand of other SciDB operators, although using the
-    <literal>insert</literal> operator inside any other write operator (such
-    as <literal>store</literal> or <literal>redimension_store</literal>) can
-    yield unpredictable results.</para>
+    <literal>insert()</literal> operator inside any other write operator (such
+    as <literal>store()</literal>) can yield unpredictable results.</para>
 
     <para>The source array and target array must be compatible. For the insert
     operator, compatible means the following:</para>
@@ -108,54 +106,44 @@
     </itemizedlist>
 
     <note>
-      <para>The AFL insert operator provides the same functionality as the AQL
-      <code><command>INSERT INTO</command></code> statement. The
-      <literal>merge</literal> operator is also similar, except that <link
-      linkend="mergeOperator">merge</link> is not a write operator (that is,
-      merge does not store the result of the operation).</para>
+      <para>The AFL <code>insert()</code> operator provides the same
+      functionality as the AQL <code><command>INSERT INTO</command></code>
+      statement. The <literal>merge</literal> operator is also similar, except
+      that <link linkend="mergeOperator">merge</link> is not a write operator
+      (that is, merge does not store the result of the operation).</para>
     </note>
   </refsect1>
 
   <refsect1>
     <title>Limitations</title>
 
-    <itemizedlist>
-      <listitem>
-        <para>In both the source and the target array, each dimension must
-        have datatype int64.</para>
-      </listitem>
+    <para>For each corresponding pair of dimensions in the source and
+    target:<itemizedlist>
+        <listitem>
+          <para>If the target dimension is bounded, the source dimension must
+          also be bounded and the respective upper bounds must be
+          equal.</para>
+        </listitem>
 
-      <listitem>
-        <para>For each corresponding pair of dimensions in the source and
-        target:</para>
+        <listitem>
+          <para>If the target dimension is unbounded, the source dimension can
+          be unbounded.</para>
+        </listitem>
 
-        <itemizedlist>
-          <listitem>
-            <para>If the target dimension is bounded, the source dimension
-            must also be bounded and the respective upper bounds must be
-            equal.</para>
-          </listitem>
-
-          <listitem>
-            <para>If the target dimension is unbounded, the source dimension
-            can be unbounded.</para>
-          </listitem>
-
-          <listitem>
-            <para>If the target dimension is unbounded and the source
-            dimension is bounded, the source dimension's chunk size must
-            divide the source dimension's size evenly.</para>
-          </listitem>
-        </itemizedlist>
-      </listitem>
-    </itemizedlist>
+        <listitem>
+          <para>If the target dimension is unbounded and the source dimension
+          is bounded, the source dimension's chunk size must divide the source
+          dimension's size evenly.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>
     <title>Examples</title>
 
     <informalexample>
-      <para>These examples show the behavior of the insert() operator.</para>
+      <para>These examples show the behavior of the <code>insert()</code>
+      operator.</para>
     </informalexample>
 
     <informalexample>
@@ -165,7 +153,7 @@
           only null values, and row 3 has only non-null values.<programlisting
           lang="test" language="test">--aql create array aFlat 
       &lt;row:int64, col:int64, value:string null&gt; 
-      [csvRow=0:5,6,0]
+      [csvRow=0:5,6,0];
  --show-query=no
  --show-output=no
 
@@ -176,7 +164,7 @@
  --show-output=no
 
 --aql load aFlat 
-      from '../tests/harness/testcases/data/doc/aInsert.scidb'
+      from '../tests/harness/testcases/data/doc/aInsert.scidb';
  --show-query=no
  --show-output=no
 
@@ -260,7 +248,7 @@
 
         <step>
           <para>Insert values from B (the original version of B—unchanged by
-          the previous insert operation) into A<programlisting lang="test"
+          the previous insert operation) into A.<programlisting lang="test"
           language="test">--afl insert (B@1, A)
  --output-format=dense
  --chunkify=yes

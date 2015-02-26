@@ -1,7 +1,7 @@
 --setup
 
-CREATE EMPTY ARRAY SortNanNullInf < I : int64, V : double NULL > [ Line=0:*,6,0 ]
-load ( SortNanNullInf, '../tests/harness/testcases/data/sort_nan_null_inf.txt')
+CREATE array SortNanNullInf < I : int64, V : double NULL > [ Line=0:*,6,0 ]
+load ( SortNanNullInf, '${TEST_DATA_DIR}/sort_nan_null_inf.txt')
 
 --test
 --start-query-logging

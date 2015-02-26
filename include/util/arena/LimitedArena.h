@@ -44,7 +44,7 @@ namespace scidb { namespace arena {
  *                  b = newArena(Options("B").limit(1*GB).parent(a));
  *  @endcode
  *              creates a new Arena 'b' that is permitted to allocate as much
- *              as a gigabyte of memory from the Arena 'a' before throwing an
+ *              as a gibibyte of memory from the Arena 'a' before throwing an
  *              arena::Exhausted exception. Clients can track the memory that
  *              is still available by calling available(), and can also catch
  *              the exception if they attempt to allocate beyond this limit.

@@ -35,17 +35,14 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
-#include <iostream>
-#include <sstream>
+#include <iosfwd>
 #include <assert.h>
 #include <set>
 
-#include <boost/foreach.hpp>
+#include <boost/operators.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/map.hpp>
-#include <boost/shared_ptr.hpp>
 
-#include <system/Utils.h>
 #include <query/TypeSystem.h>
 
 namespace scidb
@@ -56,7 +53,6 @@ class DimensionDesc;
 class InstanceDesc;
 class LogicalOpDesc;
 class PhysicalOpDesc;
-class Query;
 class ObjectNames;
 
 /**
@@ -110,7 +106,6 @@ typedef uint64_t QueryID;
 
 typedef uint64_t OpID;
 
-
 /**
  * Coordinates comparator to be used in std::map
  */
@@ -119,11 +114,15 @@ struct CoordinatesLess
     bool operator()(const Coordinates& c1, const Coordinates& c2) const
     {
         assert(c1.size() == c2.size());
-        for (size_t i = 0, n = c1.size(); i < n; i++) {
-            if (c1[i] != c2[i]) {
+
+        for (size_t i=0, n=c1.size(); i != n; ++i)
+        {
+            if (c1[i] != c2[i])
+            {
                 return c1[i] < c2[i];
             }
         }
+
         return false;
     }
 };
@@ -141,8 +140,9 @@ inline int64_t coordinatesCompare(Coordinates const& c1, Coordinates const& c2, 
 {
     assert(c1.size() == c2.size());
 
-    if (rowMajorOrder) {
-        for(size_t i = 0; i < c1.size(); i++ )
+    if (rowMajorOrder)
+    {
+        for (size_t i = 0; i < c1.size(); ++i)
         {
             int64_t res = c1[i] - c2[i];
             if (res != 0)
@@ -151,8 +151,9 @@ inline int64_t coordinatesCompare(Coordinates const& c1, Coordinates const& c2, 
             }
         }
     }
-    else {
-        for(size_t i = c1.size(); i-- > 0; )
+    else
+    {
+        for (size_t i = c1.size(); i-- > 0; )
         {
             int64_t res = c1[i] - c2[i];
             if (res != 0)
@@ -188,38 +189,29 @@ struct CoordinatesComparatorCMO
 
 typedef std::set<Coordinates, CoordinatesLess> CoordinateSet;
 
-/**
- * Array coordinate
- */
-std::ostream& operator<<(std::ostream& stream,const Coordinates& ob);
-
 //For some strange STL reason, operator<< does not work on Coordinates.
 //So we create this wrapper class. This works:
 // LOG4CXX_DEBUG(logger, "My coordinates are "<<CoordsToStr(coords))
 struct CoordsToStr
 {
-public:
     Coordinates const& _co;
-    CoordsToStr (const Coordinates& co):
-        _co(co)
+    CoordsToStr(const Coordinates& co)
+        : _co(co)
     {}
 };
 
-std::ostream& operator<<(std::ostream& stream, const CoordsToStr& w);
-
-const Coordinate MAX_COORDINATE = (uint64_t)-1 >> 2;
-const Coordinate MIN_COORDINATE = -MAX_COORDINATE;
-const uint64_t   INFINITE_LENGTH = MAX_COORDINATE;
-const VersionID  LAST_VERSION = (VersionID)-1;
-const VersionID  ALL_VERSIONS = (VersionID)-2;
-
-const InstanceID CLIENT_INSTANCE = ~0;  // Connection with this instance id is client connection
-const InstanceID INVALID_INSTANCE = ~0;  // Invalid instanceID for checking that it's not registered
-const QueryID INVALID_QUERY_ID = ~0;
-const ArrayID INVALID_ARRAY_ID = ~0;
-const AttributeID INVALID_ATTRIBUTE_ID = ~0;
-const size_t INVALID_DIMENSION_ID = ~0;
-const InstanceID COORDINATOR_INSTANCE = INVALID_INSTANCE;
+const Coordinate  MAX_COORDINATE        = (uint64_t)-1 >> 2;
+const Coordinate  MIN_COORDINATE        = -MAX_COORDINATE;
+const uint64_t    INFINITE_LENGTH       = MAX_COORDINATE;
+const VersionID   LAST_VERSION          = (VersionID)-1;
+const VersionID   ALL_VERSIONS          = (VersionID)-2;
+const InstanceID  CLIENT_INSTANCE       = ~0;  // Connection with this instance id is client connection
+const InstanceID  INVALID_INSTANCE      = ~0;  // Invalid instanceID for checking that it's not registered
+const QueryID     INVALID_QUERY_ID      = ~0;
+const ArrayID     INVALID_ARRAY_ID      = ~0;
+const AttributeID INVALID_ATTRIBUTE_ID  = ~0;
+const size_t      INVALID_DIMENSION_ID  = ~0;
+const InstanceID  COORDINATOR_INSTANCE  = INVALID_INSTANCE;
 const std::string DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME = "EmptyTag";
 
 /**
@@ -263,11 +255,13 @@ inline bool doesPartitioningSchemaHaveData(PartitioningSchema ps)
  */
 inline bool isValidPartitioningSchema(uint32_t ps, bool allowOptionalData=true)
 {
-    if (ps >= (uint32_t)psMAX) {
+    if (ps >= (uint32_t)psMAX)
+    {
         return false;
     }
 
-    if (!allowOptionalData && doesPartitioningSchemaHaveData((PartitioningSchema)ps) ) {
+    if (!allowOptionalData && doesPartitioningSchemaHaveData((PartitioningSchema)ps))
+    {
         return false;
     }
 
@@ -277,7 +271,8 @@ inline bool isValidPartitioningSchema(uint32_t ps, bool allowOptionalData=true)
 /**
  * The base class for optional data for certain PartitioningSchema.
  */
-class PartitioningSchemaData {
+class PartitioningSchemaData
+{
 public:
     virtual ~PartitioningSchemaData() {}
 
@@ -290,14 +285,15 @@ public:
 /**
  * The class for the optional data for psGroupby.
  */
-class PartitioningSchemaDataGroupby: public PartitioningSchemaData {
-public:
+struct PartitioningSchemaDataGroupby : PartitioningSchemaData
+{
     /**
      * Whether each dimension is a groupby dim.
      */
     std::vector<bool> _arrIsGroupbyDim;
 
-    virtual PartitioningSchema getID() {
+    virtual PartitioningSchema getID()
+    {
         return psGroupby;
     }
 };
@@ -331,14 +327,12 @@ enum CoordinateMappingMode
  * @note Alias this is not full name of object! Basically it prefix received from schema name or user
  * defined alias name.
  */
-class ObjectNames
+class ObjectNames : boost::equality_comparable<ObjectNames>
 {
 public:
-    typedef std::set<std::string> AliasesType;
-
-    typedef std::map<std::string, AliasesType> NamesType;
-
-    typedef std::pair<std::string, AliasesType> NamesPairType;
+    typedef std::set<std::string>               AliasesType;
+    typedef std::map<std::string,AliasesType>   NamesType;
+    typedef std::pair<std::string,AliasesType>  NamesPairType;
 
     ObjectNames();
 
@@ -389,7 +383,6 @@ public:
      */
     bool hasNameAndAlias(const std::string &name, const std::string &alias = "") const;
 
-
     /**
      * Get all names and aliases of object
      *
@@ -417,158 +410,67 @@ public:
     }
 
 protected:
-    NamesType _names;
-
+    NamesType   _names;
     std::string _baseName;
 };
 
-std::ostream& operator<<(std::ostream& stream, const ObjectNames::NamesType &ob);
-/**
- * Print only the names
- */
-void printNames(std::ostream& stream, const ObjectNames::NamesType &ob);
 /**
  * Syntactic sugar to represent an n-dimensional vector.
  */
-class DimensionVector
+class DimensionVector : boost::equality_comparable<DimensionVector>,
+                        boost::additive<DimensionVector>
 {
 public:
-    /**
-     * Create a "null" vector.
-     */
-    DimensionVector()
-    {}
-
     /**
      * Create a zero-length vector in numDims dimensions.
      * @param[in] numDims number of dimensions
      */
-    DimensionVector(size_t numDims)
-    {
-        for (size_t i = 0; i< numDims; i++)
-        {
-                _data.push_back(0);
-        }
-    }
+    DimensionVector(size_t numDims = 0)
+        : _data(numDims,0)
+    {}
 
     /**
      * Create a vector based on values.
      * @param[in] vector values
      */
-    DimensionVector(Coordinates values):
-            _data(values)
-    {}
-
-    /**
-     * Copy.
-     */
-    DimensionVector(const DimensionVector & other):
-            _data(other._data)
-    {}
-
-    ~DimensionVector()
+    DimensionVector(const Coordinates& values)
+        : _data(values)
     {}
 
     /**
      * Check if this is a "NULL" vector.
-     * @return true if the vector is in 0 dimensions. False otherwise.
+     * @return true iff the vector has 0 dimensions.
      */
-    inline bool isEmpty() const
+    bool isEmpty() const
     {
-        return _data.size() == 0;
+        return _data.empty();
     }
 
     /**
      * Get the number of dimensions.
      * @return the number of dimensions
      */
-    inline size_t numDimensions() const
+    size_t numDimensions() const
     {
         return _data.size();
     }
 
-    Coordinate& operator[] (const size_t& index )
+    Coordinate& operator[] (size_t index)
     {
-        return _data[index];
+        return isDebug() ? _data.at(index) : _data[index];
     }
 
-    const Coordinate& operator[] (const size_t& index ) const
+    const Coordinate& operator[] (size_t index) const
     {
-        return _data[index];
+        return isDebug() ? _data.at(index) : _data[index];
     }
 
-    DimensionVector& operator= (const DimensionVector& rhs)
+    DimensionVector& operator+= (const DimensionVector&);
+    DimensionVector& operator-= (const DimensionVector&);
+
+    friend bool operator== (const DimensionVector & a, const DimensionVector & b)
     {
-        if ( this == &rhs )
-        {       return *this; }
-
-        _data = rhs._data;
-        return *this;
-    }
-
-    friend DimensionVector& operator+= (DimensionVector& lhs, const DimensionVector& rhs)
-    {
-        if (lhs.isEmpty())
-        {
-            lhs._data = rhs._data;
-        }
-        else if (rhs.isEmpty())
-        {}
-        else
-        {
-            assert(lhs._data.size() == rhs._data.size());
-            for (size_t i = 0; i< lhs._data.size(); i++)
-            {
-                lhs._data[i] += rhs._data[i];
-            }
-        }
-        return lhs;
-    }
-
-    friend DimensionVector& operator-= (DimensionVector& lhs, const DimensionVector& rhs)
-    {
-        if (!lhs.isEmpty() && !rhs.isEmpty())
-        {
-            assert(lhs._data.size() == rhs._data.size());
-            for (size_t i = 0; i< lhs._data.size(); i++)
-            {
-                lhs._data[i] -= rhs._data[i];
-            }
-        }
-        return lhs;
-    }
-
-    const DimensionVector operator+ (const DimensionVector & other) const
-    {
-        DimensionVector result(*this);
-        return result += other;
-    }
-
-    friend bool operator== (const DimensionVector & lhs, const DimensionVector & rhs)
-    {
-        if ( (rhs.isEmpty() && !lhs.isEmpty()) || (!rhs.isEmpty() && lhs.isEmpty()) )
-        {
-            return false;
-        }
-
-        if (rhs.numDimensions() != lhs.numDimensions())
-        {
-            return false;
-        }
-
-        for (size_t i=0; i<rhs.numDimensions(); i++)
-        {
-            if (lhs[i]!=rhs[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    friend bool operator!= (const DimensionVector & lhs, const DimensionVector & rhs)
-    {
-        return !(lhs == rhs);
+        return a._data == b._data;
     }
 
     void clear()
@@ -576,7 +478,7 @@ public:
         _data.clear();
     }
 
-    operator Coordinates () const
+    operator const Coordinates& () const
     {
         return _data;
     }
@@ -589,32 +491,12 @@ public:
      * @param[out] str buffer to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for(int i=0; i<indent; i++)
-        {
-            str<<" ";
-        }
-
-        if (isEmpty())
-        {
-            str<<"[empty]";
-        }
-        else
-        {
-            str<<"[";
-            for(size_t i=0; i<_data.size(); i++)
-            {
-                str<<_data[i]<<" ";
-            }
-            str<<"]";
-        }
-    }
+    void toString(std::ostringstream &,int indent = 0) const;
 
     template<class Archive>
-    void serialize(Archive& ar, const unsigned int version)
+    void serialize(Archive& a,unsigned version)
     {
-        ar & _data;
+        a & _data;
     }
 
 private:
@@ -625,17 +507,17 @@ private:
 /**
  * Descriptor of array. Used for getting metadata of array from catalog.
  */
-class ArrayDesc
+class ArrayDesc : boost::equality_comparable<ArrayDesc>
 {
     friend class DimensionDesc;
 public:
     /**
      * Various array qualifiers
      */
-    enum ArrayFlags {
-        LOCAL        = 0x02,
-        TEMPORARY    = 0x04,
-        DETERIORATED = 0x08
+    enum ArrayFlags
+    {
+        TRANSIENT    = 0x10,    ///< Represented as a MemArray held in the transient array cache: see TransientCache.h for details.
+        INVALID      = 0x20     ///< The array is no longer in a consinstent state and should be removed from the database.
     };
 
     /**
@@ -674,16 +556,21 @@ public:
      */
     ArrayDesc(ArrayDesc const& other);
 
+   ~ArrayDesc()
+    {
+        assert(_accessCount == 0);
+    }
+
     /**
      * Assignment operator
      */
-    ArrayDesc& operator = (ArrayDesc const& other);
+    ArrayDesc& operator = (ArrayDesc const&);
 
     /**
      * Get the unversioned array id (id of parent array)
      * @return unversioned array id
      */
-    inline ArrayUAID getUAId() const
+    ArrayUAID getUAId() const
     {
         return _uAId;
     }
@@ -692,7 +579,7 @@ public:
      * Get the unique versioned array id.
      * @return the versioned array id
      */
-    inline ArrayID getId() const
+    ArrayID getId() const
     {
         return _arrId;
     }
@@ -701,7 +588,7 @@ public:
      * Get the array version number.
      * @return the version number
      */
-    inline VersionID getVersionId() const
+    VersionID getVersionId() const
     {
         return _versionId;
     }
@@ -712,7 +599,7 @@ public:
      * @param [in] uAId the unversioned array id
      * @param [in] vId the version number
      */
-    inline void setIds(ArrayID arrId, ArrayUAID uAId, VersionID vId)
+    void setIds(ArrayID arrId, ArrayUAID uAId, VersionID vId)
     {
         _arrId = arrId;
         _uAId = uAId;
@@ -720,23 +607,10 @@ public:
     }
 
     /**
-     * Mark array descriptor as deteriaorated (needed for maintain array descriptor's cache)
-     */
-    inline void invalidate()
-    {
-        _flags |= DETERIORATED;
-    }
-
-    inline bool isInvalidated() const
-    {
-        return _flags & DETERIORATED;
-    }
-
-    /**
      * Get name of array
      * @return array name
      */
-    inline const std::string& getName() const
+    const std::string& getName() const
     {
         return _name;
     }
@@ -745,7 +619,7 @@ public:
      * Set name of array
      * @param name array name
      */
-    inline void setName(const std::string& name)
+    void setName(const std::string& name)
     {
         _name = name;
     }
@@ -760,9 +634,9 @@ public:
      * @return true if name contains '@' at position 1 or greater and does not contain ':'.
      *         false otherwise.
      */
-    inline static bool isNameVersioned(std::string const& name)
+    static bool isNameVersioned(std::string const& name)
     {
-        if (name.size()==0)
+        if (name.empty())
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "calling isNameVersioned on an empty string";
         }
@@ -777,9 +651,9 @@ public:
      * @param[in] the name to check. A nonempty string.
      * @return true if the name contains neither ':' nor '@'. False otherwise.
      */
-    inline static bool isNameUnversioned(std::string const& name)
+    static bool isNameUnversioned(std::string const& name)
     {
-        if (name.size()==0)
+        if (name.empty())
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "calling isNameUnversioned on an empty string";
         }
@@ -796,9 +670,9 @@ public:
      * @return a substring of name up to and excluding '@', if isNameVersioned(name) is true.
      *         name otherwise.
      */
-    inline static std::string makeUnversionedName(std::string const& name)
+    static std::string makeUnversionedName(std::string const& name)
     {
-        if(isNameVersioned(name))
+        if (isNameVersioned(name))
         {
             size_t const locationOfAt = name.find('@');
             return name.substr(0, locationOfAt);
@@ -814,7 +688,7 @@ public:
     *         isVersionedName(name) is true.
     *         0 otherwise.
     */
-    inline static VersionID getVersionFromName(std::string const& name)
+    static VersionID getVersionFromName(std::string const& name)
     {
         if(isNameVersioned(name))
         {
@@ -831,7 +705,7 @@ public:
      * @param[in] version the version number
      * @return the concatenation of name, "@" and version
      */
-    inline static std::string makeVersionedName(std::string const& name, VersionID const version)
+    static std::string makeVersionedName(std::string const& name, VersionID const version)
     {
         assert(!isNameVersioned(name));
         std::stringstream ss;
@@ -867,7 +741,7 @@ public:
      * Get bitmap attribute used to mark empty cells
      * @return descriptor of the empty indicator attribute or NULL is array is regular
      */
-    inline AttributeDesc const* getEmptyBitmapAttribute() const
+    AttributeDesc const* getEmptyBitmapAttribute() const
     {
         return _bitmapAttr;
     }
@@ -876,7 +750,7 @@ public:
      * Get vector of array attributes
      * @return array attributes
      */
-    inline Attributes const& getAttributes(bool excludeEmptyBitmap = false) const
+    Attributes const& getAttributes(bool excludeEmptyBitmap = false) const
     {
         return excludeEmptyBitmap ? _attributesWithoutBitmap : _attributes;
     }
@@ -885,7 +759,7 @@ public:
      * Get vector of array dimensions
      * @return array dimensions
      */
-    inline Dimensions const& getDimensions() const
+    Dimensions const& getDimensions() const
     {
         return _dimensions;
     }
@@ -897,9 +771,15 @@ public:
 
     /**
      * Get position of the chunk for the given coordinates
-     * @param pos in: element position, out: chunk position (position if first chunk element not including overlaps)
+     * @param[inout] pos  an element position goes in, a chunk position goes out (not including overlap).
      */
     void getChunkPositionFor(Coordinates& pos) const;
+
+    /**
+     * @return whether a given position is a chunk position.
+     * @param[in] pos  a cell position.
+     */
+    bool isAChunkPosition(Coordinates const& pos) const;
 
     /**
       * Get boundaries of the chunk
@@ -923,7 +803,7 @@ public:
      * Get flags associated with array
      * @return flags
      */
-    inline int32_t getFlags() const
+    int32_t getFlags() const
     {
         return _flags;
     }
@@ -939,17 +819,45 @@ public:
     bool hasOverlap() const;
 
     /**
-     * Check if array is local array
+     * Return true if the array is marked as being 'transient'. See proposal
+     * 'TransientArrays' for more details.
      */
-    inline bool isLocal() const
+    bool isTransient() const
     {
-        return _flags & LOCAL;
+        return _flags & TRANSIENT;
+    }
+
+    /**
+     * Mark or unmark the array as being 'transient'. See proposal
+     * 'TransientArrays' for more details.
+     */
+    ArrayDesc& setTransient(bool transient)
+    {
+        if (transient)
+        {
+            _flags |= TRANSIENT;
+        }
+        else
+        {
+            _flags &= (~TRANSIENT);
+        }
+
+        return *this;
+    }
+
+    /**
+     * Return true if the array is marked as being 'invalid', that is,
+     * is pending removal from the database.
+     */
+    bool isInvalid() const
+    {
+        return _flags & INVALID;
     }
 
     /**
      * Get partitioning schema
      */
-    inline PartitioningSchema getPartitioningSchema() const
+    PartitioningSchema getPartitioningSchema() const
     {
         return _ps;
     }
@@ -957,7 +865,7 @@ public:
     /**
      * Set partitioning schema
      */
-    inline void setPartitioningSchema(PartitioningSchema ps)
+    void setPartitioningSchema(PartitioningSchema ps)
     {
        _ps = ps;
     }
@@ -970,7 +878,7 @@ public:
     void addAlias(const std::string &alias);
 
     template<class Archive>
-    void serialize(Archive& ar, const unsigned int version)
+    void serialize(Archive& ar,unsigned version)
     {
         ar & _arrId;
         ar & _uAId;
@@ -983,15 +891,11 @@ public:
 
         if (Archive::is_loading::value)
         {
-                locateBitmapAttribute();
+            locateBitmapAttribute();
         }
     }
 
     bool operator ==(ArrayDesc const& other) const;
-
-    inline bool operator !=(ArrayDesc const& other) const {
-        return !(*this == other);
-    }
 
     void cutOverlap();
     Dimensions grabDimensions(VersionID version) const;
@@ -1004,7 +908,6 @@ public:
     double getNumChunksAlongDimension(size_t dimension, Coordinate start = MAX_COORDINATE, Coordinate end = MIN_COORDINATE) const;
 
     size_t _accessCount;
-    ~ArrayDesc();
 
 private:
     void locateBitmapAttribute();
@@ -1040,22 +943,15 @@ private:
     PartitioningSchema _ps;
 };
 
-std::ostream& operator<<(std::ostream& stream,const Attributes& ob);
-std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob);
-
-/**
- * Print only the persistent part of the array descriptor
- */
-void printSchema(std::ostream& stream,const ArrayDesc& ob);
-
 /**
  * Attribute descriptor
  */
 class AttributeDesc
 {
 public:
-    enum AttributeFlags {
-        IS_NULLABLE = 1,
+    enum AttributeFlags
+    {
+        IS_NULLABLE        = 1,
         IS_EMPTY_INDICATOR = 2
     };
 
@@ -1208,27 +1104,7 @@ public:
      * @param[out] str buffer to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-                str<<" ";
-        }
-        str<<"[attDesc] id "<<_id
-           <<" name "<<_name
-           <<" aliases {";
-
-        BOOST_FOREACH(const std::string& alias, _aliases)
-        {
-            str << _name << "." << alias << ", ";
-        }
-
-        str<<"} type "<<_type
-           <<" flags "<<_flags
-           <<" compression "<<_defaultCompressionMethod
-           <<" reserve "<<_reserve
-           <<" default "<<ValueToString(_type, _defaultValue);
-    }
+    virtual void toString (std::ostringstream&,int indent = 0) const;
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -1275,12 +1151,10 @@ private:
     std::string _defaultValueExpr;
 };
 
-std::ostream& operator<<(std::ostream& stream, const AttributeDesc& ob);
-
 /**
  * Descriptor of dimension
  */
-class DimensionDesc: public ObjectNames
+class DimensionDesc : public ObjectNames, boost::equality_comparable<DimensionDesc>
 {
 public:
     /**
@@ -1349,23 +1223,25 @@ public:
                   Coordinate currEnd, Coordinate endMax,
                   int64_t chunkInterval, int64_t chunkOverlap);
 
-    bool operator == (DimensionDesc const& other) const;
-    bool operator != (DimensionDesc const& other) const
-    {
-        return !(*this == other);
-    }
+    bool operator == (DimensionDesc const&) const;
 
     /**
      * Get minimum value for array index - _startMin
      * @return minimum dimension start
      */
-    Coordinate getStartMin() const;
+    Coordinate getStartMin() const
+    {
+        return _startMin;
+    }
 
     /**
      * Get current start for array index - _currStart
      * @return current dimension start
      */
-    Coordinate getCurrStart() const;
+    Coordinate getCurrStart() const
+    {
+        return _currStart;
+    }
 
     /**
      * Get from catalog low boundary for the specified dimension
@@ -1383,19 +1259,28 @@ public:
      * Get dimension start ( _startMin  )
      * @return dimension start
      */
-    Coordinate getStart() const;
+    Coordinate getStart() const
+    {
+        return _startMin;
+    }
 
     /**
      * Get current end for array index - _currEnd
      * @return current dimension end
      */
-    Coordinate getCurrEnd() const;
+    Coordinate getCurrEnd() const
+    {
+        return _currEnd;
+    }
 
     /**
      * Get maximum end for array index - _endMax
      * @return maximum dimension end
      */
-    Coordinate getEndMax() const;
+    Coordinate getEndMax() const
+    {
+        return _endMax;
+    }
 
     /**
      * Get dimension length
@@ -1413,26 +1298,36 @@ public:
      * Get length of chunk in this dimension (not including overlaps)
      * @return step of partitioning array into chunks for this dimension
      */
-    int64_t getChunkInterval() const;
+    int64_t getChunkInterval() const
+    {
+        return _chunkInterval;
+    }
 
     /**
      * Get chunk overlap in this dimension, so given base coordinate Xi,
      * chunk stores interval of array Ai=[Xi-getChunkOverlap(), Xi+getChunkInterval()+getChunkOverlap()]
      */
-    int64_t getChunkOverlap() const;
+    int64_t getChunkOverlap() const
+    {
+        return _chunkOverlap;
+    }
+
 #ifndef SWIG
 
     /**
      * Get current origin of array along this dimension (not including overlap).
      * @return current starting offset of array int64_t index
      */
-    inline int64_t start() const;
+    int64_t start() const
+    {
+        return _startMin;
+    }
 
     /**
      * Get current length of array along this dimension (not including overlap).
      * @return difference between the current end and the current start of array along this dimension
      */
-    inline uint64_t length() const;
+    uint64_t length() const;
 #endif
     /**
      * Retrieve a human-readable description.
@@ -1442,21 +1337,7 @@ public:
      * @param[out] str buffer to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-                str<<" ";
-        }
-        str<<"[dimDesc] names "<<_names
-           <<" startMin "<<_startMin
-           <<" currStart "<<_currStart
-           <<" currEnd "<<_currEnd
-           <<" endMax "<<_endMax
-           <<" chnkInterval "<<_chunkInterval
-           <<" chnkOverlap "<<_chunkOverlap
-           << "\n";
-    }
+    virtual void toString (std::ostringstream&,int indent = 0) const;
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -1513,19 +1394,6 @@ private:
     ArrayDesc* _array;
 };
 
-std::ostream& operator<<(std::ostream& stream,const Dimensions& ob);
-
-/**
- * Print only the persistent part of the dimensions
- */
-void printSchema(std::ostream& stream,const Dimensions& ob);
-std::ostream& operator<<(std::ostream& stream,const DimensionDesc& ob);
-
-/**
- * Print only the persistent part of the dimension descriptor
- */
-void printSchema (std::ostream& stream,const DimensionDesc& ob);
-
 /**
  * Descriptor of instance
  */
@@ -1563,39 +1431,53 @@ public:
      * Get instance identifier
      * @return instance identifier
      */
-    uint64_t getInstanceId() const;
+    uint64_t getInstanceId() const
+    {
+        return _instance_id;
+    }
 
     /**
      * Get instance hostname or ip
      * @return instance host
      */
-    const std::string& getHost() const;
+    const std::string& getHost() const
+    {
+        return _host;
+    }
 
     /**
      * Get instance listening port number
      * @return port number
      */
-    uint16_t getPort() const;
+    uint16_t getPort() const
+    {
+        return _port;
+    }
 
     /**
      * @return time when the instance marked itself online
      */
-    uint64_t getOnlineSince() const;
+    uint64_t getOnlineSince() const
+    {
+        return _online;
+    }
 
     /**
      * Get instance binary path
      * @return path to the instance's binary
      */
-    const std::string& getPath() const;
+    const std::string& getPath() const
+    {
+        return _path;
+    }
 
 private:
-    uint64_t _instance_id;
+    uint64_t    _instance_id;
     std::string _host;
-    uint16_t _port;
-    uint64_t _online;
+    uint16_t    _port;
+    uint64_t    _online;
     std::string _path;
 };
-std::ostream& operator<<(std::ostream& stream,const InstanceDesc& ob);
 
 /**
  * Descriptor of pluggable logical operator
@@ -1679,7 +1561,7 @@ public:
     }
 
 private:
-    OpID _logicalOpId;
+    OpID        _logicalOpId;
     std::string _name;
     std::string _module;
     std::string _entry;
@@ -1772,55 +1654,41 @@ public:
     }
 
   private:
-    OpID _physicalOpId;
+    OpID        _physicalOpId;
     std::string _logicalOpName;
     std::string _name;
     std::string _module;
     std::string _entry;
 };
 
-struct VersionDesc
+class VersionDesc
 {
   public:
-    ArrayID getArrayID() const {
+    VersionDesc(ArrayID a = 0,VersionID v = 0,time_t t = 0)
+        : _arrayId(a),
+          _versionId(v),
+          _timestamp(t)
+    {}
+
+    ArrayID getArrayID() const
+    {
         return _arrayId;
     }
 
-    VersionID getVersionID() const {
+    VersionID getVersionID() const
+    {
         return _versionId;
     }
 
-    time_t getTimeStamp() const {
+    time_t getTimeStamp() const
+    {
         return _timestamp;
     }
-
-    VersionDesc(ArrayID arrayID, VersionID versionId, time_t timestamp) {
-        _arrayId = arrayID;
-        _versionId = versionId;
-        _timestamp = timestamp;
-    }
-    VersionDesc(const VersionDesc& rhs)
-    {
-       _arrayId   = rhs._arrayId;
-       _versionId = rhs._versionId;
-       _timestamp = rhs._timestamp;
-    }
-    VersionDesc& operator=( const VersionDesc& rhs)
-    {
-       if ( this == &rhs ) {
-          return *this;
-       }
-       _arrayId   = rhs._arrayId;
-       _versionId = rhs._versionId;
-       _timestamp = rhs._timestamp;
-       return *this;
-    }
-    VersionDesc() {}
 
   private:
     ArrayID   _arrayId;
     VersionID _versionId;
-    time_t _timestamp;
+    time_t    _timestamp;
 };
 
 
@@ -1943,10 +1811,27 @@ inline size_t getChunkNumberOfElements(Coordinates const& low, Coordinates const
  */
 inline size_t getChunkNumberOfElements(Coordinates const& chunkPos, Dimensions const& dims, bool withOverlap = true)
 {
-    Coordinates low = computeFirstChunkPosition(chunkPos, dims, withOverlap);
-    Coordinates high = computeLastChunkPosition(chunkPos, dims, withOverlap);
-    return getChunkNumberOfElements(low, high);
+    Coordinates lo(computeFirstChunkPosition(chunkPos,dims,withOverlap));
+    Coordinates hi(computeLastChunkPosition (chunkPos,dims,withOverlap));
+    return getChunkNumberOfElements(lo,hi);
 }
+
+/**
+ * Print only the persistent part of the relevant object.
+ */
+void printSchema(std::ostream&,const Dimensions&);
+void printSchema(std::ostream&,const DimensionDesc&);
+void printSchema(std::ostream&,const ArrayDesc&);
+void printNames (std::ostream&,const ObjectNames::NamesType&);
+std::ostream& operator<<(std::ostream&,const Attributes&);
+std::ostream& operator<<(std::ostream&,const ArrayDesc&);
+std::ostream& operator<<(std::ostream&,const Coordinates&);
+std::ostream& operator<<(std::ostream&,const CoordsToStr&);
+std::ostream& operator<<(std::ostream&,const AttributeDesc&);
+std::ostream& operator<<(std::ostream&,const DimensionDesc&);
+std::ostream& operator<<(std::ostream&,const Dimensions&);
+std::ostream& operator<<(std::ostream&,const InstanceDesc&);
+std::ostream& operator<<(std::ostream&,const ObjectNames::NamesType&);
 
 } // namespace
 

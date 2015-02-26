@@ -51,7 +51,7 @@ using namespace boost;
 #include "network/BaseConnection.h"
 #include "system/Exceptions.h"
 #include "array/Array.h"
-#include "array/MemArray.h"
+#include "array/MemChunk.h"
 #include "array/StreamArray.h"
 #include "array/ParallelAccumulatorArray.h"
 #include "Python.h"
@@ -123,11 +123,9 @@ namespace scidb {
 %shared_ptr(scidb::ConstItemIterator);
 %shared_ptr(scidb::SparseChunkIterator);
 %shared_ptr(scidb::ArrayIterator);
-%shared_ptr(scidb::MemArrayIterator);
 %shared_ptr(scidb::ConstArrayIterator);
 %shared_ptr(scidb::StreamArrayIterator);
 %shared_ptr(scidb::Array);
-%shared_ptr(scidb::MemArray);
 %shared_ptr(scidb::StreamArray);
 %shared_ptr(scidb::AccumulatorArray);
 %shared_ptr(scidb::ParallelAccumulatorArray);
@@ -149,7 +147,7 @@ using namespace boost;
 %include "query/TypeSystem.h"
 
 %include "array/Array.h"
-%include "array/MemArray.h"
+%include "array/MemChunk.h"
 %include "array/StreamArray.h"
 %apply std::string *INPUT {std::string& connectionString };
 %apply std::string *INPUT {std::string& queryString };

@@ -75,7 +75,7 @@ private:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_PARAMETER_NOT_POSITIVE_INTEGER) << parameterString;
         }
-        _memoryLimit = sval * MB;
+        _memoryLimit = sval * MiB;
         _memoryLimitSet = true;
     }
 
@@ -152,7 +152,7 @@ public:
         _inputAttributeName     (dynamic_pointer_cast<OperatorParamReference> (operatorParameters[0])->getObjectName()),
         _outputAttributeName    (_inputSchema.getAttributes()[_inputAttributeId].getName() + "_index"),
         _outputAttributeNameSet (false),
-        _memoryLimit            (((Config::getInstance()->getOption<int>(CONFIG_MEM_ARRAY_THRESHOLD)) * MB)),
+        _memoryLimit            (Config::getInstance()->getOption<size_t>(CONFIG_MEM_ARRAY_THRESHOLD) * MiB),
         _memoryLimitSet         (false),
         _indexSorted            (false),
         _indexSortedSet         (false)

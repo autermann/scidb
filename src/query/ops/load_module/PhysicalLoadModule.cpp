@@ -22,7 +22,6 @@
 
 /****************************************************************************/
 
-#include <fstream>                                       // For ifstream
 #include <query/Parser.h>                                // For loadModule
 #include <query/Operator.h>                              // For PhysicalOperator
 #include <system/Resources.h>                            // For fileExists
@@ -52,16 +51,7 @@ struct PhysicalLoadModule : PhysicalOperator
                 throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR,SCIDB_LE_FILE_NOT_FOUND) << path;
             }
 
-            ifstream f(path.c_str());                    // ...open for read
-            string   s((istreambuf_iterator<char>(f)),   // ...copy to string
-                        istreambuf_iterator<char>());
-
-            if (f.fail())                                // ...failed to read?
-            {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR,SCIDB_LE_FILE_READ_ERROR) << path;
-            }
-
-            loadModule(s);                               // ...parse and load
+            loadModule(path);                            // ...load user module
         }
 
         return shared_ptr<Array>();                      // Nothing to return

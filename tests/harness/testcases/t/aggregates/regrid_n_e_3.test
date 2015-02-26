@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
-create empty array A <a:int32 null> [x=-2:8,5,0]
-store(build_sparse(A,x+10,x<>2 and x<>5),A)
+create array A <a:int32 null> [x=-2:8,5,0]
+store(filter(build(A,x+10),x<>2 and x<>5),A)
 
 --test
 --aql update A set a=null where x=1
@@ -14,7 +14,7 @@ regrid(A,1,count(*))
 regrid(A,1,stdev(a))
 regrid(A,1,var(a))
 
-store(build_sparse(A,x-2,x<>0 and x<>4),A)
+store(filter(build(A,x-2),x<>0 and x<>4),A)
 --aql update A set a=null where x=1
 regrid(A,18,sum(a),max(a))
 regrid(A,3,max(a),var(a),stdev(a),count(a),sum(a),min(a))

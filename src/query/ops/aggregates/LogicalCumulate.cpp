@@ -65,19 +65,21 @@ namespace scidb
  *
  *
  *  @par Examples:
- *
- *   input:                cumulate(input, sum(v) as sum_v, count(*) as cnt, I)
- *  +-I->
- * J|     00   01   02   03              00       01       02       03
- *  V   +----+----+----+----+        +--------+--------+--------+--------+
- *  00  | 01 |    | 02 |    |   00   | (1, 1) |        | (3, 2) |        |
- *      +----+----+----+----+        +--------+--------+--------+--------+
- *  01  |    | 03 |    | 04 |   01   |        | (3, 1) |        | (7, 2) |
- *      +----+----+----+----+        +--------+--------+--------+--------+
- *  02  | 05 |    | 06 |    |   02   | (5, 1) |        | (11, 2)|        |
- *      +----+----+----+----+        +--------+--------+--------+--------+
- *  03  |    | 07 |    | 08 |   03   |        | (7, 1) |        | (15, 2)|
- *      +----+----+----+----+        +--------+--------+--------+--------+
+ *  @verbatim
+
+     input:                cumulate(input, sum(v) as sum_v, count(*) as cnt, I)
+    +-I->
+   J|     00   01   02   03              00       01       02       03
+    V   +----+----+----+----+        +--------+--------+--------+--------+
+    00  | 01 |    | 02 |    |   00   | (1, 1) |        | (3, 2) |        |
+        +----+----+----+----+        +--------+--------+--------+--------+
+    01  |    | 03 |    | 04 |   01   |        | (3, 1) |        | (7, 2) |
+        +----+----+----+----+        +--------+--------+--------+--------+
+    02  | 05 |    | 06 |    |   02   | (5, 1) |        | (11, 2)|        |
+        +----+----+----+----+        +--------+--------+--------+--------+
+    03  |    | 07 |    | 08 |   03   |        | (7, 1) |        | (15, 2)|
+        +----+----+----+----+        +--------+--------+--------+--------+
+    @endverbatim
  *
  *  @par Errors:
  *
@@ -169,15 +171,18 @@ public:
             switch(_parameters[i]->getParamType())
             {
             case PARAM_AGGREGATE_CALL:
+            {
                 if (hasDimension) {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CUMULATE_DIM_AFTER_AGGREGATES);
                 }
+                bool isInOrderAggregation = true;
                 addAggregatedAttribute(
                        (shared_ptr <OperatorParamAggregateCall> &)_parameters[i],
                        inputSchema,
-                       outputSchema );
+                       outputSchema,
+                       isInOrderAggregation);
                 break;
-
+            }
             case PARAM_DIMENSION_REF:
             {
                 SCIDB_ASSERT ( !hasDimension ); // There can be only 1 dimension

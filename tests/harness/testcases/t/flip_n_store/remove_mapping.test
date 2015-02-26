@@ -2,7 +2,7 @@
 --start-query-logging
 create array Foo<x:double>[i=1:10,10,0]
 store(build(Foo, i + 10), Foo)
-create empty array Foo_Flipped<i:int64>[x(double)=*,10,0]
+create array Foo_Flipped<i:int64>[x(double)=*,10,0]
 
 --test
 store(redimension(Foo, Foo_Flipped), Foo_Flipped)

@@ -10,11 +10,11 @@
 --test
 
 --shell --command "echo size-list=+:1:96:13                 >> /tmp/$HPID.cfg"
---shell --command "python ../../bin/dla_driver.py /tmp/$HPID.cfg 1> /tmp/$HPID.stdout 2> /tmp/$HPID.stderr"
+--shell --command "python ${TEST_BIN_DIR}/dla_driver.py /tmp/$HPID.cfg 1> /tmp/$HPID.stdout 2> /tmp/$HPID.stderr"
 
 --cleanup
 --shell --command "cat /tmp/$HPID.stderr"
---shell --command "cat /tmp/$HPID.stdout" --store
+--shell --store --command "cat /tmp/$HPID.stdout"
 --shell --command "rm /tmp/$HPID.cfg"
 --shell --command "rm /tmp/$HPID.stdout"
 --shell --command "rm /tmp/$HPID.stderr" 

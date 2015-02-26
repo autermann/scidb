@@ -122,9 +122,14 @@
                 <secondary>listing active</secondary>
               </indexterm>queries</entry>
 
-            <entry>Show all active queries. Each active query will have an id,
-            a time and date when it was queries initiated, an error code,
-            whether it generated any errors, and a status (boolean flag where
+            <entry>Show all active queries. The number of cells in the result
+            will typically exceed the number of active queries, because each
+            SciDB instance reports about each query it is working on. Each
+            cell of the result will show the reporting instance, an arbitrary
+            value for dimension n, the query_id, the coordinating instance for
+            the query, the query string (appearing only on the cell describing
+            the coordinating instance), the creation time, any applicable
+            error code, the error status, and the idle flag (a boolean where
             TRUE means that the query is idle).</entry>
           </row>
         </tbody>
@@ -148,17 +153,17 @@
       <procedure>
         <step>
           <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>name,id,schema,availability
-'vector0',210,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
-'vector1',212,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+'vector0',305,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+'vector1',307,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
         <step>
           <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>name,id,schema,availability
-'vector0',210,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
-'vector0@1',211,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
-'vector1',212,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
-'vector1@1',213,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
+'vector0',305,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+'vector0@1',306,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
+'vector1',307,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+'vector1@1',308,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 

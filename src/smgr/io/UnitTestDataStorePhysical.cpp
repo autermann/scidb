@@ -20,7 +20,8 @@
 * END_COPYRIGHT
 */
 
-#include "DataStore.h"
+#include "Storage.h"
+#include <util/DataStore.h>
 #include <query/Operator.h>
 #include <array/Metadata.h>
 #include <system/Cluster.h>
@@ -107,7 +108,8 @@ public:
 
         /* 1)
          */
-        shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(static_cast<DataStore::Guid>(-1));
+        shared_ptr<DataStore> ds = 
+            StorageManager::getInstance().getDataStores().getDataStore(static_cast<DataStore::Guid>(-1));
 
         if (!ds)
         {
@@ -135,12 +137,12 @@ public:
 
         /* 4)
          */
-        DataStores::getInstance()->closeDataStore(static_cast<DataStore::Guid>(-1), false);
+        StorageManager::getInstance().getDataStores().closeDataStore(static_cast<DataStore::Guid>(-1), false);
         ds.reset();
 
         /* 5)
          */
-        ds = DataStores::getInstance()->getDataStore(static_cast<DataStore::Guid>(-1));
+        ds = StorageManager::getInstance().getDataStores().getDataStore(static_cast<DataStore::Guid>(-1));
 
         if (!ds)
         {
@@ -199,7 +201,7 @@ public:
 
         /* 9)
          */
-        DataStores::getInstance()->closeDataStore(static_cast<DataStore::Guid>(-1), true);
+        StorageManager::getInstance().getDataStores().closeDataStore(static_cast<DataStore::Guid>(-1), true);
         ds.reset();
 
         return shared_ptr<Array> (new MemArray(_schema,query));

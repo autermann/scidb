@@ -97,13 +97,17 @@ VERSION_MAJOR=`awk -F . '{print $1}' version`
 VERSION_MINOR=`awk -F . '{print $2}' version`
 VERSION_PATCH=`awk -F . '{print $3}' version`
 
-echo "Extracting revision"
 if [ -d .git ]; then
-    echo Extracting revision from git
+    echo "Extracting revision from git."
     REVISION=$(git svn find-rev master)
 elif [ -d .svn ]; then
-    echo Extracting revision from svn
+    echo "Extracting revision from svn."
     REVISION=$(svn info|grep Revision|awk '{print $2}'|perl -p -e 's/\n//')
+elif [ -f revision ]; then
+    echo "Extracting revision from file."
+    REVISION=$(cat revision)
+else
+    die "Can not extract source control revision."
 fi
 popd
 
@@ -161,6 +165,8 @@ if [ "$type" == "deb" ]; then
 	    for filename in changelog control rules; do
             $M4 ${dirSrc}/${filename}.in > ${dirTgt}/${filename} || die $M4 failed
 	    done
+            $M4 ${dirSrc}/postinst_in > ${dirTgt}/scidb-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postinst || die $M4 failed
+            $M4 ${dirSrc}/postrm_in > ${dirTgt}/scidb-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postrm || die $M4 failed
     }
     DSC_FILE_NAME="scidb-${VERSION_MAJOR}.${VERSION_MINOR}_${VERSION_PATCH}-$REVISION.dsc"
 

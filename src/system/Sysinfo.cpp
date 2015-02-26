@@ -34,6 +34,7 @@
 
 #include "system/Sysinfo.h"
 #include "system/SciDBConfigOptions.h"
+#include "system/Constants.h"
 #ifndef SCIDB_CLIENT
 #include "system/Config.h"
 #endif
@@ -41,7 +42,7 @@
 namespace scidb
 {
 
-#define DEFAULT_CACHE_SIZE 64*1024
+enum { DEFAULT_CACHE_SIZE = 64*KiB };
 
 int Sysinfo::getNumberOfCPUs()
 {

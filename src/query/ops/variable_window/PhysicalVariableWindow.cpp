@@ -27,6 +27,7 @@
  */
 
 #include <map>
+#include "query/Aggregate.h"
 #include "query/Operator.h"
 #include "query/Network.h"
 #include "array/Metadata.h"
@@ -64,39 +65,26 @@ private:
     ArrayDesc _srcDesc;
     size_t _localCellCount;
 
-    struct AggIOMapping
-    {
-        AggIOMapping(): inputAttributeId(-2), outputAttributeIds(0), aggregates(0)
-        {}
-
-        AggIOMapping(AttributeID inAttId, AttributeID outAttId, AggregatePtr agg):
-            inputAttributeId(inAttId), outputAttributeIds(1, outAttId), aggregates(1, agg)
-        {}
-
-        int64_t inputAttributeId;
-        vector<AttributeID> outputAttributeIds;
-        vector<AggregatePtr> aggregates;
-    };
-
     vector<AggIOMapping> collectIOMappings()
     {
         vector<AggIOMapping> resultMappings;
         AggIOMapping countMapping;
 
+        bool countStar = false;
         AttributeID attID = 0;
         for (size_t i =0; i<_parameters.size(); i++)
         {
             if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
             {
-                shared_ptr <OperatorParamAggregateCall>const& ac = (shared_ptr <OperatorParamAggregateCall> const&) _parameters[i];
+                shared_ptr <OperatorParamAggregateCall>const& ac =
+                    (shared_ptr <OperatorParamAggregateCall> const&) _parameters[i];
                 AttributeID inAttributeId;
                 AggregatePtr agg = resolveAggregate(ac, _srcDesc.getAttributes(), &inAttributeId);
-                if (inAttributeId == ((AttributeID) -1))
+                if (inAttributeId == INVALID_ATTRIBUTE_ID)
                 {
                     //this is for count(*) - set it aside in the countMapping pile
-                    countMapping.inputAttributeId = -1;
-                    countMapping.outputAttributeIds.push_back(attID);
-                    countMapping.aggregates.push_back(agg);
+                    countStar = true;
+                    countMapping.push_back(attID, agg);
                 }
                 else
                 {
@@ -104,10 +92,9 @@ private:
                     size_t k;
                     for(k=0; k<resultMappings.size(); k++)
                     {
-                        if (inAttributeId == resultMappings[k].inputAttributeId)
+                        if (inAttributeId == resultMappings[k].getInputAttributeId())
                         {
-                            resultMappings[k].outputAttributeIds.push_back(attID);
-                            resultMappings[k].aggregates.push_back(agg);
+                            resultMappings[k].push_back(attID, agg);
                             break;
                         }
                     }
@@ -121,7 +108,7 @@ private:
             }
         }
 
-        if (countMapping.inputAttributeId == -1)
+        if (countStar)
         {
             //We have things in the countMapping pile - find an input for it
             int64_t minSize = -1;
@@ -131,7 +118,8 @@ private:
                 //We're scanning other attributes - let's piggyback on one of them (the smallest)
                 for (size_t i=0; i<resultMappings.size(); i++)
                 {
-                    size_t attributeSize = _srcDesc.getAttributes()[resultMappings[i].inputAttributeId].getSize();
+                    size_t attributeSize =
+                        _srcDesc.getAttributes()[resultMappings[i].getInputAttributeId()].getSize();
                     if (attributeSize > 0)
                     {
                         if (minSize == -1 || minSize > (int64_t) attributeSize)
@@ -141,11 +129,7 @@ private:
                         }
                     }
                 }
-                for (size_t i=0; i<countMapping.outputAttributeIds.size(); i++)
-                {
-                    resultMappings[j].outputAttributeIds.push_back(countMapping.outputAttributeIds[i]);
-                    resultMappings[j].aggregates.push_back(countMapping.aggregates[i]);
-                }
+                resultMappings[j].merge(countMapping);
             }
             else
             {
@@ -163,7 +147,7 @@ private:
                         }
                     }
                 }
-                countMapping.inputAttributeId = j;
+                countMapping.setInputAttributeId(j);
                 resultMappings.push_back(countMapping);
             }
         }
@@ -173,11 +157,11 @@ private:
     static size_t estimateValueSize(AggIOMapping const& mapping, ArrayDesc const& dstDesc)
     {
         size_t res =0;
-        for(size_t i=0; i<mapping.aggregates.size(); i++)
+        for (size_t i = 0; i < mapping.size(); ++i)
         {
-            Type resultType = mapping.aggregates[i]->getResultType();
+            Type resultType = mapping.getAggregate(i)->getResultType();
             size_t fixedSize = resultType.byteSize();
-            size_t varSize = dstDesc.getAttributes()[mapping.outputAttributeIds[i]].getVarSize();
+            size_t varSize = dstDesc.getAttributes()[mapping.getOutputAttributeId(i)].getVarSize();
 
             //estimate the size of a Value inside of a ValueMap. +1 for an over-estimation.
             size_t size = sizeof(Value) + sizeof(position_t) + sizeof(_Rb_tree_node_base) + 1;
@@ -227,11 +211,11 @@ private:
                          AggIOMapping const& aggMapping):
             _totalSize(0),
             _maxSize(maxSize),
-            _nAggs(aggMapping.outputAttributeIds.size()),
+            _nAggs(aggMapping.size()),
             _query(query),
             _eVSize(estimateValueSize(aggMapping, dstArray->getArrayDesc()))
         {
-            assert(_nAggs> 0 && _nAggs == aggMapping.aggregates.size());
+            assert(_nAggs > 0 && _nAggs == aggMapping.size());
 
             unordered_map<Coordinates, size_t>::const_iterator iter = chunkCounts.begin();
             while(iter!=chunkCounts.end())
@@ -250,17 +234,16 @@ private:
 
             for(size_t i=0; i<_nAggs; i++)
             {
-                _daiters.push_back(dstArray->getIterator(aggMapping.outputAttributeIds[i]));
-                Value val(aggMapping.aggregates[i]->getResultType());
-                val = TypeLibrary::getDefaultValue(aggMapping.aggregates[i]->getResultType().typeId());
+                _daiters.push_back(dstArray->getIterator(aggMapping.getOutputAttributeId(i)));
+                const Type& type = aggMapping.getAggregate(i)->getResultType();
+                Value val(type);
+                val = TypeLibrary::getDefaultValue(type.typeId());
                 _stubs.push_back(val);
             }
         }
 
         virtual ~AttributeWriter()
-        {
-            flushAll();
-        }
+        {}
 
         inline void flushAll()
         {
@@ -270,7 +253,7 @@ private:
                 ChunkWriterInfo& info = iter->second;
                 if(info.iters[0].get())
                 {
-                    LOG4CXX_TRACE(logger, "Swapping out chunk at "<<coordsToString(iter->first));
+                    LOG4CXX_TRACE(logger, "Swapping out chunk at "<<CoordsToStr(iter->first));
                     for(size_t i=0; i<_nAggs; i++)
                     {
                         info.iters[i]->flush();
@@ -311,7 +294,7 @@ private:
                         flushAll();
                     }
                     _totalSize+= (info.valuesTotal * _eVSize);
-                    LOG4CXX_TRACE(logger, "Opening chunk "<<coordsToString(chunkPos)<<", new size "<<_totalSize)
+                    LOG4CXX_TRACE(logger, "Opening chunk "<<CoordsToStr(chunkPos)<<", new size "<<_totalSize)
                 }
                 else
                 {
@@ -358,7 +341,7 @@ private:
             info.valuesWritten++;
             if(info.valuesWritten==info.valuesTotal)
             {   //guaranteed we won't need to touch this chunk again
-                LOG4CXX_DEBUG(logger, "Finished with chunk at "<<coordsToString(chunkPos)<<"; flushing");
+                LOG4CXX_DEBUG(logger, "Finished with chunk at "<<CoordsToStr(chunkPos)<<"; flushing");
                 for(size_t i=0; i<_nAggs; i++)
                 {
                     info.iters[i]->flush();
@@ -713,8 +696,8 @@ public:
                     {
                         Coordinates const& axisPos = iter2->first;
                         shared_ptr<WindowEdge>& rightWEdge = iter2->second;
-                        LOG4CXX_TRACE(logger, "Received right wedge at chunk "<<coordsToString(nextChunkPos)<<
-                                                                      " axis "<<coordsToString(axisPos)<<
+                        LOG4CXX_TRACE(logger, "Received right wedge at chunk "<<CoordsToStr(nextChunkPos)<<
+                                                                      " axis "<<CoordsToStr(axisPos)<<
                                                                       " nCoords "<<rightWEdge->getNumCoords()<<
                                                                       " nVals "<<rightWEdge->getNumValues());
 
@@ -748,7 +731,7 @@ public:
                             }
                             else
                             {
-                                LOG4CXX_TRACE(logger, "W3 chunk "<<coordsToString(chunkPos)<< " position "<<coordsToString(valPos));
+                                LOG4CXX_TRACE(logger, "W3 chunk "<<CoordsToStr(chunkPos)<< " position "<<CoordsToStr(valPos));
                                 output.writeValue(chunkPos, valPos, val->vals);
                             }
                         }
@@ -777,7 +760,7 @@ public:
                     unordered_map <Coordinates, vector<Value> >::iterator iter4 = values->begin();
                     while(iter4 != values->end())
                     {
-                        LOG4CXX_TRACE(logger, "W4 chunk "<<coordsToString(chunkPos)<< " position "<<coordsToString(iter4->first));
+                        LOG4CXX_TRACE(logger, "W4 chunk "<<CoordsToStr(chunkPos)<< " position "<<CoordsToStr(iter4->first));
                         output.writeValue(chunkPos, iter4->first, iter4->second);
                         iter4++;
                     }
@@ -835,7 +818,7 @@ public:
                 nextChunkLocal = true;
             }
         }
-        LOG4CXX_DEBUG(logger, "Processing chunk at "<<coordsToString(chunkPos)
+        LOG4CXX_DEBUG(logger, "Processing chunk at "<<CoordsToStr(chunkPos)
                                <<" nc "<<haveNextChunk<<" ncl "<<nextChunkLocal
                                <<" pc "<<havePrevChunk<<" pcl "<<prevChunkLocal);
 
@@ -891,7 +874,7 @@ public:
                 prevValuePos[_dimNum] = prevAxisCoord;
                 Coordinates prevChunkPos = prevValuePos;
                 _srcDesc.getChunkPositionFor(prevChunkPos);
-                LOG4CXX_TRACE(logger, "W1 chunk "<<coordsToString(prevChunkPos)<< " position "<<coordsToString(prevValuePos));
+                LOG4CXX_TRACE(logger, "W1 chunk "<<CoordsToStr(prevChunkPos)<< " position "<<CoordsToStr(prevValuePos));
                 output.writeValue(prevChunkPos, prevValuePos, result->vals);
             }
             ++(*sciter);
@@ -910,7 +893,7 @@ public:
                     valuePos[_dimNum]=result->coord;
                     Coordinates chunkPos = valuePos;
                     _srcDesc.getChunkPositionFor(chunkPos);
-                    LOG4CXX_TRACE(logger, "W2 chunk "<<coordsToString(chunkPos)<< " position "<<coordsToString(valuePos));
+                    LOG4CXX_TRACE(logger, "W2 chunk "<<CoordsToStr(chunkPos)<< " position "<<CoordsToStr(valuePos));
                     output.writeValue(chunkPos, valuePos, result->vals);
                 }
                 iter++;
@@ -934,8 +917,8 @@ public:
                 }
 
                 assert(wEdge->getNumValues() <= _nPreceding + _nFollowing);
-                LOG4CXX_TRACE(logger, "F1: forwarding edge from chunk "<<coordsToString(chunkPos)<<
-                                                               " axis "<<coordsToString(axisPos)<<
+                LOG4CXX_TRACE(logger, "F1: forwarding edge from chunk "<<CoordsToStr(chunkPos)<<
+                                                               " axis "<<CoordsToStr(axisPos)<<
                                                             " nCoords "<<wEdge->getNumCoords()<<
                                                               " nVals "<<wEdge->getNumValues()<<
                                                                " to n "<<nextInstance);
@@ -966,7 +949,7 @@ public:
                     valuePos[_dimNum]=result->coord;
                     Coordinates chunkPos = valuePos;
                     _srcDesc.getChunkPositionFor(chunkPos);
-                    LOG4CXX_TRACE(logger, "W5 chunk "<<coordsToString(chunkPos)<< " position "<<coordsToString(valuePos));
+                    LOG4CXX_TRACE(logger, "W5 chunk "<<CoordsToStr(chunkPos)<< " position "<<CoordsToStr(valuePos));
                     output.writeValue(chunkPos, valuePos, result->vals);
                 }
                 iter2++;
@@ -1039,7 +1022,7 @@ public:
         size_t currentAxis = 0;
 
         unordered_map<Coordinates, shared_ptr<ChunkEdge> > leftEdges;
-        shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(mapping.inputAttributeId);
+        shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(mapping.getInputAttributeId());
         AttributeWriter<USE_SWAP> output(_chunkCounts, dstArray, sizeLimit, query, mapping);
 
         shared_ptr<ChunkEdge> currentRightEdge;
@@ -1051,7 +1034,7 @@ public:
             Coordinates nextAxis = agreeOnNextAxis(axesList, currentAxis);
             while(nextAxis.size())
             {
-                LOG4CXX_DEBUG(logger, "Processing axis "<<coordsToString(nextAxis));
+                LOG4CXX_DEBUG(logger, "Processing axis "<<CoordsToStr(nextAxis));
                 axiter.setAxis(nextAxis);
                 bool exitLoop = false;
                 while(!exitLoop)
@@ -1059,7 +1042,7 @@ public:
                     if(!axiter.endOfAxis())
                     {
                         ChunkLocation cl = axiter.getNextChunk();
-                        processChunk <USE_SWAP> (cl, saiter, currentRightEdge, currentLeftEdge, leftEdges, output, outMessages, mapping.aggregates);
+                        processChunk <USE_SWAP> (cl, saiter, currentRightEdge, currentLeftEdge, leftEdges, output, outMessages, mapping.getAggregates());
                     }
                     else
                     {
@@ -1067,11 +1050,11 @@ public:
                         exitLoop = true;
                     }
 
-                    messageCycle <USE_SWAP> (outMessages, inMessages, leftEdges, output, mapping.aggregates);
+                    messageCycle <USE_SWAP> (outMessages, inMessages, leftEdges, output, mapping.getAggregates());
                     exitLoop = agreeOnBoolean(exitLoop);
                     if(exitLoop)
                     {
-                        flushLeftEdges(leftEdges, output, mapping.aggregates);
+                        flushLeftEdges(leftEdges, output, mapping.getAggregates());
                         leftEdges.clear();
                         for(size_t i =0; i<inMessages.size(); i++)
                         {
@@ -1091,11 +1074,12 @@ public:
             while (!axiter.end())
             {
                 ChunkLocation cl = axiter.getNextChunk();
-                processChunk <USE_SWAP> (cl, saiter, currentRightEdge, currentLeftEdge, leftEdges, output, outMessages,  mapping.aggregates);
+                processChunk <USE_SWAP> (cl, saiter, currentRightEdge, currentLeftEdge, leftEdges, output, outMessages,  mapping.getAggregates());
             }
-            messageCycle <USE_SWAP> (outMessages, inMessages, leftEdges, output,  mapping.aggregates);
-            flushLeftEdges(leftEdges, output,  mapping.aggregates);
+            messageCycle <USE_SWAP> (outMessages, inMessages, leftEdges, output,  mapping.getAggregates());
+            flushLeftEdges(leftEdges, output,  mapping.getAggregates());
         }
+        output.flushAll();
     }
 
     shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
@@ -1160,7 +1144,7 @@ public:
             //mixed case - assume footprint is entire array
             estimatedCellsInMemory = _localCellCount;
         }
-        size_t maxSize = (((size_t) Config::getInstance()->getOption<int>(CONFIG_MEM_ARRAY_THRESHOLD)) * 1024 * 1024) / 2;
+        size_t maxSize = (Config::getInstance()->getOption<size_t>(CONFIG_MEM_ARRAY_THRESHOLD) * MiB) / 2;
 
         LOG4CXX_DEBUG(logger, "Estimated cells in memory: "<<estimatedCellsInMemory);
 
@@ -1216,7 +1200,7 @@ DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalVariableWindow, "variable_window", "Ph
         while (! saiter->end())
         {
             Coordinates const& chunkPos = saiter->getPosition();
-            LOG4CXX_DEBUG(logger, "Processing chunk at "<<coordsToString(chunkPos));
+            LOG4CXX_DEBUG(logger, "Processing chunk at "<<CoordsToStr(chunkPos));
             shared_ptr<ChunkEdge> currChunkEdge(new ChunkEdge());
             _edgeMap[chunkPos] = currChunkEdge;
             shared_ptr<ChunkEdge> prevChunkEdge;
@@ -1285,7 +1269,7 @@ DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalVariableWindow, "variable_window", "Ph
                     {
                         if(_iterMap[prevChunkPos].get()==0)
                         {
-                            LOG4CXX_DEBUG(logger, "Reopening chunk at "<<coordsToString(prevChunkPos));
+                            LOG4CXX_DEBUG(logger, "Reopening chunk at "<<CoordsToStr(prevChunkPos));
                             daiter->setPosition(prevChunkPos);
                             _iterMap[prevChunkPos] = daiter->updateChunk().getIterator(query, ConstChunkIterator::NO_EMPTY_CHECK | ConstChunkIterator::APPEND_CHUNK);
                         }
@@ -1299,7 +1283,7 @@ DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalVariableWindow, "variable_window", "Ph
                                 _edgeMap.erase(prevChunkPos);
                                 _iterMap[prevChunkPos]->flush();
                                 _iterMap[prevChunkPos].reset();
-                                LOG4CXX_DEBUG(logger, "Unlinking and flushing chunk at "<<coordsToString(prevChunkPos));
+                                LOG4CXX_DEBUG(logger, "Unlinking and flushing chunk at "<<CoordsToStr(prevChunkPos));
                             }
                         }
                     }
@@ -1324,7 +1308,7 @@ DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalVariableWindow, "variable_window", "Ph
                         if(_iterMap[chunkCoords].get()==0)
                         {
                             daiter->setPosition(chunkCoords);
-                            LOG4CXX_DEBUG(logger, "End of axis: reopening chunk at "<<coordsToString(chunkCoords));
+                            LOG4CXX_DEBUG(logger, "End of axis: reopening chunk at "<<CoordsToStr(chunkCoords));
                             _iterMap[chunkCoords] = daiter->updateChunk().getIterator(query, ConstChunkIterator::NO_EMPTY_CHECK | ConstChunkIterator::APPEND_CHUNK);
                         }
                         _iterMap[chunkCoords]->setPosition(valueCoords);
