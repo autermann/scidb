@@ -55,12 +55,13 @@ export TEST_HOST_LIST="$(cat ${BUILD_PATH}/host_list)"
 export DEPLOY_SH="${SOURCE_PATH}/deployment/deploy.sh"
 
 echo "Build SciDB packages"
-${DEPLOY_SH} build ${BUILD_TYPE} ${PACKAGES_PATH}
+SCIDB_BUILD_PATH=${BUILD_PATH} ${DEPLOY_SH} build ${BUILD_TYPE} ${PACKAGES_PATH}
 
 echo "Prepare PostgreSQL"
 ${DEPLOY_SH} prepare_postgresql ${DB_USER} ${DB_PASSWD} ${NETWORK} ${COORDINATOR}
 
 echo "Install SciDB packages"
+${DEPLOY_SH} scidb_remove ${PACKAGES_PATH} ${TEST_HOST_LIST} || true
 ${DEPLOY_SH} scidb_install ${PACKAGES_PATH} ${TEST_HOST_LIST}
 echo "Run post-install hook '${POST_INSTALL_HOOK}'"
 ${POST_INSTALL_HOOK}

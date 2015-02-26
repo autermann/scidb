@@ -103,9 +103,9 @@ Other .
 }
 
 {Identifier} {
-    CHECK_LEXEM_SIZE(yyleng + 1)
-    const AQLKeyword *kw = FindAQLKeyword(yytext);
-    if (kw)
+    CHECK_LEXEM_SIZE(yyleng + 1U);
+
+    if (const AQLKeyword *kw = FindAQLKeyword(yytext))
     {
         //Allocate string for keyword only for non-reserved keywords. It will be freed in identifier_clause
         //in case of successful parsing (or in bison destructor in case unsuccessfull parsing).
@@ -126,7 +126,7 @@ Other .
 }
 
 {QuotedIdentifier} {
-    std::string str = std::string(yytext, 1, yyleng - 2);  
+    std::string str = std::string(yytext, 1, yyleng - 2);
     CHECK_LEXEM_SIZE(str.size() + 1)
     yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
     strcpy(yylval->stringVal, str.c_str());

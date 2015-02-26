@@ -180,7 +180,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                   TID_INT64);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "u", TID_DOUBLE, 0, 0);
-        ArrayDesc result("U", atts, outDims);
+        ArrayDesc result("U", addEmptyTagAttribute(atts), outDims);
         log4cxx_debug_dimensions("SVDLogical::inferSchema(U)", result.getDimensions());
         return result;
     }
@@ -219,7 +219,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                 dims[1].getFuncMapScale());
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "v", TID_DOUBLE, 0, 0);
-        ArrayDesc result("VT", atts, outDims);
+        ArrayDesc result("VT", addEmptyTagAttribute(atts), outDims);
         log4cxx_debug_dimensions("SVDLogical::inferSchema(VT)", result.getDimensions());
         return result;
     }
@@ -240,7 +240,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    TID_INT64);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "sigma", TID_DOUBLE, 0, 0);
-        ArrayDesc result("SIGMA", atts, outDims);
+        ArrayDesc result("SIGMA", addEmptyTagAttribute(atts), outDims);
         log4cxx_debug_dimensions("SVDLogical::inferSchema(SIGMA)", result.getDimensions());
         return result;
     } else {

@@ -25,6 +25,16 @@ message(STATUS "Configuring ${SAMPLE_CONFIG_IN} as ${SAMPLE_CONFIG}")
 configure_file(${SAMPLE_CONFIG_IN} ${SAMPLE_CONFIG} @ONLY)
 
 set (util_src
+    arena/Arena.cpp
+    arena/ArenaCheckpoint.cpp
+    arena/ArenaDetails.cpp
+    arena/ArenaHeader.cpp
+    arena/ArenaMonitor.cpp
+    arena/ArenaOptions.cpp
+    arena/DebugArena.cpp
+    arena/LimitedArena.cpp
+    arena/RootArena.cpp
+    arena/ScopedArena.cpp
     Job.cpp
     JobQueue.cpp
     Semaphore.cpp

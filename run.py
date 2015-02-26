@@ -764,7 +764,7 @@ SCIDB_MAKE_JOBS - number of make jobs to spawn (the -j parameter of make)""")
 Builds deployable SciDB packages""")
     subParser.add_argument('package_path', default=os.path.join(scidbEnv.build_path,"packages"),
                            nargs='?', help=
-                           "directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/packages")
+                           "full directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/packages")
     subParser.add_argument('-f','--force', action='store_true', help=
                            "automatically confirm any old state/directory cleanup")
     subParser.set_defaults(func=make_packages)
@@ -780,7 +780,7 @@ Currently, the plugin packages are allowed to be generated from scratch (not fro
                            help= "plugin name")
     subParser.add_argument('package_path',
                            nargs='?', help=
-                           "directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/external_plugins/<name>/packages")
+                           "full directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/external_plugins/<name>/packages")
     subParser.add_argument('-f','--force', action='store_true', help=
                            "automatically confirm any old state/directory cleanup")
     subParser.set_defaults(func=pluginMakePackages)

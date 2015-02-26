@@ -1,31 +1,31 @@
-SCIDB QUERY : <create immutable array Ts <a:string> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts <a:string> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Tsn <a:string compression 'no compression'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Tsn <a:string compression 'no compression'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_rle <a:string compression 'rle'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_rle <a:string compression 'rle'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_d <a:int32 compression 'dictionary'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_d <a:int32 compression 'dictionary'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_ns <a:int64  default 5 compression 'null suppression'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_ns <a:int64  default 5 compression 'null suppression'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_be <a:bool compression 'bitmap encoding'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_be <a:bool compression 'bitmap encoding'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_z <a:float compression 'zlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_z <a:float compression 'zlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_bz <a:double compression 'bzlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_bz <a:double compression 'bzlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array T2 <a:string, b:int32 default 9 compression 'null filter'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array T2 <a:string, b:int32 default 9 compression 'null filter'> [x=-2:3,2,1]>
 Query was executed successfully
 
 SCIDB QUERY : <show(Ts)>

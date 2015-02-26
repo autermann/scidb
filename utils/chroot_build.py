@@ -31,6 +31,7 @@ CMD_UPDATE = 2
 CMD_LOGIN = 3
 
 BUILD_RESULT='/tmp/scidb_build'
+TEMP_RESULT='/tmp'
 USE_SUDO = True
 
 class Col():
@@ -109,9 +110,8 @@ class UbuntuChroot():
     pbuilder_tgz_dir='/var/cache/pbuilder'
     ubuntu_mirror='deb http://archive.ubuntu.com/ubuntu/ %s restricted main multiverse universe'
     scidb_3rdparty_mirror='deb http://downloads.paradigm4.com/ ubuntu12.04/3rdparty/'
-    logfile = '/tmp/pbuilder.log'
 
-    def __init__(self, release, arch):
+    def __init__(self, release, arch, temp_dir):
         info('Will use pbuilder for chrooting. Checking environment...')
         #if not which('pbuilder'):
         #    err('Can not find pbuilder! Check your PATH and/or run script as root!')
@@ -119,6 +119,8 @@ class UbuntuChroot():
         self.arch = arch
         self.tgz = self.pbuilder_tgz_dir+'/'+release+'-'+arch+'.tgz'
         self.mirror = '|'.join([(self.ubuntu_mirror % release), self.scidb_3rdparty_mirror])
+        self.temp_dir=temp_dir
+        self.logfile = os.path.join(self.temp_dir,'pbuilder.log')
 
     def init(self):
         pbargs = ['pbuilder', '--create',
@@ -180,32 +182,33 @@ class UbuntuChroot():
 class CentOSChroot():
     distroname = 'centos'
 
-    def __init__(self, release, arch):
+    def __init__(self, release, arch, temp_dir):
         info("Will use mock for chrooting. Checking environment...")
         #if not which('mock'):
         #    err('Can not find mock! Check your PATH and/or run script as root!')
         self.release = release
         self.arch = arch
         self.chroot = '%s-%s-%s' % (self.distroname, release, arch)
+        self.temp_dir=temp_dir
 
     def init(self):
         mockargs = ['mock', '--init',
             '--root', self.chroot,
             '--arch', self.arch,
-            '--resultdir', '/tmp']
+            '--resultdir', self.temp_dir]
         info("Initializing %s" % self.chroot)
         if RunSudoAndWait(mockargs):
-            err("mock returned error. See log %s for details." % '/tmp/root.log')
+            err("mock returned error. See log %s for details." % os.path.join(self.temp_dir,'root.log'))
         info("Done")
 
     def update(self):
         mockargs = ['mock', '--update',
             '--root', self.chroot,
             '--arch', self.arch,
-            '--resultdir', '/tmp']
+            '--resultdir', self.temp_dir]
         info("Updating %s" % self.chroot)
         if RunSudoAndWait(mockargs):
-            err("mock returned error. See log %s for details." % '/tmp/root.log')
+            err("mock returned error. See log %s for details." % os.path.join(self.temp_dir,'root.log'))
         info("Done")
 
     def build(self, sources, jobs, buildresult):
@@ -245,6 +248,7 @@ def main():
     parser.add_argument('-j', '--jobs', dest='build_jobs', type=int, help='Number of build jobs')
     parser.add_argument('--no-color', dest='color', action='store_const', const=False, help='Disable color output')
     parser.add_argument('-r', '--result-dir', dest='result_dir', type=str, help='Directory for result packages (default is %s)' % BUILD_RESULT)
+    parser.add_argument('-t', '--temp-dir', dest='temp_dir', type=str, help='Directory for temporary storage (default is %s)' % TEMP_RESULT)
     parser.add_argument('--no-sudo', dest='use_sudo', action='store_const', const=False, help='Do not use sudo internally (you should run as root by yourself)')
 
     parser.set_defaults(
@@ -252,6 +256,7 @@ def main():
       build_jobs=1,
       color=True,
       result_dir=BUILD_RESULT,
+      temp_dir=TEMP_RESULT,
       use_sudo = True)
     args = vars(parser.parse_args())
 
@@ -261,6 +266,7 @@ def main():
     JOBS = args['build_jobs']
     COLOR = args['color']
     RESULT_DIR = args['result_dir']
+    TEMP_DIR = args['temp_dir']
     USE_SUDO = args['use_sudo']
 
     if not COLOR:
@@ -272,9 +278,9 @@ def main():
         err("Wrong distro string '%s'! It should be in format 'distroname-release-arch'" % DISTRO)
 
     if distroname == 'ubuntu':
-        chroot = UbuntuChroot(release, arch)
+        chroot = UbuntuChroot(release, arch, TEMP_DIR)
     elif distroname == 'centos':
-        chroot = CentOSChroot(release, arch)
+        chroot = CentOSChroot(release, arch, TEMP_DIR)
     else:
         err("Wrong distro name '%s', only 'ubuntu' and 'centos' allowed" % distroname)
 

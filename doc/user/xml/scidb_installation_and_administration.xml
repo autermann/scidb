@@ -167,7 +167,8 @@
       <note>
         <para><!--If fixed for next release, re-enter this sentence: This step is only required if you are setting up a cluster environment,
  and can be skipped for single-server installations.-->This step must be
-        performed by the scidb user account.</para>
+        performed by the scidb user account, <emphasis role="bold">on the
+        coordinator server only</emphasis>.</para>
       </note>
 
       <para><indexterm>
@@ -246,6 +247,13 @@ ssh scidb@<replaceable>worker</replaceable></programlisting><note>
             <para>Configure SELinux</para>
           </listitem>
         </itemizedlist></para>
+
+      <para>
+        <note>
+          <para>These configuration steps must be performed on all servers—the
+          coordinator server and all worker servers.</para>
+        </note>
+      </para>
 
       <section>
         <title>Configure iptables</title>
@@ -506,7 +514,7 @@ sudo yum install scidb-&scidb_version;-all # On all servers other than the coord
         scidb-&scidb_version;-all-coord will also install PostgreSQL 8.4, if
         it is not already installed on your system. If you already have
         PostgreSQL 8.4 on your coordinator server, there is no particular need
-        to use the scidb-&scidb_version;-all-coord package..</para>
+        to use the scidb-&scidb_version;-all-coord package.</para>
       </note>
     </section>
 
@@ -514,8 +522,10 @@ sudo yum install scidb-&scidb_version;-all # On all servers other than the coord
       <title>Set Up Postgres as the SciDB System Catalog</title>
 
       <para>If you are upgrading from a previous version of SciDB, you can
-      skip this section, and continue with <xref
-      linkend="ConfiguringSciDB"/>.</para>
+      skip this section, and continue with <xref linkend="ConfiguringSciDB"/>.
+      Also, this section only applies to the coordinator server: if you are
+      installing SciDB to a cluster, you can skip this section for all of your
+      worker servers.</para>
 
       <para><indexterm>
           <primary>system catalog</primary>
@@ -637,7 +647,8 @@ port = 5432
     <para>This section introduces the SciDB config.ini and shows how to
     configure SciDB prior to initialization (usually
     <literal>/opt/scidb/&scidb_version;/etc/config.ini</literal>). Logging
-    configuration is also described.</para>
+    configuration is also described. You create and maintain the configuration
+    file on the coordinator server only.</para>
 
     <note>
       <para><indexterm>
@@ -722,6 +733,8 @@ chunk-segment-size=100485760
   <section xml:id="InitializingandStartingSciDB">
     <title>Initializing and Starting SciDB</title>
 
+    <para>You initialize and start SciDB from the coordinator server.</para>
+
     <para>Run the following commands to initialize and start a SciDB
     database:</para>
 
@@ -773,6 +786,8 @@ chunk-segment-size=100485760
 
   <xi:include href="scidb_bestpractices.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <?hard-pagebreak ?>
 
   <section id="installReference">
     <title>Installation Reference</title>
@@ -859,6 +874,8 @@ chunk-segment-size=100485760
         </itemizedlist></para>
     </section>
 
+    <?hard-pagebreak ?>
+
     <section id="configParameters">
       <title>SciDB Configuration Parameters</title>
 
@@ -875,9 +892,9 @@ chunk-segment-size=100485760
 
       <informaltable frame="all">
         <tgroup cols="2">
-          <colspec colname="c1" colwidth="20*"/>
+          <colspec colname="c1" colwidth="12*"/>
 
-          <colspec colname="c2" colwidth="60*"/>
+          <colspec colname="c2" colwidth="88*"/>
 
           <tbody>
             <row>

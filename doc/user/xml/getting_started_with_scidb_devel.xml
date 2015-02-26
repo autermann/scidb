@@ -29,9 +29,9 @@ iquery</programlisting>
   command:<programlisting>AQL% set lang afl;</programlisting></para>
 
   <para>AQL and AFL statements end with a semicolon (;). If you forget the
-  terminating semicolon, iquery presents a prompt (<emphasis
-  role="bold">CON&gt;</emphasis>) where you can enter the terminating
-  semicolon and run the query.</para>
+  terminating semicolon, <literal>iquery</literal> presents a prompt
+  (<emphasis role="bold">CON&gt;</emphasis>) where you can enter the
+  terminating semicolon and run the query.</para>
 
   <section xml:id="UsingtheiqueryClient">
     <title>Using the iquery Client</title>
@@ -89,7 +89,7 @@ quit or exit   - End iquery session</programlisting></para>
 
     <informaltable frame="all" id="outputOptions">
       <tgroup cols="2">
-        <colspec colname="c1" colwidth="30*"/>
+        <colspec colname="c1" colwidth="15*"/>
 
         <colspec colname="c2" colwidth="50*"/>
 
@@ -245,7 +245,7 @@ quit or exit   - End iquery session</programlisting></para>
                 <replaceable>target_filename</replaceable>
               </entry>
 
-              <entry>Filename with result array data.</entry>
+              <entry>Filename where result data will be stored.</entry>
             </row>
 
             <row>
@@ -255,8 +255,8 @@ quit or exit   - End iquery session</programlisting></para>
                 <replaceable>format</replaceable>
               </entry>
 
-              <entry>Output format: auto, csv, csv+, lcsv+, sparse, lsparse.
-              Default is 'auto'.</entry>
+              <entry>Output format. See the previous table for available
+              options. Default is 'auto'.</entry>
             </row>
 
             <row>
@@ -264,8 +264,9 @@ quit or exit   - End iquery session</programlisting></para>
                 <code>-v [ --verbose ]</code>
               </entry>
 
-              <entry>Print the debugging information. Disabled by
-              default.</entry>
+              <entry>Print the debugging information. Disabled by default.
+              Useful for displaying data such as number of chunks and chunk
+              size.</entry>
             </row>
 
             <row>
@@ -281,7 +282,9 @@ quit or exit   - End iquery session</programlisting></para>
                 <code>-n [ --no-fetch ]</code>
               </entry>
 
-              <entry>Skip data fetching. Disabled by default.</entry>
+              <entry>Skip data fetching. Disabled by default. Useful when the
+              result array is large, and you do not want to have the results
+              displayed on screen.</entry>
             </row>
 
             <row>
@@ -294,8 +297,8 @@ quit or exit   - End iquery session</programlisting></para>
             </row>
 
             <row>
-              <entry>-<code>u [ --plugins
-              ]</code><replaceable>path</replaceable></entry>
+              <entry>-<code>u [ --plugins ]
+              </code><replaceable>path</replaceable></entry>
 
               <entry>Path to the plugins directory.</entry>
             </row>
@@ -344,6 +347,18 @@ quit or exit   - End iquery session</programlisting></para>
               <secondary>output format</secondary>
             </indexterm>When <literal>iquery</literal> outputs string
           attributes, the strings are wrapped in single quotes.</para>
+        </listitem>
+
+        <listitem>
+          <para><indexterm>
+              <primary>iquery</primary>
+
+              <secondary>maximum query length</secondary>
+            </indexterm><indexterm>
+              <primary>queries</primary>
+
+              <secondary>maximum length</secondary>
+            </indexterm>The maximum length of a query is 16MB.</para>
         </listitem>
       </itemizedlist></para>
   </section>

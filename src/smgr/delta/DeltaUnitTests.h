@@ -665,7 +665,7 @@ public:
                         SystemCatalog::getInstance()->deleteArray(firstVersion.getArrayDesc().getName());
                 }
 
-                ArrayID id = SystemCatalog::getInstance()->addArray(firstVersion.getArrayDesc(), psRoundRobin);
+                ArrayID id = SystemCatalog::getInstance()->addArray(firstVersion.getArrayDesc(), psHashPartitioned);
                 CPPUNIT_ASSERT(dvc.newVersion(rawBuf, secondVersion, 2, false));
                 CPPUNIT_ASSERT(dvc.newVersion(rawBuf, secondVersion, 3, true));
                 SystemCatalog::getInstance()->deleteArray(id);

@@ -25,12 +25,18 @@ function centos6 ()
     /sbin/chkconfig iptables off
     /sbin/service iptables stop
     if [ "1" == "${with_coordinator}" ]; then
-	transaction=`yum history list scidb-${release}-all-coord | awk '$1 ~ /[0-9]+/ {print $1}' | head -1`
+        transaction_all=`yum history list scidb-${release}-all-coord | awk '$1 ~ /[0-9]+/ {print $1}' | head -1`
+        transaction_tools=`yum history list scidb-${release}-dev-tools | awk '$1 ~ /[0-9]+/ {print $1}' | head -1`
     else
-	transaction=`yum history list scidb-${release}-all | awk '$1 ~ /[0-9]+/ {print $1}' | head -1`
+        transaction_all=`yum history list scidb-${release}-all | awk '$1 ~ /[0-9]+/ {print $1}' | head -1`
+        transaction_tools=`yum history list scidb-${release}-dev-tools | awk '$1 ~ /[0-9]+/ {print $1}' | head -1`
     fi
-    if [ "${transaction}" != "" ]; then
-	yum history undo -y ${transaction}
+    if [ "${transaction_all}" != "" ]; then
+        yum history undo -y ${transaction_all}
+    fi
+
+    if [ "${transaction_tools}" != "" ]; then
+        yum history undo -y ${transaction_tools}
     fi
 }
 
@@ -42,6 +48,7 @@ function ubuntu1204 ()
     else
 	apt-get purge -y scidb-${release}-all
     fi
+    apt-get purge -y scidb-${release}-dev-tools
     apt-get autoremove --purge -y
 }
 

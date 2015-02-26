@@ -12,7 +12,7 @@
       <personname>
         <firstname>SciDB Version &scidb_version;</firstname>
 
-        <surname>(using SciDB-R)</surname>
+        <surname/>
       </personname>
     </author>
 
@@ -25,7 +25,8 @@
     <title>Introduction</title>
 
     <para>This guide helps new users begin working with SciDB, and R users
-    begin working with SciDB-R.</para>
+    begin working with SciDB-R. Additionally, we have added a Python
+    interface, similar to the one for R.</para>
 
     <para><emphasis role="bold">SciDB</emphasis> is an all-in-one data
     management and advanced analytics platform. It provides massively scalable
@@ -70,15 +71,20 @@
         </listitem>
       </itemizedlist></para>
 
+    <para><emphasis role="bold">SciDB-Py</emphasis>, similar to SciDB-R, lets
+    you remain a Python programmer while including the powerful SciDB database
+    capabilities.</para>
+
     <para>This document describes how to use a Virtual Machine (VM) with both
-    SciDB and R installed. You can use this image to quickly and easily get
-    started using SciDB and the SciDB package for R.</para>
+    SciDB and the packages for SciDB-R and SciDB-Py. You can use this image to
+    quickly and easily get started using SciDB and the SciDB package for R or
+    Python.</para>
 
     <para>We also provide the following documents:<itemizedlist>
         <listitem>
           <para><emphasis>SciDB and R</emphasis> describes the R front-end to
           SciDB. Link: <ulink
-          url="http://cran.r-project.org/web/packages/scidb/vignettes/scidb.pdf">SciDB
+          url="https://raw.github.com/Paradigm4/SciDBR/master/vignettes/scidb.pdf?raw=TRUE">SciDB
           and R</ulink></para>
         </listitem>
 
@@ -140,13 +146,15 @@
       </listitem>
     </itemizedlist>
 
-    <note>
-      <para><emphasis role="bold">Note: </emphasis>Both the VirtualBox and AMI
-      SciDB installations are small-scale. That is, they are useful as an
-      introduction to SciDB, and for small amounts of data. If you want to use
-      SciDB on very large datasets, we recommend that you download the full
-      version of SciDB from the forum.</para>
-    </note>
+    <para>Note that both the VirtualBox and AMI SciDB installations are
+    small-scale. That is, as configured, they are useful as an introduction to
+    SciDB, and for small amounts of data. They do, however, contain a complete
+    version of SciDB. In fact, for the AMI, you could simply adjust the
+    settings in the config.ini file and then use SciDB on a large-scale EC2
+    cluster.</para>
+
+    <para>For the most flexibility, however, we recommend that you download
+    SciDB from the forum, and install it onto your own hardware.</para>
 
     <para>If you have any questions or concerns, contact
     <email>support@scidb.org</email> for help getting started.</para>
@@ -158,8 +166,30 @@
     <para>Paradigm4 provides both a VirtualBox image and an Amazon Machine
     Image. Use whichever you prefer.</para>
 
+    <para>The provided VMs include SciDB &scidb_version; and the latest R and
+    Python packages. All packages are available with SSL/TLS-encryption. A
+    list of available web-based tools is reported to you when you log
+    in.</para>
+
+    <para>Additionally, each image contains the following:<itemizedlist>
+        <listitem>
+          <para>authenticated web tools: RStudio, IPython Notebook, and a
+          simple SciDB web console</para>
+        </listitem>
+
+        <listitem>
+          <para>a brief text document describing the VM configuration process
+          in the <code>/home/scidb</code> directory</para>
+        </listitem>
+
+        <listitem>
+          <para>a reduced-sized MODIS example, loaded and runnable from both
+          Python and R (as well as some other examples)</para>
+        </listitem>
+      </itemizedlist></para>
+
     <section id="virtualBox">
-      <title id="virtualBox">Use a VirtualBox Image</title>
+      <title>Use a VirtualBox Image</title>
 
       <para>The VirtualBox Image is running on CentOS 6.</para>
 
@@ -170,7 +200,7 @@
 
           <para>
             <ulink
-            url="http://downloads.paradigm4.com/QuickStart/13.3/SciDB13.3-CentOS6.3-VirtualBox4.1.12-withR.ova">http://downloads.paradigm4.com/QuickStart/&scidb_version;/SciDB&scidb_version;-CentOS6.3-VirtualBox4.1.12-withR.ova</ulink>
+            url="&lt;?xml version=&quot;1.0&quot;?&gt; &lt;ns:clipboard xmlns:ns=&quot;http://www.xmlmind.com/xmleditor/namespace/clipboard&quot; &gt;http://downloads.paradigm4.com/QuickStart/&lt;ns:clipboard ns2:inclusion=&quot;com.xmlmind.xml.load.EntityRef:scidb_version &amp;lt;!DOCTYPE []&amp;gt; file:/home/smarcus/writing/1312/doc/user/xml/scidb-r_qs_pre.xml&quot; ns2:readOnly=&quot;true&quot; xmlns:ns2=&quot;http://www.xmlmind.com/xmleditor/namespace/property&quot; &gt;13.9&lt;/ns:clipboard &gt;/SciDB&lt;ns:clipboard ns2:inclusion=&quot;com.xmlmind.xml.load.EntityRef:scidb_version &amp;lt;!DOCTYPE []&amp;gt; file:/home/smarcus/writing/1312/doc/user/xml/scidb-r_qs_pre.xml&quot; ns2:readOnly=&quot;true&quot; xmlns:ns2=&quot;http://www.xmlmind.com/xmleditor/namespace/property&quot; &gt;13.9&lt;/ns:clipboard &gt;-CentOS6-VirtualBox4.2.10.ova&lt;/ns:clipboard &gt; ">http://downloads.paradigm4.com/QuickStart/&scidb_version;/SciDB&scidb_version;-CentOS6-VirtualBox4.2.10.ova</ulink>
           </para>
 
           <para>Download the .ova file to a partition with at least 8GB of
@@ -201,7 +231,7 @@
       <screen>Welcome to the SciDB VM!
 
 A simple SciDB web interface is available by directing your browser to:
-http://192.168.56.101:8080
+https://192.168.56.101:8080
 :
 :</screen>
 
@@ -225,9 +255,8 @@ http://192.168.56.101:8080
         </step>
 
         <step>
-          <para>From the VirtualBox menu, select click <emphasis
-          role="bold">File </emphasis>| <emphasis
-          role="bold">Preferences</emphasis>.</para>
+          <para>From the VirtualBox menu, select <emphasis role="bold">File
+          </emphasis>| <emphasis role="bold">Preferences</emphasis>.</para>
         </step>
 
         <step>
@@ -241,7 +270,7 @@ http://192.168.56.101:8080
         </step>
 
         <step>
-          <para>Select your SciDB-R VM, and click <emphasis
+          <para>Select your SciDB VM, and click <emphasis
           role="bold">Settings</emphasis>.</para>
         </step>
 
@@ -264,6 +293,11 @@ http://192.168.56.101:8080
       VM in a startup text message:<itemizedlist>
           <listitem>
             <para>Access RStudio from a web browser on your computer.</para>
+          </listitem>
+
+          <listitem>
+            <para>Access IPython Notebook from a web browser on your
+            computer.</para>
           </listitem>
 
           <listitem>
@@ -290,23 +324,7 @@ http://192.168.56.101:8080
       <ulink url="http://aws.amazon.com">http://aws.amazon.com/</ulink> for
       more information.</para>
 
-      <para>Note the following information for this AMI:<itemizedlist>
-          <listitem>
-            <para>The Operating System is Ubuntu 12.04.</para>
-          </listitem>
-
-          <listitem>
-            <para>To run SciDB, use the<literal> ubuntu</literal> user account
-            (as opposed to the standard <literal>scidb</literal> account
-            discussed in SciDB User Guide).</para>
-          </listitem>
-
-          <listitem>
-            <para>There are examples provided in the scripts folder: explore
-            these to see how the data on the AMI has been stored into
-            SciDB.</para>
-          </listitem>
-        </itemizedlist></para>
+      <para>The operating system for the AMI is Ubuntu 12.04.</para>
 
       <para>To work with the AMI, perform the following steps:</para>
 
@@ -337,34 +355,42 @@ http://192.168.56.101:8080
             </step>
 
             <step>
-              <para>Select <emphasis role="bold">Classic Wizard </emphasis>and
-              click <emphasis role="bold">Continue</emphasis>.</para>
+              <para>From the <emphasis role="bold">Quick Start
+              </emphasis>menu, select <emphasis role="bold">Community
+              AMIs</emphasis>.</para>
             </step>
 
             <step>
-              <para>Select <emphasis role="bold">Community AMIs</emphasis> and
-              enter <literal>ami-703a5c19</literal> (the name of the SciDB
-              image) into the text field. This should return the details for
-              the ami-703a5c19 image.</para>
+              <para>In the search box, enter <literal>ami-474c132e </literal>
+              (the name of the SciDB image) into the text field and hit
+              <emphasis role="bold">Enter</emphasis>. This should return the
+              details for the ami-474c132e image.</para>
             </step>
 
             <step>
-              <para>Click <emphasis role="bold">Select</emphasis>. The
-              remaining steps of the Wizard apply to starting any instance on
-              AWS. Note the following parameters:</para>
+              <para>Click <emphasis role="bold">Select</emphasis>.</para>
+            </step>
+
+            <step>
+              <para>Click <emphasis role="bold">Review and Launch</emphasis>.
+              You can edit your AMI. You need to open some ports, and you may
+              want to use key pairs:</para>
 
               <itemizedlist>
                 <listitem>
-                  <para><emphasis role="bold">Security Groups: </emphasis>For
-                  your security group, create a rule permitting incoming TCP
-                  SSH connections on port 22, 8080, and 8787.</para>
+                  <para><emphasis role="bold">Edit Security Groups:
+                  </emphasis>For your security group, create rules permitting
+                  incoming TCP connections for ports 22 (SSH), 8083 (SciDB web
+                  console), 8787 (RStudio), and 8888 (IPython). The listed
+                  ports use SSL-encrypted communication and require user
+                  authentication.</para>
                 </listitem>
 
                 <listitem>
-                  <para><emphasis role="bold">Key Pairs: </emphasis>If
+                  <para><emphasis role="bold">Edit Tags: </emphasis>If
                   desired, you may create a Key Pair or use an existing one.
                   This will allow logging into the instance as the <emphasis
-                  role="bold">ubuntu</emphasis> user using PKI rather than a
+                  role="bold">scidb</emphasis> user using PKI rather than a
                   password.</para>
                 </listitem>
               </itemizedlist>
@@ -373,17 +399,19 @@ http://192.168.56.101:8080
         </step>
 
         <step>
-          <para>Launch and log onto the image.</para>
+          <para>Once you have configured your image, launch and log onto the
+          image.</para>
 
           <substeps>
             <step>
-              <para>On the final page of the wizard, click <emphasis
-              role="bold">Launch</emphasis>. This launches your
-              instance.</para>
+              <para>Click <emphasis role="bold">Launch</emphasis>. You are
+              asked to confirm your key pair (or to proceed without one), and
+              then the instance is launched.</para>
             </step>
 
             <step>
-              <para>On your AWS console page, your instances are
+              <para>Click <emphasis role="bold">View Instances </emphasis>to
+              return to your AWS console page, where your instances are
               listed.</para>
             </step>
 
@@ -406,7 +434,7 @@ http://192.168.56.101:8080
 
             <step>
               <para>Open a terminal window from your computer to SSH into the
-              AMI as the ubuntu user.<screen>ssh ubuntu@ec2-54-242-36-232.compute-1.amazonaws.com</screen>Again,
+              AMI as the scidb user.<screen>ssh scidb@ec2-54-242-36-232.compute-1.amazonaws.com</screen>Again,
               the URL is an example only. When asked for the scidb password,
               enter <emphasis role="bold">paradigm4</emphasis>.</para>
             </step>
@@ -414,32 +442,61 @@ http://192.168.56.101:8080
 
           <note>
             <para><emphasis role="bold">Note: </emphasis>The standard EC2
-            approach of using a PEM key pair to log in as the ubuntu user is
+            approach of using a PEM key pair to log in as the scidb user is
             always supported as well.</para>
           </note>
         </step>
 
         <step>
           <para>The supplied database is <emphasis
-          role="bold">mydb</emphasis>. Start SciDB by typing the following
-          command:<programlisting>./START_SCIDB.sh</programlisting></para>
+          role="bold">mydb</emphasis>, and should be running when you log on.
+          The database is configured as a 4-instance cluster. You can, of
+          course, log on and modify the configuration to suit your needs, by
+          performing the following steps:<orderedlist>
+              <listitem>
+                <para>Stop the database:<screen>scidb.py stopall mydb</screen></para>
+              </listitem>
+
+              <listitem>
+                <para>Edit the <code>/opt/scidb/13.9/etc/config.ini</code>
+                file to reflect the desired configuration.</para>
+              </listitem>
+
+              <listitem>
+                <para>Run the following command to initialize the
+                database:<screen>scidb.py initall-force mydb</screen><emphasis
+                role="bold">WARNING: </emphasis>This command will delete all
+                of the data from the database.</para>
+              </listitem>
+
+              <listitem>
+                <para>Run the following command to start the database:<screen>scidb.py startall mydb</screen></para>
+              </listitem>
+            </orderedlist></para>
         </step>
 
         <step>
           <para>In addition to using SciDB from the command line, you can
-          access a GUI for SciDB or for RStudio. Point your browser to the one
-          of the following URLs (assuming the same "base-URL" listed in step
-          2.d):<itemizedlist>
+          access a GUI for SciDB or for RStudio or IPython Notebook. Point
+          your browser to the one of the following URLs (assuming the same
+          "base-URL" listed in step 2.d):<itemizedlist>
               <listitem>
                 <para>To use SciDB:
-                ec2-54-242-36-232.compute-1.amazonaws.com:8080</para>
+                https://ec2-54-242-36-232.compute-1.amazonaws.com:8083</para>
               </listitem>
 
               <listitem>
                 <para>To use SciDB-R:
-                ec2-54-242-36-232.compute-1.amazonaws.com:8787</para>
+                http://ec2-54-242-36-232.compute-1.amazonaws.com:8787</para>
               </listitem>
-            </itemizedlist></para>
+
+              <listitem>
+                <para>To use SciDB-Py:
+                https://ec2-54-242-36-232.compute-1.amazonaws.com:8888</para>
+              </listitem>
+            </itemizedlist>When asked to log on, remember that the username is
+          <emphasis role="bold">scidb </emphasis>and the password is <emphasis
+          role="bold">paradigm4</emphasis>.</para>
         </step>
       </procedure>
 
@@ -448,14 +505,14 @@ http://192.168.56.101:8080
   </section>
 
   <section id="GUI">
-    <title>Connect to RStudio or SciDB</title>
+    <title>Connect to R, Python or SciDB</title>
 
     <para>Once you have downloaded the VirtualBox image, or created your own
-    AMI from the template, you can proceed to connect to SciDB or
-    RStudio.</para>
+    AMI from the template, you can proceed to connect to SciDB, IPython
+    Notebook or RStudio.</para>
 
     <section id="RStudioConnect">
-      <title>Connect to RStudio</title>
+      <title>Connect to RStudio or IPython Notebook</title>
 
       <para>Depending on whether you are using a VirtualBox image or an Amazon
       Machine image, you can access RStudio:<itemizedlist>
@@ -472,20 +529,26 @@ http://192.168.56.101:8080
           </listitem>
         </itemizedlist></para>
 
+      <para>To access IPython Notebook:<itemizedlist>
+          <listitem>
+            <para>VirtualBox Image: you should have noted the URL for Python
+            when you started the VM. For example, <emphasis
+            role="bold">https://192.168.56.101:8888</emphasis></para>
+          </listitem>
+
+          <listitem>
+            <para>AMI: use the public DNS for the AMI, and append <emphasis
+            role="bold">:8888</emphasis> for the port. For example: <emphasis
+            role="bold">ec2-54-242-36-232.compute-1.amazonaws.com:8888</emphasis></para>
+          </listitem>
+        </itemizedlist></para>
+
       <para>From the web page, use your credentials to log on.</para>
 
       <para>
         <itemizedlist>
           <listitem>
-            <para>User name<itemizedlist>
-                <listitem>
-                  <para>VirtualBox Image: <literal>scidb</literal></para>
-                </listitem>
-
-                <listitem>
-                  <para>AMI: <literal>ubuntu</literal></para>
-                </listitem>
-              </itemizedlist></para>
+            <para>User name <literal>scidb</literal></para>
           </listitem>
 
           <listitem>
@@ -521,7 +584,7 @@ scidblist()</programlisting>
           <listitem>
             <para>VirtualBox Image: you should have noted the SciDB web URL
             when you started the VM. For example, <emphasis
-            role="bold">http://192.168.56.101:8080</emphasis></para>
+            role="bold">https://192.168.56.101:8080</emphasis></para>
           </listitem>
 
           <listitem>

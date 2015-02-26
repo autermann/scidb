@@ -399,10 +399,10 @@ void Expression::swapArguments(size_t firstIndex)
     }
 
     // Search index of context that assign binding value to current result index to change its index to input of converter
-    size_t contextIdx1;
+    size_t contextIdx1 = 0;
     bool found1 = false;
     if (producer1 == _functions.size()) {
-        for (contextIdx1 = 0; contextIdx1 < _contextNo.size(); contextIdx1++)
+        for ( ; contextIdx1 < _contextNo.size(); contextIdx1++)
         {
             vector<size_t>& indicies = _contextNo[contextIdx1];
             for (producer1 = 0; producer1 < indicies.size(); producer1++) {
@@ -415,10 +415,10 @@ void Expression::swapArguments(size_t firstIndex)
                 break;
         }
     }
-    size_t contextIdx2;
+    size_t contextIdx2 = 0;
     bool found2 = false;
     if (producer2 == _functions.size()) {
-        for (contextIdx2 = 0; contextIdx2 < _contextNo.size(); contextIdx2++)
+        for ( ; contextIdx2 < _contextNo.size(); contextIdx2++)
         {
             vector<size_t>& indicies = _contextNo[contextIdx2];
             for (producer2 = 0; producer2 < indicies.size(); producer2++) {
@@ -659,7 +659,7 @@ void Expression::insertConverter(TypeId newType, FunctionPointer converter,
     _props[resultIndex].type = newType;
     Type const& resType(TypeLibrary::getType(newType));
     Value val(resType);
-    if (tile) { 
+    if (tile) {
         val.getTile(newType);
     }
     const Value* v = &_eargs[resultIndex];

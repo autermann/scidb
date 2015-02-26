@@ -119,7 +119,7 @@ private:
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
             desc = _schema;
-            SystemCatalog::getInstance()->addArray(desc, psRoundRobin);
+            SystemCatalog::getInstance()->addArray(desc, psHashPartitioned);
         } else { 
             if (!desc.isImmutable()) { 
                 lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
@@ -236,7 +236,9 @@ private:
 
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-            PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
+            uint32_t psRaw = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getUint32();
+            PartitioningSchema ps = (PartitioningSchema)psRaw;
+
             InstanceID instanceID = ALL_INSTANCES_MASK;
             std::string arrayName = "";
             DimensionVector offsetVector = getOffsetVector(vector<ArrayDesc>());

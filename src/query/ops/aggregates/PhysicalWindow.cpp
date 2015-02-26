@@ -67,7 +67,8 @@ public:
         for (size_t i = 0; i < dims.size(); i++)
         {
             DimensionDesc const& srcDim = dims[i];
-            if(srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
+            if(static_cast<uint64_t>(srcDim.getChunkInterval()) != srcDim.getLength() &&
+               srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
             {
                 return true;
             }
@@ -87,10 +88,12 @@ public:
         {
             DimensionDesc inDim = inputSchema.getDimensions()[i];
 
-            size_t overlap = inDim.getChunkOverlap() >=
-                std::max(_window[i]._boundaries.first, _window[i]._boundaries.second)
-                ? inDim.getChunkOverlap()
-                : std::max(_window[i]._boundaries.first, _window[i]._boundaries.second);
+            int64_t overlap = inDim.getChunkOverlap();
+            int64_t const neededOverlap = std::max(_window[i]._boundaries.first, _window[i]._boundaries.second);
+            if ( neededOverlap > inDim.getChunkOverlap())
+            {
+                overlap = neededOverlap;
+            }
 
             dims.push_back( DimensionDesc(inDim.getBaseName(),
                                           inDim.getNamesAndAliases(),
@@ -117,7 +120,8 @@ public:
         for (size_t i = 0, n = dims.size(); i < n; i++)
         {
             DimensionDesc const& srcDim = dims[i];
-            if (srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
+            if (static_cast<uint64_t>(srcDim.getChunkInterval()) != srcDim.getLength() &&
+                srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_WINDOW_ERROR2);
         }
     }

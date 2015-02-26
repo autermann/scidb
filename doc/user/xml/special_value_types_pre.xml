@@ -101,10 +101,11 @@
 
   <itemizedlist>
     <listitem>
-      <para><emphasis role="bold">NA values. </emphasis>Similar to a NaN
-      value, NA can be stored in a floating-point data type while not actually
-      representing a floating-point value. NA can be stored in a cell to
-      indicate that the value is intentionally not a number.</para>
+      <para><emphasis role="bold">WE ARE REMOVING NA values.
+      </emphasis>Similar to a NaN value, NA can be stored in a floating-point
+      data type while not actually representing a floating-point value. NA can
+      be stored in a cell to indicate that the value is intentionally not a
+      number.</para>
 
       <para>It is a convention of certain mathematical packages that process
       vectors and arrays of floating point values, where NA represents a value
@@ -226,7 +227,7 @@
           <para>Assume we have the following arrays, <emphasis
           role="bold">A_null</emphasis> and <emphasis
           role="bold">B_null</emphasis>:<programlisting language="test">--afl create array A_null&lt;val_n:double NULL&gt; [i=0:9,10,0]; --show-output=no --show-query=no
---afl store(build(A_null,'[(?4),2,(NA),(?100),5,6,(),8,(NaN),null]',true),A_null); --show-output=no --show-query=no
+--afl store(build(A_null,'[(?4),2,3,(?100),5,6,(),8,(NaN),null]',true),A_null); --show-output=no --show-query=no
 --afl store(build(A_null,i+101),B_null); --show-output=no --show-query=no
 --afl show(A_null); --show-query=no
 --afl scan(A_null) --show-query=no--output-format=dense

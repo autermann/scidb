@@ -63,6 +63,7 @@
 #include "util/PluginManager.h"
 #include "smgr/io/Storage.h"
 #include <util/InjectedError.h>
+#include <util/Utility.h>
 #include <smgr/io/ReplicationManager.h>
 #include <system/Utils.h>
 
@@ -442,17 +443,15 @@ void runWithWatchdog()
    assert(0);
 }
 
-class LoggerControl {
-  public:
-    LoggerControl() {}
-    ~LoggerControl() {
-        log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getOff());
-    }
-};
-
-int main(int argc, char* argv[])
+int main(int argc,char* argv[])
 {
-    LoggerControl logCtx;
+    struct LoggerControl : boost::noncopyable, scidb::stackonly
+    {
+       ~LoggerControl()
+        {
+            log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getOff());
+        }
+    }   loggerControl;
 
     try
     {

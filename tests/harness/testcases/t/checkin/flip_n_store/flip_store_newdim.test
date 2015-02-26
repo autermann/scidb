@@ -1,10 +1,10 @@
 --setup
 --start-query-logging
-create immutable array TS <timestamp:datetime, userID:int64, resourceID:int64>[i=1:*,5,0]
-create immutable empty array TS_1 <userID:int64, resourceID:int64>[timestamp(datetime)=*,5,0, eventID=1:1000,1000,0]
-create immutable empty array TS_2 <userID:int64 null, resourceID:int64 null>[timestamp(datetime)=*,5,0]
-create immutable empty array TS_3 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0, eventID=1:1000,1000,0]
-create immutable empty array TS_4 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0]
+create array TS <timestamp:datetime, userID:int64, resourceID:int64>[i=1:*,5,0]
+create empty array TS_1 <userID:int64, resourceID:int64>[timestamp(datetime)=*,5,0, eventID=1:1000,1000,0]
+create empty array TS_2 <userID:int64 null, resourceID:int64 null>[timestamp(datetime)=*,5,0]
+create empty array TS_3 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0, eventID=1:1000,1000,0]
+create empty array TS_4 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0]
 load(TS,'../tests/harness/testcases/data/redimension_ts.txt')
 
 --igdata "redimension_store(TS, TS_1)"

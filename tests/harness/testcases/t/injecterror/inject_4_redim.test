@@ -16,12 +16,16 @@ create array NODE_ID_REDIM <v : int64> [I=0:7,2,0]
 ##
 ## ERROR4
 ##
+# The order of injection (instance1 then instance0) is important because the rollback is async.
+# If a second inejection occurs while a worker instance is rolling back on the error from a previous injection,
+# it may trigger the injected error prematurely.
+
+# node1
+subarray(apply (NODE_ID, foo, injectError (1, 4)),0,1)
+--error "redimension_store(NODE_ID, NODE_ID_REDIM)"
 
 # coordinator
 subarray(apply (NODE_ID, foo, injectError (0, 4)),0,0)
---error "redimension_store(NODE_ID, NODE_ID_REDIM)"
-# node1
-subarray(apply (NODE_ID, foo, injectError (1, 4)),0,1)
 --error "redimension_store(NODE_ID, NODE_ID_REDIM)"
 
 count(NODE_ID_REDIM)

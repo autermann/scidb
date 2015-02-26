@@ -150,6 +150,7 @@ public:
                     {
                         //no overlap
                         outputDims.push_back(DimensionDesc( dim.getBaseName(),
+                                                            dim.getNamesAndAliases(),
                                                             dim.getStartMin(),
                                                             dim.getCurrStart(),
                                                             dim.getCurrEnd(),

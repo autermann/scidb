@@ -1,4 +1,4 @@
-aql, select * from list('types')
+aql, select * from list('types') where library='scidb' order by name
 aql, create array A_bool <a:bool> [x=0:3,2,0]
 afl, remove(A_bool)
 

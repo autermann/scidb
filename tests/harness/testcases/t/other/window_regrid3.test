@@ -14,9 +14,8 @@ load(B, '../tests/harness/testcases/data/bsparse.txt')
 create array C <num:double> [x=1:100000000,100000,0,y=1:500000,100000,0,z=1:*,100000,0]
 load(C, '../tests/harness/testcases/data/bsp1.txt')
 
-
 --test
---set-format sparse
+--set-format lcsv+
 
 --aql select sum(val/2),ApproxDC(val),avg(val) from A regrid as (partition by x 2000 , y 2000)
 --aql select sum(val/2),ApproxDC(val),avg(val) from A regrid as (partition by y 2000 , x 2000)

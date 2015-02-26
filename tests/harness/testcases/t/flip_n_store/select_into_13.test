@@ -1,12 +1,12 @@
 --setup
 --start-query-logging
-create immutable empty array A <a:int32>[x=0:2,3,0]
-create immutable empty array B <b:string>[x=0:2,3,0]
-create immutable empty array C <b:string,a:int32> [x=0:2,3,0]
-create immutable empty array D <b:string> [x=0:2,3,0]
-create immutable empty array E <a:int32> [x=0:2,3,0]
-create immutable empty array F <b:string> [a(int32)=3,3,0]
-create immutable empty array G <a:int32> [b(string)=3,3,0]
+create empty array A <a:int32>[x=0:2,3,0]
+create empty array B <b:string>[x=0:2,3,0]
+create empty array C <b:string,a:int32> [x=0:2,3,0]
+create empty array D <b:string> [x=0:2,3,0]
+create empty array E <a:int32> [x=0:2,3,0]
+create empty array F <b:string> [a(int32)=3,3,0]
+create empty array G <a:int32> [b(string)=3,3,0]
 store(C,C1)
 store(D,D1)
 store(E,E1)

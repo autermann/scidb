@@ -31,12 +31,6 @@ EOF
     exit 1
 }
 
-function die()
-{
-    echo $*
-    exit 1
-}
-
 [ "$#" -lt 3 ] && usage
 
 type=$1
@@ -70,15 +64,32 @@ if [ "$target" == "chroot" ]; then
     [ "$#" -lt 4 ] && echo Looks like you forgot chroot distro! Try: centos-6-x86_64 or ubuntu-precise-amd64 && usage
 fi
 
+scidb_src_dir=$(readlink -f $(dirname $0)/..)
+
 if [ $target != "insource" ]; then
-    build_dir="`mktemp -d /tmp/scidb_packaging.XXXXX`"
-    build_src_dir="${build_dir}"/scidb-sources
+    build_dir="`pwd`/scidb_packaging"
+    build_src_dir="${build_dir}/scidb-sources"
 else
     build_dir="`pwd`"
 fi
 
+function cleanup()
+{
+  if [ $target != "insource" ]; then
+       echo Removing ${build_dir}
+       rm -rf "${build_dir}"
+       sudo rm -rf "${build_dir}"
+  fi
+}
 
-scidb_src_dir=$(readlink -f $(dirname $0)/..)
+function die()
+{
+  cleanup
+  echo $*
+  exit 1
+}
+
+cleanup
 
 pushd ${scidb_src_dir}
 echo Extracting version
@@ -107,7 +118,7 @@ fi
 M4="m4 -DVERSION_MAJOR=${VERSION_MAJOR} -DVERSION_MINOR=${VERSION_MINOR} -DVERSION_PATCH=${VERSION_PATCH} -DBUILD=${REVISION}"
 
 if [ $target != "insource" ]; then
-    M4="${M4} -DPACKAGE_BUILD_TYPE=${build_type}"
+    M4="${M4} -DPACKAGE_BUILD_TYPE=${build_type}" || die ${M4} failed
 fi
 
 echo Preparing result dir
@@ -116,7 +127,7 @@ result_dir=`readlink -f "${result_dir}"`
 
 if [ $target != "insource" ]; then
     echo Preparing building dir ${build_dir}
-    mkdir -p "${build_dir}" "${build_src_dir}"
+    mkdir -p "${build_dir}" "${build_src_dir}" || die mkdir failed
 
     pushd ${scidb_src_dir}
     if [ -d .git ]; then
@@ -148,7 +159,7 @@ if [ "$type" == "deb" ]; then
         dirTgt="${2}"
         echo Preparing sources from ${dirSrc} to ${dirTgt}
 	    for filename in changelog control rules; do
-            $M4 ${dirSrc}/${filename}.in > ${dirTgt}/${filename}
+            $M4 ${dirSrc}/${filename}.in > ${dirTgt}/${filename} || die $M4 failed
 	    done
     }
     DSC_FILE_NAME="scidb-${VERSION_MAJOR}.${VERSION_MINOR}_${VERSION_PATCH}-$REVISION.dsc"
@@ -158,7 +169,7 @@ if [ "$type" == "deb" ]; then
 
         pushd "${build_src_dir}"
             echo Building source packages in ${build_src_dir}
-            dpkg-buildpackage -rfakeroot -S -uc -us
+            dpkg-buildpackage -rfakeroot -S -uc -us || die dpkg-buildpackage failed
         popd
 
         if [ "$target" == "local" ]; then
@@ -171,11 +182,11 @@ if [ "$type" == "deb" ]; then
             popd
             pushd "${build_dir}"
                 echo Moving result from `pwd` to ${result_dir}
-                mv *.deb *.dsc *.changes *.tar.gz "${result_dir}"
+                mv *.deb *.dsc *.changes *.tar.gz "${result_dir}" || die mv failed
             popd
         elif [ "$target" == "chroot" ]; then
             echo Building binary packages in chroot
-            python ${scidb_src_dir}/utils/chroot_build.py -b -d "${distro}" -r "${result_dir}" -s "${build_dir}"/${DSC_FILE_NAME} -j${jobs} || die chroot_build.py failed
+            python ${scidb_src_dir}/utils/chroot_build.py -b -d "${distro}" -r "${result_dir}" -t "${build_dir}" -s "${build_dir}"/${DSC_FILE_NAME} -j${jobs} || die chroot_build.py failed
         fi
     else
         echo Cleaning old packages
@@ -186,10 +197,10 @@ if [ "$type" == "deb" ]; then
         build_debian_dir=$(readlink -f ${build_dir}/debian)
         if [ "${build_debian_dir}" != "${debian_dir}" ]; then
            rm -rf ${build_debian_dir}
-           cp -r ${debian_dir} ${build_debian_dir}
+           cp -r ${debian_dir} ${build_debian_dir} || die cp failed
         fi
 
-        deb_prepare_sources ${build_debian_dir} ${build_debian_dir}
+        deb_prepare_sources ${build_debian_dir} ${build_debian_dir} 
 
         echo Building binary packages locally
         pushd ${build_dir}
@@ -199,7 +210,7 @@ if [ "$type" == "deb" ]; then
         # Apparently, dpkg-buildpackage has to generate .deb files in ../ (go figure ...)
         pushd ${build_dir}/..
            echo Moving result from ${build_dir}/.. to ${result_dir}
-           mv *.deb *.changes "${result_dir}"
+           mv *.deb *.changes "${result_dir}" || die mv failed
         popd
     fi
 elif [ "$type" == "rpm" ]; then
@@ -214,17 +225,17 @@ elif [ "$type" == "rpm" ]; then
        dirTgt="${2}"
        echo Preparing sources from ${dirSrc} to ${dirTgt}
 
-       $M4 ${dirSrc}/scidb.spec.in > "${dirTgt}"/scidb.spec
+       $M4 ${dirSrc}/scidb.spec.in > "${dirTgt}"/scidb.spec || die $M4 failed
     }
 
     if [ $target != "insource" ]; then
         echo Preparing rpmbuild dirs
-        mkdir -p "${build_dir}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+        mkdir -p "${build_dir}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} || die mkdir failed
 
 	rpm_prepare_sources ${scidb_src_dir} "${build_dir}/SPECS"
 
         pushd "${build_src_dir}"
-            tar czf ${build_dir}/SOURCES/scidb.tar.gz *
+            tar czf ${build_dir}/SOURCES/scidb.tar.gz * || die tar failed
         popd
 
         echo Building SRPM
@@ -240,10 +251,10 @@ elif [ "$type" == "rpm" ]; then
                 rpmbuild -D"_topdir ${build_dir}" --rebuild ${SCIDB_SRC_RPM} || die rpmbuild failed
             popd
             echo Moving result from "${build_dir}"/SRPMS and "${build_dir}"/RPMS and to ${result_dir}
-            mv "${build_dir}"/SRPMS/*.rpm "${build_dir}"/RPMS/*/*.rpm "${result_dir}"
+            mv "${build_dir}"/SRPMS/*.rpm "${build_dir}"/RPMS/*/*.rpm "${result_dir}" || die mv failed
         elif [ "$target" == "chroot" ]; then
             echo Building RPM in chroot
-            python ${scidb_src_dir}/utils/chroot_build.py -b -d "${distro}" -r "${result_dir}" -s ${build_dir}/SRPMS/${SCIDB_SRC_RPM} || die chroot_build.py failed
+            python ${scidb_src_dir}/utils/chroot_build.py -b -d "${distro}" -r "${result_dir}" -t "${build_dir}" -s "${build_dir}"/SRPMS/${SCIDB_SRC_RPM} || die chroot_build.py failed
         fi
     else
         echo Cleaning old files from ${build_dir}
@@ -255,7 +266,7 @@ elif [ "$type" == "rpm" ]; then
         rpmbuild --with insource -D"_topdir ${build_dir}/rpmbuild" -D"_builddir ${build_dir}" -bb ${build_dir}/scidb.spec || die rpmbuild failed
 
         echo Moving result from ${build_dir} to ${result_dir}
-        mv ${build_dir}/rpmbuild/RPMS/*/*.rpm "${result_dir}"
+        mv ${build_dir}/rpmbuild/RPMS/*/*.rpm "${result_dir}" || die mv failed
 
         echo Cleaning files from ${build_dir}
         rm -rf ${build_dir}/rpmbuild
@@ -263,9 +274,6 @@ elif [ "$type" == "rpm" ]; then
     fi
 fi
 
-if [ $target != "insource" ]; then
-    echo Removing ${build_dir}
-    sudo rm -rf "${build_dir}"
-fi
+cleanup
 
 echo Done. Take result packages in ${result_dir}

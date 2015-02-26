@@ -343,7 +343,7 @@ min_1:int32 NULL DEFAULT null &gt;
 y=0:1,4,0]</screen></para></para></para>
 
     <para>In AFL, you can use the <code>regrid</code> operator to get the same
-    result: <para><screen>[
+    result: <para><programlisting>AFL% regrid(m4x4, 2, 2, max(attr1), min(attr1));  </programlisting><screen>[
 [(5,0),(7,2)],
 [(13,8),(15,10)]
 ]</screen></para></para>

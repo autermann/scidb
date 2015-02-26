@@ -73,7 +73,7 @@ static shared_ptr<LogicalQueryPlanNode> passCreateArray(AstNode *ast, const shar
  */
 static Value passConstantExpression(AstNode *ast, TypeId targetType, const shared_ptr<Query> &query);
 
-static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName, bool addEmpty, bool immutable,
+static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName, bool addEmpty,
                        const shared_ptr<Query> &query, std::string const& comment = std::string());
 
 static shared_ptr<LogicalQueryPlanNode> passAFLOperator(AstNode *ast, const shared_ptr<Query> &query);
@@ -408,14 +408,12 @@ shared_ptr<LogicalExpression> AstToLogicalExpression(AstNode *ast)
 
 static shared_ptr<LogicalQueryPlanNode> passCreateArray(AstNode *ast, const shared_ptr<Query> &query)
 {
-    const bool immutable = ast->getChild(createArrayArgImmutable)->asNodeBool()->getVal();
-
     const bool emptyArray = ast->getChild(createArrayArgEmpty)->asNodeBool()->getVal();
 
     const string &arrayName = ast->getChild(createArrayArgArrayName)->asNodeString()->getVal();
 
     ArrayDesc schema;
-    passSchema(ast->getChild(createArrayArgSchema), schema, arrayName, emptyArray, immutable, query, ast->getComment());
+    passSchema(ast->getChild(createArrayArgSchema), schema, arrayName, emptyArray, query, ast->getComment());
 
     if (schema.getName() == "")
     {
@@ -653,17 +651,14 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
                                            dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext());
 
             const int64_t maxCoordinate = boundary >= MAX_COORDINATE ? MAX_COORDINATE : boundary - 1;
-            int flags = dimNode->getChild(nIdimensionArgDistinct) == NULL || dimNode->getChild(nIdimensionArgDistinct)->asNodeBool()->getVal() 
-                ? DimensionDesc::DISTINCT :  DimensionDesc::ALL;
-            dimensions.push_back(DimensionDesc(dim_name, 0, maxCoordinate, dim_i, dim_o, dimType.typeId(), 
-                                               flags,
-                                               "", dimNode->getComment()));
+
+            dimensions.push_back(DimensionDesc(dim_name, 0, maxCoordinate, dim_i, dim_o, dimType.typeId(), 0, "", dimNode->getComment()));
         }
     }
 
 }
 
-static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName, bool addEmpty, bool immutable,
+static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName, bool addEmpty,
                        const shared_ptr<Query> &query, std::string const& comment)
 {
     const vector<Compressor*>& compressors = CompressorFactory::getInstance().getCompressors();
@@ -786,10 +781,6 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
     passDimensionsList(ast->getChild(schemaArgDimensionsList), dimensions, arrayName, usedNames, query);
 
     int flags = 0;
-    if (immutable)
-    {
-        flags |= ArrayDesc::IMMUTABLE;
-    }
 
     schema = ArrayDesc(0,0,0, arrayName, attributes, dimensions, flags, comment);
 }
@@ -1013,59 +1004,50 @@ static shared_ptr<OperatorParamArrayReference> createArrayReferenceParam(const A
                                    arrayReferenceAST->getChild(referenceArgObjectName)->getParsingContext()) << arrayName;
     }
 
-    if (!schema.isImmutable())
+    version = LAST_VERSION;
+
+    if (arrayReferenceAST->getChild(referenceArgTimestamp))
     {
-        version = LAST_VERSION;
-
-        if (arrayReferenceAST->getChild(referenceArgTimestamp))
+        if (arrayReferenceAST->getChild(referenceArgTimestamp)->getType() == asterisk)
         {
-            if (arrayReferenceAST->getChild(referenceArgTimestamp)->getType() == asterisk)
-            {
-                if (arrayReferenceAST->getChild(referenceArgIndex))
-                    throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_LE_CANT_ACCESS_INDEX_FOR_ALLVERSIONS,
-                        arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext());
+            if (arrayReferenceAST->getChild(referenceArgIndex))
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_LE_CANT_ACCESS_INDEX_FOR_ALLVERSIONS,
+                                           arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext());
 
-                return make_shared<OperatorParamArrayReference>(arrayReferenceAST->getParsingContext(), "",
-                    arrayName, inputSchema, ALL_VERSIONS, "");
+            return make_shared<OperatorParamArrayReference>(arrayReferenceAST->getParsingContext(), "",
+                                                            arrayName, inputSchema, ALL_VERSIONS, "");
+        }
+        else
+        {
+            boost::shared_ptr<LogicalExpression> lExpr =
+                AstToLogicalExpression(arrayReferenceAST->getChild(referenceArgTimestamp));
+            Expression pExpr;
+            pExpr.compile(lExpr, query, false);
+            const Value &value = pExpr.evaluate();
+
+            if (pExpr.getType() == TID_INT64)
+            {
+                version = value.getUint64();
+                if (version > systemCatalog->getLastVersion(schema.getId()))
+                {
+                    version = 0;
+                }
+            }
+            else if (pExpr.getType() == TID_DATETIME)
+            {
+                version = systemCatalog->lookupVersionByTimestamp(schema.getId(), value.getDateTime());
             }
             else
             {
-                boost::shared_ptr<LogicalExpression> lExpr =
-                    AstToLogicalExpression(arrayReferenceAST->getChild(referenceArgTimestamp));
-                Expression pExpr;
-                pExpr.compile(lExpr, query, false);
-                const Value &value = pExpr.evaluate();
-
-                if (pExpr.getType() == TID_INT64)
-                {
-                    version = value.getUint64();
-                    if (version > systemCatalog->getLastVersion(schema.getId()))
-                    {
-                        version = 0;
-                    }
-                }
-                else if (pExpr.getType() == TID_DATETIME)
-                {
-                    version = systemCatalog->lookupVersionByTimestamp(schema.getId(), value.getDateTime());
-                }
-                else
-                {
-                    assert(0);
-                }
+                assert(0);
             }
         }
+    }
 
-        if (!version)
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,
-                arrayReferenceAST->getChild(referenceArgTimestamp)->getParsingContext()) << arrayName;
-        systemCatalog->getArrayDesc(arrayName, version, schema);
-    }
-    else
-    {
-        if (arrayReferenceAST->getChild(referenceArgTimestamp))
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST2,
-                arrayReferenceAST->getChild(referenceArgTimestamp)->getParsingContext()) << arrayName;
-    }
+    if (!version)
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,
+                                   arrayReferenceAST->getChild(referenceArgTimestamp)->getParsingContext()) << arrayName;
+    systemCatalog->getArrayDesc(arrayName, version, schema);
 
     if (arrayReferenceAST->getChild(referenceArgIndex))
     {
@@ -1396,7 +1378,7 @@ static bool matchOperatorParam(AstNode *ast, const OperatorParamPlaceholders &pl
 
                     const bool empty = ast->getChild(anonymousSchemaClauseEmpty)->asNodeBool()->getVal();
 
-                    passSchema(ast->getChild(anonymousSchemaClauseSchema), schema, "", empty, false, query);
+                    passSchema(ast->getChild(anonymousSchemaClauseSchema), schema, "", empty, query);
 
                     param = make_shared<OperatorParamSchema>(ast->getParsingContext(), schema);
 
@@ -1928,7 +1910,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectStatement(AstNode *ast, shared
         }
         else
         {
-            if (aggInputSchema.getAttributes(true).size() == 1) 
+            if (aggInputSchema.getAttributes(true).size() == 1)
             {
                 size_t attNo = aggInputSchema.getEmptyBitmapAttribute() && aggInputSchema.getEmptyBitmapAttribute()->getId() == 0 ? 1 : 0;
 
@@ -2660,7 +2642,7 @@ static shared_ptr<LogicalQueryPlanNode> passLoadStatement(AstNode *ast, shared_p
     } else {
         LogicalOperator::Parameters sgParams(3);
         Value ival(TypeLibrary::getType(TID_INT32));
-        ival.setInt32(psRoundRobin);
+        ival.setInt32(psHashPartitioned);
         sgParams[0] = make_shared<OperatorParamLogicalExpression>(ast->getParsingContext(),
                 make_shared<Constant>(ast->getParsingContext(), ival, TID_INT32),
                 TypeLibrary::getType(TID_INT32), true);
@@ -3851,7 +3833,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                         {
                             const string &aggName = aggCallNode->getChild(functionArgName)->asNodeString()->getVal();
                             const string &aggAlias = aggCallNode->getChild(functionArgAliasName)->asNodeString()->getVal();
-                            
+
                             Type aggParamType;
                             if (asterisk == aggCallNode->getChild(functionArgParameters)->getChild(0)->getType())
                             {
@@ -3878,7 +3860,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                             {
                                 assert(0);
                             }
-                            
+
                             const TypeId &tid = AggregateLibrary::getInstance()->createAggregate(
                                     aggName, aggParamType)->getResultType().typeId();
                             LOG4CXX_TRACE(logger, "It has type " << tid);
@@ -3892,11 +3874,11 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                         redimensionAttrs.push_back(AttributeDesc(
                                 redimensionAttrs.size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
                                 TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
-                        
+
                         //Now prepare dimensions
                         Dimensions redimensionDims;
                         passDimensionsList(grwAsClause->getChild(0), redimensionDims, "", usedNames, query);
-                        
+
                         //Ok. Adding schema parameter
                         ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims, 0);
                         LOG4CXX_TRACE(logger, "Schema for redimension " <<  redimensionSchema);

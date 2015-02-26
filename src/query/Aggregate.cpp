@@ -46,7 +46,8 @@ void AggregateLibrary::addAggregate(AggregatePtr const& aggregate)
     std::vector<FunctionPointer> converters;
     bool supportsVectorMode;
     bool foundScalar = false;
-    foundScalar != FunctionLibrary::getInstance()->findFunction(
+
+    foundScalar |= FunctionLibrary::getInstance()->findFunction(
             aggregate->getName(),
             inputTypes,
             functDescription,

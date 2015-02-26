@@ -78,7 +78,9 @@
 
       <procedure>
         <step>
-          <para>Find the minimum value, and alias it so that we can use it in
+                <para>Find the minimum value, and <indexterm>
+                        <primary>aliases</primary>
+                        </indexterm>alias it so that we can use it in
           a cross join:<programlisting language="test">--afl aggregate(m3x3,min(val) as m) --show-output-in-test-file=no</programlisting></para>
         </step>
 

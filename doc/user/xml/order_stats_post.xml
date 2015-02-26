@@ -48,47 +48,54 @@
     <para>The result array contains only non-empty cells from the source
     array. Consider the array <code>m4x4_empty</code>, which is a
     2-dimensional array with some empty cells. Each element contains two
-    attributes. To sort the array elements by <code>val</code>, use the
-    following query:</para>
+    attributes. Here are the contents of the array:<para><screen>[
+[(13,'sand'),(),(),()],
+[(8,'peanut'),(),(6,'pastry'),(7,'doc')],
+[(4,'four'),(),(7,'carl'),()],
+[(),(0,'livia'),(14,'Apostrophe'),()]
+]</screen></para></para>
 
-    <para><programlisting>AFL% create array m4x4_empty&lt;val:double, label:string NULL&gt;[i=0:3,4,0, j=0:3,4,0];  </programlisting><programlisting>AQL% 
-<command>SELECT</command> * 
-<command>FROM</command> sort(m4x4_empty, val); 
-</programlisting><screen>{n} val,label
-{0} 0,null
-{1} 4,null
-{2} 6,null
-{3} 7,null
-{4} 8,null
-{5} 13,null
-{6} 14,null
+    <para> To sort the array elements by <code>val</code>, use the following
+    query:</para>
+
+    <para><programlisting>AQL% <command>SELECT</command> * 
+      <command>FROM</command> sort(m4x4_empty, val);  </programlisting><screen>{n} val,label
+{0} 0,'livia'
+{1} 4,'four'
+{2} 6,'pastry'
+{3} 7,'doc'
+{4} 7,'carl'
+{5} 8,'peanut'
+{6} 13,'sand'
+{7} 14,'Apostrophe'
 </screen><para>To sort the array by val, and then by label, use the following
     query.</para>
 
     <para><programlisting>AQL% 
 <command>SELECT</command> * 
-<command>FROM</command> sort(m4x4_empty, label); 
-</programlisting><screen>{n} val,label
-{0} 0,null
-{1} 4,null
-{2} 6,null
-{3} 7,null
-{4} 8,null
-{5} 13,null
-{6} 14,null
+<command>FROM</command> sort(m4x4_empty, val, label);  </programlisting><screen>{n} val,label
+{0} 0,'livia'
+{1} 4,'four'
+{2} 6,'pastry'
+{3} 7,'carl'
+{4} 7,'doc'
+{5} 8,'peanut'
+{6} 13,'sand'
+{7} 14,'Apostrophe'
 </screen><para>To use a descending sort, use the following command:</para>
 
     <para><programlisting>AQL% 
 <command>SELECT</command> * 
 <command>FROM</command> sort(m4x4_empty, val desc); 
 </programlisting><screen>{n} val,label
-{0} 14,null
-{1} 13,null
-{2} 8,null
-{3} 7,null
-{4} 6,null
-{5} 4,null
-{6} 0,null
+{0} 14,'Apostrophe'
+{1} 13,'sand'
+{2} 8,'peanut'
+{3} 7,'doc'
+{4} 7,'carl'
+{5} 6,'pastry'
+{6} 4,'four'
+{7} 0,'livia'
 </screen></para></para></para></section>
 
   <section remap="h3">

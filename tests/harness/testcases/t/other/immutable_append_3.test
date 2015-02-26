@@ -1,6 +1,6 @@
 --setup
 
-create immutable array bounded <a:int64>[x=0:168,5,0]
+create array bounded <a:int64>[x=0:168,5,0]
 load(bounded,'../tests/harness/testcases/data/unbounded.txt')
 
 --test

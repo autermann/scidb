@@ -360,7 +360,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
     {
         //All arrays are currently stored as round-robin. Let's store shadow arrays round-robin as well
         //TODO: revisit this when we allow users to store arrays with specified distributions
-        PartitioningSchema ps = psRoundRobin;
+        PartitioningSchema ps = psHashPartitioned;
         ArrayDesc shadowArrayDesc = shadowArray->getArrayDesc();
         ArrayID arrayID = INVALID_ARRAY_ID;   /**< ID of new array */
         ArrayID updateableArrayID = INVALID_ARRAY_ID;   /**< ID of new array */
@@ -387,7 +387,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                 bool updatedArrayLock = SystemCatalog::getInstance()->updateArrayLock(lock);
                 SCIDB_ASSERT(updatedArrayLock);
                 desc = shadowArrayDesc;
-                SystemCatalog::getInstance()->addArray(desc, psRoundRobin);
+                SystemCatalog::getInstance()->addArray(desc, psHashPartitioned);
             } else { 
                 if (desc.isImmutable()
                     || desc.getAttributes().size() != shadowArrayDesc.getAttributes().size()
@@ -732,7 +732,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         while (true) {
             chunkPos[i] += dims[i].getChunkInterval();
             if (chunkPos[i] <= dims[i].getEndMax()) {
-                if (!parallelLoad || desc.getChunkNumber(chunkPos) % nInstances == myInstanceID) { 
+                if (!parallelLoad || desc.getHashedChunkNumber(chunkPos) % nInstances == myInstanceID) {
                     break;
                 }
             } else {

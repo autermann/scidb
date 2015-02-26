@@ -34,7 +34,7 @@
 
 %union {
     int64_t int64Val;
-    double realVal;    
+    double realVal;
     char* stringVal;
     char* keyword;
     class AstNode* node;
@@ -52,8 +52,8 @@
 %right '^'
 %left UNARY_MINUS
 
-%type <node>    start statement create_array_statement immutable_modifier identifier_clause array_attribute
-    distinct typename array_attribute_list array_dimension array_dimension_list
+%type <node>    start statement create_array_statement identifier_clause array_attribute
+    typename array_attribute_list array_dimension array_dimension_list
     dimension_boundary_end dimension_boundaries
     function function_argument_list function_argument nullable_modifier empty_modifier
     default default_value compression reserve null_value expr reduced_expr common_expr atom constant
@@ -67,8 +67,8 @@
 
 %destructor { delete $$; $$ = NULL; } <node>
 
-%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END AGG
-    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC ALL DISTINCT BETWEEN
+%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IF THEN ELSE CASE WHEN END AGG
+    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC BETWEEN
 
 %token    EOQ         0 "end of query"
 %token    EOL            "end of line"
@@ -103,26 +103,14 @@ statement:
     ;
 
 create_array_statement:
-    CREATE immutable_modifier empty_modifier ARRAY identifier_clause schema 
+    CREATE empty_modifier ARRAY identifier_clause schema
     {
         $$ = new AstNode(createArray, CONTEXT(@$),
             createArrayArgCount,
             $2,
-            $3,
-            $5,
-            $6);
-        $$->setComment($5->getComment());
-    }
-    ;
-
-immutable_modifier:
-    IMMUTABLE
-    {
-        $$ = new AstNodeBool(immutable, CONTEXT(@1), true);
-    }
-    | dummy
-    {
-        $$ = new AstNodeBool(immutable, CONTEXT(@1), false);
+            $4,
+            $5);
+        $$->setComment($4->getComment());
     }
     ;
 
@@ -153,7 +141,7 @@ identifier_clause:
         $$ = new AstNodeString(identifierClause, CONTEXT(@1), $1);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-    }    
+    }
     ;
 
 array_attribute_list:
@@ -172,7 +160,7 @@ array_attribute:
     identifier_clause ':' typename nullable_modifier default compression reserve
     {
         $$ = new AstNode(attribute, CONTEXT(@$),
-            attributeArgCount, 
+            attributeArgCount,
             $1,
             $3,
             $4,
@@ -284,7 +272,7 @@ array_dimension:
     identifier_clause '=' dimension_boundaries ',' expr ',' expr
     {
         $$ = new AstNode(dimension, CONTEXT(@$),
-            dimensionArgCount, 
+            dimensionArgCount,
             $1,
             $3,
             $5,
@@ -295,7 +283,7 @@ array_dimension:
     | identifier_clause
     {
         $$ = new AstNode(dimension, CONTEXT(@$),
-            dimensionArgCount, 
+            dimensionArgCount,
             $1,
             new AstNode(dimensionBoundaries, CONTEXT(@$),
                 dimensionBoundaryArgCount,
@@ -306,28 +294,28 @@ array_dimension:
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
-    }    
-    | identifier_clause '(' distinct typename ')' '=' dimension_boundary_end ',' expr ',' expr
+    }
+    | identifier_clause '(' typename ')' '=' dimension_boundary_end ',' expr ',' expr
     {
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
+            NULL,
             $3,
-            $4,
-            $7,
-            $9,
-            $11);
+            $6,
+            $8,
+            $10);
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
-    | identifier_clause '(' distinct typename ')'
+    | identifier_clause '(' typename ')'
     {
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
+            NULL,
             $3,
-            $4,
             new AstNode(asterisk, CONTEXT(@$), 0),
             NULL,
             new AstNodeInt64(int64Node, CONTEXT(@$), 0));
@@ -343,7 +331,7 @@ dimension_boundaries:
         $$ = new AstNode(dimensionBoundaries, CONTEXT(@$),
             dimensionBoundaryArgCount,
             $1,
-            $3);        
+            $3);
     }
     ;
 
@@ -352,28 +340,12 @@ dimension_boundary_end:
     | asterisk
     ;
 
-distinct:
-    ALL 
-    {
-        $$ = new AstNodeBool(distinct, CONTEXT(@1), false);
-    }
-    | 
-    DISTINCT 
-    {
-        $$ = new AstNodeBool(distinct, CONTEXT(@1), true);
-    }
-    | 
-    {
-        $$ = NULL;
-    }    
-    ;
-
 //FIXME: need more flexible way
 typename: identifier_clause;
-    
+
 /**
- * This rule for recognizing scalar function as well as array operators. What is it will be 
- * decided on pass stage (Pass.cpp) when getting scalar UDF and operators metadata. 
+ * This rule for recognizing scalar function as well as array operators. What is it will be
+ * decided on pass stage (Pass.cpp) when getting scalar UDF and operators metadata.
  */
 function:
     identifier_clause '(' ')' function_alias
@@ -399,7 +371,7 @@ function:
         $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             new AstNodeString(functionName, CONTEXT(@1), "scan"),
-            new AstNode(functionArguments, CONTEXT(@1), 1,            
+            new AstNode(functionArguments, CONTEXT(@1), 1,
                 new AstNode(reference, CONTEXT(@1), referenceArgCount,
                     NULL,
                     $1,
@@ -435,7 +407,7 @@ function:
             new AstNodeBool(boolNode, CONTEXT(@1), false));
     }
     ;
-    
+
 function_alias:
     AS identifier_clause
     {
@@ -451,7 +423,7 @@ function_argument_list:
     function_argument_list ',' function_argument
     {
         $1->addChild($3);
-        $$ = $1;    
+        $$ = $1;
     }
     | function_argument
     {
@@ -462,7 +434,7 @@ function_argument_list:
 function_argument:
     expr
     /*
-    Serialized schema from coordinator's physical plan for sending it to nodes  
+    Serialized schema from coordinator's physical plan for sending it to nodes
     and construct physical operators there. See passAPFunction function in Pass.cpp
     */
     | '[' schema ']'
@@ -474,7 +446,7 @@ function_argument:
         $$ = new AstNode(anonymousSchema, CONTEXT(@$), anonymousSchemaArgCount, $1, $2);
     }
     ;
-    
+
 expr:
     common_expr
     | beetween_expr
@@ -625,7 +597,7 @@ reduced_expr:
     }
     ;
 
-// Common part for expr and reduced_expr. 
+// Common part for expr and reduced_expr.
 common_expr:
     atom
     ;
@@ -639,7 +611,7 @@ atom:
     {
         $$ = $2;
     }
-    ;    
+    ;
 
 constant:
     constant_int64
@@ -656,7 +628,7 @@ constant_string:
         $$ = new AstNodeString(stringNode, CONTEXT(@1), $1);
     }
     ;
-    
+
 constant_int64:
     INTEGER
     {
@@ -670,7 +642,7 @@ constant_real:
         $$ = new AstNodeReal(realNode, CONTEXT(@1), $1);
     }
     ;
-    
+
 constant_NA:
     NA
     {
@@ -679,7 +651,7 @@ constant_NA:
     ;
 
 //General rule for implicit scans, arrays, attributes and dimensions. We don't know exactly what it is
-//and don't know what operator required in this position, so decision will be made on pass stage. 
+//and don't know what operator required in this position, so decision will be made on pass stage.
 reference:
     identifier_clause timestamp_clause index_clause sort_quirk
     {
@@ -781,9 +753,9 @@ case_expr:
                     delete $3;
                     delete $4;
                     YYABORT;
-                }                
+                }
             }
-            
+
             if(lastIif)
             {
                 //Filling third parameter of IIF
@@ -795,7 +767,7 @@ case_expr:
 
         //Filling third parameter of IIF for ELSE clause
         lastIif->getChild(functionArgParameters)->setChild(2,
-            $4 ? $4 : new AstNodeNull(null, CONTEXT(@4)));            
+            $4 ? $4 : new AstNodeNull(null, CONTEXT(@4)));
 
         delete $3;
         $$ = iifNode;
@@ -817,7 +789,7 @@ case_when_clause_list:
     | case_when_clause_list case_when_clause
     {
         $1->addChild($2);
-        $$ = $1;    
+        $$ = $1;
     }
     ;
 
@@ -860,7 +832,7 @@ beetween_expr:
     }
     ;
 
-// Dummy rule for getting approximately position of optional token (e.g. NOT NULL, 
+// Dummy rule for getting approximately position of optional token (e.g. NOT NULL,
 // UPDATABLE, NOT EMPTY)
 dummy:
     {
@@ -888,10 +860,9 @@ asterisk:
         $$ = new AstNode(asterisk, CONTEXT(@1), 0);
     }
     ;
- 
+
 non_reserved_keywords:
-    ALL
-    | ARRAY
+      ARRAY
     | AS
     | ASC
     | BETWEEN
@@ -899,9 +870,7 @@ non_reserved_keywords:
     | CREATE
     | DESC
     | DEFAULT
-    | DISTINCT
     | END
-    | IMMUTABLE
     | IS
     | RESERVE
     ;

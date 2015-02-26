@@ -322,7 +322,7 @@ REGRID AS (PARTITION BY x 2, y 2); --show-output=no --show-query=no
 
     <para>In AFL, you can use the <code>regrid</code> operator to get the same
     result: <programlisting language="test">
---afl regrid(m4x4, 2, 2, max(attr1), min(attr1)); --show-output=yes --show-query=no  --output-format=auto --chunkify=yes
+--afl regrid(m4x4, 2, 2, max(attr1), min(attr1)); --show-output=yes --output-format=auto --chunkify=yes
 </programlisting></para>
   </section>
 

@@ -66,7 +66,7 @@
  * @par A word about SciDB data distribution:
  * <br>
  * <br>
- * The default distribution scheme that SciDB uses is called "psRoundRobin". In reality, it is a hash of the chunk
+ * The default distribution scheme that SciDB uses is called "psHashPartitioned". In reality, it is a hash of the chunk
  * coordinates, modulo the number of instances. In the one-dimensional case, if data starts at 1 with a chunk size
  * of 10 on 3 instances, then chunk 1 goes to instance 0,  chunk 11 to instance 1, chunk 21 to instance 2, chunk 31 to
  * instance 0, and on...
@@ -665,7 +665,7 @@ public:
     virtual ArrayDistribution getOutputDistribution(vector<ArrayDistribution> const& inputDistributions,
                                                     vector<ArrayDesc> const& inputSchemas) const
     {
-       /* Usually the answer is eiter "psRoundRobin" or "psUndefined". Other distributions are a more advanced topic.
+       /* Usually the answer is either "psHashPartitioned" or "psUndefined". Other distributions are a more advanced topic.
         * psUndefined is a catch-all.
         */
        return ArrayDistribution(psUndefined);

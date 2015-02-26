@@ -96,7 +96,7 @@ class PhysicalStore: public PhysicalOperator
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
             parentArrayDesc = _schema;
-            SystemCatalog::getInstance()->addArray(parentArrayDesc, psRoundRobin);
+            SystemCatalog::getInstance()->addArray(parentArrayDesc, psHashPartitioned);
         } else { 
             if (_schema.getId() != parentArrayDesc.getId()) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
@@ -164,7 +164,7 @@ class PhysicalStore: public PhysicalOperator
         assert(rc);
 
         _schema = ArrayDesc(ArrayDesc::makeVersionedName(arrayName, _lastVersion+1), parentArrayDesc.getAttributes(), newVersionDims);
-        SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
+        SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
         _arrayID = _schema.getId();
         _lock->setArrayVersionId(_arrayID);
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
@@ -189,7 +189,7 @@ class PhysicalStore: public PhysicalOperator
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
         vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psRoundRobin));
+        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 

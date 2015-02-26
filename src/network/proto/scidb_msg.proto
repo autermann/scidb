@@ -65,23 +65,19 @@ message Fetch
  */
 message Chunk
 {
-	optional int32 compression_method = 1;
-	repeated int64 coordinates = 2;
-	optional uint64 array_id = 3;
-	optional uint32 attribute_id = 4;
-	required bool eof = 5;
-        optional bool sparse = 6;
-        optional bool rle = 7;
-	optional uint64 decompressed_size = 8;
-	optional bool has_next = 9;
-	repeated int64 next_coordinates = 10;
-	optional uint32 obj_type = 11; // 0 - for remote array; 1 - for merged array. Should be copy from Fetch message field.
+    optional int32 compression_method = 1;
+    repeated int64 coordinates = 2;
+    optional uint64 array_id = 3;
+    optional uint32 attribute_id = 4;
+    required bool eof = 5;
+    optional bool sparse = 6;
+    optional bool rle = 7;
+    optional uint64 decompressed_size = 8;
+    optional bool has_next = 9;
+    repeated int64 next_coordinates = 10;
+    optional uint32 obj_type = 11; // 0 - for remote array; 1 - for merged array. Should be copy from Fetch message field.
     optional uint32 count  = 12;
     optional bool tombstone = 13 [default = false]; 
-
-    //used when cloning chunk from array A to array B: ID of array A and attID
-    optional uint64 source_array_id = 14;
-    optional uint64 source_attribute_id = 15;
 
     message Warning
     {

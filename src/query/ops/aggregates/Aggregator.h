@@ -320,7 +320,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
             std::vector<ArrayDistribution> const&,
             std::vector< ArrayDesc> const&) const
     {
-        return ArrayDistribution(psRoundRobin);
+        return ArrayDistribution(psHashPartitioned);
     }
 
     virtual void initializeOperator(ArrayDesc const& inputSchema)

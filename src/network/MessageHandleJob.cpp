@@ -655,18 +655,16 @@ void MessageHandleJob::handleReplicaChunk()
     { // tombstone record
         StorageManager::getInstance().removeLocalChunkVersion(dbArr->getArrayDesc(), coordinates, _query);
     }
-    else if (decompressedSize == 0)
-    { // clone of replica
-        //XXX TODO: cloneChunk() only makes sense for immutable arrays which are on the way out...
-        shared_ptr<ArrayDesc> sourceDesc = SystemCatalog::getInstance()->getArrayDesc(chunkRecord->source_array_id());
-        StorageManager::getInstance().cloneLocalChunk(coordinates,
-                                                      dbArr->getArrayDesc(),
-                                                      attributeID,
-                                                      *sourceDesc,
-                                                      chunkRecord->source_attribute_id(),
-                                                      _query);
-    }
-    else 
+    else if (decompressedSize <= 0)
+    { // what used to be clone of replica
+        assert(false);
+        stringstream ss;
+        ss << "Invalid chunk decompressedSize=" << decompressedSize
+           << " from InstanceID="<<_messageDesc->getSourceInstanceID()
+           << " for QueryID="<<_query->getQueryID();
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << ss.str());
+    } 
+    else
     { // regular chunk
         boost::shared_ptr<ArrayIterator> outputIter = dbArr->getIterator(attributeID);
         boost::shared_ptr<CompressedBuffer> compressedBuffer =

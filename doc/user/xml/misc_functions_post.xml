@@ -176,12 +176,14 @@
           </row>
 
           <row>
-            <entry>regex<indexterm>
-                <primary>regex</primary>
-              </indexterm></entry>
+            <entry>regex</entry>
 
             <entry><indexterm>
                 <primary>wildcards</primary>
+              </indexterm><indexterm>
+                <primary>regex</primary>
+              </indexterm><indexterm>
+                <primary>regular expressions</primary>
               </indexterm>Regular expression matching function. Uses the
             standard regular expression language from the <emphasis role="bold">boost</emphasis> library. Returns a boolean.</entry>
 

@@ -10,7 +10,7 @@ create array ABC <a: int32, b: string, c: double, d: int64, e: bool, f: float, g
 show(P)
 
 --test
---set-format dense
+
 --error --code scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TRUNCATION "build(A,string(1000000000*(x+1)))"
 store(build(A,string(100000000*(x+2))),A)
 --igdata "load(ABC, '../tests/harness/testcases/data/spsp.txt')"
@@ -53,8 +53,6 @@ quantile(filter(P,b>0),4,a)
 quantile(filter(P,b>0),4,b)
 quantile(filter(P,b>0),10,b)
 
-
---set-format sparse
 sort(ABC)
 sort(ABC,g desc)
 sort(ABC,g)
@@ -69,7 +67,6 @@ quantile(ABC,3,g)
 quantile(ABC,4,a)
 quantile(ABC,4,e)
 --error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(ABC,4,a,g)"
---reset-format
 
 --cleanup
 remove(A)

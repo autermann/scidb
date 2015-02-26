@@ -2,9 +2,10 @@
 
 [ -f /usr/sbin/mock ] && HAS_MOCK=1 || HAS_MOCK=0
 
-if [ ! $HAS_MOCK ]; then
-    echo You dont have mock utility
-    echo Connect SciDB repository and install mock
+if [ ! $HAS_MOCK -eq 1 ]; then
+    echo You do not have the mock utility.
+    echo You probably need to run \"deploy.sh prepare_chroot\".
+    exit 1
 fi
 
 function usage()
@@ -28,6 +29,7 @@ export SCIDB_VERSION_PATCH=`awk -F . '{print $3}' $(dirname "$0")/../../version`
 build_dir="`mktemp -d /tmp/scidb_packaging.XXXXX`"
 chroot_result_dir="$1"
 source_dir=~/scidb_3rdparty_sources
+SCIDB_VER=$SCIDB_VERSION_MAJOR.$SCIDB_VERSION_MINOR
 
 pushd "$(dirname "$0")"
 script_dir="`pwd`"
@@ -53,6 +55,7 @@ cppunit-1.12.1.tar.gz
 
 echo Preparing dirs
 mkdir -p "${build_dir}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} "${source_dir}" "${chroot_result_dir}" || die
+echo build: ${build_dir}, source: ${source_dir}, chroot: ${chroot_result_dir}
 
 echo Downloading sources to "${source_dir}"
 pushd "${source_dir}"

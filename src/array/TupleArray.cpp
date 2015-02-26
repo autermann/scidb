@@ -59,7 +59,7 @@ int TupleComparator::compare(Tuple const& t1, Tuple const& t2)
 			return result;
 		}
 		if (what1!=REGULAR_VALUE) {
-			return 0;
+			continue;
 		}
 		args[0] = &t1[j];
 		args[1] = &t2[j];

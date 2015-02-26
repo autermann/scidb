@@ -205,6 +205,15 @@ void Query::init(QueryID queryID, InstanceID coordID, InstanceID localInstanceID
       _queryID = queryID;
       assert( _queryID != INVALID_QUERY_ID);
 
+   /* set up our private arena...*/
+      {
+          char s[64];
+          snprintf(s,SCIDB_SIZE(s),"query %lu",queryID);
+          assert(_arena == 0);
+          _arena = arena::newArena(s);
+          assert(_arena != 0);
+      }
+
       assert(!_coordinatorLiveness);
       _coordinatorLiveness = liveness;
       assert(_coordinatorLiveness);

@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
 
-CREATE IMMUTABLE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,10,0, y=0:1999,10,0]
+CREATE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,10,0, y=0:1999,10,0]
 CREATE EMPTY ARRAY ABRREDIM <x:int64>[a(double)=*,20,0]
 
 #load(ABRLOAD,'../tests/harness/testcases/data/xyz_small.txt')
@@ -30,7 +30,7 @@ count(ABRREDIM)
 --shell --command "cat /tmp/${PPID}_3.stdout"
 
 count(ABRLOAD)
-versions(ABRLOAD)
+project(versions(ABRLOAD),version_id)
 
 --echo "should be empty..."
 count(ABRREDIM)

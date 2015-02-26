@@ -1,6 +1,6 @@
 --setup
 
-CREATE IMMUTABLE ARRAY M4x4 <a:int32, b:int32> [x=0:3,3,0, y=0:3,3,0]
+CREATE ARRAY M4x4 <a:int32, b:int32> [x=0:3,3,0, y=0:3,3,0]
 
 load(M4x4,'../tests/harness/testcases/data/M4x4.txt')
 

@@ -309,8 +309,6 @@ namespace scidb
         Coordinates _lastPos;
         Coordinates _lastPosWithOverlaps;
         Storage* _storage;
-        PersistentChunk* _cloneOf;
-        vector<PersistentChunk*> _clones;
         pthread_t _loader;
 
         void init();
@@ -826,18 +824,6 @@ namespace scidb
         //Methods:
         boost::shared_ptr<CoordinateMap> getCoordinateMap(string const& indexName, DimensionDesc const& dim,
                                                           const boost::shared_ptr<Query>& query);
-
-        boost::shared_ptr<PersistentChunk> _cloneChunk(ArrayDesc const& dstDesc, StorageAddress const& addr,
-                                                       PersistentChunk const& srcChunk, boost::shared_ptr<Query>& query);
-        boost::shared_ptr<PersistentChunk> _cloneLocalChunk(ArrayDesc const& dstDesc,
-                                                            StorageAddress const& addr,
-                                                            PersistentChunk const& srcChunk,
-                                                            ChunkDescriptor& cloneDesc,
-                                                            boost::shared_ptr<Query>& query);
-        boost::shared_ptr<PersistentChunk> _cloneLocalChunk(ArrayDesc const& dstDesc,
-                                                            StorageAddress const& addr,
-                                                            PersistentChunk const& srcChunk,
-                                                            boost::shared_ptr<Query>& query);
         /**
          * Perform metadata/lock recovery and storage rollback as part of the intialization.
          * It may block waiting for the remote coordinator recovery to occur.
@@ -968,12 +954,6 @@ namespace scidb
         }
 
         void getDiskInfo(DiskInfo& info);
-
-        /**
-         * Delete helper: unlink all the clones that point to this chunk.
-         * @param chunk the chunk to be deleted
-         */
-        void unlinkChunkClones(PersistentChunk& chunk);
 
         /**
          * Delete all descriptors that are associated with a given array ID from the header file.

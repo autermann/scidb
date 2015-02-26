@@ -56,7 +56,7 @@ public:
     {
         if (_asArrayLiteral)
             return ArrayDistribution(psLocalInstance);
-        return ArrayDistribution(psRoundRobin);
+        return ArrayDistribution(psHashPartitioned);
     }
 
 	/***

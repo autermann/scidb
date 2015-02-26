@@ -100,6 +100,9 @@
   <xi:include href="cross_join_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="cumulate_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="deldim.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="dimensions_post.xml"

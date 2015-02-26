@@ -130,7 +130,7 @@ public:
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
 
-            SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
+            SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
             parentArrayDesc = _schema;
 
         } else if (_schema.getId() != parentArrayDesc.getId()) {
@@ -156,7 +156,7 @@ public:
         _updateableDims = _schema.getDimensions();
         string versionedName = ArrayDesc::makeVersionedName(arrayName, lastVersion+1);
         _schema = ArrayDesc(versionedName, _schema.getAttributes(), _schema.grabDimensions(lastVersion+1));
-        SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
+        SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
         _arrayID = _schema.getId();
         _lock->setArrayVersionId(_arrayID);
         rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
@@ -242,19 +242,12 @@ public:
             if (isFlipped(j) && (destDims[i].getType() != TID_INT64)) {
                 AttributeID attID = static_cast<AttributeID>(turnOff(j, FLIP));
                 string indexMapName = _schema.getMappingArrayName(i);
-                if (!destDims[i].isDistinct()) { // flipped attribute may contain duplicates
+                coordinateMultiIndices[i] = buildFunctionalMapping(destDims[i]); // first try to locate method performing functional mapping for this type
+                if (!coordinateMultiIndices[i]) { // if there are no such functions, then build mapping index
                     if (srcArray->getSupportedAccess() == Array::SINGLE_PASS)  {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << "redimension_store";
                     }
-                    coordinateMultiIndices[i] = buildSortedMultiIndex(srcArray, attID, query, indexMapName, destDims[i].getStart(), destDims[i].getLength());
-                } else {
-                    coordinateMultiIndices[i] = buildFunctionalMapping(destDims[i]); // first try to locate method performing functional mapping for this type
-                    if (!coordinateMultiIndices[i]) { // if there are no such functions, then build mapping index
-                        if (srcArray->getSupportedAccess() == Array::SINGLE_PASS)  {
-                            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << "redimension_store";
-                        }
-                        coordinateIndices[i] = buildSortedIndex(srcArray, attID, query, indexMapName, destDims[i].getStart(), destDims[i].getLength());
-                    }
+                    coordinateIndices[i] = buildSortedIndex(srcArray, attID, query, indexMapName, destDims[i].getStart(), destDims[i].getLength());
                 }
             }
         }

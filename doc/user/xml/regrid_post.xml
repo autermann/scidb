@@ -21,6 +21,11 @@
     <para>The regrid operator partitions the cells in the input array into
     blocks. For each block, regrid applies a specific aggregate operation over
     the value(s) of some attribute in each block.</para>
+
+   <para>Note that the chunk size does not have to be a multiple of the grid
+   size, and the grids may span array chunks. However, processing is most
+   efficient if chunk size is a multiple of the grid size, and grids do not
+   span array chunks.</para>
   </refsect1>
 
   <refsect1>
@@ -43,21 +48,6 @@
           One or more aggregate calls.</para>
         </listitem>
       </itemizedlist></para>
-  </refsect1>
-
-  <refsect1>
-    <title>Limitations</title>
-
-    <itemizedlist>
-      <listitem>
-        <para>The grids may not span array chunks.</para>
-      </listitem>
-
-      <listitem>
-        <para>The chunk size must be a multiple of the grid size in each
-        dimension.</para>
-      </listitem>
-    </itemizedlist>
   </refsect1>
 
   <refsect1>

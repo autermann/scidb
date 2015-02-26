@@ -308,7 +308,7 @@ namespace scidb {
                 i -= 1;
             }
             chunkInitialized = false;
-            if (array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID
+            if (array._desc.getHashedChunkNumber(currPos) % array.nInstances == array.instanceID
                 && !getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS)->end())
             {
                 return;
@@ -327,7 +327,7 @@ namespace scidb {
         currPos = pos;
         array._desc.getChunkPositionFor(currPos);
         chunkInitialized = false;
-        hasCurrent = array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID;
+        hasCurrent = array._desc.getHashedChunkNumber(currPos) % array.nInstances == array.instanceID;
         if (hasCurrent && getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS)->end()) {
             hasCurrent = false;
         }

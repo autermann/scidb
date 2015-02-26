@@ -1,10 +1,10 @@
 --setup
 --start-query-logging
 load_library('rational')
-create immutable array A <a:rational,b:rational>[x=0:2,3,0]
-create immutable array T <a:rational>[x=0:2,3,0]
-create immutable empty array B <b:rational>[a(rational)=3,3,0]
-create immutable empty array C <a:rational>[b(rational)=3,3,0]
+create array A <a:rational,b:rational>[x=0:2,3,0]
+create array T <a:rational>[x=0:2,3,0]
+create empty array B <b:rational>[a(rational)=3,3,0]
+create empty array C <a:rational>[b(rational)=3,3,0]
 project(apply(store(join(build(T,rational(x+1,x+2)),build(T,rational(x+10,x+11))),A),c,str(a)+' - '+str(b)),c)
 
 --test

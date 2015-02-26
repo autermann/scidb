@@ -1,9 +1,9 @@
 --setup
-create immutable array tm_m_i64_1000_100 < x: int64 > [ i=1:1000,100,0, j=1:1000,100,0 ]
+create array tm_m_i64_1000_100 < x: int64 > [ i=1:1000,100,0, j=1:1000,100,0 ]
 
-create immutable array m_m_i64_1000_100 < x: int64 > [ i=1:1000,100,0, j=1:1000,100,0 ]
+create array m_m_i64_1000_100 < x: int64 > [ i=1:1000,100,0, j=1:1000,100,0 ]
 
-create immutable array er_m_i64_1000_100 < x: int64 > [ i=1:1000,100,0, j=1:1000,100,0 ]
+create array er_m_i64_1000_100 < x: int64 > [ i=1:1000,100,0, j=1:1000,100,0 ]
 
 --start-igdata
 store ( build ( tm_m_i64_1000_100 , i + j ), tm_m_i64_1000_100 ) 

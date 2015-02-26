@@ -4,7 +4,7 @@ Query was executed successfully
 SCIDB QUERY : <create empty array T <a:char>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array B <b:char>[a(char)=3,3,0]>
+SCIDB QUERY : <create empty array B <b:char>[a(char)=3,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create empty array C <a:char>[b(char)=3,3,0]>

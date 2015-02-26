@@ -2,17 +2,10 @@
 
 set -eu
 
-#[ -f /usr/sbin/mock ] && HAS_MOCK=1 || HAS_MOCK=0
-
-#if [ ! $HAS_MOCK ]; then
-#    echo You dont have mock utility
-#    echo Connect SciDB repository and install mock
-#fi
-
 function usage()
 {
-   echo "Usage: $0 <result dir>"
-   exit 1
+    echo "Usage: $0 <result dir>"
+    exit 1
 }
 
 function die()
@@ -23,9 +16,9 @@ function die()
 
 [ ! "$#" -eq 1 ] && usage
 
-   export SCIDB_VERSION_MAJOR=`awk -F . '{print $1}' $(dirname "$0")/../../version`
-   export SCIDB_VERSION_MINOR=`awk -F . '{print $2}' $(dirname "$0")/../../version`
-   export SCIDB_VERSION_PATCH=`awk -F . '{print $3}' $(dirname "$0")/../../version`
+export SCIDB_VERSION_MAJOR=`awk -F . '{print $1}' $(dirname "$0")/../../version`
+export SCIDB_VERSION_MINOR=`awk -F . '{print $2}' $(dirname "$0")/../../version`
+export SCIDB_VERSION_PATCH=`awk -F . '{print $3}' $(dirname "$0")/../../version`
 
 build_dir="`mktemp -d /tmp/scidb_packaging.XXXXX`"
 chroot_result_dir="$1"
@@ -67,8 +60,10 @@ pushd "${build_dir}"
    do dpkg-source -x $f
     done
     cd boost1.54-1.54.0
+    patch -p1 -i ${script_dir}/patches/boost-container_leak.patch
+    patch -p1 -i ${script_dir}/patches/boost-empty_macro.patch
     # I think some or all of these parameters are necessary.
-    debuild -d -us -uc -sa -i -I
+    debuild -d -us -uc -sa -i -I -b
     echo Packages were built in ${build_dir}
     cd ${build_dir}
 

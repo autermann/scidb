@@ -1,8 +1,8 @@
 --setup
-create immutable array A <a:int32>[x=0:2,3,0]
+create array A <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
 store(build(A,x+2),B)
-create immutable array C <c:int32>[y=0:2,3,0]
+create array C <c:int32>[y=0:2,3,0]
 store(build(C,y+10),C)
 
 --test

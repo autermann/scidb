@@ -14,10 +14,14 @@ store (build (<v : int64> [I=0:7,1,0], I), NODE_ID)
 ##
 ## ERROR4
 ##
+# The order of injection (instance1 then instance0) is important because the rollback is async.
+# If a second inejection occurs while a worker instance is rolling back on the error from a previous injection,
+# it may trigger the injected error prematurely.
 
 # node1
 subarray(apply (NODE_ID, foo, injectError (1, 4)),0,1)
 --error "store(NODE_ID, NODE_ID_RENAMED)"
+
 # coordinator
 subarray(apply (NODE_ID, foo, injectError (0, 4)),0,0)
 --error "store(NODE_ID, NODE_ID_RENAMED)"

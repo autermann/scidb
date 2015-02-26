@@ -290,13 +290,12 @@ def remote_exec(client, lcmd, auto_close=False, wait=True, tmo=600, read_max=10*
 		# end if
 
                 select.select([chan], [chan], [], time2wait)
-		# end while
 	# end while
 
 	stdin.close()
 	stdout.close()
 	stderr.close()
-	
+
 	if auto_close:
 		client.close()
 	# end if
@@ -831,6 +830,12 @@ def start(srv, liid):
            mergeSortPipelineLimitClause = ''
    # end if
 
+   if d.get('redimension-chunksize'):
+	  redimChunksizeClause = "--redimension-chunksize=%s" % d.get('redimension-chunksize')
+   else:
+	  redimChunksizeClause = ''
+   # end if
+
    if d.get('smgr-cache-size'):
 	  smgrCacheSize = d.get('smgr-cache-size')
    else:
@@ -1027,6 +1032,7 @@ def start(srv, liid):
                 mergeSortClause,
                 mergeSortNstreamClause,
                 mergeSortPipelineLimitClause,
+                redimChunksizeClause,
                 "--cache", smgrCacheSize,
                 noWatchDogClause,
                 "-k", "-l", logconf,
@@ -1095,66 +1101,89 @@ def collectDbgAll(mode='full'):
 # end def collectDbgAll
 
 
-def collectDbg(srv, liid, dt, mode='full'): 
+def collectDbg(srv, liid, dt, mode='full'):
 
-   if (mode == 'stacksonly'): 
-	 filelist='`ls *.log* mpi_*/* stack* 2> /dev/null`'
-   else: 
-	 filelist='`ls *.log* mpi_*/* core* stack* 2> /dev/null`'
-   # end if
+   if (mode == 'stacksonly'):
+     filelist='`ls *.log* mpi_*/* stack* 2> /dev/null`'
+   else:
+     filelist='`ls *.log* mpi_*/* core* stack* 2> /dev/null`'
 
    conn = sshconnect(srv)
 
    # this is called after all other liids.
    print "collect logs, cores, install files (srv %d (%s) local instance %d)"%(srv[0],srv[1],liid)
 
-   if (srv[0] == 0 and liid == 0): 
-	 tgzname = "coord-" + dt + ".tgz"
-	 instgzname = "install-" + dt + ".tgz"
-	 allname =  'all-'+dt+'.tar'
-	 dmpfiles='`ls *'+dt+'* 2>/dev/null`'
+   if (srv[0] == 0 and liid == 0):
+	 tgzname    = "coord-"   + dt + ".tgz"
+	 instgzname = "install-" + tgzname
+         instlsname = "install-" + dt + ".txt"
+	 allname    = 'all-'+      dt +'.tar'
+	 dmpfiles   = '`ls [sci]*'+ dt +'* 2>/dev/null`'
+         tgzfiles   = '`ls *'+      dt +'*.tgz 2>/dev/null`'
+         installRoot = d.get('install_root')
 
-	 cmdList1 = [binpath + "/" + "scidb_cores"]
+         if (mode != 'stacksonly'):
+           cmdList01 = ["tar", "cvPfz", instgzname, installRoot]
+         else:
+           cmdList01 = ["(find "+installRoot+" | xargs ls -l 1> "+instlsname+")"]
+           cmdList02  = ["tar", "cvPfz", instgzname, installRoot+"/"+"etc ", installRoot+"/"+"share ", instlsname]
+
+         cmdList1 = [binpath + "/" + "scidb_cores", dt]
 	 cmdList2 = ["tar", "cvPfz", tgzname, filelist]
-	 cmdList3 = ["tar", "cvPfz", instgzname, d.get('install_root')]
-	 cmdList4 = ['tar', 'cvPf', allname, dmpfiles]
+	 cmdList3 = ['tar', 'cvPf', allname, tgzfiles]
+         cmdList4 = ['rm', "-f", dmpfiles]
 
 	 try:
+           executeIt(cmdList01, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
+           if (mode == 'stacksonly'):
+             executeIt(cmdList02, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
 	   executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
 	   executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
 	   executeIt(cmdList3, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
 	   executeIt(cmdList4, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
-
-	 except IOError, detail: 
+	 except IOError, detail:
 	   if detail.errno != errno.ENOENT:
 		 print detail
 		 raise
-	   # end if
-	 # end try
-
-   else: 
+   else:
 	 tgzname = "srv-" + "%03d" % srv[0] + "-" + "%d" % liid + "-" + dt + ".tgz"
-	 cmdList1 = [binpath + "/" + "scidb_cores"]
-	 cmdList2 = ["tar", "cvPfz", tgzname, filelist]
+         instgzname = "install-" + tgzname
+         instlsname = "install-" + dt + ".txt"
+         dmpfiles   = '`ls *'+     dt +'* 2>/dev/null`'
+         installRoot = d.get('install_root')
+
+         cmdList1 = ["(find "+installRoot+" | xargs ls -l 1> "+instlsname+")"]
+         cmdList2 = ["tar", "cvPfz", instgzname, installRoot+"/"+"etc", installRoot+"/"+"share", instlsname]
+	 cmdList3 = [binpath + "/" + "scidb_cores", dt]
+	 cmdList4 = ["tar", "cvPfz", tgzname, filelist]
+         cmdList5 = ['rm', "-f", dmpfiles]
 	 prefix = getInstanceDataPath(srv, liid)
 
 	 try:
 	   executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
 	   executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+           executeIt(cmdList3, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+           executeIt(cmdList4, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+
 	   sftp = paramiko.SFTPClient.from_transport(conn.get_transport())
 
-	   remotep = prefix + "/" + tgzname
-	   localp = getInstanceDataPath(masterSrv, 0) + "/" + tgzname
+           remotep = prefix + "/" + tgzname
+           localp = getInstanceDataPath(masterSrv, 0) + "/" + tgzname
 
 	   print "Running sftp remote: %s -> local: %s" % (remotep, localp)
 	   sftp.get(remotep, localp)
+
+           remotep = prefix + "/" + instgzname
+	   localp = getInstanceDataPath(masterSrv, 0) + "/" + instgzname
+
+	   print "Running sftp remote: %s -> local: %s" % (remotep, localp)
+	   sftp.get(remotep, localp)
+
 	   sftp.close()
-	 except IOError, detail: 
+           executeIt(cmdList5, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+	 except IOError, detail:
 	   if detail.errno != errno.ENOENT:
 		 raise
-	   # end if
-	 # end try
-   # end if
    conn.close()
 # end def collectDbg
 

@@ -41,7 +41,7 @@ case `./os_detect.sh` in
 	cat ${CONFIG} | sed -e "s/enforcing/disabled/g" > ${CONFIG}.new
 	cat ${CONFIG}.new > ${CONFIG}
 	rm -f ${CONFIG}.new
-	setenforce 0	
+	setenforce 0 || true
 	;;
     "RedHat 6")
 	echo "We do not support build SciDB under RedHat 6. Please use CentOS 6 instead"

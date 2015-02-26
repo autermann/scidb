@@ -82,29 +82,33 @@ namespace scidb {
     //
 	Coordinates const& AdddimChunk::getFirstPosition(bool withOverlap) const
     {
-        Coordinates const& inPos = DelegateChunk::getFirstPosition(withOverlap);
-        addDim(inPos, ((AdddimChunk*)this)->outPos);
-        return outPos;
+	    return withOverlap ? _firstPosOverlap : _firstPos;
     }
 
 	Coordinates const& AdddimChunk::getLastPosition(bool withOverlap) const
     {
-        Coordinates const& inPos = DelegateChunk::getLastPosition(withOverlap);
-        addDim(inPos, ((AdddimChunk*)this)->outPos);
-        return outPos;
+	    return withOverlap ? _lastPosOverlap : _lastPos;
     }
 
     AdddimChunk::AdddimChunk(AdddimArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID)
     : DelegateChunk(array, iterator, attrID, true),
-      outPos(array.getArrayDesc().getDimensions().size())
-    {
-        outPos[0] = 0;
-    }
+      _firstPos(array.getArrayDesc().getDimensions().size(),0),
+      _lastPos(array.getArrayDesc().getDimensions().size(),0),
+      _firstPosOverlap(array.getArrayDesc().getDimensions().size(),0),
+      _lastPosOverlap(array.getArrayDesc().getDimensions().size(),0)
+    {}
       
     void AdddimChunk::setInputChunk(ConstChunk const& inputChunk)
     {
         DelegateChunk::setInputChunk(inputChunk);
-        isClone = !inputChunk.isSparse();
+        Coordinates const& fpo = DelegateChunk::getFirstPosition(true);
+        addDim(fpo, _firstPosOverlap);
+        Coordinates const& fp = DelegateChunk::getFirstPosition(false);
+        addDim(fp, _firstPos);
+        Coordinates const& lp = DelegateChunk::getLastPosition(false);
+        addDim(lp, _lastPos);
+        Coordinates const& lpo = DelegateChunk::getLastPosition(true);
+        addDim(lpo, _lastPosOverlap);
     }
 
     //

@@ -1,4 +1,4 @@
-SCIDB QUERY : <create immutable array A <a:char,b:char>[x=0:2,3,0]>
+SCIDB QUERY : <create array A <a:char,b:char>[x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create array T <a:char>[x=0:2,3,0]>

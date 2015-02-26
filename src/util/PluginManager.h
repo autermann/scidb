@@ -37,6 +37,7 @@
 #include <map>
 
 #include "util/Singleton.h"
+#include "util/Mutex.h"
 
 namespace scidb
 {
@@ -50,29 +51,18 @@ struct PluginDesc
     uint32_t build;
 };
 
-// TODO: Serialize access by mutex
+class ListLibrariesArrayBuilder;
+
 class PluginManager: public Singleton<PluginManager>
 {
-public:
-    PluginManager();
-
-    ~PluginManager();
-
-    /**
-     * The function finds module. Currently it's looking for a module in
-     * plugins folder specified in config.
-     * @param moduleName a name of module to load
-     * @return a reference to loaded module descriptor
-     */
-    PluginDesc& findModule(const std::string& moduleName, bool* was = NULL);
-
+private:
     /**
      * The function finds symbol in the given module handle.
      * @param plugin a pointer of module to given by findModule method.
      * @param symbolName a name of symbol to load.
      * @return a pointer to loaded symbol.
      */
-    void* openSymbol(void* plugin, const std::string& symbolName, bool throwException = false);
+    static void* openSymbol(void* plugin, const std::string& symbolName, bool throwException = false);
 
     /**
      * The function finds module and symbol in it. Currently it's looking for a module in
@@ -87,6 +77,19 @@ public:
     }
 
     /**
+     * The function finds module. Currently it's looking for a module in
+     * plugins folder specified in config.
+     * @param moduleName a name of module to load
+     * @return a reference to loaded module descriptor
+     */
+    PluginDesc& findModule(const std::string& moduleName, bool* was = NULL);
+
+public:
+    PluginManager();
+
+    ~PluginManager();
+
+    /**
      * This method loads module and all user defined objects.
      * @param libraryName a name of library
      * @param registerInCatalog tells to register library in system catalog
@@ -99,18 +102,36 @@ public:
      */
     void unLoadLibrary(const std::string& libraryName);
 
+    /**
+     * Load all of the libraries that are registered in the system catalog;
+     * to be called on startup.
+     */
     void preLoadLibraries();
 
-    const std::map<std::string, PluginDesc>& getPlugins() {
-        return _plugins;
-    }
+    /**
+     * Iterate over all of the loaded, plugins and apply the builder to each of them. Include one entry for SciDB itself.
+     * @param builder the lister object
+     */
+    void listPlugins(ListLibrariesArrayBuilder& builder);
 
-    const std::string& loadingLibrary() {
+    /**
+     *  Get the name of the library that is currently being loaded.
+     *  This is a call-back invoked by the loaded plugin, on the same thread.
+     *  @return the name of the currently loaded library
+     */
+    const std::string loadingLibrary() {
+        ScopedMutexLock cs (_mutex); //copy under lock
         return _loadingLibrary;
     }
 
+    /**
+     * Change the directory to load plugins from.
+     * @param pluginsDirectory the path
+     */
     void setPluginsDirectory(const std::string &pluginsDirectory);
+
 private:
+    Mutex _mutex;
     std::map<std::string, PluginDesc> _plugins;
     std::string _loadingLibrary;
     std::string _pluginsDirectory;

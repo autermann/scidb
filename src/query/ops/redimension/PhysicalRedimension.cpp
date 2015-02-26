@@ -42,52 +42,80 @@ using namespace boost;
  */
 class PhysicalRedimension: public RedimensionCommon
 {
-private:
-    /**
-     * True if this is a redimension with aggregates; false otherwise.
-     */
-    bool _haveAggregates;
-
 public:
     /**
-     * Vanilla; checks for aggregates.
+     * Vanilla.
      * @param logicalName the name of operator "redimension"
      * @param physicalName the name of the physical counterpart
      * @param parameters the operator parameters - the output schema and optional aggregates
      * @param schema the result of LogicalRedimension::inferSchema
      */
     PhysicalRedimension(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        RedimensionCommon(logicalName, physicalName, parameters, schema), _haveAggregates(false)
+        RedimensionCommon(logicalName, physicalName, parameters, schema)
+    {}
+
+    /**
+     * Check if we are dealing with aggregates or a synthetic dimension.
+     * @return true if this redimension has at least one aggregate or if it uses a synthetic dimension; false otherwise
+     */
+    bool haveAggregatesOrSynthetic(ArrayDesc const& srcDesc) const
     {
-        if(_parameters.size() > 1)
+        if (_parameters.size() > 1)
         {
-            _haveAggregates = true;
+            return true; //aggregate
         }
+        ArrayDesc dstDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        BOOST_FOREACH(const DimensionDesc &dstDim, dstDesc.getDimensions())
+        {
+            BOOST_FOREACH(const AttributeDesc &srcAttr, srcDesc.getAttributes())
+            {
+                if (dstDim.hasNameAndAlias(srcAttr.getName()))
+                {
+                    goto NextDim;
+                }
+            }
+            BOOST_FOREACH(const DimensionDesc &srcDim, srcDesc.getDimensions())
+            {
+                if (srcDim.hasNameAndAlias(dstDim.getBaseName()))
+                {
+                    goto NextDim;
+                }
+            }
+            return true; //synthetic
+            NextDim:;
+        }
+        return false;
     }
 
     /**
-     * Determine the distribution of the operator output: psRoundRobin with aggregates, psUndefined otherwise.
-     * @return the output distribution
+     * @see PhysicalOperator::changesDistribution
      */
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector< ArrayDesc> const&) const
+    bool changesDistribution(vector<ArrayDesc> const& sourceSchemas) const
     {
-        if(_haveAggregates)
-            return ArrayDistribution(psRoundRobin);
+        return true;
+    }
+
+    /**
+     * @see PhysicalOperator::getOutputDistribution
+     */
+    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const& inputDistros,
+                                                    std::vector< ArrayDesc> const& inputSchemas) const
+    {
+        if(haveAggregatesOrSynthetic(inputSchemas[0]))
+            return ArrayDistribution(psHashPartitioned);
         return ArrayDistribution(psUndefined);
     }
 
     /**
-     * Determine the chunking of the operator output: full with aggregates, partially-filled otherwise
-     * @return the output chunking status
+     * @see PhysicalOperator::outputFullChunks
      */
-    virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return _haveAggregates;
+        return haveAggregatesOrSynthetic(inputSchemas[0]);
     }
 
     /**
-     * Execute the operator - redimension inputArrays[0] and return the result.
-     * @return the redimensioned array.
+     * @see PhysicalOperator::execute
      */
     shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
     {
@@ -115,7 +143,7 @@ public:
                                 coordinateMultiIndices,
                                 coordinateIndices,
                                 timing,
-                                false);
+                                haveAggregatesOrSynthetic(srcArrayDesc));
     }
 };
 

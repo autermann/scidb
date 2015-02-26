@@ -1,6 +1,6 @@
 --setup
-create immutable empty array D <a:int64> [x=0:9,3,0]
-create immutable empty array C <x:int64> [a(int32)=15,3,0]
+create empty array D <a:int64> [x=0:9,3,0]
+create empty array C <x:int64> [a(int32)=15,3,0]
 store(build_sparse(D,x+1,x<>1),D)
 
 --test

@@ -1,13 +1,13 @@
 --setup
 
-create immutable array bounded <a:int64>[x=0:170,5,0]
+create array bounded <a:int64>[x=0:170,5,0]
 load(bounded,'../tests/harness/testcases/data/unbounded.txt')
 
 --test
 --start-query-logging
 
 
---error --aql "update bounded set a=99"
+--aql update bounded set a=99
 
 
 scan(bounded)  

@@ -1,6 +1,6 @@
 --setup
 --start-query-logging
-create immutable array A <a:int32> [x=0:8,6,0,y=-2:6,8,1]
+create array A <a:int32> [x=0:8,6,0,y=-2:6,8,1]
 store(build(A,x+10),A)
 
 --test

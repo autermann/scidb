@@ -1,8 +1,8 @@
 --setup
 --start-query-logging
-create immutable empty array A <a:int32,b:double> [x=-1:2,3,2,y=0:2,2,0]
-create immutable empty array T <a:int32 default 9> [x=-1:2,3,2,y=0:2,2,0]
-create immutable empty array T2 <a:double default 5.5> [x=-1:2,3,2,y=0:2,2,0]
+create empty array A <a:int32,b:double> [x=-1:2,3,2,y=0:2,2,0]
+create empty array T <a:int32 default 9> [x=-1:2,3,2,y=0:2,2,0]
+create empty array T2 <a:double default 5.5> [x=-1:2,3,2,y=0:2,2,0]
 store(join(build_sparse(T,x+y+5,x<>2),build_sparse(T2,x+y+10.2,x<>2)),A)
 
 --test

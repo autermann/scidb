@@ -213,11 +213,89 @@ void LogicalOperator::toString(std::ostream &out, int indent) const
     out << "schema: " << _schema << "\n";
 }
 
+void PhysicalOperator::setQuery(const boost::shared_ptr<Query>& query)
+{
+    arena::Options options;
+
+    options.name  (_physicalName.c_str());  // Same name as owning operator
+    options.parent(query->getArena());      // Make child of the query
+
+    _query = query;                         // Save the query
+    _arena = arena::newArena(options);      // Create new Arena
+}
+
 void PhysicalOperator::toString(std::ostream &out, int indent) const
 {
     Indent prefix(indent);
     out << prefix(' ', false);
     out << "schema " <<_schema<<"\n";
+}
+
+void PhysicalOperator::dumpArrayToLog(shared_ptr<Array> const& input, log4cxx::LoggerPtr& logger)
+{
+    ArrayDesc const& schema = input->getArrayDesc();
+    Attributes const& attrs = schema.getAttributes(true);
+    size_t const nAttrs = attrs.size();
+    vector<FunctionPointer> converters(nAttrs,NULL);
+    FunctionLibrary *functionLib = FunctionLibrary::getInstance();
+    bool needVectorMode = false; //advanced/deprecated topic
+    vector<shared_ptr<ConstArrayIterator> > aiters (nAttrs);
+    vector<shared_ptr<ConstChunkIterator> > citers (nAttrs);
+    for (size_t i =0; i<nAttrs; ++i)
+    {
+        TypeId const& typeId = attrs[i].getType();
+        converters[i] = functionLib->findConverter(typeId, TID_STRING, needVectorMode, false, false);
+        aiters[i] = input->getConstIterator(i);
+    }
+    while (!aiters[0]->end())
+    {
+        for(size_t i=0; i<nAttrs; ++i)
+        {
+            citers[i] = aiters[i]->getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+        }
+        while (!citers[0]->end())
+        {
+            Coordinates const& position = citers[0]->getPosition();
+            ostringstream out;
+            out<<CoordsToStr(position)<<" ";
+            for(size_t i=0; i<nAttrs; ++i)
+            {
+                Value const& v = citers[i]->getItem();
+                if (v.isNull())
+                {
+                    if(v.getMissingReason() == 0)
+                    {
+                        out<<"[null]";
+                    }
+                    else
+                    {
+                        out<<"[?"<<v.getMissingReason()<<"]";
+                    }
+                }
+                else if (converters[i])
+                {
+                    Value const* input = &v;
+                    Value result;
+                    converters[i](&input, &result, NULL);
+                    out<<result.getString();
+                }
+                else
+                {
+                    out<<"[nct]";
+                }
+                out<<",";
+            }
+            LOG4CXX_DEBUG(logger, out.str());
+            for(size_t i=0; i<nAttrs; ++i)
+            {
+                ++(*citers[i]);
+            }
+        }
+        for(size_t i=0; i<nAttrs; ++i)
+        {
+            ++(*aiters[i]);
+        }
+    }
 }
 
 /*
@@ -731,7 +809,7 @@ std::ostream& operator<<(std::ostream& stream, const ArrayDistribution& dist)
     {
         case psReplication:     stream<<"repl";
                                 break;
-        case psRoundRobin:      stream<<"roro";
+        case psHashPartitioned: stream<<"hash";
                                 break;
         case psLocalInstance:   stream<<"loca";
                                 break;
@@ -855,14 +933,8 @@ InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
 
     switch (ps)
     {
-        case psRoundRobin:  // WARNING: hashed, NOT bock-cyclic!
-                            // as getChunkNumber() returns hashed patterns
-
-            if(false) { // needed for debugging ScaLAPACK until the end of Cheshire
-                std::cerr << "getInstanceForChunk to hashed, chunkPos= " << chunkPosition << std::endl;
-                std::cerr << "conversion to RoundRobin, chunkPos=" << chunkPosition << std::endl;
-            }
-            result = desc.getChunkNumber(chunkPosition) % instanceCount;
+        case psHashPartitioned:
+            result = desc.getHashedChunkNumber(chunkPosition) % instanceCount;
             break;
         case psByRow:
             result = (chunkPosition[0] - dims[0].getStart()) / dims[0].getChunkInterval()
@@ -870,16 +942,16 @@ InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
             break;
         case psByCol:
         {
-                if (dims.size() > 1)
-                {
+            if (dims.size() > 1)
+            {
                 result = (chunkPosition[1] - dims[1].getStart()) / dims[1].getChunkInterval()
                           / (((dim1Length + dims[1].getChunkInterval() - 1) / dims[1].getChunkInterval() + instanceCount - 1) / instanceCount);
-                }
-                else
-                {
-                        result = 0;  // TODO Tigor ; you wanted a comment because you wanted to look at this line
-                }
-                break;
+            }
+            else
+            {
+                result = 0;  // TODO Tigor ; you wanted a comment because you wanted to look at this line
+            }
+            break;
         }
 
         case psScaLAPACK:
@@ -893,11 +965,10 @@ InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
                 throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
             }
             result = repartInfo->getInstanceID(chunkPosition, *(query.get()));
-
-        } break;
+            break;
+        }
 
         case psUndefined:
-
         case psReplication:
         case psLocalInstance:
             break;
@@ -1160,7 +1231,7 @@ boost::shared_ptr<MemArray> redistributeAggregate(boost::shared_ptr<MemArray> in
             AttributeID attrId = *it;
 
             query->validate();
-            InstanceID instanceID = getInstanceForChunk(query, chunkPosition, desc, psRoundRobin, shared_ptr<DistributionMapper>(), 0, 0);
+            InstanceID instanceID = getInstanceForChunk(query, chunkPosition, desc, psHashPartitioned, shared_ptr<DistributionMapper>(), 0, 0);
             const ConstChunk& chunk = dynamic_pointer_cast<ConstArrayIterator>(inputIters[attrId])->getChunk();
             if (!chunk.isRLE()) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "redistributeAggregate; must be RLE";
@@ -1333,6 +1404,20 @@ void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const
                                            0));
 }
 
+namespace {
+/**
+ * @return true if there are no values in the chunk body or in the ovelap
+ */
+bool isEmpty(const ConstChunk* chunk)
+{
+    assert(chunk);
+    shared_ptr<ConstChunkIterator> ci =
+       chunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS); // but do not ignore the overlap
+    assert(ci);
+    return (ci->end());
+}
+}
+
 boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
                                       boost::shared_ptr<Query> query,
                                       PartitioningSchema ps,
@@ -1361,7 +1446,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
         networkBufferLimit /= instanceCount;
     }
 
-    if (instanceID == COORDINATOR_INSTANCE_MASK) { 
+    if (instanceID == COORDINATOR_INSTANCE_MASK) {
         instanceID = query->getCoordinatorInstanceID();
     }
     if (instanceCount == 1 || (ps == psLocalInstance && instanceID == ALL_INSTANCES_MASK)) {
@@ -1373,6 +1458,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
     size_t nDims = srcDims.size();
 
     size_t nAttrs = desc.getAttributes().size();
+    assert(nAttrs>0);
     bool isEmptyable = (desc.getEmptyBitmapAttribute() != NULL);
     if (isEmptyable && desc.getEmptyBitmapAttribute()->getId() != nAttrs-1) {
         throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_REDISTRIBUTE_ERROR1);
@@ -1438,14 +1524,23 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
         // sharedEmptyBitmap is the empty bitmap at a given chunkPos, to be shared by all the attributes.
         shared_ptr<ConstRLEEmptyBitmap> sharedEmptyBitmap;
 
+        const ConstChunk& firstAttrChunk = inputIters[0]->getChunk();
+
+        // Check if the chunks have any values
+        bool chunkHasElems = (!firstAttrChunk.isRLE()) || (!isEmptyable) || (!isEmpty(&firstAttrChunk));
+
         for (AttributeID attrId = nAttrs; attrId-- != 0;)
         {
             query->validate();
 
-            // Sending current chunk to instanceID instance or saving locally
-            const ConstChunk& chunk = inputIters[attrId]->getChunk();
-            if (chunk.getSize() > 0)
-            {
+            // XXX TODO:
+            // Calling getChunk() on the input iterators causes problems (the chunk gets corrupted).
+            // It was observed on queries involving subarray() (which is redistributed downstream).
+            const ConstChunk& chunk = (attrId==0) ? firstAttrChunk :
+                                      inputIters[attrId]->getChunk();
+
+            if(chunkHasElems && chunk.getSize() > 0) {
+
                 if (resultArrayId != 0 && attrId == nAttrs - 1) {
                     bounds.updateFromChunk(&chunk, dstDesc.getEmptyBitmapAttribute() == NULL);
                 }
@@ -1466,7 +1561,11 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
                     if (!attributeDesc.isEmptyIndicator()) {
                         emptyBitmap = sharedEmptyBitmap;
                     }
+                    assert(chunkHasElems != isEmpty(&chunk));
                 }
+
+                // Sending current chunk to instanceID instance or saving locally
+
                 if ((InstanceID)instanceID != myInstanceID || ps == psReplication)
                 {
                     boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
@@ -1534,7 +1633,7 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
      */
     query->unsetOperatorContext();
 
-    if (sgCtx->onSGCompletionCallback) { 
+    if (sgCtx->onSGCompletionCallback) {
         LOG4CXX_DEBUG(logger, "Invoke SG callback.");
         sgCtx->onSGCompletionCallback(sgCtx->callbackArg);
     }
@@ -1556,15 +1655,15 @@ boost::shared_ptr<Array> redistribute(boost::shared_ptr<Array> inputArray,
         for (size_t i = 0; i < nDims; i++) {
             string const& dstMappingArrayName = dims[i].getMappingArrayName();
             string const& srcMappingArrayName = srcDims[i].getMappingArrayName();
-            if (dims[i].getType() != TID_INT64 && srcMappingArrayName != dstMappingArrayName) { 
+            if (dims[i].getType() != TID_INT64 && srcMappingArrayName != dstMappingArrayName) {
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(srcMappingArrayName);
-                if (tmpMappingArray) { 
+                if (tmpMappingArray) {
                     // Source array contains temporary NIDs, when we store this array in database, we also need to persist NIDs
                     shared_ptr<DBArray> dbMappingArray(DBArray::newDBArray(dstMappingArrayName, query));
                     ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
                     ArrayDesc const& dbMappingArrayDesc = dbMappingArray->getArrayDesc();
-                    if (query->getCoordinatorID() == COORDINATOR_INSTANCE 
-                        && tmpMappingArrayDesc.getDimensions()[0].getChunkInterval() != dbMappingArrayDesc.getDimensions()[0].getChunkInterval()) { 
+                    if (query->getCoordinatorID() == COORDINATOR_INSTANCE
+                        && tmpMappingArrayDesc.getDimensions()[0].getChunkInterval() != dbMappingArrayDesc.getDimensions()[0].getChunkInterval()) {
                         LOG4CXX_DEBUG(logger, "Update chunk interval for NID array " << dbMappingArrayDesc.getName()
                                       << "(" << dbMappingArrayDesc.getId()
                                       << ") from " << dbMappingArrayDesc.getDimensions()[0].getChunkInterval()
@@ -1833,11 +1932,11 @@ boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
         start[0] = indexArrayStart;
         Chunk& chunk = arrayIterator->newChunk(start, 0);
         size_t chunkSize = buf->getSize() - sizeof(size_t);
-        if (!distinct) { 
+        if (!distinct) {
             chunkSize -= nCoords*sizeof(uint16_t);
         }
         chunk.allocate(chunkSize);
-        chunk.setRLE(false); 
+        chunk.setRLE(false);
         memcpy(chunk.getData(), buf->getData(), chunkSize);
         chunk.write(query);
 
@@ -1867,10 +1966,10 @@ boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
         }
     }
     if (nCoords != 0)
-    {                                               
-        if (distinct) { 
+    {
+        if (distinct) {
             return boost::shared_ptr<MapType>(new MapType(attrSet.getType(), indexArrayStart, nCoords, buf->getData(), buf->getSize() - sizeof(size_t)));
-        } else { 
+        } else {
             return boost::shared_ptr<MapType>(new MapType(attrSet.getType(), indexArrayStart, nCoords, buf->getData(), buf->getSize() - sizeof(size_t), myInstanceId));
         }
     }
@@ -2032,6 +2131,58 @@ boost::shared_ptr<JobQueue> PhysicalOperator::getGlobalQueueForOperators()
         _globalThreadPoolForOperators->start();
     }
     return _globalQueueForOperators;
+}
+
+void StoreJob::run()
+{
+    ArrayDesc const& dstArrayDesc = _dstArray->getArrayDesc();
+    size_t nAttrs = dstArrayDesc.getAttributes().size();
+    Query::setCurrentQueryID(_query->getQueryID());
+
+    for (size_t i = _shift; i != 0 && !_srcArrayIterators[0]->end(); --i)
+    {
+        for (size_t j = 0; j < nAttrs; j++)
+        {
+            ++(*_srcArrayIterators[j]);
+        }
+    }
+
+    while (!_srcArrayIterators[0]->end())
+    {
+        bool chunkHasElems(true);
+        for (size_t i = 0; i < nAttrs; i++)
+        {
+            ConstChunk const& srcChunk = _srcArrayIterators[i]->getChunk();
+            if (i==0) {
+                chunkHasElems = hasValues(srcChunk);
+                if (chunkHasElems) {
+                    createdChunks.insert(_srcArrayIterators[0]->getPosition());
+                }
+            } else {
+                assert(chunkHasElems == hasValues(srcChunk));
+            }
+            if (chunkHasElems) {
+                if (i == nAttrs - 1)
+                {
+                    bounds.updateFromChunk(&srcChunk, dstArrayDesc.getEmptyBitmapAttribute() == NULL);
+                }
+                _dstArrayIterators[i]->copyChunk(srcChunk);
+            }
+            Query::validateQueryPtr(_query);
+            for (size_t j = _step; j != 0 && !_srcArrayIterators[i]->end(); ++(*_srcArrayIterators[i]), --j);
+        }
+    }
+}
+
+bool StoreJob::hasValues(ConstChunk const& srcChunk)
+{
+    ArrayDesc const& srcArrayDesc = _srcArray->getArrayDesc();
+    bool isSrcEmptyable = (srcArrayDesc.getEmptyBitmapAttribute() != NULL);
+
+    // XXX TODO: until we have the single RLE? data format,
+    //           we need to filter out other depricated formats (e.g. dense/sparse/nonempyable)
+    bool chunkHasVals = (!srcChunk.isRLE()) || (!isSrcEmptyable) || (!isEmpty(&srcChunk));
+    return chunkHasVals;
 }
 
 } //namespace

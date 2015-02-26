@@ -15,6 +15,7 @@
 * the AFFERO GNU General Public License for the complete license terms.
 *
 * You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
 */
@@ -26,8 +27,9 @@
 
 #include <boost/range/iterator_range.hpp>                // For iterator_range
 #include <assert.h>                                      // For assert()
-#include <vector>                                        // For vector
-#include <string>                                        // For string
+#include <vector>                                        // For std::vector
+#include <string>                                        // For std::string
+#include <util/arena/Vector.h>                           // For mgd::vector
 
 /****************************************************************************/
 namespace scidb {
@@ -92,28 +94,32 @@ class PointerRange : public boost::iterator_range<value*>
     template<class v>
     struct t               // ...for mutable ranges
     {
-        typedef std::vector<v>                  vector_type;
-        typedef std::basic_string<v>            string_type;
+        typedef std::vector<v>                  std_vector_type;
+        typedef mgd::vector<v>                  mgd_vector_type;
+        typedef std::basic_string<v>            std_string_type;
     };
     template<class v>
     struct t<const v>      // ...for constant ranges
     {
-        typedef std::vector<v>            const vector_type;
-        typedef std::basic_string<v>      const string_type;
+        typedef std::vector<v>            const std_vector_type;
+        typedef mgd::vector<v>            const mgd_vector_type;
+        typedef std::basic_string<v>      const std_string_type;
     };
 
  public:                   // Supporting types
     typedef boost::iterator_range<value*>       base_type;
-    typedef typename t<value>::vector_type      vector_type;
-    typedef typename t<value>::string_type      string_type;
+    typedef typename t<value>::std_vector_type  std_vector_type;
+    typedef typename t<value>::mgd_vector_type  mgd_vector_type;
+    typedef typename t<value>::std_string_type  std_string_type;
 
  public:                   // Construction
                               PointerRange();
                               PointerRange(value&);
                               PointerRange(value*,value*);
                               PointerRange(size_t,value*);
-                              PointerRange(string_type&);
-                              PointerRange(vector_type&);
+                              PointerRange(std_vector_type&);
+                              PointerRange(mgd_vector_type&);
+                              PointerRange(std_string_type&);
     template<size_t size>     PointerRange(value(&)[size]);
 
  public:                   // Operations
@@ -165,10 +171,10 @@ inline PointerRange<v>::PointerRange(size_t n,v* i)
 }
 
 /**
- *  Construct a range from the characters of the string 'r'.
+ *  Construct a range from the elements of the vector 'r'.
  */
 template<class v>
-inline PointerRange<v>::PointerRange(string_type& r)
+inline PointerRange<v>::PointerRange(std_vector_type& r)
                       : base_type(&*r.begin(),&*r.end())
 {
     assert(consistent());                                // Check consistency
@@ -178,7 +184,17 @@ inline PointerRange<v>::PointerRange(string_type& r)
  *  Construct a range from the elements of the vector 'r'.
  */
 template<class v>
-inline PointerRange<v>::PointerRange(vector_type& r)
+inline PointerRange<v>::PointerRange(mgd_vector_type& r)
+                      : base_type(&*r.begin(),&*r.end())
+{
+    assert(consistent());                                // Check consistency
+}
+
+/**
+ *  Construct a range from the characters of the string 'r'.
+ */
+template<class v>
+inline PointerRange<v>::PointerRange(std_string_type& r)
                       : base_type(&*r.begin(),&*r.end())
 {
     assert(consistent());                                // Check consistency
@@ -263,6 +279,24 @@ inline PointerRange<v> pointerRange(std::vector<v>& r)
  */
 template<class v>
 inline PointerRange<const v> pointerRange(const std::vector<v>& r)
+{
+    return PointerRange<const v>(r);                     // Create from vector
+}
+
+/**
+ *  Construct a range from the elements of the vector 'r'.
+ */
+template<class v>
+inline PointerRange<v> pointerRange(mgd::vector<v>& r)
+{
+    return PointerRange<v>(r);                           // Create from vector
+}
+
+/**
+ *  Construct a range from the elements of the vector 'r'.
+ */
+template<class v>
+inline PointerRange<const v> pointerRange(const mgd::vector<v>& r)
 {
     return PointerRange<const v>(r);                     // Create from vector
 }
@@ -425,4 +459,4 @@ inline std::ostream& insertRange(std::ostream& io,const range& r,delimiter d)
 }
 /****************************************************************************/
 #endif
-/****************************************************************************/
+/* @file ********************************************************************/

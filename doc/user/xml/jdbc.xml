@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd"
-[ <!ENTITY % myents SYSTEM "scidb_ug.ent" > %myents; ]
->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "scidb_ug.ent">
+%myents;
+]>
 <chapter id="JDBC">
   <title>JDBC Driver for SciDB</title>
 
@@ -211,6 +213,12 @@ class JDBCExample
 wget http://downloads.paradigm4.com/client/&scidb_version;/jdbc/example.jar
 java -classpath example.jar:scidb4j.jar:/usr/share/java/protobuf.jar
     org.scidb.JDBCExample</programlisting></para>
+
+    <note>
+      <para>On Ubuntu, the jar file is named <code>protobuf-java.jar</code>,
+      so you need to adjust the previous command line:<programlisting>java -classpath example.jar:scidb4j.jar:/usr/share/java/protobuf-java.jar
+    org.scidb.JDBCExample</programlisting></para>
+    </note>
 
     <para>If the example runs without error, the output is similar to the
     following:<screen>Source array name: build

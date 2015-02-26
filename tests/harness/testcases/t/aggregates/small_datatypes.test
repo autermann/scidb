@@ -1,5 +1,5 @@
 --setup
-CREATE IMMUTABLE ARRAY vec <a:int32, b:int32> [i=1:10,10,0]
+CREATE ARRAY vec <a:int32, b:int32> [i=1:10,10,0]
 
 load(vec,'../tests/harness/testcases/data/vec.txt')
 

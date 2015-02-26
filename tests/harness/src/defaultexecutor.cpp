@@ -818,13 +818,28 @@ int DefaultExecutor :: execCommandsection (const Command &section)
 		/* if these sections have any subcommands then execute them */
 		if (section.subCommands.size () > 0)
 		{
-			vector<Command> :: const_iterator it;
-			for (it = section.subCommands.begin (); it != section.subCommands.end (); ++it)
+			bool cleanup_failure=false;
+			for (vector<Command> :: const_iterator it = section.subCommands.begin (); it != section.subCommands.end (); ++it)
 			{
-				int rv = execCommandsection (*it);
-				if (rv == EXIT || rv == FAILURE)
-					return rv;
+				try
+				{
+					int rv = execCommandsection (*it);
+					if (section.cmd == TESTCASE_COMMAND_CLEANUP && rv == FAILURE)
+						cleanup_failure = true;
+					else if (rv == EXIT || rv == FAILURE)
+						return rv;
+				}
+				catch (harnessexceptions :: ERROR &e)
+				{
+				// Catch Exceptions from CLEANUP section so that it does not exit after a command under CLEANUP section fails
+					if (section.cmd != TESTCASE_COMMAND_CLEANUP)
+						throw;
+					PRINT_ERROR (e.what ());
+					cleanup_failure = true;
+				}
 			}
+			if (cleanup_failure)
+				return FAILURE;
 		}
 
 		if (section.cmd == TESTCASE_COMMAND_SETUP)

@@ -442,6 +442,8 @@ ERRMSG(SCIDB_LE_OP_MULTIPLY_ERROR9,                 "Non-supported attribute typ
 ERRMSG(SCIDB_LE_CUMULATE_NEEDS_AGGREGATES,          "Operator 'cumulate' requires one input array and at least one aggregate call");
 ERRMSG(SCIDB_LE_CUMULATE_NO_OVERLAP,                "For now, cumulate does not handle dimensions with overlaps");
 ERRMSG(SCIDB_LE_CUMULATE_DIM_AFTER_AGGREGATES,      "Operator 'cumulate' requires that the dimension parameter, if exists, should be the last one");
+ERRMSG(SCIDB_LE_ARENA_OVERFLOWED,                   "A request to allocate memory caused an arithmetic overflow.\n   arena: %1%");
+ERRMSG(SCIDB_LE_ARENA_EXHAUSTED,                    "An attempt was made to allocate more memory than is available.\n   arena  : %1%\n   request: %2%");
 //Next ERRMSG
 
 ERRMSG(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,          "Execution of query '%1%' failed with error %2%");

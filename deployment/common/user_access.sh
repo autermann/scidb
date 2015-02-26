@@ -47,7 +47,7 @@ function disable_host_checking ()
 function selinux_home_ssh ()
 {
     if [ selinuxenabled ]; then
-        chcon -R -v -t user_ssh_home_t ~/.ssh
+        chcon -R -v -t user_ssh_home_t ~/.ssh || true
     fi
 }
 

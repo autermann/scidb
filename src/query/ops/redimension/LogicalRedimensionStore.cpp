@@ -360,15 +360,15 @@ public:
 
         for (size_t i = 0; i < nDims; i++)
         {
-            if (dstDims[i].getChunkOverlap() > dstDims[i].getChunkInterval()/2)
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR3);
+            if (dstDims[i].getChunkOverlap() > dstDims[i].getChunkInterval())
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK);
 
             for (size_t j = 0; j < nSrcDims; j++)
             {
                 DimensionDesc const& srcDim = srcDims[j];
                 if (srcDim.hasNameAndAlias(dstDims[i].getBaseName()))
                 {
-                    if (dstDims[i].getStart() != srcDim.getStart())
+                    if (dstDims[i].getType() != TID_INT64 && dstDims[i].getStart() != srcDim.getStart())
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6);
                     }

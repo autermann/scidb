@@ -181,13 +181,6 @@ public:
             attributes.push_back(AttributeDesc((AttributeID)1, "profile",  TID_STRING, 0, 0));
             attributes.push_back(AttributeDesc((AttributeID)2, "deterministic",  TID_BOOL, 0, 0));
             attributes.push_back(AttributeDesc((AttributeID)3, "library",  TID_STRING, 0, 0));
-        } else if (what == "libraries") {
-            const std::map<std::string, PluginDesc>& plugins = PluginManager::getInstance()->getPlugins();
-            size = plugins.size();
-            attributes.push_back(AttributeDesc(1, "major",  TID_INT32, 0, 0));
-            attributes.push_back(AttributeDesc(2, "minor",  TID_INT32, 0, 0));
-            attributes.push_back(AttributeDesc(3, "patch",  TID_INT32, 0, 0));
-            attributes.push_back(AttributeDesc(4, "build",  TID_INT32, 0, 0));
         } else if (what == "queries") {
             attributes.push_back(AttributeDesc(1, "query_id",  TID_INT64, 0, 0));
             attributes.push_back(AttributeDesc(2, "creation_time",  TID_DATETIME, 0, 0));
@@ -209,6 +202,9 @@ public:
             return builder.getSchema(query);
         } else if (what == "chunk map") {
             ListChunkMapArrayBuilder builder;
+            return builder.getSchema(query);
+        } else if (what == "libraries") {
+            ListLibrariesArrayBuilder builder;
             return builder.getSchema(query);
         }
         else {

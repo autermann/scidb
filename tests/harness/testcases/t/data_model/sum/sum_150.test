@@ -2,9 +2,9 @@
 --setup
 --start-query-logging
 --start-igdata
---aql create immutable array T < x: double > [ i=1:1050,100,0, j=1:1050,100,0 ]
---aql create immutable array E < x: double null > [ i=0:0,1,0 ]
---aql create immutable array R < x: double null > [ i=0:0,1,0 ]
+--aql create array T < x: double > [ i=1:1050,100,0, j=1:1050,100,0 ]
+--aql create array E < x: double null > [ i=0:0,1,0 ]
+--aql create array R < x: double null > [ i=0:0,1,0 ]
 store(build(T,i-j),T)
 store(build(E,1050 * 1050 * (1050 - 1050)/2),E)
 store(repart(aggregate(T, sum(x)),R),R)

@@ -48,6 +48,7 @@
 #include <util/Event.h>
 #include <util/RWLock.h>
 #include <SciDBAPI.h>
+#include <util/Arena.h>
 #include <util/Atomic.h>
 #include <query/Aggregate.h>
 #include <query/Statistics.h>
@@ -359,11 +360,17 @@ class Query : public boost::enable_shared_from_this<Query>
     * cache for the ProGrid, which depends only on numInstances
     */
     mutable ProcGrid* _procGrid; // only access via getProcGrid()
-    
+
     /**
      * The mutex to serialize access to _queries map.
      */
     static Mutex queriesMutex;
+
+    /**
+     * A dedicated arena from which this query can allocate the various resources that
+     * it needs to execute.
+     */
+     arena::ArenaPtr _arena;
 
  public:
 
@@ -479,6 +486,15 @@ class Query : public boost::enable_shared_from_this<Query>
     size_t getInstancesCount() const
     {
         return _liveInstances.size();
+    }
+
+    /**
+     * Return the arena that is owned by this query and from which the various
+     * resources it needs in order to execute should be allocated.
+     */
+    arena::ArenaPtr getArena() const
+    {
+        return _arena;
     }
 
     /**

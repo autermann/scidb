@@ -30,10 +30,10 @@
       </listitem>
     </itemizedlist></para>
 
-  <para>For example, if you are upgrading from 12.10 to
+  <para>For example, if you are upgrading from 13.6 to
   &scidb_version;:<itemizedlist>
       <listitem>
-        <para><emphasis role="bold">scidbOldVersion</emphasis> = 12.10</para>
+        <para><emphasis role="bold">scidbOldVersion</emphasis> = 13.6</para>
       </listitem>
 
       <listitem>
@@ -47,23 +47,29 @@
 
   <procedure>
     <step>
-      <para><emphasis role="bold">OPTIONAL.</emphasis> Backup your data. You
+      <para><emphasis role="bold">Prepare.</emphasis> Backup your data. You
       need to repeat the procedure for each of your arrays. You should also
-      note the schema for each array.<note>
-          <para>If you are upgrading from 13.6 to 13.9, <emphasis
-          role="bold">DO NOT USE THE OPAQUE METHOD TO BACKUP YOUR
-          DATA</emphasis>. The changes to the system catalog for 13.9 make it
-          impossible to load data files that were saved using the opaque
-          method in 13.6 or earlier. You can perform the upgrade in place
-          (that is, skip the backup step), or save your data using one of the
-          other, available formats.</para>
-        </note><orderedlist numeration="loweralpha">
+      note the schema for each array.<orderedlist numeration="loweralpha">
           <listitem>
-            <para>Use some format (CSV in this example) to save your first
-            array.<programlisting>AQL% <command>SAVE</command> <replaceable>array-name</replaceable> <command>INTO</command> '<replaceable>saved_array</replaceable>' <command>AS</command> 'CSV'</programlisting>This
+            <para>You can upgrade in place, but we recommend that you backup
+            your data before upgrading. Use some format to save your first
+            array. For fastest performance, consider performing a parallel
+            save and then manually merging the saved CSV files collected from
+            different instances. This example does a parallel save, using the
+            lcsv+ format.<programlisting>AFL% save(<replaceable>array_name</replaceable>,'<replaceable>saved_array</replaceable>',-1,'lcsv+');</programlisting>This
             saves the array data to <replaceable>saved_array</replaceable> to
-            the coordinator instance, under your SciDB base path folder.
-            Repeat this for each of your arrays.</para>
+            all the instances, as the data is distributed, under your SciDB
+            base path folder. Repeat this for each of your arrays. When
+            reloading the data, you can feed the saved data through
+            <command>loadcsv.py</command>.<note>
+                <para>If you are upgrading from 13.6 to 13.9, <emphasis
+                role="bold">DO NOT USE THE OPAQUE METHOD TO BACKUP YOUR
+                DATA</emphasis>. The changes to the system catalog for 13.9
+                make it impossible to load data files that were saved using
+                the opaque method in 13.6 or earlier. You can perform the
+                upgrade in place (that is, skip the backup step), or save your
+                data using one of the other, available formats.</para>
+              </note></para>
           </listitem>
 
           <listitem>
@@ -76,106 +82,125 @@
             <para>After saving, you should copy all the array files to a
             temporary folder. This ensures that the data will be available,
             even if you need to restore to change your database name or
-            configuration of your SciDB instances.</para>
+            configuration of your SciDB instances.<note>
+                <para>When saving arrays in this manner, only the latest
+                version of the array is saved.</para>
+              </note></para>
           </listitem>
-        </orderedlist><note>
-          <para>When saving arrays in this manner, only the latest version of
-          the array is saved.</para>
-        </note></para>
+
+          <listitem>
+            <para>Stop SciDB.</para>
+          </listitem>
+
+          <listitem>
+            <para>If you want to keep your current SciDB configuration file,
+            make a backup copy of it somewhere. By default, the file is in the
+            following location:<screen>opt/scidb/<emphasis role="bold">scidbOldVersion</emphasis>/etc/config.ini</screen></para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">OPTIONAL.</emphasis> You can run
+            multiple versions of SciDB, if you would like: for details, see
+            <xref linkend="multipleSciDBs"/>. However, you can remove the
+            previous version of SciDB if you only need to run the latest
+            version of SciDB. If you installed to the default location, run
+            the following command to remove the old version:<programlisting>sudo rm -Rf /opt/scidb/<emphasis
+                  role="bold">scidbOldVersion</emphasis>/</programlisting></para>
+          </listitem>
+        </orderedlist></para>
     </step>
 
     <step>
-      <para>Stop SciDB, if it is running. From the SciDB user account, run the
-      following command, where <emphasis role="bold">myDataBase</emphasis> is
-      the name of your database:<programlisting>scidb.py stopall <emphasis
-            role="bold">myDataBase</emphasis></programlisting></para>
-    </step>
+      <para><emphasis role="bold">Upgrade. </emphasis>Perform the following
+      steps to upgrade to the latest version of SciDB.<orderedlist
+          numeration="loweralpha">
+          <listitem>
+            <para>Append the repository URL to the correct file:<itemizedlist>
+                <listitem>
+                  <para><emphasis role="bold">Ubuntu: </emphasis>Append the
+                  following lines to the
+                  <code>/etc/apt/sources.list.d/scidb.list</code>
+                  file:<programlisting>deb  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;
+deb-src  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;</programlisting></para>
+                </listitem>
 
-    <step>
-      <para>If you want to keep your current SciDB configuration file, make a
-      backup copy of it somewhere. By default, the file is in the following
-      location:</para>
+                <listitem>
+                  <para><emphasis role="bold">CentOS / RHEL: </emphasis>Append
+                  the following line to the
+                  <code>/etc/yum.repos.d/scidb.repo</code>
+                  file:<programlisting>baseurl=http://downloads.paradigm4.com/centos6.3/&scidb_version;/</programlisting></para>
+                </listitem>
+              </itemizedlist></para>
+          </listitem>
 
-      <para><screen>opt/scidb/<emphasis role="bold">scidbOldVersion</emphasis>/etc/config.ini</screen></para>
-    </step>
+          <listitem>
+            <para>Run the update and install commands:<itemizedlist>
+                <listitem>
+                  <para><emphasis
+                  role="bold">Ubuntu:</emphasis><programlisting>sudo apt-get update
+sudo apt-get install scidb-&scidb_version;-all</programlisting></para>
+                </listitem>
 
-    <step>
-      <para><emphasis role="bold">OPTIONAL.</emphasis> You can run multiple
-      versions of SciDB, if you would like: for details, see <xref
-      linkend="multipleSciDBs"/>. However, you can remove the previous version
-      of SciDB if you only need to run the latest version of SciDB. If you
-      installed to the default location, run the following command to remove
-      the old version:<programlisting>sudo rm -Rf /opt/scidb/<emphasis
-            role="bold">scidbOldVersion</emphasis>/</programlisting>For
-      example, if your current version is 12.10, the above command removes the
-      <literal>/opt/scidb/12.10 </literal>folder and all of its sub
-      folders.</para>
-    </step>
+                <listitem>
+                  <para><emphasis role="bold">CentOS /
+                  RHEL:</emphasis><programlisting>sudo yum clean all
+sudo yum update
+sudo yum install scidb-&scidb_version;-all</programlisting></para>
+                </listitem>
+              </itemizedlist>For more details, see <xref
+            linkend="PackageInstall"/>.</para>
+          </listitem>
 
-    <step>
-      <para>To continue the upgrade process, proceed to <xref
-      linkend="PackageInstall"/> to install the latest packages.</para>
-    </step>
+          <listitem>
+            <para>Update your environment variables to refer to the new
+            version of SciDB. Make sure to change your SciDB Version variable
+            from its current value to the <emphasis
+            role="bold">scidbNewVersion</emphasis>. Old
+            version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbOldVersion</emphasis> # This should be set in your environment.</programlisting>Set
+            to new version:<programlisting>export SCIDB_VER=13.9</programlisting>For
+            details, see <xref linkend="environmentVariables"/>.</para>
+          </listitem>
 
-    <step>
-      <para>Update your environment variables to refer to the new version of
-      SciDB. Make sure to change your SciDB Version variable from its current
-      value to the <emphasis role="bold">scidbNewVersion</emphasis>. Old
-      version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbOldVersion</emphasis> # This should be set in your environment.</programlisting>Set
-      to new version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbNewVersion</emphasis></programlisting>For
-      details, see <xref linkend="environmentVariables"/>.</para>
-    </step>
+          <listitem>
+            <para>Set up your configuration file, including setting the
+            <code>enable-catalog-upgrade</code> parameter to
+            <code>true</code>. Make sure to change all occurrences of
+            <emphasis role="bold">scidbOldVersion</emphasis>to <emphasis
+            role="bold">scidbNewVersion</emphasis>. After you edit the file,
+            copy it to the
+            <literal>/opt/scidb/&scidb_version;</literal><literal>/etc/</literal>folder.</para>
 
-    <step>
-      <para>Set up your configuration file.</para>
-
-      <itemizedlist>
-        <listitem>
-          <para><emphasis role="bold">If you copied your existing config.ini
-          file:</emphasis> make sure to change all occurrences of <emphasis
-          role="bold">scidbOldVersion</emphasis>to <emphasis
-          role="bold">scidbNewVersion</emphasis>. After you edit the file,
-          copy it to the <literal>/opt/scidb/</literal><emphasis
-          role="bold">scidbNewVersion</emphasis><literal>/etc/</literal>folder.</para>
-
-          <para>For example, if you are upgrading to version is
-          &scidb_version;, you would copy your file to the
-          <literal>/opt/scidb/&scidb_version;/etc/</literal> folder.
-          Typically, the following settings are affected:<programlisting>install_root=/opt/scidb/13.9
+            <para>Typically, the following settings are
+            affected:<programlisting>install_root=/opt/scidb/13.9
 pluginsdir=/opt/scidb/13.9/lib/scidb/plugins
 logconf=/opt/scidb/13.9/share/scidb/log4cxx.properties</programlisting></para>
 
-          <para>Also, make sure to add the following setting to the
-          configuration file:</para>
+            <para>Also, make sure to add the following setting to the
+            configuration file:<programlisting>enable-catalog-upgrade=true</programlisting>For
+            more details about the configuration file, see <xref
+            linkend="ConfiguringSciDB"/>.</para>
+          </listitem>
 
-          <programlisting>enable-catalog-upgrade=true</programlisting>
-        </listitem>
-
-        <listitem>
-          <para><emphasis role="bold">If you want to set up and use a new
-          config.ini file: </emphasis>Proceed to <xref
-          linkend="ConfiguringSciDB"/>.</para>
-        </listitem>
-      </itemizedlist>
+          <listitem>
+            <para>Restart SciDB. Initialization is recommended to avoid errors
+            that you would otherwise receive, based on incompatibilities
+            between your your "old" database and your "new" SciDB version.
+            Remember, though, that initializing the SciDB database destroys
+            all the data in that database.<note>
+                <para>If you get an error that says SciDB needs to upgrade the
+                system catalog, and that the action failed, make sure to set
+                the <code>enable-catalog-upgrade</code> parameter to <emphasis
+                role="bold">true</emphasis>, as detailed in the previous
+                step.</para>
+              </note></para>
+          </listitem>
+        </orderedlist></para>
     </step>
 
     <step>
-      <para>Restart your SciDB database. Initialization is recommended to
-      avoid errors that you would otherwise receive, based on
-      incompatibilities between your your "old" database and your "new" SciDB
-      version. Remember, though, that initializing the SciDB database destroys
-      all the data in that database.<note>
-          <para>If you get an error that says SciDB needs to upgrade the
-          system catalog, and that the action failed, make sure to set the
-          <code>enable-catalog-upgrade</code> parameter to <emphasis
-          role="bold">true</emphasis>, as detailed in step 7 above.</para>
-        </note></para>
-    </step>
-
-    <step>
-      <para>After you have the new version of SciDB running, restore the data
-      that you saved in step 1. For details, see <xref
-      linkend="opaqueLoad"/>.</para>
+      <para><emphasis role="bold">Restore. </emphasis>After you have the new
+      version of SciDB running, restore any data that you backed up in step
+      1.</para>
     </step>
   </procedure>
 

@@ -124,6 +124,14 @@
 
           <row>
             <entry><literal><link
+            linkend="cumulateOperator">cumulate</link></literal></entry>
+
+            <entry>Calculates a running aggregate along a single dimension of
+            the input array.</entry>
+          </row>
+
+          <row>
+            <entry><literal><link
             linkend="maxOperator">max</link></literal></entry>
 
             <entry>Selects the maximum value for the specified attribute,

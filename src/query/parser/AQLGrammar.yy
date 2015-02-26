@@ -33,7 +33,7 @@
 
 %union {
     int64_t int64Val;
-    double realVal;    
+    double realVal;
     char* stringVal;
     char* keyword;
     class AstNode* node;
@@ -52,10 +52,10 @@
 %right '^'
 %left UNARY_MINUS
 
-%type <node> start statement create_array_statement immutable_modifier array_attribute
-    distinct typename array_attribute_list array_dimension array_dimension_list
+%type <node> start statement create_array_statement array_attribute
+    typename array_attribute_list array_dimension array_dimension_list
     dimension_boundary_end dimension_boundaries nullable_modifier empty_modifier
-    default default_value compression reserve schema 
+    default default_value compression reserve schema
     select_statement select_list into_clause path_expression
     identifier_clause expr filter_clause atom constant constant_string constant_int64
     constant_real null_value function function_argument_list path_expression_list grw_as_clause
@@ -78,9 +78,9 @@
 
 %destructor { if ($$) delete $$; $$ = NULL; } <node>
 
-%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IMMUTABLE IF THEN ELSE CASE WHEN END
+%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IF THEN ELSE CASE WHEN END
     SELECT WHERE GROUP BY JOIN ON REGRID LOAD INTO INDEX
-    VALUES UPDATE SET LIBRARY UNLOAD TRUE FALSE DROP IS RESERVE CROSS WINDOW ASC DESC REDIMENSION ALL DISTINCT
+    VALUES UPDATE SET LIBRARY UNLOAD TRUE FALSE DROP IS RESERVE CROSS WINDOW ASC DESC REDIMENSION ALL
     CURRENT INSTANCE INSTANCES SAVE BETWEEN ERRORS SHADOW
     PARTITION PRECEDING FOLLOWING UNBOUND STEP OVER
     START THIN
@@ -129,28 +129,16 @@ statement:
     | cancel_query_statement
     | insert_into_statement
     ;
-          
+
 create_array_statement:
-    CREATE immutable_modifier empty_modifier ARRAY identifier_clause schema 
+    CREATE empty_modifier ARRAY identifier_clause schema
     {
         $$ = new AstNode(createArray, CONTEXT(@1),
             createArrayArgCount,
             $2,
-            $3,
-            $5,
-            $6);
-        $$->setComment($5->getComment());
-    }
-    ;
-
-immutable_modifier:
-    IMMUTABLE
-    {
-        $$ = new AstNodeBool(immutable, CONTEXT(@1), true);
-    }
-    | dummy
-    {
-        $$ = new AstNodeBool(immutable, CONTEXT(@1), false);
+            $4,
+            $5);
+        $$->setComment($4->getComment());
     }
     ;
 
@@ -182,15 +170,15 @@ array_attribute_list:
     ;
 
 array_attribute:
-    identifier_clause ':' typename nullable_modifier default compression reserve 
+    identifier_clause ':' typename nullable_modifier default compression reserve
     {
         $$ = new AstNode(attribute, CONTEXT(@$),
-            attributeArgCount, 
+            attributeArgCount,
             $1,
             $3,
             $4,
             $5,
-            $6, 
+            $6,
             $7);
         $$->setComment(glue._docComment);
         glue._docComment.clear();
@@ -273,12 +261,12 @@ array_dimension_list:
         $$ = new AstNode(dimensionsList, CONTEXT(@1), 1, $1);
     }
     ;
-    
+
 array_dimension:
     identifier_clause '=' dimension_boundaries ',' expr ',' expr
     {
         $$ = new AstNode(dimension, CONTEXT(@$),
-            dimensionArgCount, 
+            dimensionArgCount,
             $1,
             $3,
             $5,
@@ -289,7 +277,7 @@ array_dimension:
     | identifier_clause
     {
         $$ = new AstNode(dimension, CONTEXT(@$),
-            dimensionArgCount, 
+            dimensionArgCount,
             $1,
             new AstNode(dimensionBoundaries, CONTEXT(@$),
                 dimensionBoundaryArgCount,
@@ -301,27 +289,27 @@ array_dimension:
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
-    | identifier_clause '(' distinct typename ')' '=' dimension_boundary_end ',' expr ',' expr
+    | identifier_clause '(' typename ')' '=' dimension_boundary_end ',' expr ',' expr
     {
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
+            NULL,
             $3,
-            $4,
-            $7,
-            $9,
-            $11);
+            $6,
+            $8,
+            $10);
 
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
-    | identifier_clause '(' distinct typename ')'
+    | identifier_clause '(' typename ')'
     {
         $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
+            NULL,
             $3,
-            $4,
             new AstNode(asterisk, CONTEXT(@$), 0),
             NULL,
             new AstNodeInt64(int64Node, CONTEXT(@$), 0));
@@ -337,29 +325,13 @@ dimension_boundaries:
         $$ = new AstNode(dimensionBoundaries, CONTEXT(@$),
             dimensionBoundaryArgCount,
             $1,
-            $3);        
+            $3);
     }
     ;
 
 dimension_boundary_end:
     expr
     | asterisk
-    ;
-
-distinct:
-    ALL 
-    {
-        $$ = new AstNodeBool(distinct, CONTEXT(@1), false);
-    }
-    | 
-    DISTINCT 
-    {
-        $$ = new AstNodeBool(distinct, CONTEXT(@1), true);
-    }
-    | 
-    {
-        $$ = NULL;
-    }    
     ;
 
 //FIXME: need more flexible way
@@ -380,7 +352,7 @@ schema:
     }
     ;
 
-// Dummy rule for getting approximately position of optional token (e.g. NOT NULL, 
+// Dummy rule for getting approximately position of optional token (e.g. NOT NULL,
 // UPDATABLE, NOT EMPTY)
 dummy:
     {
@@ -421,7 +393,7 @@ select_list:
         $$ = new AstNode(selectList, CONTEXT(@1), 1, $1);
     }
     ;
-    
+
 select_list_item:
     named_expr
     | asterisk
@@ -439,20 +411,20 @@ into_clause:
 
 from_list:
     reference_input
-    {    
+    {
         $$ = new AstNode(fromList, CONTEXT(@1), 1, $1);
     }
     | from_list ',' reference_input
     {
         $1->addChild($3);
-        $$ = $1;    
+        $$ = $1;
     }
     ;
 
 filter_clause:
     WHERE expr
     {
-        $$ = $2;        
+        $$ = $2;
     }
     |
     {
@@ -535,7 +507,7 @@ window_clause_list:
         $$ = new AstNode(windowClauseList, CONTEXT(@1), 1, $1);
     }
     ;
-    
+
 
 window_clause:
     fixed_window_clause
@@ -687,7 +659,7 @@ path_expression:
         );
     }
     ;
-    
+
 timestamp_clause:
     '@' expr
     {
@@ -725,7 +697,7 @@ path_expression_list:
         $$ = new AstNode(pathExpressionList, CONTEXT(@1), 1, $1);
     }
     ;
-    
+
 identifier_clause:
     IDENTIFIER
     {
@@ -771,7 +743,7 @@ named_array_source:
     ;
 
 array_source:
-    array_access    
+    array_access
     | path_expression %prec '@'
     | function
     | '(' select_statement ')' %prec UNARY_MINUS
@@ -844,7 +816,7 @@ thin_clause:
         $$ = new AstNode(thinClause, CONTEXT(@$), thinClauseArgCount, $2, $5);
     }
     ;
-    
+
 thin_dimensions_list:
     thin_dimensions_list ',' thin_dimension
     {
@@ -949,7 +921,7 @@ expr:
     ;
 
 // Using common_expr instead expr or reduced_expr for eliminating shift-reduce conflict. Also using
-// expr here is quite useless so we do not lose anything. 
+// expr here is quite useless so we do not lose anything.
 array_access:
     common_expr '[' expr_list ']'
     {
@@ -1044,7 +1016,7 @@ reduced_expr:
     }
     ;
 
-// Common part for expr and reduced_expr. 
+// Common part for expr and reduced_expr.
 common_expr:
     atom
     ;
@@ -1059,7 +1031,7 @@ atom:
     {
         $$ = $2;
     }
-    ;    
+    ;
 
 constant:
     constant_int64
@@ -1075,7 +1047,7 @@ constant_string:
         $$ = new AstNodeString(stringNode, CONTEXT(@1), $1);
     }
     ;
-    
+
 constant_int64:
     INTEGER
     {
@@ -1152,7 +1124,7 @@ function_argument_list:
     function_argument_list ',' function_argument
     {
         $1->addChild($3);
-        $$ = $1;    
+        $$ = $1;
     }
     | function_argument
     {
@@ -1219,9 +1191,9 @@ case_expr:
                     delete $3;
                     delete $4;
                     YYABORT;
-                }                
+                }
             }
-            
+
             if(lastIif)
             {
                 //Filling third parameter of IIF
@@ -1233,7 +1205,7 @@ case_expr:
 
         //Filling third parameter of IIF for ELSE clause
         lastIif->getChild(functionArgParameters)->setChild(2,
-            $4 ? $4 : new AstNodeNull(null, CONTEXT(@4)));            
+            $4 ? $4 : new AstNodeNull(null, CONTEXT(@4)));
 
         delete $3;
         $$ = iifNode;
@@ -1255,7 +1227,7 @@ case_when_clause_list:
     | case_when_clause_list case_when_clause
     {
         $1->addChild($2);
-        $$ = $1;    
+        $$ = $1;
     }
     ;
 
@@ -1408,12 +1380,12 @@ load_save_instance_id:
     }
     | dummy
     {
-        $$ = new AstNodeInt64(int64Node, CONTEXT(@1), -2);   
+        $$ = new AstNodeInt64(int64Node, CONTEXT(@1), -2);
     }
     ;
 
 update_statement:
-    UPDATE path_expression SET update_list where_clause  
+    UPDATE path_expression SET update_list where_clause
     {
         $$ = new AstNode(updateStatement, CONTEXT(@$), updateStatementArgCount,
             $2,
@@ -1421,19 +1393,19 @@ update_statement:
             $5);
     }
     ;
-    
+
 update_list:
     update_list ',' update_list_item
     {
         $1->addChild($3);
-        $$ = $1;    
+        $$ = $1;
     }
     | update_list_item
     {
         $$ = new AstNode(updateList, CONTEXT(@1), 1, $1);
     }
     ;
-    
+
 update_list_item:
     identifier_clause '=' expr
     {
@@ -1449,7 +1421,7 @@ drop_array_statement:
     {
         $$ = new AstNode(dropArrayStatement, CONTEXT(@$), dropArrayStatementArgCount,
             $3
-            );        
+            );
     }
     ;
 
@@ -1458,7 +1430,7 @@ where_clause:
     {
         $$ = $2;
     }
-    | 
+    |
     {
         $$ = NULL;
     }
@@ -1534,7 +1506,7 @@ asterisk:
     ;
 
 non_reserved_keywords:
-    ALL
+      ALL
     | ARRAY
     | AS
     | ASC
@@ -1545,10 +1517,8 @@ non_reserved_keywords:
     | CURRENT
     | DESC
     | DEFAULT
-    | DISTINCT
     | DROP
     | END
-    | IMMUTABLE
     | INSTANCE
     | INSTANCES
     | IS

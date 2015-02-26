@@ -58,7 +58,7 @@ class PhysicalAverageRank: public PhysicalOperator
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
         vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psRoundRobin));
+        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -77,7 +77,7 @@ class PhysicalAverageRank: public PhysicalOperator
         DimensionVector offset(nDims);
 
         offset[nDims-1] += (nInstances-1)*_schema.getDimensions()[nDims-1].getChunkInterval();
-        return ArrayDistribution(psRoundRobin, DistributionMapper::createOffsetMapper(offset));
+        return ArrayDistribution(psHashPartitioned, DistributionMapper::createOffsetMapper(offset));
     }
 
     shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)

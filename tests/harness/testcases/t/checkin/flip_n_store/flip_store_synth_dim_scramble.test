@@ -19,6 +19,12 @@ redimension_store(A,B)
 # the count should be 0, because att1 and att2 are expected to be equal
 count(filter(B, att1<>att2))
 
+# same test but without the 'store' part
+count(filter(redimension(A,B), att1<>att2))
+
+# another test without the 'store'
+aggregate(apply(redimension(join(join(build(<a:int64> [x=1:100,10,0], x%10),build(<b:int64>[x=1:100,10,0], x)), build( <c:int64> [x=1:100,10,0], x)), <b:int64, c:int64> [a=0:9,2,0, s=1:10,10,0]), d, b-c ), sum(b), sum(c), avg(d), count(*))
+
 # the count should be 251, i.e. including all the elements in the array
 count(B)
 

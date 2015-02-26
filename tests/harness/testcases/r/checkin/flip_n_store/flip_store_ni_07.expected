@@ -1,13 +1,13 @@
-SCIDB QUERY : <create immutable empty array A <a:string,b:string>[x=0:2,3,0]>
+SCIDB QUERY : <create empty array A <a:string,b:string>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array T <a:string>[x=0:2,3,0]>
+SCIDB QUERY : <create empty array T <a:string>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array B <b:string>[a(string)=3,3,0]>
+SCIDB QUERY : <create empty array B <b:string>[a(string)=3,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array C <a:string>[b(string)=3,3,0]>
+SCIDB QUERY : <create empty array C <a:string>[b(string)=3,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(join(build_sparse(T,'a_'+string(x+1),1),build_sparse(T,'b_'+string(x+1),1)),A)>

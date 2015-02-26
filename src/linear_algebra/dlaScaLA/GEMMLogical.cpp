@@ -225,7 +225,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
     Attributes atts(1); atts[0] = AttributeDesc(AttributeID(0), "gemm", TID_DOUBLE, 0, 0);
 
     LOG4CXX_TRACE(logger, "GEMMLogical::inferSchema(): end.");
-    return ArrayDesc("GEMM", atts, outDims);
+    return ArrayDesc("GEMM", addEmptyTagAttribute(atts), outDims);
 }
 
 REGISTER_LOGICAL_OPERATOR_FACTORY(GEMMLogical, "gemm");

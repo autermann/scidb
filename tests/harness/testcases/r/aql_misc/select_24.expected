@@ -1,4 +1,4 @@
-SCIDB QUERY : <create immutable array A <a:int32> [x=0:2,3,0]>
+SCIDB QUERY : <create array A <a:int32> [x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <select * from show(A)>
@@ -108,13 +108,17 @@ SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
 
 SCIDB QUERY : <select * from count(versions(B))>
 {i} count
-{0} 0
+{0} 1
 
 SCIDB QUERY : <select version_id from versions(B)>
 {VersionNo} version_id
+{1} 1
 
 SCIDB QUERY : <select * from allversions(B)>
 {VersionNo,x} a
+{1,0} 10
+{1,1} 11
+{1,2} 12
 
 SCIDB QUERY : <select * from help()>
 {i} help

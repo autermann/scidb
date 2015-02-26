@@ -7,9 +7,8 @@ create array A <r:string NULL>[x=10:17,2,0]
 store(build(A,20*x+1),A)
 store(apply(A,s, iif(x=13,na,iif(x=16,null,x))),B)
 
-
 --test
---set-format dense
+
 sort(A)
 sort(filter(A, r> '250'))
 sort(filter(A, x<> 15))
@@ -74,7 +73,6 @@ quantile(filter(B, x< 15 and x>15),100,r)
 --error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "quantile(filter(B, x< 15 and x>15),100,s,r)"
 --error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "sort(A,x)"
 
---reset-format
 --cleanup
 remove(A)
 remove(B)

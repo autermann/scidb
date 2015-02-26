@@ -34,6 +34,7 @@
 #include <boost/shared_array.hpp>
 
 // SciDB
+#include <array/DelegateArray.h>
 #include <array/MemArray.h>
 #include <array/OpArray.h>
 #include <log4cxx/logger.h>
@@ -496,8 +497,20 @@ shared_ptr<Array> GEMMPhysical::execute(std::vector< shared_ptr<Array> >& inputA
     //
     // invokeMPI()
     //
-    shared_ptr<Array> result;
-    result = invokeMPI(inputArrays, options, query, _schema);
+
+    // invokeMPI does not manage an empty bitmap yet, but it is specified in _schema.
+    // so to make it compatible, we first create a copy of _schema without the empty tag attribute
+    Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
+    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions());
+
+    // and now invokeMPI produces an array without empty bitmap
+    shared_ptr<Array> arrayNoEmptyTag = invokeMPI(inputArrays, options, query, schemaNoEmptyTag);
+
+
+    // now we place a wrapper array around arrayNoEmptyTag, that adds a fake emptyTag (true everywhere)
+    // but otherwise passes through requests for iterators on the other attributes.
+    // And yes, the class name is the complete opposite of what it shold be.
+    shared_ptr<Array> result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
 
     // return the scidb array
     LOG4CXX_DEBUG(logger, "GEMMPhysical::execute(): (successful) end");

@@ -168,7 +168,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
             // Insert SG to scatter aggregated result
             ArrayDesc sgSchema =  logicalOp->getSchema();
             sgSchema.setName("");
-            //  TODO[apoliakov]: sgSchema.setPartitioningSchema(psRoundRobin); ??
+            //  TODO[apoliakov]: sgSchema.setPartitioningSchema(psHashPartitioned); ??
 
             //Prepare SG operator and single parameter - array name equal original name
             //which used in LOAD statement
@@ -176,7 +176,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
 
             boost::shared_ptr<Expression> psConst = boost::make_shared<Expression>();
             Value ps(TypeLibrary::getType(TID_INT32));
-            ps.setInt32(psRoundRobin);
+            ps.setInt32(psHashPartitioned);
             psConst->compile(false, TID_INT32, ps);
             sgParams.push_back(boost::shared_ptr<OperatorParam>(
                                    new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(""), psConst, true)));
@@ -211,7 +211,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
         PhysicalOperator::Parameters sgParams;
         boost::shared_ptr<Expression> distributeExpression = boost::make_shared<Expression>();
         Value distributeType(TypeLibrary::getType(TID_INT32));
-        distributeType.setInt32(psRoundRobin);
+        distributeType.setInt32(psHashPartitioned);
         distributeExpression->compile(false, TID_INT32, distributeType);
         sgParams.push_back(boost::shared_ptr<OperatorParam>( new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(""),
                                                                                                  distributeExpression,

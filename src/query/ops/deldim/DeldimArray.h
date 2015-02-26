@@ -57,10 +57,14 @@ class DeldimChunkIterator : public DelegateChunkIterator
 
 class DeldimChunk : public DelegateChunk
 {
-    Coordinates outPos;
+  private:
+    Coordinates _firstPos;
+    Coordinates _lastPos;
+    Coordinates _firstPosOverlap;
+    Coordinates _lastPosOverlap;
 
   public:
-	virtual Coordinates const& getFirstPosition(bool withOverlap) const;
+    virtual Coordinates const& getFirstPosition(bool withOverlap) const;
 	virtual Coordinates const& getLastPosition(bool withOverlap) const;
     virtual void setInputChunk(ConstChunk const& inputChunk);
 

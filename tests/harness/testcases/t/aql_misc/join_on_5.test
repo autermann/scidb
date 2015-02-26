@@ -1,6 +1,6 @@
 --setup
-create immutable array A <a:int32>[x=0:2,3,0,y=1:6,3,0]
-create immutable array B <b:string>[p=0:2,3,0,q=1:6,3,0]
+create array A <a:int32>[x=0:2,3,0,y=1:6,3,0]
+create array B <b:string>[p=0:2,3,0,q=1:6,3,0]
 store(build(A,x+1),A)
 store(build(B,'b'+string(p)+string(q)),B)
 store(join(A,B),C)

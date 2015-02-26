@@ -1,4 +1,4 @@
-SCIDB QUERY : <CREATE IMMUTABLE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,10,0, y=0:1999,10,0]>
+SCIDB QUERY : <CREATE ARRAY ABRLOAD <a:double compression 'dictionary'> [x=0:1999,10,0, y=0:1999,10,0]>
 Query was executed successfully
 
 SCIDB QUERY : <CREATE EMPTY ARRAY ABRREDIM <x:int64>[a(double)=*,20,0]>
@@ -28,8 +28,9 @@ SCIDB QUERY : <count(ABRLOAD)>
 {i} count
 {0} 4000000
 
-SCIDB QUERY : <versions(ABRLOAD)>
-{VersionNo} version_id,timestamp
+SCIDB QUERY : <project(versions(ABRLOAD),version_id)>
+{VersionNo} version_id
+{1} 1
 
 "should be empty..."
 SCIDB QUERY : <count(ABRREDIM)>

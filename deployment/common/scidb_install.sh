@@ -24,7 +24,7 @@ function centos6 ()
 {
     /sbin/chkconfig iptables off
     /sbin/service iptables stop
-    yum install --enablerepo=scidb3rdparty -y $(ls *.rpm)
+    yum install --enablerepo=scidb3rdparty -y $(ls *.rpm) || exit 1
 }
 
 function ubuntu1204 ()
@@ -38,8 +38,8 @@ function ubuntu1204 ()
 	done;) | sort -u
     }
     apt-get update
-    apt-get install -y $(dependencies)
-    dpkg -R -i .
+    apt-get install -y $(dependencies) || exit 1
+    dpkg -R -i . || exit 1
 
 # remark: possible to use a method more like that of the centos6() function above? i dislike the current approach because
 # it hard codes knowledge of specific 3rd party deps (mpich2 and libboost). Perhaps set up a Local Repository and then use

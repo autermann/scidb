@@ -1,4 +1,4 @@
-SCIDB QUERY : <create immutable array A <a:datetime>[x=0:2,3,0]>
+SCIDB QUERY : <create array A <a:datetime>[x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(A,datetime('10/10/2010 01:12:21')),A)>

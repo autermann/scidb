@@ -1,5 +1,5 @@
 --setup
---aql create immutable array A <a:int32> [x=0:2,3,0]
+--aql create array A <a:int32> [x=0:2,3,0]
 load_library('more_math')
 store(build(A,x+2),A)
 store(build(A,x-1),B)

@@ -1104,7 +1104,7 @@ class PhysicalQuantile: public PhysicalOperator
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
         vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psRoundRobin));
+        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -1253,7 +1253,7 @@ class PhysicalQuantile: public PhysicalOperator
 
             if (nInstances > 1)
             {
-                rankArray = redistribute(rankArray,query,psRoundRobin,"", -1, boost::shared_ptr<DistributionMapper>(), 0);
+                rankArray = redistribute(rankArray,query,psHashPartitioned,"", -1, boost::shared_ptr<DistributionMapper>(), 0);
             }
             else
             {
@@ -1295,7 +1295,7 @@ class PhysicalQuantile: public PhysicalOperator
                     chunkCoords.push_back(0);
                 }
 
-                InstanceID instanceForChunk = getInstanceForChunk(query, chunkCoords, _schema, psRoundRobin, shared_ptr<DistributionMapper> (), 0, 0);
+                InstanceID instanceForChunk = getInstanceForChunk(query, chunkCoords, _schema, psHashPartitioned, shared_ptr<DistributionMapper> (), 0, 0);
                 if(instanceForChunk == myInstance)
                 {
                     LOG4CXX_DEBUG(logger, "Initializing bucket with "<<chunkCoords.size()<<" coords; count "<<count);
@@ -1303,7 +1303,7 @@ class PhysicalQuantile: public PhysicalOperator
                     (*buckets)[chunkCoords].maxIndeces = vector<double> ();
                     (*buckets)[chunkCoords].values = vector<Value> ();
 
-                    size_t chunkNo = _schema.getChunkNumber(chunkCoords);
+                    size_t chunkNo = _schema.getHashedChunkNumber(chunkCoords);
                     liveChunks->insert(chunkNo);
                 }
             }
@@ -1312,7 +1312,7 @@ class PhysicalQuantile: public PhysicalOperator
             fillQuantiles(rankArray, buckets, *grouping);
             for(size_t i =1 ; i < nInstances ; i++)
             {
-                rankArray = redistribute(rankArray,query,psRoundRobin,"", -1, boost::shared_ptr<DistributionMapper>(), i);
+                rankArray = redistribute(rankArray,query,psHashPartitioned,"", -1, boost::shared_ptr<DistributionMapper>(), i);
                 fillQuantiles(rankArray, buckets, *grouping);
             }
             rankArray.reset();

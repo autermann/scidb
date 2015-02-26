@@ -1,4 +1,4 @@
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -7,7 +7,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -16,7 +16,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -25,7 +25,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -34,7 +34,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -43,7 +43,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -52,7 +52,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -61,7 +61,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -70,7 +70,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -79,7 +79,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
@@ -88,7 +88,7 @@ SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>
 SCIDB QUERY : <remove(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <create immutable empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
+SCIDB QUERY : <create empty array A <a:int32> [x=0:999,10,0,y=0:999,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(build_sparse(A,iif(x+y=0,1,x+y),1),A)>

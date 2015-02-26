@@ -109,7 +109,6 @@ public:
 		assert(schemas.size() == 1);
 
         ArrayDesc const& srcDesc = schemas[0];
-        
         ArrayDesc dstDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         //Compile a desc of all possible attributes (aggregate calls first) and source dimensions
@@ -219,12 +218,13 @@ public:
         }
         
         Dimensions outputDims;
-
+        size_t nNewDims = 0;
         BOOST_FOREACH(const DimensionDesc &dstDim, dstDesc.getDimensions())
         {
-            if (dstDim.getChunkOverlap() != 0)
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR3);
-
+            if (dstDim.getChunkOverlap() > dstDim.getChunkInterval())
+            {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK);
+            }
             BOOST_FOREACH(const AttributeDesc &srcAttr, aggregationDesc.getAttributes())
             {
                 if (dstDim.hasNameAndAlias(srcAttr.getName()))
@@ -239,11 +239,6 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE)
                             << srcAttr.getName() << TID_INT64;
                     }
-                    if (srcAttr.getFlags() != 0)
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_FLAGS)
-                           << srcAttr.getName() << TID_INT64;
-                    }
                     if (dstDim.getType() != TID_INT64)
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_DIMENSION_TYPE)
@@ -257,23 +252,29 @@ public:
             {
                 if (srcDim.hasNameAndAlias(dstDim.getBaseName()))
                 {
-                    if (dstDim.getType() != srcDim.getType()                   ||
-                        dstDim.getStart() != srcDim.getStart()                 ||
-                        dstDim.getLength() != srcDim.getLength()               ||
-                        dstDim.getChunkInterval() != srcDim.getChunkInterval())
+                    if (dstDim.getType() != srcDim.getType() ||
+                        (dstDim.getType() != TID_INT64 &&             //if this is a NID, we can't change its origin
+                         dstDim.getStart() != srcDim.getStart()))     //(old code on the way out)
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSIONS_DONT_MATCH)
                             << srcDim.getBaseName() << dstDim.getBaseName();
                     }
-                    outputDims.push_back(srcDim);
+                    DimensionDesc outputDim = dstDim;
+                    outputDim.setMappingArrayName(srcDim.getMappingArrayName());
+                    outputDims.push_back(outputDim);
                     goto NextDim;
                 }
             }
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION) << dstDim.getBaseName();
-          NextDim:;
+            //one synthetic dimension allowed
+            if (nNewDims++ != 0 || !aggregatedNames.empty() || dstDim.getType() != TID_INT64)
+            {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION) << dstDim.getBaseName();
+            }
+            outputDims.push_back(dstDim);
+            NextDim:;
         }
 
-        return ArrayDesc(srcDesc.getName()+"_redimension", dstDesc.getAttributes(), outputDims, dstDesc.getFlags());
+        return ArrayDesc(srcDesc.getName(), dstDesc.getAttributes(), outputDims, dstDesc.getFlags());
 	}
 };
 

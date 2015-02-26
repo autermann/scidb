@@ -1,4 +1,4 @@
-SCIDB QUERY : <create immutable array A <a:int32> [x=0:8,6,0,y=-2:6,8,1]>
+SCIDB QUERY : <create array A <a:int32> [x=0:8,6,0,y=-2:6,8,1]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(A,x+10),A)>

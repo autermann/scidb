@@ -15,21 +15,21 @@
 
         <secondary>multiplication</secondary>
       </indexterm>Produces a result array via matrix multiplication of two
-      input arrays</refpurpose>
+    input arrays</refpurpose>
 
     <para><indexterm>
         <primary>deprecated</primary>
+
         <secondary>multiply</secondary>
       </indexterm><emphasis role="bold">Deprecated. </emphasis>The
     <code>multiply</code> operator may be removed in the future. We recommend
     that you use <link linkend="gemmOperator">GEMM</link> as the alternative.
     Or, if you have the Paradigm4 Extensions to SciDB, you can use the
-    <code>sparse_multiply</code> operator.</para>
+    <code>spgemm</code> operator.</para>
   </refnamediv>
 
   <refsynopsisdiv>
     <synopsis>multiply(<replaceable>left_array</replaceable>,<replaceable>right_array</replaceable>);</synopsis>
-
   </refsynopsisdiv>
 
   <refsect1>

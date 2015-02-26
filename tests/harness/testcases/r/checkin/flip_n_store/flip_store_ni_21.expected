@@ -1,13 +1,13 @@
-SCIDB QUERY : <create immutable array A <a:float,b:float>[x=0:2,3,0]>
+SCIDB QUERY : <create array A <a:float,b:float>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array T <a:float>[x=0:2,3,0]>
+SCIDB QUERY : <create array T <a:float>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array B <b:float>[a(float)=3,3,0]>
+SCIDB QUERY : <create empty array B <b:float>[a(float)=3,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array C <a:float>[b(float)=3,3,0]>
+SCIDB QUERY : <create empty array C <a:float>[b(float)=3,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(join(build(T,x+1+0.05),build(T,x+5+0.08)),A)>

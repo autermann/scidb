@@ -365,7 +365,7 @@ namespace scidb
                 // Check if chunking is performed in more than one dimension
                 bool multisplit = false;
                 for (i = 1; i < nDimensions; i++) {
-                    if (dims[i].getChunkInterval() < dims[i].getLength()) {
+                    if (dims[i].getChunkInterval() < static_cast<int64_t>(dims[i].getLength())) {
                         multisplit = true;
                     }
                 }
@@ -724,7 +724,7 @@ namespace scidb
                 bool multisplit = false;
                 for (i = 1; i < nDimensions; i++)
                 {
-                    if (dims[i].getChunkInterval() < dims[i].getLength())
+                    if (dims[i].getChunkInterval() < static_cast<int64_t>(dims[i].getLength()))
                     {
                         multisplit = true;
                     }

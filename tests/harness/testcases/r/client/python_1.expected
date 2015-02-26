@@ -4,7 +4,7 @@ SCIDB QUERY : <echo ('python basic.py')>
 
 SCIDB QUERY : <cd ${TESTCASES_DIR}/t/client && python basic.py ${IQUERY_HOST} ${IQUERY_PORT}>
 Reading file querylist.csv
-Query 1 (aql): "select * from list('types')"
+Query 1 (aql): "select * from list('types') where library='scidb' order by name"
 Getting iterator for attribute 0, chunk 0.
 
 Data: binary
@@ -19,8 +19,6 @@ Data: int16
 Data: int32
 Data: int64
 Data: int8
-Data: point
-Data: rational
 Data: string
 Data: string_*
 Data: uint16
@@ -43,8 +41,6 @@ Data: scidb
 Data: scidb
 Data: scidb
 Data: scidb
-Data: point
-Data: rational
 Data: scidb
 Data: scidb
 Data: scidb

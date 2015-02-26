@@ -250,13 +250,13 @@ shared_ptr<Array> ScaLAPACKPhysical::redistributeOutputArrayForTiming(shared_ptr
 {
     // NOTE: for timing only.  Normally, the query planner inserts the redistribute
     // between ScaLAPACK-based operators which have output type psScaLAPACK,
-    // and other operators, such as store, that require, e.g. type psRoundRobin (which isn't, it is hashed)
+    // and other operators, such as store, that require, e.g. type psHashPartitioned
     // but until the "consume()" operator is completed, and can request redistribution to RR,
     // I need a way to force in the redistribution to measure its cost, when the terminal operator
     // is filter(val > 1e200), which is my workaround for not having "consume"
 
-    // redistribute back to psRoundRobin
-    shared_ptr<Array>redistOutput= redistribute(outputArray, query, psRoundRobin);
+    // redistribute back to psHashPartitioned
+    shared_ptr<Array>redistOutput= redistribute(outputArray, query, psHashPartitioned);
     return redistOutput;
 }
 

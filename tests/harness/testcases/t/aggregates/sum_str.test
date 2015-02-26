@@ -1,6 +1,6 @@
 --setup
 
-CREATE IMMUTABLE ARRAY vector_str<x:string, y:double>[i=1:8,4,0]
+CREATE ARRAY vector_str<x:string, y:double>[i=1:8,4,0]
 
 load(vector_str, '../tests/harness/testcases/data/vector_str.txt')
 

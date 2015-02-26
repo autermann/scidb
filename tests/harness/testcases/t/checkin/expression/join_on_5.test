@@ -1,7 +1,7 @@
 # test case for ticket #520
 
 --setup
-create immutable array A <a:int32>[x=0:2,3,0]
+create array A <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
 store(build(A,x+10),B)
 

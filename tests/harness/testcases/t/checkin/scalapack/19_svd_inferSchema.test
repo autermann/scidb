@@ -1,4 +1,5 @@
 --setup
+--start-query-logging
 
 #minimal matrices
 # 1c32
@@ -33,11 +34,20 @@ gesvd(A_1c32, 'SIGMA')
 # invalid output type, e.g. 'foo'
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33 "gesvd(A_1c32, 'foo')"
 
+# also demonstrate result has a fully-defined schema (by storing into un-created array),
+# that it does not have the "not emptyable" attribute, and that it can be scanned.
+--justrun "remove tmp"
 store(gesvd(A_1c32, 'U'),  tmp)
+show(tmp)
+scan(tmp)
 remove(tmp)
 store(gesvd(A_1c32, 'S'),  tmp)
+show(tmp)
+scan(tmp)
 remove(tmp)
 store(gesvd(A_1c32, 'VT'), tmp)
+show(tmp)
+scan(tmp)
 remove(tmp)
 
 # if firt axis name of M is 'i', it will collide with gesvd(M,'U')

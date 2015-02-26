@@ -1,8 +1,8 @@
 --setup
 --start-query-logging
-create immutable array A <a:int64, b:int64> [x=0:2,3,0,y=-2:2,4,0]
+create array A <a:int64, b:int64> [x=0:2,3,0,y=-2:2,4,0]
 create array B <c:int64, d:int64> [p=0:2,3,0,q=-2:2,4,0]
-create immutable array C <c:int64, d:int64> [p=0:2,3,0,q=-2:2,4,0]
+create array C <c:int64, d:int64> [p=0:2,3,0,q=-2:2,4,0]
 
 --test
 --aql load A from '../tests/harness/testcases/data/a_join.txt'

@@ -1,6 +1,6 @@
 --setup
 --start-query-logging
-create immutable array A <a:double> [x=-2:8,6,0]
+create array A <a:double> [x=-2:8,6,0]
 store(build(A,x+10.5),A)
 
 --test

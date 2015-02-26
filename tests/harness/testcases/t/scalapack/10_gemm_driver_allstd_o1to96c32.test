@@ -11,10 +11,10 @@
 --shell --command "echo size-list=+:1:96:13                 >> /tmp/$PPID.cfg"
 
 --shell --command "python ../../bin/dla_driver.py /tmp/$PPID.cfg 1> /tmp/$PPID.stdout 2> /tmp/$PPID.stderr"
---shell --command "cat /tmp/$PPID.stderr"
---shell --command "cat /tmp/$PPID.stdout" --store
 
 --cleanup
+--shell --command "cat /tmp/$PPID.stderr"
+--shell --command "cat /tmp/$PPID.stdout" --store
 --shell --command "rm /tmp/$PPID.cfg"
 --shell --command "rm /tmp/$PPID.stdout"
 --shell --command "rm /tmp/$PPID.stderr" 

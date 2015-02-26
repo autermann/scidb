@@ -55,7 +55,7 @@ public:
         const string &name = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[0])->getObjectName();
         ArrayDesc schema = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[1])->getSchema();
         schema.setName(name);
-        SystemCatalog::getInstance()->addArray(schema, psRoundRobin);
+        SystemCatalog::getInstance()->addArray(schema, psHashPartitioned);
     }
 
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,

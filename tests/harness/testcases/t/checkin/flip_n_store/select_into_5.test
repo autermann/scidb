@@ -1,10 +1,10 @@
 --setup
 --start-query-logging
-create immutable array A <a:int32, b:int32, c:string> [x=0:2,3,0]
-create immutable array T <a:int32> [x=0:2,3,0]
-create immutable array TS <a:string> [x=0:2,3,0]
-create immutable empty array B <a:int32, c:string> [b(int32)=3,3,0]
-create immutable array F <c:string, ad:double, b:int32, c2:string> [x=0:2,3,0]
+create array A <a:int32, b:int32, c:string> [x=0:2,3,0]
+create array T <a:int32> [x=0:2,3,0]
+create array TS <a:string> [x=0:2,3,0]
+create empty array B <a:int32, c:string> [b(int32)=3,3,0]
+create array F <c:string, ad:double, b:int32, c2:string> [x=0:2,3,0]
 
 --test
 

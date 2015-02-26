@@ -112,7 +112,8 @@
 
         <step>
           <para>Sort by country (ascending), then year (descending), and use a
-          chunk size of 100 for the result array: <para><programlisting>AFL% sort(winnersAbridged,country, year desc, 100);</programlisting><screen>{n} country,year,event
+          chunk size of 100 for the result array: <para><programlisting>AFL% sort(project(winnersFlat,country, year, event), country, year desc, 100);
+</programlisting><screen>{n} country,year,event
 {0} 'Canada',1996,'dash'
 {1} 'Ethiopia',2000,'marathon'
 {2} 'Italy',2004,'marathon'
@@ -125,12 +126,7 @@
 {9} 'USA',2004,'dash'
 {10} 'USA',2000,'dash'
 {11} 'USA',1996,'marathon'
-</screen> Note
-          that the result includes 12 cells, corresponding to the 12 non-empty
-          cells of the source array. The sort operator ignores empty cells, of
-          which there are several in the winnersAbridged array. (They empty
-          cells correspond to non-Olympic years included in the dimension
-          "year.")</para></para>
+</screen></para></para>
         </step>
       </procedure>
 

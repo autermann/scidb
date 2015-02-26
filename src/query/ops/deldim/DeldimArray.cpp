@@ -79,28 +79,33 @@ namespace scidb {
     //
 	Coordinates const& DeldimChunk::getFirstPosition(bool withOverlap) const
     {
-        Coordinates const& inPos = DelegateChunk::getFirstPosition(withOverlap);
-        delDim(inPos, ((DeldimChunk*)this)->outPos);
-        return outPos;
+        return withOverlap ? _firstPosOverlap : _firstPos;
     }
 
 	Coordinates const& DeldimChunk::getLastPosition(bool withOverlap) const
     {
-        Coordinates const& inPos = DelegateChunk::getLastPosition(withOverlap);
-        delDim(inPos, ((DeldimChunk*)this)->outPos);
-        return outPos;
+        return withOverlap ? _lastPosOverlap : _lastPos;
     }
 
     DeldimChunk::DeldimChunk(DeldimArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID)
     : DelegateChunk(array, iterator, attrID, true),
-      outPos(array.getArrayDesc().getDimensions().size())
-    {
-    }
-      
+      _firstPos(array.getArrayDesc().getDimensions().size(),0),
+      _lastPos(array.getArrayDesc().getDimensions().size(),0),
+      _firstPosOverlap(array.getArrayDesc().getDimensions().size(),0),
+      _lastPosOverlap(array.getArrayDesc().getDimensions().size(),0)
+    {}
+
     void DeldimChunk::setInputChunk(ConstChunk const& inputChunk)
     {
         DelegateChunk::setInputChunk(inputChunk);
-        isClone = !inputChunk.isSparse();
+        Coordinates const& fpo = DelegateChunk::getFirstPosition(true);
+        delDim(fpo, _firstPosOverlap);
+        Coordinates const& fp = DelegateChunk::getFirstPosition(false);
+        delDim(fp, _firstPos);
+        Coordinates const& lp = DelegateChunk::getLastPosition(false);
+        delDim(lp, _lastPos);
+        Coordinates const& lpo = DelegateChunk::getLastPosition(true);
+        delDim(lpo, _lastPosOverlap);
     }
 
     //

@@ -57,7 +57,11 @@ class AdddimChunkIterator : public DelegateChunkIterator
 
 class AdddimChunk : public DelegateChunk
 {
-    Coordinates outPos;
+  private:
+    Coordinates _firstPos;
+    Coordinates _lastPos;
+    Coordinates _firstPosOverlap;
+    Coordinates _lastPosOverlap;
 
   public:
 	virtual Coordinates const& getFirstPosition(bool withOverlap) const;

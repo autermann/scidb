@@ -593,14 +593,14 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
                 else
                 {
                     sgNeeded = true;
-                    newDist = ArrayDistribution(psRoundRobin);
+                    newDist = ArrayDistribution(psHashPartitioned);
                 }
                 sgMovable = false;
             }
             else if( cDist == ArrayDistribution(psReplication) )
             {
                 //replication distributions can be reduced instead of sg-ed so they are handled as a special case
-                ArrayDistribution reqDistro(psRoundRobin);
+                ArrayDistribution reqDistro(psHashPartitioned);
                 //does root want a particular distribution? if so - use that
                 //if not - force round robin! Otherwise we may get incorrect results
                 if( root->needsSpecificDistribution())
@@ -650,7 +650,7 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
             ArrayDistribution lhs = root->getChildren()[0]->getDistribution();
             if (root->getChildren()[0]->outputFullChunks() == false || lhs == ArrayDistribution(psLocalInstance))
             {
-                PhysNodePtr sgNode = n_buildSgNode(root->getChildren()[0]->getPhysicalOperator()->getSchema(), psRoundRobin);
+                PhysNodePtr sgNode = n_buildSgNode(root->getChildren()[0]->getPhysicalOperator()->getSchema(), psHashPartitioned);
                 n_addParentNode(root->getChildren()[0],sgNode);
                 sgNode->inferBoundaries();
                 sgNode->setSgMovable(false);
@@ -660,7 +660,7 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
             ArrayDistribution rhs = root->getChildren()[1]->getDistribution();
             if (root->getChildren()[1]->outputFullChunks() == false || rhs == ArrayDistribution(psLocalInstance))
             {
-                PhysNodePtr sgNode = n_buildSgNode(root->getChildren()[1]->getPhysicalOperator()->getSchema(), psRoundRobin);
+                PhysNodePtr sgNode = n_buildSgNode(root->getChildren()[1]->getPhysicalOperator()->getSchema(), psHashPartitioned);
                 n_addParentNode(root->getChildren()[1],sgNode);
                 sgNode->inferBoundaries();
                 sgNode->setSgMovable(false);
@@ -669,10 +669,10 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
 
             if(root->getDistributionRequirement().getReqType() == DistributionRequirement::Collocated)
             {
-                if (lhs != rhs || lhs.getPartitioningSchema() != psRoundRobin)
+                if (lhs != rhs || lhs.getPartitioningSchema() != psHashPartitioned)
                 {
-                    bool canMoveLeftToRight = (rhs.isViolated() == false && rhs.getPartitioningSchema() == psRoundRobin);
-                    bool canMoveRightToLeft = (lhs.isViolated() == false && lhs.getPartitioningSchema() == psRoundRobin);
+                    bool canMoveLeftToRight = (rhs.isViolated() == false && rhs.getPartitioningSchema() == psHashPartitioned);
+                    bool canMoveRightToLeft = (lhs.isViolated() == false && lhs.getPartitioningSchema() == psHashPartitioned);
 
                     PhysNodePtr leftCandidate = s_findThinPoint(root->getChildren()[0]);
                     PhysNodePtr rightCandidate = s_findThinPoint(root->getChildren()[1]);
@@ -718,14 +718,14 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
                     {   //move both left and right to roundRobin
                         if(lhs.getPartitioningSchema() == psReplication)
                         {   //left is replicated - reduce it
-                            PhysNodePtr reducerNode = n_buildReducerNode(root->getChildren()[0], psRoundRobin);
+                            PhysNodePtr reducerNode = n_buildReducerNode(root->getChildren()[0], psHashPartitioned);
                             n_addParentNode(root->getChildren()[0], reducerNode);
                             reducerNode->inferBoundaries();
                             s_propagateDistribution(reducerNode, root);
                         }
                         else
                         {   //left is not replicated - sg it
-                            PhysNodePtr leftSg = n_buildSgNode(leftCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
+                            PhysNodePtr leftSg = n_buildSgNode(leftCandidate->getPhysicalOperator()->getSchema(), psHashPartitioned);
                             n_addParentNode(leftCandidate, leftSg);
                             leftSg->inferBoundaries();
                             s_propagateDistribution(leftSg, root);
@@ -733,14 +733,14 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
 
                         if(rhs.getPartitioningSchema() == psReplication)
                         {   //right is replicated - reduce it
-                            PhysNodePtr reducerNode = n_buildReducerNode(root->getChildren()[1], psRoundRobin);
+                            PhysNodePtr reducerNode = n_buildReducerNode(root->getChildren()[1], psHashPartitioned);
                             n_addParentNode(root->getChildren()[1], reducerNode);
                             reducerNode->inferBoundaries();
                             s_propagateDistribution(reducerNode, root);
                         }
                         else
                         {   //right is not replicated - sg it
-                            PhysNodePtr rightSg = n_buildSgNode(rightCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
+                            PhysNodePtr rightSg = n_buildSgNode(rightCandidate->getPhysicalOperator()->getSchema(), psHashPartitioned);
                             n_addParentNode(rightCandidate, rightSg);
                             rightSg->inferBoundaries();
                             s_propagateDistribution(rightSg, root);
@@ -770,11 +770,11 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
                 PhysNodePtr child = root->getChildren()[i];
                 ArrayDistribution distro = child->getDistribution();
 
-                if (child->outputFullChunks()==false || (needCollocation && distro!= ArrayDistribution(psRoundRobin)))
+                if (child->outputFullChunks()==false || (needCollocation && distro!= ArrayDistribution(psHashPartitioned)))
                 {   //If needCollocation is true, then we have more than two children who must be collocated. This is a hard problem.
                     //Let's move everyone to roundRobin for now.
                     PhysNodePtr sgCandidate = s_findThinPoint(child);
-                    PhysNodePtr sgNode = n_buildSgNode(sgCandidate->getPhysicalOperator()->getSchema(), psRoundRobin);
+                    PhysNodePtr sgNode = n_buildSgNode(sgCandidate->getPhysicalOperator()->getSchema(), psHashPartitioned);
                     sgNode->setSgMovable(false);
                     sgNode->setSgOffsetable(false);
                     n_addParentNode(sgCandidate, sgNode);
@@ -783,7 +783,7 @@ void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
                 }
                 else if(distro.getPartitioningSchema() == psReplication)
                 {   //this child is replicated - reduce it to roundRobin no matter what
-                    PhysNodePtr reducerNode = n_buildReducerNode(child, psRoundRobin);
+                    PhysNodePtr reducerNode = n_buildReducerNode(child, psHashPartitioned);
                     n_addParentNode(child, reducerNode);
                     reducerNode->inferBoundaries();
                     s_propagateDistribution(reducerNode, root);
@@ -1038,7 +1038,7 @@ void HabilisOptimizer::cw_pushupSg (PhysNodePtr root, PhysNodePtr sgToRemove, Ph
     assert(newSgrDistro == newSgoDistro);
     root->inferDistribution();
 
-    PhysNodePtr newSg = n_buildSgNode(root->getPhysicalOperator()->getSchema(), psRoundRobin);
+    PhysNodePtr newSg = n_buildSgNode(root->getPhysicalOperator()->getSchema(), psHashPartitioned);
     newSg->setSgMovable(true);
     newSg->setSgOffsetable(true);
     n_addParentNode(root,newSg);
@@ -1062,7 +1062,7 @@ void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, Phys
 
     ArrayDistribution newDist (newSgrDistro.getPartitioningSchema(), newSgrDistro.getMapper());
 
-    PhysNodePtr newOppositeSg = n_buildSgNode(oppositeThinPoint->getPhysicalOperator()->getSchema(), psRoundRobin);
+    PhysNodePtr newOppositeSg = n_buildSgNode(oppositeThinPoint->getPhysicalOperator()->getSchema(), psHashPartitioned);
     n_addParentNode(oppositeThinPoint, newOppositeSg);
     s_setSgDistribution(newOppositeSg, newDist);
     newOppositeSg->inferBoundaries();
@@ -1075,7 +1075,7 @@ void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, Phys
     assert(newSgrDistro == newOppositeDistro);
     root->inferDistribution();
 
-    PhysNodePtr newRootSg = n_buildSgNode(root->getPhysicalOperator()->getSchema(), psRoundRobin);
+    PhysNodePtr newRootSg = n_buildSgNode(root->getPhysicalOperator()->getSchema(), psHashPartitioned);
     newRootSg->setSgMovable(true);
     newRootSg->setSgOffsetable(true);
     n_addParentNode(root,newRootSg);
@@ -1226,10 +1226,10 @@ void HabilisOptimizer::tw_rewriteStoringSG(PhysNodePtr root)
             ArrayDesc storeSchema = storeOp->getSchema();
 
             ArrayDistribution distro = child->getDistribution();
-            if (distro != ArrayDistribution(psRoundRobin))
+            if (distro != ArrayDistribution(psHashPartitioned))
                 throw SYSTEM_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_NOT_IMPLEMENTED) << " storing arrays in non-roro distribution";
 
-            PhysNodePtr newSg = n_buildSgNode(storeSchema, psRoundRobin, true);
+            PhysNodePtr newSg = n_buildSgNode(storeSchema, psHashPartitioned, true);
             PhysNodePtr grandChild = child->getChildren()[0];
             n_cutOutNode(root);
             n_cutOutNode(child);

@@ -25,6 +25,7 @@
 
 /****************************************************************************/
 
+#include <util/Arena.h>                                  // For Arena
 #include "array/Array.h"                                 // For SharedBuffer
 
 /****************************************************************************/
@@ -49,21 +50,22 @@ namespace scidb {
 class AllocationBuffer : public SharedBuffer, boost::noncopyable
 {
  public:                   // Construction
-                              AllocationBuffer():_data(0),_size(0) {}
-                             ~AllocationBuffer()         {this->free();}
+                              AllocationBuffer(const arena::ArenaPtr& = arena::getArena());
+                             ~AllocationBuffer();
 
  public:                   // Operations
-    virtual void*             getData()            const {return _data;}
-    virtual size_t            getSize()            const {return _size;}
-    virtual bool              pin()                const {return false;}
-    virtual void              unPin()              const {}
+    virtual void*             getData()            const;
+    virtual size_t            getSize()            const;
+    virtual bool              pin()                const;
+    virtual void              unPin()              const;
 
  public:                   // Operations
-    virtual void              allocate(size_t n)         {_data = new char[_size=n];}
-    virtual void              free()                     {delete[]_data;_data = 0;}
+    virtual void              allocate(size_t n);
+    virtual void              free();
 
  private:                  // Representation
-            char*             _data;                     // The allocation
+     arena::ArenaPtr    const _arena;                    // The allocating arena
+            void*             _data;                     // The allocation
             size_t            _size;                     // Its size
 };
 

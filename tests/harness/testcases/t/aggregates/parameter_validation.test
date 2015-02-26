@@ -1,6 +1,6 @@
 --setup
 
-CREATE IMMUTABLE ARRAY A<x:int64>[i=0:2,100,0]
+CREATE ARRAY A<x:int64>[i=0:2,100,0]
 
 --test
 

@@ -207,7 +207,7 @@
     <section>
       <title>Prepare the Load File</title>
 
-      <para>The CSV loading technique starts with a comma-separated-value
+      <para>The CSV loading technique starts with a comma separated value
       (CSV) file. Each row of the file describes one cell of the target array,
       including its dimension values. Because the target array has four
       variables (two dimensions and two attributes), each row of the CSV file
@@ -286,8 +286,7 @@ Options:
 
 Note: the -q and -p options are mutually exclusive.
 </screen>This command will transform <code>olympic_data.csv</code> to
-      SciDB load file format: <programlisting>
-csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_data.scidb
+      SciDB load file format: <programlisting>csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_data.scidb
 </programlisting>The -s flag specifies the number of lines to skip at the
       beginning of the file. Since the file has a header, you can strip that
       line with "-s 1". The -p flag specifies the types of data in the columns
@@ -402,6 +401,8 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <secondary>select</secondary>
         </indexterm><indexterm>
           <primary>select statement</primary>
+        </indexterm><indexterm>
+          <primary>select from</primary>
         </indexterm>There are, however, some characteristics of arrays beyond
       these basics. These include the chunk size and chunk overlap value of
       each dimension. Before you choose values for these parameters, you can
@@ -427,15 +428,28 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <primary>AQL</primary>
 
           <secondary>create array</secondary>
-        </indexterm>The following command creates the target array:</para>
+        </indexterm>The following query creates the target array:</para>
 
       <para><programlisting>AQL% <command>CREATE ARRAY</command> winners &lt;person:string, time:double&gt; 
-[year=1996:2008,1000,0, event(string)=3,1000,0]  </programlisting><para>The result of that command is an array that can accommodate the
-      data about olympic winners. To populate this array with the data, use
-      the following command:</para>
+[year=1996:2008,1000,0, event(string)=3,1000,0]  </programlisting><para>The result of that query is an array that can accommodate the data
+      about Olympic winners. To populate this array with the data, run the
+      following query:</para>
 
-      <para><programlisting>AFL% redimension_store(winnersFlat,winners);  </programlisting><para>The result of this command is the desired array; you have
-      completed the CSV load procedure.<para><screen>{year,event} person,time
+      <para><programlisting>AFL% redimension_store(winnersFlat,winners);  </programlisting><para><indexterm>
+          <primary>select into</primary>
+        </indexterm><indexterm>
+          <primary>redimension</primary>
+
+          <secondary>select into</secondary>
+        </indexterm><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>select into</secondary>
+        </indexterm>The AQL equivalent query uses the <code><command>SELECT
+      ... INTO</command></code> syntax:<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> winners <command>FROM</command> winnersFlat;  </programlisting></para></para>
+
+      <para>The result of this query is the desired array; you have completed
+      the CSV load procedure.<para><screen>{year,event} person,time
 {1996,'dash'} 'Bailey',9.84
 {1996,'marathon'} 'Thugwane',7956
 {1996,'steeplechase'} 'Keter',487.12
@@ -537,13 +551,13 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       <itemizedlist>
         <listitem>
           <para>Determine the attributes for the array, including attribute
-          name, datatype, whether it allows null values, and whether it has a
+          name, data type, whether it allows null values, and whether it has a
           default value to be used to replace null values.</para>
         </listitem>
 
         <listitem>
           <para>Determine the dimensions of the array, including each
-          dimension's name and datatype.</para>
+          dimension's name and data type.</para>
         </listitem>
       </itemizedlist>
 
@@ -1219,7 +1233,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
 
         <listitem>
           <para>A fixed-length data type that allows null values will always
-          consume one more byte than the datatype requires, regardless of
+          consume one more byte than the data type requires, regardless of
           whether the actual value is null or non-null. For example, an int8
           will require 2 bytes and an int64 will require 9 bytes. (In the
           figure, see bytes 2-4 or 17-19.)</para>
@@ -1227,7 +1241,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
 
         <listitem>
           <para>A fixed-length data type that disallows null values will
-          always consume exactly as many bytes as that datatype requires. For
+          always consume exactly as many bytes as that data type requires. For
           example, an int8 will consume 1 byte and an int64 will consume 8
           bytes. (See byte 1 or 16.)</para>
         </listitem>
@@ -1279,7 +1293,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <secondary>select</secondary>
         </indexterm><indexterm>
           <primary>select statement</primary>
-        </indexterm>Each value in the file must conform to a datatype
+        </indexterm>Each value in the file must conform to a data type
       recognized by SciDB. This includes native types, types defined in SciDB
       extensions, and user-defined types. For a complete list of the types
       recognized by your installation of SciDB, use the following AQL:</para>
@@ -1460,19 +1474,34 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       operator, see the <xref linkend="analyze"/> section in SciDB Operator
       Reference.</para></para>
 
-      <para>The following command creates the desired 2-dimensional,
-      1-attribute array:</para>
+      <para>The following query creates the desired 2-dimensional, 1-attribute
+      array:</para>
 
       <para><para><programlisting>AQL% <command>CREATE ARRAY</command> 
             intensity 
            &lt;measuredIntensity:int64 null&gt; 
            [exposure(string)=3,3,0,
-            elapsedTime=0:40000,10000,0];  </programlisting> The result of that command is an array that can accommodate
+            elapsedTime=0:40000,10000,0];  </programlisting> The result of that query is an array that can accommodate
       the data about measured intensity after exposure. To populate this array
-      with the data, use the following command:</para></para>
+      with the data, use the following query:</para></para>
 
-      <para><para><programlisting>AFL% redimension_store(intensityFlat,intensity);  </programlisting> The result of this command is the desired array; you have
-      completed the binary load procedure.</para></para>
+      <para><para><programlisting>AFL% redimension_store(intensityFlat,intensity);  </programlisting></para></para>
+
+      <para><indexterm>
+          <primary>select into</primary>
+        </indexterm><indexterm>
+          <primary>redimension</primary>
+
+          <secondary>select into</secondary>
+        </indexterm><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>select into</secondary>
+        </indexterm>The AQL equivalent query uses the <code><command>SELECT
+      ... INTO</command></code> syntax:<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> intensity <command>FROM</command> intensityFlat;  </programlisting></para></para>
+
+      <para>The result of this query is the desired array; you have completed
+      the binary load procedure.</para>
     </section>
 
     <section>

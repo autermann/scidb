@@ -62,6 +62,11 @@
       </listitem>
 
       <listitem>
+        <para>The chunks of the input array must be square, and must have a
+        chunk interval between 32 and 1024.</para>
+      </listitem>
+
+      <listitem>
         <para>Each dimension of each matrix must have the following
         characteristics:<itemizedlist mark="endash">
             <listitem>

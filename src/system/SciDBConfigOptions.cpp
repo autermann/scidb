@@ -197,6 +197,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_MAX_REQUESTS, 0, "requests", "MAX_REQUESTS", "", Config::INTEGER,
          "Max. number of client query requests queued for execution. Any requests in excess of the limit are returned to the client with an error.", 1000, false)
         (CONFIG_ENABLE_CATALOG_UPGRADE, 0, "enable-catalog-upgrade", "ENABLE_CATALOG_UPGRADE", "", Config::BOOLEAN, "Set to true to enable the automatic upgrade of SciDB catalog", false, false)
+        (CONFIG_REDIM_CHUNKSIZE, 0, "redimension-chunksize", "REDIMENSION_CHUNKSIZE", "", Config::INTEGER, "Chunksize for internal intermediate array used in operator redimension", 10240, false)
         ;
 
     cfg->addHook(configHook);

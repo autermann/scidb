@@ -266,7 +266,7 @@ namespace scidb {
                 currPos[i] = dims[i].getStart();
                 i -= 1;
             }
-            if (array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID) { 
+            if (array._desc.getHashedChunkNumber(currPos) % array.nInstances == array.instanceID) {
                 hasCurrent = true;
                 return;
             }
@@ -284,7 +284,7 @@ namespace scidb {
         currPos = pos;
         array._desc.getChunkPositionFor(currPos);
         chunkInitialized = false;
-        return hasCurrent = array._desc.getChunkNumber(currPos) % array.nInstances == array.instanceID;
+        return hasCurrent = array._desc.getHashedChunkNumber(currPos) % array.nInstances == array.instanceID;
     }
 
     void BuildArrayIterator::reset()

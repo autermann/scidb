@@ -282,7 +282,7 @@ void ArrayDesc::initializeDimensions()
         _dimensions[i]._array = this;
         Coordinate chunkLength = _dimensions[i].getChunkInterval();
         Coordinate t = chunkLength + _dimensions[i].getChunkOverlap();
-        if ( t < chunkLength ) //overflow check 
+        if ( t < chunkLength ) //overflow check
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE);
         }
@@ -292,7 +292,7 @@ void ArrayDesc::initializeDimensions()
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE);
         }
-        
+
         t = logicalChunkSize * chunkLength;
         if (chunkLength != 0 && t / chunkLength != logicalChunkSize) //overflow check again
         {
@@ -366,7 +366,7 @@ void ArrayDesc::getMappingArrayDesc(size_t dimension, ArrayDesc& indexDesc) cons
 #endif
 }
 
-uint64_t ArrayDesc::getChunkNumber(Coordinates const& pos) const
+uint64_t ArrayDesc::getHashedChunkNumber(Coordinates const& pos) const
 {
     Dimensions const& dims = _dimensions;
     uint64_t no = 0;
@@ -1219,7 +1219,7 @@ std::ostream& operator<<(std::ostream& stream,const DimensionDesc& dim)
             bound <<dim.getLength();
         }
 
-        stream << dim.getNamesAndAliases() << '(' << (dim.isDistinct() ? "" : "all ") << dim.getType() << ")=" << bound.str() << ','
+        stream << dim.getNamesAndAliases() << '(' << dim.getType() << ")=" << bound.str() << ','
                << dim.getChunkInterval() << ',' << dim.getChunkOverlap();
     }
 
@@ -1260,7 +1260,7 @@ void printSchema (std::ostream& stream,const DimensionDesc& dim)
         }
 
         printNames(stream, dim.getNamesAndAliases());
-        stream << '(' << (dim.isDistinct() ? "" : "all ") << dim.getType() << ")=" << bound.str() << ','
+        stream << '(' << dim.getType() << ")=" << bound.str() << ','
                << dim.getChunkInterval() << ',' << dim.getChunkOverlap();
     }
 }

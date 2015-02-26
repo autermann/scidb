@@ -422,24 +422,6 @@ namespace scidb
                                                                StorageAddress const& addr,
                                                                int compressionMethod,
                                                                const boost::shared_ptr<Query>& query) = 0;
-
-        /**
-         * Clone a persistent chunk; create a chunk in the target array which acts as a "pointer" to some chunk in the source array.
-         * Currently, this function has only one caller -
-         * the message handler, which receives a message sent by a private method of CachedStorage.
-         * This is only used when both arrays are immutable and (obviously) the chunk contains the exact same data.
-         * @param pos the coordinates of the chunk
-         * @param targetDesc the descriptor of the target array
-         * @param targetAttrID the attribute id of the chunk in the target array
-         * @param sourceDesc the descriptor of the source array
-         * @param sourceAttrID the attribute id of the chunk in the source array
-         * @param query performing the operation
-         */
-        virtual void cloneLocalChunk(Coordinates const& pos, ArrayDesc const& targetDesc,
-                                     AttributeID targetAttrID, ArrayDesc const& sourceDesc,
-                                     AttributeID sourceAttrID,
-                                     boost::shared_ptr<Query>& query) = 0;
-
         /**
          * Delete chunk
          * @param chunk chunk to be deleted

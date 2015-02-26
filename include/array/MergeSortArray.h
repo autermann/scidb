@@ -109,6 +109,10 @@ namespace scidb
         vector<MergeStream>    streams;
         vector<ArrayAttribute> attributes;
         vector<int>            permutation;
+
+        /// Make sure the MergeSortArray chunk have the empty bitmap chunk set.
+        /// For all output attribute chunks in the attributes buffer, set the empty bitmap chunk (nAttrs-1)
+        void setEmptyBitmap(size_t nAttrs, size_t chunkIndex);
       public:
         int binarySearch(Tuple const& tuple);
 

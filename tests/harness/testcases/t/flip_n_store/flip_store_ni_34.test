@@ -1,6 +1,6 @@
 --setup
 --start-query-logging
-create immutable empty array A <a:double,b:double>[x=0:2,3,0]
+create empty array A <a:double,b:double>[x=0:2,3,0]
 create empty array T <a:double>[x=0:2,3,0]
 create empty array B <b:double>[a(double)=3,3,0]
 create empty array C <a:double>[b(double)=3,3,0]

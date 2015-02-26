@@ -73,10 +73,6 @@ public:
     LogicalRepart(const string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-         _properties.tile = (false ==
-                 Config::getInstance()->
-                 getOption<bool>(CONFIG_REPART_DISABLE_TILE_MODE));
-
         ADD_PARAM_INPUT()
         ADD_PARAM_SCHEMA()
     }
@@ -95,7 +91,7 @@ public:
 
         if (schemaParam.getName().size() == 0)
         {
-            schemaParam.setName(srcArrayDesc.getName()+"_repart");
+            schemaParam.setName(srcArrayDesc.getName());
         }
 
         if (srcDimensions.size() != dstDimensions.size())

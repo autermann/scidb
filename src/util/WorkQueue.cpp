@@ -39,6 +39,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.common.thread
 namespace scidb
 {
 
+
 SerializationCtx::~SerializationCtx()
 {
     // no lock must be held

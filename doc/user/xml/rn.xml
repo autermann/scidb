@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE preface PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "scidb_ug.ent">
+%myents;
+]>
+<preface id="releaseNotes">
+  <title id="rn_title">Release Notes</title>
+
+  <para>These release notes cover features and changes for:<itemizedlist>
+      <listitem>
+        <para>SciDB Community Edition (CE)</para>
+      </listitem>
+
+      <listitem>
+        <para>SciDB Enterprise Edition (EE)</para>
+      </listitem>
+
+      <listitem>
+        <para>Paradigm4 Labs (P4Labs), which is a collection of external tools
+        (such as SciDB-R) maintained in the form of GitHub
+        repositories.</para>
+      </listitem>
+    </itemizedlist></para>
+
+  <para>Note that we may deprecate operators but commit to providing advance
+  notice about operators that will be removed in the next release. Operators
+  marked for deprecation below are present in R&scidb_version; but will be
+  removed in R13.12.</para>
+
+  <section>
+    <title>Supported Operating Systems</title>
+
+    <para>SciDB 13.9 supports three platforms: Ubuntu 12.04, RHEL 6, and
+    CentOS 6.</para>
+  </section>
+
+  <section id="SciDB_ReleaseNotes">
+    <title>Community Edition Features and Changes</title>
+
+    <para>This version includes the following features and
+    changes:<itemizedlist>
+        <listitem>
+          <para>Significant performance improvements in <emphasis
+          role="bold">redimension</emphasis> and <emphasis
+          role="bold">redimension_store</emphasis>, mainly in memory and disk
+          space consumption.</para>
+        </listitem>
+
+        <listitem>
+          <para>A new aggregate operator, <emphasis
+          role="bold">cumulate</emphasis>, that computes cumulative
+          aggregates, along a user- specified dimension, using user-specified
+          aggregate functions.</para>
+        </listitem>
+
+        <listitem>
+          <para>If you are upgrading from a previous version of SciDB, refer
+          to the Upgrade section of the User Guide. Note that there is a new,
+          required parameter, <code>enable-catalog-upgrade</code>, that you
+          must set.</para>
+        </listitem>
+
+        <listitem>
+          <para>The special value, <emphasis role="bold">NA</emphasis>, is
+          deprecated. You can use <emphasis role="bold">NaN</emphasis> or
+          <emphasis role="bold">Null</emphasis> instead.</para>
+        </listitem>
+
+        <listitem>
+          <para>The <emphasis role="bold">multiply</emphasis> operator is
+          deprecated, and will be removed in the next version of
+          SciDB.<itemizedlist>
+              <listitem>
+                <para>To multiply dense matrices, use the <emphasis
+                role="bold">gemm </emphasis>operator.</para>
+              </listitem>
+
+              <listitem>
+                <para>To multiply sparse matrices, use the <emphasis
+                role="bold">spgemm</emphasis> operator, which is available in
+                the Enterprise Edition.</para>
+              </listitem>
+            </itemizedlist></para>
+        </listitem>
+      </itemizedlist></para>
+  </section>
+
+  <section id="P4_ReleaseNotes">
+    <title>Enterprise Edition Features and Changes</title>
+
+    <para>This version includes the following features and changes:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>A new math operator <emphasis role="bold">spgemm </emphasis>for
+        sparse matrix multiply.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <emphasis role="bold">timestamp</emphasis> data type
+        supports a coercion from the SciDB string type whose argument is a
+        string representation of a 'date time' pair—the exact form of the date
+        and time component strings are specified by the POSIX standard.
+        Previous versions of this function would have silently accepted an
+        argument of the form 'YYYY-MM-DD', even though the time component of
+        the time stamp is absent; in 13.9 the coercion now rejects this
+        argument and throws an error.</para>
+      </listitem>
+
+      <listitem>
+        <para>The names <emphasis role="bold">first </emphasis>and <emphasis
+        role="bold">last </emphasis>were used both as functions and as
+        aggregates. For clarity, we renamed the aggregate versions to
+        <emphasis role="bold">first_value </emphasis>and <emphasis
+        role="bold">last_value</emphasis>.</para>
+      </listitem>
+
+      <listitem>
+        <para>The following operators are deprecated, and will be removed in
+        the next version of SciDB:<itemizedlist>
+            <listitem>
+              <para><emphasis role="bold">cumsum</emphasis> and <emphasis
+              role="bold">cumprod</emphasis>: use the new <emphasis
+              role="bold">cumulate</emphasis> operator</para>
+            </listitem>
+
+            <listitem>
+              <para><emphasis role="bold">linregr</emphasis> and <emphasis
+              role="bold">logistregr</emphasis>: use the <emphasis
+              role="bold">glm </emphasis>operator</para>
+            </listitem>
+
+            <listitem>
+              <para><emphasis role="bold">solve</emphasis>: use the <emphasis
+              role="bold">gesvd</emphasis> operator</para>
+            </listitem>
+          </itemizedlist></para>
+      </listitem>
+    </itemizedlist>
+  </section>
+
+  <section>
+    <title>Paradigm4 Labs Features and Changes</title>
+
+    <para>We make available a collection of external tools in the form of
+    GitHub repositories at <ulink
+    url="http://github.com/paradigm4">http://github.com/paradigm4</ulink>.</para>
+
+    <para>P4 Labs features:<itemizedlist>
+        <listitem>
+          <para>A new online tool called configurator that provides assistance
+          selecting and building the initialization parameters file,
+          config.ini. See <ulink
+          url="https://github.com/paradigm4/configurator">https://github.com/paradigm4/configurator</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para>A beta-version cluster deployment script that significantly
+          simplifies the installation of SciDB to a cluster. See <ulink
+          url="https://github.com/paradigm4/deployment">https://github.com/paradigm4/deployment</ulink>.
+          Make sure to check the README file there to be aware of the security
+          issues. Use at your own risk.</para>
+        </listitem>
+      </itemizedlist></para>
+  </section>
+
+  <section>
+    <title>Known Limitations</title>
+
+    <para><itemizedlist>
+        <listitem>
+          <para>The <emphasis role="bold">dimensions </emphasis>operator
+          sometimes reports incorrect start, length, low and high values for
+          unbounded arrays. Correct values may be obtained using <emphasis
+          role="bold">apply </emphasis>to translate a dimension into an
+          attribute, followed by a min / max aggregate.</para>
+        </listitem>
+
+        <listitem>
+          <para>The difference between the largest and the smallest dimension
+          value in an array must not exceed (2^61 - 1).</para>
+        </listitem>
+
+        <listitem>
+          <para>The <emphasis role="bold">adddim</emphasis> and <emphasis
+          role="bold">deldim</emphasis> operators may return incorrect
+          results, or cause a system crash, when used in certain
+          queries.</para>
+        </listitem>
+
+        <listitem>
+          <para>The <emphasis role="bold">repart </emphasis>operator sometimes
+          performs slower than it needs to. This applies to the
+          automatically-inserted repart commands as well. Consider using a
+          combination of <emphasis role="bold">apply</emphasis> and <emphasis
+          role="bold">redimension</emphasis> as an alternative to <emphasis
+          role="bold">repart</emphasis>.</para>
+        </listitem>
+
+        <listitem>
+          <para>Non-integer dimensions will be rearchitected in the next
+          release. For details on the current prototype, please see <ulink
+          url="http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1172">http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1172</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para>For operators <emphasis role="bold">gemm </emphasis>and
+          <emphasis role="bold">gesvd</emphasis>, the chunks of the input must
+          be square, and must have a chunk interval from 32 to 1024.</para>
+        </listitem>
+
+        <listitem>
+          <para>The <emphasis role="bold">redimension</emphasis> operator is
+          more restrictive than it needs to be—it does not allow nullable
+          attributes to be turned into dimensions and it unnecessarily
+          requires input and output dimensions to match chunk sizes. Use the
+          <emphasis role="bold">substitute </emphasis>operator to remove null
+          values from the data.</para>
+        </listitem>
+
+        <listitem>
+          <para>Use the <emphasis role="bold">apply</emphasis> operator to
+          rename input dimensions, so that <emphasis
+          role="bold">redimension</emphasis> can accept them.</para>
+        </listitem>
+
+        <listitem>
+          <para>Whenever a query requires filtering on dimension values, the
+          <emphasis role="bold">filter </emphasis>operator performs slower
+          than it needs to. In the vast majority of cases, <emphasis
+          role="bold">between</emphasis>, <emphasis
+          role="bold">subarray</emphasis>, <emphasis
+          role="bold">cross_join</emphasis>, or a combination of them, will
+          substantially increase performance. For more information about using
+          <emphasis role="bold">cross_join</emphasis> as a dimensions filter,
+          see the slides at <ulink
+          url="http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1204">http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1204</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para>Using mixed-case names for databases is not recommended. Use
+          all lowercase names to avoid problems.</para>
+        </listitem>
+      </itemizedlist></para>
+  </section>
+</preface>

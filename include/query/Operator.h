@@ -895,7 +895,7 @@ public:
     {
         _parameters.push_back(parameter);
     }
- 
+
     /**
      *  @return vector containing a list of the parameters types that can be "next" in a variadic operator
      */
@@ -1093,7 +1093,7 @@ private:
     int64_t _instanceId;
 
 public:
-    ArrayDistribution(PartitioningSchema ps = psRoundRobin,
+    ArrayDistribution(PartitioningSchema ps = psHashPartitioned,
                       boost::shared_ptr <DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper>(),
                       int64_t instanceId = 0):
         _partitioningSchema(ps), _distMapper(distMapper), _instanceId(instanceId)
@@ -1369,7 +1369,7 @@ public:
      * the non-empty cells in the chunk. If the second argument is set, no materialization
      * takes place and the boundaries are simply updated with chunk start and end positions.
      * @param chunk the chunk to use
-     * @param chunkShapeOnly if set to true, only update the bounds from the chunk start and end 
+     * @param chunkShapeOnly if set to true, only update the bounds from the chunk start and end
      *                       positions
      */
     void updateFromChunk(ConstChunk const* chunk, bool chunkShapeOnly = false);
@@ -1405,6 +1405,8 @@ private:
     vector<shared_ptr<ArrayIterator> > _dstArrayIterators;
     vector<shared_ptr<ConstArrayIterator> > _srcArrayIterators;
 
+    /// @return true if srcChunk has values anywhere in its body or overlap
+    bool hasValues(ConstChunk const& srcChunk);
 public:
 
     /**
@@ -1431,37 +1433,7 @@ public:
         }
     }
 
-    virtual void run()
-    {
-        ArrayDesc const& dstArrayDesc = _dstArray->getArrayDesc();
-        size_t nAttrs = dstArrayDesc.getAttributes().size();
-        Query::setCurrentQueryID(_query->getQueryID());
-
-        for (size_t i = _shift; i != 0 && !_srcArrayIterators[0]->end(); --i)
-        {
-            for (size_t j = 0; j < nAttrs; j++)
-            {
-                ++(*_srcArrayIterators[j]);
-            }
-        }
-
-        while (!_srcArrayIterators[0]->end())
-        {
-            createdChunks.insert(_srcArrayIterators[0]->getPosition());
-
-            for (size_t i = 0; i < nAttrs; i++)
-            {
-                ConstChunk const& srcChunk = _srcArrayIterators[i]->getChunk();
-                if (i == nAttrs - 1)
-                {
-                    bounds.updateFromChunk(&srcChunk, dstArrayDesc.getEmptyBitmapAttribute() == NULL);
-                }
-                _dstArrayIterators[i]->copyChunk(srcChunk);
-                Query::validateQueryPtr(_query);
-                for (size_t j = _step; j != 0 && !_srcArrayIterators[i]->end(); ++(*_srcArrayIterators[i]), --j);
-            }
-        }
-    }
+    virtual void run();
 
     /**
      * Get the coordinates of all the chunks created by this job.
@@ -1524,16 +1496,21 @@ public:
         for (size_t i = 0; i < groupedDimensions.size(); i++)
         {
             DimensionDesc d = groupedDimensions[i];
+            string const& baseName = d.getBaseName();
+            ObjectNames::NamesType const& aliases = d.getNamesAndAliases();
             for (size_t j = 0; j < originalDimensions.size(); j++)
             {
                 DimensionDesc dO = originalDimensions[j];
-                if (dO.getBaseName() == d.getBaseName() &&
+                if (dO.getBaseName() == baseName &&
+                    dO.getNamesAndAliases() == aliases &&
                     (dO.getLength() == INFINITE_LENGTH || dO.getLength() == d.getLength()))
                 {
                     _dimensionMask.push_back(j);
                 }
             }
         }
+        SCIDB_ASSERT(_dimensionMask.size() == 0 ||
+                     _dimensionMask.size() == groupedDimensions.size());
     }
 
     inline Coordinates reduceToGroup(Coordinates const& in) const
@@ -2010,15 +1987,21 @@ class PhysicalOperator
         return _schema;
     }
 
+    /**
+     * Return the arena from which any resources associated with the execution
+     * of this operator instance should be allocated.
+     */
+    arena::ArenaPtr getArena() const
+    {
+        return _arena;
+    }
+
     void setSchema(const ArrayDesc& schema)
     {
         _schema = schema;
     }
 
-    virtual void setQuery(const boost::shared_ptr<Query>& query)
-    {
-        _query = query;
-    }
+    virtual void setQuery(const boost::shared_ptr<Query>&);
 
     /**
      * This method is executed on coordinator instance before sending out plan on remote instances and
@@ -2110,7 +2093,7 @@ class PhysicalOperator
         }
 
         if(sourceDistributions.empty()) {
-            return ArrayDistribution(psRoundRobin);
+            return ArrayDistribution(psHashPartitioned);
         } else {
             return sourceDistributions[0];
         }
@@ -2167,10 +2150,19 @@ class PhysicalOperator
         return _injectedErrorListener;
     }
 
+    /**
+     * Helper: print the contents of input into logger, debug level.
+     * @param[in] input an array to output
+     * @param[in] logger the logger object to use
+     */
+    static void dumpArrayToLog(shared_ptr<Array> const& input,
+                               log4cxx::LoggerPtr& logger);
+
   protected:
     Parameters _parameters;
     ArrayDesc _schema;
     Statistics _statistics;
+    arena::ArenaPtr _arena;
     bool _tileMode;
 
     boost::weak_ptr<Query> _query;
@@ -2396,8 +2388,8 @@ public:
     std::vector<AggregatePtr> _aggregateList;
 
     /**
-     * A set of the coordinates of all the chunks that were created 
-     * as the result of this SG on this node. This is used to insert 
+     * A set of the coordinates of all the chunks that were created
+     * as the result of this SG on this node. This is used to insert
      * tombstone headers after a storing SG.
      */
     set<Coordinates, CoordinatesLess> _newChunks;
@@ -2429,6 +2421,9 @@ public:
     }
 };
 
+const InstanceID ALL_INSTANCES_MASK = -1;
+const InstanceID COORDINATOR_INSTANCE_MASK = -2;
+
 /**
  * This function repartitions the inputArray.
  *
@@ -2440,9 +2435,6 @@ public:
  * @param psData    a pointer to the data that is specific to the particular partitioning schema
  * @return pointer to new local array with part of array after repart.
  */
-const InstanceID ALL_INSTANCES_MASK = -1;
-const InstanceID COORDINATOR_INSTANCE_MASK = -2;
-
 boost::shared_ptr< Array> redistribute(boost::shared_ptr< Array> inputArray, boost::shared_ptr< Query> query,
                                        PartitioningSchema ps,
                                        const std::string& resultArrayName = "",
@@ -2465,7 +2457,7 @@ void syncBarrier(uint64_t barrierId, boost::shared_ptr<scidb::Query> query);
 
 
 /**
- * Redistribute inputArray using the psRoundRobin distribution scheme, using aggregate merge to merge overlapping cells.
+ * Redistribute inputArray using the psHashPartitioned distribution scheme, using aggregate merge to merge overlapping cells.
  *
  * @param inputArray a pointer to local part of repartitioning array
  * @param query a query context

@@ -382,7 +382,7 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
         </indexterm><indexterm>
           <primary>empty cells</primary>
         </indexterm><indexterm>
-          <primary>NA/NaN values</primary>
+          <primary>NaN values</primary>
         </indexterm>SciDB attributes and cells support the following types of
       values (not to be confused with SciDB's data types): <itemizedlist>
           <listitem>
@@ -486,19 +486,6 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
                 </listitem>
               </itemizedlist></para>
           </listitem>
-
-          <listitem>
-            <para><emphasis role="bold">NA values. </emphasis>Similar to a NaN
-            value, NA can be stored in a floating-point data type while not
-            actually representing a floating-point value. NA can be stored in
-            a cell to indicate that the value is intentionally not a
-            number.</para>
-
-            <para>For example, NA could represent an experimental value that
-            is missing in the source data. In SciDB, it is more
-            computationally efficient (that is, faster) to use NA values
-            rather than Null values to represent missing information.</para>
-          </listitem>
         </itemizedlist></para>
     </section>
 
@@ -515,22 +502,33 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
       functionality includes special handling for empty cells, null values,
       and default values.</para>
 
-      <para>Consider the data set m4x4_missing.txt, shown here:
-      <programlisting language="test">
---shell --command=cat $DOC_DATA/m4x4_missing.txt; --show-query=no
-</programlisting></para>
+      <para>Consider the data set m4x4_missing.txt, shown here:<screen>[
+[(0,100),(1,99),(2,98),(3,97)],
+[(4),(5,95),(6,94),(7,93)],
+[(8,92),(9,91),(),(11,89)],
+[(12,88),(13),(14,86),(15,85)]
+]</screen></para>
 
       <para>The array m4x4_missing has two issues: the attribute val2 is
-      missing for the elements at coordinates <code>{x=1, y=0}</code> and
-      <code>{x=3, y=1}</code>, and the cell at <code>{2, 2}</code> is empty.
-      You can tell SciDB how you want to handle the missing data with various
+      missing for the elements at coordinates <code>{x=1,y=0}</code> and
+      <code>{x=3,y=1}</code>, and the cell at <code>{2,2}</code> is empty. You
+      can tell SciDB how you want to handle the missing data with various
       array options.</para>
 
-      <para>First, consider the case of the empty cell, <code>{x=2,
-      y=2}</code>. By default, SciDB will leave empty cells unchanged and
-      replace NULL attributes with 0: <programlisting language="test">--afl CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32&gt;[x=0:3,4,0,y=0:3,4,0]; --show-output=no 
---afl load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt'); --output-format=auto --chunkify=yes
-</programlisting></para>
+      <para>First, consider the case of the empty cell,
+      <code>{x=2,y=2}</code>. By default, SciDB will leave empty cells
+      unchanged and replace NULL attributes with 0: <programlisting
+      language="test">AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32&gt;[x=0:3,4,0,y=0:3,4,0];
+AFL% load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt');
+
+--afl create_array(m4x4_first,&lt;val1:double&gt;[x=0:3,4,0, y=0:3,4,0]); --show-query=no --show-output=no
+--afl store(build_sparse(m4x4_first,x*4+y,x*4+y&lt;&gt; 10),m4x4_first); --show-query=no --show-output=no
+
+--afl create_array(m4x4_second,&lt;val2:int32&gt;[x=0:3,4,0, y=0:3,4,0]); --show-query=no --show-output=no
+--afl store(build(m4x4_second,'[[100,99,98,97],[0,95,94,93],[92,91,(),89],[88,0,86,85]]',true),m4x4_second);
+    --show-query=no --show-output=no
+
+--afl store(join(m4x4_first, m4x4_second),m4x4_missing); --show-query=no --output-format=dense --chunkify=yes</programlisting></para>
 
       <para><indexterm>
           <primary>empty cells</primary>
@@ -540,10 +538,12 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
           <secondary>empty cells</secondary>
         </indexterm>To change the default value, that is, the value the SciDB
       substitutes for the missing data, set the default clause of the
-      attribute option: <programlisting language="test">--afl remove(m4x4_missing); --show-query=no --show-output=no
---afl CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32 default 5468&gt;[x=0:3,4,0,y=0:3,4,0]; --show-output=no
---afl load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt'); --output-format=auto --chunkify=yes
-</programlisting></para>
+      attribute option: <programlisting language="test">AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32 default 5468&gt;[x=0:3,4,0,y=0:3,4,0];
+AF:% load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt'); --output-format=auto --chunkify=yes
+
+--afl store(build(m4x4_second,'[[100,99,98,97],[5468,95,94,93],[92,91,(),89],[88,5468,86,85]]',true),m4x4_second);
+    --show-query=no --show-output=no
+--afl store(join(m4x4_first, m4x4_second),m4x4_missing); --show-query=no --output-format=dense --chunkify=yes</programlisting></para>
     </section>
 
     <section>
@@ -711,8 +711,9 @@ or
       <para>Array <code>A</code> has has two dimensions, <literal>i</literal>
       and <literal>j</literal>. Dimension <literal>i</literal> has size 10,
       chunk size 5, and chunk overlap 1. Dimension <literal>j</literal> has
-      size 30, chunk size 10, and chunk overlap 5. SciDB stores cells from the
-      chunk overlap area in both of the neighboring chunks.</para>
+      size 30, chunk size 10, and chunk overlap 5. Specifying an overlap
+      causes SciDB to store adjoining cells in each dimension from the
+      <emphasis>overlap area </emphasis>in neighboring chunks.</para>
 
       <para>Some advantages of chunk overlap are:</para>
 
@@ -796,9 +797,23 @@ or
           <secondary>create array</secondary>
         </indexterm>For example, the array winners has a non-integer dimension
       named <code>event</code>: <programlisting language="test">
---aql CREATE ARRAY winnersFlat &lt; event:string, year:int64, person:string, time:double &gt; [i=0:*,1000000,0]; --show-output=no --show-query=no
---aql CREATE ARRAY winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0]; --show-output=no 
---aql LOAD winnersFlat FROM '../tests/harness/testcases/data/doc/olympic_data.scidb'; --show-output=no --show-query=no
+--afl CREATE ARRAY winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0]; --show-output=no
+
+--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array year &lt;year:int64&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array person &lt;person:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array country &lt;country:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array time &lt;time:double&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl store(build(event,iif(i&lt;4,'dash',iif(i&lt;8,'steeplechase','marathon'))),event); --show-query=no --show-output=no
+--afl store(build(year,1996+(i%4 * 4)),year); --show-query=no --show-output=no
+--afl store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,Kemboi,Kipruto,Thugwane,Abera,Baldini,Wanjiru]',true),person);
+      --show-query=no --show-output=no
+--afl store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,Kenya,Kenya,USA,Ethiopia,Italy,Kenya]',true),country);
+      --show-query=no --show-output=no
+--afl store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time);
+      --show-query=no --show-output=no
+--afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat); --show-query=no --show-output=no
+
 --afl redimension_store(winnersFlat,winners); --show-output=no --show-query=no
 --schema winners; --show-output=yes --show-query=yes
 </programlisting><indexterm>
@@ -825,6 +840,8 @@ or
         <secondary>select into</secondary>
       </indexterm><indexterm>
         <primary>select statement</primary>
+      </indexterm><indexterm>
+        <primary>select into</primary>
       </indexterm>An array name is its unique identifier. You can use the AQL
     <code> <command>SELECT ... INTO</command> </code> statement to copy an
     array into another array with a new name. <programlisting language="test">SELECT * INTO OlympicWinners FROM winners;

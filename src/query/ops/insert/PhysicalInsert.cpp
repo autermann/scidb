@@ -157,7 +157,7 @@ public:
        //Note also that this is called BEFORE the plan is sent to remote nodes. So in fact THIS is how remote instances find out what the
        //new array ID and name is!
        _schema = ArrayDesc(ArrayDesc::makeVersionedName(arrayName, newVersion), parentDesc.getAttributes(), parentDesc.getDimensions());
-       SystemCatalog::getInstance()->addArray(_schema, psRoundRobin);
+       SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
        _lock->setArrayVersionId(_schema.getId());
        rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
        SCIDB_ASSERT(rc);
@@ -205,7 +205,7 @@ public:
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
         vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psRoundRobin));
+        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 

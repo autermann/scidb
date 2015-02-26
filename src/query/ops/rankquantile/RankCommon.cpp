@@ -204,7 +204,7 @@ shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
     for (size_t i =1; i<nInstances; i++)
     {
         LOG4CXX_DEBUG(logger, "Performing rotation "<<i);
-        runningRank = redistribute(runningRank, query, psRoundRobin, "", -1, boost::shared_ptr<DistributionMapper>(), i);
+        runningRank = redistribute(runningRank, query, psHashPartitioned, "", -1, boost::shared_ptr<DistributionMapper>(), i);
         runningRank = boost::shared_ptr<Array> (new RankArray(outputSchema, runningRank, preSortMap, 0, true, rstats));
     }
 
@@ -287,7 +287,7 @@ shared_ptr<Array> buildDualRankArray(shared_ptr<Array>& inputArray,
     for (size_t i =1; i<nInstances; i++)
     {
         LOG4CXX_DEBUG(logger, "Performing rotation "<<i);
-        runningRank = redistribute(runningRank, query, psRoundRobin, "", -1, boost::shared_ptr<DistributionMapper>(), i);
+        runningRank = redistribute(runningRank, query, psHashPartitioned, "", -1, boost::shared_ptr<DistributionMapper>(), i);
         runningRank = boost::shared_ptr<Array> (new DualRankArray(dualRankSchema, runningRank, preSortMap, 0, true, rstats));
     }
 

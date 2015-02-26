@@ -13,7 +13,7 @@
 
         <see>gesvd</see>
       </indexterm>Produces a result matrix containing any one of the three
-    components of the singular value decomposition of a general
+    components of the singular value decomposition of a dense
     matrix.</refpurpose>
   </refnamediv>
 
@@ -77,8 +77,18 @@
     <para>The input matrix must have the following
     characteristics:<itemizedlist>
         <listitem>
+          <para>It must be dense: that is, it cannot have any empty
+          cells.</para>
+        </listitem>
+
+        <listitem>
           <para>The first attribute must be of type <literal>double</literal>.
           All other attributes are ignored.</para>
+        </listitem>
+
+        <listitem>
+          <para>The chunks of the input array must be square, and must have a
+          chunk interval between 32 and 1024.</para>
         </listitem>
 
         <listitem>

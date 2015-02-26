@@ -142,6 +142,7 @@ public:
             {
                 //no overlap
                 outDims.push_back(DimensionDesc( inputDims[j].getBaseName(),
+                                                 inputDims[j].getNamesAndAliases(),
                                                  inputDims[j].getStartMin(),
                                                  inputDims[j].getCurrStart(),
                                                  inputDims[j].getCurrEnd(),

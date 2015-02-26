@@ -1,6 +1,6 @@
 
 --setup
---aql create immutable array A <A:int64>[x=1:5,5,0]
+--aql create array A <A:int64>[x=1:5,5,0]
 store(build(A,x+1),A)
 
 --test

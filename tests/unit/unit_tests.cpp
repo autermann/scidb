@@ -20,7 +20,7 @@
 * END_COPYRIGHT
 */
 
-//Trickery: do not include scidbconfig.h
+//Trickery: do not include scidbconfig.h (this is a test too)
 // #define SCIDBCONFIG_H_ 1
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
@@ -63,6 +63,7 @@
 #include "query/AuxUnitTests.h"
 //#include "system/ExceptionUnitTests.h"
 #include "PointerRangeUnitTests.h"
+#include "ArenaUnitTests.h"
 
 using namespace std;
 

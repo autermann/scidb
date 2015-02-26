@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
-create immutable array A <a:int64> [x=0:2,3,0]
-create immutable empty array B <x:int64> [a=0:15,3,0]
+create array A <a:int64> [x=0:2,3,0]
+create empty array B <x:int64> [a=0:15,3,0]
 store(B,C)
 store(C,D)
 store(D,E)

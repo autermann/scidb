@@ -116,7 +116,7 @@ public:
 
 #define ASSERT_OPERATOR(instance, opName) (CPPUNIT_ASSERT( instance ->getPhysicalOperator()->getPhysicalName() == opName ))
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, PartitioningSchema ps = psRoundRobin)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, PartitioningSchema ps = psHashPartitioned)
     {
         SystemCatalog* systemCat = SystemCatalog::getInstance();
         if (systemCat->containsArray(desc.getName()))
@@ -128,7 +128,7 @@ public:
         return d2.getId();
     }
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end, PartitioningSchema ps = psRoundRobin)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end, PartitioningSchema ps = psHashPartitioned)
     {
         ArrayID id = s_addArray(desc, ps);
         SystemCatalog::getInstance()->updateArrayBoundaries(desc, PhysicalBoundaries(start, end));

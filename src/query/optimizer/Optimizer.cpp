@@ -95,7 +95,7 @@ namespace scidb
             } else {
                 LogicalOperator::Parameters sgParams(3);
                 Value ival(TypeLibrary::getType(TID_INT32));
-                ival.setInt32(psRoundRobin);
+                ival.setInt32(psHashPartitioned);
                 sgParams[0] = boost::shared_ptr<OperatorParam>(
                     new OperatorParamLogicalExpression(node->getParsingContext(),
                                                        boost::shared_ptr<LogicalExpression>(new Constant(node->getParsingContext(), ival, TID_INT32)),

@@ -4,8 +4,9 @@ load_library('point')
 load_library('more_math')
 
 --test
-list('operators')
-list('functions')
+--set-format csv
+sort(filter(list('operators'),library='scidb'),name)
+sort(filter(list('functions'),library='scidb'),name)
 --igdata "store(list('queries'),query_array)"
 attributes(query_array)
 list('aggregates')
@@ -13,8 +14,8 @@ list('aggregates')
 --start-igdata
 --aql select name,schema from list()
 --aql select name,schema from list('arrays')
-list('types')
-list('libraries')
+sort(filter(list('types'),library='scidb'),name)
+sort(filter(list('libraries'),regex(name,'libmore_math.so|libpoint.so')),name)
 --aql select name,schema from list()
 --aql select name,schema from list('arrays')
 --stop-igdata

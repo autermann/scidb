@@ -24,161 +24,115 @@
  * @file PhysicalRepart.cpp
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
+ * @author apoliakov@paradigm4.com
  */
 
 #include "query/Operator.h"
 #include "array/Metadata.h"
-#include "RepartArray.h"
 #include "network/NetworkManager.h"
 #include "array/DelegateArray.h"
-
+#include "../redimension/RedimensionCommon.h"
 
 using namespace std;
 using namespace boost;
 
 namespace scidb {
 
-class PhysicalRepart: public PhysicalOperator
+class PhysicalRepart : public RedimensionCommon
 {
-  private:
-    RepartAlgorithm _algorithm;
-    bool _denseOpenOnce;
-    uint64_t _sequenceScanThreshold;
-
-  public:
-    PhysicalRepart(std::string const& logicalName,
-                   std::string const& physicalName,
+public:
+    PhysicalRepart(string const& logicalName,
+                   string const& physicalName,
                    Parameters const& parameters,
                    ArrayDesc const & schema) :
-        PhysicalOperator(logicalName, physicalName, parameters, schema),
-        _algorithm(static_cast<RepartAlgorithm>(
-                       Config::getInstance()->
-                       getOption<int>(CONFIG_REPART_ALGORITHM))),
-        _denseOpenOnce(Config::getInstance()->
-                       getOption<bool>(CONFIG_REPART_DENSE_OPEN_ONCE)),
-        _sequenceScanThreshold(Config::getInstance()->
-                               getOption<int>(CONFIG_REPART_SEQ_SCAN_THRESHOLD))
-    {
-    }
+       RedimensionCommon(logicalName, physicalName, parameters, schema)
+    {}
 
-    virtual bool changesDistribution(
-            std::vector<ArrayDesc> const& sourceSchema) const
+    //True if this is a no-op (just a metadata change, doesn't change chunk sizes or overlap)
+    bool isNoop(ArrayDesc const& inputSchema) const
     {
-        if (sourceSchema.size() != 1) {
-            throw SYSTEM_EXCEPTION(
-                        SCIDB_SE_OPERATOR,
-                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
-                    << getLogicalName();
-        }
-
-        Dimensions const& source = sourceSchema[0].getDimensions();
+        Dimensions const& source = inputSchema.getDimensions();
         Dimensions const& result = _schema.getDimensions();
-
         for (size_t i = 0, count = source.size(); i < count; ++i)
         {
             int64_t sourceInterval = source[i].getChunkInterval();
             int64_t resultInterval = result[i].getChunkInterval();
-            if (sourceInterval != resultInterval) {
-                return true;
-            }
-        }
-        return false;
-    }
+            int64_t sourceOverlap = source[i].getChunkOverlap();
+            int64_t resultOverlap = result[i].getChunkOverlap();
 
-    virtual bool outputFullChunks(
-            std::vector<ArrayDesc> const& sourceSchema) const
-    {
-        if (sourceSchema.size() != 1) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
-        Dimensions const& source = sourceSchema[0].getDimensions();
-        Dimensions const& result = _schema.getDimensions();
-
-        for (size_t i = 0, count = source.size(); i < count; ++i)
-        {
-            int64_t sourceInterval = source[i].getChunkInterval();
-            int64_t resultInterval = result[i].getChunkInterval();
-            if (sourceInterval < resultInterval) {
-                return false;
-            }
-            if (sourceInterval % resultInterval != 0) {
-                return false;
-            }
-            int64_t sourceOverlap =  source[i].getChunkOverlap();
-            int64_t resultOverlap =  result[i].getChunkOverlap();
-            if (sourceOverlap < resultOverlap) {
+            if (sourceInterval != resultInterval ||
+                sourceOverlap != resultOverlap)
+            {
                 return false;
             }
         }
         return true;
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(
-            std::vector<PhysicalBoundaries> const& sourceBoundaries,
-            std::vector<ArrayDesc> const& sourceSchema) const
+    virtual bool changesDistribution(vector<ArrayDesc> const& inputSchemas) const
     {
-        if (sourceBoundaries.size() != 1 ||
-                sourceSchema.size() != 1) {
-            throw SYSTEM_EXCEPTION(
-                        SCIDB_SE_OPERATOR,
-                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
-                    << getLogicalName();
-        }
+        return !isNoop(inputSchemas[0]);
+    }
+
+    virtual PhysicalBoundaries getOutputBoundaries(vector<PhysicalBoundaries> const& sourceBoundaries,
+                                                   vector<ArrayDesc> const& sourceSchema) const
+    {
         return sourceBoundaries[0];
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& sourceDistribution,
-            std::vector< ArrayDesc> const& sourceSchema) const
+    virtual ArrayDistribution getOutputDistribution(vector<ArrayDistribution> const& sourceDistribution,
+                                                    vector< ArrayDesc> const& inputSchemas) const
     {
-        if (sourceDistribution.size() != 1 ||
-                sourceSchema.size() != 1) {
-            throw SYSTEM_EXCEPTION(
-                        SCIDB_SE_OPERATOR,
-                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
-                    << getLogicalName();
-        }
-        if (changesDistribution(sourceSchema)) {
-            return ArrayDistribution(psUndefined);
-        } else {
+        if (isNoop(inputSchemas[0]))
+        {
             return sourceDistribution[0];
         }
+        return ArrayDistribution(psUndefined);
     }
-    /**
-          * Repart is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-          * that overrides the chunkiterator method.
-          */
-    boost::shared_ptr<Array> execute(
-            std::vector< boost::shared_ptr<Array> >& sourceArray,
-            boost::shared_ptr<Query> query)
+
+    virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
     {
-        if (sourceArray.size() != 1) {
-            throw SYSTEM_EXCEPTION(
-                        SCIDB_SE_OPERATOR,
-                        SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
-                    << getLogicalName();
-        }
+        return isNoop(inputSchemas[0]);
+    }
 
-        if (sourceArray[0]->getSupportedAccess() != Array::RANDOM)
+    boost::shared_ptr<Array> execute(vector< shared_ptr<Array> >& sourceArray, shared_ptr<Query> query)
+    {
+        shared_ptr<Array> input = sourceArray[0];
+        if (isNoop(input->getArrayDesc()))
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR,
-                                   SCIDB_LE_UNSUPPORTED_INPUT_ARRAY)
-                    << getLogicalName();
+            return shared_ptr<Array> (new DelegateArray(_schema, input, true) );
         }
 
-        std::vector<ArrayDesc> sourceSchema(1);
-        sourceSchema[0] = sourceArray[0]->getArrayDesc();
-        bool singleInstance = (false == (query->getInstancesCount() > 1));
+        Attributes const& destAttrs = _schema.getAttributes(true); // true = exclude empty tag.
+        Dimensions const& destDims = _schema.getDimensions();
 
-        return boost::shared_ptr<Array>(
-                    createRepartArray(_schema, sourceArray[0], query,
-                                      _algorithm,
-                                      _denseOpenOnce,
-                                      outputFullChunks(sourceSchema),
-                                      singleInstance,
-                                      _tileMode,
-                                      _sequenceScanThreshold));
+        vector<AggregatePtr> aggregates (destAttrs.size());
+        vector<size_t> attrMapping(destAttrs.size());
+        vector<size_t> dimMapping(_schema.getDimensions().size());
+
+        for (size_t i=0; i<attrMapping.size(); ++i)
+        {
+            attrMapping[i]=i;
+        }
+        for (size_t i=0; i<dimMapping.size(); ++i)
+        {
+            dimMapping[i]=i;
+        }
+
+        vector< shared_ptr<AttributeMultiMap> > coordinateMultiIndices(destDims.size());
+        vector< shared_ptr<AttributeMap> > coordinateIndices(destDims.size());
+        ElapsedMilliSeconds timing;
+
+        shared_ptr<Array> res = redimensionArray(input,
+                                                 attrMapping,
+                                                 dimMapping,
+                                                 aggregates,
+                                                 query,
+                                                 coordinateMultiIndices,
+                                                 coordinateIndices,
+                                                 timing,
+                                                 false);
+        return res;
     }
 };
 

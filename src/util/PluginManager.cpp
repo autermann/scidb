@@ -38,6 +38,7 @@
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
 #include "system/SystemCatalog.h"
+#include "query/ops/list/ListArrayBuilder.h"
 
 namespace scidb
 {
@@ -57,6 +58,8 @@ PluginManager::PluginManager()
 
 void PluginManager::preLoadLibraries()
 {
+    ScopedMutexLock cs (_mutex);
+
 #ifndef SCIDB_CLIENT
     SystemCatalog* cat = SystemCatalog::getInstance();
     if (cat->isConnected()) {
@@ -89,6 +92,8 @@ typedef void (*GetPluginVersion)(uint32_t&, uint32_t&, uint32_t&, uint32_t&);
 
 PluginDesc& PluginManager::findModule(const std::string& moduleName, bool* was)
 {
+    ScopedMutexLock cs (_mutex);
+
     if (was)
         *was = true;
     if (_plugins.find(moduleName) != _plugins.end())
@@ -186,6 +191,8 @@ private:
  */
 void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalog)
 {
+    ScopedMutexLock cs (_mutex);
+
     Eraser<std::string> eraser(_loadingLibrary);
     _loadingLibrary = libraryName;
     bool was;
@@ -246,6 +253,8 @@ void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalo
 
 void PluginManager::unLoadLibrary(const string& libraryName)
 {
+    ScopedMutexLock cs (_mutex);
+
 #ifdef __APPLE__
     string fullName = "lib" + libraryName + ".dylib";
 #else
@@ -262,7 +271,28 @@ void PluginManager::unLoadLibrary(const string& libraryName)
 
 void PluginManager::setPluginsDirectory(const std::string &pluginsDirectory)
 {
+    ScopedMutexLock cs (_mutex);
     _pluginsDirectory = pluginsDirectory;
 }
+
+void PluginManager::listPlugins(ListLibrariesArrayBuilder& builder)
+{
+    ScopedMutexLock cs (_mutex);
+    LibraryInformation scidbEntry("SciDB",
+                                   SCIDB_VERSION_MAJOR(),
+                                   SCIDB_VERSION_MINOR(),
+                                   SCIDB_VERSION_PATCH(),
+                                   SCIDB_VERSION_BUILD(),
+                                   SCIDB_BUILD_TYPE());
+    builder.listElement(scidbEntry);
+    for (std::map<std::string, PluginDesc>::const_iterator i = _plugins.begin(); i != _plugins.end(); ++i)
+    {
+        LibraryInformation pluginEntry(i->first, i->second.major, i->second.minor, i->second.patch, i->second.build);
+        builder.listElement(pluginEntry);
+    }
+}
+
+
+
 
 } // namespace

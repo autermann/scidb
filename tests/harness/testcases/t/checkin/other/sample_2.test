@@ -1,5 +1,5 @@
 --setup
-create immutable array A <a:double> [x=0:9,2,0]
+create array A <a:double> [x=0:9,2,0]
 store(build(A,x+1),A)
 
 --test

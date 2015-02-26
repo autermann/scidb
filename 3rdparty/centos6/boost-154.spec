@@ -10,11 +10,47 @@ URL:     http://www.boost.org/
 Group:   System Environment/Libraries
 Source:  http://sourceforge.net/projects/boost/files/boost/1.54.0/boost_1_54_0.tar.bz2
 
-# Patches to supress various warnings under CentOS 6:
-#  https://svn.boost.org/trac/boost/ticket/4276
-#Patch0: boost-map_iterator.patch
-#  https://svn.boost.org/trac/boost/ticket/5416
-#Patch1: boost-serializationExportWarningPatch.patch
+# 
+Patch0: 001-coroutine.patch
+# Upstream maintenance fixes from http://www.boost.org/patches.
+Patch1: 002-date-time.patch
+# Fix conflict between chrono/duration.hpp and apache2/httpd.h.
+# The former defines a type named "CR" while the latter #defines CR.
+# Closes: #703325.
+Patch2: chrono-duration.patch
+# Patch example Jamroot to use installed libboost_python.
+# Closes: #452410.
+Patch3: boost-python-examples.patch
+# Ensure Debian systems use endian.h.
+# As of 2008-10-27, it seems that __GLIBC__ is no longer defined.
+# Assume all Debian systems have <endian.h>.
+# Include <endian.h> unconditionally on all Debian systems.
+Patch4: endian.patch
+# Enable building with Python 3.1
+# Fix a build problem where PyInt_Type is not defined.
+# Closes: #595786.
+Patch5: boost-1.44-py3.1.patch
+# Fix jam option --python-buildid.
+Patch6: pythonid.patch
+# Fix include of <boost/mpi.hpp> on gcc < 4.6.3
+# Workaround proposed in boost Trac ticket to allow using -std=c++0x with gcc 4.6.
+# It turns out to be a gcc bug that is fixed for gcc 4.6.3 and 4.7.
+# Closes: #639862.
+Patch7: mpi-allocator-c++0x.patch
+# python3.3 has an extra multiarch include location.
+# Closes: #691378.
+Patch8: fix-ftbfs-python-3.3.patch
+# boost1.54 currently FTBFS on hurd-i386 because it doesn't know hurd-i386 has clock_gettime.
+# hurd-i386 does not define _POSIX_TIMERS because it  does not have timer_create & co yet,
+# but it does have clock_gettime, thus the attached patch.
+# Closes: #714847.
+Patch9: hurd-clock-gettime.patch
+# Suppress compiler warnings under GCC -pedantic. -- Jonathon Bell <jonathon.work@gmail.com>
+Patch10: compiler-warnings.patch
+#  https://svn.boost.org/trac/boost/ticket/9166
+Patch11: boost-container_leak.patch
+# Suppress empty macro argument warnings
+Patch12: boost-empty_macro.patch
 
 %define srcdir boost_1_54_0
 %define _docdir %{scidb_path}/doc
@@ -251,8 +287,19 @@ web page (http://www.boost.org/doc/libs/1_40_0).
 %prep
 %setup -q -n %{srcdir}
 #Apply any necessary patches here: 
-#%patch0 -p1
-#%patch1 -p1
+%patch0 -p1
+%patch1 -p1
+%patch2 -p1
+%patch3 -p1
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
+%patch7 -p1
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
 
 %build
 ./bootstrap.sh --prefix=/usr

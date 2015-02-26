@@ -4,7 +4,7 @@
 create empty array catalogue <code:int64, type:string, price:double, review:string> [id=0:10,3,0]
 create empty array catalogue1 <code:int64 null, type:string null, price:double null, review:string null> [id=0:10,3,0]
 create empty array catalogue2 <code:int64, type:string null, price:double null, review:string> [id=0:10,3,0]
-create immutable empty array catalogue3 <code:int64 null, type:string, price:double, review:string null> [id=0:10,3,0]
+create empty array catalogue3 <code:int64 null, type:string, price:double, review:string null> [id=0:10,3,0]
 
 load(catalogue,'../tests/harness/testcases/data/iquery_4.txt')
 load(catalogue1,'../tests/harness/testcases/data/iquery_4.txt')

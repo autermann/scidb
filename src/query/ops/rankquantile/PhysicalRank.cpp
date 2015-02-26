@@ -81,7 +81,7 @@ public:
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
         vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psRoundRobin));
+        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 

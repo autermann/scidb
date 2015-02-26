@@ -1,6 +1,6 @@
 --setup
-create immutable array A <a:int8>[x=0:2,3,0]
-create immutable array B <a:int16>[x=0:2,3,0]
+create array A <a:int8>[x=0:2,3,0]
+create array B <a:int16>[x=0:2,3,0]
 create  array C <a:int8,b:int16>[i=1:2,2,0, j=1:2,2,0]
 store(build(A,x+1),A)
 store(build(B,x+10),B)

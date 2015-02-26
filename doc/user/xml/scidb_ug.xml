@@ -34,6 +34,9 @@
     </legalnotice>
   </bookinfo>
 
+  <xi:include href="rn.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="intro_to_scidb.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 

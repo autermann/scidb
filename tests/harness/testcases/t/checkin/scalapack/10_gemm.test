@@ -25,47 +25,47 @@
 #
 
 # identity: 11c32 22c32
-create immutable array ident11c32<a: double >   [r=0:0,32,0, c=0:0,32,0]
-create immutable array ident22c32<a: double >   [r=0:1,32,0, c=0:1,32,0]
+create array ident11c32<a: double >   [r=0:0,32,0, c=0:0,32,0]
+create array ident22c32<a: double >   [r=0:1,32,0, c=0:1,32,0]
 store(build(ident11c32, IIF(r=c, 1, 0)), ident11c32)
 store(build(ident22c32, IIF(r=c, 1, 0)), ident22c32)
 
 # identity: with non-zero-based dimensions
-create immutable array ident11nzc32<a: double >   [r=3:3,32,0, c=5:5,32,0]
-create immutable array ident22nzc32<a: double >   [r=3:4,32,0, c=5:6,32,0]
+create array ident11nzc32<a: double >   [r=3:3,32,0, c=5:5,32,0]
+create array ident22nzc32<a: double >   [r=3:4,32,0, c=5:6,32,0]
 store(build(ident11nzc32, IIF(r+2=c, 1, 0)), ident11nzc32)
 store(build(ident22nzc32, IIF(r+2=c, 1, 0)), ident22nzc32)
 
 # integers by rows, 11c32 22c32
-create immutable array intRows11c32<a: double > [r=0:0,32,0, c=0:0,32,0]
-create immutable array intRows22c32<a: double > [r=0:1,32,0, c=0:1,32,0]
+create array intRows11c32<a: double > [r=0:0,32,0, c=0:0,32,0]
+create array intRows22c32<a: double > [r=0:1,32,0, c=0:1,32,0]
 store(build(intRows11c32, 1+r*1+c),      intRows11c32)
 store(build(intRows22c32, 1+r*2+c),      intRows22c32)
 
 # integers by rows, 11c32 22c32, nz-based
-create immutable array intRows11nzc32<a: double > [r=7:7,32,0, c=11:11,32,0]
-create immutable array intRows22nzc32<a: double > [r=7:8,32,0, c=11:12,32,0]
+create array intRows11nzc32<a: double > [r=7:7,32,0, c=11:11,32,0]
+create array intRows22nzc32<a: double > [r=7:8,32,0, c=11:12,32,0]
 store(build(intRows11nzc32, 1+(r-7)*1+(c-11)),      intRows11nzc32)
 store(build(intRows22nzc32, 1+(r-7)*2+(c-11)),      intRows22nzc32)
 
 # integers by rows, nonsquare, 21&22 c32
-create immutable array intRows12c32<a: double > [r=0:0,32,0, c=0:1,32,0]
-create immutable array intRows21c32<a: double > [r=0:1,32,0, c=0:0,32,0]
+create array intRows12c32<a: double > [r=0:0,32,0, c=0:1,32,0]
+create array intRows21c32<a: double > [r=0:1,32,0, c=0:0,32,0]
 store(build(intRows12c32, 1+r*2+c),      intRows12c32)
 store(build(intRows21c32, 1+r*1+c),      intRows21c32)
 
 # integers by rows, nonsquare, 21&22 c32 nz-based
-create immutable array intRows12nzc32<a: double > [r=13:13,32,0, c=17:18,32,0]
-create immutable array intRows21nzc32<a: double > [r=13:14,32,0, c=17:17,32,0]
+create array intRows12nzc32<a: double > [r=13:13,32,0, c=17:18,32,0]
+create array intRows21nzc32<a: double > [r=13:14,32,0, c=17:17,32,0]
 store(build(intRows12nzc32, 1+(r-13)*2+(c-17)),      intRows12nzc32)
 store(build(intRows21nzc32, 1+(r-13)*1+(c-17)),      intRows21nzc32)
 
 # load same array as SciDB mutliply() test uses
-create immutable array fileDense66c33 <a: double >   [r=0:5,3,0, c=0:5,3,0]
+create array fileDense66c33 <a: double >   [r=0:5,3,0, c=0:5,3,0]
 load(fileDense66c33,'../tests/harness/testcases/data/dense.txt')
 
 # and to make it output list in order
-create immutable array output66c66 <a: double > [r=0:5,6,0, c=0:5,6,0]
+create array output66c66 <a: double > [r=0:5,6,0, c=0:5,6,0]
 
 load_library('dense_linear_algebra')
 
@@ -74,8 +74,12 @@ load_library('dense_linear_algebra')
 # simplest case: I * I + 0 -> I
 gemm(ident11c32,   ident11c32, build(ident11c32,0))
 
-#  also show result has a fully-defined schema (by storing into un-created array)
+# also demonstrate result has a fully-defined schema (by storing into un-created array),
+# that it does not have the "not emptyable" attribute, and that it can be scanned.
+--justrun "remove tmp"
 store(gemm(ident11c32,   ident11c32, build(ident11c32,0)), tmp)
+show(tmp)
+scan(tmp)
 remove(tmp)
 
 # M * I -> M ; I * M -> M ; M * M -> M^2
@@ -182,7 +186,7 @@ gemm(intRows12c32, intRows21c32, build(ident22c32,1), 'TRANSA=1;TRANSB=1;ALPHA=2
 
 
 # show that gemm's output has RANDOM access
-# (transpose() is an exampe that currently requires RANDOM access)
+# (transpose() is an example that currently requires RANDOM access)
 --echo next output (by rows) should be 7, 15, 10, 22
 transpose(gemm(intRows22c32, intRows22c32, build(ident22c32,0)))
 

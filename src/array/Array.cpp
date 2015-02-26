@@ -35,6 +35,7 @@
 #include <util/Platform.h>
 #include "array/MemArray.h"
 #include "array/RLE.h"
+#include "array/AllocationBuffer.h"
 #include "system/Exceptions.h"
 #include "query/FunctionDescription.h"
 #include "query/TypeSystem.h"
@@ -175,6 +176,46 @@ namespace scidb
     CompressedBuffer::~CompressedBuffer()
     {
         free();
+    }
+
+    AllocationBuffer::AllocationBuffer(const arena::ArenaPtr& arena)
+                    : _arena(arena),
+                      _data(0),
+                      _size(0)
+    {}
+
+    AllocationBuffer::~AllocationBuffer()
+    {
+        this->free();
+    }
+
+    void* AllocationBuffer::getData() const
+    {
+        return _data;
+    }
+
+    size_t AllocationBuffer::getSize() const
+    {
+        return _size;
+    }
+
+    bool AllocationBuffer::pin() const
+    {
+        return false;
+    }
+
+    void AllocationBuffer::unPin() const
+    {}
+
+    void AllocationBuffer::allocate(size_t n)
+    {
+        _data = _arena->allocate(_size = n);
+    }
+
+    void AllocationBuffer::free()
+    {
+        _arena->recycle(_data);
+        _data = 0;
     }
 
     size_t ConstChunk::getBitmapSize() const
@@ -681,7 +722,7 @@ namespace scidb
         Coordinates const& first = getFirstPosition(false);
         Coordinates const& last = getLastPosition(false);
         for (size_t i = 0, n = dims.size(); i < n; i++) {
-            if (dims[i].getChunkOverlap() != 0 || size_t(last[i] - first[i] + 1) != dims[i].getChunkInterval()) {
+            if (dims[i].getChunkOverlap() != 0 || (last[i] - first[i] + 1) != dims[i].getChunkInterval()) {
                 return false;
             }
         }

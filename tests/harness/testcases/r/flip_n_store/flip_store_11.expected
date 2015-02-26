@@ -12,14 +12,14 @@ Query was executed successfully
 {2} 3.05,7.08
 
 {a} b
-{null} 5.08
-{null} 6.08
-{null} 7.08
+{1.05} 5.08
+{2.05} 6.08
+{3.05} 7.08
 
 {b} a
-{null} 1.05
-{null} 2.05
-{null} 3.05
+{5.08} 1.05
+{6.08} 2.05
+{7.08} 3.05
 
 Query was executed successfully
 
@@ -43,14 +43,14 @@ Query was executed successfully
 {2} '3','7'
 
 {a} b
-{null} '5'
-{null} '6'
-{null} '7'
+{'1'} '5'
+{'2'} '6'
+{'3'} '7'
 
 {b} a
-{null} '1'
-{null} '2'
-{null} '3'
+{'5'} '1'
+{'6'} '2'
+{'7'} '3'
 
 Query was executed successfully
 

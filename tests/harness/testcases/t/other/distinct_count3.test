@@ -10,10 +10,8 @@ load(A, '../tests/harness/testcases/data/adc_sparse.txt')
 create array B <val:int64> [x=0:*,5000,0,y=0:*,5000,0]
 load(B, '../tests/harness/testcases/data/adc_sparse1.txt')
 
-
-
 --test
---set-format sparse
+--set-format lcsv+
 ApproxDC(A)
 ApproxDC(concat(A,A))
 ApproxDC(join(A,A))
@@ -41,8 +39,6 @@ aggregate(B,ApproxDC(val),sum(val),min(val),max(val),count(val))
 --aql select ApproxDC(val) from B regrid as (partition by x 100,y 100)
 --aql select ApproxDC(val) from B fixed window as (partition by x 0 preceding and 1 following, y 0 preceding and 0 following)
 --aql select ApproxDC(val) from B fixed window as (partition by x 0 preceding and 100 following, y 10 preceding and 100 following)
-
-
 
 --cleanup
 remove(A)

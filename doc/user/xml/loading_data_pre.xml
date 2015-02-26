@@ -212,15 +212,14 @@
     <section>
       <title>Prepare the Load File</title>
 
-      <para>The CSV loading technique starts with a comma-separated-value
+      <para>The CSV loading technique starts with a comma separated value
       (CSV) file. Each row of the file describes one cell of the target array,
       including its dimension values. Because the target array has four
       variables (two dimensions and two attributes), each row of the CSV file
       will have four values. Because the target array has twelve non-empty
       cells, the CSV file will have 12 rows of data, like this:</para>
 
-      <programlisting language="test">
---shell --show-query=no --command=cat $DOC_DATA/olympic_data.csv
+      <programlisting language="test">--shell --show-query=no --command=cat $DOC_DATA/olympic_data.csv
 </programlisting>
 
       <para>To include a null value for an attribute, you have several
@@ -262,11 +261,9 @@
 
       <para>To see the options for <code>csv2scidb</code>, type
       <code>csv2scidb --help</code> at the command line. The options for
-      csv2scidb are: <programlisting language="test">
---shell --show-query=no --show-output=yes --command=csv2scidb -h
+      csv2scidb are: <programlisting language="test">--shell --show-query=no --show-output=yes --command=csv2scidb -h
 </programlisting>This command will transform <code>olympic_data.csv</code> to
-      SciDB load file format: <programlisting>
-csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_data.scidb
+      SciDB load file format: <programlisting>csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_data.scidb
 </programlisting>The -s flag specifies the number of lines to skip at the
       beginning of the file. Since the file has a header, you can strip that
       line with "-s 1". The -p flag specifies the types of data in the columns
@@ -274,8 +271,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       (nullable string), and C (char).</para>
 
       <para>The file <code>olympic_data.scidb</code> looks like this:
-      <programlisting language="test">
---shell --show-output=yes --command=cat $DOC_DATA/olympic_data.scidb
+      <programlisting language="test">--shell --show-output=yes --command=cat $DOC_DATA/olympic_data.scidb
 </programlisting>The square braces show the beginning and end of the array
       dimension. The parentheses enclose the individual cells of the array.
       There are commas between attributes in cells and between cells in the
@@ -292,8 +288,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       For the olympic data, the array that you create must have four
       attributes, like this:</para>
 
-      <para><programlisting language="test">
---aql CREATE ARRAY winnersFlat &lt; event:string, year:int64, person:string, time:double &gt; [i=0:*,1000000,0]; --show-output=no 
+      <para><programlisting language="test">--aql CREATE ARRAY winnersFlat &lt; event:string, year:int64, person:string, time:double &gt; [i=0:*,1000000,0]; --show-output=no 
 </programlisting></para>
 
       <para>Within the preceding CREATE ARRAY statement, notice the
@@ -373,6 +368,8 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <secondary>select</secondary>
         </indexterm><indexterm>
           <primary>select statement</primary>
+        </indexterm><indexterm>
+          <primary>select from</primary>
         </indexterm>There are, however, some characteristics of arrays beyond
       these basics. These include the chunk size and chunk overlap value of
       each dimension. Before you choose values for these parameters, you can
@@ -397,20 +394,33 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <primary>AQL</primary>
 
           <secondary>create array</secondary>
-        </indexterm>The following command creates the target array:</para>
+        </indexterm>The following query creates the target array:</para>
 
       <programlisting language="test">--aql CREATE ARRAY winners &lt;person:string, time:double&gt; 
 [year=1996:2008,1000,0, event(string)=3,1000,0] --show-output=no 
 </programlisting>
 
-      <para>The result of that command is an array that can accommodate the
-      data about olympic winners. To populate this array with the data, use
-      the following command:</para>
+      <para>The result of that query is an array that can accommodate the data
+      about Olympic winners. To populate this array with the data, run the
+      following query:</para>
 
       <programlisting language="test">--afl redimension_store(winnersFlat,winners); --show-output=no</programlisting>
 
-      <para>The result of this command is the desired array; you have
-      completed the CSV load procedure.<programlisting language="test">--afl scan(winners); --show-query=no --output-format=dcsv</programlisting></para>
+      <para><indexterm>
+          <primary>select into</primary>
+        </indexterm><indexterm>
+          <primary>redimension</primary>
+
+          <secondary>select into</secondary>
+        </indexterm><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>select into</secondary>
+        </indexterm>The AQL equivalent query uses the <code><command>SELECT
+      ... INTO</command></code> syntax:<programlisting language="test">--aql SELECT * INTO winners FROM winnersFlat; --show-output=no</programlisting></para>
+
+      <para>The result of this query is the desired array; you have completed
+      the CSV load procedure.<programlisting language="test">--afl scan(winners); --show-query=no --output-format=dcsv</programlisting></para>
     </section>
   </section>
 
@@ -500,13 +510,13 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       <itemizedlist>
         <listitem>
           <para>Determine the attributes for the array, including attribute
-          name, datatype, whether it allows null values, and whether it has a
+          name, data type, whether it allows null values, and whether it has a
           default value to be used to replace null values.</para>
         </listitem>
 
         <listitem>
           <para>Determine the dimensions of the array, including each
-          dimension's name and datatype.</para>
+          dimension's name and data type.</para>
         </listitem>
       </itemizedlist>
 
@@ -1191,7 +1201,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
 
         <listitem>
           <para>A fixed-length data type that allows null values will always
-          consume one more byte than the datatype requires, regardless of
+          consume one more byte than the data type requires, regardless of
           whether the actual value is null or non-null. For example, an int8
           will require 2 bytes and an int64 will require 9 bytes. (In the
           figure, see bytes 2-4 or 17-19.)</para>
@@ -1199,7 +1209,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
 
         <listitem>
           <para>A fixed-length data type that disallows null values will
-          always consume exactly as many bytes as that datatype requires. For
+          always consume exactly as many bytes as that data type requires. For
           example, an int8 will consume 1 byte and an int64 will consume 8
           bytes. (See byte 1 or 16.)</para>
         </listitem>
@@ -1251,7 +1261,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
           <secondary>select</secondary>
         </indexterm><indexterm>
           <primary>select statement</primary>
-        </indexterm>Each value in the file must conform to a datatype
+        </indexterm>Each value in the file must conform to a data type
       recognized by SciDB. This includes native types, types defined in SciDB
       extensions, and user-defined types. For a complete list of the types
       recognized by your installation of SciDB, use the following AQL:</para>
@@ -1401,8 +1411,7 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       data in the 1-dimensional array you loaded. Here is the command to
       analyze the array intensityFlat:</para>
 
-      <para><programlisting language="test">
---aql SELECT * FROM analyze(intensityFlat)
+      <para><programlisting language="test">--aql SELECT * FROM analyze(intensityFlat)
 </programlisting> Of course, for the simple example presented here, the simple
       statistics reveal little of interest. For large arrays however, the data
       can be illuminating and can influence your decisions about chunk size
@@ -1412,23 +1421,36 @@ csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_da
       operator, see the <xref linkend="analyze"/> section in SciDB Operator
       Reference.</para>
 
-      <para>The following command creates the desired 2-dimensional,
-      1-attribute array:</para>
+      <para>The following query creates the desired 2-dimensional, 1-attribute
+      array:</para>
 
-      <para><programlisting language="test">
---aql CREATE ARRAY 
+      <para><programlisting language="test">--aql CREATE ARRAY 
             intensity 
            &lt;measuredIntensity:int64 null&gt; 
            [exposure(string)=3,3,0,
             elapsedTime=0:40000,10000,0]; --show-output=no 
-</programlisting> The result of that command is an array that can accommodate
+</programlisting> The result of that query is an array that can accommodate
       the data about measured intensity after exposure. To populate this array
-      with the data, use the following command:</para>
+      with the data, use the following query:</para>
 
-      <para><programlisting language="test">
---afl redimension_store(intensityFlat,intensity); --show-output=no
-</programlisting> The result of this command is the desired array; you have
-      completed the binary load procedure.</para>
+      <para><programlisting language="test">--afl redimension_store(intensityFlat,intensity); --show-output=no
+</programlisting></para>
+
+      <para><indexterm>
+          <primary>select into</primary>
+        </indexterm><indexterm>
+          <primary>redimension</primary>
+
+          <secondary>select into</secondary>
+        </indexterm><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>select into</secondary>
+        </indexterm>The AQL equivalent query uses the <code><command>SELECT
+      ... INTO</command></code> syntax:<programlisting language="test">--aql SELECT * INTO intensity FROM intensityFlat; --show-output=no</programlisting></para>
+
+      <para>The result of this query is the desired array; you have completed
+      the binary load procedure.</para>
     </section>
 
     <section>

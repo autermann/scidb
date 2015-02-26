@@ -28,7 +28,7 @@
   </refsect1>
 
   <refsect1>
-    <title>Example</title>
+    <title>Examples</title>
 
     <informalexample>
       <para>This example filters an array to remove outlying values.</para>
@@ -50,6 +50,13 @@
           m4x4:<programlisting language="test">--afl filter(m4x4,val&lt;100); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
       </procedure>
+    </informalexample>
+
+    <informalexample>
+      <para>This example uses a regular expression to filter the list of
+      available SciDB operators, and return the operators that contain the
+      letter <emphasis role="bold">z</emphasis>.<programlisting
+      language="test">--afl filter(list('operators'),regex(name,'(.*)z(.*)')); --output-format=csv</programlisting></para>
     </informalexample>
   </refsect1>
 </refentry>

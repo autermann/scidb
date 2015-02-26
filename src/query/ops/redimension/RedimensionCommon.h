@@ -196,11 +196,11 @@ public:
 
     /**
      * @see PhysicalOperator::getOutputDistribution
-     * @return psRoundRobin
+     * @return psHashPartitioned
      */
     virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector< ArrayDesc> const&) const
     {
-        return ArrayDistribution(psRoundRobin);
+        return ArrayDistribution(psHashPartitioned);
     }
 
     /**
@@ -280,12 +280,14 @@ private:
                                                       vector<AggregatePtr> const& aggregates,
                                                       vector< shared_ptr<ArrayIterator> >& redimArrayIters,
                                                       vector< shared_ptr<ChunkIterator> >& redimChunkIters,
-                                                      size_t& redimCount);
+                                                      size_t& redimCount,
+                                                      size_t const& redimChunkSize);
     void appendItemToRedimArray(vector<Value> const& item,
                                 shared_ptr<Query> const& query,
                                 vector< shared_ptr<ArrayIterator> >& redimArrayIters,
                                 vector< shared_ptr<ChunkIterator> >& redimChunkIters,
-                                size_t& redimCount);
+                                size_t& redimCount,
+                                size_t const& redimChunkSize);
     bool updateSyntheticDimForRedimArray(shared_ptr<Query> const& query,
                                          ArrayCoordinatesMapper const& coordMapper,
                                          ChunkIdMaps& chunkIdMaps,

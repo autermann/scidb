@@ -38,15 +38,15 @@ namespace scidb {
  * @brief The operator: sort().
  *
  * @par Synopsis:
- *   sort( srcArray, attr = first attribute, defaultChunkSize = 1000000 )
+ *   sort( srcArray {, attr}* {, chunkSize}? )
  *
  * @par Summary:
  *   Produces a 1D array by sorting the non-empty cells of a source array.
  *
  * @par Input:
  *   - srcArray: the source array with srcAttrs and srcDim.
- *   - attr: the attribute to sort by. If not provided, the first attribute will be used.
- *   - defaultChunkSize: the default size of a chunk in the result array.
+ *   - attr: the list of attributes to sort by. If no attribute is provided, the first attribute will be used.
+ *   - chunkSize: the size of a chunk in the result array. If not provided, 1M will be used.
  *
  * @par Output array:
  *        <
@@ -63,7 +63,7 @@ namespace scidb {
  *   n/a
  *
  * @par Notes:
- *   n/a
+ *   Assuming null < NaN < other values
  *
  */
 class LogicalSort: public LogicalOperator

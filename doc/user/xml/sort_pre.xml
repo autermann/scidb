@@ -79,9 +79,24 @@
 
       <procedure>
         <step>
-          <para>Show the source_array: <programlisting language="test">--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winners2.csv &gt; $DOC_DATA/winners2.scidb
---aql load winnersFlat from '${DOC_DATA}/winners2.scidb'; --show-query=no --show-output=no
+          <para>Show the source_array: <programlisting language="test">--afl CREATE ARRAY winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0];
+      --show-query=no --show-output=no
+
+--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array year &lt;year:int64&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array person &lt;person:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array country &lt;country:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array time &lt;time:double&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl store(build(event,iif(i&lt;4,'dash',iif(i&lt;8,'steeplechase','marathon'))),event); --show-query=no --show-output=no
+--afl store(build(year,1996+(i%4 * 4)),year); --show-query=no --show-output=no
+--afl store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,Kemboi,Kipruto,Thugwane,Abera,Baldini,Wanjiru]',true),person);
+      --show-query=no --show-output=no
+--afl store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,Kenya,Kenya,USA,Ethiopia,Italy,Kenya]',true),country);
+      --show-query=no --show-output=no
+--afl store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time);
+      --show-query=no --show-output=no
+--afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat); --show-query=no --show-output=no
+
 --afl CREATE ARRAY champions&lt;person:string,country:string,time:double&gt; 
    [year=1996:2008,13,0,event(string)=3,3,0]; --show-query=no --show-output=no
 --afl redimension_store(winnersFlat,champions); --show-query=no --show-output=no</programlisting><programlisting
@@ -95,13 +110,8 @@
         <step>
           <para>Sort by country (ascending), then year (descending), and use a
           chunk size of 100 for the result array: <programlisting
-          language="test">--afl store(project(winnersFlat,country, year, event),winnersAbridged); --show-query=no --show-output=no
---afl sort(winnersAbridged,country, year desc, 100);</programlisting> Note
-          that the result includes 12 cells, corresponding to the 12 non-empty
-          cells of the source array. The sort operator ignores empty cells, of
-          which there are several in the winnersAbridged array. (They empty
-          cells correspond to non-Olympic years included in the dimension
-          "year.")</para>
+          language="test">--afl sort(project(winnersFlat,country, year, event), country, year desc, 100);
+</programlisting></para>
         </step>
       </procedure>
 

@@ -71,7 +71,7 @@ public:
 
     bool coordinatorOnly() const
     {
-        if(getMainParameter() == "chunk descriptors" || getMainParameter() == "chunk map")
+        if(getMainParameter() == "chunk descriptors" || getMainParameter() == "chunk map" || getMainParameter() == "libraries")
         {
             return false;
         }
@@ -226,23 +226,7 @@ public:
             tuple2[2].setBool(true);
             tuple2[3].setString("scidb");
             return shared_ptr<Array>(new TupleArray(_schema, tuples));
-        } else if (what == "libraries") {
-            vector<boost::shared_ptr<Tuple> > tuples;
-            const std::map<std::string, PluginDesc>& plugins = PluginManager::getInstance()->getPlugins();
-            for (std::map<std::string, PluginDesc>::const_iterator i = plugins.begin();
-                 i != plugins.end(); ++i)
-            {
-                Tuple& tuple = *new Tuple(5);
-                PluginDesc const& pluginDesc = i->second;
-                tuples.push_back(shared_ptr<Tuple>(&tuple));
-                tuple[0].setString(i->first.c_str());
-                tuple[1].setInt32(pluginDesc.major);
-                tuple[2].setInt32(pluginDesc.minor);
-                tuple[3].setInt32(pluginDesc.patch);
-                tuple[4].setInt32(pluginDesc.build);
-            }
-            return shared_ptr<Array>(new TupleArray(_schema, tuples));
-         } else if (what == "queries") {
+        } else if (what == "queries") {
             vector<boost::shared_ptr<Tuple> > tuples;
 
             boost::function<void (const boost::shared_ptr<scidb::Query>&)> f;
@@ -266,9 +250,15 @@ public:
              builder.initialize(query);
              StorageManager::getInstance().listChunkMap(builder);
              return builder.getArray();
-         } else {
+         } else if (what == "libraries") {
+             ListLibrariesArrayBuilder builder;
+             builder.initialize(query);
+             PluginManager::getInstance()->listPlugins(builder);
+             return builder.getArray();
+         }
+         else {
            assert(0);
-        }
+         }
 
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "PhysicalList::execute";
         return boost::shared_ptr<Array>();

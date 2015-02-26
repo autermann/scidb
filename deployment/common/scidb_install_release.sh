@@ -25,7 +25,7 @@ function centos6 ()
     /sbin/chkconfig iptables off
     /sbin/service iptables stop
     if [ "1" == "${with_coordinator}" ]; then
-	yum install --enablerepo=scidb -y scidb-${release}-all-coord
+	yum install --enablerepo=scidb -y scidb-${release}-all-coord scidb-${release}-dev-tools
     else
 	yum install --enablerepo=scidb -y scidb-${release}-all
     fi
@@ -35,7 +35,7 @@ function ubuntu1204 ()
 {
     apt-get update
     if [ "1" == "${with_coordinator}" ]; then
-	apt-get install -y scidb-${release}-all-coord
+	apt-get install -y scidb-${release}-all-coord scidb-${release}-dev-tools
     else
 	apt-get install -y scidb-${release}-all
     fi

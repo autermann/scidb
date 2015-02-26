@@ -1,97 +1,97 @@
-SCIDB QUERY : <create immutable array Ts <a:string> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts <a:string> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_rle <a:string compression 'rle'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_rle <a:string compression 'rle'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_d <a:string compression 'dictionary'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_d <a:string compression 'dictionary'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_ns <a:string compression 'null suppression'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_ns <a:string compression 'null suppression'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_be <a:string compression 'bitmap encoding'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_be <a:string compression 'bitmap encoding'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_z <a:string compression 'zlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_z <a:string compression 'zlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_bz <a:string compression 'bzlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_bz <a:string compression 'bzlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array Ts_nf <a:string compression 'null filter'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs <a:string> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs <a:string> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_rle <a:string compression 'rle'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_rle <a:string compression 'rle'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_d <a:string compression 'dictionary'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_d <a:string compression 'dictionary'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_ns <a:string compression 'null suppression'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_ns <a:string compression 'null suppression'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_be <a:string compression 'bitmap encoding'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_be <a:string compression 'bitmap encoding'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_z <a:string compression 'zlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_z <a:string compression 'zlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_bz <a:string compression 'bzlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_bz <a:string compression 'bzlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array eTs_nf <a:string compression 'null filter'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array eTs_nf <a:string compression 'null filter'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs <a:string default 'default'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs <a:string default 'default'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_rle <a:string default 'default' compression 'rle'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_rle <a:string default 'default' compression 'rle'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_d <a:string default 'default' compression 'dictionary'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_d <a:string default 'default' compression 'dictionary'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_ns <a:string default 'default' compression 'null suppression'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_ns <a:string default 'default' compression 'null suppression'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_be <a:string default 'default' compression 'bitmap encoding'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_be <a:string default 'default' compression 'bitmap encoding'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_z <a:string default 'default' compression 'zlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_z <a:string default 'default' compression 'zlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_bz <a:string default 'default' compression 'bzlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_bz <a:string default 'default' compression 'bzlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable array dTs_nf <a:string default 'default' compression 'null filter'> [x=-2:3,2,1]>
+SCIDB QUERY : <create array dTs_nf <a:string default 'default' compression 'null filter'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs <a:string default 'default'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs <a:string default 'default'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_rle <a:string default 'default' compression 'rle'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_rle <a:string default 'default' compression 'rle'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_d <a:string default 'default' compression 'dictionary'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_d <a:string default 'default' compression 'dictionary'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_ns <a:string default 'default' compression 'null suppression'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_ns <a:string default 'default' compression 'null suppression'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_be <a:string default 'default' compression 'bitmap encoding'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_be <a:string default 'default' compression 'bitmap encoding'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_z <a:string default 'default' compression 'zlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_z <a:string default 'default' compression 'zlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_bz <a:string default 'default' compression 'bzlib'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_bz <a:string default 'default' compression 'bzlib'> [x=-2:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array edTs_nf <a:string default 'default' compression 'null filter'> [x=-2:3,2,1]>
+SCIDB QUERY : <create empty array edTs_nf <a:string default 'default' compression 'null filter'> [x=-2:3,2,1]>
 Query was executed successfully
 
 SCIDB QUERY : <select * into Ts_rle from build_sparse(Ts,string(x),x<>0)>

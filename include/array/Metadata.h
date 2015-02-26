@@ -223,25 +223,56 @@ const InstanceID COORDINATOR_INSTANCE = INVALID_INSTANCE;
 const std::string DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME = "EmptyTag";
 
 /**
- * Partitioning schema show how an array is distributed through instances.
- * Every kind of partitioning has one or more parameters. These parameters
- * stored in vector of integers.
+ * Partitioning schema shows how an array is distributed among the SciDB instances.
  *
- * Some newly introducd partitioning schemas need parameters (last parameter in redistribute(). They are:
- *   - psGroupBy: need a parameter of type (vector<bool>*). The vector has the same size as the full dimensions.
- *     Each element indicates whether the dimension is a groupby dimension.
+ * Guidelines for introducing a new partitioning schema:
+ *   - Add to enum PartitioningSchema (right above psMax).
+ *   - Modify the doxygen comments in LogicalSG.cpp.
+ *   - Modify redistribute() to handle the new partitioning schema.
+ *   - Modify std::ostream& operator<<(std::ostream& stream, const ArrayDistribution& dist). (See Operator.cpp)
+ *   - If the partitioning schema uses extra data:
+ *   -    Modify doesPartitioningSchemaHaveOptionalData.
+ *   -    Derive a class from PartitioningSchemaData.
+ *   -    When modifying redistribute(), consider the extra data for the new partitioning schema.
  */
 enum PartitioningSchema
 {
-    psReplication,
-    psRoundRobin,  // WARNING: hashed, NOT actually round-robin anymore, needs name change
+    psReplication = 0,
+    psHashPartitioned,
     psLocalInstance,
     psByRow,
     psByCol,
     psUndefined,
     psGroupby,
-    psScaLAPACK
+    psScaLAPACK,
+
+    // A newly introduced partitioning schema should be added before this line.
+    psMAX
 };
+
+/**
+ * Whether a partitioning schema has optional data.
+ */
+inline bool doesPartitioningSchemaHaveData(PartitioningSchema ps)
+{
+    return ps==psGroupby || ps==psScaLAPACK;
+}
+
+/**
+ * Whether an uint32_t is a valid partitioning schema.
+ */
+inline bool isValidPartitioningSchema(uint32_t ps, bool allowOptionalData=true)
+{
+    if (ps >= (uint32_t)psMAX) {
+        return false;
+    }
+
+    if (!allowOptionalData && doesPartitioningSchemaHaveData((PartitioningSchema)ps) ) {
+        return false;
+    }
+
+    return true;
+}
 
 /**
  * The base class for optional data for certain PartitioningSchema.
@@ -249,6 +280,10 @@ enum PartitioningSchema
 class PartitioningSchemaData {
 public:
     virtual ~PartitioningSchemaData() {}
+
+    /**
+     * return which partitioning schema this type of data is for.
+     */
     virtual PartitioningSchema getID() = 0;
 };
 
@@ -879,11 +914,11 @@ public:
                             Coordinates& lowerBound,
                             Coordinates& upperBound) const;
    /**
-     * Get position of the chunk for the given coordinates
+     * Get hashed position of the chunk for the given coordinates
      * @param pos in: element position
      * @param box in: bounding box for offset distributions
      */
-    uint64_t getChunkNumber(Coordinates const& pos) const;
+    uint64_t getHashedChunkNumber(Coordinates const& pos) const;
 
     /**
      * Get flags associated with array
@@ -1326,8 +1361,6 @@ class DimensionDesc: public ObjectNames
 public:
     enum DimensionFlags
     {
-        DISTINCT = 0,
-        ALL = 1,
         COMPLEX_TRANSFORMATION = 2
     };
 
@@ -1537,7 +1570,7 @@ public:
     TypeId getType() const;
 
     /**
-     * Get dimnesion comment
+     * Get dimension comment
      * @return dimension comment
      */
     std::string const& getComment() const;
@@ -1604,11 +1637,6 @@ public:
         return _flags;
     }
 
-    bool isDistinct() const
-    {
-        return (_flags & ALL) == 0;
-    }
-
     void setMappingArrayName(const std::string &mappingArrayName)
     {
         _mappingArrayName = mappingArrayName;
@@ -1663,12 +1691,12 @@ private:
 
     /**
      * The length of the chunk along this dimension, excluding overlap.
-     * 
+     *
      * Chunk Interval is often used as part of coordinate math and coordinates are signed int64. To make life easier
      * for everyone, chunk interval is also signed for the moment. Same with position_t in RLE.h.
      */
     int64_t _chunkInterval;
-    
+
     /**
      * The length of just the chunk overlap along this dimension.
      * Signed to make coordinate math easier.

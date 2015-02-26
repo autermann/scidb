@@ -620,7 +620,18 @@ shared_ptr<Array> SVDPhysical::execute(std::vector< shared_ptr<Array> >& inputAr
     //
     string whichMatrix = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 
-    shared_ptr<Array> result = invokeMPI(redistributedInputs, query, whichMatrix, _schema);
+    // invokeMPI does not manage an empty bitmap yet, but it is specified in _schema.
+    // so to make it compatible, we first create a copy of _schema without the empty tag attribute
+    Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
+    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions());
+
+    // and now invokeMPI produces an array without empty bitmap
+    shared_ptr<Array> arrayNoEmptyTag = invokeMPI(redistributedInputs, query, whichMatrix, schemaNoEmptyTag);
+
+    // now we place a wrapper array around arrayNoEmptyTag, that adds a fake emptyTag (true everywhere)
+    // but otherwise passes through requests for iterators on the other attributes.
+    // And yes, the class name is the complete opposite of what it shold be.
+    shared_ptr<Array> result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
 
     // return the scidb array
     Dimensions const& resultDims = result->getArrayDesc().getDimensions();

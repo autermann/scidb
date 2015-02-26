@@ -19,9 +19,6 @@ redimension_store  ( A1, A2 )
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_WINDOW_ERROR5 "window ( A1, 1, 1, 1, 1, sum ( v ), 'must_be_probe_or_materialize' )"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_AGGREGATE_ARGUMENTS_COUNT "window ( A1, 1, 1, 1, 1, sum ( v ), A1.v * 2 )"
 
-save ( A1, 'A1.dat', -1, 'opaque' )
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_UNSUPPORTED_INPUT_ARRAY "window ( input ( A1, 'A1.dat', -1, 'opaque' ), 1, 1, 1, 1, sum ( v ) )"
-
 aggregate ( filter ( join ( window ( A1, 1, 1, 1, 1, sum ( v ) as sum_v, count ( * ) as cnt_v ) AS B1, window ( A2, 1, 1, 1, 1, sum ( v ) as sum_v, count ( * ) as cnt_v ) AS B2), B1.sum_v <> B2.sum_v OR B1.cnt_v <> B2.cnt_v ), count ( * ) as diffs )
 
 --cleanup

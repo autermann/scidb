@@ -145,7 +145,7 @@ public:
      * for timing only.
      * For proper operation, the query planner inserts the redistribute
      * between ScaLAPACK-based operators (which have distribution psScaLAPACK) and others
-     * (e.g. store) which require psRoundRobin.  However, this requires using store() to
+     * (e.g. store) which require psHashPartitioned.  However, this requires using store() to
      * as the terminal operator, which induces very long IO wait time into the execution of
      * the benchmark.  Donghui is learning how to use the sg() operator to do this in such a
      * benchmark situation, by writing the AFL    sg(op-under-test, ...) but so far does not understand
@@ -157,7 +157,7 @@ public:
      * @param query         Current query
      * @param callerLabel   a string that can be used when labeling logging messages, since the context in which
      *                      this routine is working would be significant to the log line.
-     * @return              outputArray redistributed to psRoundRobin.
+     * @return              outputArray redistributed to psHashPartitioned.
      */
     shared_ptr<Array> redistributeOutputArrayForTiming(shared_ptr<Array>& outputArray, shared_ptr<Query>& query, const std::string& callerLabel);
 

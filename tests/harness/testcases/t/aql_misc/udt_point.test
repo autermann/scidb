@@ -1,7 +1,7 @@
 --setup
 load_library('point')
-create immutable array A <a:int32>[x=0:2,3,0]
-create immutable array B <b:point>[x=0:2,3,0]
+create array A <a:int32>[x=0:2,3,0]
+create array B <b:point>[x=0:2,3,0]
 
 --test
 

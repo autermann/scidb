@@ -1,6 +1,6 @@
 --setup
-create immutable array xyz <a:double> [x=0:1999,100,0, y=0:1999,100,0]
-create immutable array xyz_plain <a:double> [pos=1:4000000,10000,0]
+create array xyz <a:double> [x=0:1999,100,0, y=0:1999,100,0]
+create array xyz_plain <a:double> [pos=1:4000000,10000,0]
 load(xyz,'../tests/harness/testcases/data/xyz_small.txt')
 
 --test

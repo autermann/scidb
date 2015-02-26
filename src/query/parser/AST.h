@@ -81,7 +81,6 @@ typedef enum
     dimensionChunkOverlap,
     stringNode,
     stringList,
-    immutable,
     emptyable,
     function,
     functionName,
@@ -158,8 +157,7 @@ typedef enum
 typedef enum
 {
     // CreateArray
-    createArrayArgImmutable            = 0,
-    createArrayArgEmpty,
+    createArrayArgEmpty             = 0,
     createArrayArgArrayName,
     createArrayArgSchema,
     createArrayArgCount,

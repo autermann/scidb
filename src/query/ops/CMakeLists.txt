@@ -70,7 +70,6 @@ set(ops_lib_src
     deldim/DeldimArray.cpp
     repart/LogicalRepart.cpp
     repart/PhysicalRepart.cpp
-    repart/RepartArray.cpp
     load_library/LogicalLoadLibrary.cpp
     load_library/PhysicalLoadLibrary.cpp
     aggregates/LogicalAggregate.cpp

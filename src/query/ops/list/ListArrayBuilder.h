@@ -242,6 +242,97 @@ public:
     virtual Attributes getAttributes() const;
 };
 
+/**
+ * An array-listable summary of a library plugin.
+ */
+struct LibraryInformation
+{
+    /**
+     * Name of the plugin (or "scidb" for core).
+     */
+    string pluginName;
+
+    /**
+     * Major version number.
+     */
+    uint32_t majorVersion;
+
+    /**
+     * Minor version number.
+     */
+    uint32_t minorVersion;
+
+    /**
+     * Patch number.
+     */
+    uint32_t patchVersion;
+
+    /**
+     * Build number.
+     */
+    uint32_t buildNumber;
+
+    /**
+     * The build type of the plugin. Currently used for SciDB only.
+     * Sadly we don't currently store plugin build types.
+     */
+    string buildType;
+
+    LibraryInformation(string const& name,
+                       uint32_t const maV,
+                       uint32_t const miV,
+                       uint32_t const pV,
+                       uint32_t const bN,
+                       string const buildType = ""):
+        pluginName(name),
+        majorVersion(maV),
+        minorVersion(miV),
+        patchVersion(pV),
+        buildNumber(bN),
+        buildType(buildType)
+    {}
+};
+
+/**
+ * A ListArrayBuilder for listing PersistentChunk objects.
+ * Technically, we could take the ArrayUAID from the PersistentChunk. That value should be the same as the ArrayUAID that
+ * points to the node in the tree. But we are taking the value from the tree to be extra defensive.
+ */
+class ListLibrariesArrayBuilder : public ListArrayBuilder <LibraryInformation>
+{
+private:
+    /**
+     * Verbose names of all the attributes output by list('chunk map') for internal consistency and dev readability.
+     */
+    enum Attrs
+    {
+        PLUGIN_NAME     =0,
+        MAJOR           =1,
+        MINOR           =2,
+        PATCH           =3,
+        BUILD           =4,
+        BUILD_TYPE      =5,
+        EMPTY_INDICATOR =6,
+        NUM_ATTRIBUTES  =7
+    };
+
+    /**
+     * Add information about a PersistentChunk to the array.
+     * @param value - a pair of the Unversioned Array ID and PersistentChunk to list
+     */
+    virtual void addToArray(LibraryInformation const& item);
+
+public:
+    ListLibrariesArrayBuilder(): ListArrayBuilder <LibraryInformation>() {}
+    virtual ~ListLibrariesArrayBuilder() {}
+
+    /**
+     * Get the attributes of the array
+     * @return the attribute descriptors
+     */
+    virtual Attributes getAttributes() const;
+};
+
 }
 
 #endif /* LISTARRAYBUILDER_H_ */

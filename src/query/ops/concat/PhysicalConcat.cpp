@@ -112,7 +112,7 @@ public:
                 case psByRow:
                     return inputDistributions[0];
 
-                case psRoundRobin:
+                case psHashPartitioned:
                 case psByCol:
                 case psUndefined:
                 case psGroupby:

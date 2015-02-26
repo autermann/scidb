@@ -111,7 +111,7 @@ SCIDB QUERY : <project(dimensions(AL),low,high)>
 {No} low,high
 {0} 2,13
 
-SCIDB QUERY : <create immutable array BI<j:int8>[i=0:14,5,0]>
+SCIDB QUERY : <create array BI<j:int8>[i=0:14,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(BI, '[(),(1),(2),(3),(4),(5),(6)]', true), BI)>
@@ -127,7 +127,7 @@ SCIDB QUERY : <project(dimensions(BI),low,high)>
 {No} low,high
 {0} 1,6
 
-SCIDB QUERY : <create immutable array AI<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create array AI<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(BI, AI)>
@@ -145,66 +145,42 @@ SCIDB QUERY : <project(dimensions(AI),low,high)>
 
 SCIDB QUERY : <store(build(BI, '{10}[(),(),(12),(13),(14)]', true), BI)>
 {i} j
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
 {12} 12
 {13} 13
 {14} 14
 
 SCIDB QUERY : <project(dimensions(BI),low,high)>
 {No} low,high
-{0} 1,14
+{0} 12,14
 
 SCIDB QUERY : <store(build(BI, '{10}[(),(),(12),(13),(14)]', true), AI)>
 {i} j
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
 {12} 12
 {13} 13
 {14} 14
 
 SCIDB QUERY : <project(dimensions(AI),low,high)>
 {No} low,high
-{0} 1,14
+{0} 12,14
 
 SCIDB QUERY : <save(AI, '/tmp/scidb_array_a.out', 0)>
 {i} j
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
 {12} 12
 {13} 13
 {14} 14
 
-SCIDB QUERY : <create immutable array AIL<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create array AIL<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(AIL, '/tmp/scidb_array_a.out', 0)>
 {i} j
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
 {12} 12
 {13} 13
 {14} 14
 
 SCIDB QUERY : <project(dimensions(AIL),low,high)>
 {No} low,high
-{0} 1,14
+{0} 12,14
 
 SCIDB QUERY : <create not empty array BN<j:int8>[i=0:14,5,0]>
 Query was executed successfully
@@ -382,7 +358,7 @@ SCIDB QUERY : <project(dimensions(ANL), low, high)>
 {No} low,high
 {0} 0,19
 
-SCIDB QUERY : <create immutable not empty array BNI<j:int8>[i=0:14,5,0]>
+SCIDB QUERY : <create not empty array BNI<j:int8>[i=0:14,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(BNI, '[(),(1),(2),(3),(4),(5),(6)]', true), BNI)>
@@ -402,7 +378,7 @@ SCIDB QUERY : <project(dimensions(BNI),low,high)>
 {No} low,high
 {0} 0,9
 
-SCIDB QUERY : <create immutable not empty array ANI<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create not empty array ANI<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(BNI, ANI)>
@@ -424,16 +400,6 @@ SCIDB QUERY : <project(dimensions(ANI),low,high)>
 
 SCIDB QUERY : <store(build(BNI, '{10}[(),(),(12),(13),(14)]', true), BNI)>
 {i} j
-{0} 0
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
-{7} 0
-{8} 0
-{9} 0
 {10} 0
 {11} 0
 {12} 12
@@ -442,20 +408,10 @@ SCIDB QUERY : <store(build(BNI, '{10}[(),(),(12),(13),(14)]', true), BNI)>
 
 SCIDB QUERY : <project(dimensions(BNI),low,high)>
 {No} low,high
-{0} 0,14
+{0} 10,14
 
 SCIDB QUERY : <store(build(BNI, '{10}[(),(),(12),(13),(14)]', true), ANI)>
 {i} j
-{0} 0
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
-{7} 0
-{8} 0
-{9} 0
 {10} 0
 {11} 0
 {12} 12
@@ -464,41 +420,21 @@ SCIDB QUERY : <store(build(BNI, '{10}[(),(),(12),(13),(14)]', true), ANI)>
 
 SCIDB QUERY : <project(dimensions(ANI),low,high)>
 {No} low,high
-{0} 0,14
+{0} 10,14
 
 SCIDB QUERY : <save(ANI, '/tmp/scidb_array_a.out', 0)>
 {i} j
-{0} 0
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
-{7} 0
-{8} 0
-{9} 0
 {10} 0
 {11} 0
 {12} 12
 {13} 13
 {14} 14
 
-SCIDB QUERY : <create immutable not empty array ANIL<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create not empty array ANIL<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(ANIL, '/tmp/scidb_array_a.out',0)>
 {i} j
-{0} 0
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
-{7} 0
-{8} 0
-{9} 0
 {10} 0
 {11} 0
 {12} 12
@@ -507,7 +443,7 @@ SCIDB QUERY : <load(ANIL, '/tmp/scidb_array_a.out',0)>
 
 SCIDB QUERY : <project(dimensions(ANIL), low, high)>
 {No} low,high
-{0} 0,14
+{0} 10,14
 
 SCIDB QUERY : <create array target <j:int8> [x=-10:*,2,0, y(string)=*,2,0]>
 Query was executed successfully

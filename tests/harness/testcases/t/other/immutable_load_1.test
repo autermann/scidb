@@ -3,7 +3,7 @@
 --test
 --start-query-logging
 
-create immutable empty array bounded <a:int64>[x=0:150,5,0]
+create empty array bounded <a:int64>[x=0:150,5,0]
 load(bounded,'../tests/harness/testcases/data/unbounded_empty.txt')
 
 

@@ -353,35 +353,28 @@
     as well as clouds, where additional severs may be added to scale the total
     capacity.</para>
 
-    <section xml:id="ChunkingandScalability">
-      <title>Chunking and Scalability</title>
+    <para><indexterm>
+        <primary>chunks</primary>
 
-      <para><indexterm>
-          <primary>chunks</primary>
+        <secondary>about</secondary>
+      </indexterm>When data is loaded, it is partitioned and stored on each
+    instance of the SciDB database. SciDB uses<emphasis> chunking</emphasis>,
+    a partitioning technique for multidimensional arrays where each instance
+    is responsible for storing and updating a subset of the array locally, and
+    for executing queries that use the locally stored data. By distributing
+    data uniformly across all instances, SciDB is able to deliver scalable
+    performance on computationally or I/O intensive analytic operations on
+    very large data sets.</para>
 
-          <secondary>about</secondary>
-        </indexterm>When data is loaded, it is partitioned and stored on each
-      instance of the SciDB database. SciDB uses<emphasis>
-      chunking</emphasis>, a partitioning technique for multidimensional
-      arrays where each instance is responsible for storing and updating a
-      subset of the array locally, and for executing queries that use the
-      locally stored data. By distributing data uniformly across all
-      instances, SciDB is able to deliver scalable performance on
-      computationally or I/O intensive analytic operations on very large data
-      sets.</para>
+    <para>The details of chunking are shown in this section. Remember that you
+    do not need to manage chunk distribution beyond specifying chunk
+    size.</para>
 
-      <para>The details of chunking are shown in this section. Remember that
-      you do not need to manage chunk distribution beyond specifying chunk
-      size.</para>
-
-      <para>Chunking is specified for each array as follows. Each dimension of
-      an array is divided into chunks. For example, an array with dimensions
-      <literal>i</literal> and <literal>j</literal>, where
-      <literal>i</literal> is of length 10 and chunk size 5 and
-      <literal>j</literal> is of length 30 and chunk size 10 would be chunked
-      as follows:</para>
-
-      <figure>
+    <para>Chunking is specified for each array as follows. Each dimension of
+    an array is divided into chunks. For example, an array with dimensions
+    <literal>i</literal> and <literal>j</literal>, where <literal>i</literal>
+    is of length 10 and chunk size 5 and <literal>j</literal> is of length 30
+    and chunk size 10 would be chunked as follows:<figure>
         <title>Chunking diagram</title>
 
         <mediaobject>
@@ -391,44 +384,13 @@
                        valign="top"/>
           </imageobject>
         </mediaobject>
-      </figure>
+      </figure></para>
 
-      <para>Chunks are stored allocated to instances of the SciDB cluster
-      according to a hash-based scheme.</para>
-    </section>
-
-    <section xml:id="ChunkAdjacency">
-      <title>Chunk Overlap</title>
-
-      <para>It is sometimes advantageous to have neighboring chunks of an
-      array overlap with each other. Overlap is specified for each dimension
-      of an array. For example, consider an array A as
-      follows:<programlisting>A&lt;a: int32&gt;[i=1:10,5,1, j=1:30,10,5]</programlisting></para>
-
-      <para>Array A has two dimensions, <literal>i</literal> and
-      <literal>j</literal>. Dimension <literal>i</literal> is of length 10,
-      chunk size 5, and had chunk overlap 1. Dimension <literal>j</literal>
-      has length 30, chunk size 10, and chunk overlap 5. This overlap causes
-      SciDB to store adjoining cells in each dimension from the
-      <emphasis>overlap area</emphasis> in both chunks.</para>
-
-      <para>Some advantages of chunk overlap are:</para>
-
-      <itemizedlist>
-        <listitem>
-          <para>Speeding up nearest-neighbor queries, where each chunk may
-          need access to a few elements from its neighboring chunks,</para>
-        </listitem>
-
-        <listitem>
-          <para>Detecting data clusters or data features that straddle more
-          than one chunk.</para>
-        </listitem>
-      </itemizedlist>
-
-      <para>SciDB supports operators that can be used to add or change the
-      chunk overlap within an existing array.</para>
-    </section>
+    <para>Chunks are stored allocated to instances of the SciDB cluster
+    according to a hash-based scheme. Additionally, you can specify a
+    <emphasis>chunk overlap</emphasis>. SciDB then stores some cells in
+    neighboring chunks. For details, see <xref
+    linkend="ChunkOverlap"/>.</para>
   </section>
 
   <section xml:id="SciDBstoragemanagement">
@@ -1019,8 +981,7 @@
         <mediaobject>
           <imageobject>
             <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="400"
-                       fileref="../graphics/dm_installFull.png"
+                       depth="400" fileref="../graphics/dm_installFull.png"
                        scale="30" valign="top" width="400"/>
           </imageobject>
         </mediaobject>

@@ -1,7 +1,7 @@
 # http://trac.scidb.org/ticket/325#comment:18
 
 --setup
---aql create immutable array A <a:int32>[x=0:2,3,0]
+--aql create array A <a:int32>[x=0:2,3,0]
 store(build(A,x+1),A)
 
 --test

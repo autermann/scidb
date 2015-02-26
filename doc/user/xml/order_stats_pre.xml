@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <section>
@@ -50,21 +49,25 @@
     <para>The result array contains only non-empty cells from the source
     array. Consider the array <code>m4x4_empty</code>, which is a
     2-dimensional array with some empty cells. Each element contains two
-    attributes. To sort the array elements by <code>val</code>, use the
-    following query:</para>
-
-    <programlisting language="test">--afl create array A &lt;val:double&gt; [i=0:3,4,0, j=0:3,4,0]; --show-query=no --show-output=no
---afl store(build(A,'[[(0),(),(),()],[(4),(),(6),(7)],[(8),(),(),()],[(),(13),(14),()]]',true),A);
+    attributes. Here are the contents of the array:<programlisting
+    language="test">--afl create array A &lt;val:double&gt; [i=0:3,4,0, j=0:3,4,0]; --show-query=no --show-output=no
+--afl store(build(A,'[[(13),(),(),()],[(8),(),(6),(7)],[(4),(),(7),()],[(),(0),(14),()]]',true),A);
       --show-output=no --show-query=no
 --afl create array C &lt;label:string NULL default NULL&gt;[i=0:3,4,0, j=0:3,4,0];
       --show-query=no --show-output=no
---afl store(build(C,NULL),C); --show-query=no --show-output=no
---afl create array m4x4_empty&lt;val:double, label:string NULL&gt;[i=0:3,4,0, j=0:3,4,0]; --show-output=no
+--afl store(build(C,'[[(sand),(),(first),()],[(peanut),(),(pastry),(doc)],[(four),(),(carl),()],[(),(livia),(Apostrophe),()]]',true),C);
+      --show-query=no --show-output=no
+--afl create array m4x4_empty&lt;val:double, label:string NULL&gt;[i=0:3,4,0, j=0:3,4,0]; --show-query=no --show-output=no
 --afl store(join(A,C),m4x4_empty); --show-query=no --show-output=no
 
---aql 
-SELECT * 
-FROM sort(m4x4_empty, val); 
+--afl scan(m4x4_empty) --show-query=no --output-format=dense --chunkify=yes
+</programlisting></para>
+
+    <para> To sort the array elements by <code>val</code>, use the following
+    query:</para>
+
+    <programlisting language="test">--aql SELECT * 
+      FROM sort(m4x4_empty, val); --output-format=dcsv 
 </programlisting>
 
     <para>To sort the array by val, and then by label, use the following
@@ -72,7 +75,7 @@ FROM sort(m4x4_empty, val);
 
     <programlisting language="test">--aql 
 SELECT * 
-FROM sort(m4x4_empty, label); 
+FROM sort(m4x4_empty, val, label); --output-format=dcsv
 </programlisting>
 
     <para>To use a descending sort, use the following command:</para>

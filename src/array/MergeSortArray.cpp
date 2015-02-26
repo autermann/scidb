@@ -42,7 +42,7 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
         uint64_t rest = dim.getLength() % (dim.getChunkInterval()*nInstances);
         if (rest >= dim.getChunkInterval() * instanceId) {
             rest -= dim.getChunkInterval() * instanceId;
-            if (rest > dim.getChunkInterval()) {
+            if (static_cast<int64_t>(rest) > dim.getChunkInterval()) {
                 rest = dim.getChunkInterval();
             }
             length += rest;
@@ -65,8 +65,9 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
 
     void MergeSortArrayIterator::operator ++()
     {
-        if (end())
+        if (end()) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
         hasCurrent = false;
         currChunkIndex += 1;
     }
@@ -156,8 +157,9 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
 
     bool MergeSortArray::moveNext(size_t chunkIndex)
     {
-        if (chunkIndex > currChunkIndex+1)
+        if (chunkIndex > currChunkIndex+1) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_SORT_ERROR3);
+        }
         if (chunkIndex <= currChunkIndex) {
             return true;
         }
@@ -177,9 +179,10 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
                 currChunkIndex += 1;
             }
             if (chunkIterators[0]->end()) {
-                 for (size_t i = 0; i < nAttrs; i++) {
+                for (size_t i = 0; i < nAttrs; i++) {
                     chunkIterators[i]->flush();
                 }
+                setEmptyBitmap(nAttrs, chunkIndex);
                 return true;
             }
             int min = permutation.back();
@@ -217,13 +220,31 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
         for (size_t i = 0; i < nAttrs; i++) {
             chunkIterators[i]->flush();
         }
+        setEmptyBitmap(nAttrs,chunkIndex);
         return true;
     }
 
     ConstChunk const& MergeSortArray::getChunk(AttributeID attr, size_t chunkIndex)
     {
-        if (chunkIndex > currChunkIndex || chunkIndex + CHUNK_HISTORY_SIZE <= currChunkIndex)
+        if (chunkIndex > currChunkIndex || chunkIndex + CHUNK_HISTORY_SIZE <= currChunkIndex) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_SORT_ERROR4);
+        }
         return attributes[attr].chunks[chunkIndex % CHUNK_HISTORY_SIZE];
+    }
+
+    void MergeSortArray::setEmptyBitmap(size_t nAttrs, size_t chunkIndex)
+    {
+        bool isEmptyable = (desc.getEmptyBitmapAttribute() != NULL);
+        if (isEmptyable && desc.getEmptyBitmapAttribute()->getId() != nAttrs-1) {
+            throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_REDISTRIBUTE_ERROR1);
+        }
+        if (!isEmptyable) {
+            return;
+        }
+        MemChunk& ebm = attributes[nAttrs-1].chunks[chunkIndex % CHUNK_HISTORY_SIZE];
+        for (size_t i = 0; i < nAttrs-1; i++) {
+            MemChunk& chunk = attributes[i].chunks[chunkIndex % CHUNK_HISTORY_SIZE];
+            chunk.setBitmapChunk(&ebm);
+        }
     }
 }

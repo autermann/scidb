@@ -1,5 +1,5 @@
 --setup
-create immutable array null_4 <a:int32 null,b:int32 null> [x=0:2,3,0, y=0:2,3,0]
+create array null_4 <a:int32 null,b:int32 null> [x=0:2,3,0, y=0:2,3,0]
 load(null_4,'../tests/harness/testcases/data/null_4.txt')
 
 --test

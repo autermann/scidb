@@ -22,14 +22,14 @@
 
 case `./os_detect.sh` in
     "CentOS 6")
-	./chroot_build.py -i -d centos-6-x86_64
+	./chroot_build.py -i -d centos-6-x86_64 -t .
 	;;
     "RedHat 6")
 	echo "We do not support build SciDB under RedHat 6. Please use CentOS 6 instead"
 	exit 1
 	;;
     "Ubuntu 12.04")
-	./chroot_build.py -i -d ubuntu-precise-amd64
+	./chroot_build.py -i -d ubuntu-precise-amd64 -t .
 	;;
     *)
 	echo "Not supported OS"

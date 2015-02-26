@@ -250,18 +250,12 @@ void ListChunkMapArrayBuilder::addToArray(ChunkMapEntry const& value)
     _outCIters[ALLOCATED_SIZE]->writeItem(v);
     v.setUint64((uint64_t)(chunk));
     _outCIters[ADDRESS]->writeItem(v);
-    v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_cloneOf);
+    //XXX TODO: remove this field (used to be _cloneOf)
+    v.setUint64(-1) ;
     _outCIters[CLONE_OF]->writeItem(v);
+    //XXX TODO: remove this field (used to be _clones)
     str.str("");
-    str<<"[";
-    if ( chunk )
-    {
-        for(size_t i=0; i<chunk->_clones.size(); i++)
-        {
-            str<<(uint64_t) chunk->_clones[i]<<" ";
-        }
-    }
-    str<<"]";
+    str<<"[]";
     v.setString(str.str().c_str());
     _outCIters[CLONES]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_next);
@@ -306,6 +300,43 @@ void ListChunkMapArrayBuilder::addToArray(ChunkMapEntry const& value)
     _outCIters[STORAGE]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_loader);
     _outCIters[LOADER]->writeItem(v);
+}
+
+Attributes ListLibrariesArrayBuilder::getAttributes() const
+{
+    Attributes attrs(NUM_ATTRIBUTES);
+    attrs[PLUGIN_NAME]         = AttributeDesc(PLUGIN_NAME,       "name",            TID_STRING, 0, 0);
+    attrs[MAJOR]               = AttributeDesc(MAJOR,             "major",           TID_UINT32, 0, 0);
+    attrs[MINOR]               = AttributeDesc(MINOR,             "minor",           TID_UINT32, 0, 0);
+    attrs[PATCH]               = AttributeDesc(PATCH,             "patch",           TID_UINT32, 0, 0);
+    attrs[BUILD]               = AttributeDesc(BUILD,             "build",           TID_UINT32, 0, 0);
+    attrs[BUILD_TYPE]          = AttributeDesc(BUILD_TYPE,        "build_type",      TID_STRING, AttributeDesc::IS_NULLABLE, 0);
+    attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+    return attrs;
+}
+
+void ListLibrariesArrayBuilder::addToArray(LibraryInformation const& item)
+{
+    Value v;
+    v.setString(item.pluginName.c_str());
+    _outCIters[PLUGIN_NAME]->writeItem(v);
+    v.setUint32(item.majorVersion);
+    _outCIters[MAJOR]->writeItem(v);
+    v.setUint32(item.minorVersion);
+    _outCIters[MINOR]->writeItem(v);
+    v.setUint32(item.buildNumber);
+    _outCIters[BUILD]->writeItem(v);
+    v.setUint32(item.patchVersion);
+    _outCIters[PATCH]->writeItem(v);
+    if (item.buildType.size())
+    {
+        v.setString(item.buildType.c_str());
+    }
+    else
+    {
+        v.setNull();
+    }
+    _outCIters[BUILD_TYPE]->writeItem(v);
 }
 
 }

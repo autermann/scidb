@@ -25,10 +25,10 @@ create array AL<j:int8>[i=0:*,5,0]
 load(AL, '/tmp/scidb_array_a.out', 0)
 project(dimensions(AL),low,high)
 
-create immutable array BI<j:int8>[i=0:14,5,0]
+create array BI<j:int8>[i=0:14,5,0]
 store(build(BI, '[(),(1),(2),(3),(4),(5),(6)]', true), BI)
 project(dimensions(BI),low,high)
-create immutable array AI<j:int8>[i=0:*,5,0]
+create array AI<j:int8>[i=0:*,5,0]
 store(BI, AI)
 project(dimensions(AI),low,high)
 store(build(BI, '{10}[(),(),(12),(13),(14)]', true), BI)
@@ -36,7 +36,7 @@ project(dimensions(BI),low,high)
 store(build(BI, '{10}[(),(),(12),(13),(14)]', true), AI)
 project(dimensions(AI),low,high)
 save(AI, '/tmp/scidb_array_a.out', 0)
-create immutable array AIL<j:int8>[i=0:*,5,0]
+create array AIL<j:int8>[i=0:*,5,0]
 load(AIL, '/tmp/scidb_array_a.out', 0)
 project(dimensions(AIL),low,high)
 
@@ -59,10 +59,10 @@ create not empty array ANL<j:int8>[i=0:*,5,0]
 load(ANL, '/tmp/scidb_array_a.out',0)
 project(dimensions(ANL), low, high)
 
-create immutable not empty array BNI<j:int8>[i=0:14,5,0]
+create not empty array BNI<j:int8>[i=0:14,5,0]
 store(build(BNI, '[(),(1),(2),(3),(4),(5),(6)]', true), BNI)
 project(dimensions(BNI),low,high)
-create immutable not empty array ANI<j:int8>[i=0:*,5,0]
+create not empty array ANI<j:int8>[i=0:*,5,0]
 store(BNI, ANI)
 project(dimensions(ANI),low,high)
 store(build(BNI, '{10}[(),(),(12),(13),(14)]', true), BNI)
@@ -70,7 +70,7 @@ project(dimensions(BNI),low,high)
 store(build(BNI, '{10}[(),(),(12),(13),(14)]', true), ANI)
 project(dimensions(ANI),low,high)
 save(ANI, '/tmp/scidb_array_a.out', 0)
-create immutable not empty array ANIL<j:int8>[i=0:*,5,0]
+create not empty array ANIL<j:int8>[i=0:*,5,0]
 load(ANIL, '/tmp/scidb_array_a.out',0)
 project(dimensions(ANIL), low, high)
 

@@ -1,6 +1,6 @@
 --setup
 --start-query-logging
---aql create immutable array A <a:int32> [x=0:2,3,0]
+--aql create array A <a:int32> [x=0:2,3,0]
 
 --test
 

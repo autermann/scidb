@@ -1,5 +1,5 @@
 --setup
---aql create immutable array A <b:int32>[A=1:5,5,0]
+--aql create array A <b:int32>[A=1:5,5,0]
 store(build(A,A+1),A)
 
 --test

@@ -128,6 +128,7 @@ public:
             for (size_t i = 0, n = aggDims.size(); i < n; i++) { 
                 DimensionDesc const& srcDim = dims[groupBy[i]]; 
                 aggDims[i] = DimensionDesc(  srcDim.getBaseName(),
+                                             srcDim.getNamesAndAliases(),
                                              srcDim.getStartMin(),
                                              srcDim.getCurrStart(),
                                              srcDim.getCurrEnd(),

@@ -267,8 +267,8 @@ namespace scidb
         firstPos = lastPos = lastPosWithOverlaps = firstPosWithOverlaps = addr.coords;
         const Dimensions& dims = desc->getDimensions();
         for (size_t i = 0, n = dims.size(); i < n; i++) {
-            assert(firstPos[i] >= dims[i].getStart());
-            if (lastPos[i] > dims[i].getEndMax()) {
+            if (firstPos[i] < dims[i].getStart() ||
+                lastPos[i] > dims[i].getEndMax()) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES);
             }
             if ((firstPosWithOverlaps[i] -= dims[i].getChunkOverlap()) < dims[i].getStart()) {
@@ -2146,7 +2146,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                       <<" attr "<<attr
                       <<" payload data="
                       << data->getData()
-                      << " segment="<<&payload.getSegment(0));
+                      << " #segments=" << payload.nSegments());
 
         if (((iterationMode & APPEND_CHUNK) || bitmap == NULL) && payload.packedSize() < data->getSize()) {
             emptyBitmap = boost::shared_ptr<ConstRLEEmptyBitmap>(new ConstRLEEmptyBitmap((char*)data->getData() + payload.packedSize()));
@@ -2171,14 +2171,14 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
 
         emptyBitmapIterator = emptyBitmap->getIterator();
         reset();
-
         LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
                       <<" data="<<data
                       <<" bitmap "<<bitmap
                       <<" attr "<<attr
                       <<" payload data="
                       << data->getData()
-                      << " segment="<<&payload.getSegment(0));
+                      << " #segments=" << payload.nSegments()
+                      <<" pCount="<<payload.count());
     }
 
     void RLEConstChunkIterator::reset()

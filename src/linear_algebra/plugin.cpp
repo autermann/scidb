@@ -54,8 +54,8 @@ EXPORTED_FUNCTION void GetPluginVersion(uint32_t& major, uint32_t& minor, uint32
     //
     major = SCIDB_VERSION_MAJOR();
     minor = SCIDB_VERSION_MINOR();
-    patch = 0;
-    build = 0;
+    patch = SCIDB_VERSION_PATCH();
+    build = SCIDB_VERSION_BUILD();
 
     // SciDB networking should already be set up, let's configure MPI and run its initialization
     scidb::MpiManager::getInstance()->init();

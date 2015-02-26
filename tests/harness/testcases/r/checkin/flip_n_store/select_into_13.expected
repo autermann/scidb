@@ -1,22 +1,22 @@
-SCIDB QUERY : <create immutable empty array A <a:int32>[x=0:2,3,0]>
+SCIDB QUERY : <create empty array A <a:int32>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array B <b:string>[x=0:2,3,0]>
+SCIDB QUERY : <create empty array B <b:string>[x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array C <b:string,a:int32> [x=0:2,3,0]>
+SCIDB QUERY : <create empty array C <b:string,a:int32> [x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array D <b:string> [x=0:2,3,0]>
+SCIDB QUERY : <create empty array D <b:string> [x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array E <a:int32> [x=0:2,3,0]>
+SCIDB QUERY : <create empty array E <a:int32> [x=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array F <b:string> [a(int32)=3,3,0]>
+SCIDB QUERY : <create empty array F <b:string> [a(int32)=3,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create immutable empty array G <a:int32> [b(string)=3,3,0]>
+SCIDB QUERY : <create empty array G <a:int32> [b(string)=3,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(C,C1)>

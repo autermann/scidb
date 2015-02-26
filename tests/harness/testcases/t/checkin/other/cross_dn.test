@@ -1,12 +1,20 @@
 --setup
-create immutable array dense <a: double > [x=0:5,3,0, y=0:5,3,0]
-create immutable array vec <a:int32, b:int32> [i=1:10,10,0]
+create array dense <a: double > [x=0:5,3,0, y=0:5,3,0]
+create array vec <a:int32, b:int32> [i=1:10,10,0]
 load(dense,'../tests/harness/testcases/data/dense.txt')
 load(vec,'../tests/harness/testcases/data/vec.txt')
 
+create array A <v:double> [I=0:99,100,0, J=0:99,100,0]
+store(build_sparse (A, double(I+J)/100.0, ((I * 99) + J )%17 = 0), A)
+create array B <v:double> [I=0:99,100,0, J=0:99,100,0]
+store(build_sparse (B, double(I+J)/100.0, ((I * 99) + J )%19 = 0), B)
+
 --test
 cross(dense, vec)
+aggregate( apply( cross ( A, B ), vv, A.v * B.v), sum ( vv ), A.I, B.J)
 
 --cleanup
 remove (dense)
 remove (vec)
+remove (A)
+remove (B)

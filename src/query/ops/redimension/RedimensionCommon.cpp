@@ -21,6 +21,7 @@
 */
 #include "RedimensionCommon.h"
 #include <array/SortArray.h>
+#include <system/Config.h>
 
 namespace scidb
 {
@@ -28,7 +29,8 @@ namespace scidb
 using namespace std;
 using namespace boost;
 
-const size_t redimensionDefaultChunkSize = 10*1024;
+const size_t redimMinChunkSize = 1024;
+const size_t redimMaxChunkSize = 1024*1024;
 
 log4cxx::LoggerPtr RedimensionCommon::logger(log4cxx::Logger::getLogger("scidb.array.RedimensionCommon"));
 
@@ -154,7 +156,8 @@ shared_ptr<MemArray> RedimensionCommon::initializeRedimensionedArray(
     vector<AggregatePtr> const& aggregates,
     vector< shared_ptr<ArrayIterator> >& redimArrayIters,
     vector< shared_ptr<ChunkIterator> >& redimChunkIters,
-    size_t& redimCount)
+    size_t& redimCount,
+    size_t const& redimChunkSize)
 {
     // Create a 1-D MemArray called 'redimensioned' to hold the redimensioned records.
     // Each cell in the array corresponds to a cell in the destination array,
@@ -202,7 +205,7 @@ shared_ptr<MemArray> RedimensionCommon::initializeRedimensionedArray(
     }
     attrsRedimensioned.push_back(AttributeDesc(destAttrs.size(), "tmpDestPositionInChunk", TID_INT64, 0, 0));
     attrsRedimensioned.push_back(AttributeDesc(destAttrs.size()+1, "tmpDestChunkId", TID_INT64, 0, 0));
-    dimsRedimensioned[0] = DimensionDesc("Row", 0, MAX_COORDINATE, redimensionDefaultChunkSize, 0);
+    dimsRedimensioned[0] = DimensionDesc("Row", 0, MAX_COORDINATE, redimChunkSize, 0);
 
     Attributes attrsRedimensionedWithET(attrsRedimensioned);
     attrsRedimensionedWithET.push_back(AttributeDesc(attrsRedimensioned.size(),
@@ -233,10 +236,11 @@ void RedimensionCommon::appendItemToRedimArray(vector<Value> const& item,
                                                shared_ptr<Query> const& query,
                                                vector< shared_ptr<ArrayIterator> >& redimArrayIters,
                                                vector< shared_ptr<ChunkIterator> >& redimChunkIters,
-                                               size_t& redimCount)
+                                               size_t& redimCount,
+                                               size_t const& redimChunkSize)
 {
     // if necessary, refresh the chunk iterators
-    if (redimCount % redimensionDefaultChunkSize == 0)
+    if (redimCount % redimChunkSize == 0)
     {
         Coordinates chunkPos(1);
         int chunkMode = ChunkIterator::SEQUENTIAL_WRITE;
@@ -257,7 +261,7 @@ void RedimensionCommon::appendItemToRedimArray(vector<Value> const& item,
     redimCount++;
 
     // flush the current chunks, or advance the iters
-    if (redimCount % redimensionDefaultChunkSize == 0)
+    if (redimCount % redimChunkSize == 0)
     {
         for (size_t i = 0; i < redimChunkIters.size(); i++)
         {
@@ -480,6 +484,14 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     vector< shared_ptr<ArrayIterator> > redimArrayIters;
     vector< shared_ptr<ChunkIterator> > redimChunkIters;
     size_t redimCount = 0;
+    size_t redimChunkSize = 
+        Config::getInstance()->getOption<int>(CONFIG_REDIM_CHUNKSIZE);
+
+    if (redimChunkSize > redimMaxChunkSize)
+        redimChunkSize = redimMaxChunkSize;
+    if (redimChunkSize < redimMinChunkSize)
+        redimChunkSize = redimMinChunkSize;
+
     redimensioned = initializeRedimensionedArray(query, 
                                                  srcAttrs, 
                                                  destAttrs, 
@@ -487,7 +499,8 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
                                                  aggregates,
                                                  redimArrayIters,
                                                  redimChunkIters,
-                                                 redimCount);
+                                                 redimCount,
+                                                 redimChunkSize);
 
     // Iterate through the input array, generate the output data, and append to the MemArray.
     // Note: For an aggregate field, its source value (in the input array) is used.
@@ -596,7 +609,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
 
             // Set the last two fields of the data, and append to the redimensioned array
             if (hasOverlap) {
-                OverlappingChunksIterator allChunks(destDims, destPos, chunkPos);
+                OverlappingChunksIterator allChunks(destDims, destPos);
                 while (!allChunks.end()) {
                     Coordinates const& overlappingChunkPos = allChunks.getPosition();
                     position_t pos = arrayCoordinatesMapper.coord2pos(overlappingChunkPos, destPos);
@@ -607,7 +620,8 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
                                            query,
                                            redimArrayIters,
                                            redimChunkIters,
-                                           redimCount);
+                                           redimCount,
+                                           redimChunkSize);
 
                     // Must increment after overlappingChunkPos is no longer needed, because the increment will modify overlappingChunkPos.
                     ++allChunks;
@@ -621,7 +635,8 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
                                        query,
                                        redimArrayIters,
                                        redimChunkIters,
-                                       redimCount);
+                                       redimCount,
+                                       redimChunkSize);
             }
 
             // Advance chunk iterators
@@ -643,7 +658,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     } // while
 
     // If there are leftover values, flush the output iters one last time
-    if (redimCount)
+    if (redimCount % redimChunkSize != 0)
     {
         for (size_t i = 0; i < redimChunkIters.size(); ++i)
         {

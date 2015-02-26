@@ -1,5 +1,5 @@
 --setup
-create immutable array M10x10x10 <a:double> [x=1:10,2,0, y=1:10,2,0, z=1:10,2,0]
+create array M10x10x10 <a:double> [x=1:10,2,0, y=1:10,2,0, z=1:10,2,0]
 store(build(M10x10x10, (x*10+y)*10+z), M10x10x10)
 
 --test
