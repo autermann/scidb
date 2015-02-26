@@ -1,0 +1,68 @@
+Please run ./deploy.sh without arguments
+
+WARNING: you need "expect" tool for work with scripts
+
+Ubuntu: apt-get install -y expect
+CentOS/RedHat: yum install -y expect
+
+1) Password-less ssh access from <localhost> to <hostname 1> ...
+
+./deploy.sh access root <root_password> <key> <hostname 1> <hostname 2> ...
+./deploy.sh access <username> <user_password> <key> <hostname 1> <hostname 2> ...
+
+You can use empty string "" as <key> for use content from ~/.ssh/id_rsa.pub
+
+2) Prepare machine for building SciDB as <user>. Install the packages required for building SciDB from source.
+
+./deploy.sh prepare_toolchain <username> <hostname 1> <hostname 2> ...
+
+Use "localhost" as <hostname> for prepare your current machine
+
+3) Prepare machine for building SciDB packages as <user>. Install required packages, configure tools, prepare chroot.
+
+./deploy.sh prepare_chroot <username> <hostname 1> <hostname 2> ...
+
+Use "localhost" as <hostname> for prepare your current machine
+
+4) Build SciDB packages (on localhost):
+
+# Clean build (in chroot)
+./deploy.sh build <packages_path>
+
+# Fast (dirty) build (from already compiled sources)
+./deploy.sh build <packages_path>
+
+5) Install dependencies on [host_list] for running SciDB as <user>. 
+Required for installation SciDB from files.
+This step would be removed after change installation way from files to repository.
+
+./deploy.sh prepare_runtime <username> <hostname 1> <hostname 2> ...
+
+Use "localhost" as <hostname> for prepare your current machine
+
+6) Install & configure PostgreSQL for catalog of cluster 
+
+./deploy.sh prepare_postgresql <postgresql_username> <postgresql_password> <network> <host>
+
+where 
+<postgresql_username> and <postgresql_password> - username and password of PostgreSQL user,
+<network> - network mask in format "a.b.c.d/e"
+<host> - coordinator hostname or IP address
+
+7) Install SciDB packages to a cluster
+
+./deploy.sh scidb_install <packages_path> <hostname 1> <hostname 2> ...
+
+First host would considered as coordinator.
+
+8) Configure SciDB cluster
+
+./deploy.sh scidb_prepare <username> <password> <database> <base_path> <instance_count> <coordinator> <hostname 2> <hostname 3> ...
+
+<instance_count> - count of instance on each host
+First host would considered as coordinator.
+
+9) Start SciDB:
+
+./deploy.sh scidb_start <username> <coordinator>
+

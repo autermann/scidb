@@ -4,7 +4,15 @@
   <refnamediv>
     <refname>cross</refname>
 
-    <refpurpose>Produces a result array whose set of cells consists of every
+    <refpurpose><indexterm>
+        <primary>cross</primary>
+      </indexterm><indexterm>
+        <primary>cross product</primary>
+      </indexterm><indexterm>
+        <primary>binary operators</primary>
+
+        <secondary>cross</secondary>
+      </indexterm>Produces a result array whose set of cells consists of every
     possible combination of a cell from one source array and a cell from
     another source array.</refpurpose>
   </refnamediv>

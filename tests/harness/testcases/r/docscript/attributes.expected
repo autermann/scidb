@@ -19,7 +19,7 @@ SCIDB QUERY : <scan(champions)>
 {2000,"steeplechase"} "Kosgei","Kenya",503.17
 {2008,"marathon"} "Wanjiru","Kenya",7596
 
-SCIDB QUERY : <select * from attributes(champions)>
+SCIDB QUERY : <attributes(champions)>
 {No} name,type_id,nullable
 {0} "person","string",false
 {1} "country","string",false

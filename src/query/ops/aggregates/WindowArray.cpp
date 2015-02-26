@@ -430,7 +430,7 @@ namespace scidb
             _noNullsCheck = false;
         }
 
-        if (_aggregate->ignoreZeroes() && _array._inputArray->getArrayDesc().getAttributes()[_array._inputAttrIDs[_attrID]].getDefaultValue().isZero())
+        if (_aggregate->ignoreZeroes() && _array._inputArray->getArrayDesc().getAttributes()[_array._inputAttrIDs[_attrID]].getDefaultValue().isDefault(_array._inputArray->getArrayDesc().getAttributes()[_array._inputAttrIDs[_attrID]].getType()))
         {
             iterMode |= IGNORE_DEFAULT_VALUES;
         }
@@ -590,7 +590,7 @@ namespace scidb
                }
 
                //but if the agg ignores nulls, we can "filter them out" at this stage
-               if (!((currVal.isNull() && _aggregate->ignoreNulls()) || (currVal.isZero() && _aggregate->ignoreZeroes())))
+               if (!((currVal.isNull() && _aggregate->ignoreNulls()) || (currVal.isDefault(chunk.getAttributeDesc().getType()) && _aggregate->ignoreZeroes())))
                {
                    _inputMap[pos]=currVal;
                    nInputElements +=1;

@@ -137,7 +137,12 @@ protected:
     typedef boost::shared_ptr<SharedMemoryIpc> SMIptr_t ;
     std::vector<SMIptr_t> allocateMPISharedMemory(size_t numBufs, size_t  elemSize[], size_t sizes[],
                                                   string dbgNames[]);
-
+    /**
+     * Release shared memory regions and associated resources which are not used in constructing the result array
+     * @param shmIpc list of shm regions
+     * @param resultIpcIndx index into shmIpc of the region which must stay mapped (because it is used in the array/query pipeline)
+     */
+    void releaseMPISharedMemoryInputs(std::vector<MPIPhysical::SMIptr_t>& shmIpc, size_t resultIpcIndx);
     void unlaunchMPISlaves() {
         if (_mustLaunch) {
             _launcher->destroy();   // need to have saved the launcher?

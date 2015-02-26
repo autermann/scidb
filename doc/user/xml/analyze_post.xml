@@ -1,10 +1,16 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
 <refentry>
-  <refnamediv>
+  <refnamediv id="analyze">
     <refname>analyze</refname>
 
-    <refpurpose>Produces a 1-dimensional result array where each cell
+    <refpurpose><indexterm>
+        <primary>analyze</primary>
+      </indexterm><indexterm>
+        <primary>attributes</primary>
+
+        <secondary>analyze</secondary>
+      </indexterm>Produces a 1-dimensional result array where each cell
     describes some simple statistics about the values in one attribute of a
     stored array.</refpurpose>
   </refnamediv>
@@ -22,42 +28,42 @@
 
     <itemizedlist>
       <listitem>
-        <para>attribute_number -- An index for the one-dimensional result
+        <para>attribute_number: An index for the one-dimensional result
         array.</para>
       </listitem>
     </itemizedlist>
 
     <itemizedlist>
       <listitem>
-        <para>atttribute_name -- The name of an attribute from the source
+        <para>atttribute_name: The name of an attribute from the source
         array.</para>
       </listitem>
     </itemizedlist>
 
     <itemizedlist>
       <listitem>
-        <para>min -- The lowest value for the attribute in the source array.
-        </para>
-      </listitem>
-    </itemizedlist>
-
-    <itemizedlist>
-      <listitem>
-        <para>max -- The highest value for the attribute in the source
+        <para>min: The lowest value for the attribute in the source
         array.</para>
       </listitem>
     </itemizedlist>
 
     <itemizedlist>
       <listitem>
-        <para>distinct_count -- An estimate of the number of different values
+        <para>max: The highest value for the attribute in the source
+        array.</para>
+      </listitem>
+    </itemizedlist>
+
+    <itemizedlist>
+      <listitem>
+        <para>distinct_count: An estimate of the number of different values
         appearing in the source array.</para>
       </listitem>
     </itemizedlist>
 
     <itemizedlist>
       <listitem>
-        <para>non_null_count -- The number of cells in the array with non-null
+        <para>non_null_count: The number of cells in the array with non-null
         values for the attribute.</para>
       </listitem>
     </itemizedlist>
@@ -65,7 +71,7 @@
     <para>You can use the analyze operator to characterize some or all of the
     attributes in an array. To characterize some, name them explicitly with
     the attribute parameter. To characterize all attributes, you can name them
-    all explicitly, or you can omit the attribute parameter entirely. </para>
+    all explicitly, or you can omit the attribute parameter entirely.</para>
 
     <para>You can use the analyze operator in the FROM clause of an AQL SELECT
     statement, as a stand-alone operator in a AFL statement, or as an operand
@@ -83,25 +89,30 @@
         <step>
           <para>Show the schema for the 1-dimensional source
           array:<para><programlisting>AFL% show(winnersFlat)</programlisting><screen><command>winnersFlat</command>
-&lt; event:string,year:int64,person:string,country:string,time:double &gt;
+
+&lt; event:string,
+year:int64,
+person:string,
+country:string,
+time:double &gt;
+
 [i=0:*,12,0]</screen></para></para>
         </step>
 
         <step>
           <para>Create a result array describing the attributes of the source
-          array:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winnersFlat;</programlisting><screen>{i} event,year,person,country,time
-{0} "dash",1996,"Bailey","Canada",9.84
-{1} "dash",2000,"Greene","USA",9.87
-{2} "steeplechase",2000,"Kosgei","Kenya",503.17
-{3} "marathon",1996,"Thugwane","RSA",7956
-{4} "marathon",2000,"Abera","Ethiopia",7811
-{5} "marathon",2008,"Wanjiru","Kenya",7596
+          array:<para><programlisting>AFL% attributes(winnersFlat);</programlisting><screen>{No} name,type_id,nullable
+{0} "event","string",false
+{1} "year","int64",false
+{2} "person","string",false
+{3} "country","string",false
+{4} "time","double",false
 </screen></para></para>
         </step>
 
         <step>
           <para>Create a result array characterizing the values of the
-          attributes of the source array:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> analyze(winnersFlat);</programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+          attributes of the source array:<para><programlisting>AFL% analyze(winnersFlat);</programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
 {0} "country","Canada","USA",5,6
 {1} "event","dash","steeplechase",3,6
 {2} "person","Abera","Wanjiru",6,6
@@ -112,7 +123,7 @@
 
         <step>
           <para>Create a result array characterizing the values of the numeric
-          attributes (time and year) of the source array:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> analyze(winnersFlat,year,time);</programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
+          attributes (time and year) of the source array:<para><programlisting>AFL% analyze(winnersFlat,year,time);</programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
 {0} "time","9.84","7956",6,6
 {1} "year","1996","2008",3,6
 </screen></para></para>

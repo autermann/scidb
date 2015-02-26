@@ -3,6 +3,8 @@
 --setup
 --start-query-logging
 
+create array array_sm10 <a:int64,b:int64,c:int64>[i=0:*,3,0]
+
 --test
 
 #--start-igdata
@@ -12,10 +14,11 @@
 
 #--stop-igdata
 
-scan( array_sm10 )
-
+#scan( array_sm10 )
+sort( array_sm10,a)
 --cleanup
 
+remove(array_sm10)
 
 --stop-query-logging
 

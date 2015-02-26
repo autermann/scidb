@@ -48,7 +48,8 @@ project(quantile(Test1,2,a),percentage)
 project(normalize(project(Test1,a)),a)
 project(merge(Test1,Test1),b,a)
 
---error --code scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_INVERSE_ERROR1 "inverse(Test2)"
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error --code scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_INVERSE_ERROR1 "inverse(Test2)"
 project(transpose(Test2),a)
 project(multiply(Test2,Test2), multiply)
 project(multiply(subarray(Test2),subarray(Test2,1,1,2,1)),multiply)

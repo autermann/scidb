@@ -175,7 +175,7 @@ namespace scidb
             }
             ++(*src);
         }
-        if (!vectorMode && !desc.containsOverlaps()) {
+        if (!vectorMode && !desc.hasOverlap()) {
             chunk.setCount(count);
         }
         dst->flush();
@@ -234,7 +234,7 @@ namespace scidb
                     chunk.setCount(0); // unknown
                     AttributeDesc const& attr = merge->getAttributeDesc();
                     Value const& defaultValue = attr.getDefaultValue();
-                    if (next->isRLE() || merge->isRLE() || next->isSparse() || merge->isSparse() || attr.isNullable() || !defaultValue.isZero() || TypeLibrary::getType(attr.getType()).variableSize()) {
+                    if (next->isRLE() || merge->isRLE() || next->isSparse() || merge->isSparse() || attr.isNullable() || !defaultValue.isDefault(attr.getType()) || TypeLibrary::getType(attr.getType()).variableSize()) {
                         int sparseMode = next->isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
                         if (!dstIterator) {
                            boost::shared_ptr<Query> emptyQuery;

@@ -18,11 +18,16 @@
 --stop-igdata
 
 
-scan( array_sm10 )
-scan( array_sm9 )
+#scan( array_sm10 )
+#scan( array_sm9 )
+
+sort(array_sm10,a)
+sort(array_sm9,a)
 
 --cleanup
 
+remove(array_sm9)
+remove(array_sm10)
 
 --stop-query-logging
 

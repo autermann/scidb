@@ -9,6 +9,14 @@ CREATE EMPTY ARRAY Raw_CSVLoad_3 < Probe_ID : string, Platform_ID : string, Entr
 
 CREATE ARRAY Raw_CSVLoad_4 < Probe_ID : string, Platform_ID : string, Entrez_Gene_ID : int32, Symbol   : string, Synonyms : string, Description : string, TaxOn_ID : int32, Count_Gene  : int32, Count_RefSeq  : int32, Unique_to_Gene : bool, Unique_to_Genome : bool, Unique_to_RefSeq : bool > [ Line ]
 
+CREATE ARRAY Raw_CSVLoad_5 < attr_1 : int64 > [ I=0:*,4,0 ]
+
+CREATE ARRAY Raw_CSVLoad_6 < attr_1 : int64 > [ I=0:*,4,0 ]
+
+CREATE ARRAY Raw_CSVLoad_7 < attr_1 : string > [ I=0:*,4,0 ]
+
+CREATE ARRAY Raw_CSVLoad_8 < attr_2 : string > [ I=0:*,4,0 ]
+
 --test
 
 echo ('cat ./testcases/data/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load ' )
@@ -23,23 +31,51 @@ echo ('cat ./testcases/data/csv2scidb_2.csv | csv2scidb -d "|" -c 10 -s 1 -p NNS
 
 load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load' )
 
-echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 -p SSNSSSNNNSSS > /tmp/csv2scidb_test_3.load')
+echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 > /tmp/csv2scidb_test_3.load')
 
---shell --command " cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 -p SSNSSSNNNSSS > /tmp/csv2scidb_test_3.load "
+--shell --command " cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 > /tmp/csv2scidb_test_3.load "
 
 load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )
 
 # without chunk size specified... see #1560
-echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 -p SSNSSSNNNSSS > /tmp/csv2scidb_test_4.load')
+echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 > /tmp/csv2scidb_test_4.load')
 
---shell --command " cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 -p SSNSSSNNNSSS > /tmp/csv2scidb_test_4.load "
+--shell --command " cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 > /tmp/csv2scidb_test_4.load "
+
 --start-igdata
+
 load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load' )
+
 --stop-igdata
 
 subarray (Raw_CSVLoad_4, 0,100)
 
 show ( Raw_CSVLoad_4 )
+
+# empty lines in the input file - see #2134 
+echo ('cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_5.load')
+
+--shell --command " cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_5.load "
+
+load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load' )
+
+echo ('cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_6.load')
+
+--shell --command " cat ./testcases/data/csv2scidb_5.csv | csv2scidb -c 4 -p N > /tmp/csv2scidb_test_6.load "
+
+load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load' )
+
+echo ('cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_7.load')
+
+--shell --command " cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_7.load "
+
+load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load' )
+
+echo ('cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_8.load')
+
+--shell --command " cat ./testcases/data/csv2scidb_7.csv | csv2scidb -c 4 -p S > /tmp/csv2scidb_test_8.load "
+
+load ( Raw_CSVLoad_8, '/tmp/csv2scidb_test_8.load' )
 
 --cleanup
 
@@ -50,6 +86,14 @@ remove ( Raw_CSVLoad_2 )
 remove ( Raw_CSVLoad_3 )
 
 remove ( Raw_CSVLoad_4 )
+
+remove ( Raw_CSVLoad_5 )
+
+remove ( Raw_CSVLoad_6 )
+
+remove ( Raw_CSVLoad_7 )
+
+remove ( Raw_CSVLoad_8 )
 
 --shell --command " rm -rf /tmp/csv2scidb_test_1.load " --store 
 --shell --command " rm -rf /tmp/csv2scidb_test_2.load " --store

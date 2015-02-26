@@ -470,6 +470,7 @@ ERRCODE(SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE,       394); //Chunk size must be p
 ERRCODE(SCIDB_LE_OPERATION_FAILED_WITH_ERRNO,       395); //Operation %1% failed with errno %2%
 ERRCODE(SCIDB_LE_OP_RLE_EXPECTED,                   396); //Chunk expected to be in RLE format
 ERRCODE(SCIDB_LE_OP_NONEMPTY_EXPECTED,              397); //Non-emptyable array expected
+ERRCODE(SCIDB_LE_RESOURCE_BUSY,                     398); //Not enough resources: %1%
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%

@@ -34,6 +34,7 @@ clean:
 gen_matrix.o: gen_matrix.cpp
     g++ -c -o gen_matrix.o -g gen_matrix.cpp
 
+g++ -o gen_matrix -g gen_matrix.cpp -lm
 **
 ** How to use.
 **
@@ -47,6 +48,7 @@ gen_matrix 2000 2000 100 100 0.002
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <limits.h>
 
 #include <math.h>
@@ -95,8 +97,9 @@ geomdev (const double pr)
 void
 usage(char * szProg)
 {
-	printf("%s -[rd] int int int int sparse_prob attr_zipf_prob string\n", szProg);
-	printf("%s (-[r]andom or -[c]calculated) #rowchunks #colchunks #rowsperchunk #coldperchunk sparsity_probability[0.0->1.0] attr_val_probability[0.0->1.0] string\n", szProg);
+	printf("%s -[rdb] int int int int sparse_prob attr_zipf_prob string\n", szProg);
+	printf("%s (-[r]andom or -[d]eterministic) #rowchunks #colchunks #rowsperchunk #coldperchunk sparsity_probability[0.0->1.0] attr_val_probability[0.0->1.0] string\n", szProg);
+    printf("   -b - generate output in binary format. Default is ASCII strings.\n");
 	printf("   The last 'string' is some combination of G - double, N - integer, C - char \n");
 	printf("   S - string, F - double w/ zipfian, D - int w/ zipfian, E - char with zipfian.\n");
 	printf("   For example, to generate a 1000x1000 matrix with 100 chunks (10x10 chunks) \n");
@@ -113,102 +116,237 @@ usage(char * szProg)
 
 void
 print_random_attr_p ( const int nTypeCnt, const char * szTypesListStr, 
-					  const double p)
+					  const double p, const int outputInBinary )
 {
 	char szString[32]; 
 	int ints[11]={0,1,2,3,4,5,6,7,8,9};
 	double dbls[11]={0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0};
 	char chars[11]={'A','B','C','D','E','F','G','H','I','J'};
 
-	printf("(");
-	for(int c = 0; c < nTypeCnt; c++) { 
-		if (c) printf(", ");
-
-		switch(toupper(szTypesListStr[c])) {
-			case 'G':	/* double */
-				printf("%g", uniform());
-			 break;
-
-			case 'N':	/* integer */
-				printf("%ld", random());
-			break;
-
-			case 'S':	/* string */
-				int2str((random()%20000), szString);
-				printf("\"%s\"", szString);
-			break;
-
-			case 'C':  /* char */
-				int2str((random()%26), szString);
-				printf("'%1s'", szString);
-			 break;
-
-			case 'F':	/* double zipfian*/
-				printf("%g", dbls[geomdev(p)%10]);
-			 break;
-
-			case 'D':	/* integer zipfian*/
-				printf("%d", ints[geomdev(p)%10]);
-			 break;
-
-			case 'E':	/* char zipfian*/
-				printf("'%c'", chars[geomdev(p)%10]);
-			 break;
-
-			default:	/* nothing */
-		    break;
+	if (0 == outputInBinary ) { 
+		printf("(");
+		for(int c = 0; c < nTypeCnt; c++) { 
+			if (c) printf(", ");
+	
+			switch(toupper(szTypesListStr[c])) {
+				case 'G':	/* double */
+				{
+					printf("%g", uniform());
+				}
+			 	break;
+	
+				case 'N':	/* integer */
+				{
+					printf("%ld", random());
+				}
+				break;
+	
+				case 'S':	/* string */
+				{
+					int2str((random()%20000), szString);
+					printf("\"%s\"", szString);
+				}
+				break;
+	
+				case 'C':  /* char */
+				{
+					int2str((random()%26), szString);
+					printf("'%1s'", szString);
+				}
+			 	break;
+	
+				case 'F':	/* double zipfian*/
+				{
+					printf("%g", dbls[geomdev(p)%10]);
+				}
+			 	break;
+	
+				case 'D':	/* integer zipfian*/
+				{
+					printf("%d", ints[geomdev(p)%10]);
+				}
+			 	break;
+	
+				case 'E':	/* char zipfian*/
+				{
+					printf("'%c'", chars[geomdev(p)%10]);
+				}
+			 	break;
+	
+				default:	/* nothing */
+		    	break;
+			}
 		}
+		printf(")");
+	} else { 
+        for(int c = 0; c < nTypeCnt; c++) {
+            switch(toupper(szTypesListStr[c])) {
+                case 'G':   /* double */
+				{
+					double outG = uniform();
+					write(1,&outG,sizeof(outG));
+				}
+                break;
+   
+                case 'N':   /* integer */
+				{
+					long int outN = random();
+					write(1,&outN,sizeof(outN));
+				}
+                break;
+   
+                case 'S':   /* string */
+				{
+                    int2str((random()%20000), szString);
+					size_t len = strlen(szString);
+					write(1,&len,sizeof(len));
+					write(1,&szString,len);
+				}
+                break;
+   
+                case 'C':  /* char */
+				{
+                    int2str((random()%26), szString);
+					write(1,&szString[0],sizeof(char));
+				}
+                break;
+   
+                case 'F':   /* double zipfian*/
+				{
+					double outG = dbls[geomdev(p)%10];
+					write(1,&outG,sizeof(outG));
+				}
+                break;
+   
+                case 'D':   /* integer zipfian*/
+				{
+					int outN = ints[geomdev(p)%10];
+					write(1,&outN,sizeof(outN));
+				}
+                break;
+   
+                case 'E':   /* char zipfian*/
+				{
+					char outChar=chars[geomdev(p)%10];
+					write(1,&outChar,sizeof(outChar));
+				}
+                break;
+   
+                default:    /* nothing */
+                break;
+            }
+        }
 	}
-	printf(")");
 }
 
 void
-print_random_attr ( const int nTypeCnt, const char * szTypesListStr) 
+print_random_attr ( const int nTypeCnt, const char * szTypesListStr, 
+                    const int outputInBinary ) 
 {
-	print_random_attr_p ( nTypeCnt, szTypesListStr, 1.0 );
+	print_random_attr_p ( nTypeCnt, szTypesListStr, 1.0, outputInBinary );
 }
 
 void
 print_det_attr ( const int nTypeCnt, const char * szTypesListStr, 
-				 const int nCellNum, const int nCellMax ) 
+				 const int nCellNum, const int nCellMax, 
+                 const int outputInBinary ) 
 {
 	char szString[32]; 
 
-	printf("(");
-	for(int c = 0; c < nTypeCnt; c++) { 
-		if (c) printf(", ");
-
-		switch(toupper(szTypesListStr[c])) {
-			case 'G':	/* double */
-				printf("%g", ((double)nCellNum/(double)nCellMax));
-			 break;
-
-			case 'N':	/* integer */
-				printf("%d", nCellNum);
-			break;
-
-			case 'S':	/* string */
-				int2str(nCellNum, szString);
-				printf("\"%s\"", szString);
-			break;
-
-			case 'C':	/* char */
-				int2str((nCellNum%26), szString);
-				printf("'%1s'", szString);
-			break;
-				
-
-			default:	/* nothing */
-		    break;
+	if (0 == outputInBinary ) { 
+		printf("(");
+		for(int c = 0; c < nTypeCnt; c++) { 
+			if (c) printf(", ");
+	
+			switch(toupper(szTypesListStr[c])) {
+				case 'G':	/* double */
+				{
+                    printf("%g", ((double)nCellNum/(double)nCellMax));
+				}
+			 	break;
+	
+				case 'N':	/* integer */
+				{
+                    printf("%d", nCellNum);
+				}
+				break;
+	
+				case 'S':	/* string */
+				{
+                    int2str(nCellNum, szString);
+					printf("\"%s\"", szString);
+				}
+				break;
+	
+				case 'C':	/* char */
+				{
+					int2str((nCellNum%26), szString);
+					printf("'%1s'", szString);
+				}
+				break;
+					
+				default:	/* nothing */
+		    	break;
+			}
 		}
+		printf(")");
+	} else { 
+        for(int c = 0; c < nTypeCnt; c++) {
+            switch(toupper(szTypesListStr[c])) {
+                case 'G':   /* 8 byte double */
+				{
+					double outG = ((double)nCellNum/(double)nCellMax);
+					write(1,&outG,sizeof(outG));
+				}
+                break;
+   
+                case 'N':   /* 8 byte integer */	
+				{
+					write(1,&nCellNum,sizeof(nCellNum));
+				}
+                break;
+   
+                case 'S':   /* string */
+				{
+                    int2str(nCellNum, szString);
+					size_t len = strlen(szString);
+					write(1,&len,sizeof(len));
+					write(1,&szString,len);
+				}
+                break;
+   
+                case 'C':   /* char */
+				{
+                    int2str((random()%26), szString);
+					write(1,&szString[0],sizeof(char));
+				}
+                break;
+   
+                default:    /* nothing */
+                break;
+            }
+        }
 	}
-	printf(")");
 }
 
 void
 print_empty_attr()
 {
 	printf("()");
+}
+
+void
+writeCoords ( const unsigned long X, const unsigned long Y )
+{
+	write ( 1, 
+			(void *)&X,
+			sizeof(X)
+	      );
+							
+	write ( 1, 
+		    (void *)&Y,
+		    sizeof(Y)
+		  );
 }
 
 int
@@ -226,18 +364,22 @@ main (int argc, char ** argv )
 	double	    dbZProb			  =  0.0;
 	int			nCount            =    0;
 	char        szTypesListStr[1024];
-	char        szFlags[8]; 
+	char        szFlags[1024]; 
 	int			nTypeCnt 		  =    0;
 	int			nIsDense          =    0;
 	int			nIsRandom         =    0;
+	int			outputInBinary    =    0;
 
 	int  		nCellNum		  =    0;
 	int 		nCellMax		  =    0;
 
+	/*
+	** Pretty rudimentary checks for argument correctness.
+	*/
 	if (9 != argc)
 		usage(argv[0]);
 	
-	strncpy(szFlags, argv[1], 3);
+	strncpy(szFlags, argv[1], 1024);
 	nRowChunks   = atoi(argv[2]);
 	nColChunks   = atoi(argv[3]);
 	nRowsInChunk = atoi(argv[4]);
@@ -251,9 +393,10 @@ main (int argc, char ** argv )
 		nIsDense = 1; 
 
 	/*
-	** Some checks.
+	** Some checks for semantic argument correctness 
 	*/
 	assert(('-' == szFlags[0]));
+    assert((1 < strlen(szFlags)));
 	assert((0.0 < dbProb));
 	assert((1.0 >= dbProb));
 
@@ -262,31 +405,28 @@ main (int argc, char ** argv )
 	assert((0 < nRowsInChunk));
 	assert((0 < nColsInChunk));
 
-	switch(toupper(szFlags[1])) { 
-		case 'R':
-			nIsRandom = 1; 
-		 break;
-		case 'D':
-			nIsRandom = 0; 
-		 break;
-		default:
-			usage(argv[0]);
-			exit(0);
-		 break;
-
+	for(size_t i = 1,s = strlen(szFlags); i < s; i++) {
+		switch(toupper(szFlags[i])) { 
+			case 'R':
+				nIsRandom = 1; 
+		 	break;
+			case 'D':
+				nIsRandom = 0; 
+		 	break;
+  		    case 'B':
+ 				outputInBinary = 1;
+			break;
+			default:
+				usage(argv[0]);
+				exit(0);
+		 	break;
+		}
 	}
 	/*
-	** Some calculation.
+	** Some preliminary calculations.
 	*/
 	nCellMax = nRowChunks * nRowsInChunk * nColChunks * nColsInChunk;
     srandom(time(0));
-
-/*
-	while ( 1 ) { 
-		long p = geomdev ( dbProb );
-		printf("geomdev ( %g ) = %ld\n", dbProb, p);
-	}
-*/
 
 	if (0 == nIsDense) { 
 		/*
@@ -305,15 +445,18 @@ main (int argc, char ** argv )
                   j < nColChunks; 
                   j++ ) { 
 
-				if (i+j) { 
-					printf("\n;\n{ %d, %d }[[", 
+				if ( 0 == outputInBinary ) { 
+					if (i+j) { 
+
+						printf("\n;\n{ %d, %d }[[", 
 							i * nRowsInChunk, j * nColsInChunk);
-/*
-i, j);
-*/
-				} else { 
-					printf("{ %d, %d }[[",
+
+					} else { 
+
+						printf("{ %d, %d }[[",
 							i * nRowsInChunk, j * nColsInChunk);
+
+					}
 				}
 
 				nCount = 0;
@@ -341,24 +484,33 @@ i, j);
 						  /* Print a comma separator except for the first */
 						  /* cell in chunk. 							  */
 
+						  if ( 0 == outputInBinary ) { 
 
-						  if (firstInChunk) {
-						    firstInChunk = 0;
+						  	if (firstInChunk) {
+						    	firstInChunk = 0;
+						  	} else {
+						    	printf(",\n ");
+						  	}
+
+						  	printf(" {%d, %d} ",
+									i * nRowsInChunk + n, 
+									j * nColsInChunk + m
+								);
 						  } else {
-						    printf(",\n ");
-						  }
+					
+							unsigned long int X = i * nRowsInChunk + n;
+							unsigned long int Y = j * nColsInChunk + m;
+							writeCoords ( X, Y );
 
-						  printf(" {%d, %d} ",
-								i * nRowsInChunk + n, 
-								j * nColsInChunk + m
-							);
+						  }
 							
 						  if (nIsRandom) 
 							print_random_attr_p( nTypeCnt, szTypesListStr, 
-											   dbZProb );
+											   dbZProb, outputInBinary );
 						  else
 							print_det_attr( nTypeCnt, szTypesListStr, 
-										    nCellNum, nCellMax);
+										    nCellNum, nCellMax,
+                                            outputInBinary );
 
 						  nStep = geomdev ( dbProb );
 						  nCount++;
@@ -374,11 +526,14 @@ i, j);
 						}
 					}
 				}
-				printf(" ]]");
+				if ( 0 == outputInBinary ) { 
+					printf(" ]]");
+				}
    			}
 		}
-		printf("\n");
-
+		if ( 0 == outputInBinary ) { 
+			printf("\n");
+		}
 	} else { 
 		/*
 		** Dense data.
@@ -387,21 +542,29 @@ i, j);
 			for(int j = 0;j < nColChunks; j++ ) { 
 				nCount = 0;
 
-				if (i+j)
-					printf(";\n[\n");
-				else 
-					printf("[\n");
+				if ( 0 == outputInBinary ) { 
+					if (i+j)
+						printf(";\n[\n");
+					else 
+						printf("[\n");
+				}
 
 				for (int n = 0; n < nRowsInChunk; n++ ) { 
 
-					if (n)
-						printf(",\n[ ");
-					else 
-						printf("[ ");
+					if ( 0 == outputInBinary ) { 
+						if (n)
+							printf(",\n[ ");
+						else 
+							printf("[ ");
+					}
 
 					for (int m = 0; m < nColsInChunk; m++ ) { 
 
-						if (m) printf(", "); 
+						if ( 0 == outputInBinary ) { 
+							if (m)  { 
+								printf(", "); 
+							}
+						}
 
 #ifdef  _UNDEFINED 
 
@@ -417,6 +580,7 @@ printf("||      nColChunks   =   %3d ||\n", nColChunks);
 printf("+=============================+\n");
 
 #endif 
+
 						//
 						// Tricky bit here .... 
 						// 
@@ -428,24 +592,37 @@ printf("+=============================+\n");
 						if ((1.0 == dbProb) || 
 					        (dbProb > ((double)random() / (double)INT_MAX))) 
 						{
+							if ( 1 == outputInBinary ) { 
+								unsigned long int X = i * nRowsInChunk + n;
+								unsigned long int Y = j * nColsInChunk + m;
+								writeCoords ( X, Y );
+							}
 
 							if (nIsRandom) 
 								print_random_attr_p( nTypeCnt, szTypesListStr, 
-												   dbZProb );
+												   dbZProb, outputInBinary );
 							else {
 								print_det_attr( nTypeCnt, szTypesListStr, 
-											    nCellNum, nCellMax);
+											    nCellNum, nCellMax, outputInBinary);
 							}
 						} else { 
-							print_empty_attr();
+							if ( 0 == outputInBinary ) { 
+								print_empty_attr();
+							}
 						}
 						nCount++;
 					}
-					printf("]");
+					if ( 0 == outputInBinary ) { 
+						printf("]");
+					}
 				}
-				printf("\n]");
+				if ( 0 == outputInBinary ) { 
+					printf("\n]");
+				}
 			}
 		}
-		printf("\n");
+		if ( 0 == outputInBinary ) { 
+			printf("\n");
+		}
 	}
 }

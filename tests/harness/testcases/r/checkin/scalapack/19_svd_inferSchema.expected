@@ -26,7 +26,7 @@ i,c,v
 i,sigma
 0,1
 
-[An error expected at this place for the query "gesvd(A_1c1, 'foo')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33.]
+[An error expected at this place for the query "gesvd(A_1c32, 'foo')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33.]
 
 r,i,u
 0,0,1

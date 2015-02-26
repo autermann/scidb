@@ -44,7 +44,6 @@ sl_int_t pdgemmSlave(void* bufs[], size_t sizes[], unsigned count)
 {
     enum dummy {BUF_ARGS=0, BUF_A, BUF_B, BUF_C, NUM_BUFS };
 
-
     for(size_t i=0; i < count; i++) {
         if(DBG) {
             std::cerr << "pdgemmSlave: buffer at:"<< bufs[i] << std::endl;

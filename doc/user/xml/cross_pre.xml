@@ -6,7 +6,15 @@
   <refnamediv>
     <refname>cross</refname>
 
-    <refpurpose>Produces a result array whose set of cells consists of every
+    <refpurpose><indexterm>
+        <primary>cross</primary>
+      </indexterm><indexterm>
+        <primary>cross product</primary>
+      </indexterm><indexterm>
+        <primary>binary operators</primary>
+
+        <secondary>cross</secondary>
+      </indexterm>Produces a result array whose set of cells consists of every
     possible combination of a cell from one source array and a cell from
     another source array.</refpurpose>
   </refnamediv>
@@ -47,7 +55,7 @@
 
       <procedure>
         <step>
-          <para>Show the first array:<programlisting language='test'>
+          <para>Show the first array:<programlisting language="test">
 --afl create array letters &lt;letter:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
 --shell --command=csv2scidb -s 1 -p S &lt; ../examples/letters.csv &gt; ../examples/letters.scidb --show-query=no --show-output=no
 --aql load letters from '../examples/letters.scidb' --show-query=no --show-output=no 
@@ -55,13 +63,13 @@
         </step>
 
         <step>
-          <para>Show the second array:<programlisting language='test'>
+          <para>Show the second array:<programlisting language="test">
 --afl store(build(&lt;number:int64 null&gt;[i=0:4,5,0],i),numbers) --show-query=no --show-output=no
 --afl scan(numbers);</programlisting></para>
         </step>
 
         <step>
-          <para>Generate the cross product:<programlisting language='test'>--afl cross(numbers,letters); --output-format=auto --chunkify=yes</programlisting></para>
+          <para>Generate the cross product:<programlisting language="test">--afl cross(numbers,letters); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>
@@ -72,7 +80,7 @@
 
       <procedure>
         <step>
-          <para>Show the first array:<programlisting language='test'>
+          <para>Show the first array:<programlisting language="test">
 --afl create array lettersPlus &lt;letter:string, type:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
 --shell --command=csv2scidb -s 1 -p S &lt; ../examples/lettersPlus.csv &gt; ../examples/lettersPlus.scidb --show-query=no --show-output=no
 --aql load lettersPlus from '../examples/lettersPlus.scidb' --show-query=no --show-output=no
@@ -81,7 +89,7 @@
 
         <step>
           <para>Generate the cross product with the array called
-          "numbers":<programlisting language='test'>--afl cross(numbers,lettersPlus); --output-format=auto --chunkify=yes</programlisting></para>
+          "numbers":<programlisting language="test">--afl cross(numbers,lettersPlus); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>
@@ -93,7 +101,7 @@
       <procedure>
         <step>
           <para>Show the array containing some null values (where the even
-          numbers would be):<programlisting language='test'>
+          numbers would be):<programlisting language="test">
 --afl create array oddNumbers &lt;number:int64 null&gt; [i=0:4,5,0] --show-query=no --show-output=no
 --shell --command=csv2scidb -s 1 -p N &lt; ../examples/oddNumbers.csv &gt; ../examples/oddNumbers.scidb --show-query=no --show-output=no
 --aql load oddNumbers from '../examples/oddNumbers.scidb' --show-query=no --show-output=no
@@ -102,7 +110,7 @@
 
         <step>
           <para>Generate the cross product with the letters
-          array:<programlisting language='test'>--afl cross(oddNumbers,letters); --output-format=auto --chunkify=yes</programlisting></para>
+          array:<programlisting language="test">--afl cross(oddNumbers,letters); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>
@@ -114,14 +122,14 @@
       <procedure>
         <step>
           <para>Show the array containing some empty cells (where the odd
-          numbers would be):<programlisting  language='test'>
+          numbers would be):<programlisting language="test">
 --afl store(build_sparse(&lt;number:int64&gt;[i=0:4,5,0],i,((i%2)=0)),evenNumbers) --show-query=no --show-output=no
 --afl scan(evenNumbers);</programlisting></para>
         </step>
 
         <step>
           <para>Generate the cross product with the letters
-          array:<programlisting language='test'>--afl cross(evenNumbers,letters); --output-format=dense --chunkify=yes</programlisting></para>
+          array:<programlisting language="test">--afl cross(evenNumbers,letters); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>

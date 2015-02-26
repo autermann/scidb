@@ -2546,6 +2546,8 @@ void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const
                              ArrayDesc const& inputDesc,
                              ArrayDesc& outputDesc);
 
+void syncBarrier(int barrierId, boost::shared_ptr<scidb::Query> query);
+
 
 /**
  * Redistribute inputArray using the psRoundRobin distribution scheme, using aggregate merge to merge overlapping cells.

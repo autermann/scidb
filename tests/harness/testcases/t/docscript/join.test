@@ -4,9 +4,9 @@
 
 --set-format dcsv
 --start-igdata
---aql create array left_array <val:double>[i=0:2,3,0,j=0:2,3,0]  
+create array left_array <val:double>[i=0:2,3,0,j=0:2,3,0]  
 store(build(left_array,1),left_array)  
---aql create array right_array <val:double>[i=0:2,3,0,j=0:5,3,0]  
+create array right_array <val:double>[i=0:2,3,0,j=0:5,3,0]  
 store(build(right_array,0),right_array)  
 --set-format auto
 --stop-igdata

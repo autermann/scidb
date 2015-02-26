@@ -577,7 +577,7 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
                 if (attTypeNullable) {
                     defaultValue.setNull();
                 } else {
-                    setDefaultValue(defaultValue, attType.typeId());
+                    defaultValue = TypeLibrary::getDefaultValue(attType.typeId());
                 }
             }
 

@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2011 SciDB, Inc.
+# Copyright (C) 2008-2012 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,16 +33,19 @@ endif()
 ######################
 # MPI
 ######################
-set(USE_LOCAL_MPI 0)
+set(USE_LOCAL_MPI 1) # If set, will find MPICH2, while the current find module will have selected OpenMPI
 if (USE_LOCAL_MPI)
-  set(LOCAL_MPI_PATH "/home/james/packages/ompi/openmpi-1.4.5") # example
-  message(STATUS "WARNING-- using locally installed MPI")
-  set(MPI_INCLUDE "-I. -I ${LOCAL_MPI_PATH}/build/ompi/include -I  ${LOCAL_MPI_PATH}/build/opal/include")
-  set(MPI_Fortran_COMPILER "${LOCAL_MPI_PATH}/bin/mpif77")
-  set(MPI_CXX_COMPILER "${LOCAL_MPI_PATH}/bin/mpic++")
-  set(MPI_LIBRARIES "-L${LOCAL_MPI_PATH}/lib ...") # fill in the blanks
-  set(MPI_CXX_FOUND 0)     #set to 1 to pick up custom values
-  set(MPI_Fortran_FOUND 0) #set to 1 to pick up custom values
+  set(LOCAL_MPI_PATH "/usr") # example
+  message(STATUS "WARNING-- using locally installed MPICH2")
+  set(MPI_INCLUDE "-I ${LOCAL_MPI_PATH}/include/mpich2")
+  set(MPI_Fortran_COMPILER "${LOCAL_MPI_PATH}/bin/mpif77.mpich2")
+  set(MPI_CXX_COMPILER "${LOCAL_MPI_PATH}/bin/mpic++.mpich2")
+  set(MPI_CC_COMPILER "${LOCAL_MPI_PATH}/bin/mpicc.mpich2")
+  set(MPI_LIBRARIES "${LOCAL_MPI_PATH}/lib/libmpichf90.a") # fill in the blanks
+  set(MPI_Fortran_FOUND 1) # emulate find_package()
+  set(MPI_CXX_FOUND 1)     # emulate find_package()
+  set(MPI_CC_FOUND 1)      # emulate find_package()
+  set(MPICH_FOUND 1) # we have MPICH, need custom ScaLAPACK
 else (USE_LOCAL_MPI)
   set(MPI_Fortran_COMPILER mpif77) # must be before find_package to be path-resolved
   find_package(MPI)
@@ -147,21 +150,24 @@ if(USE_MKL_ILP64)
 endif(USE_MKL_ILP64)
 
 if(USE_FIND)
+    set(LIBGF "/usr/lib/gcc/x86_64-linux-gnu/4.6/libgfortran.a")
     ######################
     # BLAS
     ######################
-    set(USE_LOCAL_BLAS 0)
+    set(USE_LOCAL_BLAS 0) # the find modules are bringing in over-specific library names, this may be necessary for SciDB 12.11
     if(USE_LOCAL_BLAS)
         message(STATUS "WARNING-- using locally installed BLAS")
-        set(BLAS_LIBRARIES "-L/usr/local/lib")
+        set(BLAS_FOUND 1) # as if FIND had been used
+        set(BLAS_LIBRARIES "/usr/lib/libblas.so") # most flexible
+        #set(BLAS_DIR "/home/james/packages/atlas/atlas3.8.4/Linux_x64sbeO3/lib/")
+        #set(BLAS_LIBRARIES "-L${BLAS_DIR} -lptf77blas -latlas -pthread ${LIBGF}") # ptcblas
         # if ATLAS BLAS, have to add:
         # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -lptcblas -lptf77blas -latlas ")
         # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -pthread /usr/lib/gcc/x86_64-linux-gnu/4.6.1/libgfortran.so")
         # The generic BLAS, add:
         # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -lblas ")
         # or:
-        # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -/usr/local/lib/libblas.a ")
-        set (BLAS_FOUND 0) #set to 1 to pick up local custom values
+        # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} /usr/local/lib/libblas.a ")
     else(USE_LOCAL_BLAS)
         message(STATUS "Using platform BLAS")
         find_package(BLAS)
@@ -177,12 +183,14 @@ if(USE_FIND)
     ######################
     # LAPACK
     ######################
-    set(USE_LOCAL_LAPACK 0)
+    set(USE_LOCAL_LAPACK 0) # the find modules are bringing in over-specific library names, this may be necessary for SciDB 12.11
     if(USE_LOCAL_LAPACK)
         message(STATUS "WARNING-- using locally installed LAPACK")
-        set(LAPACK_LIBRARIES "-L/usr/local/lib -ltmg -lreflapack")  # DEBUG
-        # or set(LAPACK_LIBRARIES "/usr/local/lib/liblapack.a")  # DEBUG
-        set (LAPACK_FOUND 0) #set to 1 to pick up local custom values
+        set (LAPACK_FOUND 1) # as if FIND had been used
+        set(LAPACK_LIBRARIES "/usr/lib/liblapack.so")
+        #set(LAPACK_DIR "/home/james/packages/scalapack_installer/1.0.2/scalapack_installer_1.0.2/install/lib")
+        #set(LAPACK_LIBRARIES "-L${LAPACK_DIR} -ltmg -lreflapack ${LIBGF}")
+        # or set(LAPACK_LIBRARIES "/usr/local/lib/liblapack.a")
     else(USE_LOCAL_LAPACK)
       message(STATUS "Using platform LAPACK")
       find_package(LAPACK)
@@ -198,20 +206,25 @@ if(USE_FIND)
     ###########################
     # ScaLAPACK
     ###########################
-    set(USE_LOCAL_SCALAPACK 0) # 1 for using /usr/local/lib                 #DEBUG
+    set(USE_LOCAL_SCALAPACK 1) # set 1 to build on a scalapack built by build_scalapack_mpich2.sh, requires USE_LOCAL_MPI settings temporarily
     if(USE_LOCAL_SCALAPACK)
-        message(STATUS "WARNING-- using locally installed ScaLAPACK stack")
-        set(SCALAPACK_LIBRARIES "/usr/local/lib/libscalapack.a")
-        set(SCALAPACK_INC_DIR   "/usr/local/include/BLACS/SRC")
-        set(CMAKE_C_FLAGS       "${CMAKE_C_FLAGS} -I ${SCALAPACK_INC_DIR}")
-        set(SCALAPACK_FOUND 0) #set to 1 to pick up local custom values
+        message(STATUS "WARNING-- using locally installed ScaLAPACK for MPICH2")
+        message(STATUS "Debug: To refresh/rebuild the local copy of scalapack, remove ${CMAKE_CURRENT_BINARY_DIR}/local_scalapack/container.")
+        add_subdirectory("local_scalapack")
+        # can these next two be "returned" from local_scalapack/CMakeLists.txt?
+        set(SCALAPACK_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/local_scalapack/container/src/scalapackForMPICH2-build")
+        set(SCALAPACK_LIB_DIR   "${SCALAPACK_BUILD_DIR}/install/lib")
+        set(SCALAPACK_LIBRARIES "${SCALAPACK_LIB_DIR}/libscalapack.a") # -ltmg ${LIBGF}
+        set(SCALAPACK_INC_DIR   "${SCALAPACK_LIB_DIR}/include")   #UNSURE
+        set(SCALAPACK_FOUND 1)   # emulate find_package() 
     else()
         message(STATUS "Using platform ScaLAPACK stack")
         find_package(ScaLAPACK)
     endif()
 
     if (SCALAPACK_FOUND)
-        #message(STATUS "Debug: SCALAPACK_LIBRARIES is ${SCALAPACK_LIBRARIES}")
+        message(STATUS "Debug: SCALAPACK_LIBRARIES is ${SCALAPACK_LIBRARIES}")
+        message(STATUS "Debug: SCALAPACK_INC_DIR is ${SCALAPACK_INC_DIR}")
     else (SCALAPACK_FOUND)
         message(WARNING "ScaLAPACK not found. ScaLAPACK-based functionality will NOT be built.")
         message(WARNING "Ubuntu Hint: $ sudo apt-get install libscalapack-mpi1")
@@ -225,12 +238,12 @@ if(NOT MPI_CXX_FOUND OR NOT MPI_Fortran_FOUND)
     message(WARNING "Debug: MPI_C_FOUND is ${MPI_C_FOUND}, MPI_CXX_FOUND is ${MPI_CXX_FOUND}, MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
     message(WARNING "Ubuntu Hint: $ sudo apt-get install libopenmpi-dev")
 else(NOT MPI_CXX_FOUND OR NOT MPI_Fortran_FOUND)
-    if(${DISTRO_NAME_VER} MATCHES "RedHat")
+    if(${DISTRO_NAME_VER} MATCHES "CentOS")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lgfortran")
-    endif(${DISTRO_NAME_VER} MATCHES "RedHat")
+    endif(${DISTRO_NAME_VER} MATCHES "CentOS")
 endif(NOT MPI_CXX_FOUND OR NOT MPI_Fortran_FOUND)
 
-message(STATUS "Debug: FINAL PACKAGE SETTINGS ================================>")
+message(STATUS "Debug: FINAL PACKAGE SETTINGS src/mpi ================================>")
 message(STATUS "Debug: SCALAPACK_LIBRARIES is ${SCALAPACK_LIBRARIES}")
 message(STATUS "Debug: LAPACK_LIBRARIES is ${LAPACK_LIBRARIES}")
 message(STATUS "Debug: BLAS_LIBRARIES is ${BLAS_LIBRARIES}")
@@ -275,6 +288,10 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     # build the mpi-slave program
     #
     add_subdirectory("slaving")
+    if(USE_LOCAL_SCALAPACK)
+       add_dependencies(mpi_slave_direct scalapackForMPICH2)
+       add_dependencies(mpi_slave_scidb scalapackForMPICH2)
+    endif()
 
 else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
       MPI_CXX_FOUND AND MPI_Fortran_FOUND)
@@ -283,16 +300,12 @@ else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
           pluginNoMpi.cpp
      )
 
-    message(WARNING "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     message(WARNING "Can't build ScaLAPACK extensions")
-    message(WARNING "without ScaLAPACK, Open MPI, LAPACK, or a BLAS")
-    message(WARNING "or without MPI_CXX")
-    message(WARNING "or without MPI_Fortran interfaces.")
-    message(WARNING "This is only a warning and is not a problem unless")
-    message(WARNING "you want the libdense_linear_algebra.so plugin to be built.")
-    message(WARNING "")
-    message(WARNING "If you intended to built it, the following will help you debug what is missing.")
-    message(WARNING "-------------------------------------------------")
+    message(WARNING "without ScaLAPACK, MPI, LAPACK, and BLAS")
+    message(WARNING "This is only a warning, SciDB will build but without")
+    message(WARNING "the libdense_linear_algebra.so plugin.")
+    message(WARNING "If that is not desired, please make sure the following are correctly resolved:")
+    message(WARNING "----------------------------------------------------")
     message(WARNING "Debug: MPI_Fortran_COMPLIER is ${MPI_Fortran_COMPILER}")
     message(WARNING "Debug: CMAKE_Fortran_COMPLIER is ${CMAKE_Fortran_COMPILER}")
     message(WARNING "Debug: CMAKE_CXX_COMPILER is ${CMAKE_CXX_COMPILER}")
@@ -302,7 +315,6 @@ else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     message(WARNING "Debug: MPI_CXX_FOUND is   ${MPI_CXX_FOUND}")
     message(WARNING "Debug: MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
     message(WARNING "----------------------------------------------------")
-    message(WARNING "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 
 endif (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
        MPI_CXX_FOUND AND MPI_Fortran_FOUND)

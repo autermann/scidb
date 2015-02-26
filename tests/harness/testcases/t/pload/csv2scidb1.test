@@ -12,7 +12,7 @@
  --shell --command " cat ./testcases/data/csv2scidb_1.csv |csv2scidb -c 100 -s 1 -n 1 > /tmp/csv2scidb_test_1.txt  " 
   load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.txt' )
  --stop-igdata
- scan( Raw_CSVLoad_1 )
+ sort( Raw_CSVLoad_1,symbl )
  --cleanup
 remove ( Raw_CSVLoad_1 )
 

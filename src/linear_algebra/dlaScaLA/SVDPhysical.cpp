@@ -276,11 +276,12 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
     // Zero inputs, to emulate a sparse matrix implementation (but slower)
     // and then extract the non-missing info onto that.
     // Set outputs to NaN, to catch invalid cells being returned
-    void *argsBuf = shmIpc[0]->get();
-    double* A = reinterpret_cast<double*>(shmIpc[1]->get());
-    double* S = reinterpret_cast<double*>(shmIpc[2]->get()); shmSharedPtr_t Sx(shmIpc[2]);         
-    double* U = reinterpret_cast<double*>(shmIpc[3]->get()); shmSharedPtr_t Ux(shmIpc[3]);
-    double* VT = reinterpret_cast<double*>(shmIpc[4]->get());shmSharedPtr_t VTx(shmIpc[4]);  
+
+    void *argsBuf = shmIpc[BUF_ARGS]->get();
+    double* A = reinterpret_cast<double*>(shmIpc[BUF_MAT_A]->get());
+    double* S = reinterpret_cast<double*>(shmIpc[BUF_MAT_S]->get()); shmSharedPtr_t Sx(shmIpc[BUF_MAT_S]);
+    double* U = reinterpret_cast<double*>(shmIpc[BUF_MAT_U]->get()); shmSharedPtr_t Ux(shmIpc[BUF_MAT_U]);
+    double* VT = reinterpret_cast<double*>(shmIpc[BUF_MAT_VT]->get());shmSharedPtr_t VTx(shmIpc[BUF_MAT_VT]);
 
     setInputMatrixToAlgebraDefault(A, nElem[BUF_MAT_A]);
     extractArrayToScaLAPACK(Ain, A, DESC_A);
@@ -311,6 +312,7 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
                   U,  one, one,  DESC_U,
                   VT, one, one, DESC_VT,
                   *INFO);
+    // NOTE: INFO must not be modified after this, it is an output value
 
     LOG4CXX_DEBUG(logger, "SVD: pdgesvdMaster finished");
     if(DBG) std::cerr << "SVD: calling pdgesvdMaster finished" << std::endl;
@@ -322,6 +324,7 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
 
     typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
 
+    size_t resultShmIpcIndx = shmIpc.size();
     if (whichMatrix == "S" || whichMatrix == "SIGMA" || whichMatrix == "values")
     {
         if(DBG) std::cerr << "sequential values from 'value/S' memory" << std::endl;
@@ -371,7 +374,8 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
             if(DBG) std::cerr << "SVD('left') instance @ MYPROW,MYPCOL: "<<MYPROW<<","<<MYPCOL
                       << " returns chunks of S" << std::endl;
             *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                                first, last, iterDelta));
+                                                                  first, last, iterDelta, query));
+            resultShmIpcIndx = BUF_MAT_S;
         } else {
             // vector has been output by first column or first row, whichever is shorter
             // so return an empty array.  (We still had to do our part to generate
@@ -414,9 +418,10 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         if(DBG) std::cerr << "SVD(left) SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
         LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
 
+        resultShmIpcIndx = BUF_MAT_U;
         reformatOp_t      pdelgetOp(Ux, DESC_U, dims[0].getStart(), dims[1].getStart());
         *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                            first, last, iterDelta));
+                                                              first, last, iterDelta, query));
     }
 
     else if (whichMatrix == "VT" || whichMatrix == "right")
@@ -443,24 +448,13 @@ void SVDPhysical::invokeMPISvd(std::vector< shared_ptr<Array> >* inputArrays,
         if(DBG) std::cerr << "SVD(right) SplitArray: "<<first[0]<<","<<first[1]<<" to " << last[0] <<"," <<last[1]<< std::endl;
         LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
 
+        resultShmIpcIndx = BUF_MAT_VT;
         reformatOp_t    pdelgetOp(VTx, DESC_VT, dims[0].getStart(), dims[1].getStart());
         *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                              first, last, iterDelta));
+                                                              first, last, iterDelta, query));
     }
 
-    // REFACTOR to MPIOperator
-    //--------------------- Cleanup for objects no longer in use
-    // after the for loop the shared memory is still intact
-    for(size_t i=0; i<shmIpc.size(); i++) {
-        if (!shmIpc[i]) {
-            continue;
-        }
-        shmIpc[i]->close();
-        if (!shmIpc[i]->remove()) {
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_remove");
-        }
-    }
-
+    releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
     resetMPI();
 

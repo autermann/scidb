@@ -1049,4 +1049,30 @@ shared_ptr<Scheduler> getScheduler(Scheduler::Work& workItem, time_t period)
    return scheduler;
 }
 
+void resolveComplete(shared_ptr<asio::ip::tcp::resolver>& resolver,
+                     shared_ptr<asio::ip::tcp::resolver::query>& query,
+                     ResolverFunc& cb,
+                     const system::error_code& error,
+                     asio::ip::tcp::resolver::iterator endpoint_iterator)
+{
+    try {
+        cb(error, endpoint_iterator);
+    } catch (const scidb::Exception& e) {
+        LOG4CXX_ERROR(logger, "Name resolution callback failed with: "<<e.what());
+        assert(false);
+    }
+}
+
+void resolveAsync(const string& address, const string& service, ResolverFunc& cb)
+{
+    shared_ptr<asio::ip::tcp::resolver> resolver(new asio::ip::tcp::resolver(NetworkManager::getInstance()->getIOService()));
+    shared_ptr<asio::ip::tcp::resolver::query> query =
+       make_shared<asio::ip::tcp::resolver::query>(address, service);
+    resolver->async_resolve(*query,
+                            boost::bind(&scidb::resolveComplete,
+                                        resolver, query, cb,
+                                        boost::asio::placeholders::error,
+                                        boost::asio::placeholders::iterator));
+}
+
 } // namespace scidb

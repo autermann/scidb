@@ -58,12 +58,17 @@ function check_apt_dir
         echo "ERROR: Can not find .changes files in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
         exit 1
     fi
-    if [ "`find "$1" -maxdepth 1 -type f -iname \*.dsc | wc -l`" = 0 ]; then
-        echo "ERROR: Can not find .dsc file in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
-        exit 1
-    fi
-    if [ "`find "$1" -maxdepth 1 -type f -iname \*.tar.gz | wc -l`" = 0 ]; then
-        echo "ERROR: Can not find .tar.gz file in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
+    return 0
+}
+
+function check_yum_dir
+{
+    if [ -f "$1/.skip" ]; then
+        echo "Found '$1/.skip'. Will not scan '$1'."
+        return 1
+    fi 
+    if [ "`find "$1" -maxdepth 1 -type f -iname \*.rpm | wc -l`" = 0 ]; then
+        echo "ERROR: Can not find .rpm files in '$1'. Can not create repository here. Consider delete this directory or create .skip file"
         exit 1
     fi
     return 0
@@ -102,9 +107,22 @@ if [ "$repotype" == "apt" ]; then
     done
 elif [ "$repotype" == "yum" ]; then
     for release_dir in $dirs; do
-        rm -rf "$release_dir/repodata"
-        createrepo "$release_dir"
-        gpg -u "$2" --detach-sign --armor "$release_dir/repodata/repomd.xml" 
+        echo Checking dir $release_dir
+        check_yum_dir "$release_dir"
+        if [ "$?" = "0" ]; then
+            echo Building repo inside $release_dir
+            rm -rf "$release_dir/repodata"
+            createrepo "$release_dir"
+            echo Signing repo $release_dir
+            gpg -u "$2" --detach-sign --armor "$release_dir/repodata/repomd.xml"
+         
+            #FIXME: Debian rpmsign can't use key-id from arguments!   
+            #for f in $release_dir/*.rpm; do
+            #    echo Signing package $f
+            #    echo -e "spawn rpmsign --key-id $2 --resign $f\nexpect -exact \"Enter pass phrase: \"\nsend -- \"Secret passphrase\\\r\"\nexpect eof\nwait\n" | expect -
+            #    echo $?
+            #done
+        fi
     done
 else
     echo Unknown repo type \'$repotype\'

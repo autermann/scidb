@@ -30,6 +30,7 @@ LEN_J=`expr $1 "*" $2 - 1`;
 ZIPF=$3;
 SPRS=$4;
 INST=$5;
+Port=$6;
 LABEL="Array_${ZIPF}_${SPRS}";
 #
 #  ADMIN 1: Nuke the previous instance to clean up the space. 
@@ -38,43 +39,72 @@ scidb.py startall $INST
 #
 sleep 3;
 #
-#  DDL 1: Create array with 3 attributes
+#  DDL 1: Create array with 5 attributes for loading. 
+CMD="CREATE ARRAY Test_Array_Raw <
+    I           : int64,
+    J           : int64,
+    int_attr_1  : int64,
+    int_attr_2  : int64,
+    double_attr : double
+>
+[ RowNum=0:*,1000000,0 ]"
+#
+echo "${CMD}"
+time -p iquery --port $Port -aq "$CMD"
+#
+#  DDL 2: Create array with 3 attributes
 #
 CMD="CREATE ARRAY Test_Array <
-    int32_attr  : int32,
-    int64_attr  : int64,
+    int_attr_1  : int64,
+    int_attr_2  : int64,
     double_attr : double
 >
 [ I=0:$LEN_I,$2,0, J=0:$LEN_J,$2,0 ]"
 #
-time -p iquery -aq "$CMD"
+echo "${CMD}"
+time -p iquery --port $Port -aq "$CMD"
 #
 #    Populating this array using the build() is problematic, as here are three 
 #  attributes and the distributions are awkward. So instead I will use the 
 #  external gen_matrix executable to generate the data, and load it using a
 #  pipe.
 #
-rm /tmp/Load.pipe
+OUT_FILE="/public/users/plumber/Scale_Test_Data/Test_Array_Data_${1}_${2}_${ZIPF}_${SPRS}.scidb"
+#
+rm -rf /tmp/Load.pipe
 mkfifo /tmp/Load.pipe
-echo "gen_matrix -r $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe"
-gen_matrix -r $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe &
+echo "gen_matrix -rb $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe"
+gen_matrix -rb $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe &
 #
 #  Time the load. 
-/usr/bin/time -f "Q0 $LABEL Load %e" iquery -naq "load(Test_Array, '/tmp/Load.pipe')"
+/usr/bin/time -f "QLoad $LABEL Load %e" iquery --port $Port -nq "load Test_Array_Raw FROM '/tmp/Load.pipe' AS '(INT64,INT64,INT64,INT64,DOUBLE)';"
 #
 #  DML 1: How many cells in this array?
 CMD="join ( 
         build ( < s : string > [ I=0:0,1,0 ], 'Size_Count_For ${LABEL}'),
-        count ( Test_Array )
+        count ( Test_Array_Raw )
 )";
 #
 echo $CMD
 #
-/usr/bin/time -f "${LABEL} Cell_Count %e" iquery -taq "$CMD"
+/usr/bin/time -f "${LABEL} Cell_Count %e" iquery --port $Port -taq "$CMD"
 # 
 #  Find out how big storage.data1 on the 0 instance is. 
 #
 du -b $SCIDB_DATA_DIR/000/0/storage.data1
 #
-# END 
+# save() the array, and compress it. 
 #
+CMD="
+save ( Test_Array_Raw, '${OUT_FILE}', 0, '(INT64,INT64,INT64,INT64,DOUBLE)')
+"
+echo "${CMD}"
+#
+date;
+# /usr/bin/time -f "QSave %e" iquery --port $Port -r /dev/null -naq "${CMD}"
+ps -eo comm,%mem | grep SciDB-000-0
+#
+# Compress it. 
+# gzip ${OUT_FILE}
+#
+# END 

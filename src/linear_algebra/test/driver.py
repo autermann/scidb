@@ -20,22 +20,28 @@
 # along with SciDB.  If not, see <http://www.gnu.org/licenses/>.
 # END_COPYRIGHT
 #
-
+import array
+import datetime
+import errno
+import exceptions
+import os
 import subprocess
 import sys
-import traceback
-import os
 import string
-import errno
 import struct
-from datetime import datetime, date, time
-import array
+import time
+import traceback
+
+# bad style to use from, removes the namespace colission-avoidance mechanism
 from ConfigParser import RawConfigParser
 
 def printDebug(string, force=False):
    if _DBG or force:
       print >> sys.stderr, "%s: DBG: %s" % (sys.argv[0], string)
       sys.stderr.flush()
+
+def printDebugForce(string):
+    printDebug(string, force=True)
 
 def printInfo(string):
    sys.stdout.flush()
@@ -116,7 +122,7 @@ def executeIt(cmdList,
           p.wait()
           ret = p.returncode
           if ret != 0 and raiseOnBadExitCode:
-             raise Exception("Abnormal return code: %d" % ret)
+             raise Exception("Abnormal return code: %s on command %s" % (ret, cmdList))
     finally:
        if (sout != None):
           sout.close()
@@ -152,9 +158,17 @@ def nafl(input, timeIt=False):
                     stderrFile=None)
     return ret
 
+
 def store(what, name):
    _usedMatrices[name]=1
-   nafl("store(%s, %s)" % (what,name))
+   nafl("store(%s, %s)" % (what, name))
+
+
+def eliminateAndStore(what, name):
+    eliminate(name)
+    _usedMatrices[name]=1
+    nafl("store(%s, %s)" % (what, name))
+
 
 #
 # Run a given AFL with printing the result to stdout
@@ -163,7 +177,7 @@ def store(what, name):
 #"-osparse" # enable this when debugging distribution issues
 
 def afl(input, format="-ocsv", timeIt=False):
-    cmdList=[_iqueryBin, "-p", _basePort, "-c", _targetHost, format, "-aq", input]
+    cmdList=[_iqueryBin, "-p", _basePort, "-c", _targetHost, format, "-w16", "-aq", input]
     if _timePrefix != None and timeIt:
        cmdList.insert(0,_timePrefix)
     ret = executeIt(cmdList,
@@ -174,10 +188,10 @@ def afl(input, format="-ocsv", timeIt=False):
     return ret
 #
 # Run a given AFL with collecting the result into a buffer, which is returned
-def aflResult(input,timeIt=False):
+def aflResult(input, format="-ocsv", timeIt=False):
     # XXX TODO: get rid of the file altogether ?
     outFile = "/tmp/afl.%s.out" % os.getpid()
-    cmdList=[_iqueryBin, "-p", _basePort, "-c", _targetHost, "-ocsv", "-aq", input]
+    cmdList=[_iqueryBin, "-p", _basePort, "-c", _targetHost, format, "-w16", "-aq", input]
     if _timePrefix != None and timeIt:
        cmdList.insert(0,_timePrefix)
     ret = executeIt(cmdList,
@@ -193,18 +207,55 @@ def aflResult(input,timeIt=False):
        if sout!=None:
           sout.close()
     return (ret,result)
+
+
+def aflStderr(input, format="-odcsv", timeIt=False):
+    (ret,result) = aflResult(input, format, timeIt)
+    if (ret != 0):
+        printError("bad status returned from query: %s" % (input,))
+    else:
+        printDebugForce("TMP -- running query %s" % (input,) )
+    printDebugForce(result)
+
+
+#
+# check size of a matrix against its count
+def checkCount(MAT, nrow, ncol):
+   (ret,countRow) = aflResult("count(%s)" % (MAT,))
+   count = int(string.split(countRow)[1])
+   if count != nrow * ncol:
+       errStr = "count(MAT %s) = %s != (nrow %s * ncol %s == %s)" % (MAT, count, nrow, ncol, nrow*ncol)
+       printDebugForce("@@@@@@@ SERIOUS ERROR");
+       printDebugForce("@@@@@@@ %s" % (errStr,))
+       raise(RuntimeError(errStr))
+
+
+def getMatrixSchema(nrow, ncol, rowChunkSize, colChunkSize):
+   schemaStr = "<v:double>[r=0:%d,%d,0, c=0:%d,%d,0]" % (nrow-1, rowChunkSize, ncol-1, colChunkSize)
+   return schemaStr
+
+
 #
 # Create a 2D SciDB array schema
-def createMatrix(name, rows, cols, rchunk_size, cchunk_size):
+#
+# TODO: wean off of createMatrix(); populate() by using getMatrixSchema instead of creating
+#       and then use eliminate(name), store(MAT_AFL,name)
+#       and then have store do the eliminate
+def createMatrix(name, nrow, ncol, rowChunkSize, colChunkSize):
    _usedMatrices[name]=1
-   aflStr = "create array %s <v:double>[r=0:%d,%d,0, c=0:%d,%d,0]" % (name, rows-1, rchunk_size, cols-1, cchunk_size)
+   aflStr = "create array %s %s" % (name, getMatrixSchema(nrow, ncol, rowChunkSize, colChunkSize))
    eliminate(name)
    nafl(aflStr)
+
+
 #
 # Populate (i.e. build) a 2D SciDB array
-def populateMatrix(name, expression):
-   aflStr = "build(%s,%s)" % (name,expression)
-   store(aflStr,name)
+# TODO: wean off of createMatrix(); populate() by using getMatrixSchema instead of creating
+#       and then use eliminate(name), store(MAT_AFL,name)
+#       and then have store do the eliminate
+def populateMatrix(name, MAT_AFL):
+    store(MAT_AFL, name)
+
 
 #
 # Return a number generator in the specified range.
@@ -220,6 +271,7 @@ def getRangeGenerator(rangeStr):
       elif limits[0]=='*':
          return (lambda v: iterateRange(intLimits, v, (lambda v1,v2: mult(v1,v2))))
    return None
+
 
 #
 # Return a list of numbers
@@ -260,33 +312,33 @@ def getChunkSizeGenerator(order, listName):
    raise Exception("Invalid chunk size list range/name %s " % (listName))
 #
 # Generate chunk size for testing lots of edge conditions
-# by setting the chunksize to make edge conditions
+# by setting the chunkSize to make edge conditions
 # and to ensure a minimum amount of multi-instance
 # distribution is involved, by dividing into
 # roughly 2,3,4, .. etc pieces
 def varyChunkSizes(mat_order, scalapack_block_sizes, divs):
-    chunksizes={}
+    chunkSizes={}
     max_scalapack_block = scalapack_block_sizes[len(scalapack_block_sizes)-1]
     for scalapack_block_size in scalapack_block_sizes:
-       chunksizes[scalapack_block_size]=1
-       # white box test: also test chunksizes near the matrix size
+       chunkSizes[scalapack_block_size]=1
+       # white box test: also test chunkSizes near the matrix size
        #
        # _ separates the numbers,... easier to tr to newlines for sorting with sort -nu
-       # for now, we are not going to go above chunksize 64 ... that may be
+       # for now, we are not going to go above chunkSize 64 ... that may be
        # the limit I set in the operator
        if mat_order < scalapack_block_size:
           # add on order-1, order, and order+1 sizes (boundary conditions)
-          chunksizes[mat_order-1]=1
-          chunksizes[mat_order]=1
-          chunksizes[mat_order+1]=1
+          chunkSizes[mat_order-1]=1
+          chunkSizes[mat_order]=1
+          chunkSizes[mat_order+1]=1
        elif mat_order <= scalapack_block_size:
           # test is same as "equal"
           # add on order-1 andl order ... order+1 is over the limit
-          chunksizes[mat_order-1]=1
-          chunksizes[mat_order]=1
+          chunkSizes[mat_order-1]=1
+          chunkSizes[mat_order]=1
        elif mat_order<=max_scalapack_block: # XXX: svd errors out on chunk sizes > max_scalapack_block 
           # just order itself
-          chunksizes[mat_order]=1
+          chunkSizes[mat_order]=1
 
     # XXX TODO JHM: verify logic
     # black box test: divide the size into N chunks ..
@@ -294,46 +346,55 @@ def varyChunkSizes(mat_order, scalapack_block_sizes, divs):
     for div in divs: #XXX must get above the number of instances to see full parallelism
         tmpChunkSize = mat_order / div
         if tmpChunkSize > 1 and tmpChunkSize <= max_scalapack_block:
-           chunksizes[tmpChunkSize]=1
+           chunkSizes[tmpChunkSize]=1
 
     # remove duplicate chunk sizes only to save testing time
-    result = sorted(chunksizes.keys())
+    result = sorted(chunkSizes.keys())
     for i in range(len(result)):
        if result[i] > mat_order:
           return result[:i+1] #XXX test only one chunk size greater than the order
 
     return result
 
-def getMatrixTypeMap():
+allMatrixTypeNames = ("zero", "identity", "int_nz", "random")
+def getMatrixTypeAfl(nrow, ncol, chunkSize, matrixTypeName):
     # XXX TODO:
     # here are some handy input matrices. keep these until we have full
     # extensive regression tests written, using R and SciDB compare ops, for example
     # XXX TODO: better names ?
-    matrixDefs = {
-            "zero"    :"0",
-            "identity":"iif(r=c, 1, 0)",
-            "int_nz"  :"iif(r=c,1,r+c)",
-#            "1_2_3_4" :"iif(r=0, iif(c=0,1,2), iif(c=0,3,4))",
-#            "r*k+c"   :"(r-1)*2+c",
-#            "c*k+r"   :"double(r+1)+0.1*double(c+1)",
-#            "r+c+2"   :"r+c+2",
-#            "diag_1"  :"iif(r=c, iif(r=1, 3, 1), 0.0)",
-#            "diag_2"  :"iif(r=c, sqrt(2)/2, iif(r=0,sqrt(2)/2,-sqrt(2)/2))",
-#            "diag_3"  :"iif(r=c, sqrt(3)/2, iif(c=2, -0.5, 0.5))",
-#            "r/c"     :"double(r+1)/double(c+1)",
-#            "iid"     :"instanceid()",
-            "random"  :"abs(random()/2147483648.0)+1.0e-6"   # want range (0,1] approximate with [1e-6,1.000001]
-            }
-    return matrixDefs
+    buildExprs = {
+        "zero"    :"0",
+        "identity":"iif(r=c, 1, 0)",
+        "int_nz"  :"iif(r=c, 1,r+c)", # nz is symmetric, that's not a great test for gemm
+        "col" :"c",                   # helpful to debug,e.g. multiply
+        "kr_plus_c":"100*r+c",        # helpful to debug,e.g. multiply
+        "flt_1_c" :"1.0/(1+c)",       # converges to 1/6 PI**2 as c -> inf, when mult by its transpose
+        # the next is for experiments on error bounds of gemm
+        "rand_gemmx"   :"random()/2147483647.0*0.5+0.5",   #  range [.5,1.0]
+#        "iid"     :"instanceid()",
+        "random"  :"abs(random()/2147483647.0)+1.0e-6"   # want range (0,1] approximate with [1e-6,1.000001]
+                                                         # range of random() seems to be (0, 2**31-1)
+    }
 
-def getMatrixDef(matrixType):
-    matrixDefs = getMatrixTypeMap()
-    return matrixDefs[matrixType]
+    if matrixTypeName == "svdrandom":
+        randomAfl = getMatrixExpressionAfl(nrow, ncol, chunkSize, chunkSize, buildExprs["random"])
+        # we must condition the ordinary random matrix before using it for SVD tests
+        return getMatrixSvdRandomAfl(nrow, ncol, chunkSize, randomAfl);
+
+    return getMatrixExpressionAfl(nrow, ncol, chunkSize, chunkSize, buildExprs[matrixTypeName])
+
+#
+# getMatrixExpressionAfl
+#
+def getMatrixExpressionAfl(nrow, ncol, rowChunkSize, colChunkSize, expr):
+    schema= "<v:double>[r=0:%s,%s,0, c=0:%s,%s,0]" % (nrow-1, rowChunkSize, ncol-1, colChunkSize)
+    return "build(%s,%s)" % (schema, expr)
+
 
 #
 # Return a list of matrix size for a given list name
 def getMatrixOrderList(listName):
-    # useful ORDER_LISTs:
+    # useful order_LISTs:
     #
     # sizes, thoroughness
     # -------,----------
@@ -387,65 +448,74 @@ def iterateRange(rangeSpec, lastVal, opFunc):
 
 def add(v1,v2):
    return v1+v2
+
+
 def mult(v1,v2):
    return v1*v2
 
-#
-# Execute func for each/specified type of test matrix
-def iterateOverMatrixTypes(func,types=None):
-    matrixDefs = getMatrixTypeMap()
-    if types!=None:
-       for type in types:
-          if type in matrixDefs:
-             func(type, matrixDefs[type])
-          else:
-             printError("Unknown matrix type"+type)
-    else:
-       for key,value in matrixDefs.items():
-          func(key, value)
 
 def getChunkSizeList():
     return _chunkSizeList
 
 def getOrderDivisorList():
     return _divisorList
-#
-# Execute the test specified by func
-def doTest(matrixTypeName, matrixType, order, chunksize, error_limit, func):
-   try:
-      func(matrixTypeName, matrixType, order, chunksize, error_limit)
-      sys.stdout.flush()
-   except Exception, e:
-      mesg = "Testing matrix type %s, size %d, chunk_size %d, error_limit %d PASS: FALSE" % \
-          (matrixTypeName, order, chunksize, error_limit)
-      printDebug(mesg,True)
-      traceback.print_exc()
-      sys.stderr.flush()
-      printInfo(mesg)
-      printInfo("Reason: %s" % e)
 
 #
-# Run tests specified by func for all matrix sizes specified by orderList,
-def runTests(orderList, errorLimit, func, matrixTypes=None):
-   orderListFunc=getMatrixOrderList(orderList) # for checkin test
-   printDebug("Iterating over the following matrix orders:")
-   printDebug(str(orderList))
+# Execute a set of tests in the "allTests" table local to this routine.
+# The set is specified with a list of keys.  The default is to do all of them.
+#
+allTests = {
+    "SVD" : lambda mName, mType, order, chsize, errLimit: testSVD(mName, mType, order, chsize, errLimit),
+    "GEMM" : lambda mName, mType, order, chsize, errLimit: testGEMM(mName, mType, order, chsize, errLimit),
+    "MPICOPY" : lambda mName, mType, order, chsize, errLimit: testMPICopy(mName, mType, order, chsize, errLimit)
+}
 
-   chunkSizeList = getChunkSizeList()
-   printDebug("TEST CHUNK SIZES %s"% str(chunkSizeList))
+def doTest(funcName=None, func=None, matrixTypeName=None, order=None, chunkSize=None, errorLimit=None):
+    try:
+        func(matrixTypeName, getMatrixTypeAfl(order, order, chunkSize, matrixTypeName), order, chunkSize, errorLimit)
+        sys.stdout.flush()
+    except Exception, e:
+        mesg = "Exception in func %s when testing size %s, chunk_size %s, matrixType %s errorLimit %s PASS: FALSE" % \
+               (funcName, order, chunkSize, matrixTypeName, errorLimit)
+        # short message to stdout
+        printInfo(mesg)
+        printInfo("Reason: %s" % e)
+        # longer message to stderr
+        printDebugForce(mesg)
+        traceback.print_exc()
+        sys.stderr.flush()
 
-   #LOOP: matrix size (order)
-   order = orderListFunc(0)
-   while order!=0:
-      #LOOP: Chunk Size
-      chunkSizeGen = getChunkSizeGenerator(order, chunkSizeList)
-      chunkSize = chunkSizeGen(0)
-      while chunkSize!=0:
-         printDebug("TEST CHUNK SIZE %s"% str(chunkSize))
-         iterateOverMatrixTypes((lambda key,matrixType: doTest(key, matrixType, order, chunkSize, errorLimit, func)),\
-                                   matrixTypes)
-         chunkSize = chunkSizeGen(chunkSize)
-      order = orderListFunc(order)
+def iterateOverTests(sizeList, errorLimit, testNames=allTests.keys(), matrixTypeNamesIn=None):
+    assert matrixTypeNamesIn
+    for testName in testNames:
+        assert testName in allTests
+
+        if testName != "SVD":
+            matrixTypeNames = matrixTypeNamesIn
+        else:
+            # test "SVD" uses matrixType "svdrandom" instead of "random"
+            matrixTypeNames = [ name if name != "random" else "svdrandom"
+                                for name in matrixTypeNamesIn ]
+
+        orderListFunc = getMatrixOrderList(sizeList)
+        printDebug("Iterating over the following matrix orders: " + str(sizeList))
+        chunkSizeList = getChunkSizeList()
+        printDebug("And the following chunk sizes: %s"% str(chunkSizeList))
+    
+        # for matrix size (order)
+        order = orderListFunc(0)  # FIXME non-Pythonic generator use
+        while order!=0:
+            # for chunk Size
+            chunkSizeGen = getChunkSizeGenerator(order, chunkSizeList)
+            chunkSize = chunkSizeGen(0)   # FIXME non-Pythonic generator use
+            while chunkSize!=0:
+                printDebug("TESTING order %s @ CHUNK SIZE %s" % (order, chunkSize,))
+                for matrixTypeName in matrixTypeNames:
+                    doTest(funcName=testName, func=allTests[testName], matrixTypeName=matrixTypeName,
+                           order=order, chunkSize=chunkSize, errorLimit=errorLimit)
+                chunkSize = chunkSizeGen(chunkSize)
+            order = orderListFunc(order)
+
 
 # Generate a diagonal matrix from the vector vector and store in the array called result
 def generateDiagonal(vector,result):
@@ -453,7 +523,7 @@ def generateDiagonal(vector,result):
 
    # get length of vector
    dims = getDims(vector)
-   cols = dims[0]
+   ncol = dims[0]
 
    intervalAfl = "project(dimensions(%s),chunk_interval)" % vector
    (ret,chunkInterval) = aflResult(intervalAfl)
@@ -474,8 +544,8 @@ def generateDiagonal(vector,result):
    #
 
    VEC_1="VEC_1"
-   createMatrix(VEC_1,1,cols,1,chunkSize)
-   populateMatrix(VEC_1, "1") #matrix of ones
+   createMatrix(VEC_1, 1, ncol, rowChunkSize=1, colChunkSize=chunkSize) # 
+   populateMatrix(VEC_1, getMatrixExpressionAfl(1, ncol, rowChunkSize=1, colChunkSize=chunkSize, expr="1")) #matrix of ones
 
    if False:
       printDebug("debug diag transpose(adddim(%s)) @@@@@@@@@@@@@@@@" % vector)
@@ -487,9 +557,8 @@ def generateDiagonal(vector,result):
       afl("show(%s)" % VEC_1)
 
    OUTER_PRODUCT="OUTER_PRODUCT"
-   outerProductAfl="multiply(transpose(adddim(%s,c)),%s)" % (vector,VEC_1)
-   eliminate(OUTER_PRODUCT)
-   store(outerProductAfl,OUTER_PRODUCT)
+   outerProductAfl="multiply(transpose(adddim(%s, c)),%s)" % (vector, VEC_1)
+   eliminateAndStore(outerProductAfl, OUTER_PRODUCT)
 
    # then we just use iif to set off-diagonal values to 0
    #
@@ -498,45 +567,57 @@ def generateDiagonal(vector,result):
    # -> [ 0 b 0 ] which is our result
    #    [ 0 0 c ]
    resultAfl = "project(apply(%s,s,iif(i=c,multiply,0.0)),s)" % (OUTER_PRODUCT)
-   eliminate(result)
-   store(resultAfl,result)
+   eliminateAndStore(resultAfl,result)
 
 #
 # Frobenius norm of a matrix
-def norm(MATRIX, attr, attr_norm, MAT_NORM=None):
-    printDebug("Computing norm(%s)"%MATRIX)
+def norm(MAT_AFL, attr, attr_norm, MAT_NORM=None):
+    printDebug("Computing norm(%s)"%MAT_AFL)
 
     normAfl="project(apply(sum(project(apply(%s,square,%s*%s),square)), %s, sqrt(square_sum)), %s)" % \
-        (MATRIX,attr,attr,attr_norm,attr_norm)
+        (MAT_AFL,attr,attr,attr_norm,attr_norm)
 
     if MAT_NORM != None:
-       eliminate(MAT_NORM)
-       store(normAfl,MAT_NORM)
+       eliminateAndStore(normAfl,MAT_NORM)
     return normAfl
 
+
+from sys import float_info
+def getULP():
+    # in a perfect world, these should come from the target machine, which may not be where
+    # this program is running
+    # This is good enough for now
+    float_base = 2                          # sue me for not being more general than that
+    ULP =  float_info.epsilon * float_base # Units in the Last Place = epsilon * machine base, for ScaLAPACK
+                                            # see ScaLAPACK pdlamch_(context, 'P')
+    return ULP
+
 #
-# Scale (i.e. multiply) the singular values in MATRIX by 1/LSB/order
-def scaleError(order, MATRIX, nelsb, ebpc, MAT_ERROR):
-   # 2^55= 36028797018963968 ~= reciprocal of 1 LSB
-   errorAfl="project(apply(%s,%s,%s/%d*36028797018963968.0),%s)" % (MATRIX,ebpc,nelsb,order,ebpc)
-   if MAT_ERROR != None:
-      eliminate(MAT_ERROR)
-      store(errorAfl,MAT_ERROR)
-   return errorAfl
+# Scale matrix values by double_epsilon / order
+#
+def scaleToULPs(MAT_AFL, rms_error_normed, order, rms_ulp_error, MAT_ERROR):
+    ULP_reciprocal = 1.0/getULP()
+    errULPsAfl=("project(apply(%s,%s,%s*%s/%d),%s)" %
+                (MAT_AFL, rms_ulp_error, rms_error_normed, ULP_reciprocal, order, rms_ulp_error))
+    # note: dividing by the order here is a cheat because the error in ULPs
+    #       with order, when I thought it should not.
+    # TODO: study and fix that
 
-def divMat(MAT_1, attr_1, MAT_2, attr_2, attr_res, MAT_RES=None):
-   divAfl = "project(apply(join(%s,%s),%s,%s/%s), %s)" % (MAT_1, MAT_2, attr_res, attr_1, attr_2, attr_res)
-   if MAT_RES != None:
-      eliminate(MAT_RES)
-      store(divAfl,MAT_RES)
-   return divAfl
+    if MAT_ERROR != None:
+        eliminateAndStore(errULPsAfl,MAT_ERROR)
+    return errULPsAfl
 
-def addMat(MAT_1, attr_1, MAT_2, attr_2, attr_res, MAT_RES=None):
-   divAfl = "project(apply(join(%s,%s),%s,%s+%s), %s)" % (MAT_1, MAT_2, attr_res, attr_1, attr_2, attr_res)
+def divMat(MAT_1, attr_1, MAT_2, attr_2, attr_result, MAT_RES=None):
+   scaledAfl = "project(apply(join(%s,%s),%s,%s/%s), %s)" % (MAT_1, MAT_2, attr_result, attr_1, attr_2, attr_result)
    if MAT_RES != None:
-      eliminate(MAT_RES)
-      store(divAfl,MAT_RES)
-   return divAfl
+      eliminateAndStore(scaledAfl,MAT_RES)
+   return scaledAfl
+
+def addMat(MAT_1, attr_1, MAT_2, attr_2, attr_result, MAT_RES=None):
+   sumAfl = "project(apply(join(%s,%s),%s,%s+%s), %s)" % (MAT_1, MAT_2, attr_result, attr_1, attr_2, attr_result)
+   if MAT_RES != None:
+      eliminateAndStore(sumAfl,MAT_RES)
+   return sumAfl
 
 def getDims(M):
    dimsAfl="project(dimensions(%s),length)" % M
@@ -547,43 +628,221 @@ def getDims(M):
    results = string.split(lengths)
    return map((lambda v: int(v)), results[1:])
 
+#
+# a class to use with the "with" statement that
+# collects the time on entering and exiting a
+# block of code.
+# Time is wall-clock time, unlike time.clock() which is actualy accumulated cpu time, not a wall-clock.
+#
+class TimerRealTime():
+    def __enter__(self):     self.start = time.time() ; return self
+    def __exit__(self, *args): self.end = time.time() ; self.interval = self.end - self.start
 
+        
 # Compute residual measures: (MAT_1-MAT_2)
-def computeResidualMeasures(MAT_1, attr_1, MAT_2, attr_2, attr_res, MAT_RES=None):
+def computeResidualMeasures(MAT_1, attr_1, MAT_2, attr_2, attr_result_residual, MAT_RES=None):
     printDebug("computeResidualMeasures start")
     printDebug("MAT_1 is %s" % MAT_1)
     printDebug("attr_1 is %s" % attr_1)
     printDebug("MAT_2 is %s"  % MAT_2)
     printDebug("attr_2 is %s" % attr_2)
-    printDebug("attr_res is %s" % attr_res)
+    printDebug("attr_result_residual is %s" % attr_result_residual)
     printDebug("MAT_RES is %s" % MAT_RES)
 
-    diffAfl = "apply(join(%s,%s),%s,(%s-%s))" % (MAT_1, MAT_2, attr_res, attr_1, attr_2)
+    residualAfl = "apply(join(%s,%s),%s,(%s-%s))" % (MAT_1, MAT_2, attr_result_residual, attr_1, attr_2)
 
     if MAT_RES != None:
        printDebug("computeResidualMeasures output is in array %s" % MAT_RES)
-       eliminate(MAT_RES)
-       store(diffAfl, MAT_RES)
+       eliminateAndStore(residualAfl, MAT_RES)
     printDebug("computeResidualMeasures finish")
-    return diffAfl
+    return residualAfl
 
-# Print TRUE (or FALSE) to stdout if the RMS_EBPC values in RMS_ERROR are "less than" ERROR_LIMIT
-# where "less than" is the default compareOp 
-def testForError(testName, RMS_ERROR, RMS_EBPC, ERROR_LIMIT, compareOp="<"):
-   passTestAfl = "apply(%s,PASS,%s%s%d)" % (RMS_ERROR,RMS_EBPC,compareOp,ERROR_LIMIT)
-   (ret,res)=aflResult(passTestAfl)
-   vals = string.split(res)[1]
-   pair = string.split(vals,',')
-   if _DBG:
-      afl(passTestAfl)
-   printDebug("%s PASS (error(%s) %s limit(%d)): %s" % \
-                (testName,pair[0],compareOp,ERROR_LIMIT, str.upper(pair[1])), True)
-   printInfo("%s PASS : %s" % \
-                (testName,str.upper(pair[1])))
+# Compute the maximum with its position (by crossing with its position first):
+def findMax(MAT, attr, attr_max_tmp="attr_max_tmp"):
+    printDebug("findMax start")
+    printDebug("MAT is %s" % MAT)
+    printDebug("attr is %s" % attr)
+    printDebug("attr_max_tmp is %s" % attr_max_tmp)
 
-# Compute  norm( INPUT - U S VT ) / [ norm(INPUT) order ulp ]
-# order = max(M,N)
-def doSvdMetric1(NROW,NCOL,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERROR, EBPC, func):
+    findMaxAlf = ("filter(cross(%s,aggregate(%s, max(%s) as %s)),%s = %s)" %
+                        (MAT, MAT, attr, attr_max_tmp, attr, attr_max_tmp))
+
+    printDebug("findMax finish")
+    return findMaxAlf
+
+
+# WARNING: ripped off from testForError for debug purposes
+#          check with Tigor as to whether it can be factored
+# return TRUE (or FALSE) if the ATTR_ERROR_METRIC values in ARRAY_RMS_ERROR are within errorLimit
+# WARNING: as a dbg routine, it computes its answer immediately, it does not return
+#          a query string like testForError does
+def dbgGetErrorMetric(testName, ARRAY_RMS_ERROR, attr_error_metric, errorLimit):
+    passTestAfl = "apply(%s,PASS,%s <= %d)" % (ARRAY_RMS_ERROR, attr_error_metric, errorLimit)
+    if _DBG:
+        printDebugForce("DEBUG dbgGetErrorMetric")
+        aflStderr(passTestAfl)
+    
+    (ret,result)=aflResult(passTestAfl)
+    firstLine = string.split(result)[1]  # split on newline, take first line
+    vals = string.split(firstLine,',')   # split on commas
+    return float(vals[0])                # vals[0] is error metric
+
+# Print TRUE (or FALSE) to stdout if the attr_error_metric values in ARRAY_RMS_ERROR are within errorLimit
+def testForError(testName, ARRAY_RMS_ERROR, attr_error_metric, errorLimit):
+     passTestAfl = "apply(%s,PASS,%s <= %d)" % (ARRAY_RMS_ERROR,attr_error_metric,errorLimit)
+     (ret,result)=aflResult(passTestAfl)
+     firstLine = string.split(result)[1]  # split on newline, take first line
+     vals = string.split(firstLine,',')   # successive values in csv row separated by "," ?
+     errorMetric = float(vals[0])         # vals[0] is error metric
+     success =           vals[1]          # vals[1] is "true" or "false"
+
+     if _DBG:
+          aflStderr(passTestAfl)
+     printDebugForce("%s PASS (error(%s) <= limit(%d)): %s" % \
+                      (testName,errorMetric,errorLimit, str.upper(success)))
+     printInfo("%s PASS : %s" % \
+                (testName,str.upper(success))) # why do we convert to upper case?
+
+     hasError = not (errorMetric <= errorLimit)
+     return hasError
+
+   
+def doSvdSanityCount(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_which):
+    printDebug("doSvdSanityCount start")
+
+    # calculate array - apply(array, val * 1), since that appears to be messed up in some cases,
+    # at least after the long apply chain in doSvdMetric1
+    outOfRangeAfl = "filter(%s, %s > 1.0)"  % (MAT_WHICH, attr_which)
+    passTestAfl = "apply(count(%s),PASS,count = 0)" % (outOfRangeAfl)
+
+    # following copied/hacked form testForError
+    (ret,result)=aflResult(passTestAfl)
+    firstLine = string.split(result)[1]     # lines
+    vals = string.split(firstLine,',')   # successive values in csv row separated by "," ?
+    count = int(vals[0])
+    success =   vals[1]
+
+    msgPrefix="doSvdSanityCount %s %s %s" %(nrow, MAT_WHICH, attr_which)
+    if(count > 0):
+        msgPrefix = msgPrefix + " FAIL"
+
+    printDebugForce("%s PASS? (count %s %s limit(%d)): %s" % \
+                 (msgPrefix, count, "=" , 0, str.upper(success)))
+    printInfo("%s PASS? : %s" % \
+                 (msgPrefix, str.upper(success)))
+
+    if(count > 0):
+        msgPrefix = msgPrefix + " FAIL"
+        printDebugForce("%s count %d failing cells" % (msgPrefix, count))
+        printDebugForce("%s failing query: %s" % (msgPrefix, outOfRangeAfl))
+        aflStderr(outOfRangeAfl, format="-odcsv")
+        printDebugForce("%s end of query output")
+
+        extraApplyAfl = "apply(filter(%s, %s > 1.0), copy, %s)"  % (MAT_WHICH, attr_which, attr_which)
+        printDebugForce("%s now apply value to itself, to see if will print differently" % (msgPrefix,))
+        printDebugForce("%s query: %s" % (msgPrefix, extraApplyAfl))
+        aflStderr(extraApplyAfl, format="-odcsv") 
+        printDebugForce("%s end of query output")
+
+        showAfl = "show(%s)"  % (MAT_WHICH)
+        printDebugForce("%s query: %s" % (msgPrefix, showAfl))
+        aflStderr(showAfl, format="-odcsv")
+        printDebugForce("%s end of query output")
+
+        applyAfl = "apply(%s, copy, %s)"  % (MAT_WHICH, attr_which)
+        printDebugForce("%s query: %s" % (msgPrefix, applyAfl))
+        aflStderr(applyAfl, format="-odcsv") 
+        printDebugForce("%s end of query output")
+
+        return False
+
+    return True
+
+
+ 
+def doSvdSanityApply(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_which):
+    printDebug("doSvdSanityApply start")
+
+    # calculate array - apply(array, val * 1), since that appears to be messed up in some cases,
+    # at least after the long apply chain in doSvdMetric1
+    badApplyAfl = "filter(apply(%s, times1, %s * 1), %s != %s)"  % (MAT_WHICH, attr_which, attr_which, "times1")
+    passTestAfl = "apply(count(%s),PASS,count = 0)" % (badApplyAfl)
+    # following copied/hacked form testForError
+    (ret,result)=aflResult(passTestAfl)
+    vals = string.split(result)[1]     # lines?
+    pair = string.split(vals,',')   # successive values in csv row separated by "," ?
+    count = int(pair[0])
+    success = pair[1]
+
+    msgPrefix="doSvdSanityApply %s %s %s" %(nrow, MAT_WHICH, attr_which)
+    if(count > 0):
+        msgPrefix = msgPrefix + " FAIL"
+
+    printDebugForce("%s PASS? (count %s %s limit(%d)): %s" % \
+                    (msgPrefix, count, "=" , 0, str.upper(success)))
+    printInfo("%s PASS? : %s" % \
+                 (msgPrefix, str.upper(success)))
+    
+    if count > 0 :
+        printDebugForce("%s count %d failing cells" % (msgPrefix, count))
+        printDebugForce("%s failing query, results on next line: %s" % (msgPrefix, badApplyAfl))
+        aflStderr(badApplyAfl)
+        printDebugForce("%s end of query output")
+        return False
+
+    return True
+
+#
+# for SvdMetric1 to pass, a matrix of random entries must still have singular values that
+# are not too close together, else the scalapack algorithm for GESVD will fail to be accurate.
+# So we do what the ScaLAPACK test suite does: we create a matrix that is conditioned to have
+# well-space singular values
+# We do this by taking a random matrix, and obtaining U and VT, discarding the singular values.
+# We then re-multiply the three, and return this as the test matrix.
+#
+def getMatrixSvdRandomAfl(nrow, ncol, chunkSize, randomAfl):
+    leftAfl = "gesvd(%s, 'left')" % (randomAfl)
+    rightAfl = "gesvd(%s, 'right')" % (randomAfl)
+    # Note: its fine if randomAfl is a new matrix on each invocation, rather than an array
+    # By not storing and reading the random vals, its probably faster, too
+
+    # see scalapack/TESTING/EIG/pdsvdtst.f @ line 417
+    # which is the rule by which we compute these singular values
+    # capitals in this next section are the same as variables in the FORTRAN code
+    ULP = getULP()
+    SIZE = min(nrow, ncol)
+
+    # In theory, ScaLAPACK and LAPACK should both be able to do matrices that are as nearly rank-deficient
+    # as this would be (the last singular value will be 1 ULP)
+    # But when we run this on 64 instances, 2% of the time, we get good singular values, but we
+    # get U and VT matrices where the one norm (sum of the column) is, e.g. > 17, where it should be ==1
+    # if the matrices are pure rotation/reflection (change of basis, no scale) only.
+    # So where normally, the numerator of H, below, would be (ULP-1.0),
+    # we are going to use some (K*ULP-1.0), K > 1, to make it easier
+    # K = 2**24 successful 256 - 780
+    # K = 2**20 successful 256 - 890
+    # K = 2**18 2 failures from 256 - 829
+    # K = 2**16 2 failures from 256 - 700
+    # K = 16    dozen failures from 256 - 1024
+    K = 2**19 # 2**19 successful on every order between 1 - 1024
+    if SIZE > 1: # avoid div-by-zero
+        H = (K*ULP - 1.0) / (SIZE - 1.0)
+        diagExpr = "1.0 + r * %s" % (H,)
+    else:
+        diagExpr = "1.0"
+
+    evenSpacedDiagAfl = getMatrixExpressionAfl(nrow, ncol, chunkSize, chunkSize, "iif(r=c, %s, 0)" % (diagExpr,))
+
+    zerosAfl = "build(%s,0)" % (getMatrixSchema(nrow, ncol, chunkSize, chunkSize),)
+    gemmAfl = "gemm(%s, gemm(%s,%s,%s),%s)" % (leftAfl, evenSpacedDiagAfl, rightAfl, zerosAfl, zerosAfl)
+    productAfl = "attribute_rename(%s, gemm, v)" % (gemmAfl,)
+
+    return productAfl
+
+
+def doSvdMetric1(nrow, ncol, chunkSize, MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERROR, rms_ulp_error, errorLimit, func,
+                 debugOnError=True, numAttempts=1):
+    assert(MAT_ERROR != None)  # this thing is getting way too messy with the deferred processing
     printDebug("doSvdMetric1 start")
     printDebug("MAT_INPUT is %s" % MAT_INPUT)
     printDebug("VEC_S is %s"  % VEC_S)
@@ -597,95 +856,141 @@ def doSvdMetric1(NROW,NCOL,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERROR, EBPC, fun
     METRIC_TMP_DIAG_SS="METRIC_TMP_DIAG_SS"
     generateDiagonal(VEC_S, METRIC_TMP_DIAG_SS)
     if _DBG:
-       printDebug("%s:"%METRIC_TMP_DIAG_SS)
-       afl("show(%s)"%METRIC_TMP_DIAG_SS)
+        printDebugForce("%s:"%METRIC_TMP_DIAG_SS)
+        aflStderr("show(%s)"%METRIC_TMP_DIAG_SS)
 
-    inverseSVDAfl = "multiply(%s,multiply(%s,%s))" % (MAT_U,METRIC_TMP_DIAG_SS,MAT_VT)
+    #productSVDAfl = "multiply(%s,multiply(%s,%s))" % (MAT_U, METRIC_TMP_DIAG_SS, MAT_VT,)
+    zerosAfl = "build(%s,0)" % (getMatrixSchema(nrow, ncol, chunkSize, chunkSize),)
+    productSVDAfl = "gemm(%s, gemm(%s,%s,%s),%s)" % (MAT_U, METRIC_TMP_DIAG_SS, MAT_VT, zerosAfl, zerosAfl)
 
-    # difference of |original| and the |product of the svd matrices|
-    diffAfl = computeResidualMeasures(MAT_INPUT, "v", inverseSVDAfl, "multiply", "res_measure")
+    # difference of original and the product of the svd matrices
+    residualAfl = computeResidualMeasures(MAT_INPUT, "v", productSVDAfl, "gemm", "resid")
 
     inputNormAfl = norm(MAT_INPUT, "v", "input_norm")
+    residualNormAfl = norm(residualAfl, "resid", "resid_norm")
 
-    residualNormAfl = norm(diffAfl, "res_measure", "res_norm")
+    residNormScaledAfl = func(residualNormAfl, "resid_norm", inputNormAfl, "input_norm", "resid_norm_scaled")
+    if _DBG:
+        printDebugForce("DEBUG doSvdMetric1 residNormScaledAfl")
+        aflStderr(residNormScaledAfl)
 
-    divAfl = func(residualNormAfl, "res_norm", inputNormAfl, "input_norm", "res_error")
-
-    order = max(NROW, NCOL)
-    errAfl = scaleError(order, divAfl, "res_error", EBPC, MAT_ERROR)
-
+    order = max(nrow, ncol)
+    scaleToULPs(residNormScaledAfl, "resid_norm_scaled", order, rms_ulp_error, MAT_ERROR)
     printDebug("doSvdMetric1 output is in array %s" % MAT_ERROR)
+    errorMetric = dbgGetErrorMetric("SVD_METRIC_1", MAT_ERROR, rms_ulp_error, errorLimit)
+
+    if debugOnError:
+        hasError = not (errorMetric <= errorLimit)
+        if hasError:
+            printDebugForce("doSvdMetric1 I. SVD Error %s exceeds %s @ size %s x %s " % (errorMetric, errorLimit, nrow, ncol))
+
+            # find the arrays
+            absResidualAfl= "apply(%s, %s, abs(%s))" % (residualAfl, "abs_residual", "resid")
+            findMaxAfl = findMax(absResidualAfl, "abs_residual")
+            aflStderr(findMaxAfl)
+
+            aflStderr("max(%s)" % MAT_INPUT, format="-odcsv")
+            aflStderr("min(%s)" % MAT_INPUT, format="-odcsv")
+
+            printDebugForce("doSvdMetric1 result S %s" % VEC_S)
+            aflStderr("max(%s)" % VEC_S, format="-ocsv")
+            aflStderr("min(%s)" % VEC_S, format="-ocsv")
+            # Kappa, the condtion number of the matrix,
+            # when using the L sub_2 norm, is max / min
+            # change this to aflResult, and grab the max and min
+            # and if not zero, then divide them
+            # then print that as the condition number
+
+            printDebugForce("doSvdMetric1 result U %s" % MAT_U)
+            aflStderr("max(%s)" % MAT_U, format="-odcsv")
+            aflStderr("min(%s)" % MAT_U, format="-odcsv")
+
+            printDebugForce("doSvdMetric1 result VT %s" % MAT_VT)
+            aflStderr("max(%s)" % MAT_VT, format="-odcsv")
+            aflStderr("min(%s)" % MAT_VT, format="-odcsv")
+
+            printDebugForce("doSvdMetric1 II. SVD Error %s exceeds %s @ size %s x %s " % (errorMetric, errorLimit, nrow, ncol))
+            MAX_ATTEMPTS=1 # increase this if you think it might be a spurious calculation error
+            if (numAttempts < MAX_ATTEMPTS):
+                # this will compute the residual error one more time, in case its just  problem in error computation
+                printDebugForce("doSvdMetric1 trying the check a second time")
+                errorMetric2 = doSvdMetric1(nrow, ncol, chunkSize, MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERROR, rms_ulp_error, errorLimit, func, numAttempts=numAttempts+1)
+                if (errorMetric != errorMetric2):
+                    printDebugForce("doSvdMetric1 non-repeatable computation: errorMetric %s != errorMetric2 %s", (errorMetric, errorMetric2))
+            else:
+                printDebugForce("doSvdMetric1 III. end analysis after %s attempts to calculate the metric "% numAttempts)
+
     printDebug("doSvdMetric1 finish")
-    return errAfl
+    return errorMetric  #  !!!! NOTE!!!! does not return afl
 
 # Compute norm(I - Ut*U) / [ M ulp ]
-# M=NROW
-def doSvdMetric2(MAT_U, NROW, CHUNKSIZE, MAT_ERROR, EBPC):
+# M=nrow
+def doSvdMetric2(MAT_U, nrow, chunkSize, MAT_ERROR, rms_ulp_error):
     printDebug("doSvdMetric2 start")
     printDebug("MAT_U is %s"  % MAT_U)
-    printDebug("NROW is %d"  % NROW)
+    printDebug("nrow is %d"  % nrow)
     printDebug("MAT_ERROR is %s"% MAT_ERROR)
-    printDebug("EBPC is %s"% EBPC)
+    printDebug("rms_ulp_error is %s"% rms_ulp_error)
 
     I="IDENTITY"
-    createMatrix(I, NROW, NROW, CHUNKSIZE, CHUNKSIZE)
-    populateMatrix(I,getMatrixDef("identity"))
+    createMatrix(I, nrow, nrow, chunkSize, chunkSize)
+    populateMatrix(I, getMatrixTypeAfl(nrow, nrow, chunkSize, "identity"))
 
     UTxUAfl = "multiply(transpose(%s),%s)" % (MAT_U,MAT_U)
 
-    diffAfl = computeResidualMeasures(I, "v", UTxUAfl, "multiply", "res_measure")
+    residualAfl = computeResidualMeasures(I, "v", UTxUAfl, "multiply", "resid")
 
-    residualNormAfl = norm(diffAfl, "res_measure", "res_norm")
+    residualNormAfl = norm(residualAfl, "resid", "resid_norm")
 
-    errAfl = scaleError(NROW, residualNormAfl, "res_norm", EBPC, MAT_ERROR)
+    errULPsAfl = scaleToULPs(residualNormAfl, "resid_norm", nrow, rms_ulp_error, MAT_ERROR)
 
     printDebug("doSvdMetric2 output is in array %s" % MAT_ERROR)
     printDebug("doSvdMetric2 finish")
-    return errAfl
+    return errULPsAfl
 
 # Compute norm(I - VT*VTt) / [ N ulp ]
-# N=NCOL
-def doSvdMetric3(MAT_VT, NCOL, CHUNKSIZE, MAT_ERROR, EBPC):
+# N=ncol
+def doSvdMetric3(MAT_VT, ncol, chunkSize, MAT_ERROR, rms_ulp_error):
     printDebug("doSvdMetric3 start")
     printDebug("MAT_VT is %s"  % MAT_VT)
-    printDebug("NCOL is %d"  % NCOL)
+    printDebug("ncol is %d"  % ncol)
     printDebug("MAT_ERROR is %s"% MAT_ERROR)
-    printDebug("EBPC is %s"% EBPC)
+    printDebug("rms_ulp_error is %s"% rms_ulp_error)
 
     I="IDENTITY"
-    createMatrix(I, NCOL, NCOL, CHUNKSIZE, CHUNKSIZE)
-    populateMatrix(I,getMatrixDef("identity"))
+    createMatrix(I, ncol, ncol, chunkSize, chunkSize)
+    populateMatrix(I, getMatrixTypeAfl(ncol, ncol, chunkSize, "identity"))
 
     VTTxVTAfl = "multiply(%s, transpose(%s))" % (MAT_VT,MAT_VT)
 
-    diffAfl = computeResidualMeasures(I, "v", VTTxVTAfl, "multiply", "res_measure")
+    residualAfl = computeResidualMeasures(I, "v", VTTxVTAfl, "multiply", "resid")
 
-    residualNormAfl = norm(diffAfl, "res_measure", "res_norm")
+    residualNormAfl = norm(residualAfl, "resid", "resid_norm")
 
-    errAfl = scaleError(NCOL, residualNormAfl, "res_norm", EBPC, MAT_ERROR)
+    errULPsAfl = scaleToULPs(residualNormAfl, "resid_norm", ncol, rms_ulp_error, MAT_ERROR)
 
     printDebug("doSvdMetric3 output is in array %s" % MAT_ERROR)
     printDebug("doSvdMetric3 finish")
-    return errAfl
+    return errULPsAfl
 
-def doSvdMetric4(NROW, VEC_S, MAT_ERROR, EBPC):
+def doSvdMetric4(nrow, VEC_S, MAT_ERROR, rms_ulp_error):
    printDebug("doSvdMetric4 start")
    printDebug("VEC_S is %s"  % VEC_S)
    printDebug("MAT_ERROR is %s"% MAT_ERROR)
-   printDebug("NROW is %d"  % NROW)
+   printDebug("nrow is %d"  % nrow)
 
    if _DBG:
       printDebug("doSvdMetric4 VEC_S: ")
       afl("show(%s)"%VEC_S)
       afl("scan(%s)"%VEC_S)
 
-   cols = NROW
+   cols = nrow
    if _DBG:
       # get length of vector
       dims = getDims(VEC_S)
       cols = dims[0]
-      if cols != NROW:
-         raise Exception("Mismatched dimensions: %d != %d" % (cols,NROW))
+      if cols != nrow:
+         raise Exception("Mismatched dimensions: %d != %d" % (cols,nrow))
 
    # make sure the singular values, sigma, (in S) are strictly decreasing
    # TODO: we should note why we do this with joining the shift, rather than sorting and comparing for equality
@@ -694,11 +999,10 @@ def doSvdMetric4(NROW, VEC_S, MAT_ERROR, EBPC):
                            sum(apply(join (subarray(%s, 0, (%d-2)) as L, \
                                            subarray(%s, 1, (%d-1)) as R), \
                                BLAH, iif(L.sigma<R.sigma, 1, 0) ), BLAH), \
-                         %s, BLAH_sum), %s)" %  (VEC_S, cols, VEC_S, cols, EBPC, EBPC)
+                         %s, BLAH_sum), %s)" %  (VEC_S, cols, VEC_S, cols, rms_ulp_error, rms_ulp_error)
 
    if MAT_ERROR != None:
-      eliminate(MAT_ERROR)
-      store(compareAfl, MAT_ERROR)
+      eliminateAndStore(compareAfl, MAT_ERROR)
 
    printDebug("doSvdMetric4 output is in array %s" % MAT_ERROR)
    printDebug("doSvdMetric4 finish")
@@ -707,15 +1011,10 @@ def doSvdMetric4(NROW, VEC_S, MAT_ERROR, EBPC):
 #
 # Test the SVD operator.
 # Implements an appropriate interface to be used by iterateOverTests()
-def testSVD(matrixTypeName, matrixTypeDef, ORDER, CHUNKSIZE, ERROR_LIMIT):
-###################
-# Notes from James:
-# Though I get tests 1-4 right away (and so commented what they are below, I don't get the metrics in 5-9 right away...
-# I would understand if they were, e.g. U1 dot U2, (checking orthogonality of singular vectors) but I don't get U1 minus U2.
-# --> Bryan may recognize right away what 5-9 are for more quickly than I will.
-
-# Anyway, this will give you an idea of how we could run these tests at very large sizes in reasonable amounts of time.
-
+# does some careful numerical tests on the quality of the SVD generated from conditioned random matrices
+def testSVD(matrixTypeName, AFL_INPUT, order, chunkSize, errorLimit):
+#
+# Reference: http://www.netlib.org/scalapack/lawn93/node45.html
 # Let A be an matrix of size M,N and SVD(A) -> U, S, VT
 # Let I be the identity matrix
 # Let ulp be the machine precision (stands for unit of least precision, also called machine epsilon or epsilon-sub-m)
@@ -723,211 +1022,303 @@ def testSVD(matrixTypeName, matrixTypeDef, ORDER, CHUNKSIZE, ERROR_LIMIT):
 
 # The 9 metrics are:
 
-#     Product of factors: norm( A - U S VT ) / [ norm(A) max(M,N) ulp ]
-#     Check length of the singular vectors: norm(I - Ui' Ui) / [ M ulp ]
-#     ..... Similarly for VT, N
-#     Check that S contains requested number of values in decreasing order
-#     norm(S1 - S2) / [ SIZE ulp |S| ]
-#     norm(U1 - U2) / [ M ulp ]
-#     norm(S1 - S3) / [ SIZE ulp |S| ]
-#     norm(VT1-VT3) / [ N ulp ]
-#     norm(S1 - S4) / [ SIZE ulp |S|  ]
+#     1. Product of factors: norm( A - U S VT ) / [ norm(A) max(M,N) ulp ]
+#     2. Check length of the singular vectors: norm(I - Ui' Ui) / [ M ulp ]
+#     3. Similarl to (2) but for VT, N
+#     4. Check that S contains requested number of values in decreasing order
+#     5. norm(S1 - S2) / [ SIZE ulp |S| ]
+#     6. norm(U1 - U2) / [ M ulp ]
+#     7. norm(S1 - S3) / [ SIZE ulp |S| ]
+#     8. norm(VT1-VT3) / [ N ulp ]
+#     9. norm(S1 - S4) / [ SIZE ulp |S|  ]
 
 # The test matrices are of 6 types:
 
-#     0 matrix
-#     I (identity)
-#     diag(1, ...., ULP) "evenly spaced"
-#     U*D*VT where U,VT are orthogonal and D is "evenly spaced" as in 3
-#     matrix of 4, multiplied by the sqrt of the overflow threshold   (larger values)
-#     matrix of 4, multiplied by the sqrt of the underflow threshold (smaller values
+#     1. 0 matrix
+#     2. I (identity)
+#     3. diag(1, ...., ULP) "evenly spaced"
+#     4. U*D*VT where U,VT are orthogonal and D is "evenly spaced" as in 3
+#     5. matrix of 4, multiplied by the sqrt of the overflow threshold   (larger values)
+#     6. matrix of 4, multiplied by the sqrt of the underflow threshold (smaller values
 
+    nrow=order
+    if order>1:
+        orderList=[order-1, order, order+1]
+    else:
+        orderList=[order, order+1]
+    orderList=[order] # XXX: make a (order, order) matrix for now
+    for ncol in orderList:
+        testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit)
 
-# From this we can see that these can efficiently constructed from the following:
-
-#     norm of matrix  -- exists in SciDB, IIRC, it was not super-fast
-#     norm of matrix difference -- "SSVD norm" is very close to what is wanted here
-#     multiplication of a few scalars ... apply will be fine
-#     array(scalar) ... direct construction of run-lengths might be appropriate
-#     diagonal(vector) .... matrix from vector -- doSvdL.sh does this inefficiently
-#     matrix multiplication ... we will have this soon.
-
-# Don't yet know how the U and VT for test matrix 4 is synthesized yet ... we can get to that later
-# Ref: http://www.netlib.org/scalapack/lawn93/node45.html
-###################
-  
-   NROW=ORDER
-   if ORDER>1:
-      orderList=[ORDER-1, ORDER, ORDER+1]
-   else:
-      orderList=[ORDER, ORDER+1]
-   orderList=[ORDER] # XXX: make a (ORDER, ORDER) matrix for now
-   for NCOL in orderList:
-      testSVDByDim(matrixTypeName, matrixTypeDef, NROW, NCOL, CHUNKSIZE, ERROR_LIMIT)
 
 #
-# XXX
-def testSVDByDim(matrixTypeName, matrixTypeDef, NROW, NCOL, CHUNKSIZE, ERROR_LIMIT):
-   # want to use "nafl" from iqfuncs.bash, but haven't resolved quoting problems yet
-   INPUT="INPUT"
-   createMatrix(INPUT, NROW, NCOL, CHUNKSIZE, CHUNKSIZE)
+# testSVDByDim
+# this contains the test for a given dimension and chunkSize of matrix
+#
+# this routine may seem a bit long, but that is because when a test metric fails,
+# it is this code that has been pressed upon to help debug what has gone wrong.
+# After we resolve more issues with the nature of the AFL_INPUT which contains the
+# input test matrix, we will probably be able to reduce the amount of code
+# in this function considerably.
+def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
+    # want to use "nafl" from iqfuncs.bash, but haven't resolved quoting problems yet
+    INPUT="TMP_SVD_BY_DIM_INPUT"
 
-   if False:
-      # don't bother saving and running SvdMetric,
-      # plain svd is too slow to compare to anyway
-      populateMatrix(INPUT,getMatrixDef("random"))
+    resultMesg = " matrix type %s, RxC %dx%d, chunk_size %d, error_limit %d" % \
+                 (matrixTypeName, nrow,ncol, chunkSize, errorLimit)
 
-      printDebug("Computing [only] the SVD matrices")
+    if False:
+        printDebug("Computing [only] the SVD matrices")
+        nafl("gesvd(%s,'values')" % AFL_INPUT)
+        nafl("gesvd(%s,'left')" % AFL_INPUT)
+        nafl("gesvd(%s,'right')" % AFL_INPUT)
+    else:
+        eliminateAndStore(AFL_INPUT, INPUT)
+        printDebug("Generating SVD matrices, S, U, VT")
+        
+        S="S"
+        SAfl = "gesvd(%s,'values')" % INPUT
+        eliminate(S)
+        with TimerRealTime() as timer:
+            store(SAfl,S)
+        printDebug("%s took %s" % (SAfl, timer.interval,), _TIME_OPS)
 
-      nafl("gesvd(%s,'values')" % INPUT)
-      nafl("gesvd(%s,'left')" % INPUT)
-      nafl("gesvd(%s,'right')" % INPUT)
-   else:
-      populateMatrix(INPUT,matrixTypeDef)
+        if _DBG:
+            printDebug("%s:"%S)
+            afl("show(%s)"%S)
 
-      printDebug("Generating SVD matrices")
-      S="S"
-      SAfl = "gesvd(%s,'values')" % INPUT
-      eliminate(S)
-      store(SAfl,S) #always materialized until the generation of a diagonal matrix is improved
-      if _DBG:
-         printDebug("%s:"%S)
-         afl("show(%s)"%S)
+        U="U"
+        UAfl = "gesvd(%s,'left')" % INPUT
+        eliminate(U)
+        with TimerRealTime() as timer:
+            store(UAfl, U)
+        printDebug("%s took %s" % (UAfl, timer.interval,), _TIME_OPS)
 
-      UAfl = "gesvd(%s,'left')" % INPUT
-      U="U"
-      eliminate(U)
-      store(UAfl, U)
-      if _DBG:
-         printDebug("%s:"%U)
-         afl("show(%s)"%U)
+        if _DBG:
+            printDebug("%s:"%U)
+            afl("show(%s)"%U)
 
-      VTAfl = "gesvd(%s,'right')" % INPUT
-      VT="VT"
-      eliminate(VT)
-      store(VTAfl, VT)
-      if _DBG:
-         printDebug("%s:"%VT)
-         afl("show(%s)"%VT)
+        VT="VT"
+        VTAfl = "gesvd(%s,'right')" % INPUT
+        eliminate(VT)
+        with TimerRealTime() as timer:
+            store(VTAfl, VT)
+        printDebug("%s took %s" % (VTAfl, timer.interval,), _TIME_OPS)
+        if _DBG:
+            printDebug("%s:"%VT)
+            afl("show(%s)"%VT)
 
-      printDebug("Computing the error metric 1")
 
-      RMS_ERROR="RMS_ERROR"
-      RMS_EBPC="rms_error_bits_per_cell"
+        numericalCheck = True;                  # normal: True
+        forceSanityCheck = not numericalCheck;  # when tracking down a bug one can disable numericalCheck
+                                                # and run only the sanityChecks if desired
+                       # to test saving of files, set Terr True
+        Terr = False   # Total Error, e.g. error in residual between Input and multiply(U,S,VT)
+        Uerr = False
+        Serr = False
+        VTerr = False
 
-      resultMesg = " matrix type %s, RxC %dx%d, chunk_size %d, error_limit %d" % \
-          (matrixTypeName, NROW,NCOL, CHUNKSIZE, ERROR_LIMIT)
+        if numericalCheck :
+            # matrix of residual measures: U*S*VT(from svd) - INPUT (the original matrix)
+            printDebug("Computing the error metric 1")
+            ARRAY_RMS_ERROR="RMS_ERROR"
+            ATTR_ERROR_METRIC="rms_ulp_error"
+            
+            if matrixTypeName in ("zero","identity") :
+                # these special matrices should result in no residual at all
+                errorLimit = 0
 
-      # matrix of residual measures: U*S*VT(from svd) - INPUT (the original matrix)
-      errorLimit = ERROR_LIMIT
-      compareOp="<"
-      if matrixTypeName == "zero":
-         # all values should be zero
-         errorLimit = 0
-         compareOp="="
-         doSvdMetric1(NROW,NCOL, INPUT, S, U, VT, RMS_ERROR, RMS_EBPC, \
-                         (lambda MAT_1, attr_1, MAT_2, attr_2, attr_res: addMat(MAT_1, attr_1, MAT_2, attr_2, attr_res)))
-      else:
-         doSvdMetric1(NROW,NCOL, INPUT, S, U, VT, RMS_ERROR, RMS_EBPC, \
-                         (lambda MAT_1, attr_1, MAT_2, attr_2, attr_res: divMat(MAT_1, attr_1, MAT_2, attr_2, attr_res)))
-      testForError("SVD_METRIC_1"+resultMesg, RMS_ERROR, RMS_EBPC, errorLimit, compareOp)
+            checkResidualError = True
+            if checkResidualError:
+                func =  (lambda MAT_1, attr_1, MAT_2, attr_2, attr_residual:
+                                divMat(MAT_1, attr_1, MAT_2, attr_2, attr_residual))
+                if matrixTypeName in ("zero") :
+                    # there is no normalization by the norm of the zero matrix possible, that would be divide-by-zero
+                    # TODO JHM: I'm not too keen on summing them in this case... I wold like to avoid
+                    #           the unecessary computation completely
+                    #           todo that, lets pass the matrixTypeName into doSvdMetric1
+                    #           and it can skip the normalize by input-norm step
+                    func =  (lambda MAT_1, attr_1, MAT_2, attr_2, attr_residual:
+                                addMat(MAT_1, attr_1, MAT_2, attr_2, attr_residual))
+                errorMetric = doSvdMetric1(nrow, ncol, chunkSize, INPUT, S, U, VT, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit, func)
+                hasError = not (errorMetric <= errorLimit)
+                testForError("SVD_METRIC_1"+resultMesg, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit) # for reporting
+                Terr = hasError or Terr
 
-      # TODO: also need to check for orthoginality of U,V, what else?
+            # orthoginality of U
+            checkOrthoU = True
+            if checkOrthoU :
+                printDebug("Computing the error metric 2")
+                doSvdMetric2(U, nrow, chunkSize, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC)
+                Uerr = (testForError("SVD_METRIC_2"+resultMesg, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit)
+                       or Uerr)    
+            # orthoginality of VT
+            checkOrthoVT = True
+            if checkOrthoVT :
+                printDebug("Computing the error metric 3")
+                doSvdMetric3(VT, ncol, chunkSize, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC)
+                VTerr = (testForError("SVD_METRIC_3"+resultMesg, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit)
+                       or VTerr)
+            # ordered singular values
+            checkOrder = True
+            if checkOrder :
+                printDebug("Computing the error metric 4")
+                doSvdMetric4(nrow, S, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC)
+                errorLimit=0 #force error limit
+                Serr = (testForError("SVD_METRIC_4"+resultMesg, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit)
+                       or Serr)
 
-      # orthoginality of U
-      printDebug("Computing the error metric 2")
-      doSvdMetric2(U, NROW, CHUNKSIZE, RMS_ERROR, RMS_EBPC)
-      testForError("SVD_METRIC_2"+resultMesg, RMS_ERROR, RMS_EBPC, ERROR_LIMIT)
+        # TODO: condense the following into a loop on array in (INPUT, U, VT, S) with matching attribute
+        # Matrix check -- INPUT
+        if Terr or Uerr or Serr or VTerr or forceSanityCheck :
+            # bad total matrix, or doing more checks
+            aflStderr("show(%s)" % (INPUT,) ) # confirm that it exists
+            Terr = (not doSvdSanityCount(nrow, ncol, INPUT, S, U, VT,    INPUT, "v")
+                    or Terr)
+            Terr = (not doSvdSanityApply(nrow, ncol, INPUT, S, U, VT,    INPUT, "v")
+                    or Terr)
 
-      # orthoginality of VT
-      printDebug("Computing the error metric 3")
-      doSvdMetric3(VT, NCOL, CHUNKSIZE, RMS_ERROR, RMS_EBPC)
-      testForError("SVD_METRIC_3"+resultMesg, RMS_ERROR, RMS_EBPC, ERROR_LIMIT)
+            if Terr and _SAVE_BAD_MATRICES:
+                newName = "ERR_IN_%s" % (nrow,)
+                printDebugForce("testSVDByDim Terr and _SAVE_BAD_MATRICES: renaming INPUT to %s" % (newName,))
+                checkCount(INPUT, nrow, ncol)
+                eliminate(newName, record=False)
+                afl("rename(%s,%s)" % (INPUT, newName))
+                checkCount(newName, nrow, ncol)
 
-      printDebug("Computing the error metric 4")
-      doSvdMetric4(NROW, S, RMS_ERROR, RMS_EBPC)
-      errorLimit=0 #force error limit
-      testForError("SVD_METRIC_4"+resultMesg,
-                   RMS_ERROR, RMS_EBPC, errorLimit, compareOp="=")
+                printDebugForce("testSVDByDim Terr and _SAVE_BAD_MATRICES: renaming U to ERR_U_%s" % (nrow,))
+                eliminate("ERR_U_%s" % (nrow,), record=False)
+                afl("rename(%s,ERR_U_%s)" %  (U,  nrow))
+
+                printDebugForce("testSVDByDim Terr and _SAVE_BAD_MATRICES: renaming VT to ERR_VT_%s" % (nrow,))
+                eliminate("ERR_VT_%s" % (nrow,), record=False)
+                afl("rename(%s,ERR_VT_%s)" % (VT, nrow))
+
+                printDebugForce("testSVDByDim Terr and _SAVE_BAD_MATRICES: renaming S to ERR_S_%s" % (nrow,))
+                eliminate("ERR_S_%s" % (nrow,), record=False)
+                afl("rename(%s,ERR_S_%s)" %  (S,  nrow))
+
+
+        # Matrix check -- U 
+        if Uerr or forceSanityCheck :
+            aflStderr("show(%s)" % (U,) ) # confirm that it exists
+            Uerr = (not doSvdSanityCount(nrow, ncol, INPUT, S, U, VT,    U, "u")
+                    or Uerr)
+            Uerr = (not doSvdSanityApply(nrow, ncol, INPUT, S, U, VT,    U, "u")
+                    or Uerr)
+
+            if Uerr and _SAVE_BAD_MATRICES:
+                eliminate("ERR_U_%s" % (nrow,))
+                afl("rename(%s,ERR_U_%s)" %  (U,  nrow))
+
+        # Matrix check -- VT
+        if VTerr or forceSanityCheck :
+            aflStderr("show(%s)" % (VT,) ) # confirm that it exists
+            VTerr = (not doSvdSanityCount(nrow, ncol, INPUT, S, U, VT,    VT, "v")
+                     or VTerr)
+            VTerr = (not doSvdSanityApply(nrow, ncol, INPUT, S, U, VT,    VT, "v")
+                     or VTerr)
+ 
+            if VTerr or _SAVE_BAD_MATRICES:
+                eliminate("ERR_VT_%s" % (nrow,))
+                afl("rename(%s,ERR_VT_%s)" % (VT, nrow))
+
+        # Vector check --  S
+        if Serr or forceSanityCheck :
+            aflStderr("show(%s)" % (S,) ) # confirm that it exists
+
+            if Serr or _SAVE_BAD_MATRICES:
+                eliminate("ERR_S_%s" % (nrow,))
+                afl("rename(%s,ERR_S_%s)" %  (S,  nrow))
+
 
 #
-# compute: norm(MULT-GEMM)/ORDER/LBS
-def doGemmMetric(ORDER, MULT, GEMM, MAT_ERROR, EBPC):
+# compute: norm(gemmAfl-referenceAfl)/order/ULP
+#
+def doGemmMetric(matrixTypeName, gemmAfl, referenceAfl, order, MAT_ERROR, rms_ulp_error, errorLimit):
    printDebug("doGemmMetric start")
 
-   diffAfl = computeResidualMeasures(MULT, "multiply", GEMM, "gemm",  "res_measure")
+   residualAfl = computeResidualMeasures(gemmAfl, "gemm",  referenceAfl, "multiply", "resid")
 
-   residualNormAfl = norm(diffAfl, "res_measure", "res_norm")
+   residualNormAfl = norm(residualAfl, "resid", "resid_norm")
+   referenceNormAfl = norm(referenceAfl, "multiply", "ref_norm")
 
-   referenceNormAfl = norm(MULT, "multiply", "ref_norm")
+   if matrixTypeName in ("zero"):
+       # divMat would be bogus if the matrix is the zero matrix, so just use the numerator as the normalized result
+       residNormNormalizedAfl = "apply(%s, resid_norm_normalized, resid_norm)" % residualNormAfl
+   else:
+       residNormNormalizedAfl = divMat(residualNormAfl, "resid_norm", referenceNormAfl, "ref_norm", "resid_norm_normalized")
 
-   divAfl = divMat(residualNormAfl, "res_norm", referenceNormAfl, "ref_norm", "res_error")
+   if _DBG:
+      printDebugForce("DEBUG doGemmMetric residNormNormalizedAfl")
+      aflStderr(residNormNormalizedAfl)
 
-   errAfl = scaleError(ORDER, divAfl, "res_error", EBPC, MAT_ERROR)
+   errULPsAfl = scaleToULPs(residNormNormalizedAfl, "resid_norm_normalized", order, rms_ulp_error, MAT_ERROR)
+   errorMetric = dbgGetErrorMetric("GEMM_METRIC", MAT_ERROR, rms_ulp_error, errorLimit)
+   printDebugForce("errorMetric is %s" % (errorMetric,))
 
-   printDebug("doGemmMetric output is in array %s" % MAT_ERROR)
-   printDebug("doGemmMetric finish")
-   return errAfl
+   hasError = not (errorMetric <= errorLimit)
+   if hasError:
+      printDebugForce("doGemmMetric GEMM Error %s exceeds %s @ size %s x %s " % (errorMetric, errorLimit, order, order))      
+      printDebugForce("doGemmMetric I. residual query is %s" %(residualAfl))
+      valLimit=0.1
+      printDebugForce("doGemmMetric II. abs residual exceeding threshold %s" %(valLimit))
+      largeResidAfl = "filter(%s, r=0 and c=32)" % (residualAfl)  # customized location debug
+      aflStderr(largeResidAfl)
+
+
+   return errorMetric  # returns the error metric, not the afl, just like doSvdMetric1
 
 #
 # Test the GEMM operator.
 # Implements an appropriate interface to be used by iterateOverTests()
-def testGEMM(matrixTypeName, matrixTypeDef, ORDER, CHUNKSIZE, ERROR_LIMIT):
-   # make a (ORDER, ORDER) matrix
-   NROW=ORDER
-   NCOL=ORDER
+def testGEMM(matrixTypeName, AFL_INPUT, order, chunkSize, errorLimit):
+   # make a (order, order) matrix
+   nrow=order
+   ncol=order
 
    printInfo("GEMM TEST")
 
-   # convert to integers
-   matrixTypeDef = "iif(floor(%s)=0, 1, floor(%s))" % (matrixTypeDef,matrixTypeDef)
    INPUT="INPUT"
-   createMatrix(INPUT, NROW, NCOL, CHUNKSIZE, CHUNKSIZE)
-   populateMatrix(INPUT,matrixTypeDef)
+   eliminateAndStore(AFL_INPUT, INPUT) # when using random arrays, storage is necessary
+                                       # otherwise, we can't compare two operators on the same input
 
-   printDebug("GEMM(A,B) vs multiply(A,B) size %s, chunksize %s" % (ORDER, CHUNKSIZE))
+   printDebug("GEMM(A,transpose(A)) vs multiply(A,transpose(A)) order %s, chunkSize %s" % (order, chunkSize))
+   transposeAfl = "cast(transpose(%s), %s)" % (INPUT, getMatrixSchema(nrow, ncol, chunkSize, chunkSize))
 
-   dims = getDims(INPUT)
-
-   printDebug("GEMM matrix dims: %s"%str(dims))
-
-   GEMM_RESULT_SCHEMA=INPUT
-   TRANS = INPUT
-   if dims[0]!=dims[1]: #not square matrix ?
-      TRANS = "transpose(%s)"%INPUT
-      GEMM_RESULT_SCHEMA=INPUT+"_GEMM_SCHEMA"
-      eliminate(GEMM_RESULT_SCHEMA)
-      createMatrix(GEMM_RESULT_SCHEMA, dims[0], dims[0], CHUNKSIZE, CHUNKSIZE)
-
-   gemmAfl = "gemm(%s, %s, build(%s,0))" % (INPUT, TRANS, GEMM_RESULT_SCHEMA)
-   if _DBG:
-      GEMM="GEMM"
-      eliminate(GEMM)
-      printDebug("Saving %s"%GEMM)
-      store(gemmAfl, GEMM)
-      afl("show(%s)" % GEMM)
-
-   multAfl = "multiply(%s,%s)" % (INPUT,TRANS)
-   if _DBG:
-      MULT="MULT"
-      eliminate(MULT)
-      store(multAfl,MULT)
-      afl("show(%s)" % MULT)
+   gemmAfl = "gemm(%s, %s, build(%s,0))" % (INPUT, transposeAfl, getMatrixSchema(nrow, ncol, chunkSize, chunkSize))
+   referenceAfl = "multiply(%s, %s)" % (INPUT, transposeAfl)
 
    printDebug("Computing GEMM error metric")
-   RMS_ERROR="RMS_ERROR"
-   RMS_EBPC="rms_error_bits_per_cell"
+   ARRAY_RMS_ERROR="RMS_ERROR"
+   ATTR_ERROR_METRIC="rms_ulp_error"
 
-   doGemmMetric(ORDER, multAfl, gemmAfl, RMS_ERROR, RMS_EBPC)
+   if matrixTypeName in ("zero","identity") :
+      # these special matrices should result in no residual at all
+      errorLimit = 0
+   errorMetric = doGemmMetric(matrixTypeName, gemmAfl, referenceAfl, order, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit)
+   resultMesg = "matrix type %s, size %d, chunk_size %d, error_limit %d" % (matrixTypeName, order, chunkSize, errorLimit)
+   testForError("GEMM "+resultMesg, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit) # for reporting
 
-   resultMesg = " matrix type %s, size %d, chunk_size %d, error_limit %d" % \
-          (matrixTypeName, ORDER, CHUNKSIZE, ERROR_LIMIT)
-   testForError("GEMM"+resultMesg, RMS_ERROR, RMS_EBPC, ERROR_LIMIT)
+   hasError = not (errorMetric <= errorLimit)
+   if hasError:
+      inputRow0Afl = "filter(%s, r=0)" % (INPUT)  # customized location debug
+      aflStderr(inputRow0Afl)
+      transposeCol0Afl = "filter(%s, c=32)" % (transposeAfl)  # customized location debug
+      aflStderr(transposeCol0Afl)
+
+   if hasError and _SAVE_BAD_MATRICES:
+      newName = "ERR_GEMM_%s" % (nrow,)
+      printDebugForce("testGEMM hasError and _SAVE_BAD_MATRICES: renaming INPUT to %s" % (newName,))
+      eliminate(newName, record=False)
+      afl("rename(%s,%s)" % (INPUT, newName))
+
+
 
 #
 # Test the MPICOPY operator.
 # Implements an appropriate interface to be used by iterateOverTests()
-def testMPICopy(matrixTypeName, matrixTypeDef, order, chunkSize, errorLimit):
+def testMPICopy(matrixTypeName, AFL_INPUT, order, chunkSize, errorLimit):
    # make a (order, order) matrix
    nrow=order
    ncol=order
@@ -937,43 +1328,23 @@ def testMPICopy(matrixTypeName, matrixTypeDef, order, chunkSize, errorLimit):
 
    INPUT="INPUT"
    createMatrix(INPUT, nrow, ncol, chunkSize, chunkSize)
-   populateMatrix(INPUT,matrixTypeDef)
+   populateMatrix(INPUT, getMatrixTypeAfl(nrow, ncol, chunkSize, matrixTypeName))
 
    mpicopyAfl = "mpicopy(%s)" % (INPUT)
    if _DBG:
       MPICOPY="MPICOPY"
-      eliminate(MPICOPY)
-      store(mpicopyAfl, MPICOPY)
+      eliminateAndStore(mpicopyAfl, MPICOPY)
       afl("show(%s)" % MPICOPY)
 
    printDebug("Computing MPICOPY error metric")
-   error = "res_measure"
+   error = "resid"
    metricAfl = computeResidualMeasures(INPUT, "v", mpicopyAfl, "copy", error)
 
    maxAfl = "max(project(%s, %s))" % (metricAfl, error)
    error = error+"_max"
 
-   testForError("MPICOPY", maxAfl, error, errorLimit, compareOp="=" )
+   testForError("MPICOPY", maxAfl, error, errorLimit)
 
-#
-# Execute all or a subset of tests registered with the system
-# To register a test, it has to be added to the allTests table
-def iterateOverTests(sizeList, errorLimit, tests=None, matrixTypes=None):
-   allTests = {
-      "SVD" : lambda mName, mType, order, chsize, errLimit: testSVD(mName, mType, order, chsize, errLimit),
-      "GEMM" : lambda mName, mType, order, chsize, errLimit: testGEMM(mName, mType, order, chsize, errLimit),
-      "MPICOPY" : lambda mName, mType, order, chsize, errLimit: testMPICopy(mName, mType, order, chsize, errLimit)
-   }
-   if tests!=None:
-      for test in tests:
-         if test in allTests:
-            func = allTests[test]
-            runTests(sizeList, errorLimit, func, matrixTypes)
-         else:
-            printError("Unknown test:"+test)
-   else:
-      for func in allTests.values():
-         runTests(sizeList, errorLimit, func, matrixTypes)
 
 #config file options
 _configOptions = {}
@@ -1004,6 +1375,9 @@ _divisorList=[]
 _usedMatrices={}
 
 _DBG = False
+_SAVE_BAD_MATRICES = False
+_TIME_OPS = True
+_TIME_TESTS = True
 
 # The main entry routine that does command line parsing
 def main():
@@ -1037,8 +1411,8 @@ def main():
 
    errorLimit=10
    sizeList="SMALLEST_SIZE_LIST"
-   testsToRun = None # means all
-   matriciesToUse = None # means all
+   testsToRun = allTests.keys()
+   matricesToUse = allMatrixTypeNames # means all
 
    if "install-path" in _configOptions:
       installPath = _configOptions.get("install-path")
@@ -1055,7 +1429,7 @@ def main():
       _targetHost = _configOptions.get("target-host")
 
    if "error-limit" in _configOptions:
-      errorLimit = int(_configOptions.get("error-limit"))
+      errorLimit = float(_configOptions.get("error-limit"))
 
    if "size-list" in _configOptions:
       sizeList = _configOptions.get("size-list")
@@ -1077,24 +1451,21 @@ def main():
             break
 
    if "matrix-types" in _configOptions:
-      matriciesToUse = _configOptions.get("matrix-types")
-      matriciesToUse = matriciesToUse.split(',')
-      for m in matriciesToUse:
-         if m == "all":
-            matriciesToUse = None
-            break
+      matNames = _configOptions.get("matrix-types").split(',')
+      if matNames != ("all",): # the default is already all of them
+          matricesToUse = matNames
 
    nafl("load_library(\'dense_linear_algebra\')");
-   printDebug("Start %s: sizeList %s, errorLimit %d, testsToRun %s on matricies %s"%\
-                (str(datetime.utcnow()),sizeList,errorLimit,str(testsToRun),str(matriciesToUse)),True)
+   printDebug("Start %s: sizeList %s, errorLimit %d, testsToRun %s on matrices %s"%\
+                (str(datetime.datetime.utcnow()),sizeList,errorLimit,str(testsToRun),str(matricesToUse)),True)
 
-   iterateOverTests(sizeList, errorLimit, testsToRun, matriciesToUse)
+   iterateOverTests(sizeList, errorLimit, testsToRun, matricesToUse)
 
    for name in _usedMatrices.keys():
       eliminate(name,False)
 
-   printDebug("Finish %s: sizeList %s, errorLimit %d, testsToRun %s on matricies %s"%\
-                (str(datetime.utcnow()),sizeList,errorLimit,str(testsToRun),str(matriciesToUse)),True)
+   printDebug("Finish %s: sizeList %s, errorLimit %d, testsToRun %s on matrices %s"%\
+                (str(datetime.datetime.utcnow()),sizeList,errorLimit,str(testsToRun),str(matricesToUse)),True)
    sys.exit(0)
 
 ### MAIN

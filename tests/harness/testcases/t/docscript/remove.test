@@ -2,11 +2,10 @@
 --test
 --start-query-logging
 
---set-format dcsv
---start-igdata
+--set-format dense
 store(build(<val:double>[i=0:9,10,0],1),source)  
-remove(source)  
---stop-igdata
+--set-format dcsv
+remove(source) 
 
 --stop-query-logging
 

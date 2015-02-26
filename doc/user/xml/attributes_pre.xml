@@ -6,7 +6,9 @@
   <refnamediv>
     <refname>attributes</refname>
 
-    <refpurpose>Produces a 1-dimensional result array where each cell
+    <refpurpose><indexterm>
+        <primary>attributes operator</primary>
+      </indexterm>Produces a 1-dimensional result array where each cell
     describes one attribute of a stored array.</refpurpose>
   </refnamediv>
 
@@ -40,7 +42,7 @@
 
       <procedure>
         <step>
-          <para>Show the source_array:<programlisting language='test'>
+          <para>Show the source_array:<programlisting language="test">
 --afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
 --shell --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winnersFew.csv &gt; ../examples/winnersFew.scidb --show-query=no --show-output=no
 --aql load winnersFlat from '../examples/winnersFew.scidb' --show-query=no --show-output=no
@@ -51,12 +53,12 @@
 
         <step>
           <para>Create a result array describing the attributes of the named
-          array:<programlisting language='test'>--aql select * from attributes(champions);</programlisting></para>
+          array:<programlisting language="test">--afl attributes(champions);</programlisting></para>
         </step>
 
         <step>
           <para>Create a result array describing the nullable attributes of
-          the named array:<programlisting language='test'>--aql select * from attributes(champions) where nullable = true;</programlisting></para>
+          the named array:<programlisting language="test">--aql select * from attributes(champions) where nullable = true;</programlisting></para>
         </step>
       </procedure>
     </informalexample>

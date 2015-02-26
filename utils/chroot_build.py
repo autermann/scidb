@@ -3,117 +3,242 @@
 import sys
 import argparse
 import subprocess
+import os
 
 CMD_BUILD = 0
 CMD_INIT = 1
 CMD_UPDATE = 2
 CMD_LOGIN = 3
 
-DISTROS=['precise-amd64', 'oneiric-amd64', 'natty-amd64']
-
-TGZ_DIR='/var/cache/pbuilder'
-
-MIRROR='deb http://archive.ubuntu.com/ubuntu/ %s restricted main multiverse universe'
-
 BUILD_RESULT='/tmp/scidb_build'
+USE_SUDO = True
+
+class Col():
+    grey =   '\033[90m'
+    red =    '\033[91m'
+    green =  '\033[92m'
+    yellow = '\033[93m'
+    blue =   '\033[94m'
+    white =   '\033[97m'
+
+    @staticmethod
+    def disable():
+        Col.grey = ''
+        Col.red = ''
+        Col.green = ''
+        Col.yellow = ''
+        Col.blue = ''
+        Col.white = ''
+
+def info(str):
+    print(Col.green + str + Col.white)
+
+def warn(str):
+    print(Col.yellow + str + Col.white)
+
+def err(str):
+    print(Col.red + str + Col.white)
+    exit(1)
+
+def which(program):
+    import os
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
+def RunAndWait(arguments):
+    return subprocess.Popen(arguments).wait()
+
+def RunSudoAndWait(arguments):
+    sudoargs = ['sudo'] + arguments if USE_SUDO else arguments
+    return RunAndWait(sudoargs)
+
+class UbuntuChroot():
+    distroname = 'ubuntu'
+    pbuilder_tgz_dir='/var/cache/pbuilder'
+    ubuntu_mirror='deb http://archive.ubuntu.com/ubuntu/ %s restricted main multiverse universe'
+    logfile = '/tmp/pbuilder.log'
+
+    def __init__(self, release, arch):
+        info('Will use pbuilder for chrooting. Checking environment...')
+        #if not which('pbuilder'):
+        #    err('Can not find pbuilder! Check your PATH and/or run script as root!')
+        self.release = release
+        self.arch = arch
+        self.tgz = self.pbuilder_tgz_dir+'/'+release+'-'+arch+'.tgz'
+        self.mirror = self.ubuntu_mirror % release
+
+    def init(self):
+        pbargs = ['pbuilder', '--create',
+            '--basetgz', self.tgz,
+            '--architecture', self.arch,
+            '--othermirror', self.mirror,
+            '--distribution', self.release,
+            '--override-config',
+            '--logfile', self.logfile]
+        info("Initializing %s from mirror %s" % (self.tgz, self.mirror))
+        if RunSudoAndWait(pbargs):
+            err("pbuilder returned error. See log %s for details." % self.logfile)
+        info("Done. Result stored in %s" % self.tgz)
+
+    def update(self):
+        pbargs = ['pbuilder', '--update',
+            '--basetgz', self.tgz,
+            '--distribution', self.release,
+            '--othermirror', self.mirror,
+            '--architecture', self.arch,
+            '--override-config',
+            '--logfile', self.logfile]
+        info("Updating %s from mirror %s" % (self.tgz, self.mirror))
+        if RunSudoAndWait(pbargs):
+            err("pbuilder returned error. See log %s for details." % self.logfile)
+        info("Done. %s was updated" % self.tgz)
+
+    def build(self, sources, jobs, buildresult):
+        pbargs = ['pbuilder', '--build',
+            '--basetgz', self.tgz,
+            '--distribution', self.release,
+            '--othermirror', self.mirror,
+            '--architecture', self.arch,
+            '--buildresult', buildresult,
+            '--debbuildopts', '-j%i'%jobs,
+            '--override-config',
+            '--logfile', self.logfile,
+            sources]
+        info("Building %s in %s" % (sources, self.tgz))
+        if RunSudoAndWait(pbargs):
+            err("pbuilder returned error. See log %s for details." % self.logfile)
+        info("Done. Result stored in %s" % buildresult)
+
+    def login(self):
+        pbargs = ['pbuilder', '--login',
+            '--basetgz', self.tgz,
+            '--distribution', self.release,
+            '--othermirror', self.mirror,
+            '--architecture', self.arch,
+            '--override-config']
+        info("Logging into %s" % self.tgz)
+        RunSudoAndWait(pbargs)
+
+class CentOSChroot():
+    distroname = 'centos'
+
+    def __init__(self, release, arch):
+        info("Will use mock for chrooting. Checking environment...")
+        #if not which('mock'):
+        #    err('Can not find mock! Check your PATH and/or run script as root!')
+        self.release = release
+        self.arch = arch
+        self.chroot = '%s-%s-%s' % (self.distroname, release, arch)
+
+    def init(self):
+        mockargs = ['mock', '--init',
+            '--root', self.chroot,
+            '--arch', self.arch,
+            '--resultdir', '/tmp']
+        info("Initializing %s" % self.chroot)
+        if RunSudoAndWait(mockargs):
+            err("mock returned error. See log %s for details." % '/tmp/root.log')
+        info("Done")
+
+    def update(self):
+        mockargs = ['mock', '--update',
+            '--root', self.chroot,
+            '--arch', self.arch,
+            '--resultdir', '/tmp']
+        info("Updating %s" % self.chroot)
+        if RunSudoAndWait(mockargs):
+            err("mock returned error. See log %s for details." % '/tmp/root.log')
+        info("Done")
+
+    def build(self, sources, jobs, buildresult):
+        mockargs = ['mock', '--rebuild',
+            '--root', self.chroot,
+            '--arch', self.arch,
+            '--resultdir', buildresult,
+            sources]
+        info("Building %s in %s" % (sources, self.chroot))
+        if RunSudoAndWait(mockargs):
+            err("mock returned error. See log %s for details." % (buildresult+'/root.log'))
+        info("Done. Result stored in %s" % buildresult)
+
+    def login(self):
+        mockargs = ['mock', '--shell',
+            '--root', self.chroot,
+            '--arch', self.arch]
+        info("Logging into %s" % self.chroot)
+        RunSudoAndWait(mockargs)
 
 def main():
     parser = argparse.ArgumentParser()
-    groupCmd = parser.add_mutually_exclusive_group()
-    groupCmd.add_argument('--build', dest='command', action='store_const', const=CMD_BUILD, help='Build SciDB on selected platforms (by default)')
-    groupCmd.add_argument('--init', dest='command', action='store_const', const=CMD_INIT, help='Initialize pbuilder tgzs')
-    groupCmd.add_argument('--update', dest='command', action='store_const', const=CMD_UPDATE, help='Update pbuilder tgzs')
-    groupCmd.add_argument('--login', dest='command', action='store_const', const=CMD_LOGIN, help='Login to pbuilder chroot')
-    parser.add_argument('--distro', dest='distro', type=str, nargs='+', help='Target distro names')
-    parser.add_argument('--dsc', dest='dsc', type=str, help='Dsc file for building')
+    groupCmd = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument('-d', '--distro', dest='distro', type=str, required=True, help='Target distro name in format distroname-release-arch')
+    groupCmd.add_argument('-b', '--build', dest='command', action='store_const', const=CMD_BUILD, help='Build SciDB on selected platforms (by default)')
+    groupCmd.add_argument('-i', '--init', dest='command', action='store_const', const=CMD_INIT, help='Initialize pbuilder tgzs')
+    groupCmd.add_argument('-u', '--update', dest='command', action='store_const', const=CMD_UPDATE, help='Update pbuilder tgzs')
+    groupCmd.add_argument('-l', '--login', dest='command', action='store_const', const=CMD_LOGIN, help='Login to pbuilder chroot')
+    parser.add_argument('-s', '--src', dest='src', type=str, nargs='+', help='.dsc or .src.rpm file(s) for building')
     parser.add_argument('-j', '--jobs', dest='build_jobs', type=int, help='Number of build jobs')
+    parser.add_argument('--no-color', dest='color', action='store_const', const=False, help='Disable color output')
+    parser.add_argument('-r', '--result-dir', dest='result_dir', type=str, help='Directory for result packages (default is %s)' % BUILD_RESULT)
+    parser.add_argument('--no-sudo', dest='use_sudo', action='store_const', const=False, help='Do not use sudo internally (you should run as root by yourself)')
 
     parser.set_defaults(
       command=CMD_BUILD,
-      distro=DISTROS,
-      build_jobs=1)
+      build_jobs=1,
+      color=True,
+      result_dir=BUILD_RESULT,
+      use_sudo = True)
     args = vars(parser.parse_args())
 
     CMD = args['command']
     DISTRO = args['distro']
-    DSC = args['dsc']
-    BUILD_OPTS = ' -j%i' % args['build_jobs']
+    SRC = args['src']
+    JOBS = args['build_jobs']
+    COLOR = args['color']
+    RESULT_DIR = args['result_dir']
+    USE_SUDO = args['use_sudo']
 
-    print("Will " + ['build SciDB for', 'init chroot for', 'update chroot for', 'login into '][CMD] + " next target(s): " + str(DISTRO))
+    if not COLOR:
+        Col.disable()
+
+    try:
+        (distroname, release, arch) = DISTRO.split('-')
+    except:
+        err("Wrong distro string '%s'! It should be in format 'distroname-release-arch'" % DISTRO)
+
+    if distroname == 'ubuntu':
+        chroot = UbuntuChroot(release, arch)
+    elif distroname == 'centos':
+        chroot = CentOSChroot(release, arch)
+    else:
+        err("Wrong distro name '%s', only 'ubuntu' and 'centos' allowed" % distroname)
+
+    info("Will " + ['build package(s) for', 'init chroot for', 'update chroot for', 'login into '][CMD] + " " + str(DISTRO))
 
     if CMD == CMD_LOGIN:
-        if len(DISTRO) != 1:
-            print 'Exactly one target distro should be specified'
-            exit(1)
-        login(DISTRO[0])
+        chroot.login()
         exit(0)
-
-    for distro in DISTRO:
-        if CMD == CMD_INIT:
-            init(distro)
-        elif CMD == CMD_UPDATE:
-            update(distro)
-        elif CMD == CMD_BUILD:
-            if not DSC:
-                print '.dsc file is not specified'
-                exit(1)
-            build(distro, DSC, BUILD_OPTS)
-
-def init(distro):
-    tgz = TGZ_DIR+'/'+distro+'.tgz'
-    (dist, arch) = distro.split('-')
-    mirror = MIRROR % dist
-    pbargs = ['pbuilder', '--create',
-        '--basetgz', tgz,
-        '--architecture', arch,
-        '--othermirror', mirror,
-        '--distribution', dist,
-        '--override-config']
-    print "Initializing %s from %s" % (tgz, mirror)
-    subprocess.Popen(pbargs).wait()
-
-def update(distro):
-    tgz = TGZ_DIR+'/'+distro+'.tgz'
-    (dist, arch) = distro.split('-')
-    mirror = MIRROR % dist
-    pbargs = ['pbuilder', '--update',
-        '--basetgz', tgz,
-        '--distribution', dist,
-        '--othermirror', mirror,
-        '--architecture', arch,
-        '--override-config']
-    print "Updating %s from %s" % (tgz, mirror)
-    subprocess.Popen(pbargs).wait()
-
-def build(distro, dsc, buildopts):
-    tgz = TGZ_DIR+'/'+distro+'.tgz'
-    (dist, arch) = distro.split('-')
-    mirror = MIRROR % dist
-    buildresult = BUILD_RESULT+'/'+distro
-    pbargs = ['pbuilder', '--build',
-        '--basetgz', tgz,
-        '--distribution', dist,
-        '--othermirror', mirror,
-        '--architecture', arch,
-        '--buildresult', buildresult,
-        '--debbuildopts', buildopts,
-        '--override-config',
-        dsc]
-    print "Building %s in %s" % (dsc, tgz)
-    subprocess.Popen(pbargs).wait()
-
-def login(distro):
-    tgz = TGZ_DIR+'/'+distro+'.tgz'
-    (dist, arch) = distro.split('-')
-    mirror = MIRROR % dist
-    pbargs = ['pbuilder', '--login',
-        '--basetgz', tgz,
-        '--distribution', dist,
-        '--othermirror', mirror,
-        '--architecture', arch,
-        '--override-config']
-    print "Logging into %s" % tgz
-    subprocess.Popen(pbargs).wait()
+    elif CMD == CMD_INIT:
+        chroot.init()
+    elif CMD == CMD_UPDATE:
+        chroot.update()
+    elif CMD == CMD_BUILD:
+        if not SRC:
+            err('Source file  not specified, use --src argument!')
+        for source in SRC:
+            chroot.build(source, JOBS, RESULT_DIR)
 
 if __name__ == '__main__':
     main()

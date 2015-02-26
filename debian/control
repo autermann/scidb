@@ -5,7 +5,8 @@ Maintainer: SciDB support list <support@lists.scidb.org>
 Build-Depends: debhelper (>= 8.0.0), cmake, bison, flex, libcppunit-dev, libbz2-dev, libpqxx3-dev,
                libprotobuf-dev, protobuf-compiler, zlib1g-dev, liblog4cxx10-dev,
                libboost1.46-all-dev, libreadline-dev, fop, xsltproc, doxygen, python, subversion,
-               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev
+               swig2.0, docbook-xsl, gfortran, libscalapack-mpi1, liblapack-dev, libopenmpi-dev, libmpich2-dev,
+               mpich2 (>=1.4.1), mpich2 (<<1.4.2), openssh-client
 Standards-Version: 3.9.2
 Homepage: http://scidb.org
 
@@ -53,8 +54,7 @@ Description: SciDB developer and tester utilities (debug symbols)
 
 Package: scidb-plugins
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient (= ${binary:Version}), libscalapack-mpi1 (>=1.8.0), libscalapack-mpi1 (<1.8.1), libopenmpi1.3 (>=1.4.3), libopenmpi1.3 (<1.4.4)
-Recommends: openmpi-bin (>=1.4.3), openmpi-bin (<1.4.4), openmpi-common (>=1.4.3), openmpi-common (<1.4.4)
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient (= ${binary:Version}), libscalapack-mpi1 (>=1.8.0), libscalapack-mpi1 (<<1.8.1), libopenmpi1.3 (>=1.4.3), libopenmpi1.3 (<<1.4.4), openmpi-bin (>=1.4.3), openmpi-bin (<<1.4.4), openmpi-common (>=1.4.3), openmpi-common (<<1.4.4), libmpich2-3 (>=1.4.1), libmpich2-3 (<<1.4.2), mpich2 (>=1.4.1), mpich2 (<<1.4.2), openssh-client
 Description: SciDB server and client plugins
 
 Package: scidb-plugins-dbg

@@ -1225,9 +1225,9 @@ SCIDB QUERY : <store(Ldata_left, L)>
 {3,2} 130
 {3,3} 120
 {0,4} -40
-{0,5} 10
-{0,6} 60
-{0,7} 110
+{1,4} 10
+{2,4} 60
+{3,4} 110
 {4,0} 200
 {4,1} 190
 {4,2} 180
@@ -1340,9 +1340,9 @@ SCIDB QUERY : <insert(L, R)>
 {3,2} 130
 {3,3} 120
 {0,4} -40
-{0,5} 10
-{0,6} 60
-{0,7} 110
+{1,4} 10
+{2,4} 60
+{3,4} 110
 {4,0} 200
 {4,1} 190
 {4,2} 180
@@ -2158,7 +2158,7 @@ SCIDB QUERY : <store(repart(Ldata_left, <a:int64> [x=0:*,4,2 , y=0:*,4,2]), Ldat
 
 SCIDB QUERY : <dimensions(R)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,4611686018427387903,4,0,4,11,"int64"
+{0} "x",0,4611686018427387903,4,0,5,11,"int64"
 {1} "y",0,4611686018427387903,4,0,0,11,"int64"
 
 SCIDB QUERY : <dimensions(Ldata_left_ol)>
@@ -2288,7 +2288,7 @@ SCIDB QUERY : <insert(repart(R, <a:int64> [x=0:*,4,2, y=0:*,4,2]), Ldata_left_ol
 
 SCIDB QUERY : <dimensions(R)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,4611686018427387903,4,0,4,11,"int64"
+{0} "x",0,4611686018427387903,4,0,5,11,"int64"
 {1} "y",0,4611686018427387903,4,0,0,11,"int64"
 
 SCIDB QUERY : <dimensions(Ldata_left_ol)>

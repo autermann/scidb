@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>max</refname>
+
+    <refpurpose><indexterm>
+        <primary>max</primary>
+      </indexterm>Select maximum value</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>max(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The max operator calculates the maximum of the specified attribute
+    in the array. Result is an array with single element containing the
+    maximum of the specified attribute.</para>
+
+    <note>
+      <para>The max operator provides the same functionality as the max
+      aggregate. For details, see the <link linkend="maxAggregate">max</link>
+      aggregate reference.</para>
+    </note>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example find the maximum value of each row of a 2-dimensional
+      array.</para>
+
+      <procedure>
+        <step>
+          <para>Create a 1-attribute, 2-dimensional array called
+          m3x3:<programlisting language="test">--afl CREATE ARRAY m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Store values of 0–8 in m3x3:<programlisting language="test">--afl store(build(m3x3,i*3+j),m3x3); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Select the maximum value of each row of m3x3:<programlisting
+          language="test">--afl max(m3x3,val,i); --output-format=dense</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

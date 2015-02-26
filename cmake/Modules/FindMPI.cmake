@@ -33,11 +33,18 @@ if(${DISTRO_NAME_VER} MATCHES "RedHat-6")
   set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH} "/usr/lib64/openmpi")
 endif()
 
+if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
+  # CentOS 6.x
+  set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH} "/usr/lib64/openmpi")
+endif()
+
 if(${DISTRO_NAME_VER} MATCHES "Fedora")
   # Fedora 11/16/17
   set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH} "/usr/lib64/openmpi")
 endif()
 
-include(${CMAKE_ROOT}/Modules/FindMPI.cmake)
+if(NOT DISABLE_SCALAPACK)
+  include(${CMAKE_ROOT}/Modules/FindMPI.cmake)
+endif(NOT DISABLE_SCALAPACK)
 
 set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH_BACKUP})

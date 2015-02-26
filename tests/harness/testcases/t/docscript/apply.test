@@ -4,7 +4,7 @@
 
 --set-format dcsv
 --start-igdata
---aql CREATE ARRAY distance <miles:double> [i=0:9,10,0]  
+CREATE ARRAY distance <miles:double> [i=0:9,10,0]  
 store(build(distance,i*100.0),distance)  
 --stop-igdata
 apply(distance,kilometers,1.6*miles) 

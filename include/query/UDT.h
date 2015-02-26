@@ -77,9 +77,8 @@ namespace scidb
             friend Val max(Val const& v1, Val const& v2);
             friend Val abs(Val const& v);
 
-            Val(UDT* u, Type const& type) : udt(u), dst(NULL), value(type)
+            Val(UDT* u, Type const& type) : udt(u), dst(NULL), value(TypeLibrary::getDefaultValue(type.typeId()))
             {
-                setDefaultValue(value, type.typeId());
             }
 
             Val(UDT* u = NULL) : udt(u), dst(NULL) {}

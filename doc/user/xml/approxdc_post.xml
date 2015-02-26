@@ -17,11 +17,17 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The approxdc operator takes a set of values from an array attribute
-    and returns an approximate count of the number of distinct values
-    present.</para>
+    <para><indexterm>
+        <primary>aggregates</primary>
 
-    <para>The approxdc operator does not count null values.</para>
+        <secondary>approximate count</secondary>
+      </indexterm><indexterm>
+        <primary>approximate count</primary>
+      </indexterm>The approxdc aggregate takes a set of values from an array
+    attribute and returns an approximate count of the number of distinct
+    values present.</para>
+
+    <para>The approxdc aggregate does not count null values.</para>
   </refsect1>
 
   <refsect1>

@@ -1,0 +1,50 @@
+# keep this file sorted to avoid merging in duplicate values
+checkin.other.sample_1
+checkin.other.sample_2
+checkin.other.bernoulli_1
+checkin.other.bernoulli_3
+# next needs conversion to chunksize 32x32
+checkin.scalapack.20_svd_oldVals
+# next two superseded by svd_driverLong_order1to288c32
+checkin.scalapack.31_svd_doSvdWithMetrics_verySmall
+checkin.scalapack.32_svd_driverXS
+checkin.other.scidbLoadCsv_01_basic
+checkin.other.scidbLoadCsv_02_non_int_dimensions
+checkin.newaql.aggregate_004
+data_model
+doc.redimension_2
+doc.redimension_store_1
+doc.ug_loadingData_CSV
+doc.ug_loadingData_binary
+doc.ug_loadingData_opaque
+doc.ug_loadingData_specialValues
+doc.ug_loadingData_errors
+other.repart_setopt
+perf.repart
+scalapack.perf
+scalapack.perf.30_svd_doSvd_2_M
+scalapack.smallest_sizes
+update.kill
+# second sorted list below needs to be merged into the sorted list above
+checkin.iqueryabort.iq_SIGINT_write_1
+#This only works on one instance! Need to edit fits loader to not throw errors on multiple instances!
+fits.fits_input
+iqueryabort.abort_rdstore_1
+iqueryabort.abort_rdstore_2
+iqueryabort.abort_rdstore_3
+iqueryabort.abort_rdstore_4
+iqueryabort.abort_rdstore_7
+iqueryabort.abort_store
+iqueryabort.abort_update
+#Cannot figure out how this should work. Need instructions:
+z_valgrind.z_valgrind
+@CONFIGURE_DISABLE_TESTS_SCALAPACK@
+@CONFIGURE_DISABLE_TESTS_NOT_DEBUG@
+#
+# next 3 lines: #2194: inverse disabled until (#2182) SplitArray is fixed
+#
+checkin.other.inverse
+docscript.inverse
+other.basic_matrix_inverse
+
+

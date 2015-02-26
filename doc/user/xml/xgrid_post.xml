@@ -4,14 +4,14 @@
   <refnamediv>
     <refname>xgrid</refname>
 
-    <refpurpose>Produces a result array with the same dimensions and
+    <refpurpose><indexterm>
+        <primary>xgrid</primary>
+      </indexterm>Produces a result array with the same dimensions and
     attributes as a source array, but with the size of each dimension
     multiplied by an integer scale you supply.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL%  <command>SELECT</command>  *  <command>FROM</command> xgrid(<replaceable>source_array</replaceable>,<replaceable>scale_1</replaceable><optional>,<replaceable>scale_2</replaceable>,..., <replaceable>scale_N</replaceable></optional>)</synopsis>
-
     <synopsis>AFL%  xgrid(<replaceable>source_array</replaceable>,<replaceable>scale_1</replaceable><optional>,<replaceable>scale_2</replaceable>,..., <replaceable>scale_N</replaceable></optional>)</synopsis>
   </refsynopsisdiv>
 
@@ -35,7 +35,7 @@
 
       <procedure>
         <step>
-          <para>Create an array called m3x3:<para><programlisting>AQL% <command>CREATE ARRAY</command> m3x3 &lt;val:double&gt; [i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
+          <para>Create an array called m3x3:<para><programlisting>AFL% CREATE ARRAY m3x3 &lt;val:double&gt; [i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
         </step>
 
         <step>
@@ -53,7 +53,7 @@
         </step>
 
         <step>
-          <para>Expand each cell of m3x3 into a 2<symbol role="symbolfont">×</symbol>2 subgrid. Store the resulting array as
+          <para>Expand each cell of m3x3 into a 2<symbol role="symbolfont">×</symbol>2 sub-grid. Store the resulting array as
           m6x6:<para><programlisting>AFL% store(xgrid(m3x3,2,2),m6x6);  </programlisting><screen>[
 [(0),(0),(1),(1),(2),(2)],
 [(0),(0),(1),(1),(2),(2)],

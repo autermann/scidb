@@ -29,7 +29,47 @@ using namespace scidb;
 
 namespace scidb
 {
-
+ ///
+ /// @brief The operator: gemm().
+ ///
+ /// @par Synopsis:
+ ///   gemm( leftArray, rightArray, accumulateArray )
+ ///
+ /// @par Summary:
+ ///   Produces a result array via matrix multiplication of leftArray with rightArray and addition of accumulateArray
+ ///   All matrices must have a single numeric attribute of type 'double', two dimensions, and the chunk size of 32x32
+ ///   leftArray and rightArray must have the same size of 'inner' dimension, i.e. leftArray second dimension and rightArray first dimension.
+ ///    acumulateArray must have the shape of a matrix-multiplication-product, i.e. leftArray first dimension by rightArray second dimension.
+ ///
+ /// @par Input:
+ ///   - leftArray: the left matrix with two dimensions: leftDim1, leftDim2
+ ///   - rightArray: the right matrix with two dimensions: rightDim1, rightDim2
+ ///
+ /// @par Output array:
+ ///        <
+ ///   <br>   <double:gemm>: the result attribute
+ ///   <br> >
+ ///   <br> [
+ ///   <br>   leftDim1
+ ///   <br>   rightDim2
+ ///   <br> ]
+ ///
+ /// @par Examples:
+ ///   n/a
+ ///
+ /// @par Errors:
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR2 -- if attribute count != 1
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR5 -- if attribute type is not double in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR3 -- if number of dimensions != 2 in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR9 -- if sizes are not bounded in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR41 -- if chunk interval is too small in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR42 -- if chunk interval is too large in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR40 -- if there is chunk overlap in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR10 -- if the chunk sizes in any of the input arrays are not identical (until auto-repart is working)
+ ///
+ /// @par Notes:
+ ///   n/a
+ ///
 class GEMMLogical: public LogicalOperator
 {
 public:

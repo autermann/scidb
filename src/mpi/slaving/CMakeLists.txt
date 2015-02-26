@@ -43,42 +43,61 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_INCLUDE}")
     set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})         # hack - we don't understand FindMPI yet
     set(CMAKE_Fortran_COMPILER ${MPI_Fortran_COMPILER}) # hack - we don't understand FindMPI yet
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I ${SCALAPACK_INC_DIR}")
 
     message(STATUS "Debug: CMAKE_CXX_COMPLIER is ${CMAKE_CXX_COMPILER}")
     message(STATUS "Debug: CMAKE_Fortran_COMPLIER is ${CMAKE_Fortran_COMPILER}")
     message(STATUS "Debug: CMAKE_C_FLAGS is ${CMAKE_C_FLAGS}")
+    message(STATUS "Debug: SCALAPACK_BUILD_DIR  is ${SCALAPACK_BUILD_DIR}")
+    message(STATUS "Debug: SCALAPACK_INC_DIR  is ${SCALAPACK_INC_DIR}")
 
     #
     # build the mpi-slave program
     #
-    set (scidb_mpi_slave_src
-         mpi_slave.cpp
+    set (mpi_slave_common_src
     #    NOTE: the following items are to be moved back into their
     #    own slave in the dla area
          ../../linear_algebra/scalapackUtil/test/slaving/mpiCopySlave.cpp
          ../../linear_algebra/scalapackUtil/test/slaving/mpiRankSlave.cpp
          ../../linear_algebra/dlaScaLA/slaving/pdgemmSlave.cpp
          ../../linear_algebra/dlaScaLA/slaving/pdgesvdSlave.cpp
+         ../../linear_algebra/dlaScaLA/slaving/pdgesvdMasterSlave.cpp
          ../../linear_algebra/dlaScaLA/slaving/slaveTools.cpp
-        ../../linear_algebra/scalapackUtil/reformat.cpp
+         ../../linear_algebra/scalapackUtil/reformat.cpp
     )
 
-    add_executable(scidb_mpi_slave ${scidb_mpi_slave_src})
-    
+    add_library(mpi_slave_common STATIC ${mpi_slave_common_src})
+    target_link_libraries(mpi_slave_common  ${SCALAPACK_LIBRARIES}
+                                            ${MPI_LIBRARIES}
+                                            ${LAPACK_LIBRARIES}
+                                            ${BLAS_LIBRARIES}
+                                            mpi_common)
+
+    #
+    # first one is a stripped-down version that is a pure mpi/scalapack program
+    # used as a unit test that avoids all scidb-isms, useful for 1st-level
+    # divide-and-conquer if slave problems occur when driven by scidb
+    #
+    add_executable(mpi_slave_direct mpi_slave_direct.cpp)
+    add_executable(mpi_slave_scidb mpi_slave_scidb.cpp)
+
     # Temporary until separate dla-scalapack slave
-    target_link_libraries(scidb_mpi_slave ${SCALAPACK_LIBRARIES})
-    target_link_libraries(scidb_mpi_slave ${LAPACK_LIBRARIES})
-    target_link_libraries(scidb_mpi_slave ${BLAS_LIBRARIES})
-    target_link_libraries(scidb_mpi_slave ${MPI_LIBRARIES})
-    target_link_libraries(scidb_mpi_slave  mpi_common
+    target_link_libraries(mpi_slave_direct mpi_slave_common
                                            scidbclient
-                                           scidb_msg_lib
-                                           ${LOG4CXX_LIBRARIES}
-                                           ${PROTOBUF_LIBRARY}
-                                           ${LIBRT_LIBRARIES}
-                                           ${Boost_LIBRARIES})
-    extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "scidb_mpi_slave" scidb_mpi_slave)
-    set_target_properties(scidb_mpi_slave PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
+                                           scidb_msg_lib)
+
+    target_link_libraries(mpi_slave_scidb   mpi_slave_common
+                                            scidbclient
+                                            scidb_msg_lib
+                                            ${LOG4CXX_LIBRARIES}
+                                            ${PROTOBUF_LIBRARY}
+                                            ${LIBRT_LIBRARIES}
+                                            ${Boost_LIBRARIES})
+
+    extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "mpi_slave_direct" mpi_slave_direct)
+    extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "mpi_slave_scidb" mpi_slave_scidb)
+    set_target_properties(mpi_slave_direct PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
+    set_target_properties(mpi_slave_scidb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
 
 endif (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
        MPI_CXX_FOUND AND MPI_Fortran_FOUND)

@@ -187,6 +187,18 @@ namespace scidb
     */
    uint32_t getLivenessTimeout();
 
+   /// Host name resolution handler
+   typedef boost::function< void(const boost::system::error_code& ,
+                                 boost::asio::ip::tcp::resolver::iterator)> ResolverFunc;
+   /**
+    * Perform DNS name resolution using the standard means provided by the OS.
+    * @param address [in] host DNS name or IP address
+    * @param service [in] service name like 'ftp' or numeric port number; "" value does not restrict the resolution to a particular service
+    * @param cb [cb] callback functor that is supposed to consume the results of the name resolution;
+    *                 it must NOT perform any blocking operations such network IO or long running computation;
+    *                 cb is not invoked inside of this function.
+    */
+   void resolveAsync(const std::string& address, const std::string& service, ResolverFunc& cb);
 } // namespace scidb
 
 #endif /* NETWORK_H_ */

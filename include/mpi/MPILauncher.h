@@ -39,6 +39,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/asio.hpp>
+#include <util/WorkQueue.h>
 
 // scidb
 #include <array/Metadata.h>
@@ -46,6 +47,8 @@
 #include <system/ErrorCodes.h>
 #include <system/Exceptions.h>
 #include <util/Mutex.h>
+
+#include <mpi/MPIUtils.h>
 
 namespace scidb
 {
@@ -72,8 +75,6 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
        }
     };
 
-    MpiLauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
-    MpiLauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout);
     virtual ~MpiLauncher() {}
 
     /**
@@ -104,24 +105,85 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
 
     uint64_t getLaunchId() { return _launchId; /* no need to lock because never changes */ }
 
+    /// MPI implementation type 
+    enum { OMPI=0, MPICH };
+
+    static size_t getMPIType() { return size_t(MPICH); }
+
+    static std::string getLauncherPath(const std::string& mpiPath)
+    {
+        assert(!mpiPath.empty());
+        return mpiPath + "/bin/" + ((getMPIType() == OMPI) ?
+                                    mpi::OMPI_LAUNCHER_BIN :
+                                    mpi::MPICH_LAUNCHER_BIN);
+    }
+
+    static std::string getDaemonPath(const std::string& mpiPath)
+    {
+        assert(!mpiPath.empty());
+        return mpiPath+"/bin/"+ ((getMPIType() == OMPI) ?
+                                 mpi::OMPI_DAEMON_BIN :
+                                 mpi::MPICH_DAEMON_BIN);
+    }
+
+ protected:
+
+    MpiLauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
+    MpiLauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout);
+
+    virtual  void buildArgs(std::vector<std::string>& envVars,
+                            std::vector<std::string>& args,
+                            const std::vector<std::string>& slaveArgs,
+                            const boost::shared_ptr<const scidb::InstanceMembership>& membership,
+                            const boost::shared_ptr<scidb::Query>& query,
+                            const size_t maxSlaves) = 0;
+
+    static void getSortedInstances(std::map<scidb::InstanceID,
+                                   const scidb::InstanceDesc*>& sortedInstances,
+                                   const scidb::Instances& instances,
+                                   const boost::shared_ptr<scidb::Query>& query);
+    const std::string& getInstallPath()
+    {
+        return _installPath;
+    }
+    void setInstallPath(const std::string& path)
+    {
+        assert(_installPath.empty());
+        _installPath = path;
+    }
+
+    bool addIpcName(const std::string& name)
+    {
+        assert(!name.empty());
+        return _ipcNames.insert(name).second;
+    }
+
+    static char* initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize);
+
+    
+    static void resolveHostNames(boost::shared_ptr<std::vector<std::string> >& hosts);
+    static void handleHostNameResolve(const boost::shared_ptr<WorkQueue>& workQueue,
+                                      boost::shared_ptr<std::vector<std::string> >& hosts,
+                                      size_t indx,
+                                      const boost::system::error_code& error,
+                                      boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
+    static void processHostNameResolve(boost::shared_ptr<std::vector<std::string> >& hosts,
+                                       size_t indx,
+                                       const boost::system::error_code& error,
+                                       boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
  private:
     void handleKillTimeout(boost::shared_ptr<boost::asio::deadline_timer>& killTimer,
                            const boost::system::error_code& error);
-    void buildArgs(std::vector<std::string>& args,
-                   const std::vector<std::string>& slaveArgs,
-                   const boost::shared_ptr<const scidb::InstanceMembership>& membership,
-                   const boost::shared_ptr<scidb::Query>& query,
-                   const size_t maxSlaves);
-    void addPerInstanceArgs(const InstanceID myId,
-                            const InstanceDesc* desc,
-                            const std::string& clusterUuid,
-                            const std::string& queryId,
-                            const std::string& launchId,
-                            const std::vector<std::string>& slaveArgs,
-                            std::vector<std::string>& args);
-    void getSortedInstances(std::map<scidb::InstanceID,const scidb::InstanceDesc*>& sortedInstances,
-                            const scidb::Instances& instances,
-                            const boost::shared_ptr<scidb::Query>& query);
+    void buildArgsOMPI(std::vector<std::string>& args,
+                       const std::vector<std::string>& slaveArgs,
+                       const boost::shared_ptr<const scidb::InstanceMembership>& membership,
+                       const boost::shared_ptr<scidb::Query>& query,
+                       const size_t maxSlaves);
+    void buildArgsMPICH(std::vector<std::string>& args,
+                        const std::vector<std::string>& slaveArgs,
+                        const boost::shared_ptr<const scidb::InstanceMembership>& membership,
+                        const boost::shared_ptr<scidb::Query>& query,
+                        const size_t maxSlaves);
     void closeFds();
     void becomeProcGroupLeader();
     void setupLogging();
@@ -145,9 +207,79 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
     bool _inError;
     boost::shared_ptr<boost::asio::deadline_timer> _killTimer;
     std::string _installPath;
-    std::string _ipcName;
+    std::set<std::string> _ipcNames;
     scidb::Mutex _mutex;
     const uint32_t _MPI_LAUNCHER_KILL_TIMEOUT;
 };
+
+class MpiLauncherOMPI : public MpiLauncher
+{
+ public:
+    MpiLauncherOMPI(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q)
+    : MpiLauncher(launchId, q) {}
+    MpiLauncherOMPI(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout)
+    : MpiLauncher(launchId, q, timeout) {}
+    virtual ~MpiLauncherOMPI() {}
+ protected:
+    virtual  void buildArgs(std::vector<std::string>& envVars,
+                            std::vector<std::string>& args,
+                            const std::vector<std::string>& slaveArgs,
+                            const boost::shared_ptr<const scidb::InstanceMembership>& membership,
+                            const boost::shared_ptr<scidb::Query>& query,
+                            const size_t maxSlaves);
+ private:
+
+    void addPerInstanceArgsOMPI(const InstanceID myId,
+                                const InstanceDesc* desc,
+                                const std::string& clusterUuid,
+                                const std::string& queryId,
+                                const std::string& launchId,
+                                const std::vector<std::string>& slaveArgs,
+                                std::vector<std::string>& args);
+};
+
+/**
+ *  A class to launch an MPICH job.
+ *  @note There are several questions that need to be addressed wrt MPICH
+ *  1. There is no way (yet?) to identify run-away hydra_pmi_proxy processes after a restart,
+ *      or the ones whose children failed to handshake with SciDB.
+ *  2. MPICH uses /dev/shm for local communication, which is not cleaned up anyhow by SciDB.
+ */
+class MpiLauncherMPICH : public MpiLauncher
+{
+ public:
+    MpiLauncherMPICH(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q)
+    : MpiLauncher(launchId, q) {}
+    MpiLauncherMPICH(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout)
+    : MpiLauncher(launchId, q, timeout) {}
+    virtual ~MpiLauncherMPICH() {}
+
+ protected:
+    virtual void buildArgs(std::vector<std::string>& envVars,
+                           std::vector<std::string>& args,
+                           const std::vector<std::string>& slaveArgs,
+                           const boost::shared_ptr<const scidb::InstanceMembership>& membership,
+                           const boost::shared_ptr<scidb::Query>& query,
+                           const size_t maxSlaves);
+ private:
+    void addPerInstanceArgsMPICH(const InstanceID myId,
+                                 const InstanceDesc* desc,
+                                 const std::string& clusterUuid,
+                                 const std::string& queryId,
+                                 const std::string& launchId,
+                                 const std::vector<std::string>& slaveArgs,
+                                 std::vector<std::string>& args,
+                                 std::vector<std::string>& hosts);
+    /**
+     * Generate a script to be invoked by MPICH as an SSH launcher (i.e. /usr/bin/ssh)
+     * The script insert an environment variable into hydra_pmi_proxy process to make
+     * it identifiable and becomes /usr/bin/ssh (via exec)
+     */
+    static std::string
+    getLauncherSSHExecContent(const std::string& clusterUuid, const std::string& queryId,
+                              const std::string& launchId,    const std::string& daemonBinPath);
+};
+MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
+MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout);
 }
 #endif

@@ -11,7 +11,7 @@ create array champions <person:string,country:string,time:double null> [year=199
 redimension_store(winnersFlat,champions) 
 --stop-igdata
 scan(champions)
---aql select * from attributes(champions) 
+attributes(champions) 
 --aql select * from attributes(champions) where nullable = true 
 
 --stop-query-logging

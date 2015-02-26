@@ -55,8 +55,6 @@ Query was executed successfully
 
 [An error expected at this place for the query "normalize(I1)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2.]
 
-[An error expected at this place for the query "inverse(I3)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3.]
-
 Query was executed successfully
 
 Query was executed successfully

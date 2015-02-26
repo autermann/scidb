@@ -100,7 +100,7 @@ SCIDB QUERY : <select * from show(SP)>
 
 SCIDB QUERY : <select * from dimensions(SP)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "i",1,1000,100,0,1,100,"int64"
+{0} "i",1,1000,100,0,1,2,"int64"
 
 SCIDB QUERY : <save SP into current instance 'sp_int32_int64.bin' as '(int64,string,double,int64,bool,float,string_10)'>
 {i} a,b,c,d,e,f,g
@@ -127,7 +127,7 @@ SCIDB QUERY : <select * from show(SP)>
 
 SCIDB QUERY : <select * from dimensions(SP)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "i",1,1000,100,0,1,100,"int64"
+{0} "i",1,1000,100,0,1,2,"int64"
 
 SCIDB QUERY : <save SP into 'sp_aql.bin' as 'opaque'>
 {i} a,b,c,d,e,f,g
@@ -154,7 +154,7 @@ SCIDB QUERY : <select * from show(SP)>
 
 SCIDB QUERY : <select * from dimensions(SP)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "i",1,1000,100,0,1,100,"int64"
+{0} "i",1,1000,100,0,1,2,"int64"
 
 SCIDB QUERY : <load SP from current instance '../tests/harness/testcases/data/sp_err.txt'>
 [An error expected at this place for the query "load SP from current instance '../tests/harness/testcases/data/sp_err.txt'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]

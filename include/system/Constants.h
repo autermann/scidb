@@ -52,6 +52,8 @@ const char* SCIDB_INSTALL_PREFIX();
 
 std::string SCIDB_BUILD_INFO_STRING(const char* separator = "\n");
 
+std::string DEFAULT_MPI_DIR();
+
 extern const size_t MB;
 extern const size_t GB;
 

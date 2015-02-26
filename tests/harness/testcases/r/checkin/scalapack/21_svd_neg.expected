@@ -64,25 +64,25 @@ SCIDB QUERY : <gesvd(ColInf, 'S')>
 SCIDB QUERY : <remove(ColInf)>
 Query was executed successfully
 
-SCIDB QUERY : <create array chunkTooLarge  <a: double> [r=0:1,129,0, c=0:1,129,0]>
+SCIDB QUERY : <create array chunkTooSmall  <a: double> [r=0:1,31,0, c=0:1,31,0]>
+Query was executed successfully
+
+SCIDB QUERY : <gesvd(chunkTooSmall, 'S')>
+[An error expected at this place for the query "gesvd(chunkTooSmall, 'S')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
+
+SCIDB QUERY : <remove(chunkTooSmall)>
+Query was executed successfully
+
+SCIDB QUERY : <create array chunkTooLarge  <a: double> [r=0:1,33,0, c=0:1,33,0]>
 Query was executed successfully
 
 SCIDB QUERY : <gesvd(chunkTooLarge, 'S')>
-[An error expected at this place for the query "gesvd(chunkTooLarge, 'S')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41.]
+[An error expected at this place for the query "gesvd(chunkTooLarge, 'S')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR42. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR42.]
 
 SCIDB QUERY : <remove(chunkTooLarge)>
 Query was executed successfully
 
-SCIDB QUERY : <create array chunkNotSquare <a: double> [r=0:1,2,0,   c=0:1,3,0]>
-Query was executed successfully
-
-SCIDB QUERY : <gesvd(chunkNotSquare, 'S')>
-[An error expected at this place for the query "gesvd(chunkNotSquare, 'S')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR10. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR10.]
-
-SCIDB QUERY : <remove(chunkNotSquare)>
-Query was executed successfully
-
-SCIDB QUERY : <create array RowOverlap<a: double>  [r=0:1,2,1, c=0:1,2,0]>
+SCIDB QUERY : <create array RowOverlap<a: double>  [r=0:1,32,1, c=0:1,32,0]>
 Query was executed successfully
 
 SCIDB QUERY : <gesvd(RowOverlap, 'S')>
@@ -91,7 +91,7 @@ SCIDB QUERY : <gesvd(RowOverlap, 'S')>
 SCIDB QUERY : <remove(RowOverlap)>
 Query was executed successfully
 
-SCIDB QUERY : <create array ColOverlap<a: double>  [r=0:1,2,0, c=0:1,2,1]>
+SCIDB QUERY : <create array ColOverlap<a: double>  [r=0:1,32,0, c=0:1,32,1]>
 Query was executed successfully
 
 SCIDB QUERY : <gesvd(ColOverlap, 'S')>

@@ -4,14 +4,18 @@
   <refnamediv>
     <refname>scan</refname>
 
-    <refpurpose>Produces a result array that is equivalent to a stored array.
-    That is, the scan operator reads a stored array.</refpurpose>
+    <refpurpose><indexterm>
+        <primary>scan</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>display contents</secondary>
+      </indexterm>Produces a result array that is equivalent to a stored
+    array. That is, the scan operator reads a stored array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL%  <command>SELECT</command> * <command>FROM</command> <replaceable>stored_array</replaceable>;</synopsis>
-
-    <synopsis>AFL%  scan(<replaceable>stored_array</replaceable>);</synopsis>
+    <synopsis>scan(<replaceable>stored_array</replaceable>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>

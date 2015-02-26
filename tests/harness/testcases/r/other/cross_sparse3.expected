@@ -266,7 +266,7 @@ SCIDB QUERY : <store(cross(teeth,A),BBB)>
 
 SCIDB QUERY : <show(BBB)>
 {i} schema
-{0} "BBB<val:int64 NULL,a:float> [x=0:5,2,0,y=0:3,2,0,x_2=-2:2,3,0]"
+{0} "BBB<val:int64 NULL DEFAULT null,a:float> [x=0:5,2,0,y=0:3,2,0,x_2=-2:2,3,0]"
 
 SCIDB QUERY : <cross(A,d1)>
 {x,x,y} a,a1
@@ -2983,7 +2983,7 @@ SCIDB QUERY : <store(cross(teeth,d1),CCC)>
 
 SCIDB QUERY : <show(CCC)>
 {i} schema
-{0} "CCC<val:int64 NULL,a1:double NULL> [x=0:5,2,0,y=0:3,2,0,x_2=0:4,3,0,y_2=-2:1,2,1]"
+{0} "CCC<val:int64 NULL DEFAULT null,a1:double NULL DEFAULT null> [x=0:5,2,0,y=0:3,2,0,x_2=0:4,3,0,y_2=-2:1,2,1]"
 
 SCIDB QUERY : <unpack(teeth,j)>
 {j} x,y,val
@@ -3019,7 +3019,7 @@ SCIDB QUERY : <store(unpack(teeth,j),ZZZ)>
 
 SCIDB QUERY : <show(ZZZ)>
 {i} schema
-{0} "ZZZ<x:int64,y:int64,val:int64 NULL> [j=0:*,24,0]"
+{0} "ZZZ<x:int64,y:int64,val:int64 NULL DEFAULT null> [j=0:*,24,0]"
 
 SCIDB QUERY : <cross(unpack(teeth,j),A)>
 {j,x} x,y,val,a

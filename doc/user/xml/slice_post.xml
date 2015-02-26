@@ -4,15 +4,24 @@
   <refnamediv>
     <refname>slice</refname>
 
-    <refpurpose>Produces a result array that is a subset of the source array
+    <refpurpose><indexterm>
+        <primary>slice</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>slicing</secondary>
+      </indexterm><indexterm>
+        <primary>subarray</primary>
+      </indexterm><indexterm>
+        <primary>array reductions</primary>
+
+        <secondary>slice</secondary>
+      </indexterm>Produces a result array that is a subset of the source array
     derived by holding one or more dimension values constant</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL%  <command>SELECT</command> * <command>FROM</command> 
-               slice(<replaceable>array</replaceable>,<replaceable>dimension1</replaceable>,<replaceable>value1</replaceable><optional><replaceable>dimension2</replaceable>,<replaceable>value2</replaceable>,...</optional>);</synopsis>
-
-    <synopsis>AFL%  slice(<replaceable>array</replaceable>,<replaceable>dimension1</replaceable>,<replaceable>value1</replaceable><optional><replaceable>dimension2</replaceable>,<replaceable>value2</replaceable>,...</optional>);</synopsis>
+    <synopsis>slice(<replaceable>array</replaceable>,<replaceable>dimension1</replaceable>,<replaceable>value1</replaceable><optional><replaceable>dimension2</replaceable>,<replaceable>value2</replaceable>,...</optional>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -36,20 +45,17 @@
 
       <procedure>
         <step>
-          <para>Create a 3<symbol role="symbolfont">×</symbol>3 array
-          m3x3:
-<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting><screen>Query was executed successfully
+          <para>Create a 3<symbol role="symbolfont">×</symbol>3 array m3x3:
+          <para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting><screen>Query was executed successfully
 </screen></para></para>
         </step>
 
         <step>
-          <para>Put values of 0–8 into m3x3:
-<para><programlisting>AFL% store(build(m3x3,i*3+j),m3x3);  </programlisting></para></para>
+          <para>Put values of 0–8 into m3x3: <para><programlisting>AFL% store(build(m3x3,i*3+j),m3x3);  </programlisting></para></para>
         </step>
 
         <step>
-          <para>Select the middle column of m3x3:
-<para><programlisting>AFL% slice(m3x3,j,1);  </programlisting><screen>{i} val
+          <para>Select the middle column of m3x3: <para><programlisting>AFL% slice(m3x3,j,1);  </programlisting><screen>{i} val
 {0} 1
 {1} 4
 {2} 7

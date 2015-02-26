@@ -98,7 +98,7 @@ namespace scidb
                         }
                         ++(*src);
                     }
-                    if (!vectorMode && !acc.desc.containsOverlaps()) {
+                    if (!vectorMode && !acc.desc.hasOverlap()) {
                         accChunk.setCount(count);
                     }
                     dst->flush();

@@ -14,7 +14,6 @@
 --start-igdata
 --aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0] 
 --aql SELECT * FROM redimension_store(winnersFlat,winners)  
---shell  --command="loadcsv.py -h " --store
 --aql SELECT * FROM list('types')  
 --aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
 --aql LOAD intensityFlat FROM '../examples/intensity_data.bin' AS '(string, int64, int64 null)'  

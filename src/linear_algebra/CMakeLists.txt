@@ -53,9 +53,9 @@ endif(USE_LOCAL_MPI)
 
 #
 # DLA is built, by default, using the platform-provided set of:
-# ScaLAPACK, BLACS, Open MPI, LAPACK, and BLAS
+# ScaLAPACK, BLACS, Open MPI, LAPACK, AND BLAS
 # (On most, but not all platforms, ScaLAPACK is a recent version that
-#  contains BLACS internally, and is not a separate package)
+#  contains BLACS internally, AND is not a separate package)
 #
 # We will call this list of 4-5 packages "the ScaLAPACK stack"
 #
@@ -65,7 +65,7 @@ set(USE_PLATFORM_PACKAGES "true")
 if(USE_ALTERNATE_STACK_LP64)
     unset(USE_PLATFORM_PACKAGES)
     message(STATUS "USE_ALTERNATE_STACK_LP64:  Scalapack configured for ALTERNATE_STACK_LP64")
-    # The flags and paths for the ALTERNATE_STACK_LP64
+    # The flags AND paths for the ALTERNATE_STACK_LP64
     # would go here
     set(ALTROOT "/opt/intel/alt")
     set(ALT_INCD "${ALTROOT}/include")
@@ -110,7 +110,7 @@ if(USE_ALT_ILP64)
     # alt_avx or alt_def needed
 endif(USE_ALT_ILP64)
 
-if(USE_PLATFORM_PACKAGES)
+if(0 AND USE_PLATFORM_PACKAGES) # for when slave compilation returns to this directory tree
     ######################
     # BLAS - from platform
     ######################
@@ -166,17 +166,17 @@ if(USE_PLATFORM_PACKAGES)
         message(WARNING "ScaLAPACK not found. ScaLAPACK-based functionality will NOT be built.")
 	message(STATUS "Please look to doc/build.txt for list of dependencies")
     endif (SCALAPACK_FOUND)
-endif(USE_PLATFORM_PACKAGES)
+endif(0 AND USE_PLATFORM_PACKAGES)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOMPI_IGNORE_CXX_SEEK")
 
-if(NOT MPI_CXX_FOUND OR NOT MPI_Fortran_FOUND)
-    message(WARNING "MPI not present. ScaLAPACK-based functionality will NOT be built")
-    message(WARNING "Debug: MPI_C_FOUND is ${MPI_C_FOUND}, MPI_CXX_FOUND is ${MPI_CXX_FOUND}, MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
-    message(WARNING "Ubuntu Hint: $ sudo apt-get install libopenmpi-dev")
-endif(NOT MPI_CXX_FOUND OR NOT MPI_Fortran_FOUND)
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_INCLUDE}")
+if(MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_INCLUDE}")
+else(MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+    #    message(WARNING "MPI not present. ScaLAPACK-based functionality will NOT be built")
+    #    message(WARNING "Debug: MPI_C_FOUND is ${MPI_C_FOUND}, MPI_CXX_FOUND is ${MPI_CXX_FOUND}, MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
+    #    message(WARNING "Ubuntu Hint: $ sudo apt-get install libopenmpi-dev")
+endif(MPI_CXX_FOUND AND MPI_Fortran_FOUND)
 
 message(STATUS "Debug: BLAS_LIBRARIES is ${BLAS_LIBRARIES}")
 message(STATUS "Debug: LAPACK_LIBRARIES is ${LAPACK_LIBRARIES}")
@@ -186,13 +186,9 @@ message(STATUS "Debug: CMAKE_C_FLAGS is ${CMAKE_C_FLAGS}")
 message(STATUS "Debug: CMAKE_CXX_FLAGS is ${CMAKE_CXX_FLAGS}")
 message(STATUS "Debug: CMAKE_Fortran_FLAGS is ${CMAKE_Fortran_FLAGS}")
 
-if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
-    MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+if (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     message(STATUS "Debug: MPI_Fortran_COMPILER is ${MPI_Fortran_COMPILER}")
 
-    # we are not using OpenMPI tools (e.g. mpic++) to build because
-    # only the slave needs to be built that way
-    
     #
     # build the common mpi framework code
     #
@@ -200,14 +196,17 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
 #    set (dense_linear_algebra_common_src mpi/MPIUtils.cpp
 #                                         sharedMem/SharedMemoryIpc.cpp
 #    )
-
 #   add_library(dense_linear_algebra_common STATIC ${dense_linear_algebra_common_src})
 #   set_target_properties(dense_linear_algebra_common PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
 
+    # NOTE: library compiles with regular compilers, not MPI compilers
+    # only the slave needs MPI compilation AND ScaLAPACK+MPI libraries
+    
+
     #
-    # add the mpi test operator and scalapack-based DLA operators
-    # to the dense_linear_algebra library
+    # dense_linear_algebra library
     #
+
     set (dense_linear_algebra_src ${dense_linear_algebra_src}
         plugin.cpp
         # scalapack emulation:
@@ -235,21 +234,23 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
         dlaScaLA/SVDPhysical.cpp
         dlaScaLA/slaving/pdgemmMaster.cpp
         dlaScaLA/slaving/pdgesvdMaster.cpp
+        dlaScaLA/slaving/pdgesvdMasterSlave.cpp
     )
 
     #
-    # build the mpi-slave program
+    # build the mpi-slave program  (not currently linked here, but a version will return here, "soon")
     #
     set (mpi_slave_src
         scalapackUtil/test/slaving/mpiCopySlave.cpp
         scalapackUtil/test/slaving/mpiRankSlave.cpp
         dlaScaLA/slaving/pdgemmSlave.cpp
         dlaScaLA/slaving/pdgesvdSlave.cpp
+        dlaScaLA/slaving/pdgesvdMasterSlave.cpp
         dlaScaLA/slaving/slaveTools.cpp
         scalapackUtil/reformat.cpp
     )
 
-    # Temporarily, src/mpi/slaving produces scidb_mpi_slave, which is the "everything" slave
+    # Temporarily, src/mpi/slaving produces mpi_slave_scidb, which is the "everything" slave
 #    add_executable(mpi_slave ${mpi_slave_src})
 #    if(${DISTRO_NAME_VER} MATCHES "RedHat-[0-9][.][0-9]")
 #     target_link_libraries(mpi_slave ${LIBGFORTRAN_LIBRARIES})
@@ -263,16 +264,16 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
 #    set_target_properties(mpi_slave PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
 
 #
-# and the tools needed to test gemm and gesvd
+# AND the tools needed to test gemm AND gesvd
 #
 configure_file(doSvd.sh "${GENERAL_OUTPUT_DIRECTORY}/doSvd.sh" COPYONLY)
+configure_file(doSvdDirect.sh "${GENERAL_OUTPUT_DIRECTORY}/doSvdDirect.sh" COPYONLY)
 configure_file(doSvdWithMetrics.sh "${GENERAL_OUTPUT_DIRECTORY}/doSvdWithMetrics.sh" COPYONLY)
 configure_file(doSvdMetric.sh "${GENERAL_OUTPUT_DIRECTORY}/doSvdMetric.sh" COPYONLY)
 configure_file(diag.sh "${GENERAL_OUTPUT_DIRECTORY}/diag.sh" COPYONLY)
 configure_file(test/driver.py "${GENERAL_OUTPUT_DIRECTORY}/dla_driver.py" COPYONLY)
 
-else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
-      MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+else (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
 
      set (dense_linear_algebra_src ${dense_linear_algebra_src}
           pluginNoSP.cpp
@@ -283,7 +284,7 @@ else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     message(WARNING "without ScaLAPACK, Open MPI, LAPACK, or a BLAS")
     message(WARNING "or without MPI_CXX")
     message(WARNING "or without MPI_Fortran interfaces.")
-    message(WARNING "This is only a warning and is not a problem unless")
+    message(WARNING "This is only a warning AND is not a problem unless")
     message(WARNING "you want the libdense_linear_algebra.so plugin to be built.")
     message(WARNING "")
     message(WARNING "If you intended to built it, the following will help you debug what is missing.")
@@ -298,21 +299,21 @@ else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     message(WARNING "Debug: MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
     message(WARNING "----------------------------------------------------")
 
-endif (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
-       MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+endif (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
+       
 
 #
 # complete the linar_algebra library settings
 #
 add_library(dense_linear_algebra SHARED ${dense_linear_algebra_src})
 
-if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
-    MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+if (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
+
     # target_link_libraries(dense_linear_algebra dense_linear_algebra_common)
     target_link_libraries(dense_linear_algebra mpi)
-endif (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
-       MPI_CXX_FOUND AND MPI_Fortran_FOUND)
-       
+
+endif (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
+
 #message(STATUS "Debug: FINAL dense_linear_algebra_LIBRARIES =========================")
 #message(STATUS "Debug: dense_linear_algebra_LIBRARIES is ${dense_linear_algebra_LIBRARIES}")
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}" dense_linear_algebra)

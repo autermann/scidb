@@ -3,12 +3,26 @@
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
-  <refnamediv>
+  <refnamediv id="redimensionStore">
     <refname>redimension_store</refname>
 
-    <refpurpose>Produces a stored array using some or all of the variables of
-    a source array, potentially changing some or all of those variables from
-    dimensions to attributes or vice versa, and optionally calculating
+    <refpurpose><indexterm>
+        <primary>redimension</primary>
+
+        <secondary>redimension_store</secondary>
+      </indexterm><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>adding</secondary>
+      </indexterm><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>redimensioning</secondary>
+      </indexterm><indexterm>
+        <primary>redimension_store</primary>
+      </indexterm>Produces a stored array using some or all of the variables
+    of a source array, potentially changing some or all of those variables
+    from dimensions to attributes or vice versa, and optionally calculating
     aggregates to be included in the new array.</refpurpose>
   </refnamediv>
 
@@ -22,93 +36,11 @@
     <title>Summary</title>
 
     <para>The redimension_store operator produces a stored result array using
-    data from a source array.</para>
-
-    <para>When you use redimension_store, you must decide two things:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para>How will the variables of the source array appear in the target
-        array?</para>
-      </listitem>
-
-      <listitem>
-        <para>How will cell collisions be handled?</para>
-      </listitem>
-    </itemizedlist>
-
-    <para>For each variable of the source array, you have these choices for
-    how to use it in the target array:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para>Include the variable without modification (i.e., an attribute
-        remains an attribute and a dimension remains a dimension).</para>
-
-        <para>To include an attribute without modification, simply include in
-        the schema definition of the target array an attribute of the same
-        data type with the same name. The analogous rule holds for including
-        dimensions without modification.</para>
-      </listitem>
-
-      <listitem>
-        <para>Include the variable, but convert it (from an attribute to a
-        dimension or vice versa)</para>
-
-        <para>To convert an attribute to a dimension, simply include in the
-        schema definition for the target array a dimension with the same name
-        and datatype as the attribute from the source array. The analogous
-        process holds for converting dimensions to attributes.</para>
-      </listitem>
-
-      <listitem>
-        <para>Exclude the variable</para>
-
-        <para>To exclude a variable, simply omit it from the schema definition
-        of the target array. Even if you exclude a variable, its data can
-        still contribute to the target array through aggregates.</para>
-      </listitem>
-    </itemizedlist>
-
-    <para>Note that a single use of the redimension_store operator can make
-    all of the above kinds of modifications to the various variables in the
-    source array.</para>
-
-    <para>Depending on how you arrange the source array's variables in the
-    target array, the redimension_store operator might encounter cell
-    collisions. A cell collision occurs when the redimension_store operator
-    generates multiple candidate cells for a single cell location of the
-    target array.</para>
-
-    <para>There are several ways to handle cell collisions. The most
-    straightforward is to retain an entire vector of candidate cells along an
-    auxilliary dimension sometiems called a "synthetic dimension." the
-    synthetic dimension must be declared in the target schema and its data
-    type must be int64.</para>
-
-    <para>If you do not use a synthetic dimension and the redimension_store
-    operator produces a collision at a cell location, SciDB will produce a
-    single cell from all of the candidate cells. The attributes of that cell
-    in the target array will be populated as follows:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para>If the target attribute was declared as the value of an
-        aggregate function, the value will be the value of that function
-        calculated over the set of candidate cells for that cell location. For
-        each aggregate you calculate, a nullable attribute to accommodate it
-        must exist in the target array's schema. the attribute must have the
-        appropriate datatype for that aggregate function.</para>
-      </listitem>
-
-      <listitem>
-        <para>If the target attribute is simply the value of an attribute from
-        the source array (rather than an aggregate function), the value of the
-        target attribute will be from an arbitrarily chosen candidate cell for
-        that location. If there are several such attributes in the target
-        array, their values will all come from the same candidate cell.</para>
-      </listitem>
-    </itemizedlist>
+    data from a source array. Many of the considerations and details are the
+    same as for the redimension operator, the main difference being that
+    redimension_store saves the results to the
+    <replaceable>named_target_array</replaceable>. For details, see the <link
+    linkend="redimension">redimension reference documentation</link>.</para>
 
     <para>The argument <replaceable>named_target_array</replaceable> must be
     an array that was previously created in SciDB. The target array's schema
@@ -148,9 +80,11 @@
       </listitem>
     </itemizedlist>
 
-    <para>If cell collisions occur, but the target array includes neither a
-    synthetic dimension nor aggregates, SciDB will arbitrarily choose a cell
-    from the set of candidate cells.</para>
+    <para><indexterm>
+        <primary>collisions</primary>
+      </indexterm>If cell collisions occur, but the target array includes
+    neither a synthetic dimension nor aggregates, SciDB will arbitrarily
+    choose a cell from the set of candidate cells.</para>
   </refsect1>
 
   <refsect1>
@@ -211,7 +145,8 @@
         <step>
           <para>Create the target array.<programlisting language="test">--aql create array ppmFunction  
       &lt;ppm:int64&gt; 
-      [patientID=1:100,100,0,elapsedTime=0:999,1000,0,pulse=0:300,301,0] 
+      [patientID=1:100,100,0,
+       elapsedTime=0:999,1000,0,pulse=0:300,301,0] 
  --show-query=yes 
  --show-output=no</programlisting></para>
         </step>
@@ -231,8 +166,8 @@
 
     <informalexample>
       <para>This example converts the result array from the previous example
-      into a different array in which one attribure becomes a dimension and
-      one dimemsion becomes an attribute. The new array supports queries that
+      into a different array in which one attribute becomes a dimension and
+      one dimension becomes an attribute. The new array supports queries that
       assess how blood count (in parts per million) and elapsed time affect
       pulse.</para>
 

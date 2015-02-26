@@ -18,9 +18,16 @@
 #
 usage()
 {
-  echo "Usage: run.sh Chunk_Count Chunk_Length Installation_Base_Name"
+  echo "Usage: run.sh Chunk_Count Chunk_Length Installation_Base_Name Port"
   echo " Chunk_Count and Chunk_Length must be integers > 0"
-  echo " Installation_Base_Name must be a string"
+  echo " Installation_Base_Name must be a string. Used as a base label"
+  echo "to specify which scale of installation to use. For example, "
+  echo "a base label of 'foo' is used to scale through foo1, foo2, etc"
+  echo "and each base-label.scale-factor must be a installation in the "
+  echo "config.ini file."
+  echo " Port must be a the SciDB coordinate server TCP/IP port number."
+  echo "It is the 'base-port' configuration from the config.ini for the"
+  echo "server."
   exit;
 }
 #
@@ -37,7 +44,7 @@ fi
 #  Check for the right number of command line arguments, and that the 
 #  command line arguments make sense. 
 #
-if [ $# -ne 3 ]; then 
+if [ $# -ne 4 ]; then 
 	usage;
 fi
 #
@@ -51,6 +58,7 @@ fi
 Chunk_Count=$1
 Chunk_Length=$2
 Installation_Base_Name=$3
+Port=$4
 #  
 if [ $Chunk_Count -le 0 ]; then
     echo "Chunk_Count must be > 0"
@@ -59,6 +67,10 @@ fi
 #
 if [ $Chunk_Length -le 0 ]; then
     echo "Chunk_Length must be > 0"
+    usage;
+fi
+if [ $Port -le 0 ]; then
+    echo "Port must be identified - look in your config.ini"
     usage;
 fi
 #
@@ -92,13 +104,13 @@ V=`scidb --version | grep version | awk '{print $3}' | awk -F. '{print $4}'`;
 #  long term historical log, you need to copy the files elsewhere. 
 #
 TIMING="/tmp/scidb_load_format_timings_$1_$2.csv"
-rm -rf $TIMING
+# rm -rf $TIMING
 STORAGE="/tmp/scidb_load_format_storage_$1_$2.csv"
-rm -rf $STORAGE
+# rm -rf $STORAGE
 MEM_USAGE="/tmp/scidb_load_format_mem_usage_$1_$2.csv"
-rm -rf $MEM_USAGE
+# rm -rf $MEM_USAGE
 ARRAY_SIZE="/tmp/scidb_load_format_array_size_$1_$2.csv"
-rm -rf $ARRAY_SIZE
+# rm -rf $ARRAY_SIZE
 #
 #  We want to exercise the Queries over the Array at multiple scale factors. 
 # The list below indicates what these scale factors are. Note that the script 
@@ -106,7 +118,7 @@ rm -rf $ARRAY_SIZE
 # simplicity, on bigboy these are called $Installation_Base_Name1, $Installation_Base_Name2, $Installation_Base_Name4, and this practice
 # of "instance_config:scale_factor" seems useful. 
 #  
-for Scale_Factor in 1 2 4; do 
+for Scale_Factor in 32 8 2; do 
 #
 #  Truncate the performance study log file at each scale factor. 
   echo "" > /tmp/perf-study.txt 
@@ -166,13 +178,15 @@ for Scale_Factor in 1 2 4; do
 #
 #   For each utilization of Arrays.sh and Queries.sh, print what you're about 
 #  to do. 
-	echo "./Arrays.sh $CC $CL $Sparseness $Zipf $Inst"
-	./Arrays.sh $CC $CL $Sparseness $Zipf $Inst >> /tmp/perf-study.txt 2>&1
-	echo "./Queries.sh $CC $CL"
-    ./Queries.sh $CC $CL >> /tmp/perf-study.txt 2>&1
+	echo "./Arrays.sh $CC $CL $Sparseness $Zipf $Inst $Port"
+	./Arrays.sh $CC $CL $Sparseness $Zipf $Inst $Port >> /tmp/perf-study.txt 2>&1
+	echo "./Queries.sh $CC $CL $Port"
+    ./Queries.sh $CC $CL $Port >> /tmp/perf-study.txt 2>&1
 #
 #   Stop the instance here, if it is running. We re-initialize it in Arrays.sh 
-	scidb.py stopall $Inst
+
+scidb.py stopall $Inst
+
     done;
 #
 #  As we increase the sparseness, we need to adjust the chunk_length as well, 
@@ -187,7 +201,7 @@ for Scale_Factor in 1 2 4; do
 # So we need to extract the information we're looking for from the log file,
 # and format it into .csv lines together with the scidb version and the 
 # scale factor information.
-  grep "^Q[1-9]" /tmp/perf-study.txt | grep -v Query | sed -e "s/Q//g" | awk 'BEGIN {q="\x22"; v="'$V'"; s="'$Scale_Factor'"} {printf("%d,%d,%d,%%d,%g\n", v, s, ((NR-1)/17)+1, $1, $2)}' >> $TIMING
+  grep "^Q[1-9]" /tmp/perf-study.txt | grep -v Query | sed -e "s/Q//g" | awk 'BEGIN {q="\x22"; v="'$V'"; s="'$Scale_Factor'"} {printf("%d,%d,%d,%d,%g\n", v, s, ((NR-1)/18)+1, $1, $2)}' >> $TIMING
 
 #
 #  Extract the per-array storage size information from the log, and format it 
@@ -206,6 +220,10 @@ for Scale_Factor in 1 2 4; do
 #        At this point, there doesn't seem to be a problem doing that. 
 #  echo "./scidb_load_format_memory.sh $V $Scale_Factor /tmp/perf-study.txt >> $MEM_USAGE"
 #   ./scidb_load_format_memory.sh $V $Scale_Factor /tmp/perf-study.txt >> $MEM_USAGE;
+
+#
+# Copy the results of the run into a new file. 
+cp /tmp/perf-study.txt /tmp/perf-study-${Scale_Factor}.txt 
 
 done;
 #

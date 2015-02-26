@@ -6,8 +6,14 @@
   <refnamediv>
     <refname>sample</refname>
 
-    <refpurpose>Produces a result array by selecting random chunks of a source
-    array.</refpurpose>
+    <refpurpose><indexterm>
+        <primary>sample</primary>
+      </indexterm><indexterm>
+        <primary>chunks</primary>
+
+        <secondary>sampling</secondary>
+      </indexterm>Produces a result array by selecting random chunks of a
+    source array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -29,32 +35,24 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example selects random chunks from a 1-dimensional 3-chunk
+      <para>This example selects random chunks from a 1-dimensional 8-chunk
       array.</para>
 
       <procedure>
         <step>
-          <para>Create a 1-dimensional array with dimension size of 6 and
-          chunk size of 2:
-<programlisting language='test'>
---afl CREATE ARRAY vector1&lt;val:double&gt;[i=0:5,2,0]; --show-query=yes --show-output=no
-</programlisting>
-	  </para>
+          <para>Create a 1-dimensional array with dimension size of 16 and
+          chunk size of 2: <programlisting language="test">--afl CREATE ARRAY vector1&lt;val:double&gt;[i=0:15,2,0]; --show-query=yes --show-output=no
+</programlisting></para>
         </step>
 
         <step>
-          <para>Put values of 0–5 into vector1:
-<programlisting language='test'>
---afl store(build(vector1,i),vector1); --show-query=yes --show-output=yes
-</programlisting>
-	  </para>
+          <para>Put values of 0–15 into vector1: <programlisting
+          language="test">--afl store(build(vector1,i),vector1); --show-query=yes --output-format=dense</programlisting></para>
         </step>
 
         <step>
           <para>Sample chunks from the array with the probability of .30 that
-          a chunk is included:
-<programlisting language='test'>
---afl sample(vector1,.3); --show-query=yes --show-output=yes --show-output-in-test-file=no
+          a chunk is included: <programlisting language="test">--afl sample(vector1,0.3); --show-query=yes --output-format=dense --show-output-in-test-file=no
 </programlisting></para>
         </step>
       </procedure>

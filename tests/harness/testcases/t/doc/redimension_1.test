@@ -13,7 +13,7 @@ create array z4 <trial:string>[device(string)=2,2,0, height=60:62,3,0, ppb=1:100
 
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE "store(redimension(zFlat,z1),z1)"
 redimension_store(zFlat,z1)
-store(redimension(zFlat,z2),z2)
+count(store(redimension(zFlat,z2),z2))
 show(z3)
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE "store(redimension(z1,z3),z3)"
 redimension_store(z1,z3)

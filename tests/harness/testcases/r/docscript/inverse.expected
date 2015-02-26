@@ -1,0 +1,11 @@
+SCIDB QUERY : <CREATE ARRAY m3x3 <val:double>[i=0:2,3,0,j=0:2,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build(m3x3,iif(i=j,1,2)),m3x3)>
+[[(1),(2),(2)],[(2),(1),(2)],[(2),(2),(1)]]
+
+SCIDB QUERY : <inverse(m3x3)>
+[[(-0.6),(0.4),(0.4)],[(0.4),(-0.6),(0.4)],[(0.4),(0.4),(-0.6)]]
+
+Query was executed successfully
+

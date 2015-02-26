@@ -4,13 +4,14 @@
 # Tests for the binary load-save on Arrays with UDT
 # Tests cover AFL syntax
 
+load_library('rational')
+
 create array RAT <val: rational > [ x=0:2,3,0]
 create array RAT1 <val1: rational,val2:rational >[ x=0:2,3,0]
 create array RAT2 <val1: rational,val2:rational >[ x=0:2,3,0]
 create array RAT3 <fraction: rational > [ x=0:2,3,0]
 
 --test
-load_library('rational')
 load(RAT,'../tests/harness/testcases/data/rat.txt')
 store(join(RAT,RAT),RAT1)
 save(RAT, 'rational.out', 0, '(rational)')

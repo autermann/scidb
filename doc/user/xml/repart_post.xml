@@ -1,16 +1,20 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
 <refentry>
-  <refnamediv>
+  <refnamediv id="repartOperator">
     <refname>repart</refname>
 
-    <refpurpose>Produces a result array similar to a source array, but with
+    <refpurpose><indexterm>
+        <primary>repart</primary>
+      </indexterm><indexterm>
+        <primary>chunks</primary>
+
+        <secondary>changing</secondary>
+      </indexterm>Produces a result array similar to a source array, but with
     different chunk sizes, different chunk overlaps, or both.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT </command>* <command>FROM </command>repart(<replaceable>array</replaceable>,<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>)</synopsis>
-
     <synopsis>AFL% repart(<replaceable>array</replaceable>,<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>)</synopsis>
   </refsynopsisdiv>
 
@@ -37,7 +41,7 @@
       <procedure>
         <step>
           <para>Create a 2-dimensional array called source where each
-          dimension uses a chunk size of 1: <para><programlisting>AQL% <command>CREATE ARRAY</command> source &lt;val:double&gt; [x=0:3,1,0,y=0:3,1,0];  </programlisting></para></para>
+          dimension uses a chunk size of 1: <para><programlisting>AFL% CREATE ARRAY source &lt;val:double&gt; [x=0:3,1,0,y=0:3,1,0];  </programlisting></para></para>
         </step>
 
         <step>

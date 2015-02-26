@@ -6,16 +6,29 @@
   <sect1>
     <title>Selecting Data From an Array</title>
 
-    <para>AQL's Data Manipulation Language (DML) provides queries to access
-    and operate on array data. The basis for selecting data from a SciDB array
-    is the AQL <code> <command>SELECT</command> </code> statement with <code>
-    <command>INTO</command> </code>, <code> <command>FROM</command> </code>,
-    and <code> <command>WHERE</command> </code> clauses. The syntax of the
-    <code> <command>SELECT</command> </code> statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable>
+    <para><indexterm>
+        <primary>data</primary>
+
+        <secondary>selecting</secondary>
+      </indexterm><indexterm>
+        <primary>selecting data</primary>
+      </indexterm><indexterm>
+        <primary>AQL</primary>
+
+        <secondary>select</secondary>
+      </indexterm>The AQL Data Manipulation Language (DML) provides queries to
+    access and operate on array data. The basis for selecting data from a
+    SciDB array is the AQL <code> <command>SELECT</command> </code> statement
+    with <code> <command>INTO</command> </code>, <code>
+    <command>FROM</command> </code>, and <code> <command>WHERE</command>
+    </code> clauses. The syntax of the <code> <command>SELECT</command>
+    </code> statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable>
    [<command>INTO</command> <replaceable>target_array</replaceable>]
     <command>FROM</command> <replaceable>array_expression</replaceable> | <replaceable>source_array</replaceable>
    [<command>WHERE</command> <replaceable>expression</replaceable>]
-</synopsis> The arguments for the statement are:<variablelist>
+</synopsis> The arguments for the statement are: <variablelist>
+        <?dbfo term-width="1.5in"?>
+
         <varlistentry>
           <term><replaceable>expression</replaceable></term>
 
@@ -76,7 +89,11 @@
       array, you can use the following <code><command>SELECT</command></code>
       statement: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> A;  </programlisting><screen>[(1),(2),(3),(4),(5),(6),(7),(8),(9),(10)]
 </screen><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> B;  </programlisting><screen>[(101),(102),(103),(104),(105),(106),(107),(108),(109),(110)]
-</screen> The <code>show</code> command returns an array result
+</screen><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>from</secondary>
+        </indexterm>The <code>show</code> command returns an array result
       containing an array's schema. To see the entire schema, use a
       <code><command>SELECT</command> *</code> statement with the
       <code>show</code> command: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(A);  </programlisting><screen>[("A&lt;val_a:double&gt; [i=0:9,10,0]")]
@@ -92,9 +109,13 @@
       also take an expression as an argument. For example, you can scale
       attribute values by a certain amount:</para></para>
 
-      <para><para>The <code> <command>WHERE</command> </code> clause can also use
-      built-in functions to create expressions. For example, you can choose
-      just the middle three cells of array B with the greater-than and
+      <para><para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>where</secondary>
+        </indexterm>The <code> <command>WHERE</command> </code> clause can
+      also use built-in functions to create expressions. For example, you can
+      choose just the middle three cells of array B with the greater-than and
       less-than functions with the <code>and</code> operator: <para><programlisting>AQL% <command>SELECT</command> j <command>FROM</command> B <command>WHERE</command> j &gt; 3 <command>AND</command> j &lt; 7;  </programlisting><screen>[(),(),(),(),(4),(5),(6),(),(),()]
 </screen> You can also select an expression of the attribute values
       for the middle three cells of B by providing an expression for the
@@ -112,9 +133,15 @@
   <sect1>
     <title>Array Joins</title>
 
-    <para>A join combines two or more arrays (typically as a preprocessing
-    step for subsequent operations). The simplest type of join is an
-    <emphasis>inner join</emphasis>. An inner join performs an
+    <para><indexterm>
+        <primary>join</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>join</secondary>
+      </indexterm>A join combines two or more arrays (typically as a
+    preprocessing step for subsequent operations). The simplest type of join
+    is an <emphasis>inner join</emphasis>. An inner join performs an
     attribute-attribute join on every cell in two source arrays. An inner join
     can be performed for two arrays with the same number of dimensions, same
     dimension starting coordinates, and same chunk size.</para>
@@ -122,7 +149,8 @@
     <para>The syntax of a inner join statement is:<synopsis><command>SELECT</command> <replaceable>expression</replaceable> <command>FROM</command> <replaceable>src_array1, src_array2</replaceable></synopsis></para>
 
     <para>The inner join of arrays A and B joins the attributes:
-    </para>
+    <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> A,B;  </programlisting><screen>[(1,101),(2,102),(3,103),(4,104),(5,105),(6,106),(7,107),(8,108),(9,109),(10,110)]
+</screen></para></para>
 
     <para>This query will store the attribute-attribute join of A and B in
     array C: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> C <command>FROM</command> A, B;  </programlisting><screen>[(1,101),(2,102),(3,103),(4,104),(5,105),(6,106),(7,107),(8,108),(9,109),(10,110)]
@@ -131,9 +159,9 @@
 &lt; val_a:double,
 val_b:double &gt;
 
-[i=0:9,10,0]</screen> The attributes maintain the names from A and B; the
-    dimension takes the name from the first array of the join
-    operation.</para></para></para>
+[i=0:9,10,0]</screen> The attributes maintain the
+    names from A and B; the dimension takes the name from the first array of
+    the join operation.</para></para></para>
 
     <para>Arrays do not need to have the same number of attributes to be
     compatible. As long as the dimension starting indices, chunk sizes, and
@@ -153,10 +181,14 @@ val_b:double &gt;
     aliases array A to a1 and a2, then uses dot notation to use the attribute
     <code>val_a</code> in two different expressions. <para><programlisting>AQL% <command>SELECT</command> a1.val_a,a2.val_a+2 <command>FROM</command> A <command>AS</command> a1,A <command>AS</command> a2;  </programlisting><screen>[(1,3),(2,4),(3,5),(4,6),(5,7),(6,8),(7,9),(8,10),(9,11),(10,12)]
 </screen> The aliasing rules apply to other join operators as well,
-    including merge, corss, and cross_join. See the section "Aliases" below
+    including merge, cross, and cross_join. See the section "Aliases" below
     for more information on aliases.</para></para></para>
 
-    <para>The <code> <command>JOIN ... ON</command> </code> predicate
+    <para><indexterm>
+        <primary>AQL</primary>
+
+        <secondary>join</secondary>
+      </indexterm>The <code> <command>JOIN ... ON</command> </code> predicate
     calculates the multidimensional join of two arrays after applying the
     constraints specified in the <command><code>ON</code></command> clause.
     The <command><code>ON</code></command> clause lists one or more
@@ -196,25 +228,49 @@ val_b:double &gt;
   <sect1 remap="h3">
     <title>Aliases</title>
 
-    <para>AQL provides a way to refer to arrays and array attributes in a
-    query via aliases. These are useful when using the same array repeatedly
-    in an AQL statement, or when abbreviating a long array name. Aliases are
-    created by adding an "as" to the array or attribute name, followed by the
-    alias. Future references to the array can then use the alias. Once an
-    alias has been assigned, all attributes and dimensions of the array can
-    use the fully qualified name using the dotted naming convention.
-    <para><programlisting>AQL%  <command>SELECT</command> data.i*10 <command>FROM</command> A <command>AS</command> data <command>WHERE</command> A.i &lt; 5;  </programlisting><screen>[(0),(10),(20),(30),(40),(),(),(),(),()]
+    <para><indexterm>
+        <primary>AQL</primary>
+
+        <secondary>aliases</secondary>
+      </indexterm><indexterm>
+        <primary>query aliases</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>aliases</secondary>
+      </indexterm><indexterm>
+        <primary>AQL</primary>
+
+        <secondary>as</secondary>
+      </indexterm>AQL provides a way to refer to arrays and array attributes
+    in a query via aliases. These are useful when using the same array
+    repeatedly in an AQL statement, or when abbreviating a long array name.
+    Aliases are created by adding an "as" to the array or attribute name,
+    followed by the alias. Future references to the array can then use the
+    alias. Once an alias has been assigned, all attributes and dimensions of
+    the array can use the fully qualified name using the dotted naming
+    convention. <para><programlisting>AQL%  <command>SELECT</command> data.i*10 <command>FROM</command> A <command>AS</command> data <command>WHERE</command> A.i &lt; 5;  </programlisting><screen>[(0),(10),(20),(30),(40),(),(),(),(),()]
 </screen></para></para>
   </sect1>
 
   <sect1 remap="h3">
     <title>Nested Subqueries</title>
 
-    <para>You can nest AQL queries to refine query results.</para>
+    <para><indexterm>
+        <primary>subqueries</primary>
+      </indexterm><indexterm>
+        <primary>queries</primary>
+
+        <secondary>nesting</secondary>
+      </indexterm>You can nest AQL queries to refine query results.</para>
 
     <para>For example, you can nest <code> <command>SELECT</command> </code>
     statements before a <code> <command>WHERE</command> </code> clause to
-    select a subset of the query output. For example, this query <orderedlist>
+    select a subset of the query output.<para><programlisting>AQL% <command>SELECT</command> pow(c,2) <command>FROM</command>
+(<command>SELECT</command> A.val_a + B.val_b <command>AS</command> c <command>FROM</command> A,B) <command>WHERE</command> i &gt; 5;  </programlisting><screen>[(),(),(),(),(),(),(12996),(13456),(13924),(14400)]
+</screen></para></para>
+
+    <para>This query does the following:<orderedlist>
         <listitem>
           <para>Sums two attributes from two different arrays and stores the
           output in an alias,</para>
@@ -227,18 +283,22 @@ val_b:double &gt;
         <listitem>
           <para>Squares the result.</para>
         </listitem>
-      </orderedlist> <para><programlisting>AQL% 
-<command>SELECT</command> pow(c,2) 
-<command>FROM</command>
-(<command>SELECT</command> A.val_a + B.val_b <command>AS</command> c <command>FROM</command> A,B) <command>WHERE</command> i &gt; 5;  </programlisting><screen>[(),(),(),(),(),(),(12996),(13456),(13924),(14400)]
-</screen></para></para>
+      </orderedlist></para>
   </sect1>
 
   <sect1 remap="h3">
     <title>Data Sampling</title>
 
-    <para>SciDB provides operations to sample array data. The
-    <code>bernoulli</code> command allows you to select a subset of array
+    <para><indexterm>
+        <primary>data</primary>
+
+        <secondary>sampling</secondary>
+      </indexterm><indexterm>
+        <primary>sampling data</primary>
+      </indexterm><indexterm>
+        <primary>bernoulli</primary>
+      </indexterm>SciDB provides operations to sample array data. The
+    <code>bernoulli</code> operator allows you to select a subset of array
     cells based upon a given probability. For example, you can use the
     <code>bernoulli</code> operator to randomly sample data from an array one
     element at a time. The syntax of <code>bernoulli</code> is:

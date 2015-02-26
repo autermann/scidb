@@ -119,9 +119,9 @@ SCIDB QUERY : <load Y from  current instance 'mat.dmp' as '(int32,string,string)
 
 SCIDB QUERY : <load Y from  current instance 'mat.dmp' as '(int32,string,string)' errors 100 shadow array Y_shad>
 {x} a,b,c
-{0} 1,"(1,1)","(0/0)"
-{1} 2,"(1,1)","(0/0)"
-{2} 3,"(1,1)","(0/0)"
+{0} 1,"(1,1)","(0/1)"
+{1} 2,"(1,1)","(0/1)"
+{2} 3,"(1,1)","(0/1)"
 
 SCIDB QUERY : <load Y from current instance 'tri.dmp' as '(int32,string,string)'>
 {x} a,b,c
@@ -146,9 +146,9 @@ SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),string,dumm
 
 SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),string,dummy(10))' errors 100 shadow array C_shad>
 {x} c
-{0} "(0/0)"
-{1} "(0/0)"
-{2} "(0/0)"
+{0} "(0/1)"
+{1} "(0/1)"
+{2} "(0/1)"
 
 SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),dummy(10),string)'>
 {x} c

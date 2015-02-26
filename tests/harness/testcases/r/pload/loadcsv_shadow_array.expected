@@ -1,16 +1,25 @@
-SCIDB QUERY : <scan( array_sm10 )>
-{i} a,b,c
+SCIDB QUERY : <sort( array_sm10,a )>
+{n} a,b,c
 {0} null,1,1
-{4} 1,2,3
-{8} 4,0,6
-{12} 7,8,9
+{1} 1,2,3
+{2} 4,0,6
+{3} 7,8,9
 
-SCIDB QUERY : <scan( array_shadow )>
-{i} a,b,c,row_offset
-{0} "Assigning NULL to non-nullable attribute",null,null,10
-{8} null,"Assigning NULL to non-nullable attribute",null,12
+SCIDB QUERY : <sort( array_shadow,a )>
+{n} a,b,c,row_offset
+{0} null,"Assigning NULL to non-nullable attribute",null,12
+{1} "Assigning NULL to non-nullable attribute",null,null,10
 
-SCIDB QUERY : <scan( array_shadow2 )>
-{i} a,b,c,row_offset
-{8} null,"Assigning NULL to non-nullable attribute",null,12
+SCIDB QUERY : <sort(array_shadow2,a)>
+{n} a,b,c,row_offset
+{0} null,"Assigning NULL to non-nullable attribute",null,12
+
+SCIDB QUERY : <remove(array_shadow)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(array_shadow2)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(array_sm10)>
+Query was executed successfully
 

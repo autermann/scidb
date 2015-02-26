@@ -583,7 +583,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         {
             result.iterationMode |= ConstChunkIterator::IGNORE_NULL_VALUES;
         }
-        if (!readZeroes && inputAttributeDesc.getDefaultValue().isZero())
+        if (!readZeroes && inputAttributeDesc.getDefaultValue().isDefault(inputAttributeDesc.getType()))
         {
             result.iterationMode |= ConstChunkIterator::IGNORE_DEFAULT_VALUES;
         }
@@ -632,7 +632,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         {
             result.iterationMode |= ConstChunkIterator::IGNORE_NULL_VALUES;
         }
-        if (!readZeroes && inputAttributeDesc.getDefaultValue().isZero())
+        if (!readZeroes && inputAttributeDesc.getDefaultValue().isDefault(inputAttributeDesc.getType()))
         {
             result.iterationMode |= ConstChunkIterator::IGNORE_DEFAULT_VALUES;
         }

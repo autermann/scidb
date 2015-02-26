@@ -17,9 +17,14 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The deldim operator deletes the left-most dimension from the array.
-    The to-be-deleted dimension must have size = 1. See the adddim operator
-    reference page for an example of creating a dimension of size = 1.</para>
+    <para><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>deleting</secondary>
+      </indexterm>The deldim operator deletes the left-most dimension from the
+    array. The to-be-deleted dimension must have size = 1. See the <link
+    linkend="adddim">adddim</link> operator reference for details of creating
+    a dimension of size = 1.</para>
 
     <para>You can use the deldim operator in the FROM clause of an AQL SELECT
     statement, as a stand-alone operator in a AFL statement, or as an operand

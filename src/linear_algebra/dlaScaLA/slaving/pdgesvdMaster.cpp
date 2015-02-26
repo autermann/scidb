@@ -28,7 +28,8 @@
 #include <mpi/MPISlaveProxy.h>
 
 #include "pdgesvdMaster.hpp"
-#include "pdgesvdSlave.hpp" // for argument structure
+#include "pdgesvdSlave.hpp"
+#include "pdgesvdMasterSlave.hpp"
 
 using namespace std;
 using namespace scidb;
@@ -80,44 +81,12 @@ void pdgesvdMaster(Query* query,  // or do I need only the ctx?
     static const char ARG_NUM_SHM_BUFFERS[] = "5";  // ARGS + A, S, U, and VT
     INFO = 1 ; 
 
-    if(DBG) {
-        std::cerr << "argsBuf:" << argsBuf << std::endl;
-        std::cerr << "A:" << (void*)(A) << std::endl;
-        std::cerr << "S:" << (void*)(S) << std::endl;
-        std::cerr << "U:" << (void*)(U) << std::endl;
-        std::cerr << "VT:" << (void*)(VT) << std::endl;
-    }
-
-    // marshall all arguments except the buffers A,S,U,&VT into a struct:
-    PdgesvdArgs* args = reinterpret_cast<PdgesvdArgs*>(argsBuf) ;
-    args->NPROW = NPROW;
-    args->NPCOL = NPCOL;
-    args->MYPROW = MYPROW;
-    args->MYPCOL = MYPCOL;
-    args->MYPNUM = MYPNUM;
-
-    args->jobU = jobU ;
-    args->jobVT = jobVT ;
-    args->M = M ; 
-    args->N = N ; 
-
-    args->A.I = IA ;
-    args->A.J = JA ;
-    args->A.DESC = DESC_A ;  // NOCOMPILE have to fix
-
-    args->U.I = IU ;
-    args->U.J = JU ;
-    args->U.DESC = DESC_U ;  // NOCOMPILE have to fix
-
-    args->VT.I = IVT ;
-    args->VT.J = JVT ;
-    args->VT.DESC = DESC_VT ;  // NOCOMPILE have to fix
-
-    if(DBG) {
-        std::cerr << "argsBuf:  ----------------------------" << std::endl ;
-        std::cerr << *args << std::endl;
-        std::cerr << "argsBuf:  end-------------------------" << std::endl ;
-    }
+    pdgesvdMarshallArgs(argsBuf, NPROW,  NPCOL, MYPROW, MYPCOL, MYPNUM,
+                                 jobU, jobVT, M, N,
+                                 NULL /*A*/,  IA,  JA,  DESC_A,
+                                 NULL /*S*/,
+                                 NULL /*U*/,  IU,  JU,  DESC_U,
+                                 NULL /*VT*/, IVT, JVT, DESC_VT);
 
     //
     // ready to send stuff to the proxy
@@ -128,7 +97,7 @@ void pdgesvdMaster(Query* query,  // or do I need only the ctx?
     cmd.setCmd(string("DLAOP")); // common command for all DLAOPS (TODO: to a header)
     cmd.addArg(ipcName);
     cmd.addArg(ARG_NUM_SHM_BUFFERS);
-    cmd.addArg("pdgesvd_");             // sub-command name (TODO:factor to a header, replace in scidb_mpi_slave as well)
+    cmd.addArg("pdgesvd_");             // sub-command name (TODO:factor to a header, replace in mpi_slave_scidb as well)
     slave->sendCommand(cmd, ctx);       // at this point the command and ipcName are sent
                                         // our slave finds and maps the buffers by name
                                         // based on ipcName

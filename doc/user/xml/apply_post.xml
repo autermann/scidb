@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
 <refentry>
-  <refnamediv>
+  <refnamediv id="apply">
     <refname>apply</refname>
 
     <refpurpose>Produces a result array similar to a source array, but with
@@ -11,27 +11,28 @@
 
   <refsynopsisdiv>
     <synopsis>
-      AQL%   <command>SELECT</command> * <command>FROM</command> 
-             apply(<replaceable>source-array</replaceable>,<replaceable>new_attribute1</replaceable>,<replaceable>expression1 
-                              </replaceable><optional>,<replaceable>new_attribute2</replaceable>,<replaceable>expression2</replaceable></optional>...);</synopsis>
-
-    <synopsis>
-      AFL%   apply(<replaceable>source_array</replaceable>,<replaceable>new_attribute1</replaceable>,<replaceable>expression1
-                              </replaceable><optional>,<replaceable>new_attribute2</replaceable>,<replaceable>expression2</replaceable></optional>...);</synopsis>
+      apply(<replaceable>source_array</replaceable>,<replaceable>new_attribute1</replaceable>,<replaceable>expression1
+                     </replaceable><optional>,<replaceable>new_attribute2</replaceable>,<replaceable>expression2</replaceable></optional>...);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para>Use the apply operator to produce a result array with new attributes
-    and to compute values for them. The new array includes all attributes
-    present in the source array, plus the newly created attributes. The newly
-    created attribute(s) must not have the same name as any of the existing
-    attributes of the source array.</para>
+    <para><indexterm>
+        <primary>apply</primary>
+      </indexterm><indexterm>
+        <primary>attributes</primary>
+
+        <secondary>adding</secondary>
+      </indexterm>Use the apply operator to produce a result array with new
+    attributes and to compute values for them. The new array includes all
+    attributes present in the source array, plus the newly created attributes.
+    The newly created attribute(s) must not have the same name as any of the
+    existing attributes of the source array.</para>
   </refsect1>
 
   <refsect1>
-    <title>Example</title>
+    <title>Examples</title>
 
     <informalexample>
       <para>This example produces a result array similar to an existing array
@@ -41,7 +42,7 @@
       <procedure>
         <step>
           <para>Create an array called distance with an attribute called
-          miles:<para><programlisting>AQL% <command>CREATE ARRAY</command> distance &lt;miles:double&gt; [i=0:9,10,0];  </programlisting></para></para>
+          miles:<para><programlisting>AFL% CREATE ARRAY distance &lt;miles:double&gt; [i=0:9,10,0];  </programlisting></para></para>
         </step>
 
         <step>

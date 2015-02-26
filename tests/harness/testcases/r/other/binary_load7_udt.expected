@@ -1,3 +1,6 @@
+SCIDB QUERY : <load_library('rational')>
+Query was executed successfully
+
 SCIDB QUERY : <create array RAT <val: rational > [ x=0:2,3,0]>
 Query was executed successfully
 
@@ -8,9 +11,6 @@ SCIDB QUERY : <create array RAT2 <val1: rational,val2:rational >[ x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create array RAT3 <fraction: rational > [ x=0:2,3,0]>
-Query was executed successfully
-
-SCIDB QUERY : <load_library('rational')>
 Query was executed successfully
 
 SCIDB QUERY : <load(RAT,'../tests/harness/testcases/data/rat.txt')>
@@ -93,8 +93,8 @@ SCIDB QUERY : <load(RAT3, 'rational.out', 0, '(string)')>
 
 SCIDB QUERY : <load(RAT3, 'rational.out', 0, '(string)', 100, rat_shad)>
 {x} fraction
-{0} "(0/0)"
-{1} "(0/0)"
+{0} "(0/1)"
+{1} "(0/1)"
 
 SCIDB QUERY : <load(RAT3, 'ration1.bin', 0, '(rational,dummy(16))')>
 {x} fraction

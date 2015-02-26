@@ -63,16 +63,20 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
         }
         // TODO: check: sizes are not larger than largest ScaLAPACK fortran INTEGER
 
-        // TODO: check: chunk interval not too small
-        assert(dims[ROW].getChunkInterval() > 0); // earlier system code already checks this
-        assert(dims[COL].getChunkInterval() > 0);
+
+        // check: chunk interval not too small
+        if (dims[ROW].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE ||
+            dims[COL].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE ) {
+            // the cache will thrash and performance will be unexplicably horrible to the user
+            throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR41); // too small
+        }
 
 
         // check: chunk interval not too large
         if (dims[ROW].getChunkInterval() > slpp::SCALAPACK_MAX_BLOCK_SIZE ||
             dims[COL].getChunkInterval() > slpp::SCALAPACK_MAX_BLOCK_SIZE ) {
             // the cache will thrash and performance will be unexplicably horrible to the user
-            throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR41); // too large
+            throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR42); // too large
         }
 
         // TODO: make two variables slpp::SCLAPACK_EFFICIENT_BLOCK_SIZE_MINIMUM and _MAXIMUM instead of single number

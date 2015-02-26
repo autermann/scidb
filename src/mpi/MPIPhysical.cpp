@@ -106,7 +106,7 @@ void MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
 
     _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
     if (_mustLaunch) {
-        _launcher = boost::shared_ptr<MpiLauncher>(new MpiLauncher(_launchId, query));
+        _launcher = boost::shared_ptr<MpiLauncher>(newMPILauncher(_launchId, query));
         _ctx->setLauncher(_launchId, _launcher);
         std::vector<std::string> args;
         _launcher->launch(args, membership, maxSlaves);
@@ -138,7 +138,7 @@ void MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
 std::vector<MPIPhysical::SMIptr_t> MPIPhysical::allocateMPISharedMemory(size_t numBufs,
                                                                         size_t elemSizes[],
                                                                         size_t numElems[],
-		                                                                string dbgNames[])
+                                                                        string dbgNames[])
 {
 	if(DBG) {
 		std::cerr << "SHM ALLOCATIONS:@@@@@@@@@@@@@@@@@@@" << std::endl ;
@@ -170,6 +170,22 @@ std::vector<MPIPhysical::SMIptr_t> MPIPhysical::allocateMPISharedMemory(size_t n
     return shmIpc;
 }
 
+void MPIPhysical::releaseMPISharedMemoryInputs(std::vector<MPIPhysical::SMIptr_t>& shmIpc, size_t resultIpcIndx)
+{
+    for(size_t i=0; i<shmIpc.size(); i++) {
+        if (!shmIpc[i]) {
+            continue;
+        }
+        SharedMemoryIpc *ipc = shmIpc[i].get();
+        ipc->close();
 
+        if (i!=resultIpcIndx) {
+            ipc->unmap();
+        }
+        if (!ipc->remove()) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_remove");
+        }
+    }
+}
 
 } // namespace

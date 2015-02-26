@@ -58,7 +58,7 @@ SCIDB QUERY : <redimension_store(ddFlat,doseData)>
 {3,120} 78,508
 {3,300} 78,212
 
-SCIDB QUERY : <create array ppmFunction <ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0,pulse=0:300,301,0]>
+SCIDB QUERY : <create array ppmFunction <ppm:int64> [patientID=1:100,100,0, elapsedTime=0:999,1000,0,pulse=0:300,301,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <redimension_store(doseData,ppmFunction)>

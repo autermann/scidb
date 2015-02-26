@@ -4,7 +4,8 @@
 export DH_OPTIONS
 
 CMAKE ?= cmake
-BUILD_DIR := build
+BUILD_DIR ?= build
+INSOURCE ?= 0
 
 PACKAGES := scidb.deb scidb-dbg.deb libscidbclient.deb libscidbclient-dbg.deb scidb-utils.deb scidb-utils-dbg.deb scidb-dev-tools.deb
 PACKAGES += scidb-dev-tools-dbg.deb scidb-plugins.deb scidb-plugins-dbg.deb libscidbclient-python.deb libscidbclient-python-dbg.deb scidb-dev.deb scidb-doc.deb
@@ -20,7 +21,7 @@ CMAKE_FLAGS := -DSWIG_EXECUTABLE=/usr/bin/swig2.0 -DSCIDB_DOC_TYPE=API -DBUILD_U
 	dh $@
 
 override_dh_auto_configure:
-	mkdir -p $(BUILD_DIR) && cd $(BUILD_DIR) && $(CMAKE) $(CMAKE_FLAGS) ..
+	-test $(INSOURCE) -eq 0 && mkdir -p $(BUILD_DIR) && cd $(BUILD_DIR) && $(CMAKE) $(CMAKE_FLAGS) ..
 
 override_dh_auto_build:
 	cd $(BUILD_DIR) && $(MAKE)
@@ -29,13 +30,10 @@ override_dh_auto_install: $(PACKAGES)
 	dh_auto_install
 
 override_dh_auto_clean:
-	-test -d $(BUILD_DIR) && rm -rf $(BUILD_DIR)
+	-([ $(INSOURCE) -eq 0 ] && rm -rf $(BUILD_DIR))
 
 override_dh_clean:
-	-test -d .git && git clean -fdx
-	-test -d .git && (git svn find-rev master|perl -p -e 's/\n//'> version.txt)
-	-test -d .svn && (svn status --no-ignore|grep '^[I?]'|awk '{print $$2}'|xargs rm -rf)
-	-test -d .svn && (svn info|grep Revision|awk '{print $$2}'|perl -p -e 's/\n//'> version.txt)
+	-(if [ $(INSOURCE) -eq 1 ]; then cd debian; for p in $(PACKAGES) scidb-all scidb-all-coord; do rm -rf $${p%.deb}; done; rm -f *.log; rm -f *.substvars; rm -f files; rm -rf tmp; fi)
 
 %.deb:
 	$(CMAKE) -DCMAKE_INSTALL_PREFIX=debian/$(@:.deb=)/$(shell grep CMAKE_INSTALL_PREFIX $(BUILD_DIR)/CMakeCache.txt|sed 's/.*=//') -DCMAKE_INSTALL_COMPONENT=$(@:.deb=) -P $(BUILD_DIR)/cmake_install.cmake

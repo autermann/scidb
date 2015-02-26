@@ -53,15 +53,6 @@ extern "C" {
 
     sl_int_t numroc_(const sl_int_t&, const sl_int_t&, const sl_int_t&, const sl_int_t&, const sl_int_t&);
 
-
-    // BLACS: (slightly modified form the FORTRAN ones)
-    typedef blacs::int_t bl_int_t;
-    void blacs_gridinfo_(const bl_int_t&, const bl_int_t&,
-                         const bl_int_t&, bl_int_t&, bl_int_t&);
-    bl_int_t blacs_pnum_(const bl_int_t& cntxt, const bl_int_t& myPRow, const bl_int_t& myPCol);
-    void blacs_gridexit_(const bl_int_t&);
-    void blacs_exit_(const bl_int_t&);
-
     // This one does not exist in FORTRAN, caues the ones immediate above to return these values
     void set_fake_blacs_gridinfo_(const bl_int_t& ictxt,
                                   const bl_int_t& nprow, const bl_int_t& npcol,

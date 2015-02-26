@@ -699,7 +699,7 @@ size_t nMaterializedChunks = 0;
             count += 1;
             ++(*src);
         }
-        if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().containsOverlaps()) {
+        if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().hasOverlap()) {
             materializedChunk.setCount(count);
         }
         dst->flush();

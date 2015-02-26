@@ -641,6 +641,21 @@ void barrier(int barrierId, NetworkManager* networkManager, boost::shared_ptr<Qu
 }
 
 /**
+ * This can be used as a barrier mechanism across the cluster in a blocking/materializing operator
+ * Note: redistributeXXX() uses the same mechanism.
+ */
+void syncBarrier(int barrierId, boost::shared_ptr<Query> query)
+{
+    LOG4CXX_DEBUG(logger, "syncBarrier: barrierId = " << barrierId);
+    assert(query);
+    NetworkManager* networkManager = NetworkManager::getInstance();
+    assert(networkManager);
+    const uint64_t instanceCount = query->getInstancesCount();
+    assert(instanceCount>0);
+    barrier(barrierId%MAX_BARRIERS, networkManager, query, instanceCount);
+}
+
+/**
  * Compute hash over the groupby dimensions.
  * @param   allDims   Coordinates containing all the dims.
  * @param   isGroupby   For every dimension, whether it is a groupby dimension.
@@ -1514,26 +1529,6 @@ PhysicalBoundaries PhysicalBoundaries::trimToDims(Dimensions const& dims) const
 }
 
 
-class BroadcastedBuffer
-{
-    shared_ptr<SharedBuffer> buf;
-    boost::shared_ptr<Query> query;
-  public:
-    BroadcastedBuffer(shared_ptr<SharedBuffer> buf, boost::shared_ptr<Query> query)  {
-        this->buf = buf;
-        this->query = query;
-    }
-
-    ~BroadcastedBuffer() {
-        NetworkManager* networkManager = NetworkManager::getInstance();
-        const size_t nInstances = (size_t)query->getInstancesCount();
-        for (size_t instance = 1; instance < nInstances; instance++)
-        {
-            networkManager->send(instance, buf, query);
-        }
-    }
-};
-
 template <class SetType, class MapType>
 boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
                                                 boost::shared_ptr<Query> query,
@@ -1565,7 +1560,6 @@ boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TOO_MANY_COORDINATES);
         }
         buf = attrSet.sort(false);
-        BroadcastedBuffer broadcast(buf, query);
 
         if (indexArrayName.size())
         {
@@ -1581,6 +1575,12 @@ boost::shared_ptr<MapType> __buildSortedXIndex( SetType& attrSet,
             ArrayDesc indexMapDesc(indexArrayName, indexMapAttr, indexMapDim, ArrayDesc::LOCAL);
             SystemCatalog::getInstance()->addArray(indexMapDesc, psReplication);
             assert(indexMapDesc.getId()>0);
+        }
+        NetworkManager* networkManager = NetworkManager::getInstance();
+        const size_t nInstances = (size_t)query->getInstancesCount();
+        for (size_t instance = 1; instance < nInstances; instance++)
+        {
+            networkManager->send(instance, buf, query);
         }
     }
 

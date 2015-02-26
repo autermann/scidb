@@ -1,0 +1,31 @@
+--setup
+--start-query-logging
+# Tests for gesvd on arrays with overlaps
+
+load_library('dense_linear_algebra')
+create array M5x5 <x:double null>[i=0:4,32,1, j=0:4,32,1]
+store(build(M5x5, -2*i+13*j), M5x5)
+
+
+--test
+
+#chunk with overlaps not supported
+
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40 "gesvd(M5x5, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40 "gesvd(M5x5, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40 "gesvd(M5x5, 'right')"
+
+store(repart(M5x5, <x:double null>[i=0:4,32,0, j=0:4,32,0]), M5x5_tempA)
+gesvd(M5x5_tempA, 'values')
+gesvd(repart(M5x5, <x:double null>[i=0:4,32,0, j=0:4,32,0]), 'values')
+gesvd(M5x5_tempA, 'right')
+gesvd(repart(M5x5, <x:double null>[i=0:4,32,0, j=0:4,32,0]), 'left')
+gesvd(M5x5_tempA, 'left')
+gesvd(repart(M5x5, <x:double null>[i=0:4,32,0, j=0:4,32,0]), 'right')
+
+
+--cleanup
+remove(M5x5)
+remove(M5x5_tempA)
+--stop-query-logging
+

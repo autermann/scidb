@@ -252,7 +252,7 @@ private:
             {
                 _daiters.push_back(dstArray->getIterator(aggMapping.outputAttributeIds[i]));
                 Value val(aggMapping.aggregates[i]->getResultType());
-                setDefaultValue(val, aggMapping.aggregates[i]->getResultType().typeId());
+                val = TypeLibrary::getDefaultValue(aggMapping.aggregates[i]->getResultType().typeId());
                 _stubs.push_back(val);
             }
         }

@@ -1,0 +1,17 @@
+#Ticket 2041 - loadcsv.py -- add ssh option
+
+--setup
+--start-query-logging
+--test
+--start-igdata
+
+
+--shell --command  " cat ./testcases/data/sm10.csv | loadcsv.py -a 'array_sm10' -s  '<a:int64,b:int64,c:int64>[i=0:*,3,0]'  -v -c 3 -l -L -x -b -d 'localhost' -p 8888 " 
+
+--shell --command  " cat ./testcases/data/sm10.csv | loadcsv.py -a 'array_sm10' -s  '<a:int64,b:int64,c:int64>[i=0:*,3,0]'  -v -c 3 -l -L -x -b -d  127.0.0.1  -p 8888 " 
+
+--stop-igdata
+sort(array_sm10,a)
+--cleanup
+--stop-query-logging
+

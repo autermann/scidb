@@ -20,6 +20,28 @@
  * END_COPYRIGHT
  */
 
+/**
+ *  
+ * @file csv2scidb.cpp
+ *
+ * @author paulgeoffreybrown@gmail.com
+ * 
+ *  csv2scidb is a utility tool designed to convert data in .csv formated 
+ *  files into the ASCII load format that SciDB can understand
+ * 
+ *  This code is trash. It is so bad it infects code around it. Every line in 
+ *  this file should be inscribed into a tablet made of charcoal and 
+ *  blasted into the sun. Every copy should be hunted down and destroyed 
+ *  with similar extreme prejudice. And the program's author should be 
+ *  told to get into some other line of work, like baking, or dog walking, 
+ *  where his capacity to inflict monstrosities like this on the world is 
+ *  severely curtailed. 
+ * 
+ *  TODO: Add support for binary formats, although I suspect that doing so 
+ *        will require a re-write. 
+ * 
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -30,11 +52,21 @@
 
 using namespace std;
 
+/**
+ *  
+ * Depending on the type being formatted for load() into SciDB, we use 
+ * different delimiters to surround the value. Numbers and strings that 
+ * are to be unadorned (because they're already surrounded by the appropriate 
+ * delimiters) are unchanged. But if the user has requested that we delim 
+ * char attributes then we prepend and append a "'" char, or if the user has 
+ * requested that we delim a string then we prepend and append a """ char. 
+ */
 inline void
 putdelim(char type, FILE * out) {
     switch (type) {
         case 'N':
         case 's':
+        case 'c':
             break;
         case 'S':
             putc('"', out);
@@ -43,33 +75,70 @@ putdelim(char type, FILE * out) {
             putc('\'', out);
             break;
         default:
-            fprintf(stderr, "invalid type provided in type string\n");
+            fprintf(stdout, "invalid type provided in type string\n");
             break;
     }
 }
 
+/**
+ * 
+ *  Get the char from the string handed to us with the -p flag for the 
+ * attribute number. 
+ */
 inline char
-getFormatCh(char const* chTypeString, int const attrCnt, int const nAttrs) {
+getFormatCh(const char * chTypeString, const int attrCnt, const int nAttrs)
+{
     if (attrCnt < nAttrs) {
         return chTypeString[attrCnt];
     }
     return 'N';
 }
 
-int main(int argc, char* argv[]) {
+/**
+ * 
+ * Provide help about how to use this utility. 
+ */
+void
+usage ( const char * execName, const long int nChunkLen )
+{
+    fprintf(stdout, 
+        "%s: Utility for conversion of CSV file to SciDB input text format\n"
+        "\tUsage: csv2scidb [options] [ < input-file ] [ > output-file ]\n"
+        "\tDefault: -f 0 -c %ld -q\n"
+        "\tOptions:\n"
+        "\t  -v version of utility\n"
+        "\t  -i PATH\tinput file\n"
+        "\t  -o PATH\toutput file\n"
+        "\t  -a PATH\tappended output file\n"
+        "\t  -c INT\tlength of chunk\n"
+        "\t  -f INT\tstarting coordinate\n"
+        "\t  -n INT\tnumber of instances\n"
+        "\t  -d char\tdelimiter - default ,\n"
+        "\t  -p STR\ttype pattern - N number, S string, s nullable-string, \n"
+        "\t     C char, c nullable-char\n"
+        "\t  -q Quote the input line exactly, simply wrap it in ()\n"
+        "\t  -s N\tskip N lines at the beginning of the file\n"
+        "\t  -h \tprints this helpful error message\n"
+        "\t You cannot specify both -q and a set of -p options.\n",
+        execName, nChunkLen);
+}
+
+int 
+main(int argc, char* argv[]) {
     int i, j, ch;
     char delim = ',';
     long count = 0;
     FILE* in = stdin;
     FILE* out = stdout;
     long skip = 0;
-    long nChunkLen = 500000, outCnt = 0;
+    long nChunkLen = 1000000, outCnt = 0;
     int valSize = 0;
     int numAttrs = 0, attrCnt = 0;
     long startChunk = 0;
     long chunknum = 0;
     long instances = 1;
-    bool quoteLine = false;
+    bool quoteLine = true;
+    bool quoteLineOrTypeString[2] = {false,false};
     char *chTypeString = NULL;
 
     for (i = 1; i < argc; i++) {
@@ -127,6 +196,13 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
         } else if (strcmp(argv[i], "-p") == 0) {
+            if (true == quoteLineOrTypeString[1]) { 
+                fprintf(stderr, "Cannot specify both -p and -q options\n");
+                usage(argv[0], nChunkLen);
+                return EXIT_FAILURE;
+            }
+            quoteLineOrTypeString[0]=true;
+            quoteLine = false;
             chTypeString = argv[++i];
             for (j = 0, numAttrs = strlen(chTypeString); j < numAttrs; j++) {
                 switch (chTypeString[j]) {
@@ -134,9 +210,10 @@ int main(int argc, char* argv[]) {
                     case 'S':
                     case 's':
                     case 'C':
+                    case 'c':
                         break;
                     default:
-                        fprintf(stderr, "type string must contain only N, S, s, and C characters\n");
+                        fprintf(stderr, "type string must contain only N, S, s, C and c characters\n");
                         return EXIT_FAILURE;
                 }
             }
@@ -144,22 +221,18 @@ int main(int argc, char* argv[]) {
             printf("csv2scidb utility version %s, build type is %s\n", scidb::SCIDB_VERSION(), scidb::SCIDB_BUILD_TYPE());
             return EXIT_SUCCESS;
         } else if (strcmp(argv[i], "-q") == 0) {
+            if (true == quoteLineOrTypeString[0]) { 
+                fprintf(stderr, "Cannot specify both -q and -p options\n");
+                usage(argv[0], nChunkLen);
+                return EXIT_FAILURE;
+            }
+            quoteLineOrTypeString[1]=true;
             quoteLine = true;
+        } else if (strcmp(argv[i], "-h") == 0) {
+            usage(argv[0], nChunkLen);
+            return EXIT_SUCCESS;
         } else {
-            fprintf(stderr, "Utility for conversion of CSV file to SciDB input text format\n"
-                    "\tUsage: csv2scidb [options] [ < input-file ] [ > output-file ]\n"
-                    "\tOptions:\n"
-                    "\t\t-v version of utility\n"
-                    "\t\t-i PATH\tinput file\n"
-                    "\t\t-o PATH\toutput file\n"
-                    "\t\t-a PATH\tappended output file\n"
-                    "\t\t-c INT\tlength of chunk\n"
-                    "\t\t-f INT\tstarting coordinate\n"
-                    "\t\t-n INT\tnumber of instances\n"
-                    "\t\t-d char\tdelimiter - default ,\n"
-                    "\t\t-p STR\ttype pattern - N number, S string, s nullable-string, C char\n"
-                    "\t\t-q Quote the input line exactly, simply wrap it in ()\n"
-                    "\t\t-s N\tskip N lines at the beginning of the file\n");
+            usage(argv[0], nChunkLen);
             return 2;
         }
     }
@@ -172,6 +245,10 @@ int main(int argc, char* argv[]) {
 
     outCnt = 0;
     chunknum = startChunk;
+    //
+    // TODO: Make this more efficient by reading blocks of data larger 
+    //       than a single char at a time. 
+    //
     while ((ch = getc(in)) != EOF) {
         bool firstCh = true;
         attrCnt = 0;
@@ -196,9 +273,16 @@ int main(int argc, char* argv[]) {
             }
 
             if (quoteLine) {
+                //
+                // If we're just printing out each line and wrapping it in a 
+                // pair of (), then just print the char. 
+                //
                 putc(ch, out);
             } else if (delim == ch) {
-                if (valSize == 0 && (getFormatCh(chTypeString, attrCnt, numAttrs) == 'N' || getFormatCh(chTypeString, attrCnt, numAttrs) == 's')) {
+                //
+                // We're at the end of an attribute in the .csv file.
+                //
+                if (valSize == 0 && (getFormatCh(chTypeString, attrCnt, numAttrs) == 'N' || getFormatCh(chTypeString, attrCnt, numAttrs) == 's' || getFormatCh(chTypeString, attrCnt, numAttrs) == 'c')) {
                     fputs("null", out);
                 } else if (valSize > 0 && getFormatCh(chTypeString, attrCnt, numAttrs) == 's') {
                     putc('"', out);
@@ -206,7 +290,7 @@ int main(int argc, char* argv[]) {
 
                 valSize = 0;
                 putdelim(getFormatCh(chTypeString, attrCnt, numAttrs), out);
-                putc(',', out);
+                putc(',', out); // Marker for end of attribute in SciDB
                 attrCnt++;
                 if (numAttrs > 0 && attrCnt > numAttrs) {
                     fprintf(stderr, "too many attributes in csv file\n");
@@ -221,7 +305,9 @@ int main(int argc, char* argv[]) {
                 putc(ch, out);
             }
         } while ((ch = getc(in)) != EOF && ch != '\n');
-
+        //
+        // We're at the end of the line. 
+        //
         if (attrCnt > 0 || (numAttrs == 1 && !firstCh) || (quoteLine)) {
             if (attrCnt < numAttrs) {
                 if (valSize == 0 && (getFormatCh(chTypeString, attrCnt, numAttrs) == 'N' || getFormatCh(chTypeString, attrCnt, numAttrs) == 's')) {
@@ -234,7 +320,13 @@ int main(int argc, char* argv[]) {
                 if (!quoteLine)
                     putdelim(getFormatCh(chTypeString, attrCnt, numAttrs), out);
             }
-            putc(')', out);
+            //
+            // Only if the line had something in it do we need to append 
+            // the ')' character, indicating the end of the cell of attributes. 
+            //
+            if (!firstCh) {
+                putc(')', out);
+            }
             count++;
         }
 

@@ -57,9 +57,12 @@ public:
 
 inline std::ostream& operator<<(std::ostream& os, const PdgemmArgs& a)
 {
-    os << " TRANSA:" << a.TRANSA << " TRANSB:" << a.TRANSB << std::endl;
-    os << " M:" << a.M << " N:" << a.N << " K:" << a.K     << std::endl;
-    os << " ALPHA:" << a.ALPHA<< " BETA:" << a.BETA        << std::endl;
+    os << "NPROW:"<<a.NPROW<< " NPCOL:"<<a.NPCOL          << std::endl;
+    os << "MYPROW:"<<a.MYPROW<< "MYPCOL:"<<a.MYPCOL       << std::endl;
+    os << "MYPNUM:"<<a.MYPNUM                             << std::endl;
+    os << "TRANSA:" << a.TRANSA << " TRANSB:" << a.TRANSB << std::endl;
+    os << "M:" << a.M << " N:" << a.N << " K:" << a.K     << std::endl;
+    os << "ALPHA:" << a.ALPHA<< " BETA:" << a.BETA        << std::endl;
 
     os << "A {" << std::endl;
     os <<      a.A << std::endl;

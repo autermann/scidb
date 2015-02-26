@@ -822,7 +822,7 @@ namespace scidb
                             {
                                 try
                                 {
-                                    setDefaultValue(defaultValue, typeId);
+                                    defaultValue = TypeLibrary::getDefaultValue(typeId);
                                 }
                                 catch (const UserException &e)
                                 {
@@ -990,7 +990,7 @@ namespace scidb
                             }
                             else
                             {
-                                setDefaultValue(defaultValue, typeId);
+                                defaultValue = TypeLibrary::getDefaultValue(typeId);
                             }
                         }
                     }

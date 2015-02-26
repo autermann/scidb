@@ -321,17 +321,6 @@ void ArrayDesc::trim()
     }
 }
 
-bool ArrayDesc::containsOverlaps() const
-{
-    Dimensions const& dims = getDimensions();
-    for (size_t i = 0, n = dims.size(); i < n; i++) {
-        if (dims[i].getChunkOverlap() != 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
 std::string const& ArrayDesc::getMappingArrayName(size_t dimension) const
 {
     std::string const& mappingArrayName = _dimensions[dimension].getMappingArrayName();
@@ -752,7 +741,7 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
         if (flags & IS_NULLABLE) {
             _defaultValue.setNull();
         } else {
-            setDefaultValue(_defaultValue, type);
+            _defaultValue = TypeLibrary::getDefaultValue(type);
         }
     }
 }
@@ -787,7 +776,7 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
         if (flags & IS_NULLABLE) {
             _defaultValue.setNull();
         } else {
-            setDefaultValue(_defaultValue, type);
+            _defaultValue = TypeLibrary::getDefaultValue(type);
         }
     }
 }
@@ -916,7 +905,7 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
     //don't print NOT NULL because it default behaviour
     stream << att.getName() << ':' << att.getType()
                  << (att.getFlags() & AttributeDesc::IS_NULLABLE ? " NULL" : "");
-    if (!att.getDefaultValue().isZero()) {
+    if (!att.getDefaultValue().isDefault(att.getType())) {
         stream << " DEFAULT " << ValueToString(att.getType(), att.getDefaultValue());
     }
     if (att.getDefaultCompressionMethod() != CompressorFactory::NO_COMPRESSION) {

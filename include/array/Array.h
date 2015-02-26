@@ -418,7 +418,8 @@ class ConstChunk : public SharedBuffer
   public:
     /**
      * Check if this chunk may participate in a merge simply by bitwise or.
-     * Possible if: not sparse, not RLE, attr not nullable, type not variable size, and default value is zero.
+     * Possible if: not sparse, not RLE, attr not nullable, type not variable size,
+     * and default value is not null (equal to default value for this type).
      */
     virtual bool isPossibleToMergeByBitwiseOr() const {
         if (isSparse() || isRLE()) {
@@ -430,7 +431,8 @@ class ConstChunk : public SharedBuffer
             return false;
         }
 
-        return attr.getDefaultValue().isZero();
+        //check if attr.getDefaultValue() != null
+        return attr.getDefaultValue().isDefault(attr.getType());
     }
 
     /**

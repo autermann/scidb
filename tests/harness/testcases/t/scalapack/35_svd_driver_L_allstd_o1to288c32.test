@@ -1,0 +1,20 @@
+--setup
+
+--shell --command "echo [dense_linear_algebra]                 > /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+--shell --command "echo tests=SVD                             >> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+--shell --command "echo error-limit=20                        >> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+--shell --command "echo matrix-types=random                   >> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+
+--test
+--shell --command "echo size-list=+:1:288:7                   >> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+
+--shell --command "python ../../bin/dla_driver.py /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg 1> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.stdout 2> /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.stderr"
+--shell --command "cat /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.stderr"
+--shell --command "cat /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.stdout" --store
+
+--cleanup
+--shell --command "rm /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.cfg"
+--shell --command "rm /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.stdout"
+--shell --command "rm /tmp/35_svd_driver_L_allstd_o1to288c32.$PPID.stderr" 

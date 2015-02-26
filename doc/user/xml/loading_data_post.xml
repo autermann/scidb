@@ -3,9 +3,13 @@
 <chapter>
   <title>Loading Data</title>
 
-  <para>A key part of setting up your SciDB array is loading your data. SciDB
-  supports several load techniques, which together accommodate a wide range of
-  scenarios for moving data into SciDB.</para>
+  <para><indexterm>
+      <primary>data</primary>
+
+      <secondary>loading</secondary>
+    </indexterm>A key part of setting up your SciDB array is loading your
+  data. SciDB supports several load techniques, which together accommodate a
+  wide range of scenarios for moving data into SciDB.</para>
 
   <para>This chapter first presents the overview of loading data into SciDB:
   the basic principles and general steps that apply to all load techniques.
@@ -31,8 +35,7 @@
         assess your analytical needs to determine what arrays you will need.
         You also must determine for each array what variables it will include
         and which of those variables will be dimensions and which will be
-        attributes. For more information about creating arrays, see Creating
-        and Removing SciDB Arrays.</para>
+        attributes. For more information about creating arrays, see <xref linkend="CreateArray"/>.</para>
 
         <para>Depending on the data-loading technique you choose, this
         preliminary assessment might or might not include determining chunk
@@ -71,22 +74,28 @@
   <sect1>
     <title>Loading CSV Data</title>
 
-    <para>The CSV loading technique starts from a file in
+    <para><indexterm>
+        <primary>loading data</primary>
+
+        <secondary>CSV</secondary>
+      </indexterm><indexterm>
+        <primary>CSV data</primary>
+
+        <secondary>loading</secondary>
+      </indexterm>The CSV loading technique starts from a file in
     comma-separated-value (CSV) format, translates it into a SciDB-formatted
     text file describing a one-dimensional array, loads that file into a
     1-dimensional array in SciDB, and rearranges that 1-dimensional array into
     the multi-dimensional shape you need to support your querying and
-    analytics. The following figure presents an overview:</para>
+    analytics. The following figure presents an overview:<figure>
+        <title>Overview of data load</title>
 
-    <figure>
-      <title/>
-
-      <mediaobject>
-        <imageobject>
-          <imagedata align="center" contentdepth="300" depth="300" fileref="../graphics/csv_load_overview.png" scale="30" valign="top" width="400"/>
-        </imageobject>
-      </mediaobject>
-    </figure>
+        <mediaobject>
+          <imageobject>
+            <imagedata contentwidth="367" fileref="../graphics/csv_load_overview.png"/>
+          </imageobject>
+        </mediaobject>
+      </figure></para>
 
     <para>Obviously, the CSV loading technique commends itself to situations
     in which your external application produces a CSV file. If you have a CSV
@@ -118,10 +127,9 @@
 
       <itemizedlist>
         <listitem>
-          <para>Determine the attributes for the array, including each
-          attribute's name, datatype, whether it allows null values, and
-          whether it has a default value to be used to replace null
-          values.</para>
+          <para>Determine the attributes for the array, including the
+          attribute name, datatype, whether it allows null values, and whether
+          it has a default value to be used to replace null values.</para>
         </listitem>
 
         <listitem>
@@ -141,11 +149,11 @@
       attributes, like this:</para>
 
       <figure>
-        <title/>
+        <title>Example of 2-dimensional array with 2 attributes</title>
 
         <mediaobject>
           <imageobject>
-            <imagedata align="center" contentdepth="500" depth="200" fileref="../graphics/desired_array_olympics.png" scale="50" valign="top" width="600"/>
+            <imagedata align="center" contentdepth="500" depth="200" fileref="../graphics/desired_array_olympics.png" scale="50" valign="top" width="400"/>
           </imageobject>
         </mediaobject>
       </figure>
@@ -162,11 +170,11 @@
       <title>Prepare the Load File</title>
 
       <para>The CSV loading technique starts with a comma-separated-value
-      (csv) file. Each row of the file describes one cell of the target array,
+      (CSV) file. Each row of the file describes one cell of the target array,
       including its dimension values. Because the target array has four
-      variables (two dimensions and two attributes), each row of the csv file
+      variables (two dimensions and two attributes), each row of the CSV file
       will have four values. Because the target array has twelve non-empty
-      cells, the csv file will have 12 rows of data, like this:</para>
+      cells, the CSV file will have 12 rows of data, like this:</para>
 
       <para><screen>event,year,person,time
 dash,1996,Bailey,9.84
@@ -191,7 +199,7 @@ marathon,2008,Wanjiru,7596
         </listitem>
 
         <listitem>
-          <para>Use a question mark--with nothing else--in place of the value.
+          <para>Use a question mark—with nothing else—in place of the value.
           (By contrast, if the value you want to load is the question mark
           character itself, put it in quotation marks.</para>
         </listitem>
@@ -206,12 +214,12 @@ marathon,2008,Wanjiru,7596
       <para>For more information about null processing, see the section on
       Basic Architecture in Introduction to SciDB.</para>
 
-      <para>After you create the csv file, you must convert it to the SciDB
+      <para>After you create the CSV file, you must convert it to the SciDB
       dense load format. For that, use the <code>csv2scidb</code> shell
-      command. The <code>csv2scidb</code> command takes multicolumn csv data
+      command. The <code>csv2scidb</code> command takes multicolumn CSV data
       and transforms it into a format that the SciDB loader will recognize as
       a 1-dimensional array with one attribute for every column of the
-      original csv file. The syntax of <code>csv2scidb</code> is:
+      original CSV file. The syntax of <code>csv2scidb</code> is:
       <programlisting>csv2scidb [options]  &lt; input-file  &gt; output-file </programlisting></para>
 
       <note>
@@ -221,20 +229,24 @@ marathon,2008,Wanjiru,7596
 
       <para>To see the options for <code>csv2scidb</code>, type
       <code>csv2scidb --help</code> at the command line. The options for
-      csv2scidb are: <para><screen>Utility for conversion of CSV file to SciDB input text format
+      csv2scidb are: <para><screen>csv2scidb: Utility for conversion of CSV file to SciDB input text format
 	Usage: csv2scidb [options] [ &lt; input-file ] [ &gt; output-file ]
+	Default: -f 0 -c 1000000 -q
 	Options:
-		-v version of utility
-		-i PATH	input file
-		-o PATH	output file
-		-a PATH	appended output file
-		-c INT	length of chunk
-		-f INT	starting coordinate
-		-n INT	number of instances
-		-d char	delimiter - default ,
-		-p STR	type pattern - N number, S string, s nullable-string, C char
-		-q Quote the input line exactly, simply wrap it in ()
-		-s N	skip N lines at the beginning of the file
+	  -v version of utility
+	  -i PATH	input file
+	  -o PATH	output file
+	  -a PATH	appended output file
+	  -c INT	length of chunk
+	  -f INT	starting coordinate
+	  -n INT	number of instances
+	  -d char	delimiter - default ,
+	  -p STR	type pattern - N number, S string, s nullable-string, 
+	     C char, c nullable-char
+	  -q Quote the input line exactly, simply wrap it in ()
+	  -s N	skip N lines at the beginning of the file
+	  -h 	prints this helpful error message
+	 You cannot specify both -q and a set of -p options.
 </screen>This command will transform <code>olympic_data.csv</code> to
       SciDB load file format: <programlisting>
 csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olympic_data.scidb
@@ -272,7 +284,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <para>After you prepare the file in the SciDB dense-load format, you are
       almost ready to load the data into SciDB. But first you must create an
       array to serve as the load array. The array must have one dimension and
-      N attributes, where N is the number of columns in the original csv file.
+      N attributes, where N is the number of columns in the original CSV file.
       For the olympic data, the array that you create must have four
       attributes, like this:</para>
 
@@ -283,22 +295,22 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <itemizedlist>
         <listitem>
-          <para>The attribute names -- Even if you plan to delete the
+          <para>The attribute names: Even if you plan to delete the
           1-dimensional load array after you create the target 2-dimensional,
-          2-attribute array--the attribute names matter. You should name the
+          2-attribute array—the attribute names matter. You should name the
           attributes as you expect to name the corresponding attribute and
           dimensions in the array you will ultimately create to support your
           analytics.</para>
         </listitem>
 
         <listitem>
-          <para>The order of attributes -- You must declare the attributes in
+          <para>The order of attributes: You must declare the attributes in
           the same left-to-right order as the values that appear on each line
-          of the csv file.</para>
+          of the CSV file.</para>
         </listitem>
 
         <listitem>
-          <para>The dimension name -- The dimension name ("i" in this case) is
+          <para>The dimension name: The dimension name ("i" in this case) is
           uninteresting. You can use any name, because that dimension does not
           correspond to any variable from your data set and that dimension
           will not appear in any form in the target array. Remember that
@@ -310,27 +322,30 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         </listitem>
 
         <listitem>
-          <para>The chunk size (in this case, 1000000) for the dimension --
-          Even though you are likely to use the winnersFlat array only briefly
-          and perhaps delete it after you populate the target array, the chunk
+          <para>The chunk size (in this case, 1000000) for the dimension: Even
+          though you are likely to use the winnersFlat array only briefly and
+          perhaps delete it after you populate the target array, the chunk
           size matters because it can affect performance of the load and of
           the next step: the redimension_store.</para>
         </listitem>
 
         <listitem>
-          <para>The chunk overlap (in this case, 0) for the dimension. If you
-          are using the load array briefly--only as the target of the load
+          <para>The chunk overlap (in this case, 0) for the dimension: If you
+          are using the load array briefly—only as the target of the load
           operation and as the source of the subsequent redimension-store
-          operation--then there is no need for chunks in the load array to
+          operation—then there is no need for chunks in the load array to
           overlap at all.</para>
         </listitem>
       </itemizedlist>
 
-      <para>For more information about chunk size and overlap, see the section
-      on Basic Architecture in Introduction to SciDB.</para>
+      <para>For more information about chunk size and overlap, see the <link linkend="BasicArchitecture">Basic Architecture</link> section.</para>
 
-      <para>After you create the target array, you can populate it with data
-      using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> winnersFlat <command>FROM</command> '../examples/olympic_data.scidb';  </programlisting>The data file paths in the AFL and AQL commands are relative
+      <para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>load</secondary>
+        </indexterm>After you create the target array, you can populate it
+      with data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> winnersFlat <command>FROM</command> '../examples/olympic_data.scidb';  </programlisting>The data file paths in the AFL and AQL commands are relative
       to the working directory of the server.</para></para>
     </sect2>
 
@@ -340,13 +355,17 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <para>After you establish the load array, you can use SciDB features to
       translate it into the target array whose shape accommodates your
       analytical needs. Of course, you should have the basic shape of the
-      target array in mind from the outset -- perhaps even before you created
-      the csv file.</para>
+      target array in mind from the outset—perhaps even before you create the
+      CSV file.</para>
 
-      <para>There are, however, some characteristics of arrays beyond these
-      basics. These include the chunk size and chunk overlap value of each
-      dimension. Before you choose values for these parameters, you can use
-      the SciDB analyze operator to learn some simple statistics about the
+      <para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>select</secondary>
+        </indexterm>There are, however, some characteristics of arrays beyond
+      these basics. These include the chunk size and chunk overlap value of
+      each dimension. Before you choose values for these parameters, you can
+      use the SciDB analyze operator to learn some simple statistics about the
       data in the array you just loaded. Here is the command to analyze the
       array winnersFlat:</para>
 
@@ -361,10 +380,14 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       illuminating and can influence your decisions about chunk size and chunk
       overlap. For more information about chunk size and overlap, see the
       section on Basic Architecture in Introduction to SciDB. For more
-      information about the analyze operator, see the Analyze section in SciDB
-      Operator Reference.</para>
+      information about the analyze operator, see <xref linkend="analyze"/>
+      Analyze section in SciDB Operator Reference.</para>
 
-      <para>The following command creates the target array:</para>
+      <para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>create array</secondary>
+        </indexterm>The following command creates the target array:</para>
 
       <para><programlisting>AQL% <command>CREATE ARRAY</command> winners &lt;person:string, time:double&gt; 
 [year=1996:2008,1000,0, event(string)=3,1000,0]  </programlisting><para>The result of that command is an array that can accommodate the
@@ -379,28 +402,38 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
   <sect1>
     <title>Parallel Load</title>
 
-    <para>Like the CSV load technique, the parallel technique starts from a
-    single CSV file. However, there are significant differences that can yield
-    much faster load performance. Parallel load separates the CSV file into
-    multiple files and distributes those files among the server instances in
-    your SciDB cluster, allowing those instances to work in parallel on the
-    load. In addition, parallel load can transfer data through pipes (rather
-    than through materialized intermediate files), which also improves
-    performance.</para>
+    <para><indexterm>
+        <primary>loading data</primary>
+
+        <secondary>in parallel</secondary>
+      </indexterm><indexterm>
+        <primary>parallel load</primary>
+      </indexterm><indexterm>
+        <primary>CSV data</primary>
+
+        <secondary>loading in parallel</secondary>
+      </indexterm>Like the CSV load technique, the parallel technique starts
+    from a single CSV file. However, there are significant differences that
+    can yield much faster load performance. Parallel load separates the CSV
+    file into multiple files and distributes those files among the server
+    instances in your SciDB cluster, allowing those instances to work in
+    parallel on the load. In addition, parallel load can transfer data through
+    pipes (rather than through materialized intermediate files), which also
+    improves performance.</para>
 
     <para>The following figure presents an overview:</para>
 
     <figure>
-      <title/>
+      <title>Parallel load technique</title>
 
       <mediaobject>
         <imageobject>
-          <imagedata align="center" contentdepth="500" depth="500" fileref="../graphics/parallel_load_overview_simplified.png" scale="30" valign="top" width="500"/>
+          <imagedata contentdepth="4.0in" fileref="../graphics/parallel_load_overview_simplified.png"/>
         </imageobject>
       </mediaobject>
     </figure>
 
-    <para>In the picture, notice the following:</para>
+    <para>In the figure, notice the following:</para>
 
     <orderedlist>
       <listitem>
@@ -450,10 +483,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <itemizedlist>
         <listitem>
-          <para>Determine the attributes for the array, including each
-          attribute's name, datatype, whether it allows null values, and
-          whether it has a default value to be used to replace null
-          values.</para>
+          <para>Determine the attributes for the array, including attribute
+          name, datatype, whether it allows null values, and whether it has a
+          default value to be used to replace null values.</para>
         </listitem>
 
         <listitem>
@@ -473,7 +505,17 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     <sect2>
       <title>Load the Data</title>
 
-      <para>The linchpin of the parallel load technique is the program
+      <para><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>loadcsv.py</secondary>
+        </indexterm><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>command line</secondary>
+        </indexterm><indexterm>
+          <primary>loadcsv.py</primary>
+        </indexterm>The linchpin of the parallel load technique is the program
       loadcsv.py. Its primary input is a single CSV file and its primary
       result is a 1-D SciDB array: the load array. Besides its primary input,
       you can specify additional parameters to the program with command-line
@@ -485,53 +527,213 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <note>
         <para><code>loadcsv.py</code> is accessed directly at the command-line
         and not through the <code>iquery</code> client. Furthermore, you must
-        run loadcsv.py from the SciDB admin account.</para>
+        run loadcsv.py from the SciDB administrator account.</para>
       </note>
 
       <para>To see the options for <code>loadcsv.py</code>, type
       <code>loadcsv.py --help</code> at the command line. The options for
-      loadcsv.py are: <para><screen>Usage: loadcsv.py [options]
+      loadcsv.py are:</para>
 
-SciDB Parallel CSV Loader
+      <informaltable frame="all">
+        <tgroup cols="2">
+          <colspec colwidth="30*"/>
 
-Options:
-  -h, --help            show this help message and exit
-  -d DB_ADDRESS         SciDB Coordinator Hostname or IP Address (Default =
-                        "localhost")
-  -p DB_PORT            SciDB Coordinator Port (Default = 1239)
-  -r DB_ROOT            SciDB Installation Root Folder (Default =
-                        "/opt/scidb/12.10")
-  -i INPUT_FILE         CSV Input File (Default = stdin)
-  -n SKIP               # Lines to Skip (Default = 0)
-  -t TYPE_PATTERN       CSV Field Types Pattern: N number, S string, s
-                        nullable-string, C char (e.g., "NNsCS")
-  -D DELIMITER          Delimiter (Default = ",")
-  -f STARTING_COORDINATE
-                        Starting Coordinate (Default = 0)
-  -c CHUNK_SIZE         Chunk Size (Default = 500000)
-  -o OUTPUT_BASE        Output File Base Name (Default = INPUT_FILE or
-                        "stdin.csv")
-  -m                    Create Intermediate CSV Files (not FIFOs)
-  -l                    Leave Intermediate CSV Files
-  -M                    Create Intermediate DLF Files (not FIFOs)
-  -L                    Leave Intermediate DLF Files
-  -P SSH_PORT           SSH Port (Default = System Default)
-  -u SSH_USERNAME       SSH Username
-  -k SSH_KEYFILE        SSH Key/Identity File
-  -b                    SSH Bypass Strict Host Key Checking
-  -a LOAD_NAME          Load Array Name
-  -s LOAD_SCHEMA        Load Array Schema
-  -w SHADOW_NAME        Shadow Array Name
-  -e ERRORS_ALLOWED     # Load Errors Allowed per Instance (Default = 0)
-  -x                    Remove Load and Shadow Arrays Before Loading (if they
-                        exist)
-  -A TARGET_NAME        Target Array Name
-  -S TARGET_SCHEMA      Target Array Schema
-  -X                    Remove Target Array Before Loading (if it exists)
-  -v                    Display Verbose Messages
-  -V                    Display SciDB Version Information
-  -q                    Quiet Mode
-</screen></para></para>
+          <colspec colwidth="70*"/>
+
+          <tbody>
+            <row>
+              <entry><emphasis role="bold">Option</emphasis></entry>
+
+              <entry><emphasis role="bold">Details</emphasis></entry>
+            </row>
+
+            <row>
+              <entry><literal>-h, --help</literal></entry>
+
+              <entry>Show this help message and exit</entry>
+            </row>
+
+            <row>
+              <entry><literal>-d DB_ADDRESS</literal></entry>
+
+              <entry>SciDB coordinator hostname or IP address</entry>
+            </row>
+
+            <row>
+              <entry><literal>-p DB_PORT</literal></entry>
+
+              <entry>SciDB coordinator port. Default=1239</entry>
+            </row>
+
+            <row>
+              <entry><literal>-r DB_ROOT</literal></entry>
+
+              <entry>SciDB installation root folder.
+              Default=/opt/scidb/<replaceable>sciDB_version</replaceable></entry>
+            </row>
+
+            <row>
+              <entry><literal>-i INPUT_FILE</literal></entry>
+
+              <entry>CSV input file. Default=stdin</entry>
+            </row>
+
+            <row>
+              <entry><literal>-n SKIP</literal></entry>
+
+              <entry>Number of lines to skip. Default=0.</entry>
+            </row>
+
+            <row>
+              <entry><literal>-t TYPE_PATTERN</literal></entry>
+
+              <entry>CSV field types pattern: : N number, S string, s nullable
+              string, C char. For example: "NNsCS"</entry>
+            </row>
+
+            <row>
+              <entry><literal>-D DELIMITER</literal></entry>
+
+              <entry>Delimiter. Default is a comma (,).</entry>
+            </row>
+
+            <row>
+              <entry><literal>-f STARTING_COORDINATE</literal></entry>
+
+              <entry>Starting coordinate. Default=0.</entry>
+            </row>
+
+            <row>
+              <entry><literal>-c CHUNK_SIZE</literal></entry>
+
+              <entry>Chunk size. Default=500,000</entry>
+            </row>
+
+            <row>
+              <entry><literal>-o OUTPUT_BASE</literal></entry>
+
+              <entry>Output file base name</entry>
+            </row>
+
+            <row>
+              <entry><literal>-m</literal></entry>
+
+              <entry>Create intermediate CSV files (not FIFOs)</entry>
+            </row>
+
+            <row>
+              <entry><literal>-l</literal></entry>
+
+              <entry>Leave intermediate CSV files</entry>
+            </row>
+
+            <row>
+              <entry><literal>-M</literal></entry>
+
+              <entry>Create intermediate dense-load-format (DLF) files (not
+              FIFOs)</entry>
+            </row>
+
+            <row>
+              <entry><literal>-L</literal></entry>
+
+              <entry>Leave intermediate DLF files (not FIFOs)</entry>
+            </row>
+
+            <row>
+              <entry><literal>-P SSH_PORT</literal></entry>
+
+              <entry>SSH Port. Default is your system default.</entry>
+            </row>
+
+            <row>
+              <entry><literal>-u SSH_USERNAME</literal></entry>
+
+              <entry>SSH username</entry>
+            </row>
+
+            <row>
+              <entry><literal>-k</literal></entry>
+
+              <entry>SSH key/identity file</entry>
+            </row>
+
+            <row>
+              <entry><literal>-b</literal></entry>
+
+              <entry>SSH bypass strict host key checking</entry>
+            </row>
+
+            <row>
+              <entry><literal>-a LOAD_NAME</literal></entry>
+
+              <entry>Load array name</entry>
+            </row>
+
+            <row>
+              <entry><literal>-s LOAD_SCHEMA</literal></entry>
+
+              <entry>Load array schema</entry>
+            </row>
+
+            <row>
+              <entry><literal>-w SHADOW_NAME</literal></entry>
+
+              <entry>Shadow array name</entry>
+            </row>
+
+            <row>
+              <entry><literal>-e ERRORS_ALLOWED</literal></entry>
+
+              <entry>Number of load errors allowed per instance.
+              Default=0.</entry>
+            </row>
+
+            <row>
+              <entry><literal>-x</literal></entry>
+
+              <entry>Remove load and shadow arrays before loading (if they
+              exist)</entry>
+            </row>
+
+            <row>
+              <entry><literal>-A TARGET_NAME</literal></entry>
+
+              <entry>Target array name</entry>
+            </row>
+
+            <row>
+              <entry><literal>-S TARGET_SCHEMA</literal></entry>
+
+              <entry>Target array schema</entry>
+            </row>
+
+            <row>
+              <entry><literal>-X</literal></entry>
+
+              <entry>Remove target array before loading (if it exists)</entry>
+            </row>
+
+            <row>
+              <entry><literal>-v</literal></entry>
+
+              <entry>Display verbose messages</entry>
+            </row>
+
+            <row>
+              <entry><literal>-V</literal></entry>
+
+              <entry>Display SciDB version information</entry>
+            </row>
+
+            <row>
+              <entry><literal>-q</literal></entry>
+
+              <entry>Quiet mode</entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
 
       <para>The command-line switches work in combination to control these
       aspects of the parallel load process:</para>
@@ -555,7 +757,7 @@ Options:
 
           <para>The loadcsv.py program needs to know details about the SciDB
           installation. You supply these details with -d, which indicates the
-          hostname or IP address of the coodinator instance, -p, which
+          host name or IP address of the coordinator instance, -p, which
           indicates the port number on which the coordinator instance is
           listening, and -r, which indicates the root installation folder
           containing the utilities csv2scidb, iquery, and splitcsv. (The
@@ -570,9 +772,9 @@ Options:
           <para>The loadcsv.py program connects to the SciDB cluster through
           SSH. The program requires that each node in the cluster has SSH
           configured on the same port; use -P to indicate that port. Use -u to
-          indicate the SSH username. Use -k to supply the SSH Key/Identify
+          indicate the SSH user name. Use -k to supply the SSH Key/Identify
           file used to authenticate the the SSH user on the remote node.
-          (loadcsv.py requires that password-less SSH is configured for everny
+          (loadcsv.py requires that password-less SSH is configured for every
           node in the cluster.)</para>
 
           <para>In certain situations, SSH authentication presents a
@@ -595,7 +797,7 @@ Options:
           array for you. Use -x to empower loadcsv.py to delete any existing
           array before creating the new one you described with the -a and -s
           switches. The -x switch is a safeguard to ensure that you do not
-          inadvertantly delete a 1-dimensional array that you need. The -x
+          inadvertently delete a 1-dimensional array that you need. The -x
           switch is meaningless if you do not supply both -a and -s.</para>
         </listitem>
 
@@ -612,7 +814,7 @@ Options:
           create the target array for you. Use -x to empower loadcsv.py to
           delete any existing array before creating the new one you described
           with the -A and -S switches. The -X switch is a safeguard to ensure
-          that you do not inadvertantly delete a multi-dimensional array that
+          that you do not inadvertently delete a multi-dimensional array that
           you need. The -X switch is meaningless if you do not supply both -A
           and -S.</para>
         </listitem>
@@ -640,14 +842,14 @@ Options:
           debugging purposes), use -l.</para>
 
           <para>Likewise, the program can use either pipes or files to
-          accommodate the output of the csv2scidb program--the SciDB-readable
+          accommodate the output of the csv2scidb program—the SciDB-readable
           files to be loaded into the destination. By default, the
           dense-load-format result format will be set to a pipe. To request
           files, use -M. To request that such files be retained after the load
           operation (again, typically for debugging), use -L.</para>
 
           <para>Whether you use pipes or files, you can control the location
-          of the output of the splitcsv utility -- the utility that partitions
+          of the output of the splitcsv utility—the utility that partitions
           the original CSV file. Use the -o switch. The parameter you supply
           with -o indicates the base name of each part of the partitioned
           output. For example, if the command line includes -o '/tmp/base',
@@ -662,8 +864,8 @@ Options:
         </listitem>
 
         <listitem>
-          <para>Control of verbose mode, quiet mode, etc. for progress and
-          status reporting.</para>
+          <para>Control of verbose/quiet mode for progress and status
+          reporting.</para>
 
           <para>Use -v for verbose mode, -q for quiet mode, -h for help, and
           -V to show SciDB version information.</para>
@@ -730,7 +932,7 @@ Options:
       achieve this, use the -A switch and optionally the -S and -X
       switches.</para>
 
-      <para>The following command loads data from the csv file (aData.csv)
+      <para>The following command loads data from the CSV file (aData.csv)
       into the existing 1-dimensional load array (aFlat) and rearranges that
       data into the existing target multi-dimensional array (aFinal).</para>
 
@@ -741,7 +943,7 @@ Options:
            -A 'aFinal'
 </programlisting></para>
 
-      <para>The following command loads data from the csv file into the load
+      <para>The following command loads data from the CSV file into the load
       array, creates the target multidimensional array, and rearranges the
       data from the load array into the target array. <programlisting>loadcsv.py -n 1 -t NNN
            -a 'aFlat'  
@@ -752,7 +954,7 @@ Options:
                [row=1:*,1000,0,col=1:*,1000,0]'
 </programlisting></para>
 
-      <para>The following command loads data from the csv file into the load
+      <para>The following command loads data from the CSV file into the load
       array, establishes a shadow array for the load operations, and
       rearranges the data from the load array into the target array.</para>
 
@@ -773,17 +975,23 @@ Options:
   <sect1>
     <title>Loading Binary Data</title>
 
-    <para>The binary loading technique starts from a binary file, loads it
-    into a 1-dimensional array in SciDB, and rearranges that 1-dimensional
-    array into the multidimensional shape you need to support your querying
-    and analytics. The following figure summarizes.</para>
+    <para><indexterm>
+        <primary>loading data</primary>
+
+        <secondary>binary</secondary>
+      </indexterm><indexterm>
+        <primary>binary data</primary>
+      </indexterm>The binary loading technique starts from a binary file,
+    loads it into a 1-dimensional array in SciDB, and rearranges that
+    1-dimensional array into the multidimensional shape you need to support
+    your querying and analytics. The following figure summarizes.</para>
 
     <figure>
-      <title/>
+      <title>Binary load technique</title>
 
       <mediaobject>
         <imageobject>
-          <imagedata align="center" contentdepth="300" depth="300" fileref="../graphics/binary_load_overview.png" scale="50" valign="top" width="400"/>
+          <imagedata align="center" depth="3.0in" fileref="../graphics/binary_load_overview.png" scale="40" valign="top"/>
         </imageobject>
       </mediaobject>
     </figure>
@@ -805,10 +1013,9 @@ Options:
 
       <itemizedlist>
         <listitem>
-          <para>Determine the attributes for the array, including each
-          attribute's name, datatype, whether it allows null values, and
-          whether it has a default value to be used to replace null
-          values.</para>
+          <para>Determine the attributes for the array, including attribute
+          name, datatype, whether it allows null values, and whether it has a
+          default value to be used to replace null values.</para>
         </listitem>
 
         <listitem>
@@ -828,11 +1035,11 @@ Options:
       attribute, like this:</para>
 
       <figure>
-        <title/>
+        <title>Visualizing the target array</title>
 
         <mediaobject>
           <imageobject>
-            <imagedata align="center" contentdepth="400" depth="200" fileref="../graphics/desired_array_intensity.png" scale="50" valign="top" width="300"/>
+            <imagedata align="center" contentdepth="400" depth="175" fileref="../graphics/desired_array_intensity.png" scale="50" valign="top" width="300"/>
           </imageobject>
         </mediaobject>
       </figure>
@@ -863,11 +1070,11 @@ Options:
       which attributes allow null values.</para>
 
       <figure>
-        <title/>
+        <title>Example array created using binary load</title>
 
         <mediaobject>
           <imageobject>
-            <imagedata align="center" contentdepth="600" depth="300" fileref="../graphics/binary_load_array.png" scale="50" valign="top" width="400"/>
+            <imagedata align="center" depth="175" fileref="../graphics/binary_load_array.png" scale="50" valign="top" width="400"/>
           </imageobject>
         </mediaobject>
       </figure>
@@ -876,11 +1083,11 @@ Options:
       corresponding binary load file.</para>
 
       <figure>
-        <title/>
+        <title>Binary load file</title>
 
         <mediaobject>
           <imageobject>
-            <imagedata align="center" contentdepth="400" depth="130" fileref="../graphics/binary_load_file_simplified.png" scale="150" valign="top" width="600"/>
+            <imagedata align="center" depth="100" fileref="../graphics/binary_load_file_simplified.png" scale="50" valign="top"/>
           </imageobject>
         </mediaobject>
       </figure>
@@ -898,7 +1105,7 @@ Options:
         </listitem>
 
         <listitem>
-          <para>There are no end-of-cell delimiters. The first byte of the
+          <para>There are no end of cell delimiters. The first byte of the
           representation of the first attribute value of cell N begins
           immediately after the the last byte of the last attribute of cell
           N-1.</para>
@@ -960,10 +1167,14 @@ Options:
       <para>Storage for a given type is assumed to be in the x86_64 endian
       format.</para>
 
-      <para>Each value in the file must conform to a datatype recognized by
-      SciDB. This includes native types, types defined in SciDB extensions,
-      and user-defined types. For a complete list of the types recognized by
-      your installation of SciDB, use the following AQL:</para>
+      <para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>select</secondary>
+        </indexterm>Each value in the file must conform to a datatype
+      recognized by SciDB. This includes native types, types defined in SciDB
+      extensions, and user-defined types. For a complete list of the types
+      recognized by your installation of SciDB, use the following AQL:</para>
 
       <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> list('types');  </programlisting></para></sect2>
 
@@ -999,8 +1210,8 @@ Options:
       <itemizedlist>
         <listitem>
           <para>The attribute names -- Although the array intensityFlat is
-          merely the load array--one that you might even delete after you
-          create and populate the target 2-dimensional, 1-attribute array--the
+          merely the load array—one that you might even delete after you
+          create and populate the target 2-dimensional, 1-attribute array—the
           attribute names matter. You should name the attributes as you expect
           to name the corresponding attribute and dimensions in the array you
           will ultimately create to support your analytics.</para>
@@ -1055,8 +1266,12 @@ Options:
 
        
 
-      <para>After you create the load array, you can populate it with data
-      using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> intensityFlat <command>FROM</command> '../examples/intensity_data.bin'
+      <para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>load</secondary>
+        </indexterm>After you create the load array, you can populate it with
+      data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> intensityFlat <command>FROM</command> '../examples/intensity_data.bin'
       <command>AS</command> '(string, 
            int64, 
            int64 null)';   </programlisting></para></para>
@@ -1067,10 +1282,10 @@ Options:
 
        is relative to the SciDB server's working directory on the coordinator instance. 
 
-      <para>Notice the format string--the quoted text following the AS
-      keyword. The LOAD command uses the format string as a guide for
-      interpreting the contents of the binary file. For more information about
-      the syntax of the format string, see the Load section in SciDB Operator
+      <para>Notice the format string—the quoted text following the AS keyword.
+      The LOAD command uses the format string as a guide for interpreting the
+      contents of the binary file. For more information about the syntax of
+      the format string, see the Load section in SciDB Operator
       Reference.</para>
 
        
@@ -1082,8 +1297,8 @@ Options:
       <para>After you populate the load array, you can use SciDB features to
       translate it into the desired array whose shape accommodates your
       analytical needs. Of course, you should have the basic shape of the
-      target array in mind from the outset -- perhaps even before you created
-      the binary file.</para>
+      target array in mind from the outset—perhaps even before you created the
+      binary file.</para>
 
       <para>There are, however, some characteristics of arrays beyond these
       basics. These include the chunk size and chunk overlap value of each
@@ -1101,9 +1316,10 @@ Options:
       statistics reveal little of interest. For large arrays however, the data
       can be illuminating and can influence your decisions about chunk size
       and chunk overlap. For more information about chunk size and overlap,
-      see the section on Basic Architecture in Introduction to SciDB. For more
-      information about the analyze operator, see the Analyze section in SciDB
-      Operator Reference.</para></para>
+      see the <link linkend="BasicArchitecture">Basic Architecture</link>
+      section in Introduction to SciDB. For more information about the analyze
+      operator, see the <xref linkend="analyze"/> section in SciDB Operator
+      Reference.</para></para>
 
       <para>The following command creates the desired 2-dimensional,
       1-attribute array:</para>
@@ -1123,11 +1339,23 @@ Options:
     <sect2>
       <title>Skipping Fields and Field Padding During Binary Load</title>
 
-      <para>During binary load, you can instruct the loader to skip some data
-      in the file. This is useful when you want exclude entire fields from the
-      load operation, and when you want to skip over some padded bytes that
-      have been added to a field by the application that produced the binary
-      file.</para>
+      <para><indexterm>
+          <primary>binary load</primary>
+        </indexterm><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>binary</secondary>
+        </indexterm><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>skipping fields</secondary>
+        </indexterm><indexterm>
+          <primary>skip</primary>
+        </indexterm>During binary load, you can instruct the loader to skip
+      some data in the file. This is useful when you want exclude entire
+      fields from the load operation, and when you want to skip over some
+      padded bytes that have been added to a field by the application that
+      produced the binary file.</para>
 
       <para>For skipping entire fields: From a binary file with N attributes,
       you can load a 1-dimensional SciDB array that has M attributes, where M
@@ -1135,7 +1363,7 @@ Options:
       pairs of AQL statements, which create and populate arrays excluding
       zero, one, and two fields of the same load file.</para>
 
-      <para>The first pair of statments includes all fields:</para>
+      <para>The first pair of statements includes all fields:</para>
 
       <para><para><programlisting>AQL% <command>CREATE ARRAY</command>  
        intensityFlat 
@@ -1193,18 +1421,30 @@ Options:
   <sect1>
     <title>Transferring Data From One SciDB Installation to Another</title>
 
-    <para>The data-loading technique that transfers array data from one SciDB
-    installation to another is called the "opaque" technique, so named because
-    the intermediate file format is not user-programmable. The opaque
-    technique starts from any array in one SciDB installation, produces an
-    external file, and loads that file into another SciDB
-    installation--establishing an array that had the same dimensions,
+    <para><indexterm>
+        <primary>data</primary>
+
+        <secondary>transferring</secondary>
+      </indexterm><indexterm>
+        <primary>moving data</primary>
+      </indexterm><indexterm>
+        <primary>SciDB</primary>
+
+        <secondary>installations</secondary>
+      </indexterm><indexterm>
+        <primary>load opaque</primary>
+      </indexterm>The data-loading technique that transfers array data from
+    one SciDB installation to another is called the "opaque" technique, so
+    named because the intermediate file format is not user-programmable. The
+    opaque technique starts from any array in one SciDB installation, produces
+    an external file, and loads that file into another SciDB
+    installation—establishing an array that had the same dimensions,
     attributes, dimension indexes, and attribute values as the original array
     from the source installation. The following figure presents an
     overview.</para>
 
     <figure>
-      <title/>
+      <title>Overview of opaque load technique</title>
 
       <mediaobject>
         <imageobject>
@@ -1233,7 +1473,7 @@ Options:
       </listitem>
 
       <listitem>
-        <para>The array you are transfering includes a dimension whose
+        <para>The array you are transferring includes a dimension whose
         datatype is not int64.</para>
       </listitem>
     </itemizedlist>
@@ -1243,8 +1483,8 @@ Options:
 
       <para>When using the opaque loading technique, visualizing the SciDB
       array you want in the destination SciDB installation can be easy because
-      the desired array--or something very close to it--already exists in the
-      source installation. In the most straighforward case, you can transfer
+      the desired array—or something very close to it—already exists in the
+      source installation. In the most straightforward case, you can transfer
       the current version of the source array to the destination array without
       modification: the array in the destination installation will match the
       source array in all of the following ways:</para>
@@ -1276,16 +1516,30 @@ Options:
       destination installation when you create the array that will contain the
       data loaded from the file. The next two sections elaborate on these
       cases.</para>
-
-      <para/>
     </sect2>
 
     <sect2>
       <title>Prepare the File for Opaque Loading</title>
 
-      <para>The opaque loading technique can create a file describing the
-      current version of any SciDB array. The following command accomplishes
-      that for the array called "intensity."</para>
+      <para><indexterm>
+          <primary>opaque data loading</primary>
+        </indexterm><indexterm>
+          <primary>data</primary>
+
+          <secondary>loading, opaque</secondary>
+        </indexterm><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>opaque</secondary>
+        </indexterm><indexterm>
+          <primary>backup</primary>
+
+          <see>save opaque</see>
+        </indexterm><indexterm>
+          <primary>save opaque</primary>
+        </indexterm>The opaque loading technique can create a file describing
+      the current version of any SciDB array. The following command
+      accomplishes that for the array called "intensity."</para>
 
       <para><para>The keywords <code>CURRENT INSTANCE</code>
       instruct SciDB to create the file in the SciDB working directory on the
@@ -1303,8 +1557,8 @@ Options:
       in opaque format.</para>
 
       <para>If you want the resulting opaque-formatted file to describe
-      something other than the original array--say, a subset of it or an array
-      with an additional attribute--you can modify the array accordingly using
+      something other than the original array—say, a subset of it or an array
+      with an additional attribute—you can modify the array accordingly using
       various SciDB operators. There are two methods:</para>
 
       <itemizedlist>
@@ -1333,11 +1587,15 @@ Options:
     <sect2>
       <title>Load the Data</title>
 
-      <para>Once you have the opaque-formatted file in a location where the
-      destination installation of SciDB can access it, you are almost ready to
-      load the data. But first you must create an array as the target of the
-      load operation. The array you create must match the source array in the
-      following regards:</para>
+      <para><indexterm>
+          <primary>restore</primary>
+
+          <see>load opaque</see>
+        </indexterm>Once you have the opaque-formatted file in a location
+      where the destination installation of SciDB can access it, you are
+      almost ready to load the data. But first you must create an array as the
+      target of the load operation. The array you create must match the source
+      array in the following regards:</para>
 
       <itemizedlist>
         <listitem>
@@ -1359,12 +1617,12 @@ Options:
 
       <para>To ensure that you create a target array that is compatible with
       the to-be-loaded data, you should check the schema of the original array
-      on the source installation. The following statement--run on the source
-      installation of SciDB--reveals the information you need:</para>
+      on the source installation. The following statement—run on the source
+      installation of SciDB—reveals the information you need:</para>
 
       <para><para><programlisting>AFL% show(intensity)</programlisting><screen><command>intensity</command>
 
-&lt; measuredIntensity:int64 NULL &gt;
+&lt; measuredIntensity:int64 NULL DEFAULT null &gt;
 
 [exposure(string)=3,3,0,
 elapsedTime=0:40000,10000,0]</screen></para></para>
@@ -1382,8 +1640,12 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
       source array is called "elapsedTime" but the corresponding dimension of
       the destination array is called "duration."</para></para>
 
-      <para>Now that the destination array exists, you can load the data into
-      it:</para>
+      <para><indexterm>
+          <primary>AQL</primary>
+
+          <secondary>load opaque</secondary>
+        </indexterm>Now that the destination array exists, you can load the
+      data into it:</para>
 
       <para><para><programlisting>AQL% <command>LOAD</command> intensityCopy
      <command>FROM</command> <command>CURRENT INSTANCE</command> '../examples/intensity_data.opaque'
@@ -1396,8 +1658,16 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
   <sect1>
     <title>Data with Special Values</title>
 
-    <para>Suppose you have a load file that is missing some values, like this
-    file, <code>v4.scidb</code>:</para>
+    <para><indexterm>
+        <primary>loading data</primary>
+
+        <secondary>special values</secondary>
+      </indexterm><indexterm>
+        <primary>data</primary>
+
+        <secondary>loading special</secondary>
+      </indexterm>Suppose you have a load file that is missing some values,
+    like this file, <code>v4.scidb</code>:</para>
 
     <para><screen>[
  (0,100),(1,99),(2,),(3,97)
@@ -1420,23 +1690,25 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
   </para></para></sect1>
 
   <sect1>
-     
-
     <title>Handling Errors During Load</title>
 
-     
+    <para><indexterm>
+        <primary>load errors</primary>
+      </indexterm><indexterm>
+        <primary>errors</primary>
 
-    <para>By default, if an error occurs during load, SciDB displays an error
-    message to stdout and cancels the operation. Because load is designed to
-    work on high volumes of data, the SciDB load facility includes a mechanism
-    by which you can keep track of errors while still loading the error-free
-    values. This mechanism is known as "shadow arrays."</para>
+        <secondary>loading data</secondary>
+      </indexterm><indexterm>
+        <primary>data</primary>
 
-     
+        <secondary>load errors</secondary>
+      </indexterm>By default, if an error occurs during load, SciDB displays
+    an error message to stdout and cancels the operation. Because load is
+    designed to work on high volumes of data, the SciDB load facility includes
+    a mechanism by which you can keep track of errors while still loading the
+    error-free values. This mechanism is known as "shadow arrays."</para>
 
     <para>During a load operation, SciDB can populate two arrays:</para>
-
-     
 
     <itemizedlist>
       <listitem>
@@ -1449,17 +1721,11 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
       </listitem>
     </itemizedlist>
 
-     
-
     <para>The shadow array uses the same dimensions and dimension values as
     the load array.</para>
 
-     
-
     <para>For attributes, things are slightly different. If the load array has
     n attributes, the shadow array has n+1 attributes, as follows:</para>
-
-     
 
     <itemizedlist>
       <listitem>
@@ -1478,8 +1744,6 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
       </listitem>
     </itemizedlist>
 
-     
-
     <para>After a load operation that is largely successful but produces a few
     errors, most cells of the shadow array will be empty; such cells
     correspond to cells in the load array that were loaded without error.
@@ -1488,13 +1752,9 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
     corresponding value was loaded into the load array without error) or
     populated with a message describing the error.</para>
 
-     
-
     <para>Note that SciDB will create a shadow array automatically for you if
     you use the <code>SHADOW ARRAY</code> keywords in your LOAD
     statement.</para>
-
-     
 
     <para>By using shadow arrays, you can achieve a successful load, even if
     the load file contains some imperfections. Of course, if a file is grossly
@@ -1504,23 +1764,13 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
     abandon the load operation. To specify the maximum number of errors, use
     the <code>ERRORS</code> keyword.</para>
 
-     
-
     <para>For example, consider the following CREATE ARRAY statement that
     establishes a 1-dimensional array to serve as the load array:</para>
 
-     
-
-    <para><para><programlisting>AQL% <command>CREATE ARRAY</command>  intensityFlat 
+    <para><programlisting>AQL% <command>CREATE ARRAY</command>  intensityFlat 
  &lt; exposure:string, elapsedTime:int64, measuredIntensity:int64 null &gt;
- [i=0:6,1000000,0];  </programlisting>Assume that you want to load into this array the data from
-    the following csv file, which contains some errors:</para></para>
-
-     
-
-    <para/>
-
-     
+ [i=0:6,1000000,0];  </programlisting><para>Assume that you want to load into this array the data from the
+    following CSV file, which contains some errors:</para>
 
     <para><screen>exposure,elapsedTime,measuredIntensity
 High,777,100
@@ -1531,45 +1781,36 @@ Medium,Jess,Jill
 Low,?,Josh
 Low,1888,?
 </screen><para>As you compare the CSV file with the CREATE ARRAY statement, notice
-    the following:</para>
+    the following:<itemizedlist>
+        <listitem>
+          <para>The second row contains an error—a text value in a numeric
+          field.</para>
+        </listitem>
 
-     
+        <listitem>
+          <para>The fifth row contains two errors—text values in numeric
+          fields.</para>
+        </listitem>
 
-    <itemizedlist>
-      <listitem>
-        <para>The second row contains an error--a text value in a numeric
-        field.</para>
-      </listitem>
+        <listitem>
+          <para>The sixth row contains two errors—a null value in the second
+          field (whose corresponding attribute in the CREATE ARRAY statement
+          prohibits nulls) and a text value in the third field.</para>
+        </listitem>
 
-      <listitem>
-        <para>The fifth row contains two errors--text values in numeric
-        fields.</para>
-      </listitem>
+        <listitem>
+          <para>The seventh row contains a legitimate null value in the third
+          field.</para>
+        </listitem>
 
-      <listitem>
-        <para>The sixth row contains two errors--a null value in the second
-        field (whose corresponding attribute in the CREATE ARRAY statement
-        prohibits nulls) and a text value in the third field.</para>
-      </listitem>
+        <listitem>
+          <para>All other rows are unremarkable.</para>
+        </listitem>
+      </itemizedlist></para>
 
-      <listitem>
-        <para>The seventh row contains a legitimate null value in the third
-        field.</para>
-      </listitem>
-
-      <listitem>
-        <para>All other rows are unremarkable.</para>
-      </listitem>
-    </itemizedlist>
-
-     
-
-    <para>The corresponding SciDB-formatted text file--that is, the file that
-    results when you run csv2scidb on this CSV file, is shown below:</para>
-
-     
-
-    <para><programlisting>$ cat '../examples/int4error.scidb'   </programlisting><screen>{0}[
+    <para>The corresponding SciDB-formatted text file—that is, the file that
+    results when you run csv2scidb on this CSV file, is shown
+    below:<para><programlisting>$ cat '../examples/int4error.scidb'   </programlisting><screen>{0}[
 ("High",777,100),
 ("High",Jack,99),
 ("Medium",777,100),
@@ -1578,12 +1819,18 @@ Low,1888,?
 ("Low",?,Josh),
 ("Low",1888,?)
 ]
-</screen><para>To load this file into SciDB using a shadow array to keep track of
-    load errors, use this AQL statement:</para>
+</screen></para></para>
 
-     
+    <para><indexterm>
+        <primary>AQL</primary>
 
-    <para><programlisting>AQL% <command>LOAD</command> intensityFlat
+        <secondary>shadow array</secondary>
+      </indexterm><indexterm>
+        <primary>AQL</primary>
+
+        <secondary>errors</secondary>
+      </indexterm>To load this file into SciDB using a shadow array to keep
+    track of load errors, use this AQL statement:<para><programlisting>AQL% <command>LOAD</command> intensityFlat
       <command>FROM</command> '../examples/int4error.scidb'
       <command>AS</command>   'text'
       <command>ERRORS</command> 99
@@ -1596,99 +1843,79 @@ Low,1888,?
 {4} "Medium",0,null
 {5} "Low",0,null
 {6} "Low",1888,null
-</screen>
+</screen>In the LOAD statement, notice the
+    following:<itemizedlist>
+        <listitem>
+          <para>The LOAD statement establishes a limit of 99 errors for the
+          load. If the load operation encounters more than 99 errors, SciDB
+          will abandon it.</para>
+        </listitem>
 
-     In the LOAD statement, notice the following: 
-
-    <itemizedlist>
-      <listitem>
-        <para>The LOAD statement establishes a limit of 99 errors for the
-        load. If the load operation encounters more than 99 errors, SciDB will
-        abandon it.</para>
-      </listitem>
-
-      <listitem>
-        <para>The LOAD statement uses a shadow array named intensityFlatShadow
-        to record load errors. If the shadow array you name in the LOAD
-        statement does not already exist, SciDB will create it for you. If the
-        shadow array you name already exists, you must ensure that the shadow
-        array's schema is properly compatible with the schema of the load
-        array: string attributes with names identical to the attributes of the
-        target array (string or otherwise) plus an int64 attribute named
-        row_offset.</para>
-      </listitem>
-    </itemizedlist>
-
-     
+        <listitem>
+          <para>The LOAD statement uses a shadow array named
+          intensityFlatShadow to record load errors. If the shadow array you
+          name in the LOAD statement does not already exist, SciDB will create
+          it for you. If the shadow array you name already exists, you must
+          ensure that the shadow array's schema is properly compatible with
+          the schema of the load array: string attributes with names identical
+          to the attributes of the target array (string or otherwise) plus an
+          int64 attribute named row_offset.</para>
+        </listitem>
+      </itemizedlist></para></para>
 
     <para>One result of this LOAD statement is the array intensityFlatShadow.
-    To examine its schema definition, use the show operator:</para>
+    To examine its schema definition, use the show operator:<para><programlisting>AFL% show(intensityFlatShadow)</programlisting><screen><command>intensityFlatShadow</command>
 
-     
-
-    <para><programlisting>AFL% show(intensityFlatShadow)</programlisting><screen><command>intensityFlatShadow</command>
-
-&lt; exposure:string NULL,
-elapsedTime:string NULL,
-measuredIntensity:string NULL,
+&lt; exposure:string NULL DEFAULT null,
+elapsedTime:string NULL DEFAULT null,
+measuredIntensity:string NULL DEFAULT null,
 row_offset:int64 &gt;
 
-[i=0:6,1000000,0]</screen><para>Notice that the shadow array includes one string attribute for every
+[i=0:6,1000000,0]</screen></para></para>
+
+    <para>Notice that the shadow array includes one string attribute for every
     attribute (string or otherwise) in the target array. Notice also the
     integer row_offset attribute. Furthermore, notice that the dimension
-    declaration--in this case, just the single dimension named i--matches the
+    declaration—in this case, just the single dimension named i—matches the
     dimension declaration in the load array in all regards: bounds, chunk
     size, and chunk overlap.</para>
 
-     
-
     <para>Another result of the preceding LOAD statement is the set of
     populated values of the shadow array. To examine these values, use this
-    AQL statement:</para>
-
-     
-
-    <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlatShadow;   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity,row_offset
+    AQL statement:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlatShadow;   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity,row_offset
 {1} null,"Failed to parse string",null,35
 {4} null,"Failed to parse string","Failed to parse string",94
 {5} null,"Assigning NULL to non-nullable attribute","Failed to parse string",110
-</screen><para>The data in the intensityFlatShadow array includes three non-empty
-    cells, indicating the following:</para>
+</screen></para></para>
 
-     
+    <para>The data in the intensityFlatShadow array includes three non-empty
+    cells, indicating the following:<itemizedlist>
+        <listitem>
+          <para>One row (the second) produced an error in the second field.
+          The error occurred approximately 35 bytes from the start of the
+          file.</para>
+        </listitem>
 
-    <itemizedlist>
-      <listitem>
-        <para>One row (the second) produced an error in the second field. The
-        error occurred approximately 35 bytes from the start of the
-        file.</para>
-      </listitem>
+        <listitem>
+          <para>One row (the fifth) produced two errors, in the second and
+          third fields. The first of these errors occurred approximately 94
+          bytes from the start of the file.</para>
+        </listitem>
 
-      <listitem>
-        <para>One row (the fifth) produced two errors, in the second and third
-        fields. The first of these errors occured approximately 94 bytes from
-        the start of the file.</para>
-      </listitem>
+        <listitem>
+          <para>One row (the sixth) produced two errors, in the second and
+          third fields. The first of these errors occurred approximately 110
+          bytes from the start of the file.</para>
+        </listitem>
 
-      <listitem>
-        <para>One row (the sixth) produced two errors, in the second and third
-        fields. The first of these errors occured approximately 110 bytes from
-        the start of the file.</para>
-      </listitem>
-
-      <listitem>
-        <para>All other rows were loaded successfully.</para>
-      </listitem>
-    </itemizedlist>
-
-     
+        <listitem>
+          <para>All other rows were loaded successfully.</para>
+        </listitem>
+      </itemizedlist></para>
 
     <para>And of course, the other result of the LOAD command is data loaded
-    into the load array. To examine that data, use this AQL statement:</para>
-
-     
-
-    <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlat;   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
+    into the load array. To examine that data, use this AQL
+    statement:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlat;   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
 {0} "High",777,100
 {1} "High",0,99
 {2} "Medium",777,100
@@ -1696,53 +1923,55 @@ row_offset:int64 &gt;
 {4} "Medium",0,null
 {5} "Low",0,null
 {6} "Low",1888,null
-</screen><para>The data in the intensityFlat array indicates the following:</para>
+</screen></para></para>
 
-     
+    <para>The data in the intensityFlat array indicates the
+    following:<itemizedlist>
+        <listitem>
+          <para>The second row has two correct values (High and 99) in the
+          first and third attributes. The second attribute, whose incoming
+          value generated an error, has been populated with the default value
+          (0) for that field. SciDB inserted the default value because that
+          attribute does not allow nulls.</para>
+        </listitem>
 
-    <itemizedlist>
-      <listitem>
-        <para>The second row has two correct values (High and 99) in the first
-        and third attributes. The second attribute, whose incoming value
-        generated an error, has been populated with the default value (0) for
-        that field. SciDB inserted the default value because that attribute
-        does not allow nulls.</para>
-      </listitem>
+        <listitem>
+          <para>The fifth row has one correct value (Medium) in the first
+          attribute. The second attribute has been populated with the default
+          value for that attribute. By contrast, the third attribute, which
+          also generated an error, has been set to null because that attribute
+          allows null values.</para>
+        </listitem>
 
-      <listitem>
-        <para>The fifth row has one correct value (Medium) in the first
-        attribute. The second attribute has been populated with the default
-        value for that attribute. By contrast, the third attribute, which also
-        generated an error, has been set to null because that attribute allows
-        null values.</para>
-      </listitem>
+        <listitem>
+          <para>The sixth row has one correct value (Medium) in the first
+          attribute. The second attribute has been populated with the default
+          value for that attribute because that attribute does not allow
+          nulls. By contrast, the third attribute, which also generated an
+          error, has been set to null because that attribute allows null
+          values.</para>
+        </listitem>
 
-      <listitem>
-        <para>The sixth row has one correct value (Medium) in the first
-        attribute. The second attribute has been populated with the default
-        value for that attribute because that attribute does not alllow nulls.
-        By contrast, the third attribute, which also generated an error, has
-        been set to null because that attribute allows null values.</para>
-      </listitem>
+        <listitem>
+          <para>All other rows were loaded successfully. This includes the
+          last row, whose null value in the third attribute was represented in
+          the original CSV file.</para>
+        </listitem>
+      </itemizedlist></para>
 
-      <listitem>
-        <para>All other rows were loaded successfully. This includes the last
-        row, whose null value in the third attribute was represented in the
-        original CSV file.</para>
-      </listitem>
-    </itemizedlist>
+    <para><indexterm>
+        <primary>AQL</primary>
 
-     
+        <secondary>from</secondary>
+      </indexterm><indexterm>
+        <primary>AQL</primary>
 
-    <para>After a load operation that produced some errors, you can create an
-    array that combines the error messages in the shadow array with the
-    problematic cells in the load array. For example, the following AQL
+        <secondary>into</secondary>
+      </indexterm>After a load operation that produced some errors, you can
+    create an array that combines the error messages in the shadow array with
+    the problematic cells in the load array. For example, the following AQL
     statement accomplishes this with intensityFlat and
-    intensityFlatShadow:</para>
-
-     
-
-    <para><programlisting>AQL% <command>SELECT</command>     
+    intensityFlatShadow:<para><programlisting>AQL% <command>SELECT</command>     
         intensityFlat.exposure
                          <command>AS</command> exp, 
         intensityFlatShadow.exposure
@@ -1761,367 +1990,56 @@ row_offset:int64 &gt;
      <command>FROM</command>
         intensityFlat, 
         intensityFlatShadow;
-  </programlisting><para>You can examine the result of this AQL statement as follows:</para>
+  </programlisting></para></para>
 
-     
-
-    <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlatBadCells;  </programlisting><screen>{i} exp,expMSG,elTime,elTimeMSG,Intensity,IntensityMSG,row_offset
+    <para>You can examine the result of this AQL statement as
+    follows:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlatBadCells;  </programlisting><screen>{i} exp,expMSG,elTime,elTimeMSG,Intensity,IntensityMSG,row_offset
 {1} "High",null,0,"Failed to parse string",99,null,35
 {4} "Medium",null,0,"Failed to parse string",null,"Failed to parse string",94
 {5} "Low",null,0,"Assigning NULL to non-nullable attribute",null,"Failed to parse string",110
-</screen><para>The query result shows the usefulness of the array
+</screen></para></para>
+
+    <para>The query result shows the usefulness of the array
     intensityFlatBadCells. The array contains one non-empty cell for each
     problematic cell of the load operation. Within the array
     intensityFlatBadCells, the attributes are arranged in consecutive pairs,
     where each pair consists of a value from the load array, and an indication
     of whether that value was successfully loaded. For example, the third
-    non-empty cell of intensityFlatBadCells indicates the following:</para>
+    non-empty cell of intensityFlatBadCells indicates the
+    following:<itemizedlist>
+        <listitem>
+          <para>The value in the first attribute of the cell in the load array
+          ("Medium") was successfully loaded because the error message
+          corresponding to that attribute in the shadow array is null.</para>
+        </listitem>
 
-     
+        <listitem>
+          <para>The value in the second attribute of the cell in the load
+          array was not successfully loaded because the error message is not
+          null. The value (0) is the applicable default value for that
+          attribute.</para>
+        </listitem>
 
-    <itemizedlist>
-      <listitem>
-        <para>The value in the first attribute of the cell in the load array
-        ("Medium") was successfully loaded because the error message
-        corresponding to that attribute in the shadow array is null.</para>
-      </listitem>
+        <listitem>
+          <para>The value in the third attribute of the cell in the load array
+          was not successfully loaded because the error message is not null.
+          The value itself is null because that attribute of the target array
+          allows nulls.</para>
+        </listitem>
 
-      <listitem>
-        <para>The value in the second attribute of the cell in the load array
-        was not successfully loaded because the error message is not null. The
-        value (0) is the applicable default value for that attribute.</para>
-      </listitem>
-
-      <listitem>
-        <para>The value in the third attribute of the cell in the load array
-        was not successfully loaded because the error message is not null. The
-        value itself is null because that attribute of the target array allows
-        nulls.</para>
-      </listitem>
-
-      <listitem>
-        <para>SciDB estimates that the problems loading values for this cell
-        begin at or near byte number 110 of the load file.</para>
-      </listitem>
-    </itemizedlist>
-
-     
+        <listitem>
+          <para>SciDB estimates that the problems loading values for this cell
+          begin at or near byte number 110 of the load file.</para>
+        </listitem>
+      </itemizedlist></para>
 
     <para>As you can see, an array like intensityFlatBadCells constitutes a
     useful report on the results of a load operation. Whenever you perform a
     load operation using a shadow array, you can combine the shadow array with
     the target array to make an array like intensityFlatBadCells. Thereafter,
-    you can use that array to help you investigate the problems that occured
+    you can use that array to help you investigate the problems that occurred
     during the load. How you choose to remedy or otherwise respond to those
     problems depends on the nature of your data and the data-quality policies
     of your organization.</para>
-
-     
-  </para></para></para></para></para></para></para></para></sect1>
-
-  <!--
- -->
-
-  <!--
-  <sect1>
-    <title>Parallel Data Loading -NEW</title>
-
-    <para>What's the basics, and when to use it.</para>
-
-    <sect2>
-      <title>When to Use Simple Data Loading</title>
-
-      <para>Regardless of the specific data-loading technique you use, the
-      general steps for moving data into SciDB are as follows:</para>
-    </sect2>
-
-    <sect2>
-      <title>Visualize the desired array</title>
-
-      <para>blah blah blah</para>
-    </sect2>
-
-    <sect2>
-      <title>Prepare the File</title>
-
-      <para>blah blah blah</para>
-    </sect2>
-
-    <sect2>
-      <title>Load the Data</title>
-
-      <para>blah blah blah</para>
-    </sect2>
-
-    <sect2>
-      <title>Rearrange As Necessary</title>
-
-      <para>blah blah blah</para>
-    </sect2>
-  </sect1>-->
-
-  <!-- <sect1>
-    <title>Saving Data from a SciDB Array to a File</title>
-
-    <para>You can save all or part of the data that is contained in a SciDB
-    array to a file. You can use a <code> <command>SELECT</command> </code>
-    statement with the <code> <command>SAVE</command> </code> clause to save
-    an entire array. For example, consider the following array
-    <code>random_numbers</code>:<programlisting>AQL% <command>CREATE ARRAY</command> random_numbers &lt;val:double&gt;[i=0:99,100,0];
-AQL% <command>SELECT</command> * <command>INTO</command> random_numbers 
-     <command>FROM</command> build(random_numbers,random());</programlisting>You
-    can save the values stored in the array <code>random_numbers</code> to a
-    file with the following query:<programlisting>AQL% <command>SAVE</command> random_numbers 
-     <command>INTO</command> '/tmp/random_data.txt';</programlisting>This
-    statement saves a SciDB-formatted file called
-    <code>random_data.txt</code>.</para>
-
-    <para>To save the data to <code>csv</code> format, set the
-    <code>iquery</code> output option to <code>csv</code>:<programlisting>% iquery -o csv -q "<command>SAVE</command> random_numbers 
-     <command>INTO</command> '/tmp/random_data.csv';"</programlisting><screen>val,val_rand
-1,939618095
-2,1011655774
-3,3620619210
-4,2317057332
-5,6137260845
-6,10771327980
-7,4496569336
-8,10364290328
-9,2309513805
-10,1398261690</screen></para>
-
-    <note>
-      <para>You will need to enter your iquery statement directly at the
-      command line to change the output option to csv. Type <code>exit;</code>
-      at the <code>AQL%</code> prompt to stop the current <code>iquery</code>
-      session.</para>
-    </note>
-  </sect1>
--->
-
-  <!--
-  <sect1>
-  <title>Data Files in Two or More Dimensions</title>
-  <para>SciDB data load files must be organized for dimensions according to the schema of the target array. The following examples show how to load data into a 2-dimensional SciDB array.</para>
-  <para>Given an array defined as follows: <programlisting>CREATE ARRAY Two_Dim&lt;a: int32, c: char&gt;[I=0:7,4,0, J=0:7,4,0];</programlisting>The external load file must contain chunks corresponding to array chunks. So, for the example 2-dimensional array with the following chunk layout:  <programlisting>C11 C12 
-C21 C22</programlisting></para>
-  <para>SciDB supports two formats in load files corresponding to dense and sparse data sets. The sparse format is more efficient when a majority of the cells in the array  do not contain any data. </para>
-  <sect2>
-    <title>Dense Load Format</title>
-    <para>The dense load format    <itemizedlist>
-        <listitem>
-          <para>Data to be loaded is divided up into chunks, with each chunk enclosed within a &apos;[ ]&apos; and separated by a semi-colon. </para>
-        </listitem>
-        <listitem>
-          <para>Each cell contains a comma-separated list of attribute values placed within (). This &apos;dense&apos; representation can denote empty cells using &apos;()&apos;. </para>
-        </listitem>
-        <listitem>
-          <para>Cells within each chunk must appear in left-to-right dimension order (e.g., row-major order for a 2-dimensional array, or generalized appropriately to higher dimensions). </para>
-        </listitem>
-        <listitem>
-          <para>The location of each cell within the chunk is implicit in the order of the load data.</para>
-        </listitem>
-      </itemizedlist></para>
-    <para>A load file for a 2-dimensional dense array looks like this:<programlisting>[
-[ (0, &apos;A&apos;), (1, &apos;B&apos;), (2, &apos;C&apos;), (3, &apos;D&apos;)],
-[ (8, &apos;I&apos;), (9, &apos;J&apos;), (10, &apos;K&apos;), (11, &apos;L&apos;)],
-
-[ (16, &apos;Q&apos;), (17, &apos;R&apos;), (18, &apos;S&apos;), (19, &apos;T&apos;)],
-[ (24, &apos;Y&apos;), (25, &apos;Z&apos;), (26, &apos;A&apos;), (27, &apos;B&apos;)]
-];
-[
-[ (4, &apos;E&apos;), (5, &apos;F&apos;), (6, &apos;G&apos;), (7, &apos;H&apos;)],
-
-[ (12, &apos;M&apos;), (13, &apos;N&apos;), (14, &apos;O&apos;), (15, &apos;P&apos;)],
-[ (20, &apos;U&apos;), (21, &apos;V&apos;), (22, &apos;W&apos;), (23, &apos;X&apos;)],
-[ (28, &apos;C&apos;), (29, &apos;D&apos;), (30, &apos;E&apos;), (31, &apos;F&apos;)]
-
-];
-[
-[ (32, &apos;G&apos;), (33, &apos;H&apos;), (34, &apos;I&apos;), (35, &apos;J&apos;)],
-[ (40, &apos;O&apos;), (41, &apos;P&apos;), (42, &apos;Q&apos;), (43, &apos;R&apos;)],
-[ (48, &apos;W&apos;), (49, &apos;X&apos;), (50, &apos;Y&apos;), (51, &apos;Z&apos;)],
-
-[ (56, &apos;E&apos;), (57, &apos;F&apos;), (58, &apos;G&apos;), (59, &apos;H&apos;)]
-];
-[
-[ (36, &apos;K&apos;), (37, &apos;L&apos;), (38, &apos;M&apos;), (39, &apos;N&apos;)],
-[ (44, &apos;S&apos;), (45, &apos;T&apos;), (46, &apos;U&apos;), (47, &apos;V&apos;)],
-
-[ (52, &apos;A&apos;), (53, &apos;B&apos;), (54, &apos;C&apos;), (55, &apos;D&apos;)],
-[ (60, &apos;I&apos;), (61, &apos;J&apos;), (62, &apos;K&apos;), (63, &apos;L&apos;)]
-] </programlisting></para>
-  </sect2>
- 
-</sect1>
-
-
-  <sect1>
-    <title>Loading Text Data</title>
-
-    <para>The text loading technique starts from a properly formatted text
-    file, which the SciDB loader parses and translates directly into a SciDB
-    array that can have arbitrarily many dimensions. (Contrast this with the
-    CSV technique, in which the loader produces a 1-dimensional array, which
-    you then must redimension into the desired multi-dimensional array that
-    supports your analytical needs.)</para>
-
-    <para>The text loading technique is recommended in the following
-    situations:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para>When you want to avoid the redimension_store operation that is
-        required at the end of the CSV technique.</para>
-      </listitem>
-
-      <listitem>
-        <para>When you already know the chunk size and chunk overlap for each
-        dimension.</para>
-      </listitem>
-
-      <listitem>
-        <para>When every dimension of the target array-the array that is the
-        destination of the load operation-is of type int64.</para>
-      </listitem>
-    </itemizedlist>
-
-    <sect2>
-      <title>Visualize the desired array</title>
-
-      <para>Because the text loading technique creates a multi-dimensional
-      array directly from an input file, you should thoroughly understand your
-      desired array before you begin the procedure. That means you should know
-      enough about your data to make judicious choices for chunk size and
-      chunk overlap parameters for each dimension. In fact, you need to know
-      which cells will appear in which chunks of the stored array created by
-      the load operation. For more information about chunk size and chunk
-      overlap, see the section on Basic Architecture in the Introduction to
-      SciDB.</para>
-    </sect2>
-
-    <sect2>
-      <title>Prepare the Load File</title>
-
-      <para>The text loading technique starts with a properly formated ASCII
-      file. Of course, the file must express the values of variables
-      (dimensions and attributes) for each non-empty cell in the array.
-      However, there are other formatting requirements:</para>
-
-      <itemizedlist>
-        <listitem>
-          <para>The format must accommodate multi-dimensional arrays.</para>
-        </listitem>
-
-        <listitem>
-          <para>The format must express chunk boundaries. That is, the format
-          must include information about which cells will appear in which
-          chunks of the stored SciDB array.</para>
-        </listitem>
-      </itemizedlist>
-
-      <para>Consequently, the formatted files are more elaborate than those
-      produced by the <code>csv2scidb</code> shell command used during the CSV
-      technique.</para>
-
-      <para>The file format has two flavors: one is optimized for sparse
-      arrays, the other is for dense arrays.</para>
-
-      <para>In the text load format, data is listed by chunks. Chunks are
-      delimited by two square brackets. There are semicolons between chunks.
-      <programlisting>[[<replaceable>chunk1</replaceable>]];
-[[<replaceable>chunk2</replaceable>]];</programlisting>Within each chunk, the
-      data is organized as a list of cells. Each cell includes the coordinate
-      indices of the cell in curly braces and the attributes of the cell
-      (separated by commas) in parentheses.<programlisting>[[{<replaceable>index1</replaceable>,<replaceable>index2</replaceable>,...} (<replaceable>attribute1</replaceable>,<replaceable>attribute2</replaceable>,...), ... 
-  {<replaceable>indexm</replaceable>,<replaceable>indexn</replaceable>} (<replaceable>attribute1m</replaceable>,<replaceable>attribute2n</replaceable>)]];</programlisting></para>
-
-      <para>For example, a load file for a diagonal 2-D array with two chunks
-      looks like this:<programlisting>[[
-{0,0}(0,'A'),{1,1}(1,'B'),{2,2}(2,'C'),{3,3}(3,'D')
-]];
-[[
-{4,4}(6,'G'),{5,5}(7,'P'),{6,6}(9,'H')
-]]</programlisting>This data is stored like this:<informalfigure>
-          <mediaobject>
-            <imageobject>
-              <imagedata fileref="../graphics/sparse_load.png" scale="30"/>
-            </imageobject>
-          </mediaobject>
-        </informalfigure></para>
-
-      <tip>
-        <para>In addition to storing the data, <command> <code>LOAD</code>
-        </command> operator returns the data back to the client (or next
-        operator in the query). When the data set is very large, you may want
-        to suppress the query output. The <code>iquery</code> executable that
-        accompanies SciDB includes the <code>-n</code> option for this
-        purpose. See "Getting Started with SciDB Development" for how to use
-        <code>iquery</code>.</para>
-      </tip>
-    </sect2>
-
-    <sect2>
-      <title>Load the Data</title>
-
-      <para>blah blah blah</para>
-    </sect2>
-
-    <sect2>
-      <title>Rearrange As Necessary</title>
-
-      <para>One of the benefits of the text loading technique is that the LOAD
-      statement produces a multi-dimensional array that supports your querying
-      and analytical needs. You do not need to rearrange the array produced by
-      the LOAD command; you have completed the text load procedure.</para>
-    </sect2>
-  </sect1>
-
-  <sect1>
-    <title>Sparse Data Loading - OLD</title>
-
-    <sect2>
-      <title>Sparse Load Chunks</title>
-
-      <para>Consider a load file like this:<programlisting>[[
-{0,0} (11),
-{1,0} (21),
-{0,1} (12)
-]];
-[[
-{0,2} (13)
-]];
-[[
-{2,0} (31),
-{3,0} (41),
-{2,1} (32),
-{3,1} (42)
-]];
-[[
-{2,2} (33),
-{3,3} (44)
-]];
-[[
-{7,0} (81),
-{6,1} (72),
-{7,1} (82)
-]];
-[[
-{6,2} (73),
-{7,2} (83),
-{7,3} (84)
-]];
-[[
-{8,0} (91)
-]];
-[[
-{8,2} (93),
-{8,3} (94)
-]]</programlisting>The chunk distribution in the load file requires that the
-      array have chunks of size 2 in the first dimension and chunks of size 2
-      in the second dimension. The array schema for this load file
-      is:<programlisting>&lt;attribute:int16&gt;[x=0:8,2,0,y=0:3,2,0];</programlisting></para>
-    </sect2>
-  </sect1>
--->
+  </para></para></sect1>
 </chapter>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>regrid</refname>
+
+    <refpurpose>Select non-overlapping subarrays</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>, <replaceable>grid_2</replaceable><optional>,...,<replaceable>grid_N</replaceable></optional>,
+   <replaceable>aggregate_call_1</replaceable> <optional>, <replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para><indexterm>
+        <primary>regrid</primary>
+      </indexterm>The regrid operator partitions the cells in the input array
+    into blocks, and for each block, apply a specific aggregate operation over
+    the value(s) of some attribute in each block.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Limitations</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>The grids may not span array chunks.</para>
+      </listitem>
+
+      <listitem>
+        <para>The chunk size must be a multiple of the grid size in each
+        dimension.</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example divides a 4<symbol role="symbolfont">×</symbol>4
+      array into 4 equal partitions and calculates the average of each one.
+      This process is known as <emphasis role="italic">spatial
+      averaging</emphasis>.</para>
+
+      <procedure>
+        <step>
+          <para>Create an array m4x4:<programlisting language="test">--afl CREATE ARRAY m4x4 &lt;val:double&gt; [i=0:3,4,0,j=0:3,4,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para><programlisting language="test">--afl store(build (m4x4, i*4+j), m4x4); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Regrid m4x4 into four partitions and find the average of each
+          partition.<programlisting language="test">--afl regrid(m4x4, 2,2, avg(val)); --output-format=dense</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

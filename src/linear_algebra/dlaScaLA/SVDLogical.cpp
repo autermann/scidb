@@ -43,7 +43,62 @@ template<typename int_tt>
 inline int_tt divCeil(int_tt val, int_tt divisor) {
     return (val + divisor - 1) / divisor ;
 }
-
+ ///
+ /// @brief The operator: gesvd().
+ ///
+ /// @par Synopsis:
+ ///   gesvd( inputArray, factor )
+ ///
+ /// @par Summary:
+ ///   Produces a singular value decomposition (SVD) of the inputArray matrix and returns one of the three decomposition factors.
+ ///   The input matrix must have a single numeric attribute of type 'double', two dimensions, and the chunk size of 32x32
+ ///
+ /// @par Input:
+ /// <br>  - inputArray: an array with two dimensions (i.e. matrix): dim1, dim2
+ /// <br>  - factor: a string identifying the factor of SVD, either
+ /// <br>        'U' (aka 'left')
+ /// <br>        or
+ /// <br>        'VT' (aka 'right')
+ /// <br>        or
+ /// <br>        'S' (aka 'SIGMA','values') 
+ ///
+ /// @par Output array:
+ ///   <br> <
+ ///   <br>   <double:u> or <double:v> or <double:sigma>: the result attribute corresponding to the SVD factor
+ ///   <br> >
+ ///   <br> For U:
+ ///   <br> [
+ ///   <br>   dim1
+ ///   <br>   dim1
+ ///   <br> ]
+ ///   <br> For VT:
+ ///   <br> [
+ ///   <br>   dim2
+ ///   <br>   dim2
+ ///   <br> ]
+ ///   <br> For S:
+ ///   <br> [
+ ///   <br>   dim2
+ ///   <br> ]
+ ///
+ /// @par Examples:
+ ///   gesvd( inputArray, 'U' )
+ ///   gesvd( inputArray, 'VT' )
+ ///   gesvd( inputArray, 'S' )
+ ///
+ /// @par Errors:
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR2 -- if attribute count != 1
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR5 -- if attribute type is not double in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR3 -- if number of dimensions != 2 in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR9 -- if sizes are not bounded in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR41 -- if chunk interval is too small in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR42 -- if chunk interval is too large in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR40 -- if there is chunk overlap in any of the arrays
+ ///   DLANameSpace:SCIDB_SE_INFER_SCHEMA:DLA_ERROR10 -- if the chunk sizes in any of the input arrays are not identical (until auto-repart is working)
+ ///
+ /// @par Notes:
+ ///   n/a
+ ///
 class SVDLogical: public LogicalOperator
 {
 public:

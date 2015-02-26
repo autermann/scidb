@@ -36,7 +36,7 @@ namespace scidb {
 /// V* (V congugate-transpose or right singular vectors congugate transpose)
 /// 
 /// The difference is that the "Master" version sends the command to a program
-/// called "scidb_mpi_slave" and that process mmap/shmem's the buffer into its address
+/// called "mpi_slave_scidb" and that process mmap/shmem's the buffer into its address
 /// space, calls pdgesvd_() and returns.  The slave process is used so that if
 /// MPI experiences a failure, it will not cause the typical MPI problems that
 /// MPI failures cause for their processes, such as termination and/or inability

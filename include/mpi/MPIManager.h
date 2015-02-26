@@ -44,6 +44,7 @@
 #include <util/shm/SharedMemoryIpc.h>
 #include <mpi/MPILauncher.h>
 #include <mpi/MPIUtils.h>
+#include <system/Config.h>
 
 using namespace std;
 
@@ -418,16 +419,6 @@ namespace scidb
         static void initMpiLinks(const std::string& installPath,
                                  const std::string& mpiPath,
                                  const std::string& pluginPath);
-
-        static std::string getMpiRunPath(const std::string& mpiPath)
-        {
-            return mpiPath+"/bin/"+mpi::LAUNCHER_BIN;
-        }
-        static std::string getMpiOrtedPath(const std::string& mpiPath)
-        {
-            return mpiPath+"/bin/"+mpi::DAEMON_BIN;
-        }
-
     public:
         /**
          * @param installPath this instance install/data path
@@ -444,7 +435,8 @@ namespace scidb
          */
         static std::string getLauncherBinFile(const std::string& installPath)
         {
-            return getMpiRunPath(getMpiDir(installPath));
+            string mpiDir = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_DIR);
+            return MpiLauncher::getLauncherPath(mpiDir);
         }
 
         /**
@@ -453,33 +445,25 @@ namespace scidb
          */
         static std::string getDaemonBinFile(const std::string& installPath)
         {
-            return getMpiOrtedPath(getMpiDir(installPath));
+            string mpiDir = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_DIR);
+            return MpiLauncher::getDaemonPath(mpiDir);
         }
 
         /**
+         * Check if a process with a given pid belongs to this cluster/instance
          * @param installPath this instance install/data path
-         * @param procName as read from the /proc/<pid>/cmdline
-         * @return true if procName was started by this SciDB instance
-         *         (but not necessarily by this process)
+         * @param pid of the process to check
+         * @return true if procName is an MPI slave started by this SciDB instance
+         *              or it is an MPI launcher/daemon started by this cluster and
+         *              does not belong to any existing query;
+         *         false otherwise
+         * @note this method can produce false positives (for example because pids wrap around)
+         * @todo XXX this method does not work correctly under OMPI
+         *           (because we dont set the correct environment for launcher/daemon)
          */
-        static bool canRecognizeProc(const std::string& installPath, const std::string& procName)
-        {
-            if (procName.size() <= installPath.size()) {
-                return false;
-            }
-            if (procName.compare(0, installPath.size(), installPath)!=0) {
-                return false;
-            }
-            const size_t tailOff = installPath.size();
-            const size_t tailSize = procName.size()-tailOff;
-            if (   procName.compare(tailOff, tailSize, mpi::getSlaveBinFile("")) != 0
-                && procName.compare(tailOff, tailSize, getLauncherBinFile("")) != 0
-                && procName.compare(tailOff, tailSize, getDaemonBinFile("")) != 0) {
-                return false;
-            }
-            return true;
-        }
-
+        static bool canRecognizeProc(const std::string& installPath,
+                                     const std::string& clusterUuid,
+                                     pid_t pid);
     public:
         explicit MpiManager();
         virtual ~MpiManager() {}
@@ -502,6 +486,8 @@ namespace scidb
         boost::shared_ptr<MpiOperatorContext> checkAndSetCtx(scidb::QueryID queryId,
                                                              const boost::shared_ptr<MpiOperatorContext>& ctx);
         bool removeCtx(scidb::QueryID queryId);
+        /// for internal use
+        void forceInitMpi();
     };
 
     /**
@@ -562,6 +548,7 @@ namespace scidb
          *         otherwise false
          */
         static bool killProc(const std::string& installPath,
+                             const std::string& clusterUuid,
                              pid_t pid);
 
         private:
@@ -571,8 +558,10 @@ namespace scidb
         static void clean(scidb::QueryID queryId, uint64_t launchId,
                           MpiOperatorContext::LaunchInfo* info);
         static void processLauncherPidFile(const std::string& installPath,
+                                           const std::string& clusterUuid,
                                            const std::string& fileName);
         static void processSlavePidFile(const std::string& installPath,
+                                        const std::string& clusterUuid,
                                         const std::string& fileName);
         boost::shared_ptr<MpiOperatorContext> _ctx;
     };

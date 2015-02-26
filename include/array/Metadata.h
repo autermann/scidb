@@ -905,11 +905,6 @@ public:
     }
 
     /**
-     * Check if array contains overlaps
-     */
-    bool containsOverlaps() const;
-
-    /**
      * Get partitioning schema
      */
     inline PartitioningSchema getPartitioningSchema() const

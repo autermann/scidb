@@ -117,3 +117,25 @@ set(arg_separator_sources
 add_executable(arg_separator ${arg_separator_sources})
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "arg_separator" arg_separator)
 set_target_properties(arg_separator PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
+
+set(DISABLE_TESTS "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable.tests")
+set(DISABLE_TESTS_1I "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable1i.tests")
+set(DISABLE_TESTS_IN "${DISABLE_TESTS}.in")
+set(DISABLE_TESTS_1I_IN "${DISABLE_TESTS_1I}.in")
+
+# list_1 and run_016 disabled until we get scalapack building
+# on all platforms
+if(DISABLE_SCALAPACK)
+ set(CONFIGURE_DISABLE_TESTS_SCALAPACK "scalapack
+checkin.mpi
+checkin.other.list_1
+checkin.other.run_016
+checkin.scalapack")
+endif(DISABLE_SCALAPACK)
+
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+ set(CONFIGURE_DISABLE_TESTS_NOT_DEBUG "injecterror")
+endif(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+
+configure_file(${DISABLE_TESTS_IN} ${DISABLE_TESTS})
+configure_file(${DISABLE_TESTS_1I_IN} ${DISABLE_TESTS_1I})

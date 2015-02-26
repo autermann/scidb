@@ -568,6 +568,7 @@ void Connection::connectAsyncInternal(const string& address, uint16_t port)
    disconnectInternal();
    LOG4CXX_TRACE(logger, "Connecting (async) to " << address << ":" << port);
 
+   //XXX TODO: switch to using scidb::resolveAsync()
    shared_ptr<asio::ip::tcp::resolver>  resolver(new asio::ip::tcp::resolver(_socket.get_io_service()));
    stringstream serviceName;
    serviceName << port;

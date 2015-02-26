@@ -28,6 +28,7 @@
 # include <string>
 # include <boost/config.hpp>
 # include <boost/archive/archive_exception.hpp>
+# include <boost/lexical_cast.hpp>
 
 # include "global.h"
 # include "helper.h"
@@ -93,8 +94,8 @@ void XMLArchive :: save (const struct IndividualTestInfo &iti)
 	putCHAR (XML_CHAR_TAB);
 	(*this) << BOOST_SERIALIZATION_NVP(TestDescription);
 
-	time_t startTime = iti.testEi.sTime;
-	time_t endTime = iti.testEi.eTime;
+	time_t startTime = iti.testEi.sTime/1000;
+	time_t endTime = iti.testEi.eTime/1000;
 	string TestStartTime = ctime (&startTime);
 	string TestEndTime = ctime (&endTime);
 
@@ -103,7 +104,8 @@ void XMLArchive :: save (const struct IndividualTestInfo &iti)
 	putCHAR (XML_CHAR_TAB);
 	(*this) << BOOST_SERIALIZATION_NVP(TestEndTime);
 
-	string TestTotalExeTime = iTos (endTime - startTime);
+//	string TestTotalExeTime = iTos (endTime - startTime);
+	string TestTotalExeTime = boost::lexical_cast<std::string> ((double(time_t(iti.testEi.eTime) - time_t(iti.testEi.sTime)))/1000);
 	putCHAR (XML_CHAR_TAB);
 	(*this) << BOOST_SERIALIZATION_NVP(TestTotalExeTime);
 

@@ -6,9 +6,11 @@
 --start-igdata
 store(build(<val:double>[i=0:2,3,0,j=0:2,3,0],i*3+j+100),array1)  
 store(build(<val:double>[i=0:2,3,0,j=0:2,3,0],i*3+j+200),array2)  
+--set-format dense
 --stop-igdata
 store(join(array1,array2),storage_array)  
-save(storage_array,'/tmp/storage_array.txt')  
+--set-format dcsv
+save(storage_array,'/tmp/storage_array.txt',-2,'dcsv')  
 
 --stop-query-logging
 

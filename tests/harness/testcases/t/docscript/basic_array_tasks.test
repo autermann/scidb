@@ -18,6 +18,7 @@ load(B, '../examples/B.scidb')
 --aql SELECT val_b from B  
 --aql SELECT j FROM B WHERE j > 3 and j < 7  
 --aql SELECT sqrt(val_b) FROM B WHERE j>3 and j<7  
+--aql SELECT * FROM A,B  
 --aql SELECT * INTO C FROM A, B  
 --set-format dcsv
 show(C)
@@ -39,7 +40,7 @@ scan(vector3)
 --set-format auto
 --aql SELECT * FROM m3x3 JOIN vector3 ON m3x3.j = vector3.k  
 --aql  SELECT data.i*10 FROM A AS data WHERE A.i < 5  
---aql  SELECT pow(c,2) FROM (SELECT A.val_a + B.val_b AS c FROM A,B) WHERE i > 5  
+--aql SELECT pow(c,2) FROM (SELECT A.val_a + B.val_b AS c FROM A,B) WHERE i > 5  
 
 --stop-query-logging
 

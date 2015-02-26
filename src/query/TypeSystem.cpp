@@ -91,7 +91,6 @@ bool Type::isSubtype(TypeId const& subtype, TypeId const& supertype)
     return TypeLibrary::getType(subtype).isSubtypeOf(supertype);
 }
 
-
 /**
  * TypeLibrary implementation
  */
@@ -116,12 +115,16 @@ void TypeLibrary::registerBuiltInTypes()
 {
     for (size_t i = 0; i <= BUILTIN_TYPE_CNT; i++) {
         Type type(BuiltInNames[i], BuiltInBitSizes[i]);
+        Value _defaultValue(type);
         _instance._registerType(type);
         _instance._builtinTypesById[BuiltInNames[i]] = type;
+        _instance._defaultValuesById[BuiltInNames[i]] = _defaultValue;
     }
     Type fixedStringType(TID_FIXED_STRING, 0, TID_STRING);
+    Value _defaultValue(fixedStringType);
     _instance._registerType(fixedStringType);
-    _instance._builtinTypesById[TID_FIXED_STRING] = fixedStringType;    
+    _instance._builtinTypesById[TID_FIXED_STRING] = fixedStringType;
+    _instance._defaultValuesById[TID_FIXED_STRING] = _defaultValue;
 }
 
 bool TypeLibrary::_hasType(TypeId typeId)
@@ -199,6 +202,38 @@ std::vector<TypeId> TypeLibrary::_typeIds()
             list.push_back(i->first);
     }
     return list;
+}
+
+const Value& TypeLibrary::_getDefaultValue(TypeId typeId)
+{
+    std::map<TypeId, Value, __lesscasecmp>::iterator iter = _defaultValuesById.find(typeId);
+    if (iter != _defaultValuesById.end())
+    {
+        return iter->second;
+    }
+
+    int fixed_str;
+    if (sscanf(typeId.c_str(), "string_%d", &fixed_str) == 1)
+    {
+        return _defaultValuesById[TID_FIXED_STRING];
+    }
+
+    Value _defaultValue(_getType(typeId));
+
+    FunctionDescription functionDesc;
+    vector<FunctionPointer> converters;
+    if (FunctionLibrary::getInstance()->findFunction(typeId, vector<TypeId>(), functionDesc, converters, false))
+    {
+        functionDesc.getFuncPtr()(0, &_defaultValue, 0);
+    }
+    else
+    {
+        stringstream ss;
+        ss << typeId << "()";
+        throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_FUNCTION_NOT_FOUND) << ss.str();
+    }
+
+    return _defaultValuesById[typeId] = _defaultValue;
 }
 
 /**
@@ -522,30 +557,6 @@ bool isBuiltinType(const TypeId type)
         || TID_DATETIME == type
         || TID_VOID == type
         || TID_DATETIMETZ == type;
-}
-
-void setDefaultValue(Value &value, const TypeId typeId)
-{
-    int fixed_str;
-    if (isBuiltinType(typeId) || typeId == TID_BINARY || sscanf(typeId.c_str(), "string_%d", &fixed_str) == 1)
-    {
-        value.setZero();
-    }
-    else
-    {
-        FunctionDescription functionDesc;
-        vector<FunctionPointer> converters;
-        if (FunctionLibrary::getInstance()->findFunction(typeId, vector<TypeId>(), functionDesc, converters, false))
-        {
-            functionDesc.getFuncPtr()(0, &value, 0);
-        }
-        else
-        {
-            stringstream ss;
-            ss << typeId << "()";
-            throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_FUNCTION_NOT_FOUND) << ss.str();
-        }
-    }
 }
  
 TypeId propagateType(const TypeId type)

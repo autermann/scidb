@@ -291,9 +291,7 @@
         "python-paramiko": ">= ${targetver}",
         "python-crypto": ">= ${targetver}",
         "bzip2-libs": ">= ${targetver}",
-        "zlib": ">= ${targetver}",
-        "log4cxx": ">= ${targetver}",
-        "protobuf": ">= ${targetver}"
+        "zlib": ">= ${targetver}"
     },
 
     "scidb-plugins": {},
@@ -301,9 +299,7 @@
     "libscidbclient":
     {
         "bzip2-libs": ">= ${targetver}",
-        "zlib": ">= ${targetver}",
-        "log4cxx": ">= ${targetver}",
-        "protobuf": ">= ${targetver}"
+        "zlib": ">= ${targetver}"
     },
 
     "scidb-utils":

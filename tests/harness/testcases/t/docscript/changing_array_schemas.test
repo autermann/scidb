@@ -68,6 +68,18 @@ show(m4x4)
 --set-format dense
 scan(m4x4)  
 thin(m4x4, 0, 2, 0, 2)  
+--set-format dcsv
+--start-igdata
+create array square_array <val:int64>[i=0:15,16,0,j=0:15,16,0]  
+store(build(square_array,i*16+j),square_array)  
+--set-format dense
+--stop-igdata
+subarray(square_array,5,5,8,8)  
+slice(square_array,j,5)  
+slice(square_array,i,9)  
+thin(square_array,0,4,0,8)  
+thin(square_array,0,8,0,2)  
+thin(square_array,2,8,1,2)  
 --aql SELECT * INTO m3x3_new FROM attribute_rename(m3x3,val,val2)  
 --set-format dcsv
 show(m3x3_new)
@@ -79,6 +91,19 @@ show(m3x3_new_attr)
 --aql SELECT val2, val3 FROM m3x3_new_attr  
 --set-format dcsv
 --start-igdata
+create array chunks<val1:double,val2:double>[i=0:999,100,0,j=0:999,100,0]  
+--set-format dense
+--stop-igdata
+show(chunks)  
+--set-format dcsv
+--start-igdata
+--aql SELECT * INTO chunks_part FROM repart(chunks,<val1:double,val2:double> [i=0:999,10,0,j=0:999,1000,0])  
+--set-format dense
+--stop-igdata
+show(chunks_part)  
+--set-format dcsv
+--start-igdata
+--aql SELECT * INTO chunks_overlap FROM repart(chunks,<val1:double,val2:double> [i=0:999,100,10,j=0:999,100,10])  
 CREATE ARRAY Dsp_raw<d: string, t: string, val: double >[i=1:25,5,0]  
 CREATE ARRAY Dsp<val: double>[d(string)=5,5,0,t(string)=5,5,0]  
 load(Dsp_raw, '../examples/expo_example.scidb')  
@@ -86,11 +111,9 @@ redimension_store(Dsp_raw, Dsp)
 --stop-igdata
 scan(Dsp) 
 show(Dsp)
---start-igdata
 --aql SELECT * INTO Dsp_slice_0 FROM slice(Dsp, d, 'device-0')  
 --aql SELECT * INTO Dsp_slice_1 FROM slice(Dsp, d, 'device-1')  
 --aql SELECT * INTO Dsp_slice_2 FROM slice(Dsp, d, 'device-2')  
---stop-igdata
 show(Dsp_slice_2)
 --aql SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2)  
 show(Dsp_1d)
@@ -110,8 +133,12 @@ remove(m4x4)
 remove(m3x3)
 remove(m1)
 remove(m3x3x3)
+remove(square_array)
 remove(m3x3_new)
 remove(m3x3_new_attr)
+remove(chunks)
+remove(chunks_part)
+remove(chunks_overlap)
 remove(Dsp_raw)
 remove(Dsp)
 remove(Dsp_slice_0)

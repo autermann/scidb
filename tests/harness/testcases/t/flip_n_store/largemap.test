@@ -1,11 +1,12 @@
 --setup 
 
 --start-query-logging
-create array H<i:int64>[a(string)=1000000,1000000,0]
---start-igdata 
-store(build(<a:string>[i=0:999999,1000000,0],format(i+0.0,'Gregor awoke one morning to find himself transformed into a gigantic insect. %f')),G)
---stop-igdata
 
+#All of the NID mappings are held in one chunk right now. We make it almost as big as our default chunk-segment-size
+create array H<i:int64>[a(string)=800000,800000,0]
+--start-igdata 
+store(build(<a:string>[i=0:799999,800000,0],format(i+0.0,'Gregor awoke one morning to find himself transformed into a gigantic insect. %f')),G)
+--stop-igdata
 
 --test
 --start-igdata

@@ -13,7 +13,7 @@ import re
 import argparse
 
 # Just for sanity. You could probably run more if you wanted to
-MAX_SUPPORTED_INSTANCES = 20
+MAX_SUPPORTED_INSTANCES = 64
 
 MODE_INIT_START = 0
 MODE_START = 1

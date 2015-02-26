@@ -4,7 +4,9 @@
   <refnamediv>
     <refname>sort</refname>
 
-    <refpurpose>Produces a 1-dimensional result array by sorting non-empty
+    <refpurpose><indexterm>
+        <primary>sort</primary>
+      </indexterm>Produces a 1-dimensional result array by sorting non-empty
     cells of a source array.</refpurpose>
   </refnamediv>
 
@@ -27,11 +29,12 @@
 
     <para>The sort operator can sort by one or more attributes. The operator
     first sorts by the first attribute, then by the second, et cetera. Use the
-    optional keyword asc or desc to control the sort order for each attribute,
-    ascending or descending. The default is ascending.</para>
+    optional keyword <literal>asc</literal> or <literal>desc</literal> to
+    control the sort order for each attribute, ascending or descending. The
+    default is ascending.</para>
 
     <para>You can control the chunk size of the resulting array with the
-    optional chunk_size parameter.</para>
+    optional <literal>chunk_size</literal> parameter.</para>
 
     <para>You can use the sort operator in the FROM clause of an AQL SELECT
     statement, as a stand-alone operator in a AFL statement, or as an operand
@@ -39,7 +42,7 @@
   </refsect1>
 
   <refsect1>
-    <title>Example</title>
+    <title>Examples</title>
 
     <informalexample>
       <para>This example first scans a 2-D array, then sorts it by ascending
@@ -47,11 +50,9 @@
 
       <procedure>
         <step>
-          <para>Show the source_array:
-
-<para><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> champions;  </programlisting><screen>{year,event} person,country,time
+          <para>Show the source_array: <para><para><programlisting>AFL% scan(champions);  </programlisting><screen>{year,event} person,country,time
 {1996,"dash"} "Bailey","Canada",9.84
-{1996,"marathon"} "Thugwane","RSA",7956
+{1996,"marathon"} "Thugwane","USA",7956
 {1996,"steeplechase"} "Keter","Kenya",487.12
 {2000,"dash"} "Greene","USA",9.87
 {2000,"marathon"} "Abera","Ethiopia",7811
@@ -63,11 +64,10 @@
 {2008,"marathon"} "Wanjiru","Kenya",7596
 {2008,"steeplechase"} "Kipruto","Kenya",490.34
 </screen></para></para></para>
-	  </step>
+        </step>
 
         <step>
-          <para>Sort by country (ascending):
-<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> sort(champions,country);  </programlisting><screen>{n} person,country,time
+          <para>Sort by country (ascending): <para><programlisting>AFL% sort(champions,country);  </programlisting><screen>{n} person,country,time
 {0} "Bailey","Canada",9.84
 {1} "Abera","Ethiopia",7811
 {2} "Baldini","Italy",7855
@@ -77,7 +77,7 @@
 {6} "Kemboi","Kenya",485.81
 {7} "Wanjiru","Kenya",7596
 {8} "Kipruto","Kenya",490.34
-{9} "Thugwane","RSA",7956
+{9} "Thugwane","USA",7956
 {10} "Greene","USA",9.87
 {11} "Gatlin","USA",9.85
 </screen></para></para>
@@ -85,8 +85,7 @@
 
         <step>
           <para>Sort by country (ascending), then year (descending), and use a
-          chunk size of 100 for the result array:
-<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> sort(winnersAbridged,country, year desc, 100);  </programlisting><screen>{n} country,year,event
+          chunk size of 100 for the result array: <para><programlisting>AFL% sort(winnersAbridged,country, year desc, 100);</programlisting><screen>{n} country,year,event
 {0} "Canada",1996,"dash"
 {1} "Ethiopia",2000,"marathon"
 {2} "Italy",2004,"marathon"
@@ -96,29 +95,25 @@
 {6} "Kenya",2004,"steeplechase"
 {7} "Kenya",2000,"steeplechase"
 {8} "Kenya",1996,"steeplechase"
-{9} "RSA",1996,"marathon"
-{10} "USA",2004,"dash"
-{11} "USA",2000,"dash"
-</screen>
-	  Note that the result includes 12 cells,
-          corresponding to the 12 non-empty cells of the source array. The
-          sort operator ignores empty cells, of which there are several in the
-          winnersAbridged array. (They empty cells correspond to non-Olympic
-          years included in the dimension "year.")
-	  </para></para>
+{9} "USA",2004,"dash"
+{10} "USA",2000,"dash"
+{11} "USA",1996,"marathon"
+</screen> Note
+          that the result includes 12 cells, corresponding to the 12 non-empty
+          cells of the source array. The sort operator ignores empty cells, of
+          which there are several in the winnersAbridged array. (They empty
+          cells correspond to non-Olympic years included in the dimension
+          "year.")</para></para>
         </step>
       </procedure>
-    </informalexample>
 
-    <informalexample>
       <para>To illustrate how the sort operator handles null values, this
       example first scans an array that includes a null value, then sorts the
       cells in ascending order, then sorts them in descending order.</para>
 
-<para><procedure>
+      <para><procedure>
         <step>
-          <para>Show the source_array:
-	  <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> numbers;  </programlisting><screen>{i} number
+          <para>Show the source_array: <para><programlisting>AFL% scan(numbers);</programlisting><screen>{i} number
 {0} 0
 {1} 1
 {2} 2
@@ -128,8 +123,7 @@
         </step>
 
         <step>
-          <para>Sort by number (ascending):
-<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> sort(numbers, number asc);  </programlisting><screen>{n} number
+          <para>Sort by number (ascending): <para><programlisting>AFL% sort(numbers, number asc);</programlisting><screen>{n} number
 {0} null
 {1} 0
 {2} 1
@@ -139,8 +133,7 @@
         </step>
 
         <step>
-          <para>Sort by number (descending):
-<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> sort(numbers, number desc);  </programlisting><screen>{n} number
+          <para>Sort by number (descending): <para><programlisting>AFL% sort(numbers, number desc);</programlisting><screen>{n} number
 {0} 4
 {1} 2
 {2} 1

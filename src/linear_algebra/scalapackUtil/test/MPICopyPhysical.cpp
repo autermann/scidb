@@ -67,7 +67,7 @@ public:
 
     virtual bool changesDistribution(const std::vector<ArrayDesc> & inputSchemas) const
     {
-        return false;
+        return true;
     }
 
 
@@ -210,7 +210,9 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
     
     void *argsBuf = shmIpc[0]->get();
     double* IN = reinterpret_cast<double*>(shmIpc[1]->get());
-    double* OUT= reinterpret_cast<double*>(shmIpc[2]->get()); shmSharedPtr_t OUTx(shmIpc[2]);
+    double* OUT= reinterpret_cast<double*>(shmIpc[2]->get());
+    size_t resultShmIpcIndx = 2;
+    shmSharedPtr_t OUTx(shmIpc[resultShmIpcIndx]);
 
     setInputMatrixToAlgebraDefault(IN, nElem[1]);
     extractArrayToScaLAPACK(Ain, IN, DESC_IN);
@@ -282,21 +284,8 @@ void MPICopyPhysical::invokeMPICopy(std::vector< shared_ptr<Array> >* inputArray
 
     reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStart(), dims[1].getStart());
     *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                            first, last, iterDelta));
-
-    // REFACTOR
-    //--------------------- Cleanup for objects no longer in use
-    // after the for loop the shared memory is still intact
-    for(size_t i=0; i<shmIpc.size(); i++) {
-        if (!shmIpc[i]) {
-            continue;
-        }
-        shmIpc[i]->close();
-        if (!shmIpc[i]->remove()) {
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_remove");
-        }
-    }
-
+                                                          first, last, iterDelta, query));
+    releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
     resetMPI();
 

@@ -87,12 +87,11 @@ public:
 public:
                         OpArray(ArrayDesc const& desc, const boost::shared_array<char>& dummy,
                                 const Op_tt& op, Coordinates const& from, Coordinates const& till,
-                                Coordinates const& delta);
+                                Coordinates const& delta,
+                                const boost::shared_ptr<scidb::Query>& query);
     virtual             ~OpArray();
 
     ArrayIterator*      createArrayIterator(AttributeID id) const;
-
-    const               scidb::ConstChunk& getChunk();
 private:
     Op_tt               _op;
     Coordinates         _delta; // distance in coordinates between successive chunks on
@@ -100,6 +99,7 @@ private:
                                 // size, you can support ScaLAPACK block-cyclic quite
                                 // naturally.  When we iterate on a single node, we
                                 // iterate from chunk to chunk locally this way.
+    const boost::weak_ptr<scidb::Query> _query; // for ArrayIterator::getChunk()
 };
 
 template<class Op_tt>
@@ -110,11 +110,13 @@ OpArray<Op_tt>::~OpArray()
 template<class Op_tt>
 OpArray<Op_tt>::OpArray(ArrayDesc const& desc,
                         const boost::shared_array<char>& dummy, const Op_tt& op,
-                        Coordinates const& from, Coordinates const& till, Coordinates const& delta)
+                        Coordinates const& from, Coordinates const& till, Coordinates const& delta,
+                        const boost::shared_ptr<scidb::Query>& query)
 :
     SplitArray(desc, dummy, from, till),
     _op(op),
-    _delta(delta)
+    _delta(delta),
+    _query(query)
 {
 }
 
@@ -206,9 +208,10 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
         }
         const size_t nDims = dims.size(); // OpArray dims
         if(DBG >= DBG_DETAIL) std::cerr << dbgPrefix << " nDims:" << nDims << std::endl;
-        chunk.setRLE(false);
 
-        double* dst = reinterpret_cast<double*>(chunk.getData());
+        const boost::shared_ptr<scidb::Query> localQueryPtr(_array._query.lock());  // duration of getChunk() short enough
+        boost::shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(localQueryPtr, ChunkIterator::SEQUENTIAL_WRITE);
+
         Coordinates const& first = chunk.getFirstPosition(false);
         if(DBG >= DBG_DETAIL) std::cerr << dbgPrefix << " FIRST is: " << first << "*******" << std::endl;
         // the last dimension
@@ -222,9 +225,17 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
                                    << ")"<< std::endl;
         }
 
+        // temporaries to use the chunkIter->setPostion(), value.setDouble() and chunkIter->writeItem() API
+        Coordinates pos = first;
+        Value value;
+
         if (nDims==1) {
             if(DBG >= DBG_DETAIL) std::cerr << dbgPrefix << " case nDims 1" << std::endl;
-
+            //
+            // note: we are not saying vectors are rows by using "cols" here to step through them
+            //       we are just using a variable that is consistent with the "last" dimension, (nDims-1),
+            //       as used in the nDims==2 case below, so that we can share some common code
+            //       (setup of colsTillEnd, colCount) with that code
             int64_t colEnd = first[0] + colCount ;
             for(int64_t col = first[0]; col < colEnd; col++) {
                 double val = _array._op.operator()(col);
@@ -232,7 +243,8 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
                     std::cerr << dbgPrefix << "  ["<< col << "]"
                               << " -> val: " << val << std::endl ;
                 }
-                *dst++ = val;
+                pos[0] = col ; chunkIter->setPosition(pos);
+                value.setDouble(val); chunkIter->writeItem(value);
             }
         } else {
             assert(nDims==2);
@@ -251,18 +263,18 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
             // note that SciDB chunks are stored in row-major order, so we
             // iterate columns in the inner loop.
             for(int64_t row = first[0]; row < rowEnd; row++) {
-                double * rowData = dst ;
                 for(int64_t col = first[1]; col < colEnd; col++) {
                     double val = _array._op.operator()(row, col);
                     if(DBG >= DBG_LOOP_SIMPLE) {
                         std::cerr << dbgPrefix << " ["<< row << "," << col << "] "
                                   << " -> val: " << val << std::endl ;
                     }
-                    *rowData++ = val;
+                    pos[0] = row; pos[1] = col ; chunkIter->setPosition(pos);
+                    value.setDouble(val); chunkIter->writeItem(value);
                 }
-                dst += chunkCols ; // rows are chunkSize apart, not the logical size
             }
         }
+        chunkIter->flush(); // vital
         chunkInitialized = true;
     }
 

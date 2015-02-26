@@ -4,9 +4,15 @@
   <refnamediv>
     <refname>attribute_rename</refname>
 
-    <refpurpose>Produces a result array with the same dimensions, attributes,
-    and cell values as a source array, but with one or more of the attributes
-    renamed.</refpurpose>
+    <refpurpose><indexterm>
+        <primary>attribute_rename</primary>
+      </indexterm><indexterm>
+        <primary>attributes</primary>
+
+        <secondary>renaming</secondary>
+      </indexterm>Produces a result array with the same dimensions,
+    attributes, and cell values as a source array, but with one or more of the
+    attributes renamed.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -23,7 +29,7 @@
 
     <para>You can use the attribute_rename operator in the FROM clause of an
     AQL SELECT statement, as a stand-alone operator in a AFL statement, or as
-    an operand within other SciDB operators..</para>
+    an operand within other SciDB operators.</para>
   </refsect1>
 
   <refsect1>
@@ -46,14 +52,17 @@
         </step>
 
         <step>
-          <para>Use the project operator to exclude the person attribute, and
-          to reorder the remaining attributes:<para><programlisting>AFL% attribute_rename(champions,time,time_in_seconds)</programlisting><screen>{year,event} person,country,time_in_seconds
-{1996,"dash"} "Bailey","Canada",9.84
-{1996,"marathon"} "Thugwane","RSA",7956
-{2000,"dash"} "Greene","USA",9.87
-{2000,"marathon"} "Abera","Ethiopia",7811
-{2000,"steeplechase"} "Kosgei","Kenya",503.17
-{2008,"marathon"} "Wanjiru","Kenya",7596
+          <para>Use the project operator to exclude the
+          <literal>person</literal> attribute, and the attribute_rename
+          operator to rename the <literal>time</literal>
+          attribute:<para><programlisting>AFL% attribute_rename(project(champions,country,time)
+   ,time,time_in_seconds);</programlisting><screen>{year,event} country,time_in_seconds
+{1996,"dash"} "Canada",9.84
+{1996,"marathon"} "RSA",7956
+{2000,"dash"} "USA",9.87
+{2000,"marathon"} "Ethiopia",7811
+{2000,"steeplechase"} "Kenya",503.17
+{2008,"marathon"} "Kenya",7596
 </screen></para></para>
         </step>
       </procedure>

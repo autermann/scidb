@@ -15,12 +15,11 @@
 --stop-igdata
 
 
-scan( array_sm10 )
-
+#scan( array_sm10 )
+sort(array_sm10,a)
 --cleanup
 
-#remove( array_sm10 )
-
+remove( array_sm10 )
 
 --stop-query-logging
 

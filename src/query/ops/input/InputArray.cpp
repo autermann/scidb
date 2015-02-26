@@ -513,7 +513,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             attrVal[i].setNull();
         } else { 
             attrVal[i].setSize(TypeLibrary::getType(attrs[i].getType()).byteSize());
-            setDefaultValue(attrVal[i], attrs[i].getType());
+            attrVal[i] = TypeLibrary::getDefaultValue(attrs[i].getType());
         }
         iterator->writeItem(attrVal[i]);
         if (shadowArray) { 

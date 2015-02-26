@@ -1,0 +1,64 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>inverse</refname>
+
+    <refpurpose><indexterm>
+        <primary>inverse</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>inverse</secondary>
+      </indexterm>Matrix inverse</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>inverse(<replaceable>array</replaceable>);</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The inverse operator produces the matrix inverse of a square matrix.
+    The input matrix must be invertible, that is, the determinant of the
+    matrix must be non-zero. If the determinant is zero, SciDB returns an
+    error.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example find the matrix inverse of a 3<symbol role="symbolfont">×</symbol>3 matrix.</para>
+
+      <procedure>
+        <step>
+          <para>Create a matrix m3x3:<para><programlisting>AFL% CREATE ARRAY m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
+        </step>
+
+        <step>
+          <para>Put values of 1 and 2 into m3x3 to represent a nonsingular
+          matrix:<para><programlisting>AFL% store(build(m3x3,iif(i=j,1,2)),m3x3);  </programlisting><screen>[
+[(1),(2),(2)],
+[(2),(1),(2)],
+[(2),(2),(1)]
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para><para><programlisting>AFL% inverse(m3x3);  </programlisting><screen>[
+[(-0.6),(0.4),(0.4)],
+[(0.4),(-0.6),(0.4)],
+[(0.4),(0.4),(-0.6)]
+]</screen>This
+          query outputs:<screen>[
+[(-0.6),(0.4),(0.4)],
+[(0.4),(-0.6),(0.4)],
+[(0.4),(0.4),(-0.6)]
+]</screen></para></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

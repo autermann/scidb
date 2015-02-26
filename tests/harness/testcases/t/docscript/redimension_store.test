@@ -13,7 +13,7 @@
 --stop-igdata
 redimension_store(ddFlat,doseData) 
 --start-igdata
---aql create array ppmFunction <ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0,pulse=0:300,301,0] 
+--aql create array ppmFunction <ppm:int64> [patientID=1:100,100,0, elapsedTime=0:999,1000,0,pulse=0:300,301,0] 
 --stop-igdata
 redimension_store(doseData,ppmFunction) 
 --start-igdata

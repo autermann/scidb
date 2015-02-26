@@ -417,6 +417,7 @@ ERRMSG(SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE,        "Chunk size must be positive
 ERRMSG(SCIDB_LE_OPERATION_FAILED_WITH_ERRNO,        "Operation %1% failed with errno %2%");
 ERRMSG(SCIDB_LE_OP_RLE_EXPECTED,                    "Chunk expected to be in RLE format");
 ERRMSG(SCIDB_LE_OP_NONEMPTY_EXPECTED,               "Non-emptyable array expected");
+ERRMSG(SCIDB_LE_RESOURCE_BUSY,                      "Not enough resources: %1%");
 //Next ERRMSG
 
 ERRMSG(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,          "Execution of query '%1%' failed with error %2%");

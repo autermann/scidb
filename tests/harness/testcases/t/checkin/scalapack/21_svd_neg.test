@@ -41,23 +41,32 @@ create array ColInf<a: double>  [r=0:1,2,0, c=0:*,2,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(ColInf, 'S')"
 remove(ColInf)
 
+# chunksize too small
+create array chunkTooSmall  <a: double> [r=0:1,31,0, c=0:1,31,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(chunkTooSmall, 'S')"
+remove(chunkTooSmall)
+
 # chunksize too large
-create array chunkTooLarge  <a: double> [r=0:1,129,0, c=0:1,129,0]
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(chunkTooLarge, 'S')"
+create array chunkTooLarge  <a: double> [r=0:1,33,0, c=0:1,33,0]
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR42 "gesvd(chunkTooLarge, 'S')"
 remove(chunkTooLarge)
 
-# chunkSize not square
-create array chunkNotSquare <a: double> [r=0:1,2,0,   c=0:1,3,0]
---error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR10 "gesvd(chunkNotSquare, 'S')"
-remove(chunkNotSquare)
+# NOTE: cannot test non-square chunk size when min and max are already set to same value...
+#       the min/max check happens first
+#       keeping this for a later release where a range of chunk sizes will be permitted
+#
+## chunkSize not square
+#create array chunkNotSquare <a: double> [r=0:1,32,0,   c=0:1,33,0]
+#--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR10 "gesvd(chunkNotSquare, 'S')"
+#remove(chunkNotSquare)
 
 # overlap not allowed - rows
-create array RowOverlap<a: double>  [r=0:1,2,1, c=0:1,2,0]
+create array RowOverlap<a: double>  [r=0:1,32,1, c=0:1,32,0]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40 "gesvd(RowOverlap, 'S')"
 remove(RowOverlap)
 
 # overlap not allowed - cols
-create array ColOverlap<a: double>  [r=0:1,2,0, c=0:1,2,1]
+create array ColOverlap<a: double>  [r=0:1,32,0, c=0:1,32,1]
 --error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR40 "gesvd(ColOverlap, 'S')"
 remove(ColOverlap)
 

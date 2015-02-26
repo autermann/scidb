@@ -13,7 +13,7 @@
 
 namespace slpp {
 
-    enum dummy { SCALAPACK_EFFICIENT_BLOCK_SIZE=32, SCALAPACK_MAX_BLOCK_SIZE=128 };
+    enum dummy { SCALAPACK_MIN_BLOCK_SIZE=32, SCALAPACK_EFFICIENT_BLOCK_SIZE=32, SCALAPACK_MAX_BLOCK_SIZE=32 };
 
     // change type of integer_t to match how scalapack is compiled!!
     typedef int32_t int_t ;  // has to change depending on whether ScaLAPACK fortran 'INTEGER' is 4-byte or 8-byte ints
@@ -117,6 +117,7 @@ extern "C" {
                          const bl_int_t&, bl_int_t&, bl_int_t&);
     bl_int_t blacs_pnum_(const bl_int_t& cntxt, const bl_int_t& myPRow, const bl_int_t& myPCol);
     void blacs_gridexit_(const bl_int_t&);
+    void blacs_abort_(const bl_int_t& ctxt, const bl_int_t& errorNum);
     void blacs_exit_(const bl_int_t&);
 }
 

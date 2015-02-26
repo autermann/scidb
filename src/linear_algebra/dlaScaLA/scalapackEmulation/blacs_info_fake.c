@@ -38,11 +38,13 @@ void set_fake_blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
     S_npcol = *npcol;
     S_myrow = *myrow;
     S_mycol = *mycol;
-    //fprintf(stderr, "****************************************\n");
-    //fprintf(stderr, "WARNING: temporary hack that prevents multi-user and multi-op operation\n");
-    //fprintf(stderr, "set_fake_blacs_gridinfo_ ...\n");
-    //fprintf(stderr, "context: %d, nprow: %d, npcol %d, myrow %d, mycol %d\n",
-    //                S_contxt,  S_nprow,   S_npcol,  S_myrow,  S_mycol);
-    //fprintf(stderr, "****************************************\n");
+    /* 
+      fprintf(stderr, "****************************************\n");
+      fprintf(stderr, "WARNING: temporary hack that prevents multi-user and multi-op operation\n");
+      fprintf(stderr, "set_fake_blacs_gridinfo_ ...\n");
+      fprintf(stderr, "context: %d, nprow: %d, npcol %d, myrow %d, mycol %d\n",
+      S_contxt,  S_nprow,   S_npcol,  S_myrow,  S_mycol);
+      fprintf(stderr, "****************************************\n");
+    */
 }
 

@@ -6,9 +6,11 @@
   <refnamediv>
     <refname>cast</refname>
 
-    <refpurpose>Produces a result array with the same dimensions, attributes,
-    and cells as a source array -- but with other differences, which can
-    include different names for its dimensions or attributes, different
+    <refpurpose><indexterm>
+        <primary>cast</primary>
+      </indexterm>Produces a result array with the same dimensions,
+    attributes, and cells as a source array—but with other differences, which
+    can include different names for its dimensions or attributes, different
     nulls-allowed status for an attribute, and different datatypes for its
     dimensions.</refpurpose>
   </refnamediv>
@@ -67,7 +69,8 @@
 
       <procedure>
         <step>
-          <para>Show the schema of an existing array:<programlisting language='test'>
+          <para>Show the schema of an existing array:<programlisting
+          language="test">
 --afl create array winnersFewFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt; [i=0:*,12,0] --show-query=no --show-output=no
 --shell --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winnersFew.csv &gt; ../examples/winnersFew.scidb --show-query=no --show-output=no
 --aql load winnersFewFlat from '../examples/winnersFew.scidb' --show-query=no --show-output=no
@@ -100,7 +103,7 @@
 
           <para>In this example, the cast operator appears as an operand of
           the store operator, yielding a named array
-          "winningTimeRecast":<programlisting language='test'>--afl store
+          "winningTimeRecast":<programlisting language="test">--afl store
    (
    cast
       (
@@ -113,7 +116,8 @@
         </step>
 
         <step>
-          <para>Show the schema of the new array:<programlisting language='test'>--schema winningTimeRecast</programlisting></para>
+          <para>Show the schema of the new array:<programlisting
+          language="test">--schema winningTimeRecast</programlisting></para>
         </step>
       </procedure>
     </informalexample>

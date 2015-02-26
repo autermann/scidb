@@ -232,7 +232,7 @@ SCIDB QUERY : <insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[
 
 SCIDB QUERY : <show(MIB)>
 {i} schema
-{0} "not empty MIB<a:int64 NULL> [x=-3:0,4,2,y=0:3,4,2]"
+{0} "not empty MIB<a:int64 NULL DEFAULT null> [x=-3:0,4,2,y=0:3,4,2]"
 
 SCIDB QUERY : <scan(MIB)>
 {x,y} a

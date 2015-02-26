@@ -108,23 +108,19 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
 // TODO JHM : rename Ain -> array
 void checkInputArray(Array* Ain)
 {
-    // note that the best chunksizes for ScaLAPACK are 32x32 and 64x64
-    // for Intel {Sandy,Ivy}Bridge processors. (Core 2 2xxx, 3xxx cpus)
-    // small matrices will often have equally small chunk size, so shold
-    // handle those.
-    // However, the SciDB per-chunk overhead is overly high for 64x64 chunks.
-    // 128x128 doesn't appear to slow down on a 6-core SandyBridge-E, we'll
-    // have to do further testing / adapation if the small caches of
-    // a Xeon cause problems.
-    const slpp::int_t SL_MAX_BLOCK_SIZE=128;
+    // chunksize was already checked in ScaLAPACKLogical.cpp, but since this code
+    // was already here, we'll just fix it to check the same limit, rather than
+    // remove it this late in the 12.11 release.
+    // TODO: resolve better
+
 
     const slpp::int_t MB= brow(Ain);
     const slpp::int_t NB= bcol(Ain);
 
     // TODO JHM: add test case for illegitimate block size
     // TODO JHM test early, add separate auto repart in execute if not efficient size, then retest
-    if (MB > SL_MAX_BLOCK_SIZE ||
-        NB > SL_MAX_BLOCK_SIZE) {
+    if (MB > slpp::SCALAPACK_MAX_BLOCK_SIZE ||
+        NB > slpp::SCALAPACK_MAX_BLOCK_SIZE) {
         std::stringstream ss; ss << "SVD operator error: chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large, 64 to 128 is recommended" ;
         if(DBG) std::cerr << ss << std::endl;
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << ss.str());
@@ -283,13 +279,11 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
     procRowCol_t blacsGridSize = procGrid->useableGridSize(MN, MNB);
     procRowCol_t myGridPos = procGrid->gridPos(instanceID, blacsGridSize);
 
-    if(DBG) std::cerr << "*** myGridPos.row:" << myGridPos.row << " myGridPos.col:" << myGridPos.col << std::endl;
+    if(DBG) std::cerr << "ScaLAPACKPhysical::doBlacsInit: gridPos: "  << myGridPos.row <<     " x " << myGridPos.col     << std::endl;
+    if(DBG) std::cerr << "ScaLAPACKPhysical::doBlacsInit: gridSize: " << blacsGridSize.row << " x " << blacsGridSize.col << std::endl;
     if (myGridPos.row >= blacsGridSize.row || myGridPos.col >= blacsGridSize.col) {
         if(DBG) {
-            std::cerr << "instID:" << instanceID << " myGridPos.row:" << myGridPos.row
-                                                 << " myGridPos.col:" << myGridPos.col << std::endl;
-            std::cerr << "NOT in grid: " << blacsGridSize.row << " x " << blacsGridSize.col << std::endl;
-            std::cerr << "should not invoke a slave" << std::endl ;
+            std::cerr << "ScaLAPACKPhysical::doBlacsInit: instID:" << instanceID << " NOT in grid" << std::endl;
         }
         //
         // We are an "extra" instance that must return an empty array
@@ -304,9 +298,7 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
         return false ;
     } else {
         if(DBG) {
-            std::cerr << "instID:" << instanceID << " myGridPos.row:" << myGridPos.row
-                                                 << " myGridPos.col:" << myGridPos.col << std::endl;
-            std::cerr << "IN GRID: " << blacsGridSize.row << " x " << blacsGridSize.col << std::endl;
+            std::cerr << "ScaLAPACKPhysical::doBlacsInit: instID:" << instanceID << " in grid: " << std::endl;
         }
     }
 
@@ -315,11 +307,11 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
     slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
 
     if(DBG) {
-        std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
-        std::cerr << "(execute) set_fake_blacs_gridinfo_(ctx:"<< ICTXT
+        std::cerr << "ScaLAPACKPhysical::doBlacsInit:  NP:"<<NP << " IC:" <<IC << std::endl;
+        std::cerr << "ScaLAPACKPhysical::doBlacsInit:  set_fake_blacs_gridinfo_(ctx:"<< ICTXT
                                    << ", nprow:"<<blacsGridSize.row
                                    << ", npcol:"<<blacsGridSize.col << "," << std::endl;
-        std::cerr << "(execute)                           myRow:" << myGridPos.row
+        std::cerr << "ScaLAPACKPhysical::doBlacsInit:  myRow:" << myGridPos.row
                                    << ", myCol:" << myGridPos.col << ")" << std::endl;
     }
     set_fake_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
@@ -328,9 +320,9 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
     blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
-        std::cerr << "   -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
-        std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
+        std::cerr << "ScaLAPACKPhysical::doBlacsInit: blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "ScaLAPACKPhysical::doBlacsInit:    -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
+        std::cerr << "ScaLAPACKPhysical::doBlacsInit:    -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }
     return true;
 }

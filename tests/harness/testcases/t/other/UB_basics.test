@@ -48,7 +48,8 @@ deldim ( adddim (Timeseries_Example, New_Dim ))
 
 filter (Timeseries_Example, Total_Qty > 150 )
 
---error "inverse ( multiply ( substitute (transpose ( project (Timeseries_Example, Avg_Price )), Sub_Val) AS A, substitute ( project ( Timeseries_Example, Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (Timeseries_Example, Avg_Price )), Sub_Val) AS A, substitute ( project ( Timeseries_Example, Avg_Price), Sub_Val) AS B ) ) "
 
 join (Timeseries_Example as A, Timeseries_Example as B )
 
@@ -101,7 +102,8 @@ deldim ( adddim (bernoulli (Timeseries_Example, 0.85, 1), New_Dim ))
 filter (bernoulli (Timeseries_Example, 0.85, 1), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (bernoulli (Timeseries_Example, 0.85, 1), Avg_Price )), Sub_Val) AS A, substitute (project ( bernoulli (Timeseries_Example, 0.85, 1), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (bernoulli (Timeseries_Example, 0.85, 1), Avg_Price )), Sub_Val) AS A, substitute (project ( bernoulli (Timeseries_Example, 0.85, 1), Avg_Price), Sub_Val) AS B ) ) "
 
 join (bernoulli (Timeseries_Example, 0.85, 1) as A, bernoulli (Timeseries_Example, 0.85, 1) as B )
 
@@ -154,7 +156,8 @@ deldim ( adddim (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ),
 filter (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price )), Sub_Val) AS A, substitute (project ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price )), Sub_Val) AS A, substitute (project ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price), Sub_Val) AS B ) ) "
 
 join (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ) as A, between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ) as B )
 
@@ -205,7 +208,8 @@ deldim ( adddim (cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Tot
 filter (cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Total_Qty > 150 )
 
 # ERROR4
---error "inverse ( multiply ( transpose ( project (cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Avg_Price )) AS A, project ( cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Avg_Price) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( transpose ( project (cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Avg_Price )) AS A, project ( cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Avg_Price) AS B ) ) "
 
 join (cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]) as A, cast ( Timeseries_Example, EMPTY < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]) as B )
 
@@ -261,7 +265,8 @@ deldim ( adddim (deldim ( adddim (Timeseries_Example, New_Dim )), New_Dim ))
 filter (deldim ( adddim (Timeseries_Example, New_Dim )), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (deldim ( adddim (Timeseries_Example, New_Dim )), Avg_Price )), Sub_Val) AS A, substitute (project ( deldim ( adddim (Timeseries_Example, New_Dim )), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (deldim ( adddim (Timeseries_Example, New_Dim )), Avg_Price )), Sub_Val) AS A, substitute (project ( deldim ( adddim (Timeseries_Example, New_Dim )), Avg_Price), Sub_Val) AS B ) ) "
 
 join (deldim ( adddim (Timeseries_Example, New_Dim )) as A, deldim ( adddim (Timeseries_Example, New_Dim )) as B )
 
@@ -313,7 +318,8 @@ deldim ( adddim (filter (Timeseries_Example, Total_Qty > 150 ), New_Dim ))
 filter (filter (Timeseries_Example, Total_Qty > 150 ), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (filter (Timeseries_Example, Total_Qty > 150 ), Avg_Price )), Sub_Val) AS A, substitute (project ( filter (Timeseries_Example, Total_Qty > 150 ), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (filter (Timeseries_Example, Total_Qty > 150 ), Avg_Price )), Sub_Val) AS A, substitute (project ( filter (Timeseries_Example, Total_Qty > 150 ), Avg_Price), Sub_Val) AS B ) ) "
 
 join (filter (Timeseries_Example, Total_Qty > 150 ) as A, filter (Timeseries_Example, Total_Qty > 150 ) as B )
 
@@ -365,7 +371,8 @@ deldim ( adddim (project ( Timeseries_Example, Avg_Price, Total_Qty ), New_Dim )
 filter (project ( Timeseries_Example, Avg_Price, Total_Qty ), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (project ( Timeseries_Example, Avg_Price, Total_Qty ), Avg_Price )), Sub_Val) AS A, substitute (project ( project ( Timeseries_Example, Avg_Price, Total_Qty ), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (project ( Timeseries_Example, Avg_Price, Total_Qty ), Avg_Price )), Sub_Val) AS A, substitute (project ( project ( Timeseries_Example, Avg_Price, Total_Qty ), Avg_Price), Sub_Val) AS B ) ) "
 
 join (project ( Timeseries_Example, Avg_Price, Total_Qty ) as A, project ( Timeseries_Example, Avg_Price, Total_Qty ) as B )
 
@@ -419,7 +426,8 @@ deldim ( adddim (sample (Timeseries_Example, 0.85, 1), New_Dim ))
 filter (sample (Timeseries_Example, 0.85, 1), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (sample (Timeseries_Example, 0.85, 1), Avg_Price )), Sub_Val) AS A, substitute (project ( sample (Timeseries_Example, 0.85, 1), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (sample (Timeseries_Example, 0.85, 1), Avg_Price )), Sub_Val) AS A, substitute (project ( sample (Timeseries_Example, 0.85, 1), Avg_Price), Sub_Val) AS B ) ) "
 
 join (sample (Timeseries_Example, 0.85, 1) as A, sample (Timeseries_Example, 0.85, 1) as B )
 
@@ -473,7 +481,8 @@ deldim ( adddim (scan (Timeseries_Example), New_Dim ))
 filter (scan (Timeseries_Example), Total_Qty > 150 )
 
 # inverse error
---error "inverse ( multiply ( substitute (transpose ( project (scan (Timeseries_Example), Avg_Price )), Sub_Val) AS A, substitute (project ( scan (Timeseries_Example), Avg_Price), Sub_Val) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#--error "inverse ( multiply ( substitute (transpose ( project (scan (Timeseries_Example), Avg_Price )), Sub_Val) AS A, substitute (project ( scan (Timeseries_Example), Avg_Price), Sub_Val) AS B ) ) "
 
 join (scan (Timeseries_Example) as A, scan (Timeseries_Example) as B )
 
@@ -525,7 +534,8 @@ deldim ( adddim (join ( substitute ( project (Timeseries_Example, Avg_Price ), b
 filter (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Total_Qty > 150 )
 
 # INVERSE_ERROR1
---error "inverse ( multiply ( transpose ( project (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price )) AS A, project ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price) AS B ) ) "
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+##--error "inverse ( multiply ( transpose ( project (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price )) AS A, project ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price) AS B ) ) "
 
 join (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))) as A, join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))) as B )
 
@@ -577,7 +587,8 @@ deldim ( adddim (transpose (Timeseries_Example), New_Dim ))
 filter (transpose (Timeseries_Example), Total_Qty > 150 )
 
 # inverse error
-inverse ( multiply ( substitute (transpose ( project (transpose (Timeseries_Example), Avg_Price )), Sub_Val) AS A, substitute (project ( transpose (Timeseries_Example), Avg_Price), Sub_Val) AS B ) ) 
+# #2194: inverse disabled until (#2182) SplitArray is fixed
+#inverse ( multiply ( substitute (transpose ( project (transpose (Timeseries_Example), Avg_Price )), Sub_Val) AS A, substitute (project ( transpose (Timeseries_Example), Avg_Price), Sub_Val) AS B ) ) 
 
 join (transpose (Timeseries_Example) as A, transpose (Timeseries_Example) as B )
 

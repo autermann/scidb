@@ -4,8 +4,16 @@
   <refnamediv>
     <refname>show</refname>
 
-    <refpurpose>Produces a result array whose contents describe the schema of
-    an array you supply.</refpurpose>
+    <refpurpose><indexterm>
+        <primary>show</primary>
+      </indexterm><indexterm>
+        <primary>schema, displaying</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>showing schema</secondary>
+      </indexterm>Produces a result array whose contents describe the schema
+    of an array you supply.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -34,17 +42,14 @@
 
       <procedure>
         <step>
-          <para>Show the schema for the original array
-
-<para><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(champions);  </programlisting><screen>{i} schema
+          <para>Show the schema for the original array <para><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(champions);  </programlisting><screen>{i} schema
 {0} "champions&lt;person:string,country:string,time:double&gt; [year=1996:2008,13,0,event(string)=3,3,0]"
 </screen></para></para></para>
         </step>
 
         <step>
           <para>Use the project and store operators to create an abridged
-          array that excludes the country and time attributes:
-<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> championsAbridged <command>FROM</command> project(champions,person);  </programlisting><screen>{year,event} person
+          array that excludes the country and time attributes: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> championsAbridged <command>FROM</command> project(champions,person);  </programlisting><screen>{year,event} person
 {1996,"dash"} "Bailey"
 {1996,"marathon"} "Thugwane"
 {1996,"steeplechase"} "Keter"
@@ -61,8 +66,7 @@
         </step>
 
         <step>
-          <para>Show the schema for the abridged array:
-<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(championsAbridged);  </programlisting><screen>{i} schema
+          <para>Show the schema for the abridged array: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(championsAbridged);  </programlisting><screen>{i} schema
 {0} "championsAbridged&lt;person:string&gt; [year=1996:2008,13,0,event(string)=3,3,0]"
 </screen></para></para>
         </step>

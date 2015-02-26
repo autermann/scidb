@@ -1,0 +1,99 @@
+--setup
+--start-query-logging
+# Tests for gesvd on unbounded rectangular and square arrays
+# Tests for gesvd with repart and aggregates
+# Negative tests for gesvd
+
+
+load_library('dense_linear_algebra')
+store(build(<val:int64> [x=0:*,32,0,y=0:*,32,0],'[[{0,0}(5),{1,1}(3),{2,2}(1),{3,3}(-1),{4,4}(-3)]];[[{5,5}(-5),{6,6}(-7),{7,7}(-9)]]',true),M8x8)
+
+store(build(NOT EMPTY<val:double default 3.142 > [x=0:*,32,0,y=0:*,32,0],'[[{0,0}(5),{1,1}(3),{2,2}(1),{3,3}(-1),{4,4}(-3)]];[[{5,5}(-5),{6,6}(-7),{7,7}(-9)]]',true),M8x8_default)
+
+create array M4x24 <a:double> [x=0:3,32,0, y=0:23,16,0]
+store(build(M4x24, 0.25*x+y),M4x24)
+
+create array M4x24_UB <a:double> [x=0:*,32,0, y=0:*,16,0]
+store(M4x24, M4x24_UB)
+
+create array M3x3 <val:double> [x=0:2,32,0 , y=0:2,32,0]
+store(build(M3x3, abs(x-y)), M3x3)
+
+create array M3x3_UB <val:double> [x=0:*,32,0 , y=0:*,32,0]
+store(M3x3, M3x3_UB)
+
+
+--test
+--echo gesvd only works for the double data types:
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR5 "gesvd(M8x8, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR5 "gesvd(M8x8, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR5 "gesvd(M8x8, 'right')"
+
+--echo changing the attribute type from int64 to double with default and testing gesvd
+gesvd(M8x8_default, 'values')
+gesvd(M8x8_default, 'left')
+gesvd(M8x8_default, 'right')
+
+count(gesvd(M8x8_default, 'values'))
+count(gesvd(M8x8_default, 'left'))
+count(gesvd(M8x8_default, 'right'))
+
+--echo gesvd negative tests : array should have samilar chunking on both the dimensions
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24, 'right')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24_UB, 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24_UB, 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR41 "gesvd(M4x24_UB, 'right')"
+
+--echo using repart to make it work
+gesvd(repart(M4x24, <a:double> [x=0:3,32,0, y=0:23,32,0]), 'values')
+gesvd(repart(M4x24, <a:double> [x=0:3,32,0, y=0:23,32,0]), 'left')
+gesvd(repart(M4x24, <a:double> [x=0:3,32,0, y=0:23,32,0]), 'right')
+
+
+## Strange ! It does not support unbounded arrays in nest but it supports it without nesting.
+
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(M4x24_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'values')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(M4x24_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'left')"
+--error --code DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR9 "gesvd(repart(M4x24_UB, <a:double> [x=0:*,32,0, y=0:*,32,0]), 'right')"
+
+--echo changing the chunk size of the unbounded array to be 32 on both the dimensions
+store(repart(M4x24_UB, <a:double>  [x=0:*,32,0, y=0:*,32,0]), M4x24_repart)
+
+gesvd(M4x24_repart, 'values')
+gesvd(M4x24_repart, 'left')
+gesvd(M4x24_repart, 'right')
+
+count(gesvd(M4x24_repart, 'values'))
+count(gesvd(M4x24_repart, 'left'))
+count(gesvd(M4x24_repart, 'right'))
+
+aggregate(gesvd(M4x24_repart, 'left'), max(u), min(u))
+aggregate(gesvd(M4x24_repart, 'right'), max(v), min(v), avg(v))
+aggregate(gesvd(M4x24_repart, 'values'), max(sigma), min(sigma), avg(sigma))
+
+
+--echo output comparison between M3x3 and M3x3_UB
+gesvd(M3x3, 'values')
+gesvd(M3x3_UB, 'values')
+
+gesvd(M3x3, 'left')
+gesvd(M3x3_UB, 'left')
+
+gesvd(M3x3, 'right')
+gesvd(M3x3_UB, 'right')
+
+
+
+
+--cleanup
+remove(M8x8)
+remove(M8x8_default)
+remove(M4x24)
+remove(M4x24_UB)
+remove(M4x24_repart)
+remove(M3x3)
+remove(M3x3_UB)
+
+--stop-query-logging

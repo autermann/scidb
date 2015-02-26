@@ -79,27 +79,27 @@ public:
 
         sum->initializeState(state);
         sum->finalResult(final, state);
-        CPPUNIT_ASSERT(final.isZero());
+        CPPUNIT_ASSERT(final.isDefault(sum->getResultType().typeId()));
 
         sum->initializeState(state);
-        setDefaultValue(input, sum->getAggregateType().typeId());
+        input = TypeLibrary::getDefaultValue(sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         sum->accumulate(state, input);
-        CPPUNIT_ASSERT(state.isZero());
+        CPPUNIT_ASSERT(!state.isDefault(sum->getStateType().typeId()));
         input.setNull();
         sum->accumulate(state, input);
-        CPPUNIT_ASSERT(state.isZero());
+        CPPUNIT_ASSERT(!state.isDefault(sum->getStateType().typeId()));
 
         Value state2(sum->getStateType());
         sum->initializeState(state2);
-        CPPUNIT_ASSERT(state2.isZero());
+        CPPUNIT_ASSERT(!state2.isDefault(sum->getStateType().typeId()));
         sum->merge(state, state2);
 
         sum->finalResult(final, state);
-        CPPUNIT_ASSERT(final.isZero());
+        CPPUNIT_ASSERT(final.isDefault(sum->getResultType().typeId()));
 
         sum->initializeState(state);
-        setDefaultValue(input, sum->getAggregateType().typeId());
+        input = TypeLibrary::getDefaultValue(sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         input.setInt32(5);
         sum->accumulate(state, input);
@@ -107,7 +107,7 @@ public:
         sum->accumulate(state, input);
 
         state2 = Value(sum->getStateType());
-        setDefaultValue(state2, sum->getStateType().typeId());
+        state2 = TypeLibrary::getDefaultValue(sum->getStateType().typeId());
         sum->merge(state2, state);
         sum->merge(state, state2);
 
@@ -134,17 +134,17 @@ public:
 
         sum->initializeState(state);
         sum->finalResult(final, state);
-        CPPUNIT_ASSERT(final.isZero());
+        CPPUNIT_ASSERT(final.isDefault(sum->getResultType().typeId()));
 
         sum->initializeState(state);
-        setDefaultValue(input, sum->getAggregateType().typeId());
+        input = TypeLibrary::getDefaultValue(sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         sum->accumulate(state, input);
         sum->finalResult(final, state);
-        CPPUNIT_ASSERT(final.isZero());
+        CPPUNIT_ASSERT(final.isDefault(sum->getResultType().typeId()));
 
         sum->initializeState(state);
-        setDefaultValue(input, sum->getAggregateType().typeId());
+        input = TypeLibrary::getDefaultValue(sum->getAggregateType().typeId());
         sum->accumulate(state, input);
         input.setFloat(5.1);
         sum->accumulate(state, input);
@@ -152,7 +152,7 @@ public:
         sum->accumulate(state, input);
 
         Value state2(sum->getStateType());
-        setDefaultValue(state2, sum->getStateType().typeId());
+        state2 = TypeLibrary::getDefaultValue(sum->getStateType().typeId());
         sum->merge(state2, state);
         sum->merge(state, state2);
 

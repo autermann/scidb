@@ -12,7 +12,9 @@
 
 
 --stop-igdata
-scan(targetArr2 )
+sort(targetArr2,val1 )
 --cleanup
+remove(loadArr)
+remove(targetArr2)
 --stop-query-logging
 

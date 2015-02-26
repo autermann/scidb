@@ -4,9 +4,11 @@
   <refnamediv>
     <refname>cast</refname>
 
-    <refpurpose>Produces a result array with the same dimensions, attributes,
-    and cells as a source array -- but with other differences, which can
-    include different names for its dimensions or attributes, different
+    <refpurpose><indexterm>
+        <primary>cast</primary>
+      </indexterm>Produces a result array with the same dimensions,
+    attributes, and cells as a source array—but with other differences, which
+    can include different names for its dimensions or attributes, different
     nulls-allowed status for an attribute, and different datatypes for its
     dimensions.</refpurpose>
   </refnamediv>
@@ -66,8 +68,11 @@
       <procedure>
         <step>
           <para>Show the schema of an existing array:<para><programlisting>AFL% show(winningTime)</programlisting><screen><command>winningTime</command>
+
 &lt; time:double &gt;
-[year=1996:2008,1,0,event(string)=3,1,0]</screen></para></para>
+
+[year=1996:2008,1,0,
+event(string)=3,1,0]</screen></para></para>
         </step>
 
         <step>
@@ -114,8 +119,11 @@
 
         <step>
           <para>Show the schema of the new array:<para><programlisting>AFL% show(winningTimeRecast)</programlisting><screen><command>winningTimeRecast</command>
+
 &lt; time_in_seconds:double NULL &gt;
-[year=1996:2008,1,0,eventCode=0:2,1,0]</screen></para></para>
+
+[year=1996:2008,1,0,
+eventCode=0:2,1,0]</screen></para></para>
         </step>
       </procedure>
     </informalexample>

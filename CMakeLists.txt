@@ -24,10 +24,16 @@ cmake_minimum_required(VERSION 2.6)
 
 project(SciDB C CXX Fortran)
 
-set(SCIDB_VERSION_MAJOR "12")
-set(SCIDB_VERSION_MINOR "10")
-set(SCIDB_VERSION_PATCH "0")
-set(SCIDB_VERSION_CODENAME "Cheshire-final")
+
+file(READ "${CMAKE_SOURCE_DIR}/version" _SCIDB_VERSION)
+STRING(REGEX MATCH "^([0-9]*)\\.([0-9]*)\\.([0-9]*)\\.([a-zA-Z]*).*$" __SCIDB_VERSION "${_SCIDB_VERSION}")
+if(NOT __SCIDB_VERSION)
+    message(FATAL_ERROR "Can not parse 'version' file")
+endif()
+set(SCIDB_VERSION_MAJOR "${CMAKE_MATCH_1}")
+set(SCIDB_VERSION_MINOR "${CMAKE_MATCH_2}")
+set(SCIDB_VERSION_PATCH "${CMAKE_MATCH_3}")
+set(SCIDB_VERSION_CODENAME "${CMAKE_MATCH_4}")
 
 set(SCIDB_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}.${SCIDB_VERSION_PATCH}")
 set(SCIDB_SHORT_VERSION "${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}")
@@ -54,7 +60,7 @@ if(Subversion_SVN_EXECUTABLE)
         Subversion_WC_INFO(${CMAKE_SOURCE_DIR} SciDB)
         set(SCIDB_REVISION "${SciDB_WC_REVISION}")
         message(STATUS "Reading revision from svn: ${SCIDB_REVISION}")
-        file(WRITE "${CMAKE_BINARY_DIR}/version.txt" ${SCIDB_REVISION})
+        file(WRITE "${CMAKE_BINARY_DIR}/revision" ${SCIDB_REVISION})
     endif()
 endif()
 if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
@@ -72,15 +78,15 @@ if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     
     message(STATUS "Reading revision from git-svn: ${SCIDB_REVISION}")
 
-    file(WRITE "${CMAKE_BINARY_DIR}/version.txt" ${SCIDB_REVISION})
+    file(WRITE "${CMAKE_BINARY_DIR}/revision" ${SCIDB_REVISION})
 endif()
-if(NOT SCIDB_REVISION AND EXISTS "${CMAKE_SOURCE_DIR}/version.txt")
+if(NOT SCIDB_REVISION AND EXISTS "${CMAKE_SOURCE_DIR}/revision")
     # Get version from plain source tarball/directory    
-    file(READ "${CMAKE_SOURCE_DIR}/version.txt" SCIDB_REVISION)
+    file(READ "${CMAKE_SOURCE_DIR}/revision" SCIDB_REVISION)
     message(STATUS "Reading revision from file: ${SCIDB_REVISION}")
 endif()
 if(NOT SCIDB_REVISION)
-    message(FATAL_ERROR "Can not fetch working copy version and can't find version.txt file.")
+    message(FATAL_ERROR "Can not fetch working copy version and can't find revision file.")
 endif()
 
 set(SCIDB_VERSION "${SCIDB_VERSION}.${SCIDB_REVISION} (${SCIDB_VERSION_CODENAME})")
@@ -144,6 +150,12 @@ include(LinuxDistroVersion)
 # Set option for static linking
 message("DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
 set(LIBREADLINE_STATIC OFF)
+if(${DISTRO_NAME_VER} MATCHES "RedHat-6")
+ message(error "We do not support RedHat build. Use CentOS instead")
+endif()
+if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
+ set(DISABLE_SCALAPACK 1)
+endif()
 
 if(${DISTRO_NAME_VER} MATCHES "RedHat-[0-9][.][0-9]" OR ${DISTRO_NAME_VER} MATCHES "SUSE")
     set(Boost_USE_STATIC_LIBS ON)
@@ -281,8 +293,8 @@ endif()
 ENABLE_TESTING()
 INCLUDE(CTest)
 
-ADD_TEST(NightlyTest "/bin/bash" ${GENERAL_HARNESSTEST_DIRECTORY}/runharness.sh ${GENERAL_HARNESSTEST_DIRECTORY})
-set_tests_properties (NightlyTest PROPERTIES TIMEOUT 16200)
+ADD_TEST(NightlyTest "/bin/bash" ${GENERAL_HARNESSTEST_DIRECTORY}/runharness.sh)
+set_tests_properties (NightlyTest PROPERTIES TIMEOUT 32000)
 
 
 #

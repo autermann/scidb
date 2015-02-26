@@ -96,6 +96,7 @@ public:
 
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalInverse, "inverse")
+// #2194: inverse disabled until (#2182) SplitArray is fixed
+// DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalInverse, "inverse")
 
 } //namespace scidb

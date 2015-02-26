@@ -8,12 +8,3 @@
 
 --cleanup
 
-remove(m4x4)
-remove(m4x4_2attr)
-remove(m4x4_null)
-remove(m4x4mm)
-remove(m4x4x)
-remove(m4x4y)
-remove(winnersFlat)
-remove(winners)
-remove(perCountryMedalCount)

@@ -178,7 +178,7 @@ void GEMMPhysical::invokeMPIGemm(std::vector< shared_ptr<Array> >* inputArrays,
     //
     // get dimension information about the input arrays
     //
-    if(DBG) std::cerr << "invokeMPIGemm get dim info" << std::endl ;
+    if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm get dim info" << std::endl ;
 
     boost::shared_ptr<Array> inArray[NUM_MATRICES];
     for(size_t i=0; i < numArray; i++ ) {
@@ -193,10 +193,10 @@ void GEMMPhysical::invokeMPIGemm(std::vector< shared_ptr<Array> >* inputArrays,
     matSize_t blockSize[NUM_MATRICES];
     for(size_t i=0; i < numArray; i++ ) {
         size[i] = getMatSize(inArray[i]);
-        if(DBG) std::cerr << "size["<<i<<"] " << size[i][R] << "," << size[i][C] << std::endl;
+        if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm: size["<<i<<"] " << size[i][R] << "," << size[i][C] << std::endl;
 
         blockSize[i] = getBlockSize(inArray[i]);
-        if(DBG) std::cerr << "blockSize["<<i<<"] " << blockSize[i][R] << "," << blockSize[i][C] << std::endl;
+        if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm: blockSize["<<i<<"] " << blockSize[i][R] << "," << blockSize[i][C] << std::endl;
     }
 
     for(size_t i=0; i < numArray; i++ ) {
@@ -216,23 +216,23 @@ void GEMMPhysical::invokeMPIGemm(std::vector< shared_ptr<Array> >* inputArrays,
     for(size_t i=0; i < numArray; i++ ) {
         slpp::int_t RSRC = 0 ;
         LLD[i] = std::max(one, numroc_( size[i][R], blockSize[i][R], MYPROW, RSRC, NPROW ));
-        if(DBG) std::cerr << "M:"<<size[i][R] <<" blockSize[i][R]:"<<blockSize[i][R] << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW << std::endl;
-        if(DBG) std::cerr << "--> LLD[i] = " << LLD[i] << std::endl;
+        if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm: M:"<<size[i][R] <<" blockSize[i][R]:"<<blockSize[i][R] << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW << std::endl;
+        if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm: --> LLD[i] = " << LLD[i] << std::endl;
         LTD[i] = std::max(one, numroc_( size[i][C], blockSize[i][C], MYPCOL, RSRC, NPCOL ));
     }
 
     // create ScaLAPACK array descriptors
     slpp::desc_t DESC[NUM_MATRICES];
     for(size_t i=0; i < numArray; i++ ) {
-        if(DBG) std::cerr << "descinit_ DESC["<<i<<"]"<< std::endl;
+        if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm: descinit_ DESC["<<i<<"]"<< std::endl;
         descinit_(DESC[i], size[i][R], size[i][C], blockSize[i][R], blockSize[i][C], 0, 0, ICTXT, LLD[i], *INFO);
-        if(DBG) std::cerr << "DESC[i]=" << DESC[i] << std::endl;
+        if(DBG) std::cerr << "GEMMPhysical::invokeMPIGemm: DESC[i]=" << DESC[i] << std::endl;
         // debugging for #1986 ... when #instances is prime, process grid is a row.  When small chunk sizes are used,
         // desc.LLD is being set to a number larger than the chunk size ... I don't understand or expect this.
         bool doDebugTicket1986=true;  // remains on until fixed, can't ship with this not understood.
         if(doDebugTicket1986) {
             if (DESC[i].LLD > DESC[i].MB) {
-                std::cerr << "DEBUG, ticket 1986, DESC[i].LLD: " << DESC[i].LLD << " > DESC[i].MB: " << DESC[i].MB << std::endl;
+                std::cerr << "DEBUG, GEMMPhysical::invokeMPIGemm: ticket 1986, DESC[i].LLD: " << DESC[i].LLD << " > DESC[i].MB: " << DESC[i].MB << std::endl;
             }
         }
     }
@@ -258,7 +258,7 @@ void GEMMPhysical::invokeMPIGemm(std::vector< shared_ptr<Array> >* inputArrays,
     size_t elemBytes[NUM_BUFS];
     std::string dbgNames[NUM_BUFS];
 
-    elemBytes[BUF_ARGS]= 1 ;           nElem[BUF_ARGS]= sizeof(scidb::PdgemmArgs) ; dbgNames[BUF_ARGS] = "PdgemmArgs";
+    elemBytes[BUF_ARGS]= 1 ; nElem[BUF_ARGS]= sizeof(scidb::PdgemmArgs) ; dbgNames[BUF_ARGS] = "PdgemmArgs";
 
     elemBytes[BUF_MAT_AA]= sizeof(double) ; nElem[BUF_MAT_AA]= matrixLocalSize[AA]; dbgNames[BUF_MAT_AA] = "A" ;
     elemBytes[BUF_MAT_BB]= sizeof(double) ; nElem[BUF_MAT_BB]= matrixLocalSize[BB]; dbgNames[BUF_MAT_BB] = "B" ;
@@ -283,7 +283,8 @@ void GEMMPhysical::invokeMPIGemm(std::vector< shared_ptr<Array> >* inputArrays,
             }
         }
     }
-    shmSharedPtr_t Cx(shmIpc[CC+1]);
+    size_t resultShmIpcIndx = BUF_MAT_CC;
+    shmSharedPtr_t Cx(shmIpc[resultShmIpcIndx]);
 
     //!
     //!.... Call pdgemm to compute the product of A and B .............................
@@ -357,22 +358,9 @@ void GEMMPhysical::invokeMPIGemm(std::vector< shared_ptr<Array> >* inputArrays,
 
     reformatOp_t      pdelgetOp(Cx, DESC[CC], dims[R].getStart(), dims[C].getStart());
     *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                          first, last, iterDelta));
+                                                          first, last, iterDelta, query));
 
-
-    // REFACTOR to MPIOperator
-    //--------------------- Cleanup for objects no longer in use
-    // after the for loop the shared memory is still intact
-    for(size_t i=0; i<shmIpc.size(); i++) {
-        if (!shmIpc[i]) {
-            continue;
-        }
-        shmIpc[i]->close();
-        if (!shmIpc[i]->remove()) {
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_remove");
-        }
-    }
-
+    releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
     resetMPI();
 

@@ -60,6 +60,17 @@ redimension_store(bFlat,B)
 --set-format dense
 --stop-igdata
 --aql insert into B '[ [()()(333333333)] [()(555555555)()] [(777777777)()()] ]' 
+store(build(<val:double>[i=0:3,4,0,j=0:3,4,0],i*4+j),m4x4)  
+--aql UPDATE m4x4 SET val=-val  
+--aql UPDATE m4x4 SET val=-pow(val,-1) WHERE abs(val) > 5  
+--set-format dcsv
+--start-igdata
+versions(m4x4)  
+--set-format dense
+--stop-igdata
+--start-igdata
+scan(m4x4@1)  
+--stop-igdata
 
 --stop-query-logging
 
@@ -72,3 +83,4 @@ remove(bFlat)
 remove(B)
 remove(cFlat)
 remove(C)
+remove(m4x4)

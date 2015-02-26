@@ -6,7 +6,13 @@
   <refnamediv>
     <refname>rename</refname>
 
-    <refpurpose>Change array name</refpurpose>
+    <refpurpose><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>renaming</secondary>
+      </indexterm><indexterm>
+        <primary>rename</primary>
+      </indexterm>Change array name</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,8 +24,11 @@
 
     <para>The AFL rename operator works like the AQL statement SELECT * INTO
     except that the old array name can be reused immediately with the rename
-    operator. The rename operator is akin to using the Unix mv command,
-    whereas SELECT * INTO is akin to the Unix cp command. The argument
+    operator.</para>
+
+    <para>The rename operator is akin to using the Unix <literal>mv</literal>
+    (move) command, whereas SELECT * INTO is akin to the Unix
+    <literal>cp</literal> (copy) command. The argument
     <replaceable>named_array</replaceable> must be an array that was
     previously created and stored in the SciDB namespace.</para>
   </refsect1>
@@ -28,11 +37,12 @@
     <title>Example</title>
 
     <informalexample>
-      <para>Create an array named source and rename source to
-      target.<programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:9,10,0],1),source); --show-output=no
---afl list('arrays');
+      <para>Create an array named source, show its name and schema, rename it,
+      and show its new name and schema. Note that the array ID remains the
+      same.<programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:9,10,0],1),source); --show-output=no
+--afl list('arrays'); --output-format=csv --show-output-in-test-file=no
 --afl rename(source,target); --show-output=no
---afl list('arrays');</programlisting></para>
+--afl list('arrays'); --output-format=csv --show-output-in-test-file=no</programlisting></para>
     </informalexample>
   </refsect1>
 </refentry>

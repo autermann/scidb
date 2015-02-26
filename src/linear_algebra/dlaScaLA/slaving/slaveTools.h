@@ -26,12 +26,21 @@ void getSlaveBLACSInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, s
 
 } // namespace scidb
 
-#define SLAVE_ASSERT_ALWAYS(expr) \
-    {                             \
-        if (!(expr)) {            \
+///
+/// a macro, so that it can be improved by using __LINE__, __FILE__ etc
+///
+#define SLAVE_ASSERT_ALWAYS(expr)           \
+    {                                       \
+        if (!(expr)) {                      \
             std::cerr << #expr << "false at: " <<  __FILE__ << " : " << __LINE__  << std::endl; \
-            ::abort();            \
-        }                         \
+            sl_int_t ICTXT;                 \
+            blacs_get_(-1, 0, ICTXT);       \
+            if(ICTXT < 1) {                 \
+                ::abort();                  \
+            } else {                        \
+                blacs_abort_(ICTXT, 9999);  \
+            }                               \
+        }                                   \
     }
 
 

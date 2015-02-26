@@ -4,7 +4,7 @@
 
 --set-format dcsv
 --start-igdata
---aql CREATE ARRAY m3x4 <val:int64>[i=0:2,3,0,j=0:3,4,0]  
+CREATE ARRAY m3x4 <val:int64>[i=0:2,3,0,j=0:3,4,0]  
 --set-format auto
 --stop-igdata
 store(build(m3x4,i*4+j+1),m3x4)  

@@ -14,6 +14,7 @@
 */
 
 // std C++
+#include <cmath>
 
 // std C
 #include <stdlib.h>
@@ -26,6 +27,7 @@
 
 // local
 #include "pdgesvdSlave.hpp"
+#include "pdgesvdMasterSlave.hpp"
 #include "slaveTools.h"
 
 namespace scidb
@@ -35,7 +37,17 @@ enum dbgdummy { DBG=1 };
 #else
 enum dbgdummy { DBG=0 };
 #endif
-    
+
+//
+// forward decls
+//
+sl_int_t            pdgesvdSlave2(const sl_int_t ICTXT,  PdgesvdArgs args,
+                                  void* bufs[], size_t sizes[], unsigned count);
+scidb::PdgesvdArgs  pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t NPCOL,
+                                                       sl_int_t MYPROW, sl_int_t MYPCOL, sl_int_t MYPNUM,
+                                      sl_int_t order);
+
+
 /// TODO: I think there is a version of this in scalapackTools.h to use instead
 ///
 ///
@@ -47,34 +59,37 @@ enum dbgdummy { DBG=0 };
 ///
 static void getSlInfo(const sl_int_t ICTXT, sl_int_t& NPROW, sl_int_t& NPCOL, sl_int_t& MYPROW, sl_int_t& MYPCOL, sl_int_t& MYPNUM)
 {
-    if(DBG) std::cerr << "blacs_gridinfo_" << std::endl;
+    if(DBG) std::cerr << "getSlInfo: ICTXT: " << ICTXT << std::endl;
 
-    NPROW=-1 ; NPCOL=-1 ; MYPROW=-1 ; MYPCOL=-1 ;
+    NPROW=-1 ; NPCOL=-1 ; MYPROW=-1 ; MYPCOL=-1 ; MYPNUM= -1;
     blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
-    if(DBG) std::cerr << "blacs_gridinfo_ -- MYPROW,MYPCOL=" << MYPROW << "," << MYPCOL << std::endl;
+    if(DBG) std::cerr << "getSlInfo: blacs_gridinfo_(ICTXT: "<<ICTXT<<") -> "
+                      << "NPROW: " << NPROW << ", NPCOL: " << NPCOL
+                      << ", MYPROW: " << MYPROW << ", MYPCOL: " << MYPCOL << std::endl;
 
-    if(NPROW < 0 || NPCOL < 0) {
-        std::cerr << "blacs_gridinfo_ error -- aborting" << std::endl;
-        ::exit(99); // something that does not look like a signal
+    if(NPROW < 1 || NPCOL < 1) {
+        std::cerr << "getSlInfo: blacs_gridinfo_ error -- aborting" << std::endl;
+        ::blacs_abort_(ICTXT, 99); // something that does not look like a signal
     }
 
     if(MYPROW < 0 || MYPCOL < 0) {
-        std::cerr << "blacs_gridinfo_ error -- aborting" << std::endl;
-        ::exit(99); // something that does not look like a signal
+        std::cerr << "getSlInfo: blacs_gridinfo_ error -- aborting" << std::endl;
+        ::blacs_abort_(ICTXT, 99); // something that does not look like a signal
     }
 
-    if(DBG) std::cerr << "blacs_pnum_ " << std::endl;
     MYPNUM = blacs_pnum_(ICTXT, MYPROW, MYPCOL);
-    if(DBG) std::cerr << "blacs_pnum_ -- MYPNUM:" << MYPNUM <<std::endl;
+    if(DBG) std::cerr << "getSlInfo: blacs_pnum() -> MYPNUM: " << MYPNUM <<std::endl;
 }
+
 
 ///
 /// @return INFO = the status of the psgesvd_()
 ///
-sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count)
-{
-    enum dummy {BUF_ARGS=0, BUF_A, BUF_S, BUF_U, BUF_VT, NUM_BUFS };
+enum dummy {BUF_A=1, BUF_S, BUF_U, BUF_VT, NUM_BUFS };  // used by both pdgesvdSlave and ...Slave2
 
+sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOverwriteArgs)
+{
+    // TODO:  exit()S and SLAVE_ASSERT()s need to use MPI_abort() / blacs_abort() instead
 
     for(size_t i=0; i < count; i++) {
         if(DBG) {
@@ -85,26 +100,49 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count)
 
     if(count < NUM_BUFS) {
         std::cerr << "pdgesvdSlave: master sent " << count << " buffers, but " << NUM_BUFS << " are required." << std::endl;
-        ::exit(99); // something that does not look like a signal
+        ::abort();
     }
-
-    // take a COPY of args (because we will have to patch DESC.CTXT)
+    // size check and get reference to args
+    enum dummy {BUF_ARGS=0};  // NOTE bufs[BUF_ARGS] should not be referenced by pdgesvdSlave2
+    SLAVE_ASSERT_ALWAYS( sizes[BUF_ARGS] >= sizeof(PdgesvdArgs));
     scidb::PdgesvdArgs args = *reinterpret_cast<PdgesvdArgs*>(bufs[BUF_ARGS]) ;
-    if(DBG) {
-        std::cerr << "pdgesvdSlave: args --------------------------" << std::endl ;
-        std::cerr << args << std::endl;
-        std::cerr << "pdgesvdSlave: args end ----------------------" << std::endl ;
+
+    // set up the scalapack grid, this has to be done before we generate the fake
+    // problem
+    slpp::int_t ICTXT=-1; // will be overwritten by sl_init
+    sl_init_(ICTXT/*out*/, args.NPROW/*in*/, args.NPCOL/*in*/);  // sl_init calls blacs_grid_init
+    // NOCHECKIN next line
+    if(DBG) std::cerr << "pdgesvdSlave: sl_init(NPROW: "<<args.NPROW<<", NPCOL:"<<args.NPCOL<<") -> ICTXT: " << ICTXT << std::endl;
+
+    // blacs_grid_info is legal after this
+
+    // take a COPY of args, because we may have to overwrite it (for debug) when overwriteArgs is set
+    // NOTE bufs[BUF_ARGS] should not be referenced after this point
+    if(debugOverwriteArgs) {
+        sl_int_t NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM;
+        getSlInfo(ICTXT/*in*/, NPROW/*in*/, NPCOL/*in*/, MYPROW/*out*/, MYPCOL/*out*/, MYPNUM/*out*/);
+
+        size_t matrixCells = sizes[1]/sizeof(double);
+        size_t matrixOrder = floor(sqrt(matrixCells));  // TODO: should be multiplied by NPROW*NPCOL
+        args = pdgesvdGenTestArgs(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM, matrixOrder);
     }
 
-    // set up the scalapack grid
-    if(DBG) std::cerr << "##### sl_init() NPROW:"<<args.NPROW<<" NPCOL:"<<args.NPCOL<<std::endl;
-    slpp::int_t ICTXT=-1; // will be overwritten by sl_init
-    sl_init_(ICTXT/*out*/, args.NPROW/*in*/, args.NPCOL/*in*/); 
-    sl_int_t NPROW=args.NPROW;
-    sl_int_t NPCOL=args.NPCOL;
+    return pdgesvdSlave2(ICTXT, args, bufs, sizes, count);
+}
 
+// NOTE: args are modified, so it should not be made pointer or const-ref
+
+///
+/// This is the new standard style for implementing a slave routine for a ScaLAPACK operator,
+/// in this case, pdgesvd_().  The difference from the old style is that the new style
+/// requires that the ScaLAPACK context, ICTXT, be provided.  Until that requirement can be pushed
+/// up into the "mpi_slave_xxx" files, the existing pdgesvdSlave() routine will create the context
+/// and then call this routine.
+///
+sl_int_t pdgesvdSlave2(const sl_int_t ICTXT, PdgesvdArgs args, void* bufs[], size_t sizes[], unsigned count)
+{
     // find out where I am in the scalapack grid
-    sl_int_t MYPROW=-1, MYPCOL=-1, MYPNUM=-1; // will be overwritten by getSlInfo
+    sl_int_t NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM;
     getSlInfo(ICTXT/*in*/, NPROW/*in*/, NPCOL/*in*/, MYPROW/*out*/, MYPCOL/*out*/, MYPNUM/*out*/);
 
     if(NPROW != args.NPROW || NPCOL != args.NPCOL ||
@@ -120,8 +158,7 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count)
         }
     }
 
-
-      // setup MB,NB
+    // setup MB,NB
     const sl_int_t& M = args.A.DESC.M ;
     const sl_int_t& N = args.A.DESC.N ;
     const sl_int_t& MB = args.A.DESC.MB ;
@@ -134,8 +171,6 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count)
     const sl_int_t& MP = LLD_A ;
     const sl_int_t& NQ = LTD_A ;
 
-    // size check args
-    SLAVE_ASSERT_ALWAYS( sizes[BUF_ARGS] >= sizeof(PdgesvdArgs));
 
     // size check A, S, U, VT
     sl_int_t SIZE_A = MP * NQ ;
@@ -190,26 +225,11 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count)
     }
 
     // ScaLAPACK: the DESCS are complete except for the correct context
-    args.A.DESC.CTXT= ICTXT ;
-    // (no DESC for S)
+    args.A.DESC.CTXT= ICTXT ;  // note: no DESC for S, it is not distributed, all have a copy
     args.U.DESC.CTXT= ICTXT ;
     args.VT.DESC.CTXT= ICTXT ;
 
-    if(DBG) std::cerr << "pdgesvdSlave calling PDGESVD to get work size" << std:: endl;
-    sl_int_t INFO ;
-    double LWORK_DOUBLE;
-    pdgesvd_(args.jobU, args.jobVT, args.M, args.N,
-             A,  args.A.I,  args.A.J,  args.A.DESC, S,
-             U,  args.U.I,  args.U.J,  args.U.DESC,
-             VT, args.VT.I, args.VT.J, args.VT.DESC,
-             &LWORK_DOUBLE, -1, INFO);
-
-    sl_int_t LWORK = int(LWORK_DOUBLE); // get the cast from SVDPhysical.cpp
-    // ALLOCATE an array WORK size LWORK
-    boost::scoped_array<double> WORKtmp(new double[LWORK]);
-    double* WORK = WORKtmp.get();
-
-    if(true || DBG) {    // we'll leave this on in Cheshire.0 and re-evaluate later
+    if(DBG) {
         std::cerr << "pdgesvdSlave: argsBuf is: {" << std::endl;
         std::cerr << args << std::endl;
         std::cerr << "}" << std::endl << std::endl;
@@ -236,39 +256,124 @@ sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count)
                   << ", VT.I: " << args.VT.I
                   << ", VT.J: " << args.VT.J << std::endl;
         std::cerr << ", VT.DESC: " << args.VT.DESC << std::endl;
-
-        std::cerr << "WORK: " << (void*)(WORK)
-                  << " LWORK: " << LWORK << std::endl;
     }
 
+
+    if(DBG) std::cerr << "pdgesvdSlave calling PDGESVD to get work size" << std:: endl;
+    sl_int_t INFO = 0;
+    double LWORK_DOUBLE;
+    pdgesvd_(args.jobU, args.jobVT, args.M, args.N,
+             A,  args.A.I,  args.A.J,  args.A.DESC, S,
+             U,  args.U.I,  args.U.J,  args.U.DESC,
+             VT, args.VT.I, args.VT.J, args.VT.DESC,
+             &LWORK_DOUBLE, -1, INFO);
+
+    sl_int_t LWORK = int(LWORK_DOUBLE); // get the cast from SVDPhysical.cpp
+    // ALLOCATE an array WORK size LWORK
+    boost::scoped_array<double> WORKtmp(new double[LWORK]);
+    double* WORK = WORKtmp.get();
+
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
+    if(DBG) std::cerr << "pdgesvdSlave: calling pdgesvd_ for computation." << std::endl ;
+    INFO=0;
     pdgesvd_(args.jobU, args.jobVT, args.M, args.N,
              A,  args.A.I,  args.A.J,  args.A.DESC, S,
              U,  args.U.I,  args.U.J,  args.U.DESC,
              VT, args.VT.I, args.VT.J, args.VT.DESC,
              WORK, LWORK, INFO);
 
-    if(true || DBG) {    // we'll leave this on in Cheshire.0 and re-evaluate later
-        std::cerr << "pdgesvdSlave: result INFO: " << INFO << std::endl;
-    }
 
+    sl_int_t numToPrintAtStart=4 ;
+    if (MYPNUM==0 && DBG) {
+        int ii; // used in 2nd loop
+        for(ii=0; ii < std::min(SIZE_S, numToPrintAtStart); ii++) {
+            std::cerr << "pdgesvdSlave: S["<<ii<<"] = " << S[ii] << std::endl;
+        }
+        // now skip to numToPrintAtStart before the end, (without repeating) and print to the end
+        // to see if the test cases are producing zero eigenvalues (don't want that)
+        sl_int_t numToPrintAtEnd=4;
+        for(int ii=std::max(ii, SIZE_S-numToPrintAtEnd); ii < SIZE_S; ii++) {
+            std::cerr << "pdgesvdSlave: S["<<ii<<"] = " << S[ii] << std::endl;
+        }
+    }
     if (DBG) {
-        std::cerr << "pdgesvdSlave ------ outputs:" << std::endl;
-        // debug prints of the outputs:
-        for(int ii=0; ii < SIZE_S; ii++) {
-            std::cerr << "S["<<ii<<"] = " << S[ii] << std::endl;  
+        for(int ii=0; ii < std::min(SIZE_U, numToPrintAtStart); ii++) {
+            std::cerr << "pdgesvdSlave: U["<<ii<<"] = " << U[ii] << std::endl;
         }
-        for(int ii=0; ii < SIZE_U; ii++) {
-            std::cerr << "U["<<ii<<"] = " << U[ii] << std::endl;  
-        }
-        for(int ii=0; ii < SIZE_VT; ii++) {
-            std::cerr << "VT["<<ii<<"] = " << VT[ii] << std::endl;  
+        for(int ii=0; ii < std::min(SIZE_VT, numToPrintAtStart); ii++) {
+            std::cerr << "pdgesvdSlave: VT["<<ii<<"] = " << VT[ii] << std::endl;
         }
     }
 
+    if(MYPNUM == 0) {
+        if(INFO < 0) {
+            // argument error
+            std::cerr << "pdgesvdSlave(r:"<<MYPNUM<<"): "
+                      << "ERROR: argument error, argument # " << -INFO << std::endl;
+        } else if(INFO == (std::min(args.M, args.N)+1)) {
+            // heterogeneity detected (eigenvalues did not match on all nodes)
+            std::cerr << "pdgesvdSlave(r:"<<MYPNUM<<"): "
+                      << "WARNING: eigenvalues did not match across all instances" << std::endl;
+        } else if (INFO > 0) { // other + value of INFO
+            // DBDSQR did not converge
+            std::cerr << "pdgesvdSlave(r:"<<MYPNUM<<"): "
+                      << "ERROR: DBDSQR did not converge: " << INFO << std::endl;
+        }
+    }
     return INFO ;
 }
+
+///
+/// This code generates a PdgesvdArgs parameter block that can be used to drive
+/// pdgesvdSlave2() when there is no SciDB application to provide the info.
+/// It makes up parameters for a pdgesvd call that are appropriate to the
+/// processor grid and order of matrix being decomposed
+///
+scidb::PdgesvdArgs pdgesvdGenTestArgs(sl_int_t ICTXT, sl_int_t NPROW, sl_int_t NPCOL,
+                                                      sl_int_t MYPROW, sl_int_t MYPCOL, sl_int_t MYPNUM,
+                                      sl_int_t order)
+{
+    scidb::PdgesvdArgs result;
+
+    // hard-code a problem based on order and fixed block size
+    const slpp::int_t M=order;
+    const slpp::int_t N=order;
+    const slpp::int_t MIN_MN=order;
+    const slpp::int_t BLKSZ=32;   // NOCHECKIN
+    const slpp::int_t one = 1 ;
+    const char jobU = 'V';
+    const char jobVT = 'V';
+
+    // create ScaLAPACK array descriptors
+    const slpp::int_t RSRC = 0 ;
+    // LLD(A)
+    slpp::int_t LLD_A = std::max(one, numroc_( order, BLKSZ, MYPROW, RSRC, NPROW ));
+    // LLD(VT)
+    slpp::int_t LLD_VT = std::max(one, numroc_( order, BLKSZ, MYPROW, RSRC, NPROW ));
+
+    // WARNING -- note I never checked INFO from descinits !!
+    sl_int_t INFO = 0;
+
+    slpp::desc_t DESC_A;
+    descinit_(DESC_A, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_A, INFO);
+    slpp::desc_t DESC_U;
+    descinit_(DESC_U, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_A, INFO);
+    slpp::desc_t DESC_VT;
+    descinit_(DESC_VT, order, order, BLKSZ, BLKSZ, 0, 0, ICTXT, LLD_VT, INFO);
+    // S is different: global, not distributed, so its LLD(S) == LEN(S)
+    slpp::desc_t DESC_S;
+    descinit_(DESC_S, MIN_MN, 1, BLKSZ, BLKSZ, 0, 0, ICTXT, MIN_MN, INFO);
+
+    pdgesvdMarshallArgs(&result, NPROW,  NPCOL, MYPROW, MYPCOL, MYPNUM,
+                           jobU, jobVT, M, N,
+                           NULL /*A*/,  one, one, DESC_A,
+                           NULL /*S*/,
+                           NULL /*U*/,  one, one, DESC_U,
+                           NULL /*VT*/, one, one, DESC_VT);
+    return result;
+}
+
 
 } // namespace scidb

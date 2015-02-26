@@ -5,6 +5,7 @@
 --set-format dcsv
 --start-igdata
 CREATE ARRAY m3x3 <val:double>[i=0:2,3,0,j=0:2,3,0]  
+--set-format dense
 --stop-igdata
 store(build(m3x3,i*3+j),m3x3)  
 sum(m3x3,val,j)  

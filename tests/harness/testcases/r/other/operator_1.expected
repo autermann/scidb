@@ -105,9 +105,6 @@ SCIDB QUERY : <project(normalize(project(Test1,a)),a)>
 SCIDB QUERY : <project(merge(Test1,Test1),b,a)>
 {x} b,a
 
-SCIDB QUERY : <inverse(Test2)>
-[An error expected at this place for the query "inverse(Test2)". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_INVERSE_ERROR1. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_OP_INVERSE_ERROR1.]
-
 SCIDB QUERY : <project(transpose(Test2),a)>
 {y,x} a
 

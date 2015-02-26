@@ -57,6 +57,11 @@ std::string SCIDB_BUILD_INFO_STRING(const char* separator)
            "Copyright (C) 2008-2012 SciDB, Inc.";
 }
 
+std::string DEFAULT_MPI_DIR()
+{
+    return std::string("@CONFIGURE_DEFAULT_MPI_DIR@");
+}
+//the Ubuntu openmpi package is installed into /usr
 extern const size_t MB = 1024*1024;
 
 extern const size_t GB = 1024*MB;

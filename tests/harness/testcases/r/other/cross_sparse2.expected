@@ -199,7 +199,7 @@ SCIDB QUERY : <select * into c1 from d1 where x>2 and y>-1>
 
 SCIDB QUERY : <show(c1)>
 {i} schema
-{0} "c1<a1:double NULL> [x=0:4,3,0,y=-2:1,2,1]"
+{0} "c1<a1:double NULL DEFAULT null> [x=0:4,3,0,y=-2:1,2,1]"
 
 SCIDB QUERY : < update c1 set a1=null where x=3 and y=1>
 {x,y} a1

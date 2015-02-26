@@ -6,7 +6,9 @@
   <refnamediv>
     <refname>unpack</refname>
 
-    <refpurpose>Produces a one-dimensional result array from the data in a
+    <refpurpose><indexterm>
+        <primary>unpack</primary>
+      </indexterm>Produces a one-dimensional result array from the data in a
     multi-dimensional source array. Note that the unpack operator excludes all
     empty cells from the result array.</refpurpose>
   </refnamediv>

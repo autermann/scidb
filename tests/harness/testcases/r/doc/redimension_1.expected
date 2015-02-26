@@ -40,11 +40,9 @@ SCIDB QUERY : <redimension_store(zFlat,z1)>
 {"d1",61} "t1",6116
 {"d1",62} "t1",4114
 
-SCIDB QUERY : <store(redimension(zFlat,z2),z2)>
-{height} trial,ppb,device
-{60} "t2",9449,"d1"
-{61} "t2",8118,"d1"
-{62} "t2",2112,"d1"
+SCIDB QUERY : <count(store(redimension(zFlat,z2),z2))>
+{i} count
+{0} 3
 
 SCIDB QUERY : <show(z3)>
 {i} schema

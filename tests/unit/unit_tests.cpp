@@ -118,7 +118,7 @@ int main(int argc, char **argv)
     }
     catch(...)
     {
-        cout << "Unhabdled exception" << endl;
+        cout << "Unhandled exception" << endl;
         return 2;
     }
 }

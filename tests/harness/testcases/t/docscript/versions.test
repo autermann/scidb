@@ -4,12 +4,14 @@
 
 --set-format dcsv
 --start-igdata
---aql CREATE ARRAY m1 <val:double>[i=0:9,10,0]  
+CREATE ARRAY m1 <val:double>[i=0:9,10,0]  
+--set-format dense
+--stop-igdata
 store(build(m1,1),m1)  
 store(build(m1,100),m1)  
---stop-igdata
+--set-format dcsv
 --start-igdata
-project(versions(m1),version_id)
+versions(m1)  
 --set-format dense
 --stop-igdata
 scan(m1@1)  

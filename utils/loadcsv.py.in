@@ -192,7 +192,7 @@ def getSshCommand(username, keyfile, host, port, bypass_key_check, command):
         sshCommand += "%s" % host
     if command:
         sshCommand += " %s" % command
-    return sshCommand
+    return sshCommand.replace("\\", "\\\\").replace("\"", "\\\"")
 
 #############
 # logNormal #
@@ -578,7 +578,7 @@ try:
         setChunkSize()
         if opts.input_file:
             sys.stdin = file(opts.input_file)
-        if select.select([sys.stdin,],[],[],0.0)[0]:
+        if select.select([sys.stdin],[],[])[0]:
             getInstances()
             createCsvFragments()
             csvFragmentsCreated = True

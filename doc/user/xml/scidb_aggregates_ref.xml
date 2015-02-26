@@ -2,12 +2,18 @@
 <!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<chapter>
+<chapter id="scidbAggregateReference">
   <title>SciDB Aggregate Reference</title>
 
-  <para>This chapter lists SciDB aggregates. Aggregates take as input a set of
-  1 or more values and return a scalar value. SciDB aggregates have the syntax
-  aggregate_call_N where an aggregate call is one of the
+  <para><indexterm>
+      <primary>aggregates</primary>
+    </indexterm><indexterm>
+      <primary>aggregates</primary>
+
+      <secondary>reference</secondary>
+    </indexterm>This chapter lists SciDB aggregates. Aggregates take as input
+  a set of 1 or more values and return a scalar value. SciDB aggregates have
+  the syntax aggregate_call_N where an aggregate call is one of the
   following:<itemizedlist>
       <listitem>
         <para><code>aggregate_name(attribute_name)</code></para>
@@ -66,7 +72,7 @@ AFL% variable_window(<replaceable>array</replaceable>,
 AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<replaceable>grid_2</replaceable>,...,<replaceable>grid_N</replaceable>,
 <replaceable>aggregate_call_1</replaceable><optional>,<replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional>);</synopsis></para>
 
-  <xi:include href="approxdc_agg.xml"
+  <xi:include href="approxdc_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="avg_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>

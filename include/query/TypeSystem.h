@@ -213,72 +213,6 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Type>& ob );
 std::ostream& operator<<(std::ostream& stream, const std::vector<TypeId>& ob );
 
 /**
- * TypeLibrary is a container to registered types in the engine.
- */
-class TypeLibrary
-{
-private:
-    static TypeLibrary _instance;
-    std::map<TypeId, Type, __lesscasecmp> _typesById;
-    std::map<TypeId, Type, __lesscasecmp> _builtinTypesById;
-    PluginObjects _typeLibraries;
-    Mutex mutex;
-
-    const Type& _getType(TypeId typeId);
-    void _registerType(const Type& type);
-    bool _hasType(TypeId typeId);
-    size_t _typesCount();
-    std::vector<TypeId> _typeIds();
-    
-public:
-    TypeLibrary();
-
-    static void registerBuiltInTypes();
-
-    static const Type& getType(TypeId typeId)
-    {
-        return _instance._getType(typeId);
-    }
-
-    static bool hasType(const std::string& typeId)
-    {
-        return _instance._hasType(typeId);
-    }
-
-    static const std::vector<Type> getTypes(const std::vector<TypeId> typeIds)
-    {
-        std::vector<Type> result;
-        for( size_t i = 0, l = typeIds.size(); i < l; i++ )
-            result.push_back(_instance._getType(typeIds[i]));
-
-        return result;
-    }
-
-    static void registerType(const Type& type)
-    {
-        _instance._registerType(type);
-    }
-
-    /**
-     * Return the number of types currently registered in the TypeLibrary.
-     */
-    static size_t typesCount() { 
-        return _instance._typesCount();
-    }
-
-    /**
-     * Return a vector of typeIds registered in the library.
-     */
-    static std::vector<TypeId> typeIds() {
-        return _instance._typeIds();
-    }
-
-    static const PluginObjects& getTypeLibraries() {
-        return _instance._typeLibraries;
-    }
-};
-
-/**
  * The Value class is data storage for type Type. It has only data, as the 
  * type descriptor will be stored separately.
  * 
@@ -337,6 +271,7 @@ private:
             if (!_data) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
             }
+            memset(_data, 0, _size);
         }
     }
 
@@ -487,8 +422,13 @@ public:
         return !(*this == other);
     }
 
+    /*
+     * Check if data buffer is equal to type's default value
+     */
+    inline bool isDefault(const TypeId& typeId) const;
+
     /**
-     * Check if value is zero
+     * Check if data buffer is filled with 0
      * TODO: (RS) It can be optimized by using comparing of DWORDs
      */
     inline bool isZero() const
@@ -767,12 +707,7 @@ public:
  * New RLE fields of Value
  */
 public:
-    inline RLEPayload* getTile(TypeId const& type) {
-        if (_tile == NULL) { 
-            _tile = new RLEPayload(TypeLibrary::getType(type));
-        }
-        return _tile;
-    }
+    inline RLEPayload* getTile(TypeId const& type);
 
     inline RLEPayload* getTile() const {
         assert(_tile != NULL);
@@ -788,6 +723,92 @@ public:
         _missingReason = -3;
     }
 };
+
+/**
+ * TypeLibrary is a container to registered types in the engine.
+ */
+class TypeLibrary
+{
+private:
+    static TypeLibrary _instance;
+    std::map<TypeId, Type, __lesscasecmp> _typesById;
+    std::map<TypeId, Type, __lesscasecmp> _builtinTypesById;
+    std::map<TypeId, Value, __lesscasecmp> _defaultValuesById;
+    PluginObjects _typeLibraries;
+    Mutex mutex;
+
+    const Type& _getType(TypeId typeId);
+    void _registerType(const Type& type);
+    bool _hasType(TypeId typeId);
+    size_t _typesCount();
+    std::vector<TypeId> _typeIds();
+    const Value& _getDefaultValue(TypeId typeId);
+
+public:
+    TypeLibrary();
+
+    static void registerBuiltInTypes();
+
+    static const Type& getType(TypeId typeId)
+    {
+        return _instance._getType(typeId);
+    }
+
+    static bool hasType(const std::string& typeId)
+    {
+        return _instance._hasType(typeId);
+    }
+
+    static const std::vector<Type> getTypes(const std::vector<TypeId> typeIds)
+    {
+        std::vector<Type> result;
+        for( size_t i = 0, l = typeIds.size(); i < l; i++ )
+            result.push_back(_instance._getType(typeIds[i]));
+
+        return result;
+    }
+
+    static void registerType(const Type& type)
+    {
+        _instance._registerType(type);
+    }
+
+    /**
+     * Return the number of types currently registered in the TypeLibrary.
+     */
+    static size_t typesCount() {
+        return _instance._typesCount();
+    }
+
+    /**
+     * Return a vector of typeIds registered in the library.
+     */
+    static std::vector<TypeId> typeIds() {
+        return _instance._typeIds();
+    }
+
+    static const PluginObjects& getTypeLibraries() {
+        return _instance._typeLibraries;
+    }
+
+    static const Value& getDefaultValue(TypeId typeId)
+    {
+        return _instance._getDefaultValue(typeId);
+    }
+};
+
+RLEPayload* Value::getTile(TypeId const& type)
+{
+    if (_tile == NULL) {
+        _tile = new RLEPayload(TypeLibrary::getType(type));
+    }
+    return _tile;
+}
+
+bool Value::isDefault(const TypeId& typeId) const
+{
+    return *this == TypeLibrary::getDefaultValue(typeId);
+}
 
 /**
  * Helper Value functions
@@ -822,13 +843,6 @@ double ValueToDouble(const TypeId type, const Value& value);
 void DoubleToValue(const TypeId type, double d, Value& value);
 
 bool isBuiltinType(const TypeId type);
-
-/**
- * Returns default value for specified type
- * @param[out] value Default value for this type
- * @param[in] typeId Input typeId
- */
-void setDefaultValue(Value &value, const TypeId typeId);
 
 TypeId propagateType(const TypeId type);
 TypeId propagateTypeToReal(const TypeId type);

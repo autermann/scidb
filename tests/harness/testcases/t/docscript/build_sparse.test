@@ -2,11 +2,13 @@
 --test
 --start-query-logging
 
---set-format dcsv
-build_sparse(<val:double>[i=0:3,4,0,j=0:3,4,0],1,i=j)  
+store(build_sparse(<val:double>[i=0:3,4,0,j=0:3,4,0],1,i=j), m3x3_sparse)  
+store(build(<val:double null>[i=0:3,4,0,j=0:3,4,0],iif(i=j,1,NULL)),m3x3_dense)  
 
 --stop-query-logging
 
 
 --cleanup
 
+remove(m3x3_sparse)
+remove(m3x3_dense)

@@ -29,7 +29,7 @@ if(BUILD_USER_DOC)
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pdf/scidb-userguide-${SCIDB_SHORT_VERSION}.pdf
         COMMAND ${XSLTPROC_EXECUTABLE} --xinclude -o ${CMAKE_CURRENT_BINARY_DIR}/scidb-userguide-${SCIDB_SHORT_VERSION}.fo ${CMAKE_CURRENT_BINARY_DIR}/xml/custom.xsl ${CMAKE_CURRENT_SOURCE_DIR}/xml/scidb_ug.xml
         COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/pdf
-        COMMAND ${FOP_EXECUTABLE} -fo ${CMAKE_CURRENT_BINARY_DIR}/scidb-userguide-${SCIDB_SHORT_VERSION}.fo -pdf ${CMAKE_CURRENT_BINARY_DIR}/pdf/scidb-userguide-${SCIDB_SHORT_VERSION}.pdf
+        COMMAND ${FOP_EXECUTABLE} -c fopconfig.xml -fo ${CMAKE_CURRENT_BINARY_DIR}/scidb-userguide-${SCIDB_SHORT_VERSION}.fo -pdf ${CMAKE_CURRENT_BINARY_DIR}/pdf/scidb-userguide-${SCIDB_SHORT_VERSION}.pdf
         DEPENDS ${USER_DOC_SRC}
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/xml/
     )

@@ -89,398 +89,6 @@ inline Coordinates getEndMax(boost::shared_ptr<Array>& a) {
     return result;
 }
 
-// REFACTOR:
-static void launchMPIJob(boost::shared_ptr<MpiLauncher>& launcher,
-                  const boost::shared_ptr<const InstanceMembership>& membership,
-                  const shared_ptr<Query>& query,
-                  const int maxSlaves)
-{
-    std::vector<std::string> args;
-    launcher->launch(args, membership, maxSlaves);
-
-    if (logger->isDebugEnabled()) {
-        vector<pid_t> pids;
-        launcher->getPids(pids);
-        for (vector<pid_t>::const_iterator i=pids.begin(); i != pids.end(); ++i) {
-            LOG4CXX_DEBUG(logger,"DLA launched PID= "<<(*i));
-        }
-    }
-}
-
-void invokeMPIRank(std::vector< shared_ptr<Array> >* inputArrays,
-                  shared_ptr<Query>& query,
-                  shared_ptr<MpiOperatorContext>& ctx,
-                  ArrayDesc& outSchema,
-                  shared_ptr<Array>* result,
-                  slpp::int_t* INFO)
-{
-    const bool DBG = false;
-
-    std::cerr << "invokeMPIRank reached" << std::endl ;
-
-    size_t nInstances = query->getInstancesCount();
-    slpp::int_t instanceID = query->getInstanceID();
-
-    // MPI_Init(); -- now done in slave processes
-    // in SciDB we use query->getInstancesCount() & getInstanceID()
-    // and we use a fake scalapack gridinit to set up the grid and where
-    // we are in it.  so the blacs_getinfo calls below are fakes to help
-    // keep the code more similar
-
-    //!
-    //!.... Get the (emulated) BLACS info .............................................
-    //!
-    slpp::int_t ICTXT=-1;
-    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-
-    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
-    if(DBG) {
-        std::cerr << "(invoke) blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
-        std::cerr << "-> NPROW: " << NPROW  << ", NPCOL: " << NPCOL << std::endl;
-        std::cerr << "-> MYPROW:" << MYPROW << ", MYPCOL:" << MYPCOL << std::endl;
-    }
-
-    // REFACTOR these checks
-    if(MYPROW < 0 || MYPCOL < 0) {
-        std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL << std::endl ;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL);
-    }
-
-    if(MYPROW >= NPROW) {
-        std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW << std::endl ;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW);
-    }
-
-    if(MYPCOL >= NPCOL) {
-        std::cerr << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL << std::endl ;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL);
-    }
-
-    // check that mpi_commsize(NPE, MYPE) values
-    // which are managed in the slave as:
-    //     NPE = MpiManager::getInstance()->getWorldSize();
-    //     MYPE = MpiManager::getInstance()->getRank();
-    // and here can be derived from the blacs_getinfo
-    // 
-    // lets check them against the instanceCount and instanceID to make sure
-    // everything is consistent
-
-    // NPE <= instanceCount
-    size_t NPE = NPROW*NPCOL; // from blacs
-    if(NPE > nInstances) {
-        std::stringstream msg; msg << "MPIRank operator error: NPE:"<<NPE<< " nInstances:"<< nInstances;
-        std::cerr << msg.str() << std::endl;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
-    }
-
-    // MYPE == instanceID
-    slpp::int_t MYPE = MYPROW*NPCOL + MYPCOL ; // row-major
-    if(MYPE != instanceID) {
-        std::stringstream msg; msg << "MPIRank operator error: MYPE:"<<MYPE<< " instanceID:"<< instanceID;
-        std::cerr << msg.str() << std::endl;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
-    }
-
-    if(DBG) std::cerr << "NPE/nInstances: " << NPE << std::endl;
-    if(DBG) std::cerr << "MYPE/instanceID: " << MYPE << std::endl;
-
-    // REFACTOR  -- not only in DLA operators but also perhaps PhysicalMpiTest
-    //
-    // taken from PhysicalMpiTest operator code, pre-loop
-    //
-    const boost::shared_ptr<const InstanceMembership> membership =
-        Cluster::getInstance()->getInstanceMembership();
-
-    if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-        (membership->getInstances().size() != query->getInstancesCount())) {
-        // because we can't yet handle the extra data from
-        // replicas that we would be fed in "degraded mode"
-
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-    }
-
-    // REFACTOR
-    //
-    // taken from PhysicalMpiTest operator code, in-loop
-    //
-    if(DBG) std::cerr << "invokeMPIRank slave creation" << std::endl ;
-
-    const string& installPath = MpiManager::getInstallPath(membership);
-    uint64_t launchId =ctx->getNextLaunchId();
-
-    boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
-    ctx->setSlave(launchId, slave);
-
-    bool mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
-    boost::shared_ptr<MpiLauncher> launcher;
-    if (mustLaunch) {
-        launcher = boost::shared_ptr<MpiLauncher>(new MpiLauncher(launchId, query));
-        ctx->setLauncher(launchId, launcher);
-        launchMPIJob(launcher, membership, query, NPROW*NPCOL);
-    }
-
-    //-------------------- Get the handshake
-    if(DBG) std::cerr << "invokeMPIRank slave waitForHandshake 1" << std::endl ;
-    if(DBG) std::cerr << "-------------------------------------" << std::endl ;
-    slave->waitForHandshake(ctx);
-    if(DBG) std::cerr << "invokeMPIRank slave waitForHandshake 1 done" << std::endl ;
-
-    // After the handshake the old slave must be gone
-    boost::shared_ptr<MpiSlaveProxy> oldSlave = ctx->getSlave(launchId-1);
-    if (oldSlave) {
-        if(DBG) std::cerr << "invokeMPIRank oldSlave->destroy()" << std::endl ;
-        oldSlave->destroy();
-        oldSlave.reset();
-    }
-    ctx->complete(launchId-1);
-
-    // REFACTOR: this is a pattern in DLAs
-    //
-    // get dimension information about the input arrays
-    //
-    if(DBG) std::cerr << "invokeMPIRank get dim info" << std::endl ;
-    boost::shared_ptr<Array> Ain = (*inputArrays)[0];
-
-    std::ostringstream tmp;
-    Ain->getArrayDesc().getDimensions()[0].toString(tmp) ;
-    if(DBG) std::cerr << tmp.str() << std::endl;
-
-    std::ostringstream tmp2;
-    Ain->getArrayDesc().getDimensions()[1].toString(tmp2) ;
-    std::cerr << tmp2.str() << std::endl;
-
-    // find M,N from input array
-    slpp::int_t M = nrow(Ain);
-    slpp::int_t N = ncol(Ain);
-    if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
-
-    // find MB,NB from input array, which is the chunk size
-    // note that the best chunksizes for ScaLAPACK are 32x32 and 64x64
-    // for Intel {Sandy,Ivy}Bridge processors. (Core 2 2xxx, 3xxx cpus)
-    // small matrices will often have equally small chunk size, so shold
-    // handle those.
-    const slpp::int_t SL_BLOCK_SIZE=64; // scalapack block size
-    // TODO JHM: need to test and fix what happens if the chunk
-    //           size is not a legitimate one at this point
-    if (brow(Ain) > SL_BLOCK_SIZE ||
-        bcol(Ain) > SL_BLOCK_SIZE) {
-        std::cerr << "MPIRank operator error: chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large" << std::endl ;
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large");
-    }
-    const slpp::int_t MB= brow(Ain);
-    const slpp::int_t NB= bcol(Ain);
-
-    if (MB != NB) {
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-               << "chunksizes are MB=" << MB << " and NB=" << NB << "must be the same."
-               << " 64 or 128 is suggested.");
-    }
-
-    //!
-    //!.... Set up ScaLAPACK array descriptors ........................................
-    //!
-
-    // these formulas for LD (leading dimension) and TD (trailing dimension)
-    // are found in the headers of the scalapack functions such as pdgesvd_()
-    const slpp::int_t one = 1 ;
-    slpp::int_t LD_IN = std::max(one, numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
-    if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
-    if(DBG) std::cerr << "--> LD_IN = " << LD_IN << std::endl;
-
-    slpp::int_t TD_IN = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
-    if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
-    if(DBG) std::cerr << "-->TD_IN = " << TD_IN << std::endl;
-
-    // create ScaLAPACK array descriptors
-    std::cerr << "descinit_ DESC_IN" << std::endl;
-    slpp::desc_t DESC_IN;
-    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN, *INFO);
-
-    std::cerr << "descinit_ DESC_OUT" << std::endl;
-    slpp::desc_t DESC_OUT;
-    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_IN, *INFO);
-
-    slpp::int_t MP = LD_IN;
-    slpp::int_t NQ = TD_IN;
-
-    //REFACTOR
-    if(DBG) {
-        std::cerr << "##################################################" << std::endl;
-        std::cerr << "####master#########################################" << std::endl;
-        std::cerr << "one:" << one << std::endl;
-        std::cerr << "MB:" << MB << std::endl;
-        std::cerr << "MYPROW:" << MYPROW << std::endl;
-        std::cerr << "NPROW:" << NPROW << std::endl;
-    }
-
-    std::cerr << "LOCAL SIZES:@@@@@@@@@@@@@@@@@@@" << std::endl ;
-    std::cerr << "XX MP   = " << MP << std::endl;
-    std::cerr << "XX NQ   = " << NQ << std::endl;
-
-    // sizes
-    const slpp::int_t SIZE_IN = MP * NQ ;
-    const slpp::int_t SIZE_OUT = SIZE_IN ;
-
-    const size_t NUM_BUFS=3 ;
-    int sizes[NUM_BUFS];
-    sizes[0] =          sizeof (scidb::MPIRankArgs) ;
-    sizes[1] = SIZE_IN * sizeof(double) ;
-    sizes[2] = SIZE_OUT* sizeof(double) ;
-
-    if(DBG) {
-        std::cerr << "SHM ALLOCATIONS:@@@@@@@@@@@@@@@@@@@" << std::endl ;
-        std::cerr << "sizes[0] (args) = " << sizes[0] << std::endl;
-        std::cerr << "sizes[1] (IN) = " << sizes[1] << std::endl;
-        std::cerr << "sizes[2] (OUT) = "<< sizes[2] << std::endl;
-    }
-
-
-    //-------------------- Create IPC
-    string clusterUuid = Cluster::getInstance()->getUuid();
-    InstanceID instanceId = Cluster::getInstance()->getLocalInstanceId();
-    std::string ipcName = mpi::getIpcName(installPath, clusterUuid, query->getQueryID(), instanceId, launchId);
-
-    typedef boost::shared_ptr<SharedMemoryIpc> SMIptr_t ;
-    std::vector<SMIptr_t> shmIpc(NUM_BUFS);
-    for(size_t ii=0; ii<NUM_BUFS; ii++) {
-        std::stringstream suffix;
-        suffix << "." << ii ;
-        LOG4CXX_TRACE(logger, "IPC name = " << (ipcName + suffix.str()));
-        shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcName+suffix.str()));
-        ctx->addSharedMemoryIpc(launchId, shmIpc[ii]);
-
-        try {
-            shmIpc[ii]->create(SharedMemoryIpc::RDWR);
-            shmIpc[ii]->truncate(sizes[ii]);
-        } catch(SharedMemoryIpc::SystemErrorException& e) {
-            std::stringstream ss; ss << "shared_memory_mmap " << e.what();
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str());
-        } catch(SharedMemoryIpc::InvalidStateException& e) {
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
-        }
-
-        if(DBG) {
-            std::cerr << "----------------------------------------------" << std::endl ;
-            std::cerr << "WARNING: prefill with NaN enabled" << std::endl ;
-            std::cerr << "----------------------------------------------" << std::endl ;
-        }
-        double* buf = reinterpret_cast<double*>(shmIpc[ii]->get());
-        const double nanVal = ::nan(""); // any non-signalling NaN, don't care which
-        for (size_t jj=0; jj < (sizes[ii]/sizeof(double)); jj++) {
-            buf[jj] = nanVal;
-        }
-    }
-
-    typedef scidb::SharedMemoryPtr<double> shmSharedPtr_t ;
-    void *argsBuf = shmIpc[0]->get();
-    double* IN = reinterpret_cast<double*>(shmIpc[1]->get());
-    double* OUT= reinterpret_cast<double*>(shmIpc[2]->get()); shmSharedPtr_t OUTx(shmIpc[2]);
-
-    // use extractDataToOp() and the reformatToScalapack() operator
-    // to reformat the data according to ScaLAPACK requirements.
-    Coordinates coordFirst = getStart(Ain);
-    Coordinates coordLast = getEndMax(Ain);
-
-    scidb::ReformatToScalapack pdelsetOp(IN, DESC_IN, coordFirst[0], coordFirst[1]);
-
-    if(DBG) std::cerr << "extract data from SciDB Ain to ScaLAPACK double* IN" << std::endl ;
-    LOG4CXX_DEBUG(logger, "extract data from SciDB Ain to ScaLAPACK double* IN");
-    extractDataToOp(Ain, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
-    LOG4CXX_DEBUG(logger, "extraction done");
-    if(DBG) std::cerr << "extraction done" << std::endl ;
-
-    // debug that the reformat worked correctly:
-    if(DBG) {
-        for(int ii=0; ii < SIZE_IN; ii++) {
-            std::cerr << "("<< MYPROW << "," << MYPCOL << ") IN["<<ii<<"] = " << IN[ii] << std::endl;
-        }
-    }
-
-	// SPECIAL TO MPIRank, does not factor out
-    for(int ii=0; ii < SIZE_IN; ii++) {
-        IN[ii] = MYPE ; // change it to what we think the rank will be when it really gets to MPI
-    }      
-
-    //!
-    //!.... Call the master wrapper
-    //!
-    if(DBG) std::cerr << "MPIRankPhysical: calling mpiRankMaster M,N:" << M  << "," << N
-                                  << "MB,NB:" << MB << "," << NB << std::endl;
-    LOG4CXX_DEBUG(logger, "MPIRankPhysical: calling mpiRankMaster M,N:" << M <<","<< "MB,NB:" << MB << "," << NB);
-
-    if(DBG) std::cerr << "MPIRankPhysical calling PDGESVD to compute" << std:: endl;
-    mpirankMaster(query.get(), ctx, slave, ipcName, argsBuf,
-                  NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
-                  IN,  DESC_IN, OUT, DESC_OUT, *INFO);
-
-    LOG4CXX_DEBUG(logger, "MPIRank: mpiRankMaster finished");
-    std::cerr << "MPIRank: calling mpiRankMaster finished" << std::endl;
-    std::cerr << "MPIRank: mpiRankMaster returned INFO:" << *INFO << std::endl;
-
-    Dimensions const& dims = Ain->getArrayDesc().getDimensions();
-
-    boost::shared_array<char> resPtrDummy(reinterpret_cast<char*>(NULL));
-
-    typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
-
-    // Only in MPIRank
-    std::cerr << "--------------------------------------" << std::endl;
-    std::cerr << "sequential values of 'OUT' ScaLAPACK memory" << std::endl;
-    for(int ii=0; ii < SIZE_OUT; ii++) {
-        std::cerr << "OUT["<<ii<<"] = " << OUT[ii] << std::endl;
-    }
-    std::cerr << "--------------------------------------" << std::endl;
-    std::cerr << "using pdelgetOp to redist mpiRank OUT from memory to scidb array , start" << std::endl ;
-
-    //
-    // an OpArray is a SplitArray that is filled on-the-fly by calling the operator
-    // so all we have to do is create one with an upper-left corner equal the the
-    // global position of the first local block we have.  so we need to map
-    // our "processor" coordinate into that position, which we do by multiplying
-    // by the chunkSize
-    //
-    Coordinates first(2);
-    first[0] = dims[0].getStart() + MYPROW * dims[0].getChunkInterval();
-    first[1] = dims[1].getStart() + MYPCOL * dims[1].getChunkInterval();
-
-    Coordinates last(2);
-    last[0] = dims[0].getStart() + dims[0].getLength() - 1;
-    last[1] = dims[1].getStart() + dims[1].getLength() - 1;
-
-    Coordinates iterDelta(2);
-    iterDelta[0] = NPROW * dims[0].getChunkInterval();
-    iterDelta[1] = NPCOL * dims[1].getChunkInterval();
-
-    if(DBG) std::cerr << "MPIRank OUT SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
-    LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
-
-    reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStart(), dims[1].getStart());
-    *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
-                                                            first, last, iterDelta));
-
-    //--------------------- Cleanup for objects no longer in use
-    // after the for loop the shared memory is still intact
-    for(size_t i=0; i<shmIpc.size(); i++) {
-        if (!shmIpc[i]) {
-            continue;
-        }
-        shmIpc[i]->close();
-        if (!shmIpc[i]->remove()) {
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_remove");
-        }
-    }
-    if (mustLaunch) {
-        launcher->destroy();
-    }
-    ctx.reset();
-
-    if(DBG) std::cerr << "invoke: returning from invokeMPIRank with INFO:" << *INFO << std::endl ;
-}
-
 ///
 /// An operator that returuns the ScaLAPACK rank that is repsonsible for that
 /// cell, computed by actually receiving data from the ScaLAPACK slave process,
@@ -511,10 +119,18 @@ public:
 
     virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
 
+    private:
+    void invokeMPIRank(std::vector< shared_ptr<Array> >* inputArrays,
+                       shared_ptr<Query>& query,
+                       shared_ptr<MpiOperatorContext>& ctx,
+                       ArrayDesc& outSchema,
+                       shared_ptr<Array>* result,
+                       slpp::int_t* INFO);
+
 };
 
 ///
-/// SVDPhysical::execute()
+/// MPIRankPhysical::execute()
 /// + converts inputArrays to psScaLAPACK distribution
 /// + intersects the array chunkGrid with the maximum process grid
 /// + sets up the ScaLAPACK grid accordingly and if not participating, return early
@@ -660,6 +276,346 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
 
     if(DBG) std::cerr << "MPIRankPhysical::execute() end ---------------------------------------" << std::endl;
     return result;
+}
+
+void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArrays,
+                                     shared_ptr<Query>& query,
+                                     shared_ptr<MpiOperatorContext>& ctx,
+                                     ArrayDesc& outSchema,
+                                     shared_ptr<Array>* result,
+                                     slpp::int_t* INFO)
+{
+    const bool DBG = false;
+
+    std::cerr << "invokeMPIRank reached" << std::endl ;
+
+    size_t nInstances = query->getInstancesCount();
+    slpp::int_t instanceID = query->getInstanceID();
+
+    // MPI_Init(); -- now done in slave processes
+    // in SciDB we use query->getInstancesCount() & getInstanceID()
+    // and we use a fake scalapack gridinit to set up the grid and where
+    // we are in it.  so the blacs_getinfo calls below are fakes to help
+    // keep the code more similar
+
+    //!
+    //!.... Get the (emulated) BLACS info .............................................
+    //!
+    slpp::int_t ICTXT=-1;
+    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+
+    blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    if(DBG) {
+        std::cerr << "(invoke) blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "-> NPROW: " << NPROW  << ", NPCOL: " << NPCOL << std::endl;
+        std::cerr << "-> MYPROW:" << MYPROW << ", MYPCOL:" << MYPCOL << std::endl;
+    }
+
+    // REFACTOR these checks
+    if(MYPROW < 0 || MYPCOL < 0) {
+        std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL << std::endl ;
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL);
+    }
+
+    if(MYPROW >= NPROW) {
+        std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW << std::endl ;
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW);
+    }
+
+    if(MYPCOL >= NPCOL) {
+        std::cerr << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL << std::endl ;
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL);
+    }
+
+    // check that mpi_commsize(NPE, MYPE) values
+    // which are managed in the slave as:
+    //     NPE = MpiManager::getInstance()->getWorldSize();
+    //     MYPE = MpiManager::getInstance()->getRank();
+    // and here can be derived from the blacs_getinfo
+    // 
+    // lets check them against the instanceCount and instanceID to make sure
+    // everything is consistent
+
+    // NPE <= instanceCount
+    size_t NPE = NPROW*NPCOL; // from blacs
+    if(NPE > nInstances) {
+        std::stringstream msg; msg << "MPIRank operator error: NPE:"<<NPE<< " nInstances:"<< nInstances;
+        std::cerr << msg.str() << std::endl;
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
+    }
+
+    // MYPE == instanceID
+    slpp::int_t MYPE = MYPROW*NPCOL + MYPCOL ; // row-major
+    if(MYPE != instanceID) {
+        std::stringstream msg; msg << "MPIRank operator error: MYPE:"<<MYPE<< " instanceID:"<< instanceID;
+        std::cerr << msg.str() << std::endl;
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
+    }
+
+    if(DBG) std::cerr << "NPE/nInstances: " << NPE << std::endl;
+    if(DBG) std::cerr << "MYPE/instanceID: " << MYPE << std::endl;
+
+    // REFACTOR  -- not only in DLA operators but also perhaps PhysicalMpiTest
+    //
+    // taken from PhysicalMpiTest operator code, pre-loop
+    //
+    const boost::shared_ptr<const InstanceMembership> membership =
+        Cluster::getInstance()->getInstanceMembership();
+
+    if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
+        (membership->getInstances().size() != query->getInstancesCount())) {
+        // because we can't yet handle the extra data from
+        // replicas that we would be fed in "degraded mode"
+
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
+    }
+    const string& installPath = MpiManager::getInstallPath(membership);
+
+    // REFACTOR
+    //
+    // taken from PhysicalMpiTest operator code, in-loop
+    //
+    if(DBG) std::cerr << "invokeMPIRank slave creation" << std::endl ;
+    if(DBG) std::cerr << "invokeMPIRank slave waitForHandshake 1" << std::endl ;
+    launchMPISlaves(query, NPROW*NPCOL);
+    if(DBG) std::cerr << "invokeMPIRank slave waitForHandshake 1 done" << std::endl ;
+
+    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+
+    // REFACTOR: this is a pattern in DLAs
+    //
+    // get dimension information about the input arrays
+    //
+    if(DBG) std::cerr << "invokeMPIRank get dim info" << std::endl ;
+    boost::shared_ptr<Array> Ain = (*inputArrays)[0];
+
+    std::ostringstream tmp;
+    Ain->getArrayDesc().getDimensions()[0].toString(tmp) ;
+    if(DBG) std::cerr << tmp.str() << std::endl;
+
+    std::ostringstream tmp2;
+    Ain->getArrayDesc().getDimensions()[1].toString(tmp2) ;
+    std::cerr << tmp2.str() << std::endl;
+
+    // find M,N from input array
+    slpp::int_t M = nrow(Ain);
+    slpp::int_t N = ncol(Ain);
+    if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
+
+    // find MB,NB from input array, which is the chunk size
+    // note that the best chunksizes for ScaLAPACK are 32x32 and 64x64
+    // for Intel {Sandy,Ivy}Bridge processors. (Core 2 2xxx, 3xxx cpus)
+    // small matrices will often have equally small chunk size, so shold
+    // handle those.
+    const slpp::int_t SL_BLOCK_SIZE=64; // scalapack block size
+    // TODO JHM: need to test and fix what happens if the chunk
+    //           size is not a legitimate one at this point
+    if (brow(Ain) > SL_BLOCK_SIZE ||
+        bcol(Ain) > SL_BLOCK_SIZE) {
+        std::cerr << "MPIRank operator error: chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large" << std::endl ;
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large");
+    }
+    const slpp::int_t MB= brow(Ain);
+    const slpp::int_t NB= bcol(Ain);
+
+    if (MB != NB) {
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+               << "chunksizes are MB=" << MB << " and NB=" << NB << "must be the same."
+               << " 64 or 128 is suggested.");
+    }
+
+    //!
+    //!.... Set up ScaLAPACK array descriptors ........................................
+    //!
+
+    // these formulas for LD (leading dimension) and TD (trailing dimension)
+    // are found in the headers of the scalapack functions such as pdgesvd_()
+    const slpp::int_t one = 1 ;
+    slpp::int_t LD_IN = std::max(one, numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
+    if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
+    if(DBG) std::cerr << "--> LD_IN = " << LD_IN << std::endl;
+
+    slpp::int_t TD_IN = std::max(one, numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
+    if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
+    if(DBG) std::cerr << "-->TD_IN = " << TD_IN << std::endl;
+
+    // create ScaLAPACK array descriptors
+    std::cerr << "descinit_ DESC_IN" << std::endl;
+    slpp::desc_t DESC_IN;
+    descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN, *INFO);
+
+    std::cerr << "descinit_ DESC_OUT" << std::endl;
+    slpp::desc_t DESC_OUT;
+    descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_IN, *INFO);
+
+    slpp::int_t MP = LD_IN;
+    slpp::int_t NQ = TD_IN;
+
+    //REFACTOR
+    if(DBG) {
+        std::cerr << "##################################################" << std::endl;
+        std::cerr << "####master#########################################" << std::endl;
+        std::cerr << "one:" << one << std::endl;
+        std::cerr << "MB:" << MB << std::endl;
+        std::cerr << "MYPROW:" << MYPROW << std::endl;
+        std::cerr << "NPROW:" << NPROW << std::endl;
+    }
+
+    std::cerr << "LOCAL SIZES:@@@@@@@@@@@@@@@@@@@" << std::endl ;
+    std::cerr << "XX MP   = " << MP << std::endl;
+    std::cerr << "XX NQ   = " << NQ << std::endl;
+
+    // sizes
+    const slpp::int_t SIZE_IN = MP * NQ ;
+    const slpp::int_t SIZE_OUT = SIZE_IN ;
+
+    const size_t NUM_BUFS=3 ;
+    int sizes[NUM_BUFS];
+    sizes[0] =          sizeof (scidb::MPIRankArgs) ;
+    sizes[1] = SIZE_IN * sizeof(double) ;
+    sizes[2] = SIZE_OUT* sizeof(double) ;
+
+    if(DBG) {
+        std::cerr << "SHM ALLOCATIONS:@@@@@@@@@@@@@@@@@@@" << std::endl ;
+        std::cerr << "sizes[0] (args) = " << sizes[0] << std::endl;
+        std::cerr << "sizes[1] (IN) = " << sizes[1] << std::endl;
+        std::cerr << "sizes[2] (OUT) = "<< sizes[2] << std::endl;
+    }
+
+
+    //-------------------- Create IPC
+    string clusterUuid = Cluster::getInstance()->getUuid();
+    InstanceID instanceId = Cluster::getInstance()->getLocalInstanceId();
+    std::string ipcName = mpi::getIpcName(installPath, clusterUuid, query->getQueryID(), instanceId, _launchId);
+
+    typedef boost::shared_ptr<SharedMemoryIpc> SMIptr_t ;
+    std::vector<SMIptr_t> shmIpc(NUM_BUFS);
+    for(size_t ii=0; ii<NUM_BUFS; ii++) {
+        std::stringstream suffix;
+        suffix << "." << ii ;
+        LOG4CXX_TRACE(logger, "IPC name = " << (ipcName + suffix.str()));
+        shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcName+suffix.str()));
+        ctx->addSharedMemoryIpc(_launchId, shmIpc[ii]);
+
+        try {
+            shmIpc[ii]->create(SharedMemoryIpc::RDWR);
+            shmIpc[ii]->truncate(sizes[ii]);
+        } catch(SharedMemoryIpc::SystemErrorException& e) {
+            std::stringstream ss; ss << "shared_memory_mmap " << e.what();
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str());
+        } catch(SharedMemoryIpc::InvalidStateException& e) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
+        }
+
+        if(DBG) {
+            std::cerr << "----------------------------------------------" << std::endl ;
+            std::cerr << "WARNING: prefill with NaN enabled" << std::endl ;
+            std::cerr << "----------------------------------------------" << std::endl ;
+        }
+        double* buf = reinterpret_cast<double*>(shmIpc[ii]->get());
+        const double nanVal = ::nan(""); // any non-signalling NaN, don't care which
+        for (size_t jj=0; jj < (sizes[ii]/sizeof(double)); jj++) {
+            buf[jj] = nanVal;
+        }
+    }
+
+    typedef scidb::SharedMemoryPtr<double> shmSharedPtr_t ;
+    void *argsBuf = shmIpc[0]->get();
+    double* IN = reinterpret_cast<double*>(shmIpc[1]->get());
+    double* OUT= reinterpret_cast<double*>(shmIpc[2]->get());
+    size_t resultShmIpcIndx = 2;
+    shmSharedPtr_t OUTx(shmIpc[resultShmIpcIndx]);
+
+    // use extractDataToOp() and the reformatToScalapack() operator
+    // to reformat the data according to ScaLAPACK requirements.
+    Coordinates coordFirst = getStart(Ain);
+    Coordinates coordLast = getEndMax(Ain);
+
+    scidb::ReformatToScalapack pdelsetOp(IN, DESC_IN, coordFirst[0], coordFirst[1]);
+
+    if(DBG) std::cerr << "extract data from SciDB Ain to ScaLAPACK double* IN" << std::endl ;
+    LOG4CXX_DEBUG(logger, "extract data from SciDB Ain to ScaLAPACK double* IN");
+    extractDataToOp(Ain, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
+    LOG4CXX_DEBUG(logger, "extraction done");
+    if(DBG) std::cerr << "extraction done" << std::endl ;
+
+    // debug that the reformat worked correctly:
+    if(DBG) {
+        for(int ii=0; ii < SIZE_IN; ii++) {
+            std::cerr << "("<< MYPROW << "," << MYPCOL << ") IN["<<ii<<"] = " << IN[ii] << std::endl;
+        }
+    }
+
+	// SPECIAL TO MPIRank, does not factor out
+    for(int ii=0; ii < SIZE_IN; ii++) {
+        IN[ii] = MYPE ; // change it to what we think the rank will be when it really gets to MPI
+    }      
+
+    //!
+    //!.... Call the master wrapper
+    //!
+    if(DBG) std::cerr << "MPIRankPhysical: calling mpiRankMaster M,N:" << M  << "," << N
+                                  << "MB,NB:" << MB << "," << NB << std::endl;
+    LOG4CXX_DEBUG(logger, "MPIRankPhysical: calling mpiRankMaster M,N:" << M <<","<< "MB,NB:" << MB << "," << NB);
+
+    if(DBG) std::cerr << "MPIRankPhysical calling PDGESVD to compute" << std:: endl;
+    mpirankMaster(query.get(), ctx, slave, ipcName, argsBuf,
+                  NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
+                  IN,  DESC_IN, OUT, DESC_OUT, *INFO);
+
+    LOG4CXX_DEBUG(logger, "MPIRank: mpiRankMaster finished");
+    std::cerr << "MPIRank: calling mpiRankMaster finished" << std::endl;
+    std::cerr << "MPIRank: mpiRankMaster returned INFO:" << *INFO << std::endl;
+
+    Dimensions const& dims = Ain->getArrayDesc().getDimensions();
+
+    boost::shared_array<char> resPtrDummy(reinterpret_cast<char*>(NULL));
+
+    typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
+
+    // Only in MPIRank
+    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "sequential values of 'OUT' ScaLAPACK memory" << std::endl;
+    for(int ii=0; ii < SIZE_OUT; ii++) {
+        std::cerr << "OUT["<<ii<<"] = " << OUT[ii] << std::endl;
+    }
+    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "using pdelgetOp to redist mpiRank OUT from memory to scidb array , start" << std::endl ;
+
+    //
+    // an OpArray is a SplitArray that is filled on-the-fly by calling the operator
+    // so all we have to do is create one with an upper-left corner equal the the
+    // global position of the first local block we have.  so we need to map
+    // our "processor" coordinate into that position, which we do by multiplying
+    // by the chunkSize
+    //
+    Coordinates first(2);
+    first[0] = dims[0].getStart() + MYPROW * dims[0].getChunkInterval();
+    first[1] = dims[1].getStart() + MYPCOL * dims[1].getChunkInterval();
+
+    Coordinates last(2);
+    last[0] = dims[0].getStart() + dims[0].getLength() - 1;
+    last[1] = dims[1].getStart() + dims[1].getLength() - 1;
+
+    Coordinates iterDelta(2);
+    iterDelta[0] = NPROW * dims[0].getChunkInterval();
+    iterDelta[1] = NPCOL * dims[1].getChunkInterval();
+
+    if(DBG) std::cerr << "MPIRank OUT SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
+    LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
+
+    reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStart(), dims[1].getStart());
+    *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+                                                          first, last, iterDelta, query));
+    releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
+    unlaunchMPISlaves();
+    resetMPI();
+
+    if(DBG) std::cerr << "invoke: returning from invokeMPIRank with INFO:" << *INFO << std::endl ;
 }
 
 REGISTER_PHYSICAL_OPERATOR_FACTORY(MPIRankPhysical, "mpirank", "MPIRankPhysical");

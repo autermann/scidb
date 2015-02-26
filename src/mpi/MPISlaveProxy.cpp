@@ -56,6 +56,9 @@ static double getTimeInSecs()
 static bool checkForTimeout(double startTime, double timeout,
                             uint64_t launchId, MpiOperatorContext* ctx)
 {
+    if (timeout < 0) {
+        return true;
+    }
     if ((getTimeInSecs() - startTime) > timeout) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED)
             << "MPI slave process failed to communicate in time";
@@ -195,8 +198,11 @@ int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx,
                << "No connection to MPI slave");
     }
 
-    MpiOperatorContext::LaunchErrorChecker noopChecker;
-    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, noopChecker);
+    const double noTimeoutValue = -1.0;
+    MpiOperatorContext::LaunchErrorChecker errChecker =
+       boost::bind(&checkLauncher, 0.0, noTimeoutValue, _1, _2);
+    
+    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
     LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForStatus: message from client: "
@@ -242,10 +248,10 @@ void MpiSlaveProxy::waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx)
                << "No connection to MPI slave");
     }
 
-    MpiOperatorContext::LaunchErrorChecker timeChecker =
-       boost::bind(&checkForTimeout, getTimeInSecs(),
+    MpiOperatorContext::LaunchErrorChecker errChecker =
+       boost::bind(&checkLauncher, getTimeInSecs(),
                    static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT), _1, _2);
-    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, timeChecker);
+    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
     LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForExit: "
@@ -266,13 +272,14 @@ void MpiSlaveProxy::destroy(bool error)
     if (error) {
         _inError=true;
     }
+    const string clusterUuid = Cluster::getInstance()->getUuid();
     // kill the slave proc and its parent orted
     for ( std::vector<pid_t>::const_iterator iter=_pids.begin();
           iter!=_pids.end(); ++iter) {
         pid_t pid = *iter;
 
         //XXX TODO tigor: kill proceess group (-pid) ?
-        MpiErrorHandler::killProc(_installPath, pid);
+        MpiErrorHandler::killProc(_installPath, clusterUuid, pid);
     }
 
     // rm pid file

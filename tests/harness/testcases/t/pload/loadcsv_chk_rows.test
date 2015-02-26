@@ -11,11 +11,12 @@
 --stop-igdata
 
 
-scan( array_sm11 )
-
+#scan( array_sm11 )
+sort(array_sm11,a)
 
 --cleanup
 
+remove(array_sm11)
 
 --stop-query-logging
 

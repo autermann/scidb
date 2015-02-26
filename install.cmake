@@ -109,8 +109,8 @@ if(NOT ${DISTRO_NAME_VER} STREQUAL "")
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
-    if (TARGET scidb_mpi_slave)
-        install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/scidb_mpi_slave" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
+    if (TARGET mpi_slave_scidb)
+        install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/mpi_slave_scidb" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
     endif ()
     list(APPEND CPACK_COMPONENTS_ALL scidb-plugins)
     set(scidb-plugins_SUMMARY "SciDB server and client plugins")
@@ -214,8 +214,8 @@ if(NOT ${DISTRO_NAME_VER} STREQUAL "")
         install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libfindstars${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
         install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
         install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
-        if (TARGET scidb_mpi_slave)
-            install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/scidb_mpi_slave${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_EXTENSION} COMPONENT scidb-plugins-dbg)
+        if (TARGET mpi_slave_scidb)
+            install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/mpi_slave_scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_EXTENSION} COMPONENT scidb-plugins-dbg)
         endif ()
 
         list(APPEND CPACK_COMPONENTS_ALL scidb-plugins-dbg)
@@ -291,7 +291,7 @@ add_custom_target(src_package
     COMMAND rm -rf ${CPACK_SRC_PACKAGE_FILE_NAME}
     COMMAND rm -rf ${CMAKE_BINARY_DIR}/${CPACK_SRC_PACKAGE_FILE_NAME}.tgz
     COMMAND svn export ${CMAKE_SOURCE_DIR} ${CPACK_SRC_PACKAGE_FILE_NAME}
-    COMMAND cp ${CMAKE_BINARY_DIR}/version.txt ${CPACK_SRC_PACKAGE_FILE_NAME}
+    COMMAND cp ${CMAKE_BINARY_DIR}/revision ${CPACK_SRC_PACKAGE_FILE_NAME}
     COMMAND tar -czf ${CMAKE_BINARY_DIR}/${CPACK_SRC_PACKAGE_FILE_NAME}.tgz ${CPACK_SRC_PACKAGE_FILE_NAME}
     WORKING_DIRECTORY /tmp
     )

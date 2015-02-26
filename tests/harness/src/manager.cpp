@@ -106,6 +106,7 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 	string result_str = "FAILED";
 	long int sTime = 0, eTime = 0;
 	string failureReason("Test case execution failed, Check log file.");
+	boost::posix_time::ptime time_of_epoch(gregorian::date(1970,1,1));
 
 	scidbtestharness::executors::ExecutorFactory f;
 	scidbtestharness :: executors :: Executor *caseexecutor = 0;
@@ -150,7 +151,7 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 		{
 			throw ConfigError (FILE_LINE_FUNCTION, ERR_CONFIG_INVALID_EXECUTOR_TYPE);
 		}
-		sTime = time (0);
+		sTime = (boost::posix_time::microsec_clock::local_time()-time_of_epoch).total_milliseconds();
 		ie.logger_name = tid_str;
 
 		complete_es_mutex.lock();   /* lock */
@@ -165,7 +166,7 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 		 * only return code SUCCESS/FAILURE is only being returned. Hence resolving the issue of crash
 		 * during pthread_mutex_destroy() at the end of harness execution. */
 		retValue = caseexecutor->execute (ie);
-		eTime = time (0);
+		eTime = (boost::posix_time::microsec_clock::local_time()-time_of_epoch).total_milliseconds();
 		delete caseexecutor;
 		caseexecutor = 0;
 
@@ -259,7 +260,7 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 	catch (harnessexceptions :: SystemError &e)// SYSTEM_EXCEPTION
 	{
 		/* errors like, .test file does not exists or could not be opened etc.*/
-		eTime = time (0);
+		eTime = (boost::posix_time::microsec_clock::local_time()-time_of_epoch).total_milliseconds();
 		LOG4CXX_ERROR (logger, e.what ());
 		result = RESULT_SYSTEM_EXCEPTION;
 		result_str = "FAILED_ON_EXCEPTION";
@@ -274,7 +275,7 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 		/* TODO : this catch() is not required now as all the exceptions from 'defaultexecutor'
  		 * are being locally handled by it and only return code SUCCESS/FAILURE is only being returned.*/
 		/* errors like, connection string is not given or port number is not valid etc.*/
-		eTime = time (0);
+		eTime = (boost::posix_time::microsec_clock::local_time()-time_of_epoch).total_milliseconds();
 		LOG4CXX_ERROR (logger, e.what ());
 		result = RESULT_CONFIG_EXCEPTION;
 		result_str = "FAILED_ON_EXCEPTION";
@@ -288,7 +289,7 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 		/* TODO : this catch() is not required now as all the exceptions from 'defaultexecutor'
  		 * are being locally handled by it and only return code SUCCESS/FAILURE is only being returned.*/
 		/* most of the exceptions thrown by CAPIs */
-		eTime = time (0);
+		eTime = (boost::posix_time::microsec_clock::local_time()-time_of_epoch).total_milliseconds();
 		if (caseexecutor)
 		{
 			delete caseexecutor;

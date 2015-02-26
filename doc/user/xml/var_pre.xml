@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>var</refname>
+
+    <refpurpose><indexterm>
+        <primary>variance</primary>
+      </indexterm>Variance</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>var(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The <literal>var</literal> operator returns the variance of a set of
+    values taken from an array attribute.</para>
+
+    <note>
+      <para>The var operator provides the same functionality as the var
+      aggregate. For details, see the <link linkend="varAggregate">var
+      aggregate reference</link>.</para>
+    </note>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example finds the variance of each row of a 2-dimensional
+      array.</para>
+
+      <procedure>
+        <step>
+          <para>Create a 1-attribute, 2-dimensional array called
+          m3x3:<programlisting language="test">--afl CREATE ARRAY m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Store values of random values between 0 and 1 in
+          m3x3:<programlisting language="test">--afl store(build(m3x3,random()%10),m3x3); --output-format=dense --chunkify=yes --show-output-in-test-file=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Select the variance of each row of m3x3:<programlisting
+          language="test">--afl var(m3x3,val,i); --output-format=dense --show-output-in-test-file=no</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

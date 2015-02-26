@@ -6,20 +6,52 @@
   <refnamediv>
     <refname>build_sparse</refname>
 
-    <refpurpose>Produces a sparse result array and assigns values to its
+    <refpurpose><indexterm>
+        <primary>build_sparse</primary>
+      </indexterm><indexterm>
+        <primary>sparse arrays</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>sparse</secondary>
+      </indexterm>Produces a sparse result array and assigns values to its
     non-empty cells.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> * <command>FROM</command> build_sparse(<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>,
-                                <replaceable>expression</replaceable>,<replaceable>boolean_expression</replaceable>);</synopsis>
-
     <synopsis>AFL% build_sparse(<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>,
                   <replaceable>expression</replaceable>,<replaceable>boolean_expression</replaceable>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
+
+    <para>In SciDB, a sparse array is an array that allows empty cells. SciDB
+    dense arrays do not allow empty cells. You can use
+    <literal>build_sparse</literal> to create arrays with empty cells—but you
+    can also build dense arrays with the <literal>build_sparse</literal>
+    operator.</para>
+
+    <para>That is, you can you use build_sparse to create an array, and fill
+    every cell with a value; in this case, you have used the
+    <literal>build_sparse</literal> operator to create a dense array.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>A <emphasis role="bold">sparse</emphasis> array may (but does
+        not have to) contain empty cells.</para>
+      </listitem>
+
+      <listitem>
+        <para>A <emphasis role="bold">dense</emphasis> array cannot contain
+        empty cells.</para>
+      </listitem>
+    </itemizedlist>
+
+    <note>
+      <para>NULL, 0, and empty are distinct. That is, a dense array can have
+      cells that contain 0 or NULL, but cannot contain empty cells.</para>
+    </note>
 
     <para>The build_sparse operator takes as input a template_array or schema
     definition, an expression that defines a scalar value, and an expression
@@ -34,30 +66,40 @@
   </refsect1>
 
   <refsect1>
-    <title>Example</title>
-
-    <informalexample>
-      <para>Build a sparse identity matrix -- one where only the diagonal
-      elements are present:
-<programlisting language='test'>
---afl build_sparse(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],1,i=j);
-</programlisting></para>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
     <title>Limitations</title>
 
     <itemizedlist>
       <listitem>
-        <para>The build_sparse operator can only take arrays with one
-        attribute.</para>
+        <para>The <literal>build_sparse</literal> operator can only take
+        arrays with one attribute.</para>
       </listitem>
 
       <listitem>
-        <para>The build_sparse operator can only take arrays with bounded
-        dimensions.</para>
+        <para>The <literal>build_sparse</literal> operator can only take
+        arrays with bounded dimensions.</para>
       </listitem>
     </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>In this example, we build a sparse identity matrix, and then a
+      dense identity matrix. In the sparse matrix, only the diagonal elements
+      are present, while in the dense matrix, only the diagonal elements have
+      non-NULL values.</para>
+
+      <para>Here we create and store the sparse identity matrix in
+      <literal>m3x3_sparse</literal>:</para>
+
+      <para><programlisting language="test">--afl store(build_sparse(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],1,i=j),
+       m3x3_sparse); --output-format=auto --chunkify=yes</programlisting></para>
+
+      <para>Here we create and store the sparse identity matrix in
+      <literal>m3x3_dense</literal>:</para>
+
+      <programlisting language="test">--afl store(build(&lt;val:double null&gt;[i=0:3,4,0,j=0:3,4,0],iif(i=j,1,NULL)),m3x3_dense); --output-format=auto --chunkify=yes</programlisting>
+    </informalexample>
   </refsect1>
 </refentry>

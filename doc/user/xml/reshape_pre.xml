@@ -6,13 +6,17 @@
   <refnamediv>
     <refname>reshape</refname>
 
-    <refpurpose>Produces a result array with the same cells as a given array,
-    but a different shape.</refpurpose>
+    <refpurpose><indexterm>
+        <primary>reshape operator</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>reshape</secondary>
+      </indexterm>Produces a result array with the same cells as a given
+    array, but a different shape.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> * <command>FROM</command> reshape(<replaceable>source_array</replaceable>,<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>)</synopsis>
-
     <synopsis>AFL% reshape(<replaceable>source_array</replaceable>,<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>);</synopsis>
   </refsynopsisdiv>
 
@@ -20,16 +24,20 @@
     <title>Summary</title>
 
     <para>The reshape operator produces a result array containing the same
-    cells as -- but a different shape from -- an existing array.</para>
+    cells as—but a different shape from—an existing array.</para>
 
     <para>The new array must have the same number of attributes as the source
     array. The reshape operator cannot convert attributes to dimensions or
-    vice versa. For that, use redimension or redimension_store.</para>
+    vice versa. For that, use <link linkend="redimension">redimension</link>
+    or <link linkend="redimensionStore">redimension_store</link>.</para>
 
     <para>The new array must have the same number of cells as the source
     array, but the resulting array can have more or fewer dimensions than the
-    source. From a 3x4 source array, reshape can produce a result array of
-    one, two, three, or even more dimensions:</para>
+    source.</para>
+
+    <para>To illustrate, let's look at a 3x4 source array. From a 3x4 source
+    array, reshape can produce a result array of one, two, three, or even more
+    dimensions:</para>
 
     <itemizedlist>
       <listitem>
@@ -62,7 +70,7 @@
       </listitem>
     </itemizedlist>
 
-    <para>To indicate the shape of the to-be-created array, you have two
+    <para>To indicate the shape of the result array, you have two
     choices:</para>
 
     <itemizedlist>
@@ -80,7 +88,18 @@
       </listitem>
     </itemizedlist>
 
-    <para>The reshape operator does not alter the source array.</para>
+    <para>Note the following:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The reshape operator does not alter the source array</para>
+      </listitem>
+
+      <listitem>
+        <para>The reshape operator does not work for a source array that has a
+        non-zero chunk overlap.</para>
+      </listitem>
+    </itemizedlist>
   </refsect1>
 
   <refsect1>
@@ -92,33 +111,33 @@
 
       <procedure>
         <step>
-          <para>Create an array called m3x4:<programlisting language='test'>--aql CREATE ARRAY m3x4 &lt;val:int64&gt;[i=0:2,3,0,j=0:3,4,0]; --show-output=no</programlisting></para>
+          <para>Create an array called m3x4:<programlisting language="test">--afl CREATE ARRAY m3x4 &lt;val:int64&gt;[i=0:2,3,0,j=0:3,4,0]; --show-output=no</programlisting></para>
         </step>
 
         <step>
-          <para>Store values of 1–12 in m3x4:<programlisting language='test'>--afl store(build(m3x4,i*4+j+1),m3x4); --output-format=auto --chunkify=yes</programlisting></para>
+          <para>Store values of 1–12 in m3x4:<programlisting language="test">--afl store(build(m3x4,i*4+j+1),m3x4); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
 
         <step>
-          <para>Reshape m3x4 as 6x2:<programlisting language='test'>--afl reshape(m3x4,&lt;val:int64&gt;[i=0:5,6,0,j=0:1,2,0]); --output-format=auto --chunkify=yes</programlisting></para>
+          <para>Reshape m3x4 as 6x2:<programlisting language="test">--afl reshape(m3x4,&lt;val:int64&gt;[i=0:5,6,0,j=0:1,2,0]); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
 
         <step>
-          <para>Reshape m3x4 as 2x6:<programlisting language='test'>--afl reshape(m3x4,&lt;val:int64&gt;[i=0:1,2,0,j=0:5,6,0]); --output-format=auto --chunkify=yes</programlisting></para>
+          <para>Reshape m3x4 as 2x6:<programlisting language="test">--afl reshape(m3x4,&lt;val:int64&gt;[i=0:1,2,0,j=0:5,6,0]); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
 
         <step>
-          <para>Reshape m3x4 as 3x2x2:<programlisting language='test'>--afl reshape(m3x4,&lt;val:int64&gt;[p=0:2,3,0,q=0:1,2,0,r=0:1,2,0]); --output-format=auto </programlisting></para>
+          <para>Reshape m3x4 as 3x2x2:<programlisting language="test">--afl reshape(m3x4,&lt;val:int64&gt;[p=0:2,3,0,q=0:1,2,0,r=0:1,2,0]); --output-format=auto </programlisting></para>
         </step>
 
         <step>
           <para>Reshape m3x4 as 12 (a one-dimensional array of size
-          12):<programlisting language='test'>--afl reshape(m3x4,&lt;val:int64&gt;[p=0:11,12,0]); --output-format=auto</programlisting></para>
+          12):<programlisting language="test">--afl reshape(m3x4,&lt;val:int64&gt;[p=0:11,12,0]); --output-format=auto</programlisting></para>
         </step>
 
         <step>
           <para>Reshape m3x4 as 1x12 (a two-dimensional array where the size
-          of one of the dimensions equals 1):<programlisting language='test'>--afl reshape(m3x4,&lt;val:int64&gt;[p=0:0,1,0,q=0:11,12,0]); --output-format=auto --chunkify=yes</programlisting></para>
+          of one of the dimensions equals 1):<programlisting language="test">--afl reshape(m3x4,&lt;val:int64&gt;[p=0:0,1,0,q=0:11,12,0]); --output-format=auto --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>

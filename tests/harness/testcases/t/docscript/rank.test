@@ -1,0 +1,25 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+CREATE ARRAY rank_array <val:double>[i=0:3,4,0,j=0:3,4,0]  
+--set-format dense
+--stop-igdata
+--start-igdata
+store(build(rank_array,random()%7/1.0),rank_array)  
+--stop-igdata
+--start-igdata
+rank(rank_array,val,i)  
+--stop-igdata
+--start-igdata
+rank(rank_array,val,j)  
+--stop-igdata
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(rank_array)

@@ -34,6 +34,9 @@ SCIDB QUERY : <SELECT j FROM B WHERE j > 3 and j < 7>
 SCIDB QUERY : <SELECT sqrt(val_b) FROM B WHERE j>3 and j<7>
 [(),(),(),(),(10.247),(10.2956),(10.3441),(),(),()]
 
+SCIDB QUERY : <SELECT * FROM A,B>
+[(1,101),(2,102),(3,103),(4,104),(5,105),(6,106),(7,107),(8,108),(9,109),(10,110)]
+
 SCIDB QUERY : <SELECT * INTO C FROM A, B>
 [(1,101),(2,102),(3,103),(4,104),(5,105),(6,106),(7,107),(8,108),(9,109),(10,110)]
 
@@ -78,7 +81,7 @@ SCIDB QUERY : <SELECT * FROM m3x3 JOIN vector3 ON m3x3.j = vector3.k>
 SCIDB QUERY : < SELECT data.i*10 FROM A AS data WHERE A.i < 5>
 [(0),(10),(20),(30),(40),(),(),(),(),()]
 
-SCIDB QUERY : < SELECT pow(c,2) FROM (SELECT A.val_a + B.val_b AS c FROM A,B) WHERE i > 5>
+SCIDB QUERY : <SELECT pow(c,2) FROM (SELECT A.val_a + B.val_b AS c FROM A,B) WHERE i > 5>
 [(),(),(),(),(),(),(12996),(13456),(13924),(14400)]
 
 Query was executed successfully

@@ -1254,6 +1254,10 @@ void Query::acquireLocks()
 
 const ProcGrid* Query::getProcGrid() const
 {
+    // locking to ensure a single allocation
+    // XXX TODO: consider always calling Query::getProcGrid() in MpiManager::checkAndSetCtx
+    //           that should guarantee an atomic creation of _procGrid
+    ScopedMutexLock lock(const_cast<Mutex&>(errorMutex));
     // logically const, but we made _procGrid mutable to allow the caching
     // NOTE: Tigor may wish to push this down into the MPI context when
     //       that code is further along.  But for now, Query is a fine object

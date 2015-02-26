@@ -56,6 +56,10 @@ public:
 
 inline std::ostream& operator<<(std::ostream& os, const PdgesvdArgs& a)
 {
+    os << "NPROW:"<<a.NPROW<< " NPCOL:"<<a.NPCOL          << std::endl;
+    os << "MYPROW:"<<a.MYPROW<< "MYPCOL:"<<a.MYPCOL       << std::endl;
+    os << "MYPNUM:"<<a.MYPNUM                             << std::endl;
+
     os << "jobU:" << a.jobU << " jobVT:" << a.jobVT << std::endl;
     os << "M:" << a.M << " N:" << a.N               << std::endl; 
     os << "A{" << a.A << "}"                        << std::endl;
@@ -65,7 +69,7 @@ inline std::ostream& operator<<(std::ostream& os, const PdgesvdArgs& a)
 }
 
 /// @ return the INFO output by pdgesvd_()
-sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count);
+sl_int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debugOverwriteArgs=false);
 
 } // namespace scidb
 

@@ -139,29 +139,49 @@ std::string getProcDirName()
     return dir;
 }
 
-void connectStdIoToLog(const std::string& logFile)
+struct FdCleaner
+{
+    FdCleaner(int fd) : _fd(fd) {}
+    ~FdCleaner() { scidb::File::closeFd(_fd); }
+    int _fd;
+};
+
+void connectStdIoToLog(const std::string& logFile, bool closeStdin)
 {
     int fd = scidb::File::openFile(logFile, (O_WRONLY|O_CREAT|O_EXCL));
     if (fd < 0) {
         perror("open");
         _exit(1);
     }
-    struct FdCleaner
     {
-        FdCleaner(int fd) : _fd(fd) {}
-        ~FdCleaner() { scidb::File::closeFd(_fd); }
-        int _fd;
-    } fdCleaner(fd);
+        struct FdCleaner fdCleaner(fd);
 
-    if (::dup2(fd, STDERR_FILENO) != STDERR_FILENO) {
-        perror("dup2(stderr)");
+        if (::dup2(fd, STDERR_FILENO) != STDERR_FILENO) {
+            perror("dup2(stderr)");
+            _exit(1);
+        }
+        if (::dup2(fd, STDOUT_FILENO) != STDOUT_FILENO) {
+            perror("dup2(stdout)");
+            _exit(1);
+        }
+    }
+
+    if (closeStdin) {
+        scidb::File::closeFd(STDIN_FILENO);
+        return;
+    }
+
+    fd = scidb::File::openFile(std::string("/dev/null"), (O_RDONLY));
+    if (fd < 0) {
+        perror("open");
         _exit(1);
     }
-    if (::dup2(fd, STDOUT_FILENO) != STDOUT_FILENO) {
-        perror("dup2(stdout)");
+    struct FdCleaner stdinCleaner(fd);
+
+    if (::dup2(fd, STDIN_FILENO) != STDIN_FILENO) {
+        perror("dup2(stdin)");
         _exit(1);
     }
-    scidb::File::closeFd(STDIN_FILENO);
 }
 
 void recordPids(const std::string& fileName)
@@ -171,12 +191,7 @@ void recordPids(const std::string& fileName)
         perror("open");
         _exit(1);
     }
-    struct FdCleaner
-    {
-        FdCleaner(int fd) : _fd(fd) {}
-        ~FdCleaner() { scidb::File::closeFd(_fd); }
-        int _fd;
-    } fdCleaner(fd);
+    struct FdCleaner fdCleaner(fd);
 
     // XXX TODO tigor: consider using std::stringstream
     char outBuf[128];
@@ -241,15 +256,9 @@ bool readProcName(const std::string& pid, std::string& procName)
 
     int fd = scidb::File::openFile(fileName, (O_RDONLY));
     if (fd < 0) {
-        perror("open");
         return false;
     }
-    struct FdCleaner
-    {
-        FdCleaner(int fd) : _fd(fd) {}
-        ~FdCleaner() { scidb::File::closeFd(_fd); }
-        int _fd;
-    } fdCleaner(fd);
+    struct FdCleaner fdCleaner(fd);
 
     const size_t readSize(1024);
     std::vector<char> buf(readSize);
@@ -281,6 +290,109 @@ bool readProcName(const std::string& pid, std::string& procName)
                      buf.begin(), buf.end());
     return true;
 }
+
+
+std::string
+getScidbMPIEnvVar(const string& clusterUuid,
+                  const string& queryId,
+                  const string& launchId)
+{
+    stringstream var;
+    var << SCIDBMPI_ENV_VAR <<"="<< clusterUuid <<"."<< queryId <<"."<< launchId;
+    return var.str();
+}
+
+bool
+parseScidbMPIEnvVar(const string& envVarValue,
+                    const string& clusterUuid,
+                    uint64_t& queryId,
+                    uint64_t& launchId)
+{
+    string format;
+    format += clusterUuid + ".%"PRIu64".%"PRIu64"%n";
+    int n=0;
+    int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &queryId, &launchId, &n);
+    if (rc == EOF || rc < 2) {
+        return false;
+    }
+    return true;
+}
+
+bool matchEnvVar(const std::string& varName,
+                 char* varPair,
+                 std::string& varValue)
+{
+    char * delim = strchr(varPair, '=');
+    if (delim == NULL) {
+        return false;
+    }
+    *delim = '\0';
+    if (varName == varPair) {
+        varValue = string(delim+1);
+        return true;
+    }
+    return false;
+}
+
+bool readProcEnvVar(const std::string& pid,
+                    const std::string& varName,
+                    std::string& varValue)
+{
+    string fileName = getProcDirName()+"/"+pid+"/environ";
+
+    int fd = scidb::File::openFile(fileName, (O_RDONLY));
+    if (fd < 0) {
+        return false;
+    }
+    struct FdCleaner fdCleaner(fd);
+
+    char buf[8196];
+    const size_t readSize(8196);
+    std::vector<char> prefix;
+
+    while(true) {
+        ssize_t n = read(fd, buf, readSize);
+        if (n < 0) {
+            return false;
+        }
+        if (n == 0) {
+            if (!prefix.empty() && matchEnvVar(varName, &prefix[0], varValue)) {
+                return true;
+            }
+            return false;
+        }
+        size_t off(0);
+        while (off<static_cast<size_t>(n)) {
+            assert(off < readSize);
+            size_t len = n-off;
+            char *start = buf + off;
+            char *end = reinterpret_cast<char*>(memchr(start, '\0', len));
+            if (end == NULL) {
+                prefix.resize(prefix.size()+len);
+                memcpy(&prefix[prefix.size()-len],start,len);
+                assert(prefix.at(prefix.size()-1)=='\0');
+                break;
+            }
+            assert(end > start);
+            assert(*end=='\0');
+            len = end-start+1;
+            if (prefix.size() >0) {
+                prefix.resize(prefix.size()+len);
+                memcpy(&prefix[prefix.size()-len],start,len);
+                start = &prefix[0];
+                assert(prefix.at(prefix.size()-1)=='\0');
+            }
+            if (matchEnvVar(varName, start, varValue)) {
+                return true;
+            }
+            prefix.resize(0);
+            off += len;
+        }
+    }
+    assert(false);
+    return false;
+}
+
 
 const std::string Command::EXIT("EXIT");
 std::string Command::toString()

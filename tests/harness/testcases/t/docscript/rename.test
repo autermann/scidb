@@ -5,12 +5,17 @@
 --set-format dcsv
 --start-igdata
 store(build(<val:double>[i=0:9,10,0],1),source)  
+--set-format csv
 --stop-igdata
-list('arrays')  
 --start-igdata
+list('arrays')  
+--set-format dcsv
 rename(source,target)  
+--set-format csv
 --stop-igdata
-list('arrays') 
+--start-igdata
+list('arrays')  
+--stop-igdata
 
 --stop-query-logging
 

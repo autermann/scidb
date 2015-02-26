@@ -63,6 +63,8 @@ class MPIInitPhysical: public MPIPhysical
      */
     shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
     {
+        MpiManager::getInstance()->forceInitMpi();
+
         launchMPISlaves(query, std::numeric_limits<size_t>::max());
         boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
         mpi::Command cmd;

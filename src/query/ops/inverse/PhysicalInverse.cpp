@@ -202,6 +202,7 @@ private:
 	ArrayDesc _schema;
 };
 
-DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalInverse, "inverse", "PhysicalInverse")
+// #2194: inverse disabled until (#2182) SplitArray is fixed
+// DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalInverse, "inverse", "PhysicalInverse")
 
 } //namespace scidb

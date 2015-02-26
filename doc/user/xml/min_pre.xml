@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry>
+  <refnamediv>
+    <refname>min</refname>
+
+    <refpurpose><indexterm>
+        <primary>min</primary>
+      </indexterm>Select minimum value</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>min(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The min operator selects the minimum value from an array
+    attribute.</para>
+
+    <note>
+      <para>The min operator provides the same functionality as the min
+      aggregate. For details, see the <link linkend="minAggregate">min</link>
+      aggregate reference.</para>
+    </note>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example finds the minimum value of each row of a
+      2-dimensional array.</para>
+
+      <procedure>
+        <step>
+          <para>Create a 1-attribute, 2-dimensional array called
+          m3x3:<programlisting language="test">--afl CREATE ARRAY m3x3 &lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Store random values in m3x3:<programlisting language="test">--afl store(build(m3x3,random()%20+1),m3x3); --output-format=dense --chunkify=yes --show-output-in-test-file=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Select the minimum value of each row of m3x3:<programlisting
+          language="test">--afl min(m3x3,val,i); --output-format=dense --show-output-in-test-file=no</programlisting></para>
+        </step>
+      </procedure>
+
+      <para>Continuing on with this example, we can retrieve the minimum
+      value, along with its position in the array, by using the following
+      query:<programlisting language="test">--afl project(filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)),val=m),val); --show-output=no</programlisting></para>
+
+      <para>This query does the following:</para>
+
+      <procedure>
+        <step>
+          <para>Find the minimum value, and alias it so that we can use it in
+          a cross join:<programlisting language="test">--afl aggregate(m3x3,min(val) as m) --show-output-in-test-file=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Cross join the minimum value with the original array, so that
+          cell {i,j}x becomes {i,i,j}(m=min,x):<programlisting
+          language="test">--afl cross_join(aggregate(m3x3,min(val) as m),m3x3) --show-output-in-test-file=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Remove the extra dimension added in the previous
+          step:<programlisting language="test">--afl deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)) --show-output-in-test-file=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Filter (select) the cells that have the actual minimum
+          value:<programlisting language="test">--afl filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)), val=m); --output-format=dense --chunkify=yes --show-output-in-test-file=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Of the correct cells, show only <literal>val</literal>, not
+          the alias, <literal>m</literal>:<programlisting language="test">--afl project(filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)), val=m),val); --output-format=dense --chunkify=yes --show-output-in-test-file=no</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

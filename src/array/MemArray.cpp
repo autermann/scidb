@@ -1295,7 +1295,7 @@ namespace scidb
                         memset(buf, 0xFF, bitmapSize);
                     }
                 }
-            } else if (!defaultValue.isZero()) {
+            } else if (!defaultValue.isDefault(attr->getType())) {
                 if (elemSize == 0) { // boolean attribute with default value true
                     memset(buf, 0xFF, bitmapSize);
                 } else {

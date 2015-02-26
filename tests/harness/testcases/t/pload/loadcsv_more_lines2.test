@@ -11,7 +11,8 @@
 
 --stop-igdata
 
-scan( array_sm9)
+#scan( array_sm9)
+sort(array_sm9,a)
 
 --cleanup
 

@@ -275,7 +275,7 @@ namespace scidb
                 count += 1;
                 ++(*src);
             }
-            if (!vectorMode && !getArrayDesc().containsOverlaps()) {
+            if (!vectorMode && !getArrayDesc().hasOverlap()) {
                 materializedChunk->setCount(count);
             }
             dst->flush();
@@ -1003,7 +1003,7 @@ namespace scidb
                         dst->writeItem(src->getItem());
                         ++(*src);
                     }
-                    if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().containsOverlaps()) {
+                    if (!vectorMode && !(src->getMode() & ChunkIterator::TILE_MODE) && !chunk.getArrayDesc().hasOverlap()) {
                         if (emptyableToNonEmptyable) {
                             count = outChunk.getNumberOfElements(false); // false = no overlap
                         }

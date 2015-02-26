@@ -102,7 +102,7 @@ public:
     void initializeState(Value& state)
     {
         state = Value(getStateType());
-        setDefaultValue(state, getStateType().typeId());
+        state = TypeLibrary::getDefaultValue(getStateType().typeId());
         if (_initByFirstValue) {
             //We use missing code 1 because missing code 0 has special meaning to the aggregate framework.
             state.setNull(1);
@@ -189,7 +189,7 @@ public:
     void initializeState(Value& state)
     {
         state = Value(getStateType());
-        setDefaultValue(state, getStateType().typeId());
+        state = TypeLibrary::getDefaultValue(getStateType().typeId());
     }
 
     bool ignoreNulls() const
@@ -243,7 +243,7 @@ public:
     {
         if (state.isNull())
         {
-            setDefaultValue(result, getResultType().typeId());
+            result = TypeLibrary::getDefaultValue(getResultType().typeId());
             return;
         }
 

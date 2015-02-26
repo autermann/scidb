@@ -103,7 +103,7 @@ void MpiManager::initMpiLinks(const std::string& installPath,
                        << "symlink" << rc << err << target);
     }
 
-    // scidb_mpi_slave
+    // mpi_slave_scidb
     target = mpi::getSlaveBinFile(installPath);
     rc = ::symlink(mpi::getSlaveSourceBinFile(pluginPath).c_str(), target.c_str());
     if (rc !=0 && errno != EEXIST) {
@@ -111,6 +111,12 @@ void MpiManager::initMpiLinks(const std::string& installPath,
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
                << "symlink" << rc << err << target);
     }
+}
+
+void MpiManager::forceInitMpi()
+{
+    ScopedMutexLock lock(_mutex);
+    initMpi();
 }
 
 void MpiManager::initMpi()
@@ -152,6 +158,16 @@ boost::shared_ptr<MpiOperatorContext> MpiManager::checkAndSetCtx(scidb::QueryID 
     ScopedMutexLock lock(_mutex);
     if (!_isReady) {
         initMpi();
+    }
+    // XXX TODO: Currently we cannot run more than query which use scalapack concurrently
+    //           The issue is that blacs_gridinfo_() from src/linear_algebra/dlaScaLA/scalapackEmulation/blacs_info_fake.c
+    //           uses a set of static variables. Note though that cascading scalapack operators is allowed because
+    //           each scalapack operator is followed by a blocking SG and the operator tree is executed sequentially
+    //           in a depth-first order. The other sources of concurrency such as ParrallelAccumulatorArray, Physica(Redimension)Store
+    //           should not be a problem for the same reason (of blocking SG).
+    if (_ctxMap.find(queryId) == _ctxMap.end() && _ctxMap.size() != 0) {
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_RESOURCE_BUSY)
+               << "too many queries");
     }
     std::pair<ContextMap::iterator, bool> res = _ctxMap.insert(ContextMap::value_type(queryId, ctx));
     if (res.second) {
@@ -290,6 +306,7 @@ static void getQueryId(std::set<scidb::QueryID>* queryIds,
 }
 
 void MpiErrorHandler::processLauncherPidFile(const std::string& installPath,
+                                             const std::string& clusterUuid,
                                              const std::string& fileName)
 {
     const char *myFuncName = "MpiErrorHandler::processLauncherPidFile";
@@ -302,13 +319,14 @@ void MpiErrorHandler::processLauncherPidFile(const std::string& installPath,
     LOG4CXX_DEBUG(logger,  myFuncName << ": killing launcher pid group = " << pids[0]);
 
     // kill launcher's proc group
-    if (!killProc(installPath, -pids[0])) {
+    if (!killProc(installPath, clusterUuid, -pids[0])) {
         LOG4CXX_DEBUG(logger,  myFuncName << ": removing file: "<<fileName);
         scidb::File::remove(fileName.c_str(), false);
     }
 }
 
 void MpiErrorHandler::processSlavePidFile(const std::string& installPath,
+                                          const std::string& clusterUuid,
                                           const std::string& fileName)
 {
     const char *myFuncName = "MpiErrorHandler::processSlavePidFile";
@@ -321,13 +339,13 @@ void MpiErrorHandler::processSlavePidFile(const std::string& installPath,
 
     // kill slave
     LOG4CXX_DEBUG(logger, myFuncName << ": killing slave pid = "<<pids[0]);
-    if (killProc(installPath, pids[0])) {
+    if (killProc(installPath, clusterUuid, pids[0])) {
         removeFile = false;
     }
 
-    // kill slave parent (orted)
+    // kill slave parent (orted/hydra_pmi_proxy)
     LOG4CXX_DEBUG(logger, myFuncName << ": killing slave ppid ="<<pids[1]);
-    if (killProc(installPath, pids[1])) {
+    if (killProc(installPath, clusterUuid, pids[1])) {
         removeFile = false;
     }
     if (removeFile) {
@@ -440,20 +458,22 @@ void MpiErrorHandler::cleanAll()
         assert(static_cast<size_t>(n) <= len);
 
         if (fileName.compare(n, len-n, mpi::LAUNCHER_BIN)==0) {
-            processLauncherPidFile(installPath, pidDirName+"/"+fileName);
+            processLauncherPidFile(installPath, uuid, pidDirName+"/"+fileName);
         } else if (fileName.compare(n, len-n, mpi::SLAVE_BIN)==0) {
-            processSlavePidFile(installPath, pidDirName+"/"+fileName);
+            processSlavePidFile(installPath, uuid, pidDirName+"/"+fileName);
         }
     }
 }
 
 void MpiErrorHandler::killAllMpiProcs()
 {
-    const char *myFuncName = "MpiErrorHandler::killAll";
-    // read ipc files
+    const char *myFuncName = "MpiErrorHandler::killAllMpiProcs";
+
     const boost::shared_ptr<const InstanceMembership> membership =
         Cluster::getInstance()->getInstanceMembership();
     const std::string& installPath = MpiManager::getInstallPath(membership);
+
+    std::string clusterUuid = Cluster::getInstance()->getUuid();
 
     // read pid files
     std::string procDirName = mpi::getProcDirName();
@@ -481,27 +501,21 @@ void MpiErrorHandler::killAllMpiProcs()
             continue;
         }
         assert(pid >= 1);
-        killProc(installPath, pid);
+        killProc(installPath, clusterUuid, pid);
     }
 }
 
-bool MpiErrorHandler::killProc(const std::string& installPath, pid_t pid)
+bool MpiErrorHandler::killProc(const std::string& installPath,
+                               const std::string& clusterUuid,
+                               pid_t pid)
 {
-    const char *myFuncName = "MpiErrorHandler::processProcFile";
+    const char *myFuncName = "MpiErrorHandler::killProc";
     bool doesProcExist = false;
     if (pid > 0) {
-        stringstream ss;
-        ss<<pid;
-        const std::string pidFileName = ss.str();
-        std::string procName;
-        if (!mpi::readProcName(pidFileName, procName)) {
-            LOG4CXX_WARN(logger, myFuncName << ": cannot read:" << pidFileName);
+        if (!MpiManager::canRecognizeProc(installPath, clusterUuid, pid)) {
             return doesProcExist;
         }
-        if (!MpiManager::canRecognizeProc(installPath, procName)) {
-            return doesProcExist;
-        }
-        LOG4CXX_DEBUG(logger, myFuncName << ": killing "<< procName << ", pid ="<<pid);
+        LOG4CXX_DEBUG(logger, myFuncName << ": killing pid ="<<pid);
     } else {
         LOG4CXX_DEBUG(logger, myFuncName << ": killing process group pid ="<<pid);
     }
@@ -526,6 +540,41 @@ bool MpiErrorHandler::killProc(const std::string& installPath, pid_t pid)
     }
     doesProcExist = (rc==0 || err!=ESRCH);
     return doesProcExist;
+}
+
+bool MpiManager::canRecognizeProc(const std::string& installPath,
+                                  const std::string& clusterUuid,
+                                  pid_t pid)
+{
+    const char *myFuncName = "MpiErrorHandler::canRecognizeProc";
+    assert(pid>0);
+    stringstream ss;
+    ss<<pid;
+    const std::string pidFileName = ss.str();
+
+    std::string procName;
+    if (!mpi::readProcName(pidFileName, procName)) {
+        LOG4CXX_WARN(logger, myFuncName << ": cannot read:" << pidFileName);
+        return false;
+    }
+    if (procName == mpi::getSlaveBinFile(installPath)) {
+        return true;
+    }
+    if (procName != getLauncherBinFile(installPath) &&
+        procName != getDaemonBinFile(installPath)) {
+        return false;
+    }
+
+    std::string procEnvVar;
+    mpi::readProcEnvVar(pidFileName,
+                        mpi::SCIDBMPI_ENV_VAR,
+                        procEnvVar);
+    uint64_t queryId(0);
+    uint64_t launchId(0);
+    if (!mpi::parseScidbMPIEnvVar(procEnvVar, clusterUuid, queryId, launchId)) {
+        return false;
+    }
+    return (!Query::getQueryByID(queryId, false, false));
 }
 
 ///XXX TODO tigor: find a better place and implementation

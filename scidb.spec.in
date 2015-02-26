@@ -1,0 +1,219 @@
+%define __strip /bin/true
+%define __os_install_post %{nil}
+%bcond_with insource
+
+Name: scidb
+Version: VERSION
+Release: BUILD
+URL: http://scidb.org
+%if %{without insource}
+Source: scidb.tar.gz
+%endif
+Group: Applications/Databases
+Summary: SciDB - database for extra large data processing
+License: GPLv3
+#Some packages versions which we build by ourself forced to avoid using versions from CentOS or EPEL
+BuildRequires: cmake = 2.8.10-1
+BuildRequires: make
+BuildRequires: gcc-c++
+BuildRequires: gcc-gfortran
+BuildRequires: flex
+BuildRequires: bison
+BuildRequires: swig2 = 2.0.8-1
+BuildRequires: boost-devel = 1.46.1-1
+BuildRequires: protobuf-devel = 2.4.1-1
+BuildRequires: log4cxx-devel = 0.10.0-1
+BuildRequires: libpqxx-devel = 3.1-1
+BuildRequires: bzip2-devel
+BuildRequires: zlib-devel
+BuildRequires: readline-devel
+BuildRequires: python-devel
+BuildRequires: doxygen
+BuildRequires: fop
+BuildRequires: docbook-style-xsl
+BuildRequires: libxslt
+Requires: python-paramiko
+Requires: python-crypto
+Requires: python-argparse
+Requires: postgresql >= 8.4, postgresql < 8.5
+%description
+SciDB - database for extra large data processing
+
+%package -n scidb-dbg
+Summary: Description: SciDB - database for extra large data processing (debug symbols)
+Group: Applications/Databases
+Requires: scidb = %{version}-%{release} 
+%description -n scidb-dbg
+Description: SciDB - database for extra large data processing (debug symbols)
+
+%package -n libscidbclient
+Summary: SciDB client library
+Group: Applications/Databases
+%description -n libscidbclient
+SciDB client library
+
+%package -n libscidbclient-dbg
+Summary: SciDB client library (debug symbols)
+Group: Applications/Databases
+Requires: libscidbclient = %{version}-%{release} 
+%description -n libscidbclient-dbg
+SciDB client library (debug symbols)
+
+%package -n scidb-utils
+Summary: SciDB querying tool and other utilities
+Group: Applications/Databases
+Requires: libscidbclient >= %{version}-%{release} 
+%description -n scidb-utils
+SciDB querying tool and other utilities
+
+%package -n scidb-utils-dbg
+Summary: SciDB querying tool and other utilities (debug symbols)
+Group: Applications/Databases
+Requires: scidb-utils = %{version}-%{release} 
+%description -n scidb-utils-dbg
+SciDB querying tool and other utilities (debug symbols)
+
+%package -n scidb-dev-tools
+Summary: SciDB developer and tester utilities
+Group: Applications/Databases
+Requires: libscidbclient >= %{version}-%{release} 
+%description -n scidb-dev-tools
+SciDB developer and tester utilities
+
+%package -n scidb-dev-tools-dbg
+Summary: SciDB developer and tester utilities (debug symbols)
+Group: Applications/Databases
+Requires: scidb-dev-tools = %{version}-%{release} 
+%description -n scidb-dev-tools-dbg
+SciDB developer and tester utilities (debug symbols)
+
+%package -n scidb-plugins
+Summary: SciDB server and client plugins
+Group: Applications/Databases
+Requires: libscidbclient >= %{version}-%{release} 
+%description -n scidb-plugins
+SciDB server and client plugins
+
+%package -n scidb-plugins-dbg
+Summary: SciDB developer and tester utilities (debug symbols)
+Group: Applications/Databases
+Requires: scidb-plugins-dbg = %{version}-%{release} 
+%description -n scidb-plugins-dbg
+SciDB developer and tester utilities (debug symbols)
+
+%package -n libscidbclient-python
+Summary: SciDB client library python connector
+Group: Applications/Databases
+Requires: python
+Requires: libscidbclient >= %{version}-%{release} 
+%description -n libscidbclient-python
+SciDB client library python connector
+
+%package -n libscidbclient-python-dbg
+Summary: SciDB client library python connector (debug symbols)
+Group: Applications/Databases
+Requires: libscidbclient-python = %{version}-%{release} 
+%description -n libscidbclient-python-dbg
+SciDB client library python connector (debug symbols)
+
+%package -n scidb-dev
+Summary: SciDB headers
+Group: Applications/Databases
+Requires: libscidbclient >= %{version}-%{release} 
+%description -n scidb-dev
+SciDB headers
+
+%package -n scidb-doc
+Summary: SciDB documentation
+Group: Applications/Databases
+BuildArch: noarch
+%description -n scidb-doc
+SciDB documentation
+
+%package -n scidb-all
+Summary: SciDB metapackage which install entire SciDB
+Group: Applications/Databases
+Requires: scidb = %{version}-%{release}
+Requires: libscidbclient = %{version}-%{release}
+Requires: scidb-utils = %{version}-%{release}
+Requires: scidb-plugins = %{version}-%{release}
+Requires: libscidbclient-python = %{version}-%{release}
+Requires: scidb-doc = %{version}-%{release}
+%description -n scidb-all
+Install entire SciDB
+
+%package -n scidb-all-coord
+Summary: SciDB metapackage which install entire SciDB and PostgreSQL
+Group: Applications/Databases
+Requires: scidb = %{version}-%{release}
+Requires: libscidbclient = %{version}-%{release}
+Requires: scidb-utils = %{version}-%{release}
+Requires: scidb-plugins = %{version}-%{release}
+Requires: libscidbclient-python = %{version}-%{release}
+Requires: scidb-doc = %{version}-%{release}
+Requires: postgresql-server >= 8.4, postgresql-server < 8.5
+Requires: postgresql-contrib >= 8.4, postgresql-server < 8.5
+%description -n scidb-all-coord
+Install entire SciDB and PostgreSQL
+
+%if %{without insource}
+%prep
+%setup -c
+%endif
+
+%build
+%if %{without insource}
+cmake . -DSWIG_EXECUTABLE=/usr/bin/swig2 -DSCIDB_DOC_TYPE=API -DBUILD_USER_DOC=1
+%endif
+make %{?_smp_mflags}
+
+%install
+for p in scidb scidb-dbg libscidbclient libscidbclient-dbg scidb-utils scidb-utils-dbg scidb-dev-tools scidb-dev-tools-dbg scidb-plugins scidb-plugins-dbg libscidbclient-python libscidbclient-python-dbg scidb-dev scidb-doc; do
+    cmake -DCMAKE_INSTALL_PREFIX=%{buildroot}/$(grep CMAKE_INSTALL_PREFIX CMakeCache.txt|sed 's/.*=//') -DCMAKE_INSTALL_COMPONENT=$p -P cmake_install.cmake | tail -n+2 | awk '{print $3}'|sed "s|%{buildroot}/||"|sort|uniq > "/tmp/rpm-$p-files"
+done
+
+%files -f /tmp/rpm-scidb-files
+%defattr(-,root,root,-)
+
+%files -n scidb-dbg -f /tmp/rpm-scidb-dbg-files
+%defattr(-,root,root,-)
+
+%files -n libscidbclient -f /tmp/rpm-libscidbclient-files
+%defattr(-,root,root,-)
+
+%files -n libscidbclient-dbg -f /tmp/rpm-libscidbclient-dbg-files
+%defattr(-,root,root,-)
+
+%files -n scidb-utils -f /tmp/rpm-scidb-utils-files
+%defattr(-,root,root,-)
+
+%files -n scidb-utils-dbg -f /tmp/rpm-scidb-utils-dbg-files
+%defattr(-,root,root,-)
+
+%files -n scidb-dev-tools -f /tmp/rpm-scidb-dev-tools-files
+%defattr(-,root,root,-)
+
+%files -n scidb-dev-tools-dbg -f /tmp/rpm-scidb-dev-tools-dbg-files
+%defattr(-,root,root,-)
+
+%files -n scidb-plugins -f /tmp/rpm-scidb-plugins-files
+%defattr(-,root,root,-)
+
+%files -n scidb-plugins-dbg -f /tmp/rpm-scidb-plugins-dbg-files
+%defattr(-,root,root,-)
+
+%files -n libscidbclient-python -f /tmp/rpm-libscidbclient-python-files
+%defattr(-,root,root,-)
+
+%files -n libscidbclient-python-dbg -f /tmp/rpm-libscidbclient-python-dbg-files
+%defattr(-,root,root,-)
+
+%files -n scidb-dev -f /tmp/rpm-scidb-dev-files
+%defattr(-,root,root,-)
+
+%files -n scidb-doc -f /tmp/rpm-scidb-doc-files
+%defattr(-,root,root,-)
+
+%files -n scidb-all
+
+%files -n scidb-all-coord

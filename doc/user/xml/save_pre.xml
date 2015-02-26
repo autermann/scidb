@@ -10,14 +10,67 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AFL% save(<replaceable>array</replaceable>,<replaceable>filepath</replaceable>)</synopsis>
+    <synopsis>save(<replaceable>src_array</replaceable>,<replaceable>file_path</replaceable><optional>,<replaceable>instance_id</replaceable><optional>,<replaceable>format</replaceable></optional></optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para>The AFL save operator works like the AQL SAVE statement. It saves
-    the data from the cells of a SciDB array into a file.</para>
+    <para><indexterm>
+        <primary>save</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>save to file</secondary>
+      </indexterm>The AFL save operator saves the data from the cells of a
+    SciDB array into a file. By default, it saves the data in SciDB array
+    format: to specify a different output format, use the
+    <replaceable>format</replaceable> parameter.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para><replaceable>src_array</replaceable> — The source array
+        containing the data that you want to save.</para>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>file_path</replaceable> — The complete path to the
+        file to hold the returned data.</para>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>instance_id</replaceable> — An optional parameter
+        to specify the instance for the source array data. The value must be
+        one of the following: </para>
+
+        <itemizedlist>
+          <listitem>
+            <para><emphasis role="bold">-2</emphasis>: Save all data on the
+            coordinator instance of the query.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">-1</emphasis>: Save data as it is
+            distributed; that is, each instance concurrently saves its own
+            portion of data to file.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">0</emphasis>, <emphasis
+            role="bold">1</emphasis>, ...: Save all data to the specified
+            instance ID.</para>
+          </listitem>
+        </itemizedlist>
+      </listitem>
+
+      <listitem>
+        <para><replaceable>format</replaceable> — An optional parameter to
+        specify the output format for the array data. For details, see <link
+        linkend="outputOptions">Output Options</link>. Note that you must
+        include the <replaceable>instance_id </replaceable>parameter if you
+        want to specify an output format.</para>
+      </listitem>
+    </itemizedlist>
   </refsect1>
 
   <refsect1>
@@ -30,29 +83,25 @@
       <procedure>
         <step>
           <para>Create a 2-dimensional array containing values 100–108:
-          <programlisting language="test">
---afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j+100),array1); --show-query=yes --show-output=no
+          <programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j+100),array1); --show-query=yes --show-output=no
 </programlisting></para>
         </step>
 
         <step>
           <para>Create a 2-dimensional array containing values 200–208:
-          <programlisting language="test">
---afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j+200),array2); --show-query=yes --show-output=no
+          <programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j+200),array2); --show-query=yes --show-output=no
 </programlisting></para>
         </step>
 
         <step>
           <para>Join array1 and array2 and store the output in an array
-          storage_array: <programlisting language="test">
---afl store(join(array1,array2),storage_array); --show-query=yes --show-output=yes
+          storage_array: <programlisting language="test">--afl store(join(array1,array2),storage_array); --show-query=yes --output-format=dense
 </programlisting></para>
         </step>
 
         <step>
           <para>Save the contents of storage_array to a file. <programlisting
-          language="test">
---afl save(storage_array,'/tmp/storage_array.txt'); --show-query=yes --show-output=yes
+          language="test">--afl save(storage_array,'/tmp/storage_array.txt',-2,'dcsv'); --show-query=yes --show-output=yes
 </programlisting></para>
         </step>
       </procedure>

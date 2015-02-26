@@ -1,0 +1,87 @@
+--setup
+--start-query-logging
+
+#CREATE ARRAY M5x5_dense<a: double >[I=0:4,1,0,J=0:4,1,0]
+#CREATE ARRAY M5x5_Sparse <a1: double> [x=0:4,1,0,y=0:4,1,0]
+#create ARRAY M5x5<a:double> [x=0:4,1,0,y=0:4,1,0]
+#store ( build (M5x5_dense, 5*I + J ), M5x5_dense)
+#build_sparse(M5x5_Sparse, 1.0*x+100.0*y, x=y)
+#store ( build (M5x5, 5*x + y ), M5x5)
+
+
+CREATE ARRAY M5x5_dense<a: double >[I=0:4,32,0,J=0:4,32,0]
+CREATE ARRAY M5x5_Sparse <a1: double> [x=0:4,32,0,y=0:4,32,0]
+create ARRAY M5x5<a:double> [x=0:4,32,0,y=0:4,32,0]
+store ( build (M5x5_dense, 5*I + J ), M5x5_dense)
+build_sparse(M5x5_Sparse, 1.0*x+100.0*y, x=y)
+store ( build (M5x5, 5*x + y ), M5x5)
+
+
+
+CREATE ARRAY M5x5_dense_c2<a: double >[I=0:4,33,0,J=0:4,33,0]
+CREATE ARRAY M5x5_Sparse_c2<a1: double> [x=0:4,33,0,y=0:4,33,0]
+create array M5x5_c2<a:double> [x=0:4,33,0,y=0:4,33,0]
+store ( build (M5x5_dense_c2, 5*I + J ), M5x5_dense_c2)
+build_sparse(M5x5_Sparse_c2, 1.0*x+100.0*y, x=y)
+store ( build (M5x5_c2, 5*x + y ), M5x5_c2)
+
+
+CREATE ARRAY M5x5_dense_nzd<a: double >[I=1:4,32,0,J=1:4,32,0]
+CREATE ARRAY M5x5_Sparse_nzd<a1: double> [x=1:4,32,0,y=1:4,32,0]
+create array M5x5_nzd<a:double> [x=1:4,32,0,y=1:4,32,0]
+store ( build (M5x5_dense_nzd, 5*I + J ), M5x5_dense_nzd)
+build_sparse(M5x5_Sparse_nzd, 1.0*x+100.0*y, x=y)
+store ( build (M5x5_nzd, 5*x + y ), M5x5_nzd)
+
+
+CREATE ARRAY M5x2_dense_new<a: double >[I=0:4,32,0,J=0:1,32,0]
+CREATE ARRAY M2x5_Sparse<a1: double> [x=0:1,32,0,y=0:4,32,0]
+
+store ( build (M5x2_dense_new, 5*I+J ), M5x2_dense_new)
+build_sparse(M2x5_Sparse, 1.0*x+100.0*y, x=y)
+
+
+
+--test
+
+load_library('dense_linear_algebra')
+#1.gemm with Dense array and sparse array having Dimensions starting with 0
+gemm(M5x5_dense,M5x5_Sparse,M5x5)
+#2.gemm with dense and sparse matrix chunk size more  than 32
+gemm(M5x5_dense_c2,M5x5_Sparse_c2,M5x5_c2)
+#3.gemm with Dense array and sparse array having Dimensions starting with non zero.
+gemm(M5x5_dense_nzd,M5x5_Sparse_nzd,M5x5_nzd)
+#4.gemm with rectangular Dense array and rectangular sparse array having Dimensions starting with non zero.Presntly nt working for #multiinstances
+gemm(M5x2_dense_new,M2x5_Sparse,M5x5)
+
+
+--cleanup
+
+
+remove(M5x5_dense)
+remove(M5x5_Sparse)
+
+
+
+remove(M5x5_dense_c2)
+remove(M5x5_Sparse_c2)
+remove(M5x5_c2)
+
+
+remove(M5x5_dense_nzd)
+remove(M5x5_Sparse_nzd)
+remove(M5x5_nzd)
+
+
+remove(M5x2_dense_new)
+remove(M2x5_Sparse)
+remove(M5x5)
+
+
+
+--stop-query-logging
+
+
+
+
+

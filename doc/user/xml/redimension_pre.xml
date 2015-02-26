@@ -3,12 +3,24 @@
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
-  <refnamediv>
+  <refnamediv id="redimension">
     <refname>redimension</refname>
 
-    <refpurpose>Produces a result array using some or all of the variables of
-    a source array, potentially changing some or all of those variables from
-    dimensions to attributes or vice versa, and optionally calculating
+    <refpurpose><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>adding</secondary>
+      </indexterm><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>redimensioning</secondary>
+      </indexterm><indexterm>
+        <primary>redimension</primary>
+
+        <secondary>operator</secondary>
+      </indexterm>Produces a result array using some or all of the variables
+    of a source array, potentially changing some or all of those variables
+    from dimensions to attributes or vice versa, and optionally calculating
     aggregates to be included in the result array.</refpurpose>
   </refnamediv>
 
@@ -22,8 +34,8 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The redimension_store operator produces a result array using data
-    from a source array.</para>
+    <para>The redimension operator produces a result array using data from a
+    source array.</para>
 
     <para>When you use redimension, you must decide two things:</para>
 
@@ -81,10 +93,12 @@
     candidate cell values for a single cell location of the target
     array.</para>
 
-    <para>If the redimension operator produces a collision at a cell location,
-    SciDB will produce a single cell from all of the candidate cells. The
-    attributes of that cell in the target array will be populated as
-    follows:</para>
+    <para><indexterm>
+        <primary>collisions</primary>
+      </indexterm>If the redimension operator produces a collision at a cell
+    location, SciDB will produce a single cell from all of the candidate
+    cells. The attributes of that cell in the target array will be populated
+    as follows:</para>
 
     <itemizedlist>
       <listitem>
@@ -92,7 +106,7 @@
         aggregate function, the value will be the value of that function
         calculated over the set of candidate cells for that cell location. For
         each aggregate you calculate, a nullable attribute to accommodate it
-        must exist in the target array's schema. the attribute must have the
+        must exist in the target array's schema. The attribute must have the
         appropriate datatype for that aggregate function.</para>
       </listitem>
 
@@ -125,6 +139,73 @@
         <para>The result array cannot include any other variables besides
         variables that appear in the source array, and attributes to
         accommodate aggregate values.</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Limitations</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>Each attribute or dimension to be changed must be of type
+        int64.</para>
+      </listitem>
+
+      <listitem>
+        <para>The dimensions in the source array must be bounded.</para>
+      </listitem>
+
+      <listitem>
+        <para>Except for newly added aggregate values, the variables in the
+        new array must be a subset of the variables in the source
+        array.</para>
+      </listitem>
+
+      <listitem>
+        <para>If a dimension of the new array corresponds to an attribute of
+        the source array:</para>
+
+        <itemizedlist>
+          <listitem>
+            <para>The dimension must be large enough to accommodate all
+            distinct values of that attribute present in the source
+            array.</para>
+          </listitem>
+
+          <listitem>
+            <para>The attribute in the source array cannot allow null
+            values.</para>
+          </listitem>
+
+          <listitem>
+            <para>The chunk overlap property of the dimension must equal
+            0.</para>
+          </listitem>
+        </itemizedlist>
+      </listitem>
+
+      <listitem>
+        <para>If a dimension of the new array corresponds to a dimension in
+        the source array:</para>
+
+        <itemizedlist>
+          <listitem>
+            <para>The two dimensions must have identical size and identical
+            range (i.e., max and min values).</para>
+          </listitem>
+
+          <listitem>
+            <para>The two dimensions must have identical values for chunk size
+            and chunk overlap.</para>
+          </listitem>
+        </itemizedlist>
+      </listitem>
+
+      <listitem>
+        <para>If you use aggregates as part of the redimension operator, the
+        destination attributes—the attributes that will contain the aggregate
+        values—must allow null values.</para>
       </listitem>
     </itemizedlist>
   </refsect1>
@@ -244,72 +325,5 @@
         </step>
       </procedure>
     </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Limitations</title>
-
-    <itemizedlist>
-      <listitem>
-        <para>Each attribute or dimension to be changed must be of type
-        int64.</para>
-      </listitem>
-
-      <listitem>
-        <para>The dimensions in the source array must be bounded.</para>
-      </listitem>
-
-      <listitem>
-        <para>Except for newly added aggregate values, the variables in the
-        new array must be a subset of the variables in the source
-        array.</para>
-      </listitem>
-
-      <listitem>
-        <para>If a dimension of the new array corresponds to an attribute of
-        the source array:</para>
-
-        <itemizedlist>
-          <listitem>
-            <para>The dimension must be large enough to accommodate all
-            distinct values of that attribute present in the source
-            array.</para>
-          </listitem>
-
-          <listitem>
-            <para>The attribute in the source array cannot allow null
-            values.</para>
-          </listitem>
-
-          <listitem>
-            <para>The chunk overlap property of the dimension must equal
-            0.</para>
-          </listitem>
-        </itemizedlist>
-      </listitem>
-
-      <listitem>
-        <para>If a dimension of the new array corresponds to a dimension in
-        the source array:</para>
-
-        <itemizedlist>
-          <listitem>
-            <para>The two dimensions must have identical size and identical
-            range (i.e., max and min values).</para>
-          </listitem>
-
-          <listitem>
-            <para>The two dimensions must have identical values for chunk size
-            and chunk overlap.</para>
-          </listitem>
-        </itemizedlist>
-      </listitem>
-
-      <listitem>
-        <para>If you use aggregates as part of the redimension operator, the
-        destination attributes--the attributes that will contain the aggregate
-        values--must allow null values.</para>
-      </listitem>
-    </itemizedlist>
   </refsect1>
 </refentry>

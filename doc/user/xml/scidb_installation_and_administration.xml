@@ -2,132 +2,451 @@
 <!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<chapter remap="h1">
+<chapter>
   <title>SciDB Installation and Administration</title>
 
-  <para>SciDB is supported on the Ubuntu 12.04 platform.</para>
+  <para><indexterm>
+      <primary>platforms</primary>
+    </indexterm><indexterm>
+      <primary>SciDB</primary>
+
+      <secondary>platforms</secondary>
+    </indexterm>SciDB is supported on the following platforms:</para>
+
+  <itemizedlist>
+    <listitem>
+      <para>Ubuntu 12.04</para>
+    </listitem>
+
+    <listitem>
+      <para>CentOS 6.3</para>
+    </listitem>
+
+    <listitem>
+      <para>Red Hat Enterprise Linux (RHEL) 6.3</para>
+    </listitem>
+  </itemizedlist>
+
+  <note>
+    <para>SciDB requires a 64-bit (x86_64 or amd64) platform.</para>
+  </note>
 
   <para>A complete SciDB installation is a multi-database environment that
   includes the core SciDB engine, Postgres, the open source SQL database
   engine which is used for system catalog data, as well as ScaLAPACK/MPI which
   is used as a computational engine for dense linear algebra.</para>
 
+  <para><indexterm>
+      <primary>SciDB</primary>
+
+      <secondary>contact</secondary>
+    </indexterm><indexterm>
+      <primary>support</primary>
+    </indexterm>To report issues, contact
+  <email>support@scidb.org</email>.</para>
+
   <sect1 remap="h2" xml:id="InstallingSciDB">
     <title>Terminology</title>
 
     <para>The following terms are used to describe the SciDB installation and
-    administration process:<variablelist>
-        <varlistentry>
-          <term>
-            <emphasis>Single server</emphasis>
-          </term>
+    administration process:</para>
 
-          <listitem>
-            <para>A configuration that consists of a single machine with a
-            processor that may contain multiple cores, memory and attached
-            storage. A single server may be virtual or physical.</para>
-          </listitem>
-        </varlistentry>
+    <variablelist>
+      <?dbfo term-width="1.5in"?>
 
-        <varlistentry>
-          <term>
-            <emphasis>Virtual server</emphasis>
-          </term>
+      <varlistentry>
+        <term>Single server</term>
 
-          <listitem>
-            <para>A server that shares hardware rather than having dedicated
-            hardware.</para>
-          </listitem>
-        </varlistentry>
+        <listitem>
+          <para><indexterm>
+              <primary>server</primary>
 
-        <varlistentry>
-          <term>
-            <emphasis>Coordinator server</emphasis>
-          </term>
+              <secondary>single</secondary>
+            </indexterm>A configuration that consists of a single machine with
+          a processor that may contain multiple cores, memory and attached
+          storage. A single server may be virtual or physical.</para>
+        </listitem>
+      </varlistentry>
 
-          <listitem>
-            <para>In a configuration that has multiple servers, exactly one
-            server functions as the coordinator, and contains the
-            <emphasis>coordinator instance</emphasis>.</para>
-          </listitem>
-        </varlistentry>
+      <varlistentry>
+        <term>Virtual server</term>
 
-        <varlistentry>
-          <term>
-            <emphasis>SciDB Instance</emphasis>
-          </term>
+        <listitem>
+          <para><indexterm>
+              <primary>server</primary>
 
-          <listitem>
-            <para>An independent SciDB group of processes, that is, a single
-            running SciDB. There may be a many-to-one mapping between SciDB
-            instances and a server.</para>
-          </listitem>
-        </varlistentry>
+              <secondary>virtual</secondary>
+            </indexterm>A server that shares hardware rather than having
+          dedicated hardware.</para>
+        </listitem>
+      </varlistentry>
 
-        <varlistentry>
-          <term>
-            <emphasis>Coordinator instance</emphasis>
-          </term>
+      <varlistentry>
+        <term>Coordinator server</term>
 
-          <listitem>
-            <para>A SciDB instance that resides on the coordinator server.
-            There is a single coordinator instance for a SciDB cluster. A
-            coordinator instance coordinates query activity in addition to
-            participating in query execution.</para>
-          </listitem>
-        </varlistentry>
+        <listitem>
+          <para><indexterm>
+              <primary>coordinator server</primary>
+            </indexterm>In a configuration that has multiple servers, exactly
+          one server functions as the coordinator, and contains the
+          <emphasis>coordinator instance</emphasis>.</para>
+        </listitem>
+      </varlistentry>
 
-        <varlistentry>
-          <term>
-            <emphasis>Worker instance</emphasis>
-          </term>
+      <varlistentry>
+        <term>SciDB instance</term>
 
-          <listitem>
-            <para>A SciDB instance that only participates in query
-            execution.</para>
-          </listitem>
-        </varlistentry>
+        <listitem>
+          <para>An independent SciDB group of processes, that is, a single
+          running SciDB. There may be a many-to-one mapping between SciDB
+          instances and a server.</para>
+        </listitem>
+      </varlistentry>
 
-        <varlistentry>
-          <term>
-            <emphasis>Cluster</emphasis>
-          </term>
+      <varlistentry>
+        <term>Coordinator instance</term>
 
-          <listitem>
-            <para>A group of one or more single servers connected by TCP/IP,
-            working together as a single system. A cluster can be a private
-            grid or a public cloud.</para>
-          </listitem>
-        </varlistentry>
+        <listitem>
+          <para><indexterm>
+              <primary>instances</primary>
 
-        <varlistentry>
-          <term>
-            <emphasis>SciDB Cluster</emphasis>
-          </term>
+              <secondary>coordinator</secondary>
+            </indexterm><indexterm>
+              <primary>coordinator instance</primary>
+            </indexterm>A SciDB instance that resides on the coordinator
+          server. There is a single coordinator instance for a SciDB cluster.
+          A coordinator instance coordinates query activity in addition to
+          participating in query execution.</para>
+        </listitem>
+      </varlistentry>
 
-          <listitem>
-            <para>A collection of SciDB instances (one coordinator and zero or
-            more worker instances) form a SciDB cluster.</para>
-          </listitem>
-        </varlistentry>
-      </variablelist></para>
+      <varlistentry>
+        <term>Worker instance</term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>instances</primary>
+
+              <secondary>worker</secondary>
+            </indexterm><indexterm>
+              <primary>worker instance</primary>
+            </indexterm>A SciDB instance that only participates in query
+          execution.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>Cluster</term>
+
+        <listitem>
+          <para>A group of one or more single servers connected by TCP/IP,
+          working together as a single system. A cluster can be a private grid
+          or a public cloud.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>SciDB cluster</term>
+
+        <listitem>
+          <para>A collection of SciDB instances (one coordinator and zero or
+          more worker instances) form a SciDB cluster.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </sect1>
+
+  <sect1 remap="h2" xml:id="DataModelInstall">
+    <title>Visualizing a Completed SciDB Installation</title>
+
+    <para><indexterm>
+        <primary>architecture</primary>
+      </indexterm><indexterm>
+        <primary>SciDB</primary>
+
+        <secondary>architecture</secondary>
+      </indexterm>This section describes the pieces of a completed SciDB
+    installation.</para>
+
+    <sect2 remap="h3" xml:id="DM_IC">
+      <title>The SciDB Installation and Its Clusters</title>
+
+      <para>The chapter describes the process for creating one SciDB
+      Installation, which consists of one or more SciDB clusters. The
+      following conceptual data model diagram expresses this
+      graphically.</para>
+
+      <figure>
+        <title>SciDB Cluster</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="100"
+                       fileref="../graphics/dm_InstallationHasClusters.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      Each SciDB cluster name is unique.</para>
+
+      <note>
+        <para>The data models shown in this chapter are purely conceptual.
+        They do not describe any physical data characteristics or connote any
+        particular meta-model such as relational, object-oriented, etc. For a
+        complete description of this notation, see Mastering Data Modeling: A
+        User-Driver Approach by John Carlis et al. (Addison-Wesley,
+        2001)</para>
+      </note>
+    </sect2>
+
+    <sect2 remap="h3" xml:id="DM_CSI">
+      <title>The SciDB Cluster, Servers, and Instances</title>
+
+      <para><indexterm>
+          <primary>cluster</primary>
+        </indexterm><indexterm>
+          <primary>SciDB</primary>
+
+          <secondary>cluster</secondary>
+        </indexterm>Each SciDB cluster consists of one or more servers, each
+      of which can host one or more server instances.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>SciDB Servers and Instances</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="350"
+                       fileref="../graphics/dm_clusterHasServerHasInstance.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB Installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.)</para>
+    </sect2>
+
+    <sect2 remap="h3" xml:id="DM_CI_WI">
+      <title>The Coordinator Instance and Worker Instances</title>
+
+      <para>Every instance is either a coordinator instance, a worker
+      instance, or both. Each SciDB cluster will have exactly one coordinator
+      instance.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>SciDB Instances: Coordinator and Workers</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="400"
+                       fileref="../graphics/dm_instanceBeCoordinatorOrWorker.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <note>
+        <para>A worker instance can also serve as the coordinator instance.
+        Such an instance is typically referred to as the coordinator instance,
+        but it can share in the workload of SciDB queries like any other
+        worker instance.</para>
+      </note>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) An
+      instance can be a coordinator instance, a worker instance, or both.
+      Every coordinator instance is an instance. Every worker instance is an
+      instance. Each coordinator instance coordinates the work of one SciDB
+      cluster, and each SciDB cluster can be coordinated by one coordinator
+      instance.</para>
+    </sect2>
+
+    <sect2 remap="h3" xml:id="DM_CS_WS">
+      <title>The Coordinator Server and Worker Servers</title>
+
+      <para><indexterm>
+          <primary>coordinator server</primary>
+        </indexterm><indexterm>
+          <primary>instances</primary>
+
+          <secondary>worker</secondary>
+        </indexterm><indexterm>
+          <primary>worker server</primary>
+        </indexterm>Whichever server hosts the coordinator instance is known
+      as the coordinator server. The other servers as known as worker servers.
+      In most contexts, the distinction between the coordinator server and
+      worker servers is immaterial, and they are collectively known as
+      servers. The installation instructions in this chapter direct you to
+      install Postgres on the coordinator server. Although the coordinator
+      server must host the coordinator instance, it can also host other
+      (worker) instances.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>SciDB Servers: Coordinator and Workers</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="400"
+                       fileref="../graphics/dm_serverBeCoordinatorOrWorker.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) An
+      instance can be a coordinator instance, a worker instance, or both. Each
+      coordinator instance coordinates the work of one SciDB cluster, and each
+      SciDB cluster can be coordinated by one coordinator instance. A server
+      can be a coordinator server or a worker server. The coordinator server
+      hosts the coordinator instance (and because every coordinator instance
+      is an instance, might also host other instances). The coordinator server
+      will ultimately host the Postgres installation.</para>
+    </sect2>
+
+    <sect2 remap="h3" xml:id="DM_DP_D">
+      <title>Disk Partitions and Directories</title>
+
+      <para><indexterm>
+          <primary>partitions</primary>
+        </indexterm><indexterm>
+          <primary>disk partitions</primary>
+        </indexterm>When two or more instances are hosted by the same server,
+      each of those instances requires its own directory to store SciDB
+      database files. Those directories could be on the same disk
+      partition.</para>
+
+      <para>Like this:</para>
+
+      <figure>
+        <title>Disk Partitions and Directories</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="350"
+                       fileref="../graphics/dm_disksAndPartitions.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <para>The figure asserts the following: There are SciDB installations.
+      Each SciDB installation has an arbitrary ID and SciDB clusters. There
+      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
+      and belongs to one SciDB installation. Within any SciDB installation,
+      each SciDB cluster name is unique. There are servers. Each server has an
+      IP address, belongs to one SciDB cluster, and can host multiple
+      instances. There are instances. Each instance is hosted by one server.
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) There
+      are disk partitions. Each disk partition belongs to one server, and has
+      a unique mount point and can have multiple directories. Each directory
+      in on one disk partition, has a directory name, and can contain data for
+      exactly one instance. Each instance stores its SciDB data on one
+      directory.</para>
+    </sect2>
+
+    <sect2 remap="h3" xml:id="DM_Complete">
+      <title>Complete SciDB Installation</title>
+
+      <para>The complete data model described in the preceding sections is
+      shown below. The model can help you visualize important distinctions
+      that arise during the installation process. For example, some steps of
+      the installation apply to all servers, whereas others apply only to the
+      coordinator server. Likewise, some steps apply only to the coordinator
+      instance, whereas other steps apply to all instances.</para>
+
+      <para>The complete model is here:</para>
+
+      <figure>
+        <title>SciDB Installation</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata align="center" contentdepth="500" contentwidth="400"
+                       depth="400" fileref="../graphics/dm_installFull.png"
+                       scale="30" valign="top" width="400"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+
+      <?dbfo-need height="1.5in" ?>
+
+      <note>
+        <para>Remember, this is merely a conceptual model to help you
+        understand the building blocks of the installation process. It is a
+        conceptual model—not intended to connote any physical data layout or
+        any particular meta-model such as relational or object-oriented. For
+        that matter, it presents a somewhat simplified view of a SciDB
+        configuration, which is all you need to begin the installation
+        process.</para>
+      </note>
+    </sect2>
   </sect1>
 
   <sect1 remap="h2" xml:id="PlatformPrep">
-     
-
     <title>Preparing the Platform</title>
 
-     Before installing SciDB, the following steps are required to prepare a cluster for running SciDB. Many of these steps must be executed as the Linux 'root' account (creating the scidb account, preparing the system catalog, configuring a local data directory for use by SciDB, installing SciDB software packages). 
+    <para>Before installing SciDB, the following steps are required to prepare
+    a cluster for running SciDB. Many of these steps must be executed as the
+    Linux 'root' account (creating the scidb account, preparing the system
+    catalog, configuring a local data directory for use by SciDB, installing
+    SciDB software packages).</para>
 
     <sect2 remap="h3" xml:id="LinuxUserAccount">
       <title><emphasis role="bold">scidb</emphasis> Account</title>
 
-      <note>This step must be performed by root, or an account with equivalent
-      administrative privileges. The scidb account must be available on all
-      servers in the cluster.</note>
+      <note>
+        <para>This step must be performed by root, or an account with
+        equivalent administrative privileges. The scidb account must be
+        available on all servers in the cluster.</para>
+      </note>
 
-      <para>First, you need to create the<emphasis role="bold">
+      <para><indexterm>
+          <primary>account, sciDB</primary>
+        </indexterm>First, you need to create the<emphasis role="bold">
       scidb</emphasis> account. All SciDB processes as well as data and log
       files are created and owned by this ID. On a cluster, each server must
       have this account. This is also the account that initializes, starts,
@@ -139,18 +458,20 @@
       chapter.</para>
     </sect2>
 
-     
-
     <sect2 remap="h3" xml:id="DataDir">
       <title>Configure Storage</title>
 
-      <note>This action must be performed by the root account on each server
-      in the cluster. Once created the base path should be owned by the
-      <emphasis role="bold">scidb</emphasis> account.</note>
+      <note>
+        <para>This action must be performed by the root account on each server
+        in the cluster. Once created the base path should be owned by the
+        <emphasis role="bold">scidb</emphasis> account.</para>
+      </note>
 
-      <para>On each server, select a location on the local file system to
-      place the data directory for each instance. This must be accessible via
-      the same path name on every server.</para>
+      <para><indexterm>
+          <primary>configuration</primary>
+        </indexterm>On each server, select a location on the local file system
+      to place the data directory for each instance. This must be accessible
+      via the same path name on every server.</para>
 
       <para>The recommended configuration is 1 disk and 4 CPU cores for each
       SciDB instance. This is easily achieved in a virtual server
@@ -161,45 +482,54 @@
     </sect2>
 
     <sect2 remap="h3" xml:id="RemoteExecutionConfigurationssh">
-      <title>Remote Execution Configuration (ssh)</title>
+      <title>Remote Execution Configuration (SSH)</title>
 
-      <note>This step is only required if you are setting up a cluster
-      environment, and can be skipped for single-server installations. This
-      step must be performed by the scidb user account.</note>
+      <note>
+        <para><!--If fixed for next release, re-enter this sentence: This step is only required if you are setting up a cluster environment,
+ and can be skipped for single-server installations.-->This step must be
+        performed by the scidb user account.</para>
+      </note>
 
-      <para>SciDB uses <code>ssh</code> for execution of management commands
-      such as start and stop within a cluster. This is why the <emphasis
-      role="bold">scidb</emphasis> user account should have password-less
-      <code>ssh</code> access from the coordinator to the workers and from the
-      coordinator to itself.</para>
+      <para><indexterm>
+          <primary>ssh</primary>
+        </indexterm><indexterm>
+          <primary>password-less communication</primary>
+        </indexterm><indexterm>
+          <primary>communication between instances</primary>
+        </indexterm>SciDB uses <code>ssh</code> for execution of management
+      commands such as start and stop within a cluster. This is why the
+      <emphasis role="bold">scidb</emphasis> user account should have
+      password-less <code>ssh</code> access from the coordinator to the
+      workers and from the coordinator to itself.</para>
 
       <para>There are several methods to configure password-less
       <code>SSH</code> between servers. We recommend the following simple
       method.</para>
 
       <orderedlist>
-        <listitem><para>Create a key:<programlisting>ssh-keygen</programlisting></para>
-        By default, this creates a key file with a public/private key pair in
-        ~/.ssh/id_rsa.pub and ~/.ssh/id_rsa. Optionally, a key file name may
-        be specified. If a non-default filename is used for the key pair, it
-        must be listed in the SciDB config file for use by scidb.py.
-        <programlisting>
+        <listitem>
+          <para>Create a key:<programlisting>ssh-keygen</programlisting>By
+          default, this creates a key file with a public/private key pair in
+          ~/.ssh/id_rsa.pub and ~/.ssh/id_rsa. Optionally, a key file name may
+          be specified. If a non-default filename is used for the key pair, it
+          must be listed in the SciDB configuration file for use by
+          scidb.py.</para>
+
+          <programlisting>
 scidb@monolith1:~/.ssh$ ssh-keygen 
 Generating public/private rsa key pair.
-Enter file in which to save the key (/home/scidb/.ssh/id_rsa): scidb_rsa
+Enter file in which to save the key (/home/scidb/.ssh/id_rsa):
 Enter passphrase (empty for no passphrase): 
 Enter same passphrase again: 
-Your identification has been saved in scidb_rsa.
-Your public key has been saved in scidb_rsa.pub.
-...
-</programlisting></listitem>
+Your identification has been saved in id_rsa.
+Your public key has been saved in id_rsa.pub.
+...</programlisting>
+        </listitem>
 
         <listitem>
           <para>Copy the key to the localhost (or coordinator) and to each
-          worker to authorize ssh clients connecting to it: <programlisting>
-ssh-copy-id -i ~/.ssh/scidb_rsa.pub scidb@worker
-ssh-copy-id -i ~/.ssh/scidb_rsa.pub scidb@localhost
-</programlisting></para>
+          worker to authorize ssh clients connecting to it: <programlisting>ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@worker
+ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@localhost</programlisting></para>
         </listitem>
 
         <listitem>
@@ -208,65 +538,83 @@ ssh-copy-id -i ~/.ssh/scidb_rsa.pub scidb@localhost
         </listitem>
       </orderedlist>
     </sect2>
-
-     
   </sect1>
 
   <sect1 remap="h2" xml:id="PackageInstall">
     <title>Package Installation</title>
 
+    <para>Packages are available for Ubuntu, CentOS, and RHEL. Note that
+    CentOS and RHEL use the same package.</para>
+
+    <para>SciDB currently provides the following packages.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The <code>scidb</code> package contains the server
+        binaries.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <code>libscidbclient</code> and
+        <code>libscidbclient-python</code> packages contain the SciDB client
+        library and the SciDB connector for python applications.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <code>scidb-plugins </code>package contains plugins that can
+        be added to SciDB to extend its capabilities. This package contains
+        the <code>dense_linear_algebra</code> plugin.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <code>scidb-utils</code> package contains SciDB server
+        utilities.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <code>scidb-dev</code> contains development header files for
+        developers creating SciDB extensions (types, operators, and
+        aggregates).</para>
+      </listitem>
+
+      <listitem>
+        <para>The <code>scidb-dev</code> contains development header files for
+        developers creating SciDB extensions (types, operators, and
+        aggregates).</para>
+      </listitem>
+
+      <listitem>
+        <para>The <code>libscidbclient-dbg, libscidbclient-python-dbg,
+        scidb-dbg, scidb-dev-tools-dbg, scidb-plugins-dbg</code>, and
+        <code>scidb-utils-dbg</code> packages contain debugging
+        symbols.</para>
+      </listitem>
+    </itemizedlist>
+
     <sect2 remap="h3" xml:id="InstallSciDBfrombinarypackage">
-      <title>Install SciDB from binary package</title>
+      <title>Install SciDB on Ubuntu from binary package</title>
 
-      <note>This step must be performed by the root account. In a cluster,
-      this step must be performed on all servers.</note>
+      <para>This section describes how to download and install SciDB on
+      Ubuntu, using pre-built binary packages.</para>
 
-      <para>We currently provide the following packages for Ubuntu
-      (.deb).</para>
-
-      <itemizedlist>
-        <listitem>The <code>scidb</code> package contains the server
-        binaries.</listitem>
-
-        <listitem>
-          <para>The <code>libscidbclient</code> and
-          <code>libscidbclient-python</code> packages contain the SciDB client
-          library and the SciDB connector for python applications.</para>
-        </listitem>
-
-        <listitem>
-          <para>The <code>scidb-plugins </code>package contains plugins that
-          can be added to SciDB to extend its capabilities. This package
-          contains the <code>dense_linear_algebra</code> plugin.</para>
-        </listitem>
-
-        <listitem>The <code>scidb-utils</code> package contains SciDB server
-        utilities.</listitem>
-
-        <listitem>The <code>scidb-dev</code> contains development header files
-        for developers creating SciDB extensions (types, operators, and
-        aggregates).</listitem>
-
-        <listitem>The <code>scidb-doc</code> package contains the SciDB User
-        Guide document.</listitem>
-      </itemizedlist>
+      <note>
+        <para>This step must be performed by the root account. In a cluster,
+        this step must be performed on all servers.</para>
+      </note>
 
       <para>This section describes how to download and install SciDB using
       pre-built binary packages.</para>
 
       <orderedlist>
         <listitem>
-          <para>Add SciDB's GPG public key. <programlisting>
-wget -O- http://downloads.paradigm4.com/apt/key |sudo apt-key add -
-</programlisting></para>
+          <para>Add SciDB's GPG public key by running the following command.
+          <programlisting>wget -O-  http://downloads.paradigm4.com/apt/key | sudo apt-key add -</programlisting></para>
         </listitem>
 
         <listitem>
           <para>Add SciDB's APT repository to the apt configuration file
-          <code>/etc/apt/sources.list.d/scidb.list</code>. <programlisting>
-deb  http://downloads.paradigm4.com/apt/  precise/cheshire/
-deb-src  http://downloads.paradigm4.com/apt/ precise/cheshire/
-</programlisting></para>
+          <code>/etc/apt/sources.list.d/scidb.list</code>. <programlisting>deb  http://downloads.paradigm4.com/apt/  precise/12.12.0/
+deb-src  http://downloads.paradigm4.com/apt/ precise/12.12.0/</programlisting></para>
         </listitem>
 
         <listitem>
@@ -275,9 +623,69 @@ deb-src  http://downloads.paradigm4.com/apt/ precise/cheshire/
           scidb-all (or scidb-all-coord) metapackage. This package includes
           all of the standard SciDB packages.<programlisting>sudo apt-get update
 sudo apt-cache search scidb
-sudo apt-get install scidb-all-coord # On the coordinator server
-sudo apt-get install scidb-all # On all other servers
-sudo apt-get source scidb # Download the source</programlisting></para>
+sudo apt-get install scidb-all-coord # On the coordinator server only
+sudo apt-get install scidb-all # On all servers other than the coordinator server
+sudo apt-get source scidb # If you want the SciDB source</programlisting></para>
+        </listitem>
+      </orderedlist>
+
+      <para>If you want the default SciDB installation with all packages
+      installed, you can install the scidb-all (worker) or scidb-all-coord
+      (coordinator) metapackage. These packages include all of the standard
+      SciDB packages required for a complete installation.</para>
+
+      <note>
+        <para>The only difference between the scidb-all and scidb-all-coord
+        packages is that scidb-all-coord contains Postgres. If you already
+        have Postgres on your coordinator server, there is no need to install
+        the scidb-all-coord package.</para>
+      </note>
+    </sect2>
+
+    <sect2 remap="h3" xml:id="packageCentOS">
+      <title>Install SciDB on CentOS / RHEL from binary package</title>
+
+      <para>This section describes how to download and install SciDB on CentOS
+      and RHEL, using pre-built binary packages.</para>
+
+      <note>
+        <para>This procedure must be performed by the root account. In a
+        cluster, this step must be performed on all servers.</para>
+      </note>
+
+      <orderedlist>
+        <listitem>
+          <para>Add the SciDB repository to the repository folder, by creating
+          the configuration file
+          <code>/etc/yum.repos.d/scidb.repo</code>.</para>
+        </listitem>
+
+        <listitem>
+          <para>Add the following lines to the
+          <code>/etc/yum.repos.d/scidb.repo</code> file:<programlisting>[scidb]
+name=SciDB
+baseurl=http://downloads.paradigm4.com/yum/centos6.3/12.12.0/
+gpgcheck=0</programlisting></para>
+        </listitem>
+
+        <listitem>
+          <para>Update packages by running the following
+          command:<programlisting>sudo yum update</programlisting><note>
+              <para>If you receive an error concerning the boost library,
+              remove boost by running the following command, and then rerun
+              <command>sudo yum update</command>.</para>
+
+              <programlisting>rpm -qa | grep boost | sudo xargs yum remove -y</programlisting>
+            </note></para>
+        </listitem>
+
+        <listitem>
+          <para>Install SciDB. If you want the default SciDB installation with
+          all packages installed, you can install the scidb-all (or
+          scidb-all-coord) metapackage. This package includes all of the
+          standard SciDB packages.<programlisting>sudo yum search scidb
+sudo yum install scidb-all-coord # On the coordinator server only
+sudo yum install scidb-all # On all servers other than the coordinator server</programlisting></para>
         </listitem>
       </orderedlist>
 
@@ -297,7 +705,24 @@ sudo apt-get source scidb # Download the source</programlisting></para>
     <sect2 remap="h3" xml:id="PostgresInstallationandConfiguration">
       <title>System Catalog Setup</title>
 
-      <para>SciDB relies on Postgres as the system catalog.</para>
+      <para><indexterm>
+          <primary>system catalog</primary>
+        </indexterm><indexterm>
+          <primary>Postgres</primary>
+        </indexterm><indexterm>
+          <primary>security, Postgres</primary>
+        </indexterm>SciDB relies on Postgres as the system catalog. In this
+      section, we describe how to set up and use Postgres <emphasis
+      role="bold">for SciDB</emphasis>.</para>
+
+      <warning>
+        <para>We strongly recommend that you use a separate Postgres
+        installation exclusively for SciDB. The main reason for this is that
+        SciDB needs to store the password for the 'scidb' user in clear text
+        in a configuration file. Thus, if you use an existing Postgres
+        installation for SciDB, you introduce a security risk into the
+        existing Postgres installation.</para>
+      </warning>
 
       <para>Note the following:<itemizedlist>
           <listitem>
@@ -322,16 +747,34 @@ sudo apt-get source scidb # Download the source</programlisting></para>
       <para>By default, Postgres is configured to allow only local access via
       Unix-domain sockets. In a cluster environment, the Postgres database
       server needs to be configured to allow access from other instances in
-      the cluster. To do this:</para>
+      the cluster. To do this, perform the following steps:</para>
 
-      <orderedlist>
-        <listitem>
+      <procedure>
+        <step>
+          <para>If you have never previously run Postgres on your system, you
+          must perform the following steps:</para>
+
+          <substeps>
+            <step>
+              <para>Run the following command to create the
+              <literal>pg_hba.conf</literal> file (you will edit this file in
+              step 2):<programlisting>sudo service postgresql initdb</programlisting></para>
+            </step>
+
+            <step>
+              <para>Create a PostgreSQL user on your Linux system. For
+              details, see the Postgres documentation.</para>
+            </step>
+          </substeps>
+        </step>
+
+        <step>
           <para>Configure Postgres to use 'trust' authentication for local and
           remote connections. To do this, modify the
           <literal>pg_hba.conf</literal> file (usually at
-          <literal>/etc/postgresql/8.4/main/</literal> or <literal>
-          /var/lib/pgsql/data/</literal>) and include the following settings.
-          <programlisting>
+          <literal>/etc/postgresql/8.4/main/</literal> or
+          <literal>/var/lib/pgsql/data/</literal>) and include the following
+          settings.<programlisting>
 local   all      all                      trust
 host    all      all     10.0.0.1/8       trust
 </programlisting></para>
@@ -340,36 +783,32 @@ host    all      all     10.0.0.1/8       trust
           authentication for all local and remote connections from instances
           within the 10.0.0.1/8 subnet. Replace the subnet/mask with the
           correct one for your cluster.</para>
-        </listitem>
+        </step>
 
-        <listitem>
+        <step>
           <para>You might need to set the <literal>postgresql.conf</literal>
           file to have it listen on the relevant port. If you are running a
           cluster with multiple servers, you will also need to modify the
           <literal>postgresql.conf</literal> file to allow connections from
-          other instances in the cluster.</para>
-
-          <programlisting>
-# - Connection Settings -
+          other instances in the cluster.<programlisting># - Connection Settings -
 listen_addresses = '*'
 port = 5432
-</programlisting>
-        </listitem>
+</programlisting></para>
+        </step>
 
-        <listitem>
-          <para>Restart Postgres.</para>
+        <step>
+          <para>Restart Postgres.<programlisting>sudo /etc/init.d/postgresql restart
+</programlisting></para>
+        </step>
 
-          <programlisting>
-sudo /etc/init.d/postgresql restart
-</programlisting>
-        </listitem>
-
-        <listitem>
-          <para>The last step, after you have configured Postgres, is to add
+        <step>
+          <para>The final step, after you have configured Postgres, is to add
           it to Linux system services. This means that Postgres will be
-          started automatically on system reboot: <programlisting>sudo /sbin/chkconfig --add postgresql</programlisting></para>
-        </listitem>
-      </orderedlist>
+          started automatically on system reboot.<programlisting>sudo /sbin/chkconfig --add postgresql</programlisting>To
+          run the previous command, you need to install the chkconfig package,
+          if it is not already installed on your system.</para>
+        </step>
+      </procedure>
 
       <warning>
         <para>This Postgres configuration might pose security issues. When
@@ -384,8 +823,7 @@ sudo /etc/init.d/postgresql restart
       </warning>
 
       <para>You can verify that a PostgreSQL instance is running on the
-      coordinator with the <literal>status</literal> command: <programlisting>
-sudo /etc/init.d/postgresql status
+      coordinator with the <literal>status</literal> command: <programlisting>sudo /etc/init.d/postgresql status
 </programlisting></para>
     </sect2>
 
@@ -397,12 +835,14 @@ sudo /etc/init.d/postgresql status
         only.</para>
       </note>
 
-      <para>The following variables should be set in the scidb user's
+      <para><indexterm>
+          <primary>environment variables</primary>
+        </indexterm>The following variables should be set in the scidb user's
       environment. <programlisting>
-export SCIDB_VER=12.10
-export PATH=/opt/scidb/$SCIDB_VER/bin:/opt/scidb/$SCIDB_VER/share/scidb:$PATH
-export LD_LIBRARY_PATH=/opt/scidb/$SCIDB_VER/lib:$LD_LIBRARY_PATH
-</programlisting></para>
+export SCIDB_VER=12.12
+export PATH=/opt/scidb/$SCIDB_VER/bin:
+   /opt/scidb/$SCIDB_VER/share/scidb:$PATH
+export LD_LIBRARY_PATH=/opt/scidb/$SCIDB_VER/lib:$LD_LIBRARY_PATH</programlisting></para>
     </sect2>
   </sect1>
 
@@ -411,7 +851,7 @@ export LD_LIBRARY_PATH=/opt/scidb/$SCIDB_VER/lib:$LD_LIBRARY_PATH
 
     <para>This section introduces the SciDB config.ini and shows how to
     configure SciDB prior to initialization (usually
-    <literal>/opt/scidb/12.10/etc/config.ini</literal>). Logging configuration
+    <literal>/opt/scidb/12.12/etc/config.ini</literal>). Logging configuration
     is also described.</para>
 
     <sect2>
@@ -422,18 +862,20 @@ export LD_LIBRARY_PATH=/opt/scidb/$SCIDB_VER/lib:$LD_LIBRARY_PATH
         only.</para>
       </note>
 
-      <para>The standard location of the SciDB configuration file is
-      <literal>/opt/scidb/12.10/etc/config.ini</literal>.</para>
+      <para><indexterm>
+          <primary>configuration</primary>
+        </indexterm>The standard location of the SciDB configuration file is
+      <literal>/opt/scidb/12.12/etc/config.ini</literal>.</para>
 
       <para>The configuration 'test1' below is an example of the configuration
       for a single-instance system (coordinator only):<programlisting>[test1]
 server-0=localhost,0
 db_user=test1user
 db_passwd=test1passwd
-install_root=/opt/scidb/12.10
-metadata=/opt/scidb/12.10/share/scidb/meta.sql
-pluginsdir=/opt/scidb/12.10/lib/scidb/plugins
-logconf=/opt/scidb/12.10/share/scidb/log4cxx.properties
+install_root=/opt/scidb/12.12
+metadata=/opt/scidb/12.12/share/scidb/meta.sql
+pluginsdir=/opt/scidb/12.12/lib/scidb/plugins
+logconf=/opt/scidb/12.12/share/scidb/log4cxx.properties
 base-path=/home/scidb/data
 base-port=1239
 interface=eth0
@@ -450,9 +892,13 @@ chunk-segment-size=100485760
     <sect2>
       <title>Cluster Configuration Example</title>
 
-      <para>The following SciDB cluster configuration is called 'monolith.'
-      This cluster consists of eight identical virtual servers with the
-      following characteristics:<itemizedlist>
+      <para><indexterm>
+          <primary>configuration</primary>
+
+          <secondary>example</secondary>
+        </indexterm>The following SciDB cluster configuration is called
+      'monolith.' This cluster consists of eight identical virtual servers
+      with the following characteristics:<itemizedlist>
           <listitem>
             <para>x86_64 6-core processor</para>
           </listitem>
@@ -488,10 +934,10 @@ server-5=10.0.20.236,1
 server-6=10.0.20.237,1
 server-7=10.0.20.238,1
 db_user=monolith
-db_password=monolith
-install_root=/opt/scidb/12.10
-metadata=/opt/scidb/12.10/share/scidb/meta.sql
-pluginsdir=/opt/scidb/12.10/lib/scidb/plugins
+db_passwd=monolith
+install_root=/opt/scidb/12.12
+metadata=/opt/scidb/12.12/share/scidb/meta.sql
+pluginsdir=/opt/scidb/12.12/lib/scidb/plugins
 logconf=/opt/scidb/log4cxx.properties.trace
 base-path=/data/monolith_data
 base-port=1239
@@ -501,7 +947,11 @@ interface=eth0</programlisting></para>
       <literal>sample_config.ini</literal> with examples which must be
       customized and copied to <literal>config.ini</literal>.</para>
 
-      <para>The following table describes the basic configuration file
+      <para><indexterm>
+          <primary>configuration</primary>
+
+          <secondary>parameters</secondary>
+        </indexterm>The following table describes the basic configuration file
       settings:</para>
 
       <informaltable frame="all">
@@ -632,8 +1082,12 @@ interface=eth0</programlisting></para>
         </tgroup>
       </informaltable>
 
-      <para>The following table describes the cluster configuration file
-      contents and how to set them:</para>
+      <para><indexterm>
+          <primary>configuration</primary>
+
+          <secondary>parameters</secondary>
+        </indexterm>The following table describes the cluster configuration
+      file contents and how to set them:</para>
 
       <informaltable frame="all">
         <tgroup cols="2">
@@ -700,6 +1154,34 @@ interface=eth0</programlisting></para>
 
             <row>
               <entry>
+                <para>data-dir-prefix (optional)</para>
+              </entry>
+
+              <entry>
+                <para>The SciDB administrator can provide file system
+                directories for reference to multiple disks that are connected
+                to a single server. For example, if a server has 4 disks and 8
+                instances, your configuration could be as follows:</para>
+
+                <para>
+                  <literallayout>data-dir-prefix-0-0=/datadisk1/myserver.000.0
+data-dir-prefix-0-1=/datadisk2/myserver.000.1
+data-dir-prefix-0-2=/datadisk3/myserver.000.2
+data-dir-prefix-0-3=/datadisk4/myserver.000.3
+data-dir-prefix-0-4=/datadisk1/myserver.000.4
+data-dir-prefix-0-5=/datadisk2/myserver.000.5
+data-dir-prefix-0-6=/datadisk3/myserver.000.6
+data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout>
+                </para>
+
+                <para>You do not need to specify this parameter for each
+                instance. For any instance that you omit, SciDB creates a
+                folder using the default naming scheme.</para>
+              </entry>
+            </row>
+
+            <row>
+              <entry>
                 <para>interface</para>
               </entry>
 
@@ -714,7 +1196,7 @@ interface=eth0</programlisting></para>
               </entry>
 
               <entry>
-                <para>The listening port of Postgres -- the port on which
+                <para>The listening port of Postgres—the port on which
                 Postgres accepts incoming connections. Default: 5432.</para>
               </entry>
             </row>
@@ -767,8 +1249,14 @@ interface=eth0</programlisting></para>
         </tgroup>
       </informaltable>
 
-      <para>The following table describes the configuration file elements for
-      tuning your system performance:</para>
+      <para><indexterm>
+          <primary>configuration</primary>
+
+          <secondary>tuning</secondary>
+        </indexterm><indexterm>
+          <primary>optimization</primary>
+        </indexterm>The following table describes the configuration file
+      elements for tuning your system performance:</para>
 
       <informaltable frame="all">
         <tgroup cols="2">
@@ -902,7 +1390,7 @@ interface=eth0</programlisting></para>
 
               <entry>
                 <para>Number of threads used per operator per query. Limit the
-                number of threads allocated per (multithreaded) operator in a
+                number of threads allocated per (multi-threaded) operator in a
                 query. If operator-threads is unspecified, SciDB automatically
                 detects the number of CPU cores and uses that value. If you
                 are running multiple instances on each server,
@@ -971,7 +1459,17 @@ interface=eth0</programlisting></para>
     <sect2 remap="h3" xml:id="LoggingConfiguration">
       <title>Logging Configuration</title>
 
-      <para>SciDB uses Apache's log4cxx (<ulink
+      <itemizedlist>
+        <listitem>
+          <para>x86 6-core processor</para>
+        </listitem>
+      </itemizedlist>
+
+      <para><indexterm>
+          <primary>configuration</primary>
+
+          <secondary>logging</secondary>
+        </indexterm>SciDB uses Apache's log4cxx (<ulink
       url="http://logging.apache.org/log4cxx/">http://logging.apache.org/log4cxx/</ulink>).</para>
 
       <para>The logging configuration file, specified by the
@@ -980,7 +1478,7 @@ interface=eth0</programlisting></para>
 # Levels: TRACE &lt; DEBUG &lt; INFO &lt; WARN &lt; ERROR &lt; FATAL
 ###
 
-log4j.rootLogger=DEBUG, file
+log4j.rootLogger=ERROR, file
 
 log4j.appender.file=org.apache.log4j.RollingFileAppender
 log4j.appender.file.File=scidb.log
@@ -994,13 +1492,24 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
   <sect1 remap="h2" xml:id="InitializingandStartingSciDB">
     <title>Initializing and Starting SciDB</title>
 
-    <sect2 remap="h3" xml:id="Thescidb.pyScript"><title>The scidb.py
-    Script</title><para>To begin a SciDB session, use the
-    <literal>scidb.py</literal> script. In a standard SciDB build, this script
-    is located at:<programlisting>/opt/scidb/<replaceable>version.number</replaceable>/bin</programlisting></para><para>The
-    syntax for the <literal>scidb.py</literal> script is: <programlisting>scidb.py <replaceable>command</replaceable> <replaceable>db</replaceable> <replaceable>conffile</replaceable></programlisting></para><para>The
-    options for the <replaceable>command</replaceable> argument
-    are:</para><informaltable frame="all">
+    <sect2 remap="h3" xml:id="Thescidb.pyScript">
+      <title>The scidb.py Script</title>
+
+      <para><indexterm>
+          <primary>scidb.py</primary>
+        </indexterm><indexterm>
+          <primary>scidb script</primary>
+        </indexterm>To begin a SciDB session, use the
+      <literal>scidb.py</literal> script. In a standard SciDB build, this
+      script is located at:<programlisting>/opt/scidb/<replaceable>version.number</replaceable>/bin</programlisting></para>
+
+      <para>The syntax for the <literal>scidb.py</literal> script is:
+      <programlisting>scidb.py <replaceable>command</replaceable> <replaceable>db</replaceable> <replaceable>conffile</replaceable></programlisting></para>
+
+      <para>The options for the <replaceable>command</replaceable> argument
+      are:</para>
+
+      <informaltable frame="all">
         <tgroup cols="2">
           <colspec colname="c1" colwidth="30*"/>
 
@@ -1112,7 +1621,11 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
               </entry>
 
               <entry>
-                <para>Display SciDB version number information.</para>
+                <para><indexterm>
+                    <primary>versions</primary>
+
+                    <secondary>SciDB</secondary>
+                  </indexterm>Display SciDB version number information.</para>
               </entry>
             </row>
 
@@ -1143,35 +1656,53 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
             </row>
           </tbody>
         </tgroup>
-      </informaltable><para>The <replaceable>db</replaceable> argument is the
-    name of the SciDB cluster you want to create or get information
-    about.</para><para>The configuration file is set by default to
-    <code>/opt/scidb/12.10/etc/config.ini</code>. If you want to use a custom
-    configuration file for a particular SciDB cluster, use the
-    <replaceable>conffile</replaceable> argument.</para><para>Run the
-    following command to initialize SciDB on the server. If the SciDB user has
-    sudo privileges, everything will be done automatically (otherwise see the
-    previous section for additional Postgres configuration steps):
-    </para><para> First, initialize the system catalog database in Postgres.
-    This must be done as user Postgres, therefore, this command must be run as
-    user Postgres, or as superuser as follows. <programlisting>sudo -u postgres /opt/scidb/12.10/bin/scidb.py init_syscat test1</programlisting></para>
-    The remainder of the commands are run as user 'scidb'. <para>
-        <programlisting>scidb.py initall test1</programlisting>
-      </para><warning>
+      </informaltable>
+
+      <para>The <replaceable>db</replaceable> argument is the name of the
+      SciDB cluster you want to create or get information about.</para>
+
+      <para>The configuration file is set by default to
+      <code>/opt/scidb/12.12/etc/config.ini</code>. If you want to use a
+      custom configuration file for a particular SciDB cluster, use the
+      <replaceable>conffile</replaceable> argument.</para>
+
+      <para>Run the following command to initialize SciDB on the server. If
+      the SciDB user has sudo privileges, everything will be done
+      automatically (otherwise see <xref
+      linkend="PostgresInstallationandConfiguration"/> for additional Postgres
+      configuration steps):</para>
+
+      <para>First, initialize the system catalog database in Postgres. This
+      must be done as user Postgres, therefore, this command must be run as
+      user Postgres, or as superuser as follows. <programlisting>sudo -u postgres /opt/scidb/12.12/bin/scidb.py init_syscat <replaceable>db</replaceable></programlisting></para>
+
+      <para>The remainder of the commands are runs as user
+      'scidb.'<programlisting>scidb.py initall <replaceable>db</replaceable></programlisting></para>
+
+      <warning>
         <para>This will reinitialize the SciDB database. Any arrays that you
         have created in previous SciDB sessions will be removed and
         corresponding storage files will be deleted.</para>
-      </warning><para>To start the set of local SciDB instances specified in
-    your config.ini file, use the following command: <programlisting>scidb.py startall test1</programlisting></para><para>This
-    will report the status of the various instances:<programlisting>scidb.py status test1</programlisting></para><para>This
-    will stop all SciDB instances:<programlisting>scidb.py stopall test1</programlisting></para></sect2>
+      </warning>
+
+      <para>To start the set of local SciDB instances specified in your
+      config.ini file, use the following command: <programlisting>scidb.py startall <replaceable>db</replaceable></programlisting></para>
+
+      <para>This will report the status of the various
+      instances:<programlisting>scidb.py status <replaceable>db</replaceable></programlisting></para>
+
+      <para>This will stop all SciDB instances:<programlisting>scidb.py stopall <replaceable>db</replaceable></programlisting></para>
+    </sect2>
 
     <sect2>
       <title>SciDB Logs</title>
 
-      <para>SciDB logs are written to the file <literal>scidb.log</literal> in
-      the appropriate directories for each instance:
-      <replaceable>base-path</replaceable>/000/0 for the coordinator and
+      <para><indexterm>
+          <primary>logs</primary>
+        </indexterm>SciDB logs are written to the file
+      <literal>scidb.log</literal> in the appropriate directories for each
+      instance: <replaceable>base-path</replaceable>/000/0 for the coordinator
+      and
       <replaceable>base-path</replaceable>/<replaceable>M</replaceable>/<replaceable>N</replaceable>
       for the server <replaceable>M</replaceable> instance
       <replaceable>N</replaceable>. Consider an installation with four
@@ -1209,14 +1740,20 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
     </sect2>
   </sect1>
 
-  <sect1 remap="h2" xml:id="scidb_on_ec2">
+  <sect1 id="scidb_on_ec2" remap="h2">
     <title>SciDB on Amazon EC2</title>
 
-    <para>Amazon Elastic Compute Cloud (EC2) is a central part of Amazon.com's
-    cloud computing platform. A public Amazon Machine Image (AMI) from
-    Paradigm4 is available on EC2 as
+    <para><indexterm>
+        <primary>cloud, running sciDB</primary>
+      </indexterm><indexterm>
+        <primary>SciDB</primary>
+
+        <secondary>in the cloud</secondary>
+      </indexterm>Amazon Elastic Compute Cloud (EC2) is a central part of
+    Amazon.com's cloud computing platform. A public Amazon Machine Image (AMI)
+    from Paradigm4 is available on EC2 as
     <code>SciDB_12_10-Ubuntu-10_04-Sep-14-2012 (ami-80e950e9)</code>. This AMI
-    has been pre-installed and pre-configured with release 12.10 of
+    has been pre-installed and pre-configured with release 12.12 of
     SciDB.</para>
 
     <note>
@@ -1271,7 +1808,10 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
       </listitem>
 
       <listitem>
-        <para>Configure and refresh your SciDB installation as described earlier in this chapter under the Package Installation section.</para>
+        <para>Execute the following command to get the latest SciDB
+        repository:</para>
+
+        <programlisting>sudo apt-get update</programlisting>
       </listitem>
 
       <listitem>
