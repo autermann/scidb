@@ -77,30 +77,22 @@ public:
         typedef enum {INVALID_ROLE=0, COORD, WORKER} InstanceRole;
         typedef enum {INVALID_MODE=0, RD, WR, CRT, RM, RNT, RNF} LockMode;
 
+
         LockDesc(const std::string& arrayName,
                 QueryID  queryId,
                 InstanceID   instanceId,
                 InstanceRole instanceRole,
                 LockMode lockMode);
-        LockDesc(const std::string& arrayName,
-                QueryID  queryId,
-                InstanceID   instanceId,
-                InstanceRole instanceRole,
-                LockMode lockMode,
-                uint64_t timestmap
-                );
 
         virtual ~LockDesc() {}
         const std::string& getArrayName() const { return _arrayName; }
         ArrayID   getArrayId() const { return _arrayId; }
-        ArrayID   getImmutableArrayId() const { return _immutableArrayId; }
         QueryID   getQueryId() const { return _queryId; }
         InstanceID    getInstanceId() const { return _instanceId; }
         VersionID getArrayVersion() const { return _arrayVersion; }
         ArrayID   getArrayVersionId() const { return _arrayVersionId; }
         InstanceRole  getInstanceRole() const { return _instanceRole; }
         LockMode  getLockMode() const { return _lockMode; }
-        uint64_t  getTimestamp() const { return _timestamp; }
         bool  isLocked() const { return _isLocked; }
         void setArrayId(ArrayID arrayId) { _arrayId = arrayId; }
         void setArrayVersionId(ArrayID versionId) { _arrayVersionId = versionId; }
@@ -123,8 +115,6 @@ public:
         VersionID _arrayVersion;
         InstanceRole _instanceRole; // 1-coordinator, 2-worker
         LockMode  _lockMode; // {1=read, write, remove, renameto, renamefrom}
-        uint64_t  _timestamp;
-        ArrayID  _immutableArrayId;
         bool _isLocked;
     };
 
@@ -222,15 +212,6 @@ public:
      */
     boost::shared_ptr<LockDesc> checkForCoordinatorLock(const std::string& arrayName,
             QueryID queryId);
-
-
-    /**
-     * Get number of array using specified coordinate mapping array
-     * @param arrayName array definining coordinatres mapping
-     *
-     * @return number of references to coordinates mapping array
-     */
-    size_t countReferences(std::string const& arrayName);
 
     /**
      * Populate PostgreSQL database with metadata, generate cluster UUID and return
@@ -543,7 +524,6 @@ private:
     uint32_t _deleteArrayLocks(InstanceID instanceId, QueryID queryId);
     boost::shared_ptr<LockDesc> _checkForCoordinatorLock(const std::string& arrayName,
             QueryID queryId);
-    size_t _countReferences(std::string const& arrayName);
     void _initializeCluster();
     void _addArray(ArrayDesc &array_desc, PartitioningSchema ps);
     void _updateArray(const ArrayDesc &array_desc);

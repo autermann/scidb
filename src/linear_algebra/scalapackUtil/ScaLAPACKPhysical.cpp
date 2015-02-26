@@ -233,13 +233,7 @@ ArrayDesc ScaLAPACKPhysical::getRepartSchema(ArrayDesc const& inputSchema) const
                               inDim.getCurrEnd(),
                               inDim.getEndMax(),
                               slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE,  // no way to generate a consensus size.
-                              false,
-                              inDim.getType(),
-                              inDim.getFlags(),
-                              inDim.getMappingArrayName(),
-                              inDim.getComment(),
-                              inDim.getFuncMapOffset(),
-                              inDim.getFuncMapScale()));
+                              0));
     }
 
     Attributes inAttrs = inputSchema.getAttributes();

@@ -90,7 +90,10 @@
               </indexterm>libraries</entry>
 
             <entry>Show all libraries that are loaded in the current SciDB
-            session.</entry>
+            session, and the SciDB version information. For each instance,
+            this parameter returns the SciDB version information, and the
+            version information for each library that is loaded for that
+            instance.</entry>
           </row>
 
           <row>
@@ -109,7 +112,7 @@
                 <primary>data types</primary>
               </indexterm>types</entry>
 
-            <entry>Show all the datatypes the SciDB supports.</entry>
+            <entry>Show all the data types the SciDB supports.</entry>
           </row>
 
           <row>
@@ -145,17 +148,17 @@
       <procedure>
         <step>
           <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>{No} name,id,schema,availability
-{0} 'vector0',573,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
-{1} 'vector1',575,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+{0} 'vector0',17,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+{1} 'vector1',19,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
         <step>
           <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>{No} name,id,schema,availability
-{0} 'vector0',573,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
-{1} 'vector0@1',574,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
-{2} 'vector1',575,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
-{3} 'vector1@1',576,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
+{0} 'vector0',17,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+{1} 'vector0@1',18,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
+{2} 'vector1',19,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+{3} 'vector1@1',20,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
@@ -164,16 +167,18 @@
 {0} 'ApproxDC'
 {1} 'avg'
 {2} 'count'
-{3} 'first'
-{4} 'last'
-{5} 'mad'
-{6} 'max'
-{7} 'median'
-{8} 'min'
-{9} 'stdev'
-{10} 'sum'
-{11} 'top_five'
-{12} 'var'
+{3} 'first_value'
+{4} 'la_first'
+{5} 'la_last'
+{6} 'last_value'
+{7} 'mad'
+{8} 'max'
+{9} 'median'
+{10} 'min'
+{11} 'stdev'
+{12} 'sum'
+{13} 'top_five'
+{14} 'var'
 </screen></para></para>
         </step>
       </procedure>

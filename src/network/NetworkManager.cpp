@@ -71,7 +71,7 @@ NetworkManager::NetworkManager():
         _acceptor(_ioService, boost::asio::ip::tcp::endpoint(
                 boost::asio::ip::tcp::v4(),
                 Config::getInstance()->getOption<int>(CONFIG_PORT))),
-        _input(_ioService, STDIN_FILENO),
+        _input(_ioService),
         _aliveTimer(_ioService),
         _aliveTimeout(DEFAULT_ALIVE_TIMEOUT),
         _selfInstanceID(INVALID_INSTANCE),
@@ -81,6 +81,7 @@ NetworkManager::NetworkManager():
         _maxRepReceiveQSize(Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE)),
         _msgHandlerFactory(new DefaultNetworkMessageFactory)
 {
+    // Note: that _acceptor is 'fully opened', i.e. bind()'d, listen()'d and polled as needed
     _acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
    int64_t reconnTimeout = Config::getInstance()->getOption<int>(CONFIG_RECONNECT_TIMEOUT);
    Scheduler::Work func = bind(&NetworkManager::handleReconnect);
@@ -196,6 +197,7 @@ void NetworkManager::handleShutdown()
 
 void NetworkManager::startInputWatcher()
 {
+   _input.assign(STDIN_FILENO);
    _input.async_read_some(boost::asio::buffer((void*)&one_byte_buffer,sizeof(one_byte_buffer)),
                           bind(&NetworkManager::handleInput, this,
                                boost::asio::placeholders::error,

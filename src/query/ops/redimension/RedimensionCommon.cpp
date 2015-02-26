@@ -433,8 +433,6 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
                                                       vector<size_t> const& dimMapping,
                                                       vector<AggregatePtr> const& aggregates,
                                                       shared_ptr<Query> const& query,
-                                                      vector< shared_ptr<AttributeMultiMap> > const& coordinateMultiIndices,
-                                                      vector< shared_ptr<AttributeMap> > const& coordinateIndices,
                                                       ElapsedMilliSeconds& timing,
                                                       bool redistributionRequired)
 {
@@ -569,15 +567,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
                         // a dimension is NULL. Just skip this item.
                         goto ToNextItem;
                     }
-                    if (destDims[i].getType() == TID_INT64) {
-                        destPos[i] = value.getInt64();
-                    } else {
-                        if (coordinateIndices[i]) {
-                            destPos[i] = coordinateIndices[i]->get(value);
-                        } else {
-                            destPos[i] = coordinateMultiIndices[i]->get(value);
-                        }
-                    }
+                    destPos[i] = value.getInt64();
                 } else if (j == SYNTHETIC) {
                     destPos[i] = dimStartSynthetic;
                 } else {
@@ -596,12 +586,8 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
             // Build data (except the last two fields, i.e. position/chunkid) to be written
             for (size_t i = 0; i < destAttrs.size(); i++) {
                 size_t j = attrMapping[i];
-                if ( isFlipped(j) ) { // if flipped from a dim and ...
-                    if (destAttrs[i].getType() == TID_INT64) { // ... if this is an INT64 dim
-                        valuesInRedimArray[i].setInt64( srcPos[turnOff(j, FLIP)] );
-                    } else { // ... if this is an NID
-                        valuesInRedimArray[i] = srcArrayDesc.getOriginalCoordinate(turnOff(j, FLIP), srcPos[turnOff(j, FLIP)], query);
-                    }
+                if ( isFlipped(j) ) { // if flipped from a dim
+                    valuesInRedimArray[i].setInt64( srcPos[turnOff(j, FLIP)] );
                 } else { // from an attribute
                     valuesInRedimArray[i] = srcChunkIterators[j]->getItem();
                 }

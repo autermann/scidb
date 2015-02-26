@@ -103,14 +103,6 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
             }
         }
 
-        // TEMPORARY until #2202 defines how to interpret arrays that have non-integer dimensions
-        // "array dimensions must be of equal size, temporarily"
-        for(unsigned dim =ROW; dim <= COL; dim++) {
-            if( !IS_INTEGRAL(dims[dim].getType())) {
-                throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR45);
-            }
-        }
-
         // check: chunk interval not too small
         if (dims[ROW].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE ||
             dims[COL].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE ) {

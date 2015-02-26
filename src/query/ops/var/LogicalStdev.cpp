@@ -131,13 +131,7 @@ public:
                                              srcDim.getCurrEnd(),
                                              srcDim.getEndMax(),
                                              i == 0 && groupBy[i] == 0 ? srcDim.getChunkInterval() : srcDim.getCurrLength(),
-                                             0,
-                                             srcDim.getType(),
-                                             srcDim.getFlags(),
-                                             srcDim.getMappingArrayName(),
-                                             srcDim.getComment(),
-                                             srcDim.getFuncMapOffset(),
-                                             srcDim.getFuncMapScale());
+                                             0);
             }
             return ArrayDesc(desc.getName(), aggAttrs, aggDims);
         }

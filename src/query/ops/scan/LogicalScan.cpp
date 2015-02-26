@@ -89,31 +89,6 @@ public:
         SystemCatalog* systemCatalog = SystemCatalog::getInstance();
 
         systemCatalog->getArrayDesc(arrayRef->getObjectName(), arrayRef->getVersion(), schema);
-        
-        if (arrayRef->getIndex() != "")
-        {
-            const string &dimName = arrayRef->getIndex();
-            const Dimensions &dims = schema.getDimensions();
-            size_t i, n = dims.size();
-            for (i = 0; i < n && dims[i].getBaseName() != dimName; ++i) ;
-            if (i == n) {
-                assert(false);
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) <<
-                      (string("dimension ")+dimName+string(" not found"));
-            }
-            if (dims[i].getType() == TID_INT64) {
-                assert(false);
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) <<
-                      string("Non-integer dimensions expected");
-            }
-            const string &mappingArray = schema.getMappingArrayName(i);
-            if (!SystemCatalog::getInstance()->containsArray(mappingArray)) {
-                assert(false);
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) <<
-                      (string("dimension mapping array ")+mappingArray+string(" not found"));
-            }
-            systemCatalog->getArrayDesc(mappingArray, schema);
-        }
 
         schema.addAlias(arrayRef->getObjectName());
         schema.trim();

@@ -86,11 +86,6 @@ class SciDBExecutor: public scidb::SciDB
             if (libName != "scidb")
                 plugins.push_back(libName);
         }
-        for (size_t i = 0; i < desc.getDimensions().size(); i++) {
-            const string& libName = TypeLibrary::getTypeLibraries().getObjectLibrary(desc.getDimensions()[i].getType());
-            if (libName != "scidb")
-                plugins.push_back(libName);
-        }
     }
 
     void prepareQuery(const std::string& queryString,

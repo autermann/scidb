@@ -20,24 +20,14 @@
 * END_COPYRIGHT
 */
 
+#ifndef  AFL_SCANNER_H_
+#define  AFL_SCANNER_H_
 
-/**
- * @file
- *
- * @brief Derived scanner from base FlexLexer
- *
- * @author Artyom Smirnov <smirnoffjr@gmail.com>
- */
-
-#ifndef AFL_SCANNER_H_
-#define AFL_SCANNER_H_
-
-#undef yyFlexLexer
-#define yyFlexLexer AFLBaseFlexLexer
-#include "FlexLexer.h"
-
+#include <util/arena/ScopedArena.h>
 #include "AFLParser.hpp"
-#include "util/StackAlloc.h"
+#undef   yyFlexLexer
+#define  yyFlexLexer AFLBaseFlexLexer
+#include "FlexLexer.h"
 
 namespace scidb
 {
@@ -47,20 +37,22 @@ class QueryParser;
 class AFLScanner : public AFLBaseFlexLexer
 {
 public:
-    AFLScanner(QueryParser &glue, std::istream* arg_yyin = 0,    std::ostream* arg_yyout = 0);
+    AFLScanner(QueryParser& glue,std::istream* = 0,std::ostream* = 0);
 
-    virtual ~AFLScanner();
+    virtual ~AFLScanner() {}
 
-    virtual AFLParser::token_type lex(AFLParser::semantic_type* yylval, AFLParser::location_type* yylloc);
+    virtual short lex(AFLParser::semantic_type*,AFLParser::location_type*);
 
-    void set_debug(bool b);
+    void set_debug(bool);
 
 private:
-    QueryParser &_glue;
+    char* copyLexeme(size_t,const char*);
 
-    scidb::StackAlloc<char> stringsAllocator;
+private:
+    QueryParser&       _glue;
+    arena::ScopedArena _arena;
 };
 
 }
 
-#endif /* AFL_SCANNER_H_ */
+#endif

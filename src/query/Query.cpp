@@ -1052,7 +1052,7 @@ void UpdateErrorHandler::_handleError(const shared_ptr<Query>& query)
                  "Update error handler is invoked for query ("
                  << query->getQueryID() << ")");
 
-   RollbackWork rw = bind(&UpdateErrorHandler::doRollback, _1, _2, _3, _4);
+   RollbackWork rw = bind(&UpdateErrorHandler::doRollback, _1, _2, _3);
 
    if (_lock->getInstanceRole() == SystemCatalog::LockDesc::COORD) {
       handleErrorOnCoordinator(_lock, rw);
@@ -1098,7 +1098,6 @@ void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog
 
    VersionID newVersion      = coordLock->getArrayVersion();
    ArrayID newArrayVersionId = coordLock->getArrayVersionId();
-   uint64_t timestamp = lock->getTimestamp();
 
    if (newVersion != 0) {
       ArrayID arrayId = coordLock->getArrayId();
@@ -1111,10 +1110,8 @@ void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog
                     << lock->getQueryId() << ")");
 
       if (newArrayVersionId > 0 && rollback) {
-         rollback(lastVersion, arrayId, newArrayVersionId, timestamp);
+         rollback(lastVersion, arrayId, newArrayVersionId);
       }
-   } else if (rollback && lock->getImmutableArrayId() > 0) {
-       rollback(-1, lock->getImmutableArrayId(), newArrayVersionId, timestamp);
    }
 
    if (coordLock->getLockMode() == SystemCatalog::LockDesc::CRT) {
@@ -1136,14 +1133,12 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
    string const& arrayName   = lock->getArrayName();
    VersionID newVersion      = lock->getArrayVersion();
    ArrayID newArrayVersionId = lock->getArrayVersionId();
-   uint64_t timestamp = lock->getTimestamp();
 
    LOG4CXX_TRACE(_logger, "UpdateErrorHandler::handleErrorOnWorker:"
                  << " forceLockCheck = "<< forceCoordLockCheck
                  << " arrayName = "<< arrayName
                  << " newVersion = "<< newVersion
-                 << " newArrayVersionId = "<< newArrayVersionId
-                 << " timestamp = "<< timestamp);
+                 << " newArrayVersionId = "<< newArrayVersionId);
 
    if (newVersion != 0) {
 
@@ -1172,10 +1167,8 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
        assert(forceCoordLockCheck || lastVersion < newVersion);
 
        if (lastVersion < newVersion && newArrayVersionId > 0 && rollback) {
-           rollback(lastVersion, arrayId, newArrayVersionId, timestamp);
+           rollback(lastVersion, arrayId, newArrayVersionId);
        }
-   } else if (rollback && lock->getImmutableArrayId() > 0) {
-       rollback(-1, lock->getImmutableArrayId(), newArrayVersionId, timestamp);
    }
    LOG4CXX_TRACE(_logger, "UpdateErrorHandler::handleErrorOnWorker:"
                      << " exit");
@@ -1183,42 +1176,31 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
 
 void UpdateErrorHandler::doRollback(VersionID lastVersion,
                                     ArrayID baseArrayId,
-                                    ArrayID newArrayId,
-                                    uint64_t timestamp)
+                                    ArrayID newArrayId)
 {
 
     LOG4CXX_TRACE(_logger, "UpdateErrorHandler::doRollback:"
                   << " lastVersion = "<< lastVersion
                   << " baseArrayId = "<< baseArrayId
-                  << " newArrayId = "<< newArrayId
-                  << " timestamp = "<< timestamp);
+                  << " newArrayId = "<< newArrayId);
    // if a query stopped before the coordinator recorded the new array version id
    // there is no rollback to do
+
+   assert(newArrayId>0);
    assert(baseArrayId>0);
-   if (newArrayId>0) {
-       std::map<ArrayID,VersionID> undoArray;
-       undoArray[baseArrayId] = lastVersion;
-       try {
-           StorageManager::getInstance().rollback(undoArray);
-           StorageManager::getInstance().remove(baseArrayId, newArrayId);
-       } catch (const scidb::Exception& e) {
-           LOG4CXX_ERROR(_logger, "UpdateErrorHandler::doRollback:"
-                         << " lastVersion = "<< lastVersion
-                         << " baseArrayId = "<< baseArrayId
-                         << " newArrayId = "<< newArrayId
-                         << ". Error: "<< e.what());
-           throw; //XXX TODO: anything to do ???
-       }
-   } else {
-       try {
-           StorageManager::getInstance().remove(baseArrayId, baseArrayId, timestamp);
-       } catch (const scidb::Exception& e) {
-           LOG4CXX_ERROR(_logger, "UpdateErrorHandler::doRollback:"
-                         << " baseArrayId = "<< baseArrayId
-                         << " timestamp = "<< timestamp
-                         << ". Error: "<< e.what());
-           throw; //XXX TODO: anything to do ???
-       }
+
+   std::map<ArrayID,VersionID> undoArray;
+   undoArray[baseArrayId] = lastVersion;
+   try {
+       StorageManager::getInstance().rollback(undoArray);
+       StorageManager::getInstance().remove(baseArrayId, newArrayId);
+   } catch (const scidb::Exception& e) {
+       LOG4CXX_ERROR(_logger, "UpdateErrorHandler::doRollback:"
+                     << " lastVersion = "<< lastVersion
+                     << " baseArrayId = "<< baseArrayId
+                     << " newArrayId = "<< newArrayId
+                     << ". Error: "<< e.what());
+       throw; //XXX TODO: anything to do ???
    }
 }
 
@@ -1250,6 +1232,7 @@ boost::shared_ptr<Array> Query::getArray(std::string const& arrayName)
     return arr ? arr : boost::shared_ptr<Array>(DBArray::newDBArray(arrayName, shared_from_this()));
 }
 
+//TODO-3667: check who uses this besides NIDS
 void Query::setTemporaryArray(boost::shared_ptr<Array> const& tmpArray)
 {
     _temporaryArrays[tmpArray->getArrayDesc().getName()] = tmpArray;

@@ -171,7 +171,6 @@ public:
                                                             srcAttr.getAliases(),
                                                             &srcAttr.getDefaultValue(),
                                                             srcAttr.getDefaultValueExpr(),
-                                                            srcAttr.getComment(),
                                                             srcAttr.getVarSize()));
             }
         }
@@ -235,7 +234,6 @@ public:
                                                      inAttr.getAliases(),
                                                      &inAttr.getDefaultValue(),
                                                      inAttr.getDefaultValueExpr(),
-                                                     inAttr.getComment(),
                                                      inAttr.getVarSize()));
                 }
                 else
@@ -250,22 +248,12 @@ public:
                                 MIN_COORDINATE,
                                 MAX_COORDINATE,
                                 defaultChunkSize,
-                                0,  
-                                inAttr.getType()
-                                );
+                                0);
                     }
                     else
                     {
-                        dim = DimensionDesc(
-                                inAttr.getName(),
-                                0,
-                                0,
-                                MIN_COORDINATE,
-                                MAX_COORDINATE,
-                                defaultChunkSize,
-                                0,
-                                inAttr.getType()
-                                );
+                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE)
+                              << inAttr.getName() << TID_INT64;
                     }
                     dim.addAlias(schemas[0].getName());
                     BOOST_FOREACH(const string& attrAlias, inAttr.getAliases())
@@ -282,13 +270,13 @@ public:
                     AttributeDesc(
                             outAttrId++,
                             inDim.getBaseName(),
-                            inDim.getType(),
+                            TID_INT64,
                             0,
                             0)
                 );
             }
             outAttrs.push_back(AttributeDesc(
-                    outAttrId, "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+                    outAttrId, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
             if (!outDims.size())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR1);
@@ -332,15 +320,10 @@ public:
             {
                 if (srcDims[j].hasNameAndAlias(dstAttrs[i].getName()))
                 {
-                    if (srcDims[j].getType() != dstAttrs[i].getType())
+                    if (dstAttrs[i].getType() != TID_INT64)
                     {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DIMENSION_TYPE)
-                            << srcDims[j].getBaseName() << srcDims[j].getType() << dstAttrs[i].getType();
-                    }
-                    if (dstAttrs[i].getFlags() != 0)
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_FLAGS)
-                            << dstAttrs[i].getName();
+                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_TYPE)
+                            << srcDims[j].getBaseName() <<  TID_INT64 << dstAttrs[i].getType();
                     }
 
                     goto NextAttr;
@@ -368,29 +351,6 @@ public:
                 DimensionDesc const& srcDim = srcDims[j];
                 if (srcDim.hasNameAndAlias(dstDims[i].getBaseName()))
                 {
-                    if (dstDims[i].getType() != TID_INT64 && dstDims[i].getStart() != srcDim.getStart())
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6);
-                    }
-                    if (dstDims[i].getType() != srcDim.getType()) {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR4) << srcDim.getBaseName();
-                    }
-                    if (dstDims[i].getMappingArrayName() != srcDim.getMappingArrayName()) { 
-                        dstDims[i] = DimensionDesc(dstDims[i].getBaseName(), dstDims[i].getNamesAndAliases(),
-                                                   srcDim.getStartMin(), 
-                                                   srcDim.getCurrStart(),
-                                                   srcDim.getCurrEnd(),
-                                                   dstDims[i].getEndMax(), 
-                                                   dstDims[i].getChunkInterval(),
-                                                   dstDims[i].getChunkOverlap(), 
-                                                   srcDim.getType(),
-                                                   dstDims[i].getFlags(),
-                                                   srcDim.getMappingArrayName(),
-                                                   dstDims[i].getComment(),
-                                                   srcDim.getFuncMapOffset(),
-                                                   srcDim.getFuncMapScale());
-                        
-                    }
                     goto NextDim;
                 }
             }
@@ -407,8 +367,7 @@ public:
                         }
                     }
 
-                    if (( srcAttrs[j].getType() != dstDims[i].getType() && dstDims[i].getType() != TID_INT64 ) ||
-                        ( srcAttrs[j].getFlags() & ~AttributeDesc::IS_NULLABLE) != 0 )
+                    if ( !IS_INTEGRAL( srcAttrs[j].getType()) || srcAttrs[j].getType() == TID_UINT64 )
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_STORE_ERROR5) << srcAttrs[j].getName();
 
                     dstDims[i] = DimensionDesc(dstDims[i].getBaseName(), dstDims[i].getNamesAndAliases(),
@@ -417,14 +376,11 @@ public:
                                                MIN_COORDINATE,
                                                dstDims[i].getEndMax(), 
                                                dstDims[i].getChunkInterval(),
-                                               dstDims[i].getChunkOverlap(), 
-                                               srcAttrs[j].getType(),
-                                               dstDims[i].getFlags(),
-                                               dstDesc.createMappingArrayName(i, 0));
+                                               dstDims[i].getChunkOverlap());
                     goto NextDim;
                 }
             }
-            if (nNewDims++ != 0 || !aggregatedNames.empty() || dstDims[i].getType() != TID_INT64) { 
+            if (nNewDims++ != 0 || !aggregatedNames.empty()) {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION)
                     << dstDims[i].getBaseName();
             }

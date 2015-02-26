@@ -82,7 +82,6 @@ set(ops_lib_src
     aggregates/LogicalCumulate.cpp
     aggregates/PhysicalCumulate.cpp
     join/JoinArray.cpp
-    join/MapJoinArray.cpp
     join/LogicalJoin.cpp
     join/PhysicalJoin.cpp
     cross_join/CrossJoinArray.cpp
@@ -90,9 +89,6 @@ set(ops_lib_src
     cross_join/PhysicalCrossJoin.cpp
     substitute/LogicalSubstitute.cpp
     substitute/PhysicalSubstitute.cpp
-    multiply/LogicalMultiply.cpp
-    multiply/PhysicalMultiply.cpp
-    multiply/MultiplyArray.cpp
     slice/LogicalSlice.cpp
     slice/PhysicalSlice.cpp
     slice/SliceArray.cpp
@@ -211,6 +207,10 @@ set(ops_lib_src
     test/splitarray/PhysicalSplitArrayTest.cpp
     consume/LogicalConsume.cpp
     consume/PhysicalConsume.cpp
+    uniq/LogicalUniq.cpp
+    uniq/PhysicalUniq.cpp
+    index_lookup/LogicalIndexLookup.cpp
+    index_lookup/PhysicalIndexLookup.cpp
 )
 
 file(GLOB_RECURSE ops_lib_include "*.h")

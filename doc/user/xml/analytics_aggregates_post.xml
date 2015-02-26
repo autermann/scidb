@@ -213,6 +213,31 @@ min:int32 NULL DEFAULT null &gt;
 </programlisting><screen>{i} a,b
 {0} 4,16
 </screen></para></para></para>
+
+    <para><indexterm>
+        <primary>special values</primary>
+
+        <secondary>aggregates</secondary>
+      </indexterm><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>special values</secondary>
+      </indexterm>The rules for aggregates concerning missing values and empty
+    cells:<itemizedlist>
+        <listitem>
+          <para>All aggregate operators and functions exclude empty
+          cells.</para>
+        </listitem>
+
+        <listitem>
+          <para>Except for <code>count(*)</code>, aggregate operators and
+          functions exclude missing values.</para>
+        </listitem>
+
+        <listitem>
+          <para><code>count(*)</code> includes missing values.</para>
+        </listitem>
+      </itemizedlist></para>
   </section>
 
   <section>
@@ -501,71 +526,64 @@ i 1 <command>PRECEDING</command> <command>AND</command> 1 <command>FOLLOWING</co
       </indexterm>The preceding sections of this chapter describe those
     features of SciDB that were designed exclusively to calculate aggregates.
     You can also calculate aggregates "in-line" as part of other data
-    management or rearrangement steps: the redimension and redimension_store
-    operators support this type of usage. Those operators are used to
+    management or rearrangement steps: the redimension 
+    operator supports this type of usage. The redimension operator is used to
     transform a source array into a result array with different schema or
     dimensions. In those cases, aggregates can be useful in summarizing
     multiple elements from the source array that are mapped to a single
     element in the destination array.</para>
 
-    <para>For example, suppose you have a 2-dimensional array describing some
-    recent olympic champions, and you want to produce a 1-dimensional array
-    that shows the gold-medal count for each country.</para>
+    <para>For example, suppose you have an array describing some recent
+    Olympic champions, and you want to produce an array that shows the
+    gold-medal count for each country.</para>
 
-    <para>The schema of the original 2-dimensional array (named "winners")
+    <para>The schema of the array, <emphasis role="bold">winners</emphasis>,
     appears below:</para>
 
     <para><programlisting>AFL% show(winners)</programlisting><screen><command>winners</command>
 
-&lt; person:string,
+&lt; event:string,
+person:string,
+year:int64,
+time:double,
 country:string,
-time:double &gt;
+country_id:int64 &gt;
 
-[year=1996:2008,13,0,
-event(string)=3,3,0]</screen><para>To examine the data in the "winners" array, use the following AQL
-    statement with the -o lcsv+ format: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners;
-</programlisting><screen>{year,event} person,country,time
-{1996,'dash'} 'Bailey','Canada',9.84
-{1996,'marathon'} 'Thugwane','USA',7956
-{1996,'steeplechase'} 'Keter','Kenya',487.12
-{2000,'dash'} 'Greene','USA',9.87
-{2000,'marathon'} 'Abera','Ethiopia',7811
-{2000,'steeplechase'} 'Kosgei','Kenya',503.17
-{2004,'dash'} 'Gatlin','USA',9.85
-{2004,'marathon'} 'Baldini','Italy',7855
-{2004,'steeplechase'} 'Kemboi','Kenya',485.81
-{2008,'dash'} 'Bolt','Jamaica',9.69
-{2008,'marathon'} 'Wanjiru','Kenya',7596
-{2008,'steeplechase'} 'Kipruto','Kenya',490.34
+[i=0:*,144,0]</screen><para>To examine the data in the <emphasis role="bold">winners
+    </emphasis>array, use the following AFL statement with the -o lcsv+
+    format: <para><programlisting>AFL% scan(winners)  </programlisting><screen>i,event,person,year,time,country,country_id
+0,'dash','Bailey',1996,9.84,'Canada',0
+1,'dash','Greene',2000,9.87,'USA',5
+2,'dash','Gatlin',2004,9.85,'USA',5
+3,'dash','Bolt',2008,9.69,'Jamaica',3
+4,'steeplechase','Keter',1996,487.12,'Kenya',4
+5,'steeplechase','Kosgei',2000,503.17,'Kenya',4
+6,'steeplechase','Kemboi',2004,485.81,'Kenya',4
+7,'steeplechase','Kipruto',2008,490.34,'Kenya',4
+8,'marathon','Thugwane',1996,7956,'USA',5
+9,'marathon','Abera',2000,7811,'Ethiopia',1
+10,'marathon','Baldini',2004,7855,'Italy',2
+11,'marathon','Wanjiru',2008,7596,'Kenya',4
 </screen></para></para>
 
     <para>To create the schema for the desired array, execute the following
-    AQL statement:</para>
+    statement:<para><programlisting>AFL% CREATE ARRAY perCountryMedalCount &lt;country:string, medalCount: uint64 null&gt; [country_id=0:*,20,0];
+       </programlisting></para></para>
 
-    <para><programlisting>AQL% <command>CREATE ARRAY</command> perCountryMedalCount &lt;medalCount: uint64 null&gt; [country(string)=20,20,0];  </programlisting><para>Notice that the sole dimension is country, which is an attribute
-    (not a dimension) of the original "winners" array. To populate the desired
-    array with data, use the following AFL statement:</para>
+    <para>Notice that the sole dimension is the country ID (<emphasis role="bold">country_id</emphasis>), which is an attribute (not a
+    dimension) of the original<emphasis role="bold"> winners </emphasis>array.
+    To populate the desired array with data, use the following AFL
+    statement:<para><programlisting>AFL% store(redimension(winners, perCountryMedalCount, count(*) as medalCount),perCountryMedalCount);  </programlisting><screen>{country_id} country,medalCount
+{0} 'Canada',1
+{1} 'Ethiopia',1
+{2} 'Italy',1
+{3} 'Jamaica',1
+{4} 'Kenya',5
+{5} 'USA',3
+</screen></para></para>
 
-    <para><programlisting>AFL% redimension_store (winners, perCountryMedalCount, count(*) as medalCount)
-</programlisting><screen>{country} medalCount
-{'Canada'} 1
-{'Ethiopia'} 1
-{'Italy'} 1
-{'Jamaica'} 1
-{'Kenya'} 5
-{'USA'} 3
-</screen><para>The result of this redimension_store operation is the desired array.
-    You can examine the contents with the following AQL statement:</para>
-
-    <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> perCountryMedalCount;
-</programlisting><screen>{country} medalCount
-{'Canada'} 1
-{'Ethiopia'} 1
-{'Italy'} 1
-{'Jamaica'} 1
-{'Kenya'} 5
-{'USA'} 3
-</screen><para>Notice that the sum of the counts is 12—the number of nonempty cells
-    in the "winners" array.</para>
-  </para></para></para></para></section>
+    <para>The result of this redimension operation is the desired array.
+    Notice that the sum of the counts is 12, the number of nonempty cells in
+    the <emphasis role="bold">winners </emphasis>array.</para>
+  </para></section>
 </section>

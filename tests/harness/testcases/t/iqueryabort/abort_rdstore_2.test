@@ -10,17 +10,17 @@ store(join(build_sparse(ABR2,'a_'+string(x+1),1),build_sparse(ABR2,'b_'+string(x
 --echo "issuing redim"
 #redimension_store(ABR1,ABR3)
 
---shell --command "../utils/killquery.sh -afl 2 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 2 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_1.stdout"
+--shell --command "cat /tmp/${HPID}_1.stdout"
 
---shell --command "../utils/killquery.sh -afl 15 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 15 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_2.stdout"
+--shell --command "cat /tmp/${HPID}_2.stdout"
 
---shell --command "../utils/killquery.sh -afl 9 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_3.stdout"
+--shell --command "cat /tmp/${HPID}_3.stdout"
 
 --echo "should be empty..."
 scan(ABR3)
@@ -37,6 +37,6 @@ project(sort(filter(list('arrays'), regex(name,'ABR.*'))),name,schema)
 remove(ABR1)
 remove(ABR2)
 remove(ABR3)
---shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_3.stdout 2>/dev/null"

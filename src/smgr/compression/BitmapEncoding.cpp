@@ -143,20 +143,12 @@ namespace scidb {
         TypeId type = chunk.getAttributeDesc().getType();        
         _elementSize = TypeLibrary::getType(type).byteSize();
 
-        if(_elementSize == 0 || _elementSize > 8 || chunk.isSparse() || !chunk.getArrayDesc().isImmutable() || chunk.getAttributeDesc().isNullable())
-        {
-            _bitmapElements = chunkSize;
-            _elementSize = 1;
-        }
-        else
-        {
-            _bitmapElements = chunkSize / _elementSize;
-        }
+        /* No more immutable arrays, to keep consistent with old code, always treat data as string
+         */
+        _bitmapElements = chunkSize;
+        _elementSize = 1;
 
         if(!_bitmapElements) { return chunkSize; }
-
-       
-       
 
         char *readPos = const_cast<char *>(dataSrc);
         ByteOutputItr out((uint8_t *) dst, chunkSize-1);
@@ -231,16 +223,10 @@ namespace scidb {
         TypeId type = chunk.getAttributeDesc().getType();        
         _elementSize = TypeLibrary::getType(type).byteSize();
 
-        if(_elementSize == 0 || _elementSize > 8 || chunk.isSparse() || !chunk.getArrayDesc().isImmutable() || chunk.getAttributeDesc().isNullable())
-        {
-            _bitmapElements = chunkSize;
-            _elementSize = 1;
-        }
-        else
-        {
-            _bitmapElements = chunkSize / _elementSize;
-        }
-
+        /* No more immutable arrays, to keep consistent with old code, always treat data as string
+         */
+        _bitmapElements = chunkSize;
+        _elementSize = 1;
 
         if(!_bitmapElements) { return chunkSize; }
 

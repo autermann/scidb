@@ -60,10 +60,7 @@ namespace scidb {
                     if (_mode & TILE_MODE) {
                         _iterators[i]->getItem().getTile()->getCoordinates(_array.getInputArray()->getArrayDesc(), _array.bindings[i].resolvedId, _iterators[i]->getChunk().getFirstPosition(false), _iterators[i]->getPosition(), _query, _params[i], !(_mode & IGNORE_OVERLAPS));
                     } else {
-
-                        _params[i] = _array.getInputArray()->getArrayDesc().getOriginalCoordinate(_array.bindings[i].resolvedId,
-                                                                                              inputIterator->getPosition()[_array.bindings[i].resolvedId],
-                                                                                              _query);
+                        _params[i].setInt64(inputIterator->getPosition()[_array.bindings[i].resolvedId]);
                     }
                     break;
 

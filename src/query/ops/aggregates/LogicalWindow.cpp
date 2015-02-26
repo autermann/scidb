@@ -188,13 +188,7 @@ PARAM_AGGREGATE_CALL)
                                        srcDim.getCurrEnd(),
                                        srcDim.getEndMax(),
                                        srcDim.getChunkInterval(), 
-                                       0,
-                                       srcDim.getType(),
-                                       srcDim.getFlags(),
-                                       srcDim.getMappingArrayName(),
-                                       srcDim.getComment(),
-                                       srcDim.getFuncMapOffset(),
-                                       srcDim.getFuncMapScale());
+                                       0);
         }
 
         ArrayDesc output (desc.getName(), Attributes(), aggDims);

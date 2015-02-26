@@ -342,20 +342,15 @@ COMMIT</screen>
         <para>CentOS and RHEL have SELinux (Security-Enhanced Linux) enabled
         by default. This can cause problems when you attempt to set up
         password-less SSH. You can either disable SELinux or configure SELinux
-        to allow password-less ssh to function correctly.<itemizedlist>
-            <listitem>
-              <para>Configure SELinux so that password-less ssh works. As the
-              scidb user, run the following commands on each
-              host:<programlisting>ssh-copy-id scidb@<replaceable>hostname</replaceable>
-ssh scidb@<replaceable>hostname</replaceable> "chcon -R -v -t user_ssh_home_t ~/.ssh"</programlisting>Or,</para>
-            </listitem>
+        to allow password-less SSH to function correctly. For details, see
+        your operating system documentation, or search the web for
+        instructions.</para>
 
-            <listitem>
-              <para>Disable SELinux. For details, see your operating system
-              documentation, or search the web for instructions. Note that
-              this method may introduce security risks.</para>
-            </listitem>
-          </itemizedlist></para>
+        <para>
+          <note>
+            <para>Disabling SELinux may introduce security risks.</para>
+          </note>
+        </para>
 
         <para>For more information on SELinux, see <ulink
         url="http://wiki.centos.org/HowTos/SELinux">http://wiki.centos.org/HowTos/SELinux</ulink>.</para>
@@ -721,8 +716,7 @@ smgr-cache-size=1024
 execution-threads=16
 result-prefetch-queue-size=4
 result-prefetch-threads=4
-chunk-segment-size=100485760
-</programlisting></para>
+chunk-segment-size-in-mb=100</programlisting></para>
 
       <para>For an example of the configuration for a SciDB cluster, and for
       more details about the configuration parameters, see <xref
@@ -738,23 +732,30 @@ chunk-segment-size=100485760
     <para>Run the following commands to initialize and start a SciDB
     database:</para>
 
+    <note>
+      <simpara>For all of the following commands, replace
+      [<replaceable>db</replaceable>] with the name of your actual
+      cluster.</simpara>
+    </note>
+
     <procedure>
       <step>
         <para><indexterm>
             <primary>Postgres</primary>
           </indexterm>Initialize the system catalog database in Postgres. This
         must be done as user Postgres, therefore, this command must be run as
-        user Postgres, or as superuser as follows. <programlisting>cd /tmp &amp;&amp; sudo -u postgres /opt/scidb/&scidb_version;/bin/scidb.py init_syscat <replaceable>db</replaceable></programlisting></para>
+        user Postgres, or as superuser as follows. <programlisting>cd /tmp &amp;&amp; sudo -u postgres /opt/scidb/&scidb_version;/bin/scidb.py init_syscat [<replaceable>db</replaceable>]</programlisting></para>
       </step>
 
       <step>
-        <para>Run the following command as the 'scidb' user.<programlisting>scidb.py initall <replaceable>db</replaceable></programlisting><warning>
+        <para>Run the following command as the 'scidb' user.<programlisting>scidb.py initall [<replaceable>db</replaceable>]</programlisting><warning>
             <para>This will reinitialize the SciDB database. Any arrays that
             you have created in previous SciDB sessions will be removed and
             corresponding storage files will be deleted.</para>
           </warning></para>
 
-        <para>If the scidb.py initall command fails with an error, inspect the
+        <para>If the <code>scidb.py initall </code>command fails with an
+        error, inspect the
         <replaceable>&lt;base-path&gt;</replaceable>/000/0/scidb.log file. If
         the log indicates a PostgreSQL authentication error, modify the
         <literal>pg_hba.conf</literal> file, and change the authentication
@@ -765,18 +766,18 @@ chunk-segment-size=100485760
 
       <step>
         <para>Again, as the 'scidb' user, start the set of local SciDB
-        instances specified in your config.ini file.<programlisting>scidb.py startall <replaceable>db</replaceable></programlisting></para>
+        instances specified in your config.ini file.<programlisting>scidb.py startall [<replaceable>db</replaceable>]</programlisting></para>
       </step>
     </procedure>
 
     <para>You can also execute the following commands (as the 'scidb'
     user).<itemizedlist>
         <listitem>
-          <para>To report the status of the various instances:<programlisting>scidb.py status <replaceable>db</replaceable></programlisting></para>
+          <para>To report the status of the various instances:<programlisting>scidb.py status [<replaceable>db</replaceable>]</programlisting></para>
         </listitem>
 
         <listitem>
-          <para>To stop all SciDB instances:<programlisting>scidb.py stopall <replaceable>db</replaceable></programlisting></para>
+          <para>To stop all SciDB instances:<programlisting>scidb.py stopall [<replaceable>db</replaceable>]</programlisting></para>
         </listitem>
       </itemizedlist></para>
 
@@ -1226,7 +1227,10 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout></para><para>You
             </row>
 
             <row>
-              <entry><para>chunk-segment-size (optional)</para></entry>
+              <entry><para>chunk-segment-size (optional)</para><para><emphasis
+              role="bold">Deprecated. </emphasis>This parameter may be removed
+              in the future. Use <code>chunk-segment-size-in-mb</code>
+              instead.</para></entry>
 
               <entry><para>Size of a storage segment in bytes. Set to a
               nonzero value to enable reuse of storage from removed arrays. If
@@ -1234,6 +1238,17 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout></para><para>You
               to contain the largest chunk of the array. If set to zero, no
               space reuse or storage reclamation is done. Default value: 85MB.
               Maximum size: 2,147,483,647 B (= 2GB).</para></entry>
+            </row>
+
+            <row>
+              <entry><para>chunk-segment-size-in-mb (optional)</para></entry>
+
+              <entry><para>Size of a storage segment in megabytes. Set to a
+              nonzero value to enable reuse of storage from removed arrays. If
+              this number is set to a nonzero value, it must be large enough
+              to contain the largest chunk of the array. If set to zero, no
+              space reuse or storage reclamation is done. Default value: 85MB.
+              Note that there is no upper limit.</para></entry>
             </row>
 
             <row>
@@ -1310,7 +1325,7 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout></para><para>You
         </indexterm><indexterm>
           <primary>config.ini</primary>
         </indexterm>The following SciDB cluster configuration is called
-      'salty.' This cluster consists of 4 identical servers. Each server has
+      'salty.' This cluster consists of 2 identical servers. Each server has
       the the following characteristics:<itemizedlist>
           <listitem>
             <para>x86_64 4-core processor</para>
@@ -1335,9 +1350,9 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout></para><para>You
         </itemizedlist></para>
 
       <para>The following configuration file applies to such a cluster called
-      <literal>salty</literal>. <programlisting>[salty]
-server-0=p4xen1.local.paradigm4.com,7
-server-1=p4xen2.local.paradigm4.com,8
+      <literal>salty</literal>.<programlisting>[salty]
+server-0=p4xen1.local.paradigm4.com,3
+server-1=p4xen2.local.paradigm4.com,4
 db_user=salty
 db_passwd=salty
 install_root=/opt/scidb/&scidb_version;
@@ -1391,8 +1406,8 @@ data-dir-prefix-1-4=/datadisk2/salty.001.4
               <primary>port numbers</primary>
             </indexterm>The port numbers for each instance on a server are
           incremental. The port numbers in the above example are listed in the
-          comments for each server. Thus, instance number 4 on each server
-          uses the same port, 1604. Note that only the coordinator instance
+          comments for each server. Thus, instance number 3 on each server
+          uses the same port, 1603. Note that only the coordinator instance
           uses the base port, 1600.</para>
         </listitem>
 

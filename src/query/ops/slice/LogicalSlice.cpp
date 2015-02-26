@@ -79,7 +79,6 @@ public:
 	std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
 	{
 		assert(schemas.size() == 1);
-        Dimensions const& dims = schemas[0].getDimensions();
 		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
         size_t i = _parameters.size();
 		if ((i & 1) == 0)
@@ -89,8 +88,7 @@ public:
 		}
 		else
 		{
-			const shared_ptr<OperatorParamDimensionReference> &dimDesc = (const shared_ptr<OperatorParamDimensionReference>&) _parameters[i - 1];
-			res.push_back(PARAM_CONSTANT(dims[dimDesc->getObjectNo()].getType()));
+			res.push_back(PARAM_CONSTANT(TID_INT64));
 		}
 		return res;
 	}

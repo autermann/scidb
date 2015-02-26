@@ -29,7 +29,7 @@ Query was executed successfully
 {25} 9,8,8,'bar'
 {26} 9,1,8.2,'foo'
 
-SCIDB QUERY : <CREATE ARRAY Data < AV : double NULL > [ I(int64)=*,10,0, J(int64)=*,10,0, W(string)=*,4,0 ]>
+SCIDB QUERY : <CREATE ARRAY Data < AV : double NULL > [ I=0:*,10,0, J=0:*,10,0, W(string)=*,4,0 ]>
 Query was executed successfully
 
 SCIDB QUERY : <redimension_store(Raw_Test_Data, Data, avg ( V ) as AV)>

@@ -91,20 +91,20 @@
           array:<para><programlisting>AFL% show(winnersFlat)</programlisting><screen><command>winnersFlat</command>
 
 &lt; event:string,
-year:int64,
 person:string,
+year:int64,
 country:string,
 time:double &gt;
 
-[i=0:*,12,0]</screen></para></para>
+[i=0:11,12,0]</screen></para></para>
         </step>
 
         <step>
           <para>Create a result array describing the attributes of the source
           array:<para><programlisting>AFL% attributes(winnersFlat);</programlisting><screen>{No} name,type_id,nullable
 {0} 'event','string',false
-{1} 'year','int64',false
-{2} 'person','string',false
+{1} 'person','string',false
+{2} 'year','int64',false
 {3} 'country','string',false
 {4} 'time','double',false
 </screen></para></para>
@@ -113,19 +113,19 @@ time:double &gt;
         <step>
           <para>Create a result array characterizing the values of the
           attributes of the source array:<para><programlisting>AFL% analyze(winnersFlat);</programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} 'country','Canada','USA',5,6
-{1} 'event','dash','steeplechase',3,6
-{2} 'person','Abera','Wanjiru',6,6
-{3} 'time','9.84','7956',6,6
-{4} 'year','1996','2008',3,6
+{0} 'country','Canada','USA',6,12
+{1} 'event','dash','steeplechase',3,12
+{2} 'person','Abera','Wanjiru',12,12
+{3} 'time','9.69','7956',12,12
+{4} 'year','1996','2008',4,12
 </screen></para></para>
         </step>
 
         <step>
           <para>Create a result array characterizing the values of the numeric
           attributes (time and year) of the source array:<para><programlisting>AFL% analyze(winnersFlat,year,time);</programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} 'time','9.84','7956',6,6
-{1} 'year','1996','2008',3,6
+{0} 'time','9.69','7956',12,12
+{1} 'year','1996','2008',4,12
 </screen></para></para>
         </step>
       </procedure>

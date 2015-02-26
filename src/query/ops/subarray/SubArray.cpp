@@ -36,46 +36,6 @@ namespace scidb
 {
     using namespace boost;
     
-
-    void subarrayMappingArray(string const& dimName, string const& mappingArrayName, string const& tmpMappingArrayName, 
-                              Coordinate from, Coordinate till, boost::shared_ptr<Query> const& query)
-    {
-        shared_ptr<Array> srcMappingArray = query->getArray(mappingArrayName);
-        ArrayDesc const& srcMappingArrayDesc = srcMappingArray->getArrayDesc();
-        shared_ptr<ConstArrayIterator> srcArrayIterator = srcMappingArray->getConstIterator(0);
-        Coordinates origin(1);
-        origin[0] = srcMappingArrayDesc.getDimensions()[0].getStart();
-        srcArrayIterator->setPosition(origin);
-        ConstChunk const& srcChunk = srcArrayIterator->getChunk();
-        shared_ptr<ConstChunkIterator> srcChunkIterator = srcChunk.getConstIterator();
-        
-        Dimensions indexMapDim(1);
-        indexMapDim[0] = DimensionDesc("no", 0, 0, till-from, till-from, till-from+1, 0);                
-        ArrayDesc dstMappingArrayDesc(tmpMappingArrayName,
-                                      srcMappingArrayDesc.getAttributes(), 
-                                      indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
-        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc, query));
-        if (till >= from) { 
-            shared_ptr<ArrayIterator> dstArrayIterator = dstMappingArray->getIterator(0);
-            Coordinates pos(1);
-            Chunk& dstChunk = dstArrayIterator->newChunk(pos, 0);
-            dstChunk.setRLE(false);
-            shared_ptr<ChunkIterator> dstChunkIterator = dstChunk.getIterator(query);
-            
-            pos[0] = from;
-            if (srcChunkIterator->setPosition(pos)) {
-                while (from <= till && !srcChunkIterator->end()) { 
-                    dstChunkIterator->writeItem(srcChunkIterator->getItem());
-                    ++(*dstChunkIterator);
-                    ++(*srcChunkIterator);
-                    from += 1;
-                }
-            }
-            dstChunkIterator->flush();
-        }
-        query->setTemporaryArray(dstMappingArray);
-    }
-
     //
     // SubArray chunk methods
     //

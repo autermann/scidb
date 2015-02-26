@@ -7,7 +7,7 @@
 
 create array A <r:string NULL>[x=10:17,2,0]
 store(build(A,20*x+1),A)
-store(apply(A,s, iif(x=13,na,iif(x=16,null,x))),B)
+store(apply(A,s, iif(x=13,null,iif(x=16,null,x))),B)
 
 create array Z <val:double NULL> [x=0:5,3,0]
 store(build(Z,iif(x=1,-5.0/(2.0-2.0),iif(x=3 or x=4,null,5.0/(2.0-2.0)))),Z)

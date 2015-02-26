@@ -6,6 +6,13 @@
 
     <refpurpose>Returns the standard deviation for the specified attribute of
     the input array.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>stdev</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>stdev</code> operator may be removed in the future. Use the <link linkend="stdevAggregate">stdev aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -17,15 +24,15 @@
 
     <para><indexterm>
         <primary>standard deviation</primary>
-      </indexterm>The <literal>stdev</literal> operator takes a set of scalar
+</indexterm>The <code>stdev</code> operator takes a set of scalar
     values from an array attribute and returns the standard deviation of those
-    values. For the corresponding aggregate, see the <link linkend="stdevAggregate">stdev aggregate</link> reference.</para>
+    values.</para>
   </refsect1>
 
   <refsect1>
     <title>Inputs</title>
 
-    <para>The <literal>stdev</literal> operator takes the following
+    <para>The <code>stdev</code> operator takes the following
     arguments:<itemizedlist>
         <listitem>
           <para><emphasis role="bold">array</emphasis>: a source array with
@@ -61,15 +68,15 @@
         <step>
           <para>Store values of random values between 0 and 1 in m3x3:
           <para><programlisting>AFL% store(build(m3x3,random()%9/10.0),m3x3);  </programlisting><screen>[
-[(0.7),(0.7),(0.7)],
-[(0),(0.1),(0.5)],
-[(0.7),(0.1),(0.8)]
+[(0.8),(0.8),(0.4)],
+[(0.2),(0.7),(0.1)],
+[(0.6),(0.5),(0.7)]
 ]</screen></para></para>
         </step>
 
         <step>
           <para>Select the standard deviation of each row of m3x3:
-          <para><programlisting>AFL% stdev(m3x3,val,i);  </programlisting><screen>[(1.58051e-08),(0.264575),(0.378594)]
+          <para><programlisting>AFL% stdev(m3x3,val,i);  </programlisting><screen>[(0.23094),(0.321455),(0.1)]
 </screen></para></para>
         </step>
       </procedure>

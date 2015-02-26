@@ -6,10 +6,10 @@ SCIDB QUERY : <store(build(avg_array,i*4+j),avg_array)>
 
 SCIDB QUERY : <avg(avg_array,val,j)>
 {i} val_avg
-{0} 1.5
-{1} 5.5
-{2} 9.5
-{3} 13.5
+{0} 6
+{1} 7
+{2} 8
+{3} 9
 
 Query was executed successfully
 

@@ -79,7 +79,7 @@
 
       <procedure>
         <step>
-          <para>Show the source_array: <programlisting language="test">--afl CREATE ARRAY winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0];
+          <para>Show the source_array: <programlisting language="test">--afl CREATE ARRAY winners &lt;person:string, time:double, event:string&gt; [year=1996:2008,1000,0];
       --show-query=no --show-output=no
 
 --afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
@@ -97,9 +97,14 @@
       --show-query=no --show-output=no
 --afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat); --show-query=no --show-output=no
 
---afl CREATE ARRAY champions&lt;person:string,country:string,time:double&gt; 
-   [year=1996:2008,13,0,event(string)=3,3,0]; --show-query=no --show-output=no
---afl redimension_store(winnersFlat,champions); --show-query=no --show-output=no</programlisting><programlisting
+
+--afl create array event_index&lt;event:string&gt;[event_id=0:*,5,0]; --show-query=no --show-output=no
+--afl store(uniq(sort(project(winnersFlat,event)),'chunk_size=5'),event_index); --show-query=no --show-output=no
+--afl create_array(champions,&lt;person:string,country:string,time:double&gt; 
+   [year=1996:2008,13,0,event_id=0:3,3,0]); --show-query=no --show-output=no
+--afl store(redimension
+       (project(index_lookup(winnersFlat,event_index, winnersFlat.event, event_id),person,year,country,time,event_id)
+       ,champions),champions); --show-query=no --show-output=no</programlisting><programlisting
           language="test">--afl scan(champions); --show-query=yes --show-output=yes</programlisting></para>
         </step>
 

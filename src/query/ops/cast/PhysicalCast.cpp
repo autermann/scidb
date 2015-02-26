@@ -90,13 +90,7 @@ public:
                     srcDim.getCurrEnd(),
                     srcDim.getEndMax(),
                     srcDim.getChunkInterval(),
-                    srcDim.getChunkOverlap(),
-                    srcDim.getType(),
-                    srcDim.getFlags(),
-                    inputArray->getArrayDesc().getDimensions()[i].getMappingArrayName(),
-                    srcDim.getComment(),
-                    srcDim.getFuncMapOffset(),
-                    srcDim.getFuncMapScale());
+                    srcDim.getChunkOverlap());
         }
 
         ArrayDesc dstSchema("", _schema.getAttributes(), dstDimensions, _schema.getFlags());

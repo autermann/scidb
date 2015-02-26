@@ -40,12 +40,6 @@ using namespace boost;
 
 namespace scidb {
 
-inline string stripVersion(string const& s)
-{
-    size_t v = s.find('@');
-    return (v != string::npos) ? (s.substr(0, v) + s.substr(s.find(':'))) : s;
-}
-
 /**
  * @brief The operator: store().
  *
@@ -138,7 +132,7 @@ public:
                         if (attrsMap.count(ss.str()) == 0) {
                             newAttr = AttributeDesc(attr.getId(), ss.str(), attr.getType(), attr.getFlags(),
                                 attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
-                                attr.getDefaultValueExpr(), attr.getComment());
+                                attr.getDefaultValueExpr());
                             attrsMap[ss.str()] = 1;
                             break;
                         }
@@ -162,13 +156,7 @@ public:
                                            dim.getCurrEnd(), 
                                            dim.getEndMax(), 
                                            dim.getChunkInterval(), 
-                                           dim.getChunkOverlap(), 
-                                           dim.getType(), 
-                                           dim.getFlags(), 
-                                           dim.getMappingArrayName(), 
-                                           dim.getComment(),
-                                           dim.getFuncMapOffset(),
-                                           dim.getFuncMapScale());
+                                           dim.getChunkOverlap());
                 }
                 else
                 {
@@ -182,13 +170,7 @@ public:
                                                    dim.getCurrEnd(), 
                                                    dim.getEndMax(), 
                                                    dim.getChunkInterval(), 
-                                                   dim.getChunkOverlap(), 
-                                                   dim.getType(), 
-                                                   dim.getFlags(), 
-                                                   dim.getMappingArrayName(), 
-                                                   dim.getComment(),
-                                                   dim.getFuncMapOffset(),
-                                                   dim.getFuncMapScale());
+                                                   dim.getChunkOverlap());
                             dimsMap[ss.str()] = 1;
                             break;
                         }
@@ -215,14 +197,9 @@ public:
                                    && ((srcDims[i].getLength() % srcDims[i].getChunkInterval()) == 0
                                        || srcDesc.getEmptyBitmapAttribute() != NULL)))
                            && srcDims[i].getChunkInterval() == dstDims[i].getChunkInterval()
-                           && srcDims[i].getChunkOverlap() == dstDims[i].getChunkOverlap()
-                           && srcDims[i].getType() == dstDims[i].getType()))
+                           && srcDims[i].getChunkOverlap() == dstDims[i].getChunkOverlap()))
                 {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-                }
-                if (srcDims[i].getType() != TID_INT64 && stripVersion(srcDims[i].getMappingArrayName()) != stripVersion(dstDims[i].getMappingArrayName()) && !dstDims[i].getMappingArrayName().empty() && srcDims[i].getMappingArrayName().empty())
-                {
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_STORE_ERROR1);
                 }
             }
 
@@ -242,12 +219,7 @@ public:
                 newDims[i] = DimensionDesc(dim.getBaseName(),
                                            dim.getNamesAndAliases(),
                                            dim.getStartMin(), dim.getCurrStart(),
-                                           dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(),
-                                           dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
-                                           srcDims[i].getMappingArrayName(),
-                                           dim.getComment(),
-                                           dim.getFuncMapOffset(),
-                                           dim.getFuncMapScale());
+                                           dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(), dim.getChunkOverlap());
             }
             return ArrayDesc(dstDesc.getId(), dstDesc.getUAId(), dstDesc.getVersionId(), arrayName, dstDesc.getAttributes(), newDims, dstDesc.getFlags());
         }

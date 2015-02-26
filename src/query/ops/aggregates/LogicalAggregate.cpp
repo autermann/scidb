@@ -148,13 +148,7 @@ public:
                                                  inputDims[j].getCurrEnd(),
                                                  inputDims[j].getEndMax(),
                                                  inputDims[j].getChunkInterval(),
-                                                 0,
-                                                 inputDims[j].getType(),
-                                                 inputDims[j].getFlags(),
-                                                 inputDims[j].getMappingArrayName(),
-                                                 inputDims[j].getComment(),
-                                                 inputDims[j].getFuncMapOffset(),
-                                                 inputDims[j].getFuncMapScale()));
+                                                 0));
                 return;
             }
         }

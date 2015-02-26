@@ -38,16 +38,43 @@
 
             <entry>Syntax</entry>
 
-            <entry>Datatypes</entry>
+            <entry>Data Types</entry>
           </row>
         </thead>
 
         <tbody>
           <row>
+            <entry>first_index</entry>
+
+            <entry><indexterm>
+                <primary>first_index</primary>
+              </indexterm>Returns the initial dimension value of the supplied
+            dimension. This function takes two arguments:<itemizedlist>
+                <listitem>
+                  <para>Array name as a string</para>
+                </listitem>
+
+                <listitem>
+                  <para>Dimension name as a string (optional if the array has
+                  only one dimension)</para>
+                </listitem>
+              </itemizedlist></entry>
+
+            <entry>first_index ('array')<para>or</para>first_index
+            ('array','dimension')</entry>
+
+            <entry>string</entry>
+          </row>
+
+          <row>
             <entry>high</entry>
 
-            <entry>Returns the maximum dimension value where the cell is
-            non-empty. This function takes two arguments: <itemizedlist>
+            <entry><indexterm>
+                <primary>dimensions</primary>
+
+                <secondary>maximum value</secondary>
+              </indexterm>Returns the maximum dimension value where the cell
+            is non-empty. This function takes two arguments: <itemizedlist>
                 <listitem>
                   <para>Array name as a string</para>
                 </listitem>
@@ -84,9 +111,11 @@
           </row>
 
           <row>
-            <entry>last</entry>
+            <entry>last_index</entry>
 
-            <entry>Returns the final dimension value of the supplied
+            <entry><indexterm>
+                <primary>last_index</primary>
+              </indexterm>Returns the final dimension value of the supplied
             dimension. This function takes two arguments:<itemizedlist>
                 <listitem>
                   <para>Array name as a string</para>
@@ -98,7 +127,8 @@
                 </listitem>
               </itemizedlist></entry>
 
-            <entry>last('array')<para>or</para>last('array','dimension')</entry>
+            <entry>last_index ('array')<para>or</para>last_index
+            ('array','dimension')</entry>
 
             <entry>string</entry>
           </row>
@@ -133,8 +163,12 @@
           <row>
             <entry>low</entry>
 
-            <entry>Returns the minimum dimension value where the cell is
-            non-empty. This function takes two arguments: <itemizedlist>
+            <entry><indexterm>
+                <primary>dimensions</primary>
+
+                <secondary>minimum value</secondary>
+              </indexterm>Returns the minimum dimension value where the cell
+            is non-empty. This function takes two arguments: <itemizedlist>
                 <listitem>
                   <para>Array name as a string</para>
                 </listitem>

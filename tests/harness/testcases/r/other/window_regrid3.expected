@@ -131,13 +131,13 @@ SCIDB QUERY : <select sum(num) from C regrid  as (partition by x 1000 ,y 5000, z
 x,y,z,sum
 1,1,1,15.2
 100,20,100,inf
-100000,100,1000,0
+100000,100,1000,nan
 
 SCIDB QUERY : <select sum(num) from C regrid  as (partition by z 1000 , y 5000, x 10000)>
 x,y,z,sum
 1,1,1,15.2
 10,20,1000,inf
-10000,100,10000,0
+10000,100,10000,nan
 
 SCIDB QUERY : <select count(num1),sum(num1),count(num)*10000 from apply(C,num1,21*x+y) regrid  as (partition by z 1000 , y 5000, x 10000)>
 x,y,z,count,sum_1,expr
@@ -161,7 +161,7 @@ SCIDB QUERY : <select count(num1),sum(num1),avg(num/2) from apply(C,num1,21*x+y)
 x,y,z,count,sum_1,avg_2
 1,1,1,1,22,7.6
 183,9,1273,1,2200000,inf
-182150,41,12723,1,2100500000,null
+182150,41,12723,1,2100500000,nan
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

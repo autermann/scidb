@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
@@ -90,10 +89,22 @@
       <procedure>
         <step>
           <para>Show the schema for the 1-dimensional source
-          array:<programlisting language="test">
---afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winnersFew.csv &gt; $DOC_DATA/winnersFew.scidb --show-query=no --show-output=no
---aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' --show-query=no --show-output=no
+          array:<programlisting language="test">--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array year &lt;year:int64&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array person &lt;person:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array country &lt;country:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array time &lt;time:double&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl store(build(event,iif(i&lt;4,'dash',iif(i&lt;8,'steeplechase','marathon'))),event);
+       --show-query=no --show-output=no 
+--afl store(build(year,1996+(i%4 * 4)),year); --show-query=no --show-output=no
+--afl store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,Kemboi,Kipruto,
+      Thugwane,Abera,Baldini,Wanjiru]',true),person); --show-query=no --show-output=no
+--afl store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,Kenya,Kenya,USA,
+      Ethiopia,Italy,Kenya]',true),country); --show-query=no --show-output=no
+--afl store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),
+      (490.34),(7956),(7811),(7855),(7596)]',true),time); --show-query=no --show-output=no
+--afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat);
+       --show-query=no --show-output=no
 --schema winnersFlat</programlisting></para>
         </step>
 

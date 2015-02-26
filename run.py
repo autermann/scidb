@@ -599,6 +599,7 @@ def runTests(scidbEnv, testsPath, commands=[]):
              "export", "SCIDB_PORT=%s"%coordPort,";",
              "export", "SCIDB_BUILD_PATH=%s"%scidbEnv.build_path,";",
              "export", "SCIDB_INSTALL_PATH=%s"%scidbEnv.install_path,";",
+             "export", "SCIDB_SOURCE_PATH=%s"%scidbEnv.source_path,";",
              "export", "SCIDB_DATA_PATH=%s"%dataPath, ";",
              "export", "SCIDB_DB_USER=%s"%dbUser, ";",
              "export", "SCIDB_DB_PASSWD=%s"%dbPasswd, ";",

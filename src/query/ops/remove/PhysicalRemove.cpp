@@ -81,23 +81,7 @@ public:
 
         if (SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc, true))
         {
-            if (!arrayDesc.isImmutable())
-            {
-                BOOST_FOREACH(const VersionDesc &ver, SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId()))
-                {
-                    std::stringstream versionName;
-                    versionName << arrayName << "@" << ver.getVersionID();
-
-                    ArrayDesc versionArrayDesc;
-                    if (SystemCatalog::getInstance()->getArrayDesc(versionName.str(), versionArrayDesc, false))
-                    {
-                         removeCoordinateIndices(versionArrayDesc, query);
-                    }
-                }
-            }
-            // remove all versions at once
             StorageManager::getInstance().remove(arrayDesc.getUAId(), arrayDesc.getId());
-            removeCoordinateIndices(arrayDesc, query);
         }
         return boost::shared_ptr<Array>();
     }
@@ -109,23 +93,7 @@ public:
     }
 
 private:
-    void removeCoordinateIndices(ArrayDesc const& desc, shared_ptr<Query> query)
-    {        
-        Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0, n = dims.size(); i < n; i++) { 
-            if (dims[i].getType() != TID_INT64) {
-                string indexName = dims[i].getMappingArrayName();
-                ArrayDesc indexDesc;
-                if (SystemCatalog::getInstance()->getArrayDesc(indexName, indexDesc, false)
-                    && SystemCatalog::getInstance()->countReferences(indexName) <= 1)
-                {
-                    SystemCatalog::getInstance()->deleteArray(indexDesc.getId());
-                    StorageManager::getInstance().remove(indexDesc.getUAId(), indexDesc.getId());
-                    StorageManager::getInstance().removeCoordinateMap(indexName);
-                }
-            }
-        }
-    }
+
 
    boost::shared_ptr<SystemCatalog::LockDesc> _lock;
 };

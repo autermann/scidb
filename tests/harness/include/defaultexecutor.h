@@ -31,6 +31,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 #include <list>
 #include <fstream>
 #include <sstream>
@@ -57,12 +58,13 @@ struct ShellCommandOptions
 	ShellCommandOptions (void)
 	{
 		_store = false;
+		_storeAll = false;
 		_cwd = "";
 	}
 
 	std::string _command;
 	std::string _outputFile;
-	int _store;
+	bool _store, _storeAll;
 	std::string _cwd;
 };
 
@@ -194,6 +196,8 @@ class DefaultExecutor : public Executor
 		std::vector<Command> _setupCommands;
 		std::vector<Command> _testCommands;
 		std::vector<Command> _cleanupCommands;
+		
+		std::map<std::string,std::string> _testEnvVars;
 
 		/**
 		 * information gathered from the harness that is required during executors execution
@@ -275,7 +279,7 @@ class DefaultExecutor : public Executor
 		int setPrecision (const std::string &args);
 
 		int Shell (ShellCommandOptions *sco);
-
+		void initializeCommand (std::string &command);
                 /** 
                  * Disconnects any established connection to SciDB.
                  */
@@ -371,6 +375,18 @@ class DefaultExecutor : public Executor
 		 * @return SUCCESS, FAILURE
 		 */
 		int execute (const InfoForExecutor &ie);
+		
+		/**
+		 * Sets up test-specific environment variables for use in shell command (e.g. TESTDIR
+		 * variable will point to the path where the .test file is located).
+		 */
+		void addTestSpecificVariables(void);
+		
+		/**
+		 * Inserts the test-specific environment variables into the current process which makes
+		 * them available in the child processes also.
+		 */
+		void setTestSpecificVariables(void);
 };
 
 } //END namespace executors

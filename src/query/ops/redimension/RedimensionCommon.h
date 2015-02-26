@@ -252,8 +252,6 @@ public:
                                        vector<size_t> const& dimMapping,
                                        vector<AggregatePtr> const& aggregates,
                                        shared_ptr<Query> const& query,
-                                       vector< shared_ptr<AttributeMultiMap> > const& coordinateMultiIndices,
-                                       vector< shared_ptr<AttributeMap> > const& coordinateIndices,
                                        ElapsedMilliSeconds& timing,
                                        bool redistributionRequired = true);
 

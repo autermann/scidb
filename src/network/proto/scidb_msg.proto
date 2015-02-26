@@ -118,11 +118,6 @@ message QueryResult
             required int64 end_max = 5;
             required int64 chunk_interval = 6;
             required int64 chunk_overlap = 7;
-            required string type_id = 8;
-            required int32 flags = 9;
-            required string mapping_array_name = 10;
-            optional int64 coordinates_mapping_size = 11;
-            optional bytes coordinates_mapping = 12;
 	}
 
     message Warning

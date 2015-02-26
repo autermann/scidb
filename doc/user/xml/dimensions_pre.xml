@@ -70,7 +70,7 @@
 
     <informalexample>
       <para>This example creates an array with one integer dimension and one
-      string-type dimension:<programlisting language="test" width="5 in">--afl CREATE ARRAY array1 &lt;val:double&gt;[i=0:2000,10,0,j(string)=10,10,0]; --show-output=no
+      string-type dimension:<programlisting language="test" width="5 in">--afl CREATE ARRAY array1 &lt;val:double&gt;[row=0:2000,10,0,column=1:10,10,0]; --show-output=no
 --afl dimensions(array1); --output-format=dcsv</programlisting></para>
     </informalexample>
   </refsect1>

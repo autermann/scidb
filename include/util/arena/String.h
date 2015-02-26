@@ -26,6 +26,7 @@
 /****************************************************************************/
 
 #include <util/arena/Managed.h>                          // For macros
+#include <util/PointerRange.h>                           // For PointerRange
 #include <boost/container/string.hpp>                    // For basic_string
 
 /****************************************************************************/
@@ -58,20 +59,22 @@ class basic_string : public SCIDB_MANAGED_BASE(boost::container,basic_string,C,T
     using               base_type::npos;
 
  public:             // Construction
-                        basic_string(                                                                            ) : base_type()       {}
-    template<class it>  basic_string(                        it i,it e                                           ) : base_type(i,e)    {}
-                        basic_string(                        const C* s                                          ) : base_type(s)      {}
-                        basic_string(                        const C* s,size_type n                              ) : base_type(s,n)    {}
-                        basic_string(                        size_type n,C c                                     ) : base_type(n,c)    {}
-                        basic_string(                        const basic_string& s,size_type p,size_type n = npos) : base_type(s,p,n)  {}
+                        basic_string(                                                                            ) : base_type()                   {}
+    template<class it>  basic_string(                        it i,it e                                           ) : base_type(i,e)                {}
+                        basic_string(                        const C* s                                          ) : base_type(s)                  {}
+                        basic_string(                        const C* s,size_type n                              ) : base_type(s,n)                {}
+                        basic_string(                        size_type n,C c                                     ) : base_type(n,c)                {}
+                        basic_string(                        const basic_string& s,size_type p,size_type n = npos) : base_type(s,p,n)              {}
+                        basic_string(                        PointerRange<const C> r                             ) : base_type(r.begin(),r.end())  {}
 
  public:             // Construction
-    explicit            basic_string(const allocator_type& a                                                     ) : base_type(a)      {}
-    template<class it>  basic_string(const allocator_type& a,it i,it e                                           ) : base_type(i,e,a)  {}
-                        basic_string(const allocator_type& a,const C* s                                          ) : base_type(s,a)    {}
-                        basic_string(const allocator_type& a,const C* s,size_type n                              ) : base_type(s,n,a)  {}
-                        basic_string(const allocator_type& a,size_type n,C c                                     ) : base_type(n,c,a)  {}
-                        basic_string(const allocator_type& a,const basic_string& s,size_type p,size_type n = npos) : base_type(s,p,n,a){}
+    explicit            basic_string(const allocator_type& a                                                     ) : base_type(a)                  {}
+    template<class it>  basic_string(const allocator_type& a,it i,it e                                           ) : base_type(i,e,a)              {}
+                        basic_string(const allocator_type& a,const C* s                                          ) : base_type(s,a)                {}
+                        basic_string(const allocator_type& a,const C* s,size_type n                              ) : base_type(s,n,a)              {}
+                        basic_string(const allocator_type& a,size_type n,C c                                     ) : base_type(n,c,a)              {}
+                        basic_string(const allocator_type& a,const basic_string& s,size_type p,size_type n = npos) : base_type(s,p,n,a)            {}
+                        basic_string(const allocator_type& a,PointerRange<const C> r                             ) : base_type(r.begin(),r.end(),a){}
 };
 
 /**

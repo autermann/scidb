@@ -21,7 +21,7 @@ Description: SciDB - database for extra large data processing
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dbg
 Architecture: any
-Depends: scidb-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version})
+Depends: scidb-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), gdb
 Description: SciDB - database for extra large data processing (debug symbols)
 
 Package: libscidbclient-VERSION_MAJOR.VERSION_MINOR
@@ -31,7 +31,7 @@ Description: SciDB client library
 
 Package: libscidbclient-VERSION_MAJOR.VERSION_MINOR-dbg
 Architecture: any
-Depends: libscidbclient-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version})
+Depends: libscidbclient-VERSION_MAJOR.VERSION_MINOR (= ${binary:Version}), gdb
 Description: SciDB client library (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-utils
@@ -41,7 +41,7 @@ Description: SciDB querying tool and other utilities
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-utils-dbg
 Architecture: any
-Depends: scidb-VERSION_MAJOR.VERSION_MINOR-utils (= ${binary:Version})
+Depends: scidb-VERSION_MAJOR.VERSION_MINOR-utils (= ${binary:Version}), gdb
 Description: SciDB querying tool and other utilities (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools
@@ -51,7 +51,7 @@ Description: SciDB developer and tester utilities
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools-dbg
 Architecture: any
-Depends: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools (= ${binary:Version})
+Depends: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools (= ${binary:Version}), gdb
 Description: SciDB developer and tester utilities (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-plugins
@@ -61,7 +61,7 @@ Description: SciDB server and client plugins
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-plugins-dbg
 Architecture: any
-Depends: scidb-VERSION_MAJOR.VERSION_MINOR-plugins (= ${binary:Version})
+Depends: scidb-VERSION_MAJOR.VERSION_MINOR-plugins (= ${binary:Version}), gdb
 Description: SciDB server and client plugins (debug symbols)
 
 Package: libscidbclient-VERSION_MAJOR.VERSION_MINOR-python
@@ -71,7 +71,7 @@ Description: SciDB client library python connector
 
 Package: libscidbclient-VERSION_MAJOR.VERSION_MINOR-python-dbg
 Architecture: any
-Depends: libscidbclient-VERSION_MAJOR.VERSION_MINOR-python (= ${binary:Version})
+Depends: libscidbclient-VERSION_MAJOR.VERSION_MINOR-python (= ${binary:Version}), gdb
 Description: SciDB client library python connector (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev

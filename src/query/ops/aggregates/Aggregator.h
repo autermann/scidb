@@ -431,7 +431,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
                                                   _schema.getAttributes()[i].getName(),
                                                   _aggs[i]->getStateType().typeId(),
                                                   AttributeDesc::IS_NULLABLE,
-                                                  0, std::set<std::string>(), &defaultNull, "", ""));
+                                                  0, std::set<std::string>(), &defaultNull, ""));
             }
         }
 

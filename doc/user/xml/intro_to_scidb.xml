@@ -79,12 +79,7 @@
     <emphasis>i</emphasis> and <emphasis>j</emphasis>, each with values (1, 2,
     3, ..., 10) and (1, 2, ..., 30) respectively.</para>
 
-    <para>Basic array dimensions are 64-bit integers. SciDB also supports
-    arrays with one or more non-integer dimensions, such as variable-length
-    strings (<emphasis>alpha</emphasis>,<emphasis> beta</emphasis>,<emphasis>
-    gamma</emphasis>, ...) or floating-point values (1.2, 2.76, 4.3, ...).
-    Version &scidb_version; of SciDB and Paradigm4 support non-int64
-    dimensions only partially.</para>
+    <para>Basic array dimensions are 64-bit integers.</para>
 
     <para>When the total number of values or cardinality of a dimension is
     known in advance, the SciDB array can be declared with a<emphasis>

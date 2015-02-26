@@ -328,7 +328,7 @@ Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
         {
             bind.kind = BindInfo::BI_COORDINATE;
             bind.resolvedId = i;
-            bind.type = dims[i].getType();
+            bind.type = TID_INT64;
             return bind;
         }
     }

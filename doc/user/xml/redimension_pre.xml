@@ -183,10 +183,6 @@
       </listitem>
 
       <listitem>
-        <para>The dimensions in the source array must be bounded.</para>
-      </listitem>
-
-      <listitem>
         <para>Except for newly added aggregate values, the variables in the
         new array must be a subset of the variables in the source
         array.</para>
@@ -204,30 +200,9 @@
           </listitem>
 
           <listitem>
-            <para>The attribute in the source array cannot allow null
-            values.</para>
-          </listitem>
-
-          <listitem>
-            <para>The chunk overlap property of the dimension must equal
-            0.</para>
-          </listitem>
-        </itemizedlist>
-      </listitem>
-
-      <listitem>
-        <para>If a dimension of the new array corresponds to a dimension in
-        the source array:</para>
-
-        <itemizedlist>
-          <listitem>
-            <para>The two dimensions must have identical size and identical
-            range (i.e., max and min values).</para>
-          </listitem>
-
-          <listitem>
-            <para>The two dimensions must have identical values for chunk size
-            and chunk overlap.</para>
+            <para>The attribute in the source array can allow null values, but
+            cells for which the attribute is null will not be included in the
+            output.</para>
           </listitem>
         </itemizedlist>
       </listitem>

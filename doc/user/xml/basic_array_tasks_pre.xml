@@ -119,12 +119,11 @@
       <command>SELECT</command> statement is <command>SELECT *</command>,
       which selects all data from a specified array or array expression.
       Consider two arrays, <code>A</code> and <code>B</code>: <programlisting
-      language="test">
---aql CREATE ARRAY A &lt;val_a:double&gt;[i=0:9,10,0]; --show-output=no
+      language="test">--aql CREATE ARRAY A &lt;val_a:double&gt;[i=0:9,10,0]; --show-output=no
 --aql CREATE ARRAY B &lt;val_b:double&gt;[j=0:9,10,0]; --show-output=no
 
---afl load(A, '../tests/harness/testcases/data/doc/A.scidb'); --show-output=no --show-query=no
---afl load(B, '../tests/harness/testcases/data/doc/B.scidb'); --show-output=no --show-query=no
+--afl store(build(A,i+1),A); --show-output=no --show-query=no
+--afl store(build(B,j+101),B); --show-output=no --show-query=no
 </programlisting> These arrays contain data. To see all the data stored in the
       array, you can use the following <command>SELECT</command> statement:
       <programlisting language="test">--aql SELECT * FROM A; --output-format=auto
@@ -133,12 +132,11 @@
           <primary>AQL</primary>
 
           <secondary>from</secondary>
-        </indexterm>The <code>show</code> command returns an array result
+        </indexterm>The <code>show()</code> operator returns an array result
       containing an array's schema. To see the entire schema, use a
-      <code><command>SELECT</command> *</code> statement with the
-      <code>show</code> command: <programlisting language="test">
---aql SELECT * FROM show(A); --output-format=auto 
---aql SELECT * FROM show(B); --output-format=auto 
+      <command>SELECT</command> statement that contains the <code>show</code>
+      operator:<programlisting language="test">--aql SELECT * from show(A); --output-format=auto 
+--aql SELECT * from show(B); --output-format=auto 
 </programlisting></para>
 
       <para>To refine the result of the <command>SELECT</command> statement,
@@ -202,7 +200,7 @@
     <para>This query will store the attribute-attribute join of A and B in
     array C: <programlisting language="test">--aql SELECT * INTO C FROM A, B; --output-format=auto 
 </programlisting> The target array C has schema: <programlisting
-    language="test">--schema C;</programlisting> The attributes maintain the
+    language="test">--schema C;</programlisting>The attributes maintain the
     names from A and B; the dimension takes the name from the first array of
     the join operation.</para>
 
@@ -219,7 +217,9 @@
     <para>If two arrays have an attribute with the same name, you can select
     the attributes to use with array dot notation: <programlisting
     language="test">--aql SELECT  C.val_b + D.val_b FROM C,D; --output-format=auto 
-</programlisting>If you are using attributes that have the same fully
+</programlisting><indexterm>
+        <primary>aliases</primary>
+      </indexterm>If you are using attributes that have the same fully
     qualified name, for example, you are joining an array with itself, you can
     use an alias to rename an array for the particular query. This query
     aliases array A to a1 and a2, then uses dot notation to use the attribute
@@ -251,12 +251,12 @@
     <para>An attribute predicate in the <command>ON</command> clause is used
     to filter the output of the multidimensional array.</para>
 
-    <para>For example, consider a 2-dimensional array <code>m3x3</code>schema
-    and attributes values: <programlisting language="test">--aql CREATE ARRAY m3x3&lt;a:double&gt; [i=1:3,3,0,j=1:3,3,0]; 
---afl load(m3x3, '../tests/harness/testcases/data/doc/m3x3.txt'); --show-query=no --show-output=no
+    <para>For example, consider a 2-dimensional array, <code>m3x3</code>:
+    <programlisting language="test">--afl store(build(&lt;a:double&gt; [i=1:3,3,0,j=1:3,3,0],(i-1)*3+(j-1)),m3x3); --show-query=no --show-output=no
+--schema m3x3
+--afl scan(m3x3); --show-query=no --output-format=dense --chunkify=yes
 </programlisting> Now consider also a 1-dimensional array <code>vector3</code>
-    whose schema and attributes are: <programlisting language="test">--aql CREATE ARRAY vector3&lt;b:double&gt; [k=1:3,3,0]; --show-output=no --show-query=no
---afl load(vector3, '../tests/harness/testcases/data/doc/vector3.scidb'); --show-query=no --show-output=no
+    whose schema and attributes are: <programlisting language="test">--afl store(build(&lt;b:double&gt; [k=1:3,3,0],'[(21),(20.5),(20.3333)]',true),vector3); --show-output=no --show-query=no
 --schema vector3;
 --afl scan(vector3); --output-format=dense 
 </programlisting></para>
@@ -265,7 +265,7 @@
     <code>{i,j}</code> in which the cell at coordinate <code>{i,j}</code>
     combines the cell at <code>{i,j}</code> of <code>m3x3</code> with the cell
     at coordinate <code>{k=j}</code> of <code>vector3</code>: <programlisting
-    language="test">--aql SELECT * FROM m3x3 JOIN vector3 ON m3x3.j = vector3.k; --output-format=auto 
+    language="test">--aql SELECT * FROM m3x3 JOIN vector3 ON m3x3.j = vector3.k; --output-format=auto --chunkify=yes 
 </programlisting></para>
   </section>
 
@@ -350,8 +350,7 @@
     cells based upon a given probability. For example, you can use the
     <code>bernoulli</code> operator to randomly sample data from an array one
     element at a time. The syntax of <code>bernoulli</code> is:
-    <programlisting>
-bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
+    <programlisting>bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
 
     <para>The <code>sample</code> command allows you to randomly sample data
     one array chunk at a time:<programlisting>sample(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting>The

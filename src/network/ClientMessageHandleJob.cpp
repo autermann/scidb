@@ -414,17 +414,6 @@ void ClientMessageHandleJob::executeQueryInternal(scidb::QueryResult& queryResul
             dimension->set_end_max(dimensions[i].getEndMax());
             dimension->set_chunk_interval(dimensions[i].getChunkInterval());
             dimension->set_chunk_overlap(dimensions[i].getChunkOverlap());
-            dimension->set_type_id(dimensions[i].getType());
-            dimension->set_flags(dimensions[i].getFlags());
-            dimension->set_mapping_array_name("");
-            if (dimensions[i].getType() != TID_INT64 && !dimensions[i].getMappingArrayName().empty()) {
-                boost::shared_ptr<Array> mappingArray = query->getArray(dimensions[i].getMappingArrayName());
-                boost::shared_ptr<ConstArrayIterator> mappingArrayIterator = mappingArray->getConstIterator(0);
-                if (!mappingArrayIterator->end()) {
-                    dimension->set_mapping_array_name(dimensions[i].getMappingArrayName());
-                    dimension->set_coordinates_mapping_size(mappingArray->getArrayDesc().getDimensions()[0].getLength());
-                }
-            }
         }
     }
 

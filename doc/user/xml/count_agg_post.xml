@@ -15,15 +15,15 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> count(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;
+    <synopsis>AQL% <command>SELECT</command> count(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable> <optional><command>GROUP BY</command> <replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>
 
-AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>))</synopsis>
+AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
 
     <para>OR</para>
 
-    <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
+    <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable> <optional><command>GROUP BY</command> <replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
 
-    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,count(*))</synopsis>
+    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,count(*) <optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -54,12 +54,9 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
       <procedure>
         <step>
-          <para>Create an array:<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Put values 1 along the diagonal of m3x3 and leave the
-          remaining cells empty:<para><programlisting>AFL% store(build_sparse(m3x3,1,i=j),m3x3);  </programlisting><screen>[
+          <para>Create an array with values 1 along the diagonal of m3x3, and
+          the remaining cells empty.<para><programlisting>AFL% store(build_sparse(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],1,i=j),m3x3);
+       </programlisting><screen>[
 [(1),(),()],
 [(),(1),()],
 [(),(),(1)]
@@ -79,7 +76,7 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
       <procedure>
         <step>
-          <para>Show the contents of count_array:<para><screen>[
+          <para>Show the contents of array <emphasis role="bold">A</emphasis>:<para><screen>[
 [(),(),()],
 [(null),(null),(null)],
 [('a7'),('a8'),('a9')]
@@ -93,7 +90,8 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
         <step>
           <para>Count the number of nonempty and non-null cells for the
-          <literal>value</literal> attribute:<para><programlisting>AQL% <command>SELECT</command> count(value) <command>FROM</command> A;  </programlisting><screen>[(3)]
+          <literal>value</literal> attribute, along the first
+          dimension:<para><programlisting>AQL% <command>SELECT</command> count(value) <command>FROM</command> A <command>GROUP BY</command> row;  </programlisting><screen>[(),(),(3)]
 </screen></para></para>
         </step>
       </procedure>

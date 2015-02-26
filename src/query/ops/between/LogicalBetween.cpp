@@ -93,7 +93,7 @@ class LogicalBetween: public  LogicalOperator
         Dimensions const& dims = schemas[0].getDimensions();
         size_t nDims = dims.size();
 		if (i < nDims*2)
-			res.push_back(PARAM_CONSTANT(dims[i < nDims ? i : i - nDims].getType()));
+			res.push_back(PARAM_CONSTANT(TID_INT64));
 		else
 			res.push_back(END_OF_VARIES_PARAMS());
 		return res;

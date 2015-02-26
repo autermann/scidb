@@ -175,11 +175,10 @@ namespace scidb
         
         static uint32_t calculateSignature(ArrayDesc const& desc);
 
-
         enum Flags { 
             SPARSE_CHUNK = 1,
             RLE_FORMAT = 2,
-            COORDINATE_MAPPING = 4,
+            COORDINATE_MAPPING = 4, //TODO-3667: remove this in next release (right now used to throw exn)
             ARRAY_METADATA = 8
         };
     };

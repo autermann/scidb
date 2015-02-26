@@ -43,7 +43,7 @@ namespace mpi
 {
     /// MPI implementation type
     enum { OMPI16=0, MPICH14, MPICH12, MPI_TYPE_MAX };
-  
+
     const std::string SLAVE_BIN    = "mpi_slave_scidb";
     const std::string LAUNCHER_BIN = "mpirun";
 
@@ -64,15 +64,15 @@ namespace mpi
     {
 
       static const char * MPI_TYPE_STR[] =
-	{
-	  "openmpi-1.6",
-	  "mpich2-1.4",
-	  "mpich2-1.2",
-	  NULL
-	};
-      
+        {
+          "openmpi-1.6",
+          "mpich2-1.4",
+          "mpich2-1.2",
+          NULL
+        };
+
       if (mpiType >= MPI_TYPE_MAX) {
-	return NULL;
+        return NULL;
       }
       return MPI_TYPE_STR[mpiType];
     }
@@ -80,8 +80,14 @@ namespace mpi
     /// @return the type of shared memory in use by MPI-based operators
     SharedMemoryIpc::SharedMemoryIpcType_t getShmIpcType();
 
-    /// @return a new shared memory IPC object corresponding to the shared memory type in use
-    SharedMemoryIpc* newSharedMemoryIpc(const std::string& name);
+    /**
+     * Create a new shared memory region
+     * @param name
+     * @param preallocate if set to true will force the backing (e.g. /dev/shm) to be fully allocated
+     *        preallocation adds some performance overhead, but guarantees no SIGBUS signals if the backing runs out of space
+     * @return a new shared memory IPC object corresponding to the shared memory type in use
+     */
+    SharedMemoryIpc* newSharedMemoryIpc(const std::string& name, bool preallocate=false);
 
     /**
      * @return filename to store the pid(s) of MPI launcher
@@ -262,11 +268,11 @@ namespace mpi
     bool readProcName(const std::string& pid, std::string& procName);
 
     /**
-     * Read a given environment variable value for a given process 
+     * Read a given environment variable value for a given process
      * @param pid process id specified by a stringnified pid
      * @param varName environment variable name
      * @param varValue [out] environment variable value
-     * @return true if the environment variable is found 
+     * @return true if the environment variable is found
      */
     bool readProcEnvVar(const std::string& pid,
                         const std::string& varName,
@@ -289,7 +295,7 @@ namespace mpi
      * of queryId and launchId.
      * @param envVarValue [in] value to parse
      * @param clusterUuid [in] for this cluster
-     * @param queryId [out] parsed 
+     * @param queryId [out] parsed
      * @param launchId [out] parsed
      * @return true if successfully parsed; false otherwise
      */
@@ -306,7 +312,7 @@ namespace mpi
      * of queryId and launchId.
      * @param envVarValue [in] value to parse
      * @param clusterUuid [out] parsed
-     * @param queryId [out] parsed 
+     * @param queryId [out] parsed
      * @param launchId [out] parsed
      * @return true if successfully parsed; false otherwise
      */
@@ -314,9 +320,9 @@ namespace mpi
     parseScidbMPIEnvVar(const std::string& envVarValue,
                         uint64_t& queryId,
                         uint64_t& launchId,
-			std::string& clusterUuid);
+                        std::string& clusterUuid);
 
-    
+
     class Command
     {
     public:

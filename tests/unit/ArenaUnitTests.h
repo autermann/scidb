@@ -60,6 +60,7 @@ struct ArenaTests : public CppUnit::TestFixture
                     void      testRootArena();
                     void      testLimitedArena();
                     void      testScopedArena();
+                    void      testSharedPtr();
                     void      testLimiting();
                     void      anExample();
 
@@ -86,6 +87,7 @@ struct ArenaTests : public CppUnit::TestFixture
     CPPUNIT_TEST      (testRootArena);
     CPPUNIT_TEST      (testLimitedArena);
     CPPUNIT_TEST      (testScopedArena);
+    CPPUNIT_TEST      (testSharedPtr);
     CPPUNIT_TEST      (testLimiting);
     CPPUNIT_TEST      (anExample);
     CPPUNIT_TEST_SUITE_END();
@@ -97,7 +99,7 @@ struct ArenaTests : public CppUnit::TestFixture
  */
 void ArenaTests::testOptions()
 {
-    cout << Options("A").pagesize(1024).locking(false) << endl;
+    cout << Options("A").pagesize(1*KB).locking(false) << endl;
     cout << Options("B").resetting(true).locking(true) << endl;
 }
 
@@ -132,7 +134,7 @@ void ArenaTests::testFinalizer()
 void ArenaTests::allocator(Arena& a)
 {
     Allocator<void>    v;                                // void
-    Allocator<int>     i(a);                             // Arena&
+    Allocator<int>     i(&a);                            // Arena&
     Allocator<int>     j(i);                             // const Allocator&
     Allocator<double>  d(i);                             // const Allocator&
 
@@ -205,9 +207,9 @@ void ArenaTests::testScopedArena()
 template<class type>
 void ArenaTests::opnew()
 {
-    char pad[16];                                        // Guard with padding
-    char t  [sizeof(type)];                              // Placement target
-    char Pad[16];Pad[0] = pad[0];                        // Prevent warning
+    char prePad [16];                                    // Guard with padding
+    char t      [sizeof(type)];                          // Placement target
+    char postPad[16];                                    // Guard with padding
 
     try{delete   new          type;}    catch(...){}     // Regliar
     try{delete   new(nothrow) type;}    catch(...){}     // 'nothrow'
@@ -215,6 +217,8 @@ void ArenaTests::opnew()
     try{delete[] new          type[1];} catch(...){}     // Array
     try{delete[] new(nothrow) type[1];} catch(...){}     // Array nothrow
     try{         new(&t)      type[1];} catch(...){}     // Array placement
+
+    (void)prePad;(void)postPad;                          // Silence warnings
 }
 
 /**
@@ -323,7 +327,7 @@ void ArenaTests::array(Arena& a,count_t n)
 
     try
     {
-        destroy(a,newarray<t>(a,n));
+        destroy(a,newArray<t>(a,n));
     }
     catch (int)
     {}
@@ -464,6 +468,25 @@ void ArenaTests::nesting(Arena& a)
     container_t     c(&a,&s,&s+1);                       // Copy to 's' to 'a'
 
     CPPUNIT_ASSERT(c.begin()->get_allocator().arena() == &a);
+}
+
+/**
+ *  Check that allocate_shared() is wired up and working correctly.
+ */
+void ArenaTests::testSharedPtr()
+{
+    ArenaPtr a(getArena());                              // The current arena
+
+ /* A number of ways of saying essentially the same thing. Note that the first
+    two calls bind to boost::allocate_shared() while the last two bind instead
+    to arena::allocate_shared(). Guess which variation we prefer...*/
+
+    shared_ptr<int> w(allocate_shared<int,Allocator<int> >(a,78));   // theirs
+    shared_ptr<int> x(boost::allocate_shared<int>         (Allocator<int>(a),78));
+    shared_ptr<int> y(arena::allocate_shared<int>         (*a,78));  // ours
+    shared_ptr<int> z(allocate_shared<int>                (*a,78));  // ours
+
+    cout << *z << ": extensive testing shows that allocate_shared() is AOK.\n";
 }
 
 /**
@@ -645,7 +668,7 @@ void ArenaTests::anExample()
 
          /* You can also allocate arrays...*/
 
-            pDbl = newarray<double>(*B,2);               // A 2 element array
+            pDbl = newArray<double>(*B,2);               // A 2 element array
             pDbl[0] = 7;
             pDbl[1] = 8;
 
@@ -683,7 +706,7 @@ void ArenaTests::anExample()
         // ...
         C->calloc(387,2);
         // ...
-        double* p = newarray<double>(*C,8483);
+        double* p = newArray<double>(*C,8483);
         // ...
         destroy(*C,p);
 

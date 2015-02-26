@@ -10,7 +10,7 @@ SCIDB QUERY : <store(build(<val:double>[i=0:1,32,0,j=0:1,32,0], iif(i=j,sqrt(3)/
 SCIDB QUERY : <create array product<val:double>[i=0:1,32,0,j=0:1,32,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(multiply(multiply(A,B),C),product)>
+SCIDB QUERY : <store(gemm(gemm(A,B, build(A,0)),C, build(A,0)),product)>
 [[(1.75),(0.433013)],[(0.433013),(1.25)]]
 
 SCIDB QUERY : <gesvd(product,'U')>

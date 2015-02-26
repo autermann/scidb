@@ -48,35 +48,27 @@
       <procedure>
         <step>
           <para>Create a matrix and store values into it:<programlisting
-          language="test">--afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:3,4,0],i*4+j+1),A); --output-format=dense --chunkify=yes</programlisting></para>
+          language="test">--afl store(build(&lt;val:double&gt;[row=0:2,3,0,col=0:3,4,0],row*4+col+1),A); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>
           <para>Calculate the cumulative sum along the first
-          dimension:<programlisting language="test">--afl cumulate(A,sum(val),i); --output-format=dense --chunkify=yes</programlisting></para>
+          dimension:<programlisting language="test">--afl cumulate(A,sum(val),row); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Calculate the cumulative product along the first
+          dimension:<programlisting language="test">--afl cumulate(A,prod(val),row); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>
           <para>Calculate the cumulative average along the second
-          dimension:<programlisting language="test">--afl cumulate(A,avg(val),j); --output-format=dense --chunkify=yes</programlisting></para>
+          dimension:<programlisting language="test">--afl cumulate(A,avg(val),col); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>
           <para>Calculate the the average, min, and max values along the first
-          dimension:<programlisting language="test">--afl cumulate(A,avg(val),min(val),max(val),i); --output-format=dense --chunkify=yes</programlisting></para>
-        </step>
-
-        <step>
-          <para>To calculate a cumulative product, it is a bit more
-          complicated. The following query calculates the cumulative product
-          over the first dimension, <emphasis
-          role="bold">i</emphasis>.<programlisting language="test">--afl project
-        (apply
-          (cumulate
-             (apply(A,lv,log(val)),
-              sum(lv) as slv),
-           eslv, exp(slv))
-        ,eslv); --output-format=dense --chunkify=yes</programlisting></para>
+          dimension:<programlisting language="test">--afl cumulate(A,avg(val),min(val),max(val),row); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>

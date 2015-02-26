@@ -33,7 +33,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/split_member.hpp>
-#include "util/StackAlloc.h"
+#include <util/arena/Map.h>
 
 namespace scidb
 {
@@ -43,19 +43,11 @@ class ConstChunk;
 class RLEPayload;
 class Query;
 class ArrayDesc;
-    
+
 typedef int64_t position_t;
 typedef int64_t Coordinate;
 typedef std::vector<Coordinate> Coordinates;
-
-
-#define USE_STACK_ALLOCATOR_FOR_VALUE_MAP true
-
-#ifdef USE_STACK_ALLOCATOR_FOR_VALUE_MAP
-typedef std::map<position_t, Value, std::less<position_t>, StackAlloc<std::pair<position_t, Value> > > ValueMap;
-#else
-typedef std::map<position_t, Value> ValueMap;
-#endif
+typedef mgd::map<position_t, Value> ValueMap;
 
 extern bool checkChunkMagic(ConstChunk const& chunk);
 
@@ -64,14 +56,14 @@ class ConstRLEEmptyBitmap
 {
     friend class RLEEmptyBitmap;
 public:
-    struct Segment { 
+    struct Segment {
         position_t _lPosition;   // start position of sequence of set bits
         position_t _length;  // number of set bits
         position_t _pPosition; // index of value in payload
     };
 
     // This structure must use platform independent data types with fixed size.
-    struct Header { 
+    struct Header {
         uint64_t _magic;
         uint64_t _nSegs;
         uint64_t _nNonEmptyElements;
@@ -95,13 +87,13 @@ public:
     }
 
   public:
-    size_t getValueIndex(position_t pos) const { 
+    size_t getValueIndex(position_t pos) const {
         size_t l = 0, r = _nSegs;
-        while (l < r) { 
+        while (l < r) {
             size_t m = (l + r) >> 1;
             if (_seg[m]._lPosition + _seg[m]._length <= pos) {
                 l = m + 1;
-            } else { 
+            } else {
                 r = m;
             }
         }
@@ -111,13 +103,13 @@ public:
     /**
      * Check if element at specified position is empty
      */
-    bool isEmpty(position_t pos) const { 
+    bool isEmpty(position_t pos) const {
         size_t l = 0, r = _nSegs;
-        while (l < r) { 
+        while (l < r) {
             size_t m = (l + r) >> 1;
             if (_seg[m]._lPosition + _seg[m]._length <= pos) {
                 l = m + 1;
-            } else { 
+            } else {
                 r = m;
             }
         }
@@ -127,7 +119,7 @@ public:
     /**
      * Get number of RLE segments
      */
-    size_t nSegments() const { 
+    size_t nSegments() const {
         return _nSegs;
     }
 
@@ -142,25 +134,24 @@ public:
     /**
      * Find segment of non-empty elements with position greater or equal than specified.
      */
-    size_t findSegment(position_t pos) const { 
+    size_t findSegment(position_t pos) const {
         size_t l = 0, r = _nSegs;
-        while (l < r) { 
+        while (l < r) {
             size_t m = (l + r) >> 1;
             if (_seg[m]._lPosition + _seg[m]._length <= pos) {
                 l = m + 1;
-            } else { 
+            } else {
                 r = m;
             }
         }
-        return r;            
+        return r;
     }
-
 
     /**
      * Method to be called to save bitmap in chunk body
      */
     void pack(char* dst) const;
-    
+
     /**
      * Get size needed to pack bitmap (used to dermine size of chunk)
      */
@@ -188,9 +179,9 @@ public:
         {
             reset();
         }
+
         iterator() {}
 
-            
         void reset()
         {
             _currSeg = 0;
@@ -231,7 +222,7 @@ public:
             return true;
         }
 
-        bool skip(size_t n); 
+        bool skip(size_t n);
 
         void operator ++()
         {
@@ -487,7 +478,7 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
     RLEEmptyBitmap(ValueMap& vm, bool all = false);
 
     /**
-     * Constructor of RLE bitmap from dense bit vector 
+     * Constructor of RLE bitmap from dense bit vector
      */
     RLEEmptyBitmap(char* data, size_t numBits);
 
@@ -568,7 +559,7 @@ public:
     } __attribute__ ((packed));
 
     // This structure must have platform independent data types because we use it in chunk format data structure
-    struct Header { 
+    struct Header {
         uint64_t  _magic;
         uint64_t  _nSegs;
         uint64_t  _elemSize;
@@ -597,8 +588,8 @@ public:
     {}
 
   public:
-    
-    size_t count() const { 
+
+    size_t count() const {
         return _nSegs == 0 ? 0 : _seg[_nSegs]._pPosition;
     }
 
@@ -662,7 +653,7 @@ public:
     /**
      * Return pointer for raw data for non-nullable types
      */
-    char* getRawValue(size_t index) const { 
+    char* getRawValue(size_t index) const {
         return _payload + index*(_elemSize == 0 ? 4 : _elemSize);
     }
 
@@ -674,21 +665,21 @@ public:
     /**
      * Get number of RLE segments
      */
-    size_t nSegments() const { 
+    size_t nSegments() const {
         return _nSegs;
     }
 
     /**
      * Get element size (0 for varying size types)
      */
-    size_t elementSize() const { 
+    size_t elementSize() const {
         return _elemSize;
     }
 
     /**
      * Get payload size in bytes
      */
-    size_t payloadSize() const { 
+    size_t payloadSize() const {
         return _dataSize;
     }
 
@@ -740,18 +731,17 @@ public:
 
     void getCoordinates(ArrayDesc const& array, size_t dim, Coordinates const& chunkPos, Coordinates const& tilePos, boost::shared_ptr<Query> const& query, Value& dst, bool withOverlap) const;
 
-    bool checkBit(size_t bit) const { 
+    bool checkBit(size_t bit) const {
         return (_payload[bit >> 3] & (1 << (bit & 7))) != 0;
     }
-    
-    char* getFixData() const { 
+
+    char* getFixData() const {
         return _payload;
     }
-    
-    char* getVarData() const { 
+
+    char* getVarData() const {
         return _payload + _varOffs;
     }
-    
 
     virtual ~ConstRLEPayload()
     {}
@@ -812,7 +802,7 @@ public:
             assert(!end());
             return _currPpos;
         }
-        
+
         uint32_t getValueIndex() const
         {
             assert(!end());
@@ -912,9 +902,9 @@ public:
           *   you call dataReader += bitmapReader.skip(physicalPositionsCount) and receive the consistent positions inside bitmapReader and dataReader.
           */
         uint64_t skip(uint64_t count)
-        {  
+        {
             uint64_t setBits = 0;
-            while (!end()) { 
+            while (!end()) {
                 if (_currPpos + count >= _cs->_pPosition + _cs->length()) {
                     uint64_t tail = _cs->length() - _currPpos + _cs->_pPosition;
                     count -= tail;
@@ -923,18 +913,18 @@ public:
                     }  else {
                         position_t beg = _cs->_valueIndex + _currPpos - _cs->_pPosition;
                         position_t end = _cs->_valueIndex + _cs->length();
-                        while (beg < end) { 
+                        while (beg < end) {
                             setBits += _payload->checkBit(beg++);
                         }
-                    } 
+                    }
                     toNextSegment();
-                } else { 
+                } else {
                     if (_cs->_same)  {
                         setBits += _payload->checkBit(_cs->_valueIndex) ? count : 0;
-                    } else {   
+                    } else {
                         position_t beg = _cs->_valueIndex + _currPpos - _cs->_pPosition;
                         position_t end = beg + count;
-                        while (beg < end) { 
+                        while (beg < end) {
                             setBits += _payload->checkBit(beg++);
                         }
                     }
@@ -944,7 +934,7 @@ public:
             }
             return setBits;
         }
- 
+
         void operator +=(uint64_t count)
         {
             assert(!end());
@@ -1192,7 +1182,7 @@ class RLEPayload : public ConstRLEPayload
      * constant inplace it's impossible for example.
      * That's why copy param is tru by default
      */
-    void assignSegments(const ConstRLEPayload& payload, bool copy = true) 
+    void assignSegments(const ConstRLEPayload& payload, bool copy = true)
     {
 
         if (copy) {
@@ -1209,7 +1199,7 @@ class RLEPayload : public ConstRLEPayload
     /**
      * Assignment operator: deep copy from const payload into non-const
      */
-    RLEPayload& operator=(ConstRLEPayload const& other) 
+    RLEPayload& operator=(ConstRLEPayload const& other)
     {
         _nSegs = other.nSegments();
         _elemSize = other._elemSize;
@@ -1226,12 +1216,12 @@ class RLEPayload : public ConstRLEPayload
     }
 
     RLEPayload(ConstRLEPayload const& other):
-        ConstRLEPayload() 
+        ConstRLEPayload()
     {
         *this = other;
     }
 
-    RLEPayload& operator=(RLEPayload const& other) 
+    RLEPayload& operator=(RLEPayload const& other)
     {
         _nSegs = other._nSegs;
         _elemSize = other._elemSize;
@@ -1250,7 +1240,7 @@ class RLEPayload : public ConstRLEPayload
      * Copy constructor: deep copy
      */
     RLEPayload(RLEPayload const& other):
-        ConstRLEPayload() 
+        ConstRLEPayload()
     {
         *this = other;
     }
@@ -1300,8 +1290,8 @@ class RLEPayload : public ConstRLEPayload
 
         void init();
 
-      public:        
-        RLEPayload* getPayload() { 
+      public:
+        RLEPayload* getPayload() {
             return result;
         }
 
@@ -1326,7 +1316,7 @@ class RLEPayload : public ConstRLEPayload
         uint64_t add(iterator& inputIterator, uint64_t limit, bool setupPrevVal = false);
         ~append_iterator();
     };
-     
+
     /**
      * Clear all data
      */
@@ -1343,7 +1333,7 @@ class RLEPayload : public ConstRLEPayload
     void unPackTile(const ConstRLEPayload& payload, const ConstRLEEmptyBitmap& emptyMap, position_t vStart, position_t vEnd);
 
     /**
-     * Use this method to copy empty bitmask to payload 
+     * Use this method to copy empty bitmask to payload
      * positions.
      * @param [in] emptyMap an input empty bitmap mask according to which data should be extracted
      * @param [in] vStart a logical position of start from data should be copied

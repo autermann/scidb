@@ -20,6 +20,15 @@
 ##
 
 ################################################################################
+Update as of Version 13.12
+################################################################################
+
+The operators uniq and index_lookup, which used to be part of this tutorial,
+have been promoted to fully productized in the core scidb engine.
+The reader may still find it very useful to read through their source code,
+and other operator code for that matter, found under src/query/ops  
+
+################################################################################
 Writing SciDB User-Defined Operators
 For Version 13.6
 ################################################################################
@@ -46,8 +55,10 @@ The files surrounding this guide contain the following key items:
     given array and performs a very basic computation
 3)  uniq – the first “serious” operator that implements a non-trivial algorithm,
     and extends SciDB by adding previously unavailable functionality.
-4)  Index_lookup – another complex operator that uses a few additional features
+    NOTE: As of 13.12 this code has been promoted to scidb proper
+4)  index_lookup – another complex operator that uses a few additional features
     of SciDB.
+    NOTE: As of 13.12 this code has been promoted to scidb proper
 5)  A Makefile that builds the four operators above into a single plugin called 
     “libexample_udos.so” which can be installed into SciDB
 6)  SampleQueries – scripts that load some NYSE trading data into SciDB and 

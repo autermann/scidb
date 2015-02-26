@@ -111,36 +111,6 @@ public:
     {
     }
     
-    virtual void getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords,
-                                     const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()/*emptyQuery*/) const
-    {
-        size_t nDims = intCoords.size();
-        origCoords.resize(nDims);
-        Coordinates pos(1);
-        Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0; i < nDims; i++) { 
-            if (_queryResult.mappingArrays[i]) { 
-                boost::shared_ptr<ConstArrayIterator> ai = _queryResult.mappingArrays[i]->getConstIterator(
-                        //for builtin types we use 'value' attribute (0) and for UDTs 'label' attribute (1)
-                        isBuiltinType(dims[i].getType()) ? 0 : 1
-                );
-                boost::shared_ptr<ConstChunkIterator> ci = ai->getChunk().getConstIterator();
-                pos[0] = intCoords[i];
-                if (ci->setPosition(pos)) {                 
-                    origCoords[i] = ci->getItem();
-                } else { 
-                    origCoords[i].setNull();
-                }
-            } else { 
-                if (dims[i].getType() == TID_INT64) { 
-                    origCoords[i].setInt64(intCoords[i]);
-                } else { 
-                    origCoords[i].setNull();
-                }
-            }
-        }
-    }
-
 protected:
     // overloaded method
     ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
@@ -328,54 +298,9 @@ public:
                         queryResultRecord->dimensions(i).curr_end(),
                         queryResultRecord->dimensions(i).end_max(),
                         queryResultRecord->dimensions(i).chunk_interval(),
-                        queryResultRecord->dimensions(i).chunk_overlap(),
-                        queryResultRecord->dimensions(i).type_id(),
-                        queryResultRecord->dimensions(i).flags(),
-                        queryResultRecord->dimensions(i).mapping_array_name());
+                        queryResultRecord->dimensions(i).chunk_overlap());
 
                 dimensions.push_back(dim);
-
-                size_t dimMapSize = queryResultRecord->dimensions(i).coordinates_mapping_size();
-                if (dim.getType() != TID_INT64 && !dim.getMappingArrayName().empty())
-                {
-                    //we need to download the mapping array for this dimension. But first check to see if we already have it
-                    //Sometimes, several dimensions will have the same mapping array.
-                    string mappingArrayName = dim.getMappingArrayName();
-                    bool mappingAlreadyCollected = false;
-                    for (int j=0; j<i; j++)
-                    {
-                        if(dimensions[j].getType() != TID_INT64 && dimensions[j].getMappingArrayName() == mappingArrayName)
-                        {
-                            queryResult.mappingArrays[i]= queryResult.mappingArrays[j];
-                            mappingAlreadyCollected = true;
-                            break;
-                        }
-                    }
-
-                    if ( !mappingAlreadyCollected )
-                    {
-                        Attributes mapAttrs;
-                        if (isBuiltinType(dim.getType()))
-                        {
-                            mapAttrs.push_back(AttributeDesc(0, "value", dim.getType(), 0, 0));
-                        }
-                        else
-                        {
-                            mapAttrs.push_back(AttributeDesc(0, "value", TID_VOID, 0, 0));
-                            mapAttrs.push_back(AttributeDesc(1, "label", TID_STRING, 0, 0));
-                        }
-                        Dimensions mapDims(1);
-                        mapDims[0] = DimensionDesc("no", dim.getStart(), dim.getStart(), dim.getStart() + dimMapSize-1, dim.getStart() + dimMapSize-1, dimMapSize, 0);
-                        ArrayDesc mapArrayDesc(mappingArrayName, mapAttrs, mapDims);
-
-                        boost::shared_ptr<Array> clientArray = boost::shared_ptr<Array>(
-                                    new ClientArray(static_cast<BaseConnection*>(connection),
-                                                    mapArrayDesc, queryResult.queryID, queryResult));
-                        const boost::shared_ptr<Query> emptyQuery; // no query on the client side
-                        boost::shared_ptr<Array> mapArray = boost::shared_ptr<Array>(new MemArray(clientArray,emptyQuery,true));
-                        queryResult.mappingArrays[i] = mapArray;
-                    }
-                }
             }
 
             SciDBWarnings::getInstance()->associateWarnings(resultMessage->getQueryID(), &queryResult);

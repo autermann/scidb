@@ -633,7 +633,6 @@ public:
      * Various array qualifiers
      */
     enum ArrayFlags {
-        IMMUTABLE    = 0x01,
         LOCAL        = 0x02,
         TEMPORARY    = 0x04,
         DETERIORATED = 0x08
@@ -668,7 +667,7 @@ public:
      * @param documentation comment
      */
     ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId, const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
-              int32_t flags = 0, std::string const& comment = std::string());
+              int32_t flags = 0);
 
     /**
      * Copy constructor
@@ -935,31 +934,9 @@ public:
     void trim();
 
     /**
-     * Get array comment
-     * @return array comment
-     */
-    inline const std::string& getComment() const
-    {
-        return _comment;
-    }
-
-    /**
-     * Checks if arrya has non-zero overlap in any dimension
+     * Checks if array has non-zero overlap in any dimension
      */
     bool hasOverlap() const;
-
-    /**
-     * Check if array is updatable
-     */
-    inline bool isImmutable() const
-    {
-        bool res = _flags & IMMUTABLE;
-        if(res)
-        {
-            SCIDB_ASSERT(_uAId == 0 || _uAId == _arrId);
-        }
-        return res;
-    }
 
     /**
      * Check if array is local array
@@ -986,46 +963,6 @@ public:
     }
 
     /**
-     * Map value of this coordinate to the integer value
-     * @param dimensionNo dimension index
-     * @param value original coordinate value
-     * @param mode coordinate mapping mode
-     * @return ordinal number to which this value is mapped
-     * @todo move the query parameter into the constructor (and possibly split the client and server interfaces)
-     */
-    Coordinate getOrdinalCoordinate(size_t dimensionNo, Value const& value, CoordinateMappingMode mode,
-                                    const boost::shared_ptr<Query>& query) const;
-
-    /**
-     * Perform reverse mapping of integer dimension to the original dimension domain
-     * @param dimensionNo dimension index
-     * @param pos integer coordinate
-     * @return original value for the coordinate
-     * @todo move the query parameter into the constructor (and possibly split the client and server interfaces)
-     */
-    Value getOriginalCoordinate(size_t dimensionNo, Coordinate pos,
-                                const boost::shared_ptr<Query>& query) const;
-
-    /**
-     * Get descriptor of the array with coordinate index
-     * @param dimensionNo dimension index
-     * @param indexDesc [OUT] coordinate index array descriptor
-     */
-    void getMappingArrayDesc(size_t dimensionNo, ArrayDesc& indexDesc) const;
-
-    /**
-     * Get name of array with coordinates index
-     * @param dimensionNo dimension index
-     */
-    std::string const& getMappingArrayName(size_t dimensionNo) const;
-
-    /**
-     * Create name of array with coordinates index
-     * @param dimensionNo dimension index
-     */
-    std::string createMappingArrayName(size_t dimensionNo, VersionID version) const;
-
-    /**
      * Add alias to all objects of schema
      *
      * @param alias alias name
@@ -1042,7 +979,6 @@ public:
         ar & _attributes;
         ar & _dimensions;
         ar & _flags;
-        ar & _comment;
         //XXX tigor TODO: add _ps as well
 
         if (Archive::is_loading::value)
@@ -1101,7 +1037,6 @@ private:
     Dimensions _dimensions;
     AttributeDesc* _bitmapAttr;
     int32_t _flags;
-    std::string _comment;
     PartitioningSchema _ps;
 };
 
@@ -1148,7 +1083,6 @@ public:
                   const std::set<std::string> &aliases = std::set<std::string>(),
                   Value const* defaultValue = NULL,
                   const std::string &defaultValueExpr = std::string(),
-                  std::string const& comment = std::string(),
                   size_t varSize = 0);
 
 
@@ -1161,7 +1095,7 @@ public:
      * @param flags attribute flags from AttributeDesc::AttributeFlags
      * @param defaultCompressionMethod default compression method for this attribute
      * @param aliases attribute aliases
-     * @param rereserve percent of chunk space reserved for future updates
+     * @param reserve percent of chunk space reserved for future updates
      * @param defaultValue default attribute value (if NULL, then use predefined default value: zero for scalar types, empty for strings,...)
      * @param comment documentation comment
      * @param varSize size of variable size type
@@ -1171,7 +1105,6 @@ public:
                   const std::set<std::string> &aliases,
                   int16_t reserve, Value const* defaultValue = NULL,
                   const std::string &defaultValueExpr = std::string(),
-                  std::string const& comment = std::string(),
                   size_t varSize = 0);
 
     bool operator == (AttributeDesc const& other) const;
@@ -1258,12 +1191,6 @@ public:
     int getFlags() const;
 
     /**
-     * Get attribute comment
-     * @return attribute comment
-     */
-    const std::string& getComment() const;
-
-    /**
      * Return type size or var size (in bytes) or 0 for truly variable size.
      */
     size_t getSize() const;
@@ -1300,8 +1227,7 @@ public:
            <<" flags "<<_flags
            <<" compression "<<_defaultCompressionMethod
            <<" reserve "<<_reserve
-           <<" default "<<ValueToString(_type, _defaultValue)
-           <<" comment "<<_comment<<"\n";
+           <<" default "<<ValueToString(_type, _defaultValue);
     }
 
     template<class Archive>
@@ -1315,7 +1241,6 @@ public:
         ar & _defaultCompressionMethod;
         ar & _reserve;
         ar & _defaultValue;
-        ar & _comment;
         ar & _varSize;
         ar & _defaultValueExpr;
     }
@@ -1336,7 +1261,6 @@ private:
     uint16_t _defaultCompressionMethod;
     int16_t _reserve;
     Value _defaultValue;
-    std::string _comment;
     size_t _varSize;
 
     /**
@@ -1359,11 +1283,6 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& ob);
 class DimensionDesc: public ObjectNames
 {
 public:
-    enum DimensionFlags
-    {
-        COMPLEX_TRANSFORMATION = 2
-    };
-
     /**
      * Construct empty dimension descriptor (for receiving metadata)
      */
@@ -1379,19 +1298,10 @@ public:
      * @param end dimension end
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
-     * @param type dimension type
-     * @param flags dimension flags from DimensionDesc::DimensionFlags
-     * @param mappingArrayName name of the persistent array from which this dimension was taken
-     * @param comment documentation comment
      */
     DimensionDesc(const std::string &name,
                   Coordinate start, Coordinate end,
-                  int64_t chunkInterval, int64_t chunkOverlap,
-                  TypeId type = TID_INT64,
-                  int flags = 0,
-                  std::string const& mappingArrayName = std::string(),
-                  std::string const& comment = std::string()
-        );
+                  int64_t chunkInterval, int64_t chunkOverlap);
 
     /**
      *
@@ -1401,19 +1311,10 @@ public:
      * @param end dimension end
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
-     * @param type dimension type
-     * @param flags dimension flags from DimensionDesc::DimensionFlags
-     * @param mappingArrayName name of the persistent array from which this dimension was taken
-     * @param comment documentation comment
      */
     DimensionDesc(const std::string &baseName, const NamesType &names,
                   Coordinate start, Coordinate end,
-                  int64_t chunkInterval, int64_t chunkOverlap,
-                  TypeId type = TID_INT64,
-                  int flags = 0,
-                  std::string const& mappingArrayName = std::string(),
-                  std::string const& comment = std::string()
-        );
+                  int64_t chunkInterval, int64_t chunkOverlap);
 
     /**
      * Construct full descriptor (for returning metadata from catalog)
@@ -1425,24 +1326,11 @@ public:
      * @param endMax dimension maximum end
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
-     * @param type dimension type
-     * @param flags dimension flags from DimensionDesc::DimensionFlags
-     * @param mappingArrayName name of the persistent array from which this dimension was taken
-     * @param comment documentation comment
-     * @param funcMapOffset offset for coordinate map function (used for SUBARRAY, THIN)
-     * @param funcMapScale scale for coordinate map function (used for THIN)
      */
     DimensionDesc(const std::string &name,
                   Coordinate startMin, Coordinate currStart,
                   Coordinate currEnd, Coordinate endMax,
-                  int64_t chunkInterval, int64_t chunkOverlap,
-                  TypeId type = TID_INT64,
-                  int flags = 0,
-                  std::string const& mappingArrayName =std::string(),
-                  std::string const& comment = std::string(),
-                  Coordinate funcMapOffset = 0,
-                  Coordinate funcMapScale = 1
-    );
+                  int64_t chunkInterval, int64_t chunkOverlap);
 
     /**
      * Construct full descriptor (for returning metadata from catalog)
@@ -1455,24 +1343,11 @@ public:
      * @param endMax dimension maximum end
      * @param chunkInterval chunk size in this dimension
      * @param chunkOverlap chunk overlay in this dimension
-     * @param type dimension type
-     * @param flags dimension flags from DimensionDesc::DimensionFlags
-     * @param mappingArrayName name of the persistent array from which this dimension was taken
-     * @param comment documentation comment
-     * @param funcMapOffset offset for coordinate map function (used for SUBARRAY, THIN)
-     * @param funcMapScale scale for coordinate map function (used for THIN)
      */
     DimensionDesc(const std::string &baseName, const NamesType &names,
                   Coordinate startMin, Coordinate currStart,
                   Coordinate currEnd, Coordinate endMax,
-                  int64_t chunkInterval, int64_t chunkOverlap,
-                  TypeId type = TID_INT64,
-                  int flags = 0,
-                  std::string const& mappingArrayName = std::string(),
-                  std::string const& comment = std::string(),
-                  Coordinate funcMapOffset = 0,
-                  Coordinate funcMapScale = 1
-    );
+                  int64_t chunkInterval, int64_t chunkOverlap);
 
     bool operator == (DimensionDesc const& other) const;
     bool operator != (DimensionDesc const& other) const
@@ -1546,10 +1421,6 @@ public:
      */
     int64_t getChunkOverlap() const;
 #ifndef SWIG
-    /**
-     * Get name of the persistent array from which this dimension was taken
-     */
-    std::string const& getMappingArrayName() const;
 
     /**
      * Get current origin of array along this dimension (not including overlap).
@@ -1563,27 +1434,6 @@ public:
      */
     inline uint64_t length() const;
 #endif
-    /**
-     * Get type of the dimension coordinate
-     * @return dimension coordinate type
-     */
-    TypeId getType() const;
-
-    /**
-     * Get dimension comment
-     * @return dimension comment
-     */
-    std::string const& getComment() const;
-
-    /**
-     * Return false if this is a non-integer dimension.
-     * @return true if this is an integer dimension; false otherwise.
-     */
-    inline bool isInteger() const
-    {
-        return _isInteger;
-    }
-
     /**
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
@@ -1605,12 +1455,7 @@ public:
            <<" endMax "<<_endMax
            <<" chnkInterval "<<_chunkInterval
            <<" chnkOverlap "<<_chunkOverlap
-           <<" type "<<_type
-           <<" flags "<<_flags
-           <<" mappingArrayName "<<_mappingArrayName
-           <<" comment " << _comment
-           <<" funcMapOffset " << _funcMapOffset
-           <<" funcMapScale " << _funcMapScale << "\n";
+           << "\n";
     }
 
     template<class Archive>
@@ -1623,45 +1468,7 @@ public:
         ar & _endMax;
         ar & _chunkInterval;
         ar & _chunkOverlap;
-        ar & _type;
-        ar & _flags;
-        ar & _mappingArrayName;
-        ar & _comment;
-        ar & _isInteger;
-        ar & _funcMapOffset;
-        ar & _funcMapScale;
     }
-
-    int getFlags() const
-    {
-        return _flags;
-    }
-
-    void setMappingArrayName(const std::string &mappingArrayName)
-    {
-        _mappingArrayName = mappingArrayName;
-    }
-
-    Coordinate getFuncMapOffset() const
-    {
-        return _funcMapOffset;
-    }
-
-    Coordinate getFuncMapScale() const
-    {
-        return _funcMapScale;
-    }
-
-    void setFuncMapOffset(Coordinate offs)
-    {
-        _funcMapOffset = offs;
-    }
-
-    void setFuncMapScale(Coordinate scale)
-    {
-        _funcMapScale = scale;
-    }
-
     void setCurrStart(Coordinate currStart)
     {
         _currStart = currStart;
@@ -1704,15 +1511,6 @@ private:
     int64_t _chunkOverlap;
 
     ArrayDesc* _array;
-
-    Coordinate _funcMapOffset;
-    Coordinate _funcMapScale;
-
-    TypeId _type;
-    int  _flags;
-    std::string _mappingArrayName;
-    std::string _comment;
-    bool _isInteger;
 };
 
 std::ostream& operator<<(std::ostream& stream,const Dimensions& ob);
@@ -2054,6 +1852,8 @@ inline Attributes addEmptyTagAttribute(const Attributes& attributes) {
  */
 inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
 {
+    //XXX: This does not check to see if some other attribute does not already have the same name
+    //     and it would be faster to mutate the structure, not copy. See also ArrayDesc::addAttribute
     return ArrayDesc(desc.getName(), addEmptyTagAttribute(desc.getAttributes()), desc.getDimensions());
 }
 

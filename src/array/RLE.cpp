@@ -34,25 +34,25 @@ namespace scidb
 
     const uint64_t RLE_EMPTY_BITMAP_MAGIC = 0xEEEEAAAA00EEBAACLL;
     const uint64_t RLE_PAYLOAD_MAGIC = 0xDDDDAAAA000EAAACLL;
-        
+
     bool checkChunkMagic(ConstChunk const& chunk)
     {
         if (chunk.isRLE()) {
             PinBuffer scope(chunk);
             if (chunk.getAttributeDesc().isEmptyIndicator())  {
                 return *(uint64_t*)chunk.getData() == RLE_EMPTY_BITMAP_MAGIC;
-            } else { 
+            } else {
                 return *(uint64_t*)chunk.getData() == RLE_PAYLOAD_MAGIC;
             }
         }
         return true;
     }
-                   
+
     size_t ConstRLEEmptyBitmap::packedSize() const {
         return sizeof(Header) + _nSegs*sizeof(Segment);
     }
 
-    void ConstRLEEmptyBitmap::pack(char* dst) const { 
+    void ConstRLEEmptyBitmap::pack(char* dst) const {
         Header* hdr = (Header*)dst;
         hdr->_magic = RLE_EMPTY_BITMAP_MAGIC;
         hdr->_nSegs = _nSegs;
@@ -71,31 +71,31 @@ namespace scidb
     {
         _chunkPinned = bitmapChunk.pin();
         char* src = (char*)bitmapChunk.getData();
-        if (src != NULL) { 
+        if (src != NULL) {
             Header* hdr = (Header*)src;
             assert(hdr->_magic == RLE_EMPTY_BITMAP_MAGIC);
             _nSegs = hdr->_nSegs;
             _nNonEmptyElements = hdr->_nNonEmptyElements;
             _seg = (Segment*)(hdr+1);
             _chunk = &bitmapChunk;
-        } else { 
+        } else {
             _nSegs = 0;
             _nNonEmptyElements = 0;
             bitmapChunk.unPin();
             _chunkPinned = false;
         }
     }
-  
+
 
     ConstRLEEmptyBitmap::ConstRLEEmptyBitmap(char const* src) : _chunk(NULL)
     {
-        if (src != NULL) { 
+        if (src != NULL) {
             Header* hdr = (Header*)src;
             assert(hdr->_magic == RLE_EMPTY_BITMAP_MAGIC);
             _nSegs = hdr->_nSegs;
             _nNonEmptyElements = hdr->_nNonEmptyElements;
             _seg = (Segment*)(hdr+1);
-        } else { 
+        } else {
             _nSegs = 0;
             _nNonEmptyElements = 0;
         }
@@ -120,11 +120,11 @@ namespace scidb
                     assert(_seg[i]._lPosition + _seg[i]._length > start);
                     segm._length = _seg[i]._lPosition + _seg[i]._length - start;
                     i += 1;
-                } else {                    
+                } else {
                     assert(other._seg[j]._lPosition + other._seg[j]._length > start);
                     segm._length = other._seg[j]._lPosition + other._seg[j]._length - start;
                     j += 1;
-                } 
+                }
                 result->addSegment(segm);
             }
         }
@@ -151,7 +151,7 @@ namespace scidb
                     segm._length = other._seg[j]._lPosition + other._seg[j]._length - segm._lPosition;
                 }
                 j += 1;
-            }  else { 
+            }  else {
                 if (segm._length != 0)  {
                     result->addSegment(segm);
                     segm._pPosition += segm._length;
@@ -160,7 +160,7 @@ namespace scidb
                     segm._lPosition = _seg[i]._lPosition;
                     segm._length = _seg[i]._length;
                     i += 1;
-                } else { 
+                } else {
                     segm._lPosition = other._seg[j]._lPosition;
                     segm._length = other._seg[j]._length;
                     j += 1;
@@ -265,15 +265,15 @@ namespace scidb
         bs._pPosition = 0;
         bs._length = 0;
         reserve(payload.nSegments());
-        for (size_t i = 0, n = payload.nSegments(); i < n; i++) { 
+        for (size_t i = 0, n = payload.nSegments(); i < n; i++) {
             ConstRLEPayload::Segment const& ps = payload.getSegment(i);
             size_t bit = ps._valueIndex;
             size_t len = ps.length();
             if (ps._same) {
-                if (payload.checkBit(bit)) { 
+                if (payload.checkBit(bit)) {
                     if (bs._lPosition + bs._length == ps._pPosition) {
                         bs._length += len;
-                    } else { 
+                    } else {
                         if (bs._length != 0) {
                             _container.push_back(bs);
                             bs._pPosition += bs._length;
@@ -281,13 +281,13 @@ namespace scidb
                         bs._lPosition = ps._pPosition;
                         bs._length = len;
                     }
-                } 
-            } else { 
-                for (size_t j = 0; j < len; j++) { 
-                    if (payload.checkBit(bit+j)) { 
+                }
+            } else {
+                for (size_t j = 0; j < len; j++) {
+                    if (payload.checkBit(bit+j)) {
                         if (size_t(bs._lPosition + bs._length) == ps._pPosition + j) {
                             bs._length += 1;
-                        } else { 
+                        } else {
                             if (bs._length != 0) {
                                 _container.push_back(bs);
                                 bs._pPosition += bs._length;
@@ -306,13 +306,13 @@ namespace scidb
         _nSegs = _container.size();
         _nNonEmptyElements = bs._pPosition + bs._length;
     }
-            
+
     position_t RLEEmptyBitmap::addRange(position_t lpos, position_t ppos, uint64_t sliceSize, size_t level, Coordinates const& chunkSize, Coordinates const& origin, Coordinates const& first, Coordinates const& last)
     {
-        sliceSize /= chunkSize[level]; 
+        sliceSize /= chunkSize[level];
         lpos += (first[level] - origin[level])*sliceSize;
-        if (level+1 < origin.size()) { 
-            for (Coordinate beg = first[level], end = last[level]; beg <= end; beg++) {                 
+        if (level+1 < origin.size()) {
+            for (Coordinate beg = first[level], end = last[level]; beg <= end; beg++) {
                 ppos = addRange(lpos, ppos, sliceSize, level+1, chunkSize, origin, first, last);
                 lpos += sliceSize;
             }
@@ -321,7 +321,7 @@ namespace scidb
             size_t len =  last[level] - first[level] + 1;
             if (_container.size() > 0 && _container.back()._lPosition + _container.back()._length == lpos) {
                 _container.back()._length += len;
-            } else { 
+            } else {
                 Segment segm;
                 segm._lPosition = lpos;
                 segm._pPosition = ppos;
@@ -718,13 +718,13 @@ namespace scidb
     }
 
     RLEEmptyBitmap::RLEEmptyBitmap(ValueMap& vm, bool all)
-    { 
+    {
         Segment segm;
         segm._pPosition = 0;
         segm._length = 0;
         segm._lPosition = 0;
         reserve(vm.size());
-        for (ValueMap::const_iterator i = vm.begin(); i != vm.end(); ++i) { 
+        for (ValueMap::const_iterator i = vm.begin(); i != vm.end(); ++i) {
             assert(i->first >= segm._lPosition + segm._length);
             if (all || i->second.getBool()) {
                 if (i->first != segm._lPosition + segm._length) { // hole
@@ -734,7 +734,7 @@ namespace scidb
                         segm._length = 0;
                     }
                     segm._lPosition = i->first;
-                } 
+                }
                 segm._length += 1;
             }
         }
@@ -745,9 +745,9 @@ namespace scidb
         _nNonEmptyElements = segm._pPosition + segm._length;
         _seg = &_container[0];
     }
-    
+
     RLEEmptyBitmap::RLEEmptyBitmap(ConstChunk const& chunk)
-    {         
+    {
         Segment segm;
         segm._pPosition = 0;
         segm._length = 0;
@@ -762,7 +762,7 @@ namespace scidb
         }
         boost::shared_ptr<ConstChunkIterator> it = chunk.getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS);
         assert(!(it->getMode() & ConstChunkIterator::TILE_MODE));
-        while (!it->end()) { 
+        while (!it->end()) {
             Coordinates const& coord = it->getPosition();
             position_t pos = 0;
             for (size_t i = 0; i < nDims; i++) {
@@ -777,7 +777,7 @@ namespace scidb
                     segm._length = 0;
                 }
                 segm._lPosition = pos;
-            } 
+            }
             segm._length += 1;
             ++(*it);
         }
@@ -788,20 +788,20 @@ namespace scidb
         _nNonEmptyElements = segm._pPosition + segm._length;
         _seg = &_container[0];
     }
-    
+
     RLEEmptyBitmap::RLEEmptyBitmap(char* data, size_t numBits)
     {
         Segment segm;
         segm._pPosition = 0;
         for (size_t i = 0; i < numBits; i++) {
-            if ((data[i >> 3] & (1 << (i & 7))) != 0) { 
+            if ((data[i >> 3] & (1 << (i & 7))) != 0) {
                 segm._lPosition = i;
                 while (++i < size_t(numBits) && (data[i >> 3] & (1 << (i & 7))) != 0);
                 segm._length = i - segm._lPosition;
                 _container.push_back(segm);
                 segm._pPosition += segm._length;
             }
-        }  
+        }
         _nNonEmptyElements = segm._pPosition;
         _nSegs = _container.size();
         _seg = &_container[0];
@@ -810,16 +810,16 @@ namespace scidb
     bool ConstRLEEmptyBitmap::iterator::skip(size_t n)
     {
         assert(!end());
-        _currLPos += n;            
+        _currLPos += n;
         if (_currLPos >= _cs->_lPosition + _cs->_length) {
             position_t ppos = getPPos();
             size_t l = 0, r = _bm->_nSegs;
             ConstRLEEmptyBitmap::Segment* seg = _bm->_seg;
-            while (l < r) { 
+            while (l < r) {
                 size_t m = (l + r) >> 1;
                 if (seg[m]._pPosition + seg[m]._length <= ppos) {
                     l = m + 1;
-                } else { 
+                } else {
                     r = m;
                 }
             }
@@ -866,8 +866,8 @@ namespace scidb
     {
         Dimensions const& dims = array.getDimensions();
         size_t nDims = dims.size();
-
-        RLEPayload::append_iterator appender(value.getTile(dims[dim].getType()));
+        Value buf;
+        RLEPayload::append_iterator appender(value.getTile(TID_INT64));
         if (array.getEmptyBitmapAttribute() != NULL) {
             Coordinates origin(nDims);
             Coordinates currPos(nDims);
@@ -876,7 +876,7 @@ namespace scidb
             Coordinates overlapEnd(nDims);
             position_t  startPos = 0;
 
-            for (size_t i = 0; i < nDims; i++) {             
+            for (size_t i = 0; i < nDims; i++) {
                 //Coordinate of first chunk element, including overlaps
                 origin[i] = max(dims[i].getStartMin(), chunkPos[i] - dims[i].getChunkOverlap());
                 //Coordinate of last chunk element, including overlaps
@@ -888,7 +888,6 @@ namespace scidb
                 overlapEnd[i] = min(dims[i].getEndMax(), chunkPos[i] + dims[i].getChunkInterval() - 1);
             }
 
-
             iterator it(this);
             if (withOverlap) {
                 while (!it.end()) {
@@ -899,7 +898,8 @@ namespace scidb
                             currPos[i] = origin[i] + (pos % chunkIntervals[i]);
                             pos /= chunkIntervals[i];
                         }
-                        appender.add(array.getOriginalCoordinate(dim, currPos[dim], query));
+                        buf.setInt64(currPos[dim]);
+                        appender.add(buf);
                         ++it;
                     } else {
                         it += it.getRepeatCount();
@@ -920,7 +920,8 @@ namespace scidb
                             pos /= chunkIntervals[i];
                         }
                         if (!skip) {
-                            appender.add(array.getOriginalCoordinate(dim, currPos[dim], query));
+                            buf.setInt64(currPos[dim]);
+                            appender.add(buf);
                         }
                         ++it;
                     } else {
@@ -991,7 +992,8 @@ namespace scidb
             uint64_t n = count();
             if (n != 0) {
                 while (true) {
-                    appender.add(array.getOriginalCoordinate(dim, curr, query), len);
+                    buf.setInt64(curr);
+                    appender.add(buf, len);
                     if (n <= len)  {
                         break;
                     }
@@ -1030,7 +1032,7 @@ namespace scidb
     size_t ConstRLEPayload::packedSize() const {
         return sizeof(Header) + (_nSegs+1)*sizeof(Segment) + _dataSize;
     }
-        
+
     void ConstRLEPayload::pack(char* dst) const
     {
         Header* hdr = (Header*)dst;
@@ -1043,7 +1045,7 @@ namespace scidb
         dst += sizeof(Header);
         if (_seg != NULL) { // in case of tile append payload may stay without termination element
             memcpy(dst, _seg, (_nSegs+1)*sizeof(Segment));
-        } else { 
+        } else {
             assert(_nSegs == 0);
             ((Segment*)dst)->_pPosition = 0;
         }
@@ -1073,7 +1075,7 @@ namespace scidb
 
     ConstRLEPayload::ConstRLEPayload(char const* src)
     {
-        if (src == NULL) { 
+        if (src == NULL) {
             _nSegs = 0;
             _elemSize = 0;
             _dataSize = 0;
@@ -1081,7 +1083,7 @@ namespace scidb
             _isBoolean = false;
             _seg = NULL;
             _payload = NULL;
-        } else { 
+        } else {
             Header* hdr = (Header*)src;
             assert(hdr->_magic == RLE_PAYLOAD_MAGIC);
             _nSegs = hdr->_nSegs;
@@ -1184,7 +1186,7 @@ namespace scidb
         _dataSize = _data.size();
         _payload = &_data[0];
     }
-                                    
+
 
     void RLEPayload::appendValue(vector<char>& varPart, Value const& val, size_t valueIndex)
     {
@@ -1322,7 +1324,7 @@ namespace scidb
     }
 
     RLEPayload::RLEPayload(ValueMap& vm, size_t nElems, size_t elemSize, Value const& defaultVal, bool isBoolean,  bool subsequent)
-    { 
+    {
         Value const* currVal = NULL;
         Segment currSeg;
         _data.reserve(isBoolean ? vm.size()/8 : vm.size()*(elemSize==0 ? 4 : elemSize));
@@ -1333,7 +1335,7 @@ namespace scidb
         vector<char> varPart;
         this->_elemSize = elemSize;
         this->_isBoolean = isBoolean;
-        
+
         // write default value
         _dataSize = 0;
         size_t valueIndex = 0;
@@ -1342,32 +1344,32 @@ namespace scidb
             appendValue(varPart, defaultVal, valueIndex);
             valueIndex += 1;
         }
-        for (ValueMap::const_iterator i = vm.begin(); i != vm.end(); ++i) { 
+        for (ValueMap::const_iterator i = vm.begin(); i != vm.end(); ++i) {
             position_t pos = i->first;
             Value const& val = i->second;
-            if (subsequent) { 
+            if (subsequent) {
                 pos = currSeg._pPosition + segLength;
-            } else { 
+            } else {
                 assert(pos >= position_t(currSeg._pPosition + segLength));
                 if (val == defaultVal) { // ignore explicitly specified default values
                     continue;
                 }
             }
-            if (currVal == NULL // first element 
+            if (currVal == NULL // first element
                 || !currSeg._same // sequence of different values
-                || *currVal != val // new value is not the same as in the current segment 
+                || *currVal != val // new value is not the same as in the current segment
                 || pos != position_t(currSeg._pPosition + segLength)) // hole
-            { 
+            {
                 int carry = 0;
                 if (pos != position_t(currSeg._pPosition + segLength)) { // hole
                     if (segLength != 0) {
                         _container.push_back(currSeg); // complete current sequence
                     }
                     // .. and insert sequence of default values
-                    if (defaultVal.isNull()) { 
+                    if (defaultVal.isNull()) {
                         currSeg._null = true;
                         currSeg._valueIndex = defaultVal.getMissingReason();
-                    } else { 
+                    } else {
                         currSeg._null = false;
                         currSeg._valueIndex = 0;
                     }
@@ -1376,7 +1378,7 @@ namespace scidb
                     _container.push_back(currSeg);
                 } else if (segLength != 0) { // subsequent element
                     if ((!currSeg._same || segLength == 1) && !val.isNull() && !currVal->isNull()) {
-                        if (*currVal == val) {  // sequence of different values is termianted with the same value as new one: cut this value from the sequence and form separate sequence of repeated values 
+                        if (*currVal == val) {  // sequence of different values is termianted with the same value as new one: cut this value from the sequence and form separate sequence of repeated values
                             assert(!currSeg._same);
                             carry = 1;
                             segLength -= 1;
@@ -1388,17 +1390,17 @@ namespace scidb
                             currVal = &val;
                             continue;
                         }
-                    } 
+                    }
                     _container.push_back(currSeg); // complete current sequence
                 }
                 if (val.isNull()) {
                     currSeg._null = true;
                     currSeg._valueIndex = val.getMissingReason();
-                } else { 
+                } else {
                     currSeg._null = false;
-                    if (carry) { 
+                    if (carry) {
                         currSeg._valueIndex = valueIndex-1;
-                    } else { 
+                    } else {
                         appendValue(varPart, val, valueIndex);
                         currSeg._valueIndex = valueIndex++;
                     }
@@ -1407,21 +1409,21 @@ namespace scidb
                 currSeg._pPosition = pos - carry;
                 segLength = 1 + carry;
                 currVal = &val;
-            } else { // same subsequent value 
+            } else { // same subsequent value
                 segLength += 1;
             }
         }
-        if (segLength != 0) { 
+        if (segLength != 0) {
             _container.push_back(currSeg); // save current segment
         }
-        if (subsequent) { 
+        if (subsequent) {
             nElems = currSeg._pPosition + segLength;
         } else if (currSeg._pPosition + segLength != nElems) {
             // tail sequence of default values
-            if (defaultVal.isNull()) { 
+            if (defaultVal.isNull()) {
                 currSeg._null = true;
                 currSeg._valueIndex = defaultVal.getMissingReason();
-            } else { 
+            } else {
                 currSeg._null = false;
                 currSeg._valueIndex = 0;
             }
@@ -1488,7 +1490,7 @@ namespace scidb
     {
         unpackRawData(rawData, rawSize, varOffs, elemSize, nElems, isBoolean);
     }
-    
+
     void RLEPayload::unpackRawData(char* rawData, size_t rawSize, size_t varOffs, size_t elemSize, size_t nElems, bool isBoolean)
     {
         clear();
@@ -1537,7 +1539,7 @@ namespace scidb
     }
 
     void RLEPayload::append(RLEPayload& payload)
-    {        
+    {
         assert(_isBoolean == payload._isBoolean);
         assert(_elemSize == payload._elemSize);
         if (payload._container.empty()) {
@@ -1553,7 +1555,7 @@ namespace scidb
             _container = payload._container;
             _data = payload._data;
             _varOffs = payload._varOffs;
-        } else { 
+        } else {
             _container.insert(_container.end(), payload._container.begin(), payload._container.end());
             size_t headItems;
             if (!_isBoolean) {
@@ -1562,13 +1564,13 @@ namespace scidb
                     int* p = (int*)&_data[_varOffs];
                     int* end = (int*)&_data[_varOffs + payload._varOffs];
                     size_t varHead = _dataSize - _varOffs;
-                    while (p < end) { 
+                    while (p < end) {
                         *p++ += varHead;
                     }
                     _data.insert(_data.end(), payload._data.begin() + payload._varOffs, payload._data.end());
                     headItems = _varOffs/sizeof(int);
                     _varOffs += payload._varOffs;
-                } else { 
+                } else {
                     _data.insert(_data.end(), payload._data.begin(), payload._data.end());
                     headItems = _dataSize/_elemSize;
                 }
@@ -1579,7 +1581,7 @@ namespace scidb
             }
             Segment* s = &_container[headSegments];
             Segment* end = &_container[_container.size()];
-            while (s < end) { 
+            while (s < end) {
                 if (!s->_null) {
                     s->_valueIndex += headItems;
                 }
@@ -1625,7 +1627,7 @@ namespace scidb
         if (rs._pPosition != vEnd - vStart) {
             rs._valueIndex = 0;
             _container.push_back(rs);
-        }            
+        }
         _nSegs = _container.size();
         rs._pPosition = vEnd - vStart;
         _container.push_back(rs);
@@ -1639,7 +1641,7 @@ namespace scidb
         clear();
         _elemSize = payload.elementSize();
         _isBoolean = payload.isBool();
-        
+
         RLEPayload::Segment rs;
         rs._pPosition = 0;
         rs._same = true;
@@ -1649,12 +1651,12 @@ namespace scidb
 
         if (emptyMap.count() == payload.count()) { // no gaps in payload
             size_t begin = emptyMap.findSegment(vStart);
-            if (begin < emptyMap.nSegments()) { 
+            if (begin < emptyMap.nSegments()) {
                 size_t end = emptyMap.findSegment(vEnd);
                 if (end >= emptyMap.nSegments() || emptyMap.getSegment(end)._lPosition > vEnd) {
                     end -= 1;
                 }
-                if (end != size_t(-1)) { 
+                if (end != size_t(-1)) {
                     const RLEEmptyBitmap::Segment& firstSeg = emptyMap.getSegment(begin);
                     const RLEEmptyBitmap::Segment& lastSeg = emptyMap.getSegment(end);
                     const int64_t inStart = max<int64_t>(firstSeg._pPosition, vStart - firstSeg._lPosition + firstSeg._pPosition);
@@ -1669,19 +1671,19 @@ namespace scidb
                         // physical end in payload
                         const int64_t resEnd = min<int64_t>(inEnd, ps._pPosition + ps.length());
                         const int64_t length = resEnd - resStart;
-                        
+
                         if (!ps._null) {
                             size_t srcValueIndex = ps._valueIndex + (ps._same ? 0 : resStart - ps._pPosition);
                             size_t nItems = ps._same ? 1 : length;
                             if (_isBoolean) {
                                 char* otherData = payload.getFixData();
                                 _data.resize((dstValueIndex + nItems + 7) >> 3);
-                                for (size_t k = 0; k < nItems; k++) { 
-                                    if (otherData[(srcValueIndex + k) >> 3] & (1 << ((srcValueIndex + k) & 7))) { 
+                                for (size_t k = 0; k < nItems; k++) {
+                                    if (otherData[(srcValueIndex + k) >> 3] & (1 << ((srcValueIndex + k) & 7))) {
                                         _data[(dstValueIndex + k) >> 3] |= 1 << ((dstValueIndex + k) & 7);
                                     }
                                 }
-                            } else { 
+                            } else {
                                 if (_elemSize == 0) {
                                     _data.resize(_data.size() + nItems*sizeof(int));
                                     int* dst = (int*)&_data[0] + dstValueIndex;
@@ -1704,8 +1706,8 @@ namespace scidb
                                 // append previous segment
                                 segLength += length;
                                 rs._same = false;
-                            } else { 
-                                if (segLength != 0) { 
+                            } else {
+                                if (segLength != 0) {
                                     _container.push_back(rs);
                                     rs._pPosition += segLength;
                                 }
@@ -1716,7 +1718,7 @@ namespace scidb
                             }
                             dstValueIndex += nItems;
                         } else {
-                            if (segLength != 0) { 
+                            if (segLength != 0) {
                                 _container.push_back(rs);
                                 rs._pPosition += segLength;
                             }
@@ -1729,8 +1731,8 @@ namespace scidb
                         }
                     }
                 }
-            } 
-        } else { 
+            }
+        } else {
             for (size_t i = emptyMap.findSegment(vStart);
                  i < emptyMap.nSegments() && emptyMap.getSegment(i)._lPosition < vEnd;
                  i++)
@@ -1748,19 +1750,19 @@ namespace scidb
                     // physical end in payload
                     const int64_t resEnd = min<int64_t>(inEnd, ps._pPosition + ps.length());
                     const int64_t length = resEnd - resStart;
-                    
+
                     if (!ps._null) {
                         size_t srcValueIndex = ps._valueIndex + (ps._same ? 0 : resStart - ps._pPosition);
                         size_t nItems = ps._same ? 1 : length;
                         if (_isBoolean) {
                             char* otherData = payload.getFixData();
                             _data.resize((dstValueIndex + nItems + 7) >> 3);
-                            for (size_t k = 0; k < nItems; k++) { 
-                                if (otherData[(srcValueIndex + k) >> 3] & (1 << ((srcValueIndex + k) & 7))) { 
+                            for (size_t k = 0; k < nItems; k++) {
+                                if (otherData[(srcValueIndex + k) >> 3] & (1 << ((srcValueIndex + k) & 7))) {
                                     _data[(dstValueIndex + k) >> 3] |= 1 << ((dstValueIndex + k) & 7);
                                 }
                             }
-                        } else { 
+                        } else {
                             if (_elemSize == 0) {
                                 _data.resize(_data.size() + nItems*sizeof(int));
                                 int* dst = (int*)&_data[0] + dstValueIndex;
@@ -1783,8 +1785,8 @@ namespace scidb
                             // append previous segment
                             segLength += length;
                             rs._same = false;
-                        } else { 
-                            if (segLength != 0) { 
+                        } else {
+                            if (segLength != 0) {
                                 _container.push_back(rs);
                                 rs._pPosition += segLength;
                             }
@@ -1795,7 +1797,7 @@ namespace scidb
                         }
                         dstValueIndex += nItems;
                     } else {
-                        if (segLength != 0) { 
+                        if (segLength != 0) {
                             _container.push_back(rs);
                             rs._pPosition += segLength;
                         }
@@ -1809,7 +1811,7 @@ namespace scidb
                 }
             }
         }
-        if (segLength != 0) { 
+        if (segLength != 0) {
             _container.push_back(rs);
             rs._pPosition += segLength;
         }
@@ -1817,20 +1819,20 @@ namespace scidb
         _container.push_back(rs);
         _seg = &_container[0];
         _varOffs = _data.size();
-        if (varPart.size() != 0) { 
+        if (varPart.size() != 0) {
             _data.insert(_data.end(), varPart.begin(), varPart.end());
         }
         _dataSize = _data.size();
         _valuesCount = dstValueIndex;
         this->_payload = &_data[0];
     }
-        
-    void RLEPayload::trim(position_t lastPos) 
-    { 
+
+    void RLEPayload::trim(position_t lastPos)
+    {
         _container[_nSegs]._pPosition = lastPos;
     }
 
-    void RLEPayload::flush(position_t chunkSize) 
+    void RLEPayload::flush(position_t chunkSize)
     {
         _nSegs = _container.size();
         assert(_nSegs == 0 || _container[_nSegs - 1]._pPosition < chunkSize);
@@ -1914,34 +1916,34 @@ namespace scidb
         segm._pPosition = 0;
         prevVal = new Value();
     }
-        
-    RLEPayload::append_iterator::append_iterator(size_t bitSize) 
+
+    RLEPayload::append_iterator::append_iterator(size_t bitSize)
     {
         result = new RLEPayload(bitSize);
         init();
     }
 
-    RLEPayload::append_iterator::append_iterator(RLEPayload* dstPayload) 
+    RLEPayload::append_iterator::append_iterator(RLEPayload* dstPayload)
     {
         result = dstPayload;
         dstPayload->clear();
         init();
     }
 
-    void RLEPayload::append_iterator::flush() 
-    { 
-        if (segLength != 0) { 
+    void RLEPayload::append_iterator::flush()
+    {
+        if (segLength != 0) {
             result->addSegment(segm);
         }
         result->_valuesCount = valueIndex;
         result->setVarPart(varPart);
         result->flush(segm._pPosition + segLength);
     }
-        
-uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool setupPrevVal) 
-    { 
+
+uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool setupPrevVal)
+    {
         uint64_t count = min(limit, ii.available());
-        if (ii.isNull()) {                            
+        if (ii.isNull()) {
             if (segLength != 0 && (!segm._null || segm._valueIndex != ii.getMissingReason()))  {
                 result->addSegment(segm);
                 segm._pPosition += segLength;
@@ -1952,26 +1954,26 @@ uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool set
             segm._same = true;
             segm._valueIndex = ii.getMissingReason();
             ii += count;
-        } else { 
+        } else {
             if (segLength != 0 && (segm._null || (segm._same && segLength > 1) || (ii.isSame() && count > 1))) {
                 result->addSegment(segm);
                 segm._pPosition += segLength;
                 segLength = 0;
             }
-            if (segLength == 0) { 
+            if (segLength == 0) {
                 segm._same = (count == 1) || ii.isSame();
                 segm._valueIndex = valueIndex;
                 segm._null = false;
-            } else { 
+            } else {
                 segm._same = false;
-            }                
+            }
             segLength += count;
             if (!result->_isBoolean && result->_elemSize != 0) {
                 size_t size;
                 if (segm._same) {
                     size = result->_elemSize;
                     valueIndex += 1;
-                } else { 
+                } else {
                     size = result->_elemSize*size_t(count);
                     valueIndex += size_t(count);
                 }
@@ -1992,7 +1994,7 @@ uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool set
                     ii.getItem(*prevVal);
                     ii += count;
                     result->appendValue(varPart, *prevVal, valueIndex++);
-                } else { 
+                } else {
                     for (uint64_t i = 0; i < count; i++) {
                         ii.getItem(*prevVal);
                         result->appendValue(varPart, *prevVal, valueIndex++);
@@ -2003,10 +2005,10 @@ uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool set
         }
         return count;
     }
-        
-    void RLEPayload::append_iterator::add(Value const& v, uint64_t count) 
-    { 
-        if (v.isNull()) {                            
+
+    void RLEPayload::append_iterator::add(Value const& v, uint64_t count)
+    {
+        if (v.isNull()) {
             if (segLength != 0 && (!segm._null || segm._valueIndex != v.getMissingReason()))  {
                 result->addSegment(segm);
                 segm._pPosition += segLength;
@@ -2019,30 +2021,30 @@ uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool set
         } else if (segLength != 0 && !segm._null && v == *prevVal) {
             if (segm._same) {
                 segLength += count;
-            } else { 
+            } else {
                 result->addSegment(segm);
                 segm._pPosition += segLength - 1;
                 segm._same = true;
                 segm._valueIndex = valueIndex-1;
                 segLength = 1 + count;
             }
-        } else { 
+        } else {
             if (segLength == 0 || segm._null || count > 1) {
                 if (segLength != 0) {
                     result->addSegment(segm);
                     segm._pPosition += segLength;
                     segLength = 0;
-                }                                    
+                }
                 segm._same = true;
                 segm._null = false;
                 segm._valueIndex = valueIndex;
-            } else { 
+            } else {
                 if (segLength > 1 && segm._same) {
                     result->addSegment(segm);
                     segm._pPosition += segLength;
                     segLength = 0;
                     segm._valueIndex = valueIndex;
-                } else {                                                        
+                } else {
                     segm._same = false;
                 }
             }
@@ -2051,7 +2053,7 @@ uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool set
             *prevVal = v;
         }
     }
-    
+
     RLEPayload::append_iterator::~append_iterator()
     {
         delete prevVal;

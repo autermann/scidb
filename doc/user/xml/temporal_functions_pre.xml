@@ -40,7 +40,7 @@
 
             <entry>Syntax</entry>
 
-            <entry>Returned Datatype</entry>
+            <entry>Returned Data type</entry>
           </row>
         </thead>
 
@@ -81,8 +81,9 @@
           <row>
             <entry>apply_offset</entry>
 
-            <entry>Converts a datetime value into its equivalent value, based
-            on the offset supplied (in seconds).</entry>
+            <entry>Converts a UTC datetime to local datetime by subtracting
+            the offset timezone value, and stores the result as datetimetz
+            including the offset timezone value.</entry>
 
             <entry>apply_offset(datetime,int64)</entry>
 

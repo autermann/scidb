@@ -30,8 +30,6 @@
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "JoinArray.h"
-#include "MapJoinArray.h"
-
 
 using namespace std;
 using namespace boost;
@@ -154,16 +152,6 @@ public:
 
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
-        Dimensions const& rightDimensions = right->getArrayDesc().getDimensions();
-        Dimensions const& leftDimensions = left->getArrayDesc().getDimensions();
-        size_t nRightDims = rightDimensions.size();
-        for (size_t i = 0; i < nRightDims; i++) {
-            if (rightDimensions[i].getType() != TID_INT64
-                && rightDimensions[i].getMappingArrayName() != leftDimensions[i].getMappingArrayName()) 
-            {
-                return boost::shared_ptr<Array>(new MapJoinArray(_schema, left, redistribute(right, query, psReplication), query));
-            }
-        }
         return boost::shared_ptr<Array>(_schema.getEmptyBitmapAttribute() == NULL
                                         ? (Array*)new JoinArray(_schema, left, right)
                                         : (Array*)new JoinEmptyableArray(_schema, left, right));

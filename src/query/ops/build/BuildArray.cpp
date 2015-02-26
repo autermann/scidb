@@ -61,9 +61,7 @@ namespace scidb {
             switch (array._bindings[i].kind) {
             case BindInfo::BI_COORDINATE:
             {
-                _params[i] = array._desc.getOriginalCoordinate(array._bindings[i].resolvedId,
-                                                               currPos[array._bindings[i].resolvedId],
-                                                               _query);
+                _params[i].setInt64(currPos[array._bindings[i].resolvedId]);
             } break;
             case BindInfo::BI_VALUE:
             {

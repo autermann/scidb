@@ -51,37 +51,37 @@ create array M1024x1024 <x:double>[i=0:1024-1,32,0, j=0:1024-1,32,0]
 
 # Try killing the iquery
 
---shell --command "../utils/killquery.sh -afl 9  0 'aggregate(COPY, count(*), equity)' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  0 'aggregate(COPY, count(*), equity)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_1.stdout"
+--shell --command "cat /tmp/${HPID}_1.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  0 'filter(COPY, equity=1)' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  0 'filter(COPY, equity=1)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_2.stdout"
+--shell --command "cat /tmp/${HPID}_2.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  1 'between(COPY, null,null,null,null)' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  1 'between(COPY, null,null,null,null)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_3.stdout"
+--shell --command "cat /tmp/${HPID}_3.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  1 'between(COPY, 1,0,null,null)' 1> /tmp/${PPID}_4.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  1 'between(COPY, 1,0,null,null)' 1> /tmp/${HPID}_4.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_4.stdout"
+--shell --command "cat /tmp/${HPID}_4.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  1 'between(COPY, 0,0,null,null)' 1> /tmp/${PPID}_5.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  1 'between(COPY, 0,0,null,null)' 1> /tmp/${HPID}_5.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_5.stdout"
+--shell --command "cat /tmp/${HPID}_5.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  1 'join(COPY, COPY)' 1> /tmp/${PPID}_6.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  1 'join(COPY, COPY)' 1> /tmp/${HPID}_6.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_6.stdout"
+--shell --command "cat /tmp/${HPID}_6.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  1 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))' 1> /tmp/${PPID}_7.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  1 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))' 1> /tmp/${HPID}_7.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_7.stdout"
+--shell --command "cat /tmp/${HPID}_7.stdout"
 
---shell --command "../utils/killquery.sh -afl 9  1 $'gesvd(M1024x1024, \'values\')' 1> /tmp/${PPID}_8.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9  1 $'gesvd(M1024x1024, \'values\')' 1> /tmp/${HPID}_8.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_8.stdout"
+--shell --command "cat /tmp/${HPID}_8.stdout"
 
 --stop-query-logging
 --cleanup
@@ -90,11 +90,11 @@ remove(SCHEMA)
 remove(ORIG)
 remove(COPY)
 remove(M1024x1024)
---shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_4.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_5.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_6.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_7.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_8.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_3.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_4.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_5.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_6.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_7.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_8.stdout 2>/dev/null"

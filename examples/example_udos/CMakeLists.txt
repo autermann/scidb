@@ -24,12 +24,8 @@ set (example_udos_src
     plugin.cpp
     HelloInstances/LogicalHelloInstances.cpp
     HelloInstances/PhysicalHelloInstances.cpp
-    IndexLookup/LogicalIndexLookup.cpp
-    IndexLookup/PhysicalIndexLookup.cpp
     InstanceStats/LogicalInstanceStats.cpp
     InstanceStats/PhysicalInstanceStats.cpp
-    Uniq/LogicalUniq.cpp
-    Uniq/PhysicalUniq.cpp
 )
 
 file(GLOB example_udos_include "*.h")

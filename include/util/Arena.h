@@ -28,7 +28,7 @@
 #include <new>                                           // For placement new
 #include <iosfwd>                                        // For ostream
 #include <boost/utility.hpp>                             // For noncopyable
-#include <boost/shared_ptr.hpp>                          // For shared_ptr
+#include <boost/make_shared.hpp>                         // For shared_ptr
 #include <boost/type_traits.hpp>                         // For has_trivial...
 #include <util/Utility.h>                                // For stackonly
 #include <util/Platform.h>                               // For SCIDB_NORETURN
@@ -74,7 +74,7 @@ ArenaPtr                      newArena(const Options&);  // Adds a new branch
 
 template<class t> finalizer_t finalizer();
 template<class t> void        finalize(void*);
-template<class t> t*          newarray(Arena&,count_t);
+template<class t> t*          newArray(Arena&,count_t);
 template<class t> void        destroy (Arena&,const t*,count_t = unlimited);
 
 /****************************************************************************/
@@ -248,15 +248,14 @@ class Allocator
  public:                   // Construction
                               Allocator()                                      : _arena(getArena().get()){assert(consistent());}
                               Allocator(Arena* p)                              : _arena(p)               {assert(consistent());}
-                              Allocator(Arena& r)                              : _arena(&r)              {assert(consistent());}
-                              Allocator(ArenaPtr p)                            : _arena(p.get())         {assert(consistent());}
-    template<class t>         Allocator(Allocator<t> a)                        : _arena(a.arena())       {assert(consistent());}
+                              Allocator(const ArenaPtr& p)                     : _arena(p.get())         {assert(consistent());}
+    template<class t>         Allocator(const Allocator<t>& a)                 : _arena(a.arena())       {assert(consistent());}
 
  public:                   // Operations
             Arena*            arena()                    const                 {return _arena;}
             count_t           max_size()                 const                 {return unlimited / sizeof(type);}
             type*             address(type& v)           const                 {return &v;}
-      const type*             address(type const&v)      const                 {return &v;}
+      const type*             address(const type& v)     const                 {return &v;}
             bool              operator==(Allocator a)    const                 {return _arena == a._arena;}
             bool              operator!=(Allocator a)    const                 {return _arena != a._arena;}
 
@@ -335,9 +334,9 @@ struct Allocator<void>
  *              Notice also that there is no comparable overload for 'operator
  *              new []': again, there's just no portable way to implement this
  *              operator (see article below for the gory details). Instead, we
- *              have the function newarray() for this purpose:
+ *              have the function newArray() for this purpose:
  *  @code
- *                  Foo* p = newarray(arena,78);    // allocate off arena
+ *                  Foo* p = newArray(arena,78);    // allocate off arena
  *                      ...
  *                  destroy(arena,p);               // return to the arena
  *  @endcode
@@ -551,7 +550,7 @@ inline finalizer_t finalizer()
  *  - and *only* the Arena 'a'- for destruction by calling 'destroy(a,p)'. For
  *  example:
  *  @code
- *      double* p = newarray<string>(arena,13);          // Allocate an array
+ *      double* p = newArray<string>(arena,13);          // Allocate an array
  *          ...
  *      destroy(arena,p);                                // Destroy the array
  *  @endcode
@@ -559,7 +558,7 @@ inline finalizer_t finalizer()
  *  array to the Arena to be destroyed and the underlying memory recycled.
  */
 template<class type>
-type* newarray(Arena& a,count_t c)
+type* newArray(Arena& a,count_t c)
 {
     finalizer_t f = finalizer<type>();                   // Find the finalizer
     void* const v = a.allocate(sizeof(type),f,c);        // Allocate the array
@@ -650,7 +649,47 @@ inline std::ostream& operator<<(std::ostream& o,const Exhausted& e)
     return o << e.what();                                // Insert and return
 }
 
-/****************************************************************************/
+/**
+ *  Construct an object of the given type within memory that is allocated from
+ *  off the given Arena, and wrap it in a shared_ptr.
+ *
+ *  This function overloads the boost function of the same name so as to allow
+ *  it to be called directly with a reference to an Arena,  without the caller
+ *  being required to first explicitly wrap the Arena in an Allocator.
+ *
+ *  The function is available at all arities - well, 8, at any rate - with any
+ *  additional arguments being passed on to the constructor for class 'type'.
+ *
+ *  @param x1,...,xn    Optional arguments to the constructor for class 'type'
+ *  (not shown in the synopsis above).
+ *
+ *  @see http://en.cppreference.com/w/cpp/memory/shared_ptr/allocate_shared
+ *  @see http://www.boost.org/doc/libs/1_54_0/libs/smart_ptr/make_shared.html
+ */
+template<class type>
+inline shared_ptr<type> allocate_shared(Arena& arena)
+{
+    return boost::allocate_shared<type>(Allocator<type>(&arena));
+}
+
+/** @cond ********************************************************************
+ * In the absence of proper compiler support for variadic templates, we create
+ * the additional overloads with the help of the preprocessor...*/
+#define SCIDB_ALLOCATE_SHARED(_,i,__)                                          \
+                                                                               \
+template<class type,BOOST_PP_ENUM_PARAMS(i,class X)>                           \
+inline shared_ptr<type>                                                        \
+allocate_shared(Arena& arena,BOOST_PP_ENUM_BINARY_PARAMS(i,X,const& x))        \
+{                                                                              \
+    Allocator<type> a(&arena);                                                 \
+                                                                               \
+    return boost::allocate_shared<type>(Allocator<type>(&arena),               \
+                                        BOOST_PP_ENUM_PARAMS(i,x));            \
+}
+
+BOOST_PP_REPEAT_FROM_TO(1,8,SCIDB_ALLOCATE_SHARED,"")    // Emit the overloads
+#undef SCIDB_ALLOCATE_SHARED                             // And clean up after
+/** @endcond ****************************************************************/
 }}
 /****************************************************************************/
 

@@ -37,6 +37,7 @@
 #include <log4cxx/logger.h>
 
 using boost::shared_ptr;
+using boost::make_shared;
 using namespace std;
 
 namespace scidb
@@ -199,7 +200,10 @@ public:
 
     bool needsAccumulate() const
     {
-        return false;
+        //if _ignoreNulls is true, that means this is a "count(attribute_name)" aggregate.
+        //this can be made more optimal but right now we are disabling the optimization to fix the bug
+        //aggregate(build(<v:double null>[i=1:2,2,0],null), count(v)) --> 0
+        return _ignoreNulls;
     }
 
     void accumulate(Value& state, Value const& input)
@@ -254,88 +258,102 @@ public:
 AggregateLibrary::AggregateLibrary()
 {
     /** SUM **/
-    addAggregate(AggregatePtr(new ExpressionAggregate("sum", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "a+b", "a+b")));
+    addAggregate(make_shared<ExpressionAggregate> ("sum", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "a+b", "a+b"));
 
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, int8_t, int64_t>("sum", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, int16_t, int64_t>("sum", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, int32_t, int64_t>("sum", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, int64_t, int64_t>("sum", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, uint8_t, uint64_t>("sum", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, uint16_t, uint64_t>("sum", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, uint32_t, uint64_t>("sum", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, uint64_t, uint64_t>("sum", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, float, double>("sum", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggSum, double, double>("sum", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+    addAggregate(make_shared<BaseAggregate<AggSum, int8_t, int64_t> >("sum", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, int16_t, int64_t> >("sum", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, int32_t, int64_t> >("sum", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, int64_t, int64_t> >("sum", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, uint8_t, uint64_t> >("sum", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, uint16_t, uint64_t> >("sum", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, uint32_t, uint64_t> >("sum", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, uint64_t, uint64_t> >("sum", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggSum, float, double> >("sum", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggSum, double, double> >("sum", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
+
+    /** PROD **/
+    addAggregate(make_shared<ExpressionAggregate>("prod", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "a*b", "a*b"));
+
+    addAggregate(make_shared<BaseAggregate<AggProd, int8_t, int64_t> >("prod", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, int16_t, int64_t> >("prod", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, int32_t, int64_t> >("prod", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, int64_t, int64_t> >("prod", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, uint8_t, uint64_t> >("prod", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, uint16_t, uint64_t> >("prod", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, uint32_t, uint64_t> >("prod", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, uint64_t, uint64_t> >("prod", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregate<AggProd, float, double> >("prod", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggProd, double, double> >("prod", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
 
     /** COUNT **/
-    addAggregate(AggregatePtr(new CountAggregate(TypeLibrary::getType(TID_VOID))));
+    addAggregate(make_shared<CountAggregate>(TypeLibrary::getType(TID_VOID)));
 
     /** AVG **/
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, int8_t, double>("avg", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, int16_t, double>("avg", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, int32_t, double>("avg", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, int64_t, double>("avg", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, uint8_t, double>("avg", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, uint16_t, double>("avg", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, uint32_t, double>("avg", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, uint64_t, double>("avg", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, float, double>("avg", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggAvg, double, double>("avg", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+    addAggregate(make_shared<BaseAggregate<AggAvg, int8_t, double> >("avg", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, int16_t, double> >("avg", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, int32_t, double> >("avg", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, int64_t, double> >("avg", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, uint8_t, double> >("avg", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, uint16_t, double> >("avg", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, uint32_t, double> >("avg", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, uint64_t, double> >("avg", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, float, double> >("avg", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggAvg, double, double> >("avg", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
 
     /** MIN **/
-    addAggregate(AggregatePtr(new ExpressionAggregate("min", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "iif(a < b, a, b)", "iif(a < b, a, b)", true)));
+    addAggregate(make_shared<ExpressionAggregate>("min", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "iif(a <b, a, b)", "iif(a <b, a, b)", true));
 
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, int8_t, int8_t>("min", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT8))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, int16_t, int16_t>("min", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT16))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, int32_t, int32_t>("min", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT32))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, int64_t, int64_t>("min", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, uint8_t, uint8_t>("min", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT8))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, uint16_t, uint16_t>("min", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT16))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, uint32_t, uint32_t>("min", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT32))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, uint64_t, uint64_t>("min", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, float, float>("min", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_FLOAT))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMin, double, double>("min", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, int8_t, int8_t> >("min", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT8)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, int16_t, int16_t> >("min", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT16)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, int32_t, int32_t> >("min", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT32)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, int64_t, int64_t> >("min", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, uint8_t, uint8_t> >("min", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT8)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, uint16_t, uint16_t> >("min", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT16)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, uint32_t, uint32_t> >("min", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT32)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, uint64_t, uint64_t> >("min", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, float, float> >("min", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_FLOAT)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMin, double, double> >("min", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
 
     /** MAX **/
-    addAggregate(AggregatePtr(new ExpressionAggregate("max", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "iif(a > b, a, b)", "iif(a > b, a, b)", true)));
+    addAggregate(make_shared<ExpressionAggregate>("max", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_VOID), "iif(a > b, a, b)", "iif(a > b, a, b)", true));
 
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, int8_t, int8_t>("max", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT8))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, int16_t, int16_t>("max", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT16))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, int32_t, int32_t>("max", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT32))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, int64_t, int64_t>("max", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, uint8_t, uint8_t>("max", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT8))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, uint16_t, uint16_t>("max", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT16))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, uint32_t, uint32_t>("max", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT32))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, uint64_t, uint64_t>("max", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, float, float>("max", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_FLOAT))));
-    addAggregate(AggregatePtr(new BaseAggregateInitByFirst<AggMax, double, double>("max", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, int8_t, int8_t> >("max", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_INT8)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, int16_t, int16_t> >("max", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_INT16)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, int32_t, int32_t> >("max", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_INT32)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, int64_t, int64_t> >("max", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_INT64)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, uint8_t, uint8_t> >("max", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_UINT8)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, uint16_t, uint16_t> >("max", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_UINT16)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, uint32_t, uint32_t> >("max", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_UINT32)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, uint64_t, uint64_t> >("max", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_UINT64)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, float, float> >("max", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_FLOAT)));
+    addAggregate(make_shared<BaseAggregateInitByFirst<AggMax, double, double> >("max", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
 
     /** VAR **/
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, int8_t, double>("var", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, int16_t, double>("var", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, int32_t, double>("var", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, int64_t, double>("var", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, uint8_t, double>("var", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, uint16_t, double>("var", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, uint32_t, double>("var", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, uint64_t, double>("var", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, float, double>("var", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggVar, double, double>("var", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+    addAggregate(make_shared<BaseAggregate<AggVar, int8_t, double> >("var", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, int16_t, double> >("var", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, int32_t, double> >("var", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, int64_t, double> >("var", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, uint8_t, double> >("var", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, uint16_t, double> >("var", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, uint32_t, double> >("var", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, uint64_t, double> >("var", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, float, double> >("var", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggVar, double, double> >("var", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
 
     /** STDEV **/
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, int8_t, double>("stdev", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, int16_t, double>("stdev", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, int32_t, double>("stdev", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, int64_t, double>("stdev", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, uint8_t, double>("stdev", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, uint16_t, double>("stdev", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, uint32_t, double>("stdev", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, uint64_t, double>("stdev", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, float, double>("stdev", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE))));
-    addAggregate(AggregatePtr(new BaseAggregate<AggStDev, double, double>("stdev", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE))));
+    addAggregate(make_shared<BaseAggregate<AggStDev, int8_t, double> >("stdev", TypeLibrary::getType(TID_INT8), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, int16_t, double> >("stdev", TypeLibrary::getType(TID_INT16), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, int32_t, double> >("stdev", TypeLibrary::getType(TID_INT32), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, int64_t, double> >("stdev", TypeLibrary::getType(TID_INT64), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, uint8_t, double> >("stdev", TypeLibrary::getType(TID_UINT8), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, uint16_t, double> >("stdev", TypeLibrary::getType(TID_UINT16), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, uint32_t, double> >("stdev", TypeLibrary::getType(TID_UINT32), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, uint64_t, double> >("stdev", TypeLibrary::getType(TID_UINT64), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, float, double> >("stdev", TypeLibrary::getType(TID_FLOAT), TypeLibrary::getType(TID_DOUBLE)));
+    addAggregate(make_shared<BaseAggregate<AggStDev, double, double> >("stdev", TypeLibrary::getType(TID_DOUBLE), TypeLibrary::getType(TID_DOUBLE)));
 
     /** ApproxDC (ANALYZE) **/
-    addAggregate(AggregatePtr(new AnalyzeAggregate()));
+    addAggregate(make_shared<AnalyzeAggregate>());
 }
 
 

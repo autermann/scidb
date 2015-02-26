@@ -91,7 +91,10 @@
               </indexterm>libraries</entry>
 
             <entry>Show all libraries that are loaded in the current SciDB
-            session.</entry>
+            session, and the SciDB version information. For each instance,
+            this parameter returns the SciDB version information, and the
+            version information for each library that is loaded for that
+            instance.</entry>
           </row>
 
           <row>
@@ -110,7 +113,7 @@
                 <primary>data types</primary>
               </indexterm>types</entry>
 
-            <entry>Show all the datatypes the SciDB supports.</entry>
+            <entry>Show all the data types the SciDB supports.</entry>
           </row>
 
           <row>

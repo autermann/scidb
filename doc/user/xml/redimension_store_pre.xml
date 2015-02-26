@@ -23,6 +23,14 @@
     of a source array, potentially changing some or all of those variables
     from dimensions to attributes or vice versa, and optionally calculating
     aggregates to be included in the new array.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>redimension_store</secondary>
+      </indexterm><emphasis role="bold">Deprecated. </emphasis>The
+    <code>redimension_store</code> operator may be removed in the future. We
+    recommend that you use <code>store(redimension())</code> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -38,8 +46,12 @@
     data from a source array. Many of the considerations and details are the
     same as for the redimension operator, the main difference being that
     redimension_store saves the results to the
-    <replaceable>named_target_array</replaceable>. For details, see the <link
-    linkend="redimension">redimension reference documentation</link>.</para>
+    <replaceable>named_target_array</replaceable>.</para>
+
+    <para>In fact, <command>redimension_store(...)</command> works exactly the
+    same as <command>store(redimension(...)</command>. For details, see the
+    <link linkend="redimension">redimension reference
+    documentation</link>.</para>
 
     <para>The argument <replaceable>named_target_array</replaceable> must be
     an array that was previously created in SciDB. The target array's schema
@@ -214,259 +226,6 @@
           from the source array.<programlisting language="test">--afl redimension_store(doseData,pulseFunction) 
  --show-query=yes 
  --show-output=yes</programlisting></para>
-        </step>
-      </procedure>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Example Four</title>
-
-    <informalexample>
-      <para>This example shows three different ways to handle
-      collisions.</para>
-
-      <procedure>
-        <step>
-          <para>Show the source array.<programlisting language="test">--aql create array nwFlat 
-      &lt;event:string,year:int64,person:string,country:string,time:double&gt; 
-      [csvRow=0:11,12,0]
- --show-query=no 
- --show-output=no
---shell --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/nationWinners.csv &gt; $DOC_DATA/nationWinners.scidb 
- --show-query=no 
- --show-output=no
---aql load nwFlat 
-      from '../tests/harness/testcases/data/doc/nationWinners.scidb'; 
- --show-query=no 
- --show-output=no
---aql create array 
-      nationWinners 
-      &lt;person:string,country:string,time:double&gt; 
-      [event(string)=3,3,0,year=1996:2008,13,0];
- --show-query=no 
- --show-output=no
---afl redimension_store(nwFlat,nationWinners) 
- --show-query=no 
- --show-output=yes
-</programlisting></para>
-        </step>
-
-        <step>
-          <para>Create an array to accommodate data where each non-empty cell
-          will show a (country,year) pair of a country with at least one
-          victory in that year, along with a count of the number of victories
-          that country had during that year.<programlisting language="test">--aql create array victoryCountPerCountryYear 
-      &lt;victoryCount:uint64 null&gt; 
-      [year=1996:2008,13,0,country(string)=300,300,0];
- --show-query=yes 
- --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters a collision (as
-          revealed by the cell with a count greater than 1 in the
-          result).<programlisting language="test">--afl redimension_store
-      (nationWinners,
-       victoryCountPerCountryYear,
-       count(*) as victoryCount)
- --show-query=yes 
- --show-output=yes</programlisting></para>
-        </step>
-
-        <step>
-          <para><indexterm>
-              <primary>synthetic dimensions</primary>
-            </indexterm>Create an array that includes a synthetic dimension
-          (synD) for collisions. The other (non-synthetic) dimensions define
-          (country,year) pairs. The attributes accommodate all other variables
-          from the original array, nationWinners.<programlisting
-          language="test">--aql create array vPer_CY_Synthetic 
-      &lt;person:string,event:string,time:double&gt; 
-      [country(string)=300,300,0,year=1996:2008,13,0,synD=1:6,6,0]
- --show-query=yes 
- --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters a collision (as
-          revealed by the cell whose value for synD is greater than
-          1).<programlisting language="test">--afl redimension_store(nationWinners,vPer_CY_Synthetic)
- --show-query=yes 
- --show-output=yes</programlisting></para>
-        </step>
-
-        <step>
-          <para>Create an array whose dimensions define (country,year) pairs.
-          The attributes accommodate all other variables from the original
-          array, nationWinners. Note that the array schema includes neither a
-          synthetic dimension nor any attribute to accommodate aggregate
-          values.<programlisting language="test">--aql create array arbitraryWinner 
-      &lt;person:string,event:string,time:double&gt; 
-      [country(string)=300,300,0,year=1996:2008,13,0]
- --show-query=yes 
- --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters a collision (for
-          Kenya, 2008), and resolves it by arbitrarily choosing one of the
-          Kenyan victories of that year.<programlisting language="test">--afl redimension_store(nationWinners,arbitraryWinner)
- --show-query=yes 
- --show-output=yes</programlisting></para>
-        </step>
-      </procedure>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Example Five</title>
-
-    <informalexample>
-      <para>This example shows that a single synthetic dimension applies, even
-      if the redimension_store operator eliminates multiple dimensions from
-      the source array.</para>
-
-      <procedure>
-        <step>
-          <para>Show the source array.<programlisting language="test">--afl scan(nationWinners) 
- --show-query=yes
- --show-output=yes
-</programlisting></para>
-        </step>
-
-        <step>
-          <para>Create an array to accommodate data where each non-empty cell
-          will describe a country with at least one victory in the original
-          data, along with a count of the number of victories that country
-          has.<programlisting language="test">--aql create array victoryCountPerCountry 
-      &lt;victoryCount:uint64 null&gt; 
-      [country(string)=300,300,0];
- --show-query=yes 
- --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters collisions (as
-          revealed by the cells with a count greater than 1 in the
-          result).<programlisting language="test">--afl redimension_store
-        (nationWinners,
-         victoryCountPerCountry,
-         count(*) as victoryCount)
- --show-query=yes 
- --show-output=yes</programlisting></para>
-        </step>
-
-        <step>
-          <para>Create an array that includes a synthetic dimension (synD) for
-          collisions. The other (non-synthetic) dimension defines countries.
-          The attributes accommodate all other attributes from the original
-          array.<programlisting language="test">--aql create array vPer_C_Synthetic 
-      &lt;person:string,event:string,time:double&gt; 
-      [country(string)=300,300,0,synD=1:6,6,0]
- --show-query=yes 
- --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters collisions for two
-          reasons:</para>
-
-          <itemizedlist>
-            <listitem>
-              <para>Event is not a dimension in the target array, and one
-              country (Kenya) has won multiple events (steeplechase and
-              marathon)</para>
-            </listitem>
-
-            <listitem>
-              <para>Year is not a dimension in the target array, and two
-              countries (Kenya and USA) have won in multiple years.</para>
-            </listitem>
-          </itemizedlist>
-
-          <para>Also note that despite the two reasons collisions, a single
-          synthetic dimension suffices to accommodate all the cells that
-          constitute the collisions.<programlisting language="test">--afl redimension_store(nationWinners,vPer_C_Synthetic)
- --show-query=yes 
- --show-output=yes</programlisting></para>
-        </step>
-      </procedure>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Example Six</title>
-
-    <informalexample>
-      <para>This example shows a collision-handling strategy in which the
-      target array includes some attributes with values from an arbitrarily
-      chosen candidate cell and other attributes whose values are aggregates
-      calculated over the set of candidate cells.</para>
-
-      <procedure>
-        <step>
-          <para>Show the source array.<programlisting language="test">--aql create array namesFlat 
-      &lt; givenName:string,
-        surname:string,
-        a:int64,
-        b:int64 null,
-        c:int64, 
-        d:int64&gt; 
-      [ csvRow=0:6,6,0 ]
- --show-query=no 
- --show-output=no
---shell --command=csv2scidb -s 1 -p SSNNNN 
-          &lt; $DOC_DATA/namesData.csv &gt; 
-            $DOC_DATA/namesData.scidb 
- --show-query=no 
- --show-output=no
---aql load namesFlat 
-      from '../tests/harness/testcases/data/doc/namesData.scidb'; 
- --show-query=no 
- --show-output=no
---aql create array names 
-         &lt;a:int64, b:int64 null, c:int64, d:int64&gt; 
-         [givenName(string)=5,5,0,surname(string)=5,5,0]
- --show-query=no 
- --show-output=no
---afl redimension_store(namesFlat,names) 
- --show-query=no 
- --show-output=yes
-</programlisting></para>
-        </step>
-
-        <step>
-          <para>Create an array to be the target of the redimension_store
-          operator. Note that the array excludes one attribute (a) from the
-          source array, includes two other attributes (b and c), and declares
-          another attribute (avgD) to accommodate the value of an aggregate.
-          Notice also that the target array excludes one of the dimensions
-          (givenName) of the source array, so the redimension_store operator
-          will generate collisions.<programlisting language="test">--aql create array namesRedimensioned 
-        &lt;b:int64 null, c:int64, avgD:double null&gt; 
-        [surname(string)=5,5,0]
- --show-query=yes 
- --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the target array with data.
-          <programlisting language="test">--afl redimension_store
-       (names,
-        namesRedimensioned,
-        avg(d) as avgD)
- --show-query=yes 
- --show-output=yes</programlisting>The redimension_store operation yields a
-          target array with three cells. The first cell is not the result of a
-          collision (because the source array included only one person with
-          surname "Richards.") The second and third cells are the result of
-          collisions.</para>
         </step>
       </procedure>
     </informalexample>

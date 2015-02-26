@@ -15,7 +15,7 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> avg(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
+    <synopsis>AQL% <command>SELECT</command> avg(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable> <optional><command>GROUP BY</command> <replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
 
     <synopsis>AFL% aggregate(<replaceable>array</replaceable>,avg(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
   </refsynopsisdiv>

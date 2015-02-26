@@ -64,7 +64,7 @@ public:
                 }
                 else
                 {
-                    result[i] = inputSchema.getOrdinalCoordinate(i, low, cmLowerBound, query);
+                    result[i] = low.getInt64();
                     if (dims[i].getStartMin() != MIN_COORDINATE && result[i] < dims[i].getStartMin())
                     {
                         result[i] = dims[i].getStartMin();
@@ -96,7 +96,7 @@ public:
                 }
                 else
                 {
-                    result[i] = inputSchema.getOrdinalCoordinate(i, high, cmUpperBound, query);
+                    result[i] = high.getInt64();
                     if (result[i] > dims[i].getEndMax())
                     {
                         result[i] = dims[i].getEndMax();
@@ -212,7 +212,6 @@ public:
         boost::shared_ptr< Array> array = inputArrays[0];
         ArrayDesc const& desc = array->getArrayDesc();
         Dimensions const& srcDims = desc.getDimensions();
-        Dimensions const& dstDims = _schema.getDimensions();
         size_t nDims = srcDims.size();
         
         /***
@@ -224,13 +223,6 @@ public:
         {
             if (lowPos[i] > highPos[i]) {
                 return boost::shared_ptr<Array>(new MemArray(_schema,query));
-            }
-            if (query->getCoordinatorID() != COORDINATOR_INSTANCE) { 
-                string const& oldMapping = srcDims[i].getMappingArrayName();
-                string const& newMapping = dstDims[i].getMappingArrayName();
-                if (!newMapping.empty() && oldMapping != newMapping) { 
-                    subarrayMappingArray(srcDims[i].getBaseName(), oldMapping, newMapping, lowPos[i], highPos[i], query);
-                }
             }
         }
         /***

@@ -16,6 +16,14 @@
       </indexterm>Produces a result array whose set of cells consists of every
     possible combination of a cell from one source array and a cell from
     another source array.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>cross</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis>The
+    <code>cross</code> operator may be removed in the future. Use
+    <code>cross_join</code> as the alternative.</para>
   </refnamediv>
 
   <refsynopsisdiv>

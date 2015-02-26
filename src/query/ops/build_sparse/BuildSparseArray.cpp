@@ -64,9 +64,7 @@ namespace scidb {
             switch (_array._expressionBindings[i].kind) {
               case BindInfo::BI_COORDINATE:
               {
-                  _params[i] = _array._desc.getOriginalCoordinate(_array._expressionBindings[i].resolvedId,
-                                                                  _currPos[_array._expressionBindings[i].resolvedId],
-                                                                  _query);
+                  _params[i].setInt64(_currPos[_array._expressionBindings[i].resolvedId] );
               } break;
               case BindInfo::BI_VALUE:
               {
@@ -127,9 +125,7 @@ namespace scidb {
             switch (_array._predicateBindings[i].kind) {
               case BindInfo::BI_COORDINATE:
               {
-                  params[i] = _array._desc.getOriginalCoordinate(_array._predicateBindings[i].resolvedId,
-                                                                 _currPos[_array._predicateBindings[i].resolvedId],
-                                                                 _query);
+                  params[i].setInt64(_currPos[_array._predicateBindings[i].resolvedId]);
               } break;
               case BindInfo::BI_VALUE:
               {

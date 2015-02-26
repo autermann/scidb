@@ -7,6 +7,13 @@
     <refpurpose><indexterm>
         <primary>variance</primary>
       </indexterm>Return the variance for an attribute.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>var</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>var</code> operator may be removed in the future. Use the <link linkend="varAggregate">var aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -16,9 +23,8 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The <literal>var</literal> operator returns the variance of a set of
-    values taken from an array attribute. For the corresponding aggregate, see
-    the <link linkend="varAggregate">var aggregate</link> reference.</para>
+    <para>The <code>var</code> operator returns the variance of a set of
+    values taken from an array attribute.</para>
   </refsect1>
 
   <refsect1>
@@ -60,14 +66,14 @@
         <step>
           <para>Store values of random values between 0 and 9 in
           m3x3:<para><programlisting>AFL% store(build(m3x3,random()%10),m3x3);  </programlisting><screen>[
-[(0),(4),(5)],
-[(2),(4),(1)],
-[(2),(3),(8)]
+[(5),(2),(3)],
+[(1),(9),(1)],
+[(1),(9),(1)]
 ]</screen></para></para>
         </step>
 
         <step>
-          <para>Select the variance of each row of m3x3:<para><programlisting>AFL% var(m3x3,val,i);  </programlisting><screen>[(7),(2.33333),(10.3333)]
+          <para>Select the variance of each row of m3x3:<para><programlisting>AFL% var(m3x3,val,i);  </programlisting><screen>[(2.33333),(21.3333),(21.3333)]
 </screen></para></para>
         </step>
       </procedure>

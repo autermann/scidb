@@ -93,6 +93,9 @@
   <xi:include href="concat_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="consume.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="count_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="cross_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -125,17 +128,11 @@
 
   <xi:include href="help_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <!--
-   We don't want people to use "input" - we guide them to use a different input paradigm. SJM
-   Now it seems like it is okay: made pre/post files. -->
+  <xi:include href="index_lookup_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="input_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="insert_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <!-- Inverse is going away; possibly permanently.
-  <xi:include href="inverse_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
--->
+  <xi:include href="insert_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="join_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
@@ -155,8 +152,7 @@
 
   <xi:include href="min_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="multiply_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="mpi_init.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="normalize_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -230,14 +226,15 @@
   <xi:include href="transpose_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="uniq_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="unload_library.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="unpack_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
-<!-- Wait until the operator is actually in SciDB before adding to the doc.
-  <xi:include href="vacuum_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
--->
+
   <xi:include href="var_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="variable_window_post.xml"

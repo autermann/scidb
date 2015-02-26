@@ -5,41 +5,41 @@
 #include <iostream>
 #include <stdint.h>
 #include <limits>
-
 #include <boost/format.hpp>
 
-#include "array/Metadata.h"
-
-#include "system/Config.h"
-#include "system/SciDBConfigOptions.h"
+#include <system/Config.h>
+#include <system/SciDBConfigOptions.h>
+#include <array/Metadata.h>
+#include <util/na.h>
 
 #include "query/parser/AST.h"
 #include "query/parser/ParsingContext.h"
-#include "util/na.h"
 %}
 
-%require "2.3"
+%require            "2.3"
 %debug
-%start start
+%start              start
 %defines
-%skeleton "lalr1.cc"
-%name-prefix="scidb"
-%define "parser_class_name" "AFLParser"
+%skeleton           "lalr1.cc"
+%name-prefix=       "scidb"
+%define             "parser_class_name" "AFLParser"
 %locations
 %verbose
-
-%parse-param { class QueryParser& glue }
-
 %error-verbose
+%expect             57
 
-%union {
-    int64_t int64Val;
-    double realVal;
-    char* stringVal;
-    char* keyword;
-    class AstNode* node;
-    bool boolean;
+%union
+{
+    int64_t         int64Val;
+    double          realVal;
+    const char*     stringVal;
+    const char*     keyword;
+    class AstNode*  node;
+    bool            boolean;
 }
+
+%parse-param        {class QueryParser& glue}
+%destructor         {delete $$; $$ = 0;} <node>
 
 %left '&' '?'
 %left OR
@@ -52,37 +52,41 @@
 %right '^'
 %left UNARY_MINUS
 
-%type <node>    start statement create_array_statement identifier_clause array_attribute
-    typename array_attribute_list array_dimension array_dimension_list
+%type <node> start statement create_array_statement array_attribute
+    typename array_attribute_list array_dimension array_dimension_list asterisk
     dimension_boundary_end dimension_boundaries
-    function function_argument_list function_argument nullable_modifier empty_modifier
-    default default_value compression reserve null_value expr reduced_expr common_expr atom constant
-    constant_string constant_int64 constant_real constant_NA reference function_alias schema
-    constant_bool sort_quirk timestamp_clause index_clause
-    beetween_expr
+    nullable_modifier empty_modifier
+    default default_value compression reserve sort_quirk
+    constant constant_string constant_int64 constant_real constant_bool constant_null
     case_expr case_arg case_when_clause_list case_when_clause case_default
-    asterisk
+    expr beetween_expr reduced_expr common_expr atom
+    identifier_clause timestamp_clause
+    function function_argument_list function_argument
+    schema anonymous_schema
+    function_alias
+    path_expression
 
 %type <keyword> non_reserved_keywords
 
-%destructor { delete $$; $$ = NULL; } <node>
+%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IF THEN ELSE CASE WHEN END
+                 TRUE FALSE IS RESERVE ASC DESC BETWEEN
 
-%token <keyword> ARRAY AS COMPRESSION CREATE DEFAULT EMPTY FROM NOT NULL_VALUE IF THEN ELSE CASE WHEN END AGG
-    PARAMS_START PARAMS_END TRUE FALSE NA IS RESERVE ASC DESC BETWEEN
 
-%token    EOQ         0 "end of query"
-%token    EOL            "end of line"
-%token <stringVal>     IDENTIFIER    "identifier"
-%token <int64Val>    INTEGER "integer"
-%token <realVal>    REAL "real"
-%token <stringVal>    STRING_LITERAL "string"
-%token LEXER_ERROR;
+
+
+%token              EOQ             0   "end of query"
+%token              EOL                 "end of line"
+%token <stringVal>  IDENTIFIER          "identifier"
+%token <int64Val>   INTEGER             "integer"
+%token <realVal>    REAL                "real"
+%token <stringVal>  STRING_LITERAL      "string"
+%token              LEXER_ERROR
 
 %{
 #include "query/parser/QueryParser.h"
 #include "query/parser/AFLScanner.h"
-#undef yylex
-#define yylex glue._aflScanner->lex
+#undef   yylex
+#define  yylex glue._aflScanner->lex
 
 // Macroses for easy getting token position
 #define BC(tok) tok.begin.column
@@ -101,6 +105,11 @@ statement:
     create_array_statement
     | function
     ;
+
+
+
+
+
 
 create_array_statement:
     CREATE empty_modifier ARRAY identifier_clause schema
@@ -226,7 +235,6 @@ reserve:
         $$ = NULL;
     }
 
-
 compression:
     COMPRESSION constant_string
     {
@@ -235,24 +243,6 @@ compression:
     | dummy
     {
         $$ = new AstNodeString(stringNode, CONTEXT(@1), "no compression");
-    }
-    ;
-
-null_value:
-    NULL_VALUE
-    {
-        $$ = new AstNodeNull(null, CONTEXT(@1));
-    }
-    ;
-
-constant_bool:
-    TRUE
-    {
-        $$ = new AstNodeBool(boolNode, CONTEXT(@1),true);
-    }
-    | FALSE
-    {
-        $$ = new AstNodeBool(boolNode, CONTEXT(@1), false);
     }
     ;
 
@@ -295,34 +285,6 @@ array_dimension:
         $$->setComment(glue._docComment);
         glue._docComment.clear();
     }
-    | identifier_clause '(' typename ')' '=' dimension_boundary_end ',' expr ',' expr
-    {
-        $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
-            nIdimensionArgCount,
-            $1,
-            NULL,
-            $3,
-            $6,
-            $8,
-            $10);
-
-        $$->setComment(glue._docComment);
-        glue._docComment.clear();
-    }
-    | identifier_clause '(' typename ')'
-    {
-        $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
-            nIdimensionArgCount,
-            $1,
-            NULL,
-            $3,
-            new AstNode(asterisk, CONTEXT(@$), 0),
-            NULL,
-            new AstNodeInt64(int64Node, CONTEXT(@$), 0));
-
-        $$->setComment(glue._docComment);
-        glue._docComment.clear();
-    }
     ;
 
 dimension_boundaries:
@@ -341,115 +303,24 @@ dimension_boundary_end:
     ;
 
 //FIXME: need more flexible way
-typename: identifier_clause;
-
-/**
- * This rule for recognizing scalar function as well as array operators. What is it will be
- * decided on pass stage (Pass.cpp) when getting scalar UDF and operators metadata.
- */
-function:
-    identifier_clause '(' ')' function_alias
+typename:
+    identifier_clause
     {
-        $$ = new AstNode(function, CONTEXT(@$),
-            functionArgCount,
-            $1,
-            new AstNode(functionArguments, CONTEXT(@2), 0),
-            $4,
-            new AstNodeBool(boolNode, CONTEXT(@1), false));
-    }
-    | identifier_clause '(' function_argument_list ')' function_alias
-    {
-        $$ = new AstNode(function, CONTEXT(@$),
-            functionArgCount,
-            $1,
-            $3,
-            $5,
-            new AstNodeBool(boolNode, CONTEXT(@1), false));
-    }
-    | identifier_clause AS identifier_clause
-    {
-        $$ = new AstNode(function, CONTEXT(@$),
-            functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), "scan"),
-            new AstNode(functionArguments, CONTEXT(@1), 1,
-                new AstNode(reference, CONTEXT(@1), referenceArgCount,
-                    NULL,
-                    $1,
-                    NULL,
-                    NULL,
-                    NULL,
-                    NULL
-                    )
-             ),
-            $3,
-            new AstNodeBool(boolNode, CONTEXT(@1), false));
-    }
-    // Little aggregate syntax sugar. Now only COUNT using asterisc to count all attributes.
-    | identifier_clause '(' asterisk ')' function_alias
-    {
-        $$ = new AstNode(function, CONTEXT(@$),
-            functionArgCount,
-            $1,
-            new AstNode(functionArguments, CONTEXT(@2), 1,
-                $3),
-            $5,
-            new AstNodeBool(boolNode, CONTEXT(@1), false));
-    }
-    | reference AS identifier_clause
-    {
-        $$ = new AstNode(function, CONTEXT(@$),
-            functionArgCount,
-            new AstNodeString(functionName, CONTEXT(@1), "scan"),
-            new AstNode(functionArguments, CONTEXT(@1), 1,
-                $1
-            ),
-            $3,
-            new AstNodeBool(boolNode, CONTEXT(@1), false));
-    }
-    ;
-
-function_alias:
-    AS identifier_clause
-    {
-        $$ = $2;
-    }
-    |
-    {
-        $$ = NULL;
-    }
-    ;
-
-function_argument_list:
-    function_argument_list ',' function_argument
-    {
-        $1->addChild($3);
         $$ = $1;
     }
-    | function_argument
-    {
-        $$ = new AstNode(functionArguments, CONTEXT(@1), 1, $1);
-    }
     ;
 
-function_argument:
-    expr
-    /*
-    Serialized schema from coordinator's physical plan for sending it to nodes
-    and construct physical operators there. See passAPFunction function in Pass.cpp
-    */
-    | '[' schema ']'
-    {
-        $$ = $2;
-    }
-    | empty_modifier schema
-    {
-        $$ = new AstNode(anonymousSchema, CONTEXT(@$), anonymousSchemaArgCount, $1, $2);
-    }
-    ;
-
+//Full expression rule.
+//
+// NOTE: If you changing this rules, don't forget update reduced_expr!
+//
 expr:
     common_expr
     | beetween_expr
+    | '+' expr %prec UNARY_MINUS
+    {
+        $$ = $2;
+    }
     | '-' expr %prec UNARY_MINUS
     {
         $$ = makeUnaryScalarOp("-", $2, CONTEXT(@1));
@@ -533,6 +404,10 @@ expr:
 //
 reduced_expr:
     common_expr
+    | '+' reduced_expr %prec UNARY_MINUS
+    {
+        $$ = $2;
+    }
     | '-' reduced_expr %prec UNARY_MINUS
     {
         $$ = makeUnaryScalarOp("-", $2, CONTEXT(@1));
@@ -603,9 +478,9 @@ common_expr:
     ;
 
 atom:
-    constant
+      path_expression // AFL ONLY
+    | constant
     | function
-    | reference
     | case_expr
     | '(' expr ')'
     {
@@ -616,9 +491,8 @@ atom:
 constant:
     constant_int64
     | constant_real
-    | constant_NA
     | constant_string
-    | null_value
+    | constant_null
     | constant_bool
     ;
 
@@ -643,35 +517,21 @@ constant_real:
     }
     ;
 
-constant_NA:
-    NA
+constant_bool:
+    TRUE
     {
-        $$ = new AstNodeReal(realNode, CONTEXT(@1), NA::NAInfo<double>::value());
+        $$ = new AstNodeBool(boolNode, CONTEXT(@1),true);
+    }
+    | FALSE
+    {
+        $$ = new AstNodeBool(boolNode, CONTEXT(@1), false);
     }
     ;
 
-//General rule for implicit scans, arrays, attributes and dimensions. We don't know exactly what it is
-//and don't know what operator required in this position, so decision will be made on pass stage.
-reference:
-    identifier_clause timestamp_clause index_clause sort_quirk
+constant_null:
+    NULL_VALUE
     {
-        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
-            NULL,
-            $1,
-            $2,
-            $4,
-            $3
-        );
-    }
-    | identifier_clause '.' identifier_clause sort_quirk
-    {
-        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
-            $1,
-            $3,
-            NULL,
-            $4,
-            NULL
-        );
+        $$ = new AstNodeNull(null, CONTEXT(@1));
     }
     ;
 
@@ -690,14 +550,104 @@ timestamp_clause:
     }
     ;
 
-index_clause:
-    ':' identifier_clause
+/**
+ * This rule for recognizing scalar function as well as array operators. What is it will be
+ * decided on pass stage (Pass.cpp) when getting scalar UDF and operators metadata.
+ */
+function:
+    identifier_clause '(' ')' function_alias
+    {
+        $$ = new AstNode(function, CONTEXT(@$),
+            functionArgCount,
+            $1,
+            new AstNode(functionArguments, CONTEXT(@2), 0),
+            $4,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+    | identifier_clause '(' function_argument_list ')' function_alias
+    {
+        $$ = new AstNode(function, CONTEXT(@$),
+            functionArgCount,
+            $1,
+            $3,
+            $5,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+    // Little aggregate syntax sugar. Now only COUNT using asterisc to count all attributes.
+    | identifier_clause '(' asterisk ')' function_alias
+    {
+        $$ = new AstNode(function, CONTEXT(@$),
+            functionArgCount,
+            $1,
+            new AstNode(functionArguments, CONTEXT(@2), 1,
+                $3),
+            $5,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+    | identifier_clause AS identifier_clause
+    {
+        $$ = new AstNode(function, CONTEXT(@$),
+            functionArgCount,
+            new AstNodeString(functionName, CONTEXT(@1), "scan"),
+            new AstNode(functionArguments, CONTEXT(@1), 1,
+                new AstNode(reference, CONTEXT(@1), referenceArgCount,
+                    NULL,
+                    $1,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL
+                    )
+             ),
+            $3,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+    | path_expression AS identifier_clause
+    {
+        $$ = new AstNode(function, CONTEXT(@$),
+            functionArgCount,
+            new AstNodeString(functionName, CONTEXT(@1), "scan"),
+            new AstNode(functionArguments, CONTEXT(@1), 1,
+                $1
+            ),
+            $3,
+            new AstNodeBool(boolNode, CONTEXT(@1), false));
+    }
+    ;
+
+function_alias:
+    AS identifier_clause
     {
         $$ = $2;
     }
     |
     {
         $$ = NULL;
+    }
+    ;
+
+//General rule for implicit scans, arrays, attributes and dimensions. We don't know exactly what it is
+//and don't know what operator required in this position, so decision will be made on pass stage.
+path_expression:
+    identifier_clause timestamp_clause sort_quirk
+    {
+        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
+            NULL,
+            $1,
+            $2,
+            $3,
+            NULL
+        );
+    }
+    | identifier_clause '.' identifier_clause sort_quirk
+    {
+        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
+            $1,
+            $3,
+            NULL,
+            $4,
+            NULL
+        );
     }
     ;
 
@@ -709,6 +659,31 @@ schema:
             $5
         );
     }
+    ;
+
+function_argument_list:
+    function_argument_list ',' function_argument
+    {
+        $1->addChild($3);
+        $$ = $1;
+    }
+    | function_argument
+    {
+        $$ = new AstNode(functionArguments, CONTEXT(@1), 1, $1);
+    }
+    ;
+
+function_argument:
+    expr
+    | anonymous_schema
+    ;
+
+anonymous_schema:
+    empty_modifier schema
+    {
+        $$ = new AstNode(anonymousSchema, CONTEXT(@$), anonymousSchemaArgCount, $1, $2);
+    }
+    ;
 
 case_expr:
     CASE case_arg case_when_clause_list case_default END
@@ -802,7 +777,7 @@ case_when_clause:
                 new AstNode(functionArguments, CONTEXT(@$), 3,
                     $2, //will be updated in case_expr
                     $4,
-                    NULL //will be filled in case_expr
+                    NULL//will be filled in case_expr
                 ),
                 NULL,
                 new AstNodeBool(boolNode, CONTEXT(@$), false)
@@ -829,13 +804,6 @@ beetween_expr:
                 makeBinaryScalarOp("<=", $1->clone(), $5, CONTEXT(@$)),
                 CONTEXT(@$)
                 );
-    }
-    ;
-
-// Dummy rule for getting approximately position of optional token (e.g. NOT NULL,
-// UPDATABLE, NOT EMPTY)
-dummy:
-    {
     }
     ;
 
@@ -875,10 +843,34 @@ non_reserved_keywords:
     | RESERVE
     ;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Dummy rule for getting approximately position of optional token (e.g. NOT NULL, UPDATABLE, NOT EMPTY)
+dummy:
+    {
+    }
+    ;
 %%
 
-void scidb::AFLParser::error(const AFLParser::location_type& loc,
-    const std::string& msg)
+void scidb::AFLParser::error(const location_type& loc,const std::string& msg)
 {
     glue.error(loc, msg);
 }

@@ -84,8 +84,6 @@ class PhysicalThin: public  PhysicalOperator
     {
 		assert(inputArrays.size() == 1);
         boost::shared_ptr<Array> input = inputArrays[0];
-        ArrayDesc const& inputDesc = input->getArrayDesc();
-        Dimensions const& srcDims = inputDesc.getDimensions();
         Dimensions const& dstDims = _schema.getDimensions();
         size_t nDims = dstDims.size();        
 		assert(_parameters.size() == nDims*2);
@@ -94,13 +92,6 @@ class PhysicalThin: public  PhysicalOperator
         for (size_t i = 0; i < nDims; i++) { 
             from[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i*2])->getExpression()->evaluate().getInt64();
             step[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i*2+1])->getExpression()->evaluate().getInt64();
-            if (query->getCoordinatorID() != COORDINATOR_INSTANCE) { 
-                string const& oldMapping = srcDims[i].getMappingArrayName();
-                string const& newMapping = dstDims[i].getMappingArrayName();
-                if (!newMapping.empty() && oldMapping != newMapping) { 
-                    thinMappingArray(srcDims[i].getBaseName(), oldMapping, newMapping, from[i], step[i], dstDims[i].getEndMax(), query);
-                }
-            }
         }
 		return boost::shared_ptr<Array>(new ThinArray(_schema, input, from, step));
 	 }

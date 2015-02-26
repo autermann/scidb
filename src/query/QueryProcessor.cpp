@@ -336,13 +336,6 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
             currentResultArray = RemoteMergedArray::create(currentResultArray->getArrayDesc(),
                     query->getQueryID(), query->statistics);
         }
-        const ArrayDesc& arrayDesc = currentResultArray->getArrayDesc();
-        for (size_t i = 0; i < arrayDesc.getDimensions().size(); i++) {
-            const string& mappingArrayName = arrayDesc.getDimensions()[i].getMappingArrayName();
-            if (arrayDesc.getDimensions()[i].getType() != TID_INT64 && !mappingArrayName.empty()) {
-                query->_mappingArrays[mappingArrayName] = make_shared<AccumulatorArray>(query->getArray(mappingArrayName),query);
-            }
-        }
     }
     query->setCurrentResultArray(currentResultArray);
 }

@@ -20,41 +20,59 @@
 * END_COPYRIGHT
 */
 
+#include <string.h>                                      // For strcasecmp()
+#include <boost/tuple/tuple.hpp>                         // For tie()
+#include <util/Platform.h>                               // For SCISB_SIZE
+#include "AFLParser.hpp"                                 // For token numbers
+#include "ALKeywords.h"                                  // For our interface
 
-/**
- * @file
- *
- * @brief Routines for manipulating registered keywords of AFL parser
- *
- * @author Artyom Smirnov <smirnoffjr@gmail.com>
- */
-#include <string.h>
+/****************************************************************************/
+namespace scidb {
+/****************************************************************************/
 
-#include "query/parser/AFLKeywords.h"
-
-using namespace std;
-
-namespace scidb
+namespace {
+struct byName
 {
+    bool operator()(const ALKeyword& k,const char* s) const {return strcasecmp(k.name,s) < 0;}
+    bool operator()(const char* s,const ALKeyword& k) const {return strcasecmp(s,k.name) < 0;}
+};}
 
-const AFLKeyword AFLKeywords[] =
+const ALKeyword* getAFLKeyword(const char* nm)
 {
-    #include "query/parser/AFLKeywordsList.h"
-    {NULL,  AFLParser::token::EOQ, false} // just array end marker for loop
-};
-
-const AFLKeyword* FindAFLKeyword(const char *keyword)
-{
-    const AFLKeyword *kw = &AFLKeywords[0];
-
-    while(kw->name)
+    static const ALKeyword map[] =                       // Must remain sorted
     {
-        if (!strcasecmp(kw->name, keyword))
-            return kw;
-        ++kw;
-    }
+        {"and",        AFLParser::token::AND,         true },
+        {"array",      AFLParser::token::ARRAY,       false},
+        {"as",         AFLParser::token::AS,          false},
+        {"asc",        AFLParser::token::ASC,         false},
+        {"between",    AFLParser::token::BETWEEN,     false},
+        {"case",       AFLParser::token::CASE,        true },
+        {"compression",AFLParser::token::COMPRESSION, false},
+        {"create",     AFLParser::token::CREATE,      false},
+        {"default",    AFLParser::token::DEFAULT,     false},
+        {"desc",       AFLParser::token::DESC,        false},
+        {"else",       AFLParser::token::ELSE,        true },
+        {"empty",      AFLParser::token::EMPTY,       true },
+        {"end",        AFLParser::token::END,         false},
+        {"false",      AFLParser::token::FALSE,       true },
+        {"if",         AFLParser::token::IF,          true },
+        {"is",         AFLParser::token::IS,          false},
+        {"not",        AFLParser::token::NOT,         true },
+        {"null",       AFLParser::token::NULL_VALUE,  true },
+        {"or",         AFLParser::token::OR,          true },
+        {"reserve",    AFLParser::token::RESERVE,     false},
+        {"then",       AFLParser::token::THEN,        true },
+        {"true",       AFLParser::token::TRUE,        true },
+        {"when",       AFLParser::token::WHEN,        true }
+    };
 
-    return NULL;
+    const ALKeyword *f,*l;
+
+    boost::tie(f,l) = std::equal_range(map,map+SCIDB_SIZE(map),nm,byName());
+
+    return f == l ? 0 : f;
 }
 
+/****************************************************************************/
 }
+/****************************************************************************/

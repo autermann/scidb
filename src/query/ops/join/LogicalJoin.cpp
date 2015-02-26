@@ -94,23 +94,13 @@ class LogicalJoin: public LogicalOperator
         Dimensions const& rightDimensions = rightArrayDesc.getDimensions();
         size_t totalAttributes = leftAttributes.size() + rightAttributes.size();
         int nBitmaps = 0;
-        bool mapJoin = false;
         nBitmaps += (leftArrayDesc.getEmptyBitmapAttribute() != NULL);
         nBitmaps += (rightArrayDesc.getEmptyBitmapAttribute() != NULL); 
         if (nBitmaps == 2) { 
             totalAttributes -= 1;
         }
-        for (size_t i = 0, n = leftDimensions.size(); i < n; i++) {
-            if (leftDimensions[i].getType() != TID_INT64) { 
-                mapJoin = true;
-                break;
-            }
-        }
-        if (nBitmaps == 0 && mapJoin) {
-            nBitmaps += 1;
-        }
-        Attributes joinAttributes(totalAttributes);
 
+        Attributes joinAttributes(totalAttributes);
         size_t j = 0;
         for (size_t i = 0, n = leftAttributes.size(); i < n; i++) {
             AttributeDesc const& attr = leftAttributes[i];
@@ -141,10 +131,8 @@ class LogicalJoin: public LogicalOperator
         Dimensions joinDimensions;
         for (size_t i = 0, n = leftDimensions.size(); i < n; i++)
         {
-            if(!(leftDimensions[i].getType() ==  rightDimensions[i].getType()
-                       && (leftDimensions[i].getType() != TID_INT64 
-                           || (leftDimensions[i].getStart() == rightDimensions[i].getStart()
-                              && leftDimensions[i].getChunkInterval() == rightDimensions[i].getChunkInterval()))))
+            if(!( (leftDimensions[i].getStart() == rightDimensions[i].getStart()
+                   && leftDimensions[i].getChunkInterval() == rightDimensions[i].getChunkInterval())))
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LOGICAL_JOIN_ERROR2);
             }
@@ -158,24 +146,18 @@ class LogicalJoin: public LogicalOperator
                            lDim.getCurrEnd(),
                            lDim.getEndMax(),
                            lDim.getChunkInterval(),
-                           min(lDim.getChunkOverlap(), rightDimensions[i].getChunkOverlap()),
-                           lDim.getType(),
-                           lDim.getFlags(),
-                           lDim.getMappingArrayName(),
-                           lDim.getComment(),
-                           lDim.getFuncMapOffset(),
-                           lDim.getFuncMapScale()
+                           min(lDim.getChunkOverlap(), rightDimensions[i].getChunkOverlap())
                        )
                    );
            joinDimensions[i].addAlias(leftArrayDesc.getName());
-           if (!mapJoin) {
-               Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
-               Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
-               Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
-               joinDimensions[i].setCurrStart(newCurrStart);
-               joinDimensions[i].setCurrEnd(newCurrEnd);
-               joinDimensions[i].setEndMax(newEndMax);
-           }
+
+           Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
+           Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
+           Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
+           joinDimensions[i].setCurrStart(newCurrStart);
+           joinDimensions[i].setCurrEnd(newCurrEnd);
+           joinDimensions[i].setEndMax(newEndMax);
+
            BOOST_FOREACH(const ObjectNames::NamesPairType &rDimName, rightDimensions[i].getNamesAndAliases())
            {
                BOOST_FOREACH(const string &alias, rDimName.second)

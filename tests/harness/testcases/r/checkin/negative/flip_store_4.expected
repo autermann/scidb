@@ -15,7 +15,7 @@ Query was executed successfully
 
 [An error expected at this place for the query "redimension(D,C)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE.]
 
-[An error expected at this place for the query "redimension_store(D,C)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DIMENSION_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DIMENSION_TYPE.]
+[An error expected at this place for the query "redimension_store(D,C)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE.]
 
 Query was executed successfully
 

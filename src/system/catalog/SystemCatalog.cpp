@@ -73,25 +73,6 @@ namespace scidb
 
     Mutex SystemCatalog::_pgLock;
 
-    SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
-                                      QueryID  queryId,
-                                      InstanceID   instanceId,
-                                      InstanceRole instanceRole,
-                                      LockMode lockMode,
-                                      uint64_t timestamp
-        )
-    : _arrayName(arrayName),
-      _arrayId(0),
-      _queryId(queryId),
-      _instanceId(instanceId),
-      _arrayVersionId(0),
-      _arrayVersion(0),
-      _instanceRole(instanceRole),
-      _lockMode(lockMode),
-      _timestamp(timestamp),
-      _immutableArrayId(0),
-      _isLocked(false)
-     {}
 
      SystemCatalog::LockDesc::LockDesc(const std::string& arrayName,
                                       QueryID  queryId,
@@ -106,8 +87,6 @@ namespace scidb
       _arrayVersion(0),
       _instanceRole(instanceRole),
       _lockMode(lockMode),
-      _timestamp(StorageManager::getInstance().getCurrentTimestamp()),
-      _immutableArrayId(SystemCatalog::getInstance()->findArrayByName(arrayName)),
       _isLocked(false)
      {}
 
@@ -129,9 +108,7 @@ namespace scidb
             << ", arrayVersion="
             << _arrayVersion
             << ", arrayVersionId="
-            << _arrayVersionId
-            << ", timestamp="
-            << _timestamp;
+            << _arrayVersionId;
         return out.str();
     }
             
@@ -211,7 +188,7 @@ namespace scidb
         {
             vid = ArrayDesc::getVersionFromName(array_name);
             string unv_name = ArrayDesc::makeUnversionedName(array_name);
-            string sql_u = "select id, name, partitioning_schema, flags, comment from \"array\" where name = $1";
+            string sql_u = "select id, name, partitioning_schema, flags from \"array\" where name = $1";
 
             connection->prepare("find-by-name2", sql_u)("varchar", treat_string);
             result query_res_u = tr.prepared("find-by-name2")(unv_name).exec();
@@ -264,22 +241,20 @@ namespace scidb
             VersionID vid;
             fillArrayIdentifiers(_connection, tr, array_name, arrId, uaid, vid);
 
-            string sql1 = "insert into \"array\"(id, name, partitioning_schema, flags, comment) values ($1, $2, $3, $4, $5)";
+            string sql1 = "insert into \"array\"(id, name, partitioning_schema, flags) values ($1, $2, $3, $4)";
             _connection->prepare(sql1, sql1)
                 ("bigint", treat_direct)
                 ("varchar", treat_string)
                 ("integer", treat_direct)
-                ("integer", treat_direct)
-                ("varchar", treat_string);
+                ("integer", treat_direct);
             tr.prepared(sql1)
                 (arrId)
                 (array_desc.getName())
                 ((int) ps)
-                (array_desc.getFlags())
-                (array_desc.getComment()).exec();
+                (array_desc.getFlags()).exec();
 
             string sql2 = "insert into \"array_attribute\"(array_id, id, name, type, flags, "
-                " default_compression_method, reserve, default_missing_reason, default_value, comment) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+                " default_compression_method, reserve, default_missing_reason, default_value) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
             _connection->prepare(sql2, sql2)
                 ("bigint", treat_direct)
                 ("int", treat_direct)
@@ -289,7 +264,6 @@ namespace scidb
                 ("int", treat_direct)
                 ("int", treat_direct)
                 ("int", treat_direct)
-                ("varchar", treat_string)
                 ("varchar", treat_string);
 
             Attributes const& attributes = array_desc.getAttributes();
@@ -306,15 +280,14 @@ namespace scidb
                     (attr.getDefaultCompressionMethod())
                     (attr.getReserve())
                     (attr.getDefaultValue().getMissingReason())
-                    (attr.getDefaultValueExpr())
-                    (attr.getComment()).exec();
+                    (attr.getDefaultValueExpr()).exec();
 
                 //Attribute in descriptor has no some data before adding to catalog so build it manually for
                 //caching
                 cachedAttributes[i] =
                     AttributeDesc(i, attr.getName(), attr.getType(), attr.getFlags(),
                                   attr.getDefaultCompressionMethod(), std::set<std::string>(), attr.getReserve(),
-                                  &attr.getDefaultValue(), attr.getDefaultValueExpr(), attr.getComment());
+                                  &attr.getDefaultValue(), attr.getDefaultValueExpr());
             }
 
             //
@@ -322,7 +295,7 @@ namespace scidb
             //      " start, length, chunk_interval, chunk_overlap) values ($1, $2, $3, $4, $5, $6, $7)";
             //
             string sql3 = "insert into \"array_dimension\"(array_id, id, name,"
-                " startMin, currStart, currEnd, endMax, chunk_interval, chunk_overlap, funcMapOffset, funcMapScale, type, flags, mapping_array_name, comment) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)";
+                " startMin, currStart, currEnd, endMax, chunk_interval, chunk_overlap) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
             _connection->prepare(sql3, sql3)
                 ("bigint", treat_direct)
                 ("int", treat_direct)
@@ -333,12 +306,6 @@ namespace scidb
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
-                ("bigint", treat_direct)
-                ("bigint", treat_direct)
-                ("varchar", treat_string)
-                ("int", treat_direct)
-                ("varchar", treat_string)
-                ("varchar", treat_string)
                 ;
 
             Dimensions const& dims = array_desc.getDimensions();
@@ -354,13 +321,7 @@ namespace scidb
                     (dim.getCurrEnd())
                     (dim.getEndMax())
                     (dim.getChunkInterval())
-                    (dim.getChunkOverlap())
-                    (dim.getFuncMapOffset())
-                    (dim.getFuncMapScale())
-                    (dim.getType())
-                    (dim.getFlags())
-                    (dim.getMappingArrayName())
-                    (dim.getComment()).exec();
+                    (dim.getChunkOverlap()).exec();
                 //TODO: If DimensionDesc will store IDs in future, here must be building vector of
                 //dimensions for caching as for attributes.
             }
@@ -389,50 +350,6 @@ namespace scidb
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << "Unknown exception when adding array";
         }
-    }
-
-    size_t SystemCatalog::countReferences(std::string const& arrayName)
-    {
-        boost::function<size_t()> work = boost::bind(&SystemCatalog::_countReferences,
-                this, cref(arrayName));
-        return Query::runRestartableWork<size_t, broken_connection>(work, _reconnectTries);
-    }
-
-    size_t SystemCatalog::_countReferences(std::string const& arrayName)
-    {
-        LOG4CXX_TRACE(logger, "SystemCatalog::countReferences(arrayName=" << arrayName << ")");
-
-        ScopedMutexLock mutexLock(_pgLock);
-
-        assert(_connection);
-        size_t count = 0;
-        try
-        {
-            work tr(*_connection);
-            _connection->prepare("countReferences", "select count(distinct array_id) as cnt from array_dimension where mapping_array_name=$1")
-                ("varchar", treat_string);
-             result query_res = tr.prepared("countReferences")(arrayName).exec();
-             count = query_res[0].at("cnt").as(uint32_t());
-             tr.commit();
-        }
-        catch (const sql_error &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
-        }
-        catch (const Exception &e)
-        {
-            throw;
-        }
-        catch (const std::exception &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-        }
-        catch (...)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
-                "Unknown exception when get number of instances";
-        }
-        return count;
     }
 
     void SystemCatalog::updateArray(const ArrayDesc &array_desc)
@@ -472,30 +389,26 @@ namespace scidb
                     (array_id).exec();
                 _connection->unprepare("updateArray");
 
-                string sql1 = "update \"array\" set name=$2, flags=$3, comment=$4 where id=$1";
+                string sql1 = "update \"array\" set name=$2, flags=$3 where id=$1";
                 _connection->prepare(sql1, sql1)
                     ("bigint", treat_direct)
                     ("varchar", treat_string)
-                    ("integer", treat_direct)
-                    ("varchar", treat_string);
+                    ("integer", treat_direct);
                 tr.prepared(sql1)
                     (array_id)
                     (array_desc.getName())
-                    (array_desc.getFlags())
-                    (array_desc.getComment()).exec();
+                    (array_desc.getFlags()).exec();
             } else {
-                string sql1 = "update \"array\" set flags=$2, comment=$3 where id=$1";
+                string sql1 = "update \"array\" set flags=$2 where id=$1";
                 _connection->prepare(sql1, sql1)
                     ("bigint", treat_direct)
-                    ("integer", treat_direct)
-                    ("varchar", treat_string);
+                    ("integer", treat_direct);
                 tr.prepared(sql1)
                     (array_id)
-                    (array_desc.getFlags())
-                    (array_desc.getComment()).exec();
+                    (array_desc.getFlags()).exec();
             }
 
-            string sql2 = "update \"array_attribute\" set name=$3, type=$4, flags=$5, default_compression_method=$6, reserve=$7, default_missing_reason=$8, default_value=$9, comment=$10 where array_id=$1 and id=$2";
+            string sql2 = "update \"array_attribute\" set name=$3, type=$4, flags=$5, default_compression_method=$6, reserve=$7, default_missing_reason=$8, default_value=$9 where array_id=$1 and id=$2";
             _connection->prepare(sql2, sql2)
                 ("bigint", treat_direct)
                 ("int", treat_direct)
@@ -505,7 +418,6 @@ namespace scidb
                 ("int", treat_direct)
                 ("int", treat_direct)
                 ("int", treat_direct)
-                ("varchar", treat_string)
                 ("varchar", treat_string);
 
             Attributes const& attributes = array_desc.getAttributes();
@@ -521,11 +433,11 @@ namespace scidb
                     (attr.getDefaultCompressionMethod())
                     (attr.getReserve())
                     (attr.getDefaultValue().getMissingReason())
-                    (attr.getDefaultValueExpr())
-                    (attr.getComment()).exec();
+                    (attr.getDefaultValueExpr()).exec();
             }
 
-            string sql3 = "update \"array_dimension\" set name=$3, startMin=$4, endMax=$5, chunk_interval=$6, chunk_overlap=$7, funcMapOffset=$12, funcMapScale=$13, type=$8, flags=$9, mapping_array_name=$10, comment=$11 where array_id=$1 and id=$2";
+
+            string sql3 = "update \"array_dimension\" set name=$3, startMin=$4, endMax=$5, chunk_interval=$6, chunk_overlap=$7 where array_id=$1 and id=$2";
 
             _connection->prepare(sql3, sql3)
                 ("bigint", treat_direct)
@@ -533,12 +445,6 @@ namespace scidb
                 ("varchar", treat_string)
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
-                ("bigint", treat_direct)
-                ("bigint", treat_direct)
-                ("varchar", treat_string)
-                ("int", treat_direct)
-                ("varchar", treat_string)
-                ("varchar", treat_string)
                 ("bigint", treat_direct)
                 ("bigint", treat_direct)
                 ;
@@ -554,13 +460,7 @@ namespace scidb
                     (dim.getStartMin())
                     (dim.getEndMax())
                     (dim.getChunkInterval())
-                    (dim.getChunkOverlap())
-                    (dim.getType())
-                    (dim.getFlags())
-                    (dim.getMappingArrayName())
-                    (dim.getComment())
-                    (dim.getFuncMapOffset())
-                    (dim.getFuncMapScale()).exec();
+                    (dim.getChunkOverlap()).exec();
             }
 
             tr.commit();
@@ -750,19 +650,15 @@ namespace scidb
     bool SystemCatalog::getArrayDesc(const string &array_name, VersionID version, ArrayDesc &array_desc, const bool throwException)
     {
         if (getArrayDesc(array_name, array_desc, throwException)) {
-            if (!array_desc.isImmutable()) {
-                std::stringstream ss;
-                if (version == LAST_VERSION) {
-                    version = getLastVersion(array_desc.getId());
-                    if (version == 0) {
-                        return true;
-                    }
+            std::stringstream ss;
+            if (version == LAST_VERSION) {
+                version = getLastVersion(array_desc.getId());
+                if (version == 0) {
+                    return true;
                 }
-                ss << array_name << "@" << version;
-                return getArrayDesc(ss.str(), array_desc, throwException);
-            } else {
-                return true;
             }
+            ss << array_name << "@" << version;
+            return getArrayDesc(ss.str(), array_desc, throwException);
         } else {
             return false;
         }
@@ -817,7 +713,7 @@ namespace scidb
         try
         {
             work tr(*_connection);
-            string sql1 = "select id, name, partitioning_schema, flags, comment from \"array\" where name = $1";
+            string sql1 = "select id, name, partitioning_schema, flags from \"array\" where name = $1";
             _connection->prepare("find-by-name", sql1)("varchar", treat_string);
             result query_res1 = tr.prepared("find-by-name")(array_name).exec();
             if (query_res1.size() <= 0)
@@ -836,7 +732,7 @@ namespace scidb
             fillArrayIdentifiers(_connection, tr, array_name, array_id, uaid, vid);
             int flags = query_res1[0].at("flags").as(int());
 
-            string sql2 = "select id, name, type, flags, default_compression_method, reserve, default_missing_reason, default_value, comment "
+            string sql2 = "select id, name, type, flags, default_compression_method, reserve, default_missing_reason, default_value"
                 " from \"array_attribute\" where array_id = $1 order by id";
             _connection->prepare(sql2, sql2)("integer", treat_direct);
             result query_res2 = tr.prepared(sql2)(array_id).exec();
@@ -900,8 +796,7 @@ namespace scidb
                         std::set<std::string>(),
                         i.at("reserve").as(int16_t()),
                         &defaultValue,
-                        defaultValueExpr,
-                        i.at("comment").as(string())
+                        defaultValueExpr
                         );
                     attributes.push_back(att);
                 }
@@ -909,7 +804,7 @@ namespace scidb
 
             // string sql3 = "select name, start, length, chunk_interval, chunk_overlap "
             //          " from \"array_dimension\" where array_id = $1 order by id";
-            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap, funcMapOffset, funcMapScale, type, flags, mapping_array_name, comment "
+            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap "
                 " from \"array_dimension\" where array_id = $1 order by id";
 
             _connection->prepare(sql3, sql3)("integer", treat_direct);
@@ -929,13 +824,7 @@ namespace scidb
                             i.at("currend").as(int64_t()),
                             i.at("endmax").as(int64_t()),
                             i.at("chunk_interval").as(int64_t()),
-                            i.at("chunk_overlap").as(int64_t()),
-                            i.at("type").as(string()),
-                            i.at("flags").as(int()),
-                            i.at("mapping_array_name").as(string()),
-                            i.at("comment").as(string()),
-                            i.at("funcMapOffset").as(int64_t()),
-                            i.at("funcMapScale").as(int64_t())
+                            i.at("chunk_overlap").as(int64_t())
                             ));
                 }
             }
@@ -943,8 +832,7 @@ namespace scidb
                               query_res1[0].at("name").as(string()),
                               attributes,
                               dimensions,
-                              flags,
-                              query_res1[0].at("comment").as(string()));
+                              flags);
             newDesc.setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
             array_desc = newDesc;
@@ -997,7 +885,7 @@ namespace scidb
         try
         {
             work tr(*_connection);
-            string sql1 = "select id, name, partitioning_schema, flags, comment from \"array\" where id = $1";
+            string sql1 = "select id, name, partitioning_schema, flags from \"array\" where id = $1";
             _connection->prepare("find-by-id", sql1)("bigint", treat_direct);
             result query_res1 = tr.prepared("find-by-id")(array_id).exec();
             if (query_res1.size() <= 0)
@@ -1011,7 +899,7 @@ namespace scidb
             VersionID vid;
             fillArrayIdentifiers(_connection, tr, array_name, array_id, uaid, vid);
 
-            string sql2 = "select id, name, type, flags, default_compression_method, reserve, default_missing_reason, default_value, comment "
+            string sql2 = "select id, name, type, flags, default_compression_method, reserve, default_missing_reason, default_value"
                 " from \"array_attribute\" where array_id = $1 order by id";
             _connection->prepare(sql2, sql2)("integer", treat_direct);
             result query_res2 = tr.prepared(sql2)(array_id).exec();
@@ -1060,8 +948,7 @@ namespace scidb
                         std::set<std::string>(),
                         i.at("reserve").as(int16_t()),
                         &defaultValue,
-                        defaultValueExpr,
-                        i.at("comment").as(string())
+                        defaultValueExpr
                         );
 
                     attributes.push_back(att);
@@ -1071,7 +958,7 @@ namespace scidb
             // string sql3 = "select name, start, length, chunk_interval, chunk_overlap "
             //      " from \"array_dimension\" where array_id = $1 order by id";
 
-            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap, funcMapOffset, funcMapScale, type, flags, mapping_array_name, comment "
+            string sql3 = "select name, startmin, currstart, currend, endmax, chunk_interval, chunk_overlap "
                 " from \"array_dimension\" where array_id = $1 order by id";
             _connection->prepare(sql3, sql3)("integer", treat_direct);
             result query_res3 = tr.prepared(sql3)(array_id).exec();
@@ -1090,22 +977,14 @@ namespace scidb
                             i.at("currend").as(int64_t()),
                             i.at("endmax").as(int64_t()),
                             i.at("chunk_interval").as(int64_t()),
-                            i.at("chunk_overlap").as(int64_t()),
-                            i.at("type").as(string()),
-                            i.at("flags").as(int()),
-                            i.at("mapping_array_name").as(string()),
-                            i.at("comment").as(string()),
-                            i.at("funcMapOffset").as(int64_t()),
-                            i.at("funcMapScale").as(int64_t())
-                            ));
+                            i.at("chunk_overlap").as(int64_t())));
                 }
             }
             newDesc = boost::shared_ptr<ArrayDesc>(new ArrayDesc(array_id, uaid, vid,
                                                                  query_res1[0].at("name").as(string()),
                                                                  attributes,
                                                                  dimensions,
-                                                                 query_res1[0].at("flags").as(int()),
-                                                                 query_res1[0].at("comment").as(string())));
+                                                                 query_res1[0].at("flags").as(int())));
             newDesc->setPartitioningSchema((PartitioningSchema)query_res1[0].at("partitioning_schema").as(int()));
             tr.commit();
         }
@@ -1185,10 +1064,6 @@ namespace scidb
         }
     }
 
-    const std::string SystemCatalog::cleanupMappingArraysSql("delete from \"array\" as AR where not exists"
-                                                             " (select AD.array_id from array_dimension as AD where AR.name=AD.mapping_array_name)"
-                                                             " and AR.name like '%:%'");
-
     bool SystemCatalog::deleteArray(const string &array_name)
     {
         boost::function<bool()> work = boost::bind(&SystemCatalog::_deleteArrayByName,
@@ -1213,9 +1088,6 @@ namespace scidb
             result query_res = tr.prepared("delete-array-name")(array_name).exec();
             totalNewArrays -= query_res.affected_rows();
             rc = (query_res.affected_rows() > 0);
-            
-            _connection->prepare("cleanup-mapping-arrays", cleanupMappingArraysSql); 
-            totalNewArrays -= tr.prepared("cleanup-mapping-arrays").exec().affected_rows();; 
 
             tr.commit();
         }
@@ -2934,8 +2806,7 @@ void SystemCatalog::_readArrayLocks(const InstanceID instanceId,
                                                         query_res[i].at("query_id").as(QueryID()),
                                                         instanceId,
                                                         static_cast<LockDesc::InstanceRole>(query_res[i].at("instance_role").as(int())),
-                                                        static_cast<LockDesc::LockMode>(query_res[i].at("lock_mode").as(int())),
-                                                        0
+                                                        static_cast<LockDesc::LockMode>(query_res[i].at("lock_mode").as(int()))
                                                         ));
          lock->setArrayVersion(query_res[i].at("array_version").as(VersionID()));
          lock->setArrayId(query_res[i].at("array_id").as(ArrayID()));
@@ -3090,8 +2961,7 @@ SystemCatalog::_checkForCoordinatorLock(const string& arrayName, QueryID queryId
                                                               queryId,
                                                               query_res[0].at("instance_id").as(InstanceID()),
                                                               LockDesc::COORD,
-                                                              static_cast<LockDesc::LockMode>(query_res[0].at("lock_mode").as(int())),
-                                                              0
+                                                              static_cast<LockDesc::LockMode>(query_res[0].at("lock_mode").as(int()))
                                                      ));
          coordLock->setArrayVersion(query_res[0].at("array_version").as(VersionID()));
          coordLock->setArrayId(query_res[0].at("array_id").as(ArrayID()));

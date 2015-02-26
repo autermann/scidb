@@ -144,13 +144,15 @@ bool LimitedArena::consistent() const
  */
 ArenaPtr newLimitedArena(const Options& o)
 {
-    if (o.locking())                                     // Wants locking too?
+    using boost::make_shared;                            // For make_shared()
+
+    if (o.locking())                                     // Needs locking too?
     {
-        return ArenaPtr(new Locking<LimitedArena>(o));   // ...locking arena
+        return make_shared< Locking<LimitedArena> >(o);  // ...locking arena
     }
     else                                                 // No locking needed
     {
-        return ArenaPtr(new LimitedArena(o));            // ...vanilla arena
+        return make_shared<LimitedArena>(o);             // ...vanilla arena
     }
 }
 

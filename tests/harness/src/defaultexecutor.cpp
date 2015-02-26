@@ -118,6 +118,13 @@ namespace scidbtestharness
 namespace executors
 {
 
+/* Prepare command for shell redirection */
+void DefaultExecutor :: initializeCommand (string& command)
+{
+	boost::replace_all(command,"\\","\\\\"); /* prepend \ with \    */
+	boost::replace_all(command,"'","\\'");   /* prepend ' with \    */
+}
+
 int DefaultExecutor :: exit (void)
 {
 	return EXIT;
@@ -543,8 +550,8 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 			stringstream bstream;
 			int rbytes, exit_code=FAILURE;
 		        char buf[BUFSIZ+1];
-		        FILE *pipe = 0;
-		        while ((rbytes = ReadOutputOf (new_command, &pipe, buf, BUFSIZ, &exit_code)) > 0)
+		        FILE *mystream = 0;
+		        while ((rbytes = ReadOutputOf (new_command, &mystream, buf, BUFSIZ, &exit_code)) > 0)
 		        {
 		                buf[rbytes] = 0;
 	                        bstream << buf;
@@ -563,7 +570,7 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 	}
 
 	boost::filesystem::ofstream _outputfileStream;
-	if (sco->_outputFile.length ())
+	if (!sco->_outputFile.empty ())
 	{
 		LOG4CXX_INFO (_logger, "Storing the output in the file : " << sco->_outputFile);
 
@@ -581,7 +588,7 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 	if (_queryLogging == true || _ie.log_queries == true)
 	{
 		/* store in the file specified in the --out option */
-		if (sco->_outputFile.length ())
+		if (!sco->_outputFile.empty ())
 			_outputfileStream << "SCIDB QUERY : <" <<sco->_command << ">" << "\n";
 
 		/* store in the .out file along with the results of different SciDB queries */
@@ -589,6 +596,7 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 			_resultfileStream << "SCIDB QUERY : <" <<sco->_command << ">" << "\n";
 	}
 
+	/* Change Current Working Directory if it is specified */
 	if (strcasecmp(sco->_cwd.c_str(),"") != 0)
 	{
 		sco->_cwd = getAbsolutePath(sco->_cwd.c_str());
@@ -601,15 +609,42 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
                         LOG4CXX_INFO (_logger, "Invalid working directory specified : '" << sco->_cwd << "'. Reverting to current working directory.");
 	}
 
-	int rbytes, exit_code=FAILURE;
+	/* execute the shell command */
+	int rbytes, exit_code=FAILURE, exit_code_err=FAILURE;
 	char buf[BUFSIZ+1];
-	FILE *pipe = 0;
-	while ((rbytes = ReadOutputOf (sco->_command, &pipe, buf, BUFSIZ, &exit_code)) > 0)
+	FILE *mystream = 0, *mystream2 = 0;
+	stringstream execShellCommand, getShellErr;
+
+	char tmpFileName[] = "/tmp/harness_XXXXXX"; // temporary filename
+	int tfd = mkstemp(tmpFileName);            // create temporary file
+	while (tfd == -1)
+	{
+		if (errno == EEXIST)        // try another name if failed to open unique temporary file
+		{
+			strncpy (tmpFileName, "/tmp/Harness_XXXXXX", 20);
+			tfd = mkstemp(tmpFileName);
+		}
+		else
+		{
+			close (tfd);
+			bfs::remove (tmpFileName);
+			LOG4CXX_ERROR (_logger, "Error creating temporary file: " << tmpFileName);
+			return FAILURE;
+		}
+	}
+	close (tfd);                               // close file so that it can be used below
+
+	initializeCommand (sco->_command);
+	execShellCommand << "/bin/sh -c $'" << sco->_command << "' 2> " << tmpFileName;  // wrap shell command to redirect stderr into the temporary file
+	getShellErr << "cat " << tmpFileName;
+	LOG4CXX_DEBUG (_logger, "Actual shell command executed: \"" << execShellCommand.str() << "\"");
+
+	while ((rbytes = ReadOutputOf (execShellCommand.str(), &mystream, buf, BUFSIZ, &exit_code)) > 0)
 	{
 		buf[rbytes] = 0;
 
 		/* store in the file specified in the --out option */
-		if (sco->_outputFile.length ())
+		if (!sco->_outputFile.empty ())
 			_outputfileStream << buf;
 
 		/* store in the .out file along with the results of different SciDB queries */
@@ -617,19 +652,45 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 			_resultfileStream << buf;
 
 		/* if none of --out, --store is given then log the output to .log file */
-		if (sco->_outputFile.length() == 0 && sco->_store == false)
+		if (!sco->_outputFile.empty() == 0 && sco->_store == false)
 			LOG4CXX_INFO (_logger, buf);
 	}
 
+	/* display stderr of the above executed shell command from the temporary file */
+	if ( bfs::file_size (tmpFileName) > 0 )
+	{
+		LOG4CXX_INFO (_logger, "Getting stderr from " << getShellErr.str());
+		while ((rbytes = ReadOutputOf (getShellErr.str(), &mystream2, buf, BUFSIZ, &exit_code_err)) > 0)
+		{
+			buf[rbytes] = 0;
+
+			/* display on stderr */
+			cerr << buf;
+
+			/* save the output to .log file */
+			LOG4CXX_INFO (_logger, buf);
+
+	                /* store in the file specified in the --out option */
+			if (!sco->_outputFile.empty ())
+				_outputfileStream << buf;
+
+			/* store in the .out file along with the results of different SciDB queries */
+			if (sco->_storeAll == true)
+				_resultfileStream << buf;
+		}
+	}
+	bfs::remove (tmpFileName); // cleanup temporary file
+
+
     /* store in the file specified in the --out option */
-    if (sco->_outputFile.length ())
+    if (!sco->_outputFile.empty ())
         _outputfileStream << "\n";
     
     /* store in the .out file along with the results of different SciDB queries */
     if (sco->_store == true)
         _resultfileStream << "\n";
 
-	if (sco->_outputFile.length ())
+	if (!sco->_outputFile.empty ())
 	{
         _outputfileStream.close ();
     }
@@ -1281,6 +1342,7 @@ int DefaultExecutor :: parseShellCommandOptions (string line, struct ShellComman
 		desc.add_options() ("command", po::value<string>(), "shell command to be executed.");
 		desc.add_options() ("out", po::value<string>(), "File name to redirect the output of the shell command.");
 		desc.add_options() ("store",                    "Flag to indicate if the output of the shell command should be stored inside the .expected/.out file along with the output of SciDB queries.");
+		desc.add_options() ("store-all",                "Flag to indicate if the stderr of the shell command should be stored inside the .expected/.out file along with the output of SciDB queries.");
 		desc.add_options() ("cwd", po::value<string>(), "Working directory for the shell command.");
 		po::variables_map vm;
 		po::store (po::parse_command_line (argc, argv, desc), vm);
@@ -1293,6 +1355,12 @@ int DefaultExecutor :: parseShellCommandOptions (string line, struct ShellComman
 
 			if (vm.count ("store"))
 				sco->_store = true;
+
+			if (vm.count ("store-all"))
+			{
+				sco->_storeAll = true;
+				sco->_store = true;   // 'store-all' option includes 'store' option implicitly
+			}
 
 			if (vm.count ("cwd"))
 				sco->_cwd = vm["cwd"].as<string>();
@@ -1768,8 +1836,8 @@ void DefaultExecutor :: parseEnvironmentVariables (string &line, int line_number
                 }
 
                 env_value = getenv (env_var_ptr.get());
-                if (env_value)
-                {
+ 		if (env_value)
+		{
                         line.replace (env_start, env_end - env_start + 1, env_value);
                         LOG4CXX_DEBUG (_logger, "Environment variable '" << env_var_ptr.get() << "' substituted with '" << env_value << "'.");
                         if (strcmp (env_value,"") == 0)
@@ -1783,6 +1851,52 @@ void DefaultExecutor :: parseEnvironmentVariables (string &line, int line_number
                 }
                 env_start = line.find ("${", env_start+1);
         }
+}
+
+void DefaultExecutor :: addTestSpecificVariables (void)
+{
+    assert (!_ie.tcfile.empty ());
+
+    //----------------------------------------------------------------
+    // Add environment variable that specifies test directory for
+    // shell option.
+    size_t lastDirSep = _ie.tcfile.find_last_of("/");
+    
+    if (lastDirSep != std::string::npos)
+    {
+      std::string testFolder = _ie.tcfile.substr(0,lastDirSep);
+        
+      _testEnvVars["TESTDIR"] = testFolder;
+    }
+    else
+    {
+      LOG4CXX_INFO (_logger, "Setting $TESTDIR environment variable failed: failed to locate dir separator in .test path!");
+    }
+    
+    //----------------------------------------------------------------
+    // Set all of the above variables in the environment now.
+    setTestSpecificVariables();
+}
+
+void DefaultExecutor :: setTestSpecificVariables (void)
+{
+  for (
+       std::map<std::string,std::string>::iterator it=_testEnvVars.begin();
+       it!=_testEnvVars.end();
+       it++
+       )
+    {
+      std::string variableName;
+      std::string variableValue;
+      
+      variableName = it->first;
+      variableValue = it->second;
+        
+      if (setenv(variableName.c_str(),variableValue.c_str(),1) != 0)
+     {
+       LOG4CXX_INFO (_logger, "Setting environment variable $" << variableName << " failed: call to setenv returned non-zero!");
+     }
+    }
 }
 
 int DefaultExecutor :: parseTestCaseFile (void)
@@ -2745,6 +2859,13 @@ int DefaultExecutor :: execute (const InfoForExecutor &ie)
 		return FAILURE;
 
 	createLogger ();
+	
+    //------------------------------------------------------------------------
+    // Introduce test-specific environment variables (see function definition
+    // for details).
+    //------------------------------------------------------------------------
+    addTestSpecificVariables();
+    
 	//printExecutorEnvironment ();
 
 	if (parseTestCaseFile () == FAILURE)

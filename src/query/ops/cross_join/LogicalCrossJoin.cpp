@@ -200,8 +200,7 @@ class LogicalCrossJoin: public LogicalOperator
                                            rightDim->getParsingContext());
             rightCrossJoinOnMask |=  (uint64_t)1 << r;
             
-            if (leftDimensions[l].getType() != TID_INT64 || rightDimensions[r].getType() != TID_INT64
-                    || leftDimensions[l].getStart() != rightDimensions[r].getStart()
+            if (     leftDimensions[l].getStart() != rightDimensions[r].getStart()
                     || leftDimensions[l].getChunkInterval() != rightDimensions[r].getChunkInterval()
                     || leftDimensions[l].getChunkOverlap() != rightDimensions[r].getChunkOverlap())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);

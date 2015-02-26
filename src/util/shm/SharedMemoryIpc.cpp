@@ -27,6 +27,9 @@
 #include <boost/interprocess/detail/os_file_functions.hpp>
 #include <util/shm/SharedMemoryIpc.h>
 #include <util/FileIO.h>
+#include <sys/vfs.h>
+#include <sys/statfs.h>
+#include <fcntl.h>
 
 using namespace std;
 using namespace boost::interprocess;
@@ -153,9 +156,53 @@ void* SharedMemory::get()
             }
             throw;
         }
+        preallocateShmMemory();
     }
     assert(_region);
     return _region->get_address();
+}
+
+void SharedMemory::preallocateShmMemory()
+{
+    assert(_shm);
+    assert(_region);
+    if (!_isPreallocate ||
+        _shm->get_mode() == boost::interprocess::read_only) {
+        return;
+    }
+
+    uint64_t regionSize = getSize();
+    assert(regionSize>0);
+
+    // Shm objects are files in /dev/shm (at least on Linux)
+    // We preallocate memory by preallocating space for the shm file.
+    std::string path("/dev/shm/");
+    const std::string& name = getName();
+    assert(!name.empty());
+    assert(name == _shm->get_name());
+    path += name;
+
+    int fd = File::openFile(path,O_RDWR|O_LARGEFILE);
+    if (fd<0) {
+        int err=errno;
+        throw SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
+    }
+
+    struct FdCleaner fdCleaner(fd);
+
+    int err = ::posix_fallocate(fd,0,regionSize);
+
+    if (err==EFBIG || err==ENOSPC) {
+        throw NoShmMemoryException(err, REL_FILE, __FUNCTION__, __LINE__);
+    } else if (err != 0) {
+        throw SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
+    }
+
+    if (File::closeFd(fd) != 0) {
+        int err=errno;
+        throw SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
+    }
+    fdCleaner._fd = -1;
 }
 
 bool SharedMemory::flush()

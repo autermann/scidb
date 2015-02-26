@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
-  <refnamediv id="sumAggregate">
+<refentry id="sumAggregate">
+  <refnamediv>
     <refname>sum</refname>
 
     <refpurpose><indexterm>
@@ -15,7 +15,7 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> sum(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
+    <synopsis>AQL% <command>SELECT</command> sum(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable> <optional><command>GROUP BY</command> <replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
 
     <synopsis>AFL% aggregate(<replaceable>array</replaceable>,sum(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
   </refsynopsisdiv>

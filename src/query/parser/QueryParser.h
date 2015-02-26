@@ -20,15 +20,6 @@
 * END_COPYRIGHT
 */
 
-
-/**
- * @file
- *
- * @brief Glue class between lexer and parser.
- *
- * @author Artyom Smirnov <smirnoffjr@gmail.com>
- */
-
 #ifndef QUERYPARSER_H_
 #define QUERYPARSER_H_
 
@@ -38,19 +29,12 @@
 namespace scidb
 {
 
-#define CHECK_LEXEM_SIZE(size) \
-    if ( (size) > STACK_ALLOC_BLOCK_SIZE)\
-    {\
-        _glue.error(*yylloc, boost::str(boost::format("Lexem size can not be greater than '%d'") % STACK_ALLOC_BLOCK_SIZE));\
-        return token::LEXER_ERROR;\
-    }
-
 class AstNode;
 class ParsingContext;
 
 /**
  * Class which combining string lexer and grammar parser objects into query parser.
- * 
+ *
  * @note Not reentrant! Instance holding root of AST and context during parsing.
  */
 class QueryParser
@@ -71,13 +55,10 @@ public:
      */
     boost::shared_ptr<AstNode> parse(const std::string& input, bool aql = true);
 
-    void setComment(std::string const& comment) { 
-        _docComment = comment;
-    }
+    void setComment(const char* comment) {_docComment = comment;}
 
-    void error(const class location& l, const std::string& m);
-
-    void error(boost::shared_ptr<ParsingContext> context, const std::string& msg);
+    void error(const class location&,const std::string&);
+    void error(const boost::shared_ptr<ParsingContext>& context,const std::string& msg);
 
 private:
     bool _trace;

@@ -172,15 +172,26 @@ boost::shared_ptr<Array> PhysicalAnalyze::execute(vector<boost::shared_ptr<Array
         v.setString(data[i].attribute_name.c_str());
         cIter[0]->writeItem(v);
         ++(*cIter[0]);
-
-        v.setString(data[i].min.c_str());
+        if(data[i].non_null_count != 0)
+        {
+            v.setString(data[i].min.c_str());
+        }
+        else
+        {
+            v.setNull();
+        }
         cIter[1]->writeItem(v);
         ++(*cIter[1]);
-
-        v.setString(data[i].max.c_str());
+        if(data[i].non_null_count != 0)
+        {
+            v.setString(data[i].max.c_str());
+        }
+        else
+        {
+            v.setNull();
+        }
         cIter[2]->writeItem(v);
         ++(*cIter[2]);
-
         v = Value(TypeLibrary::getType(TID_UINT64));            
         v.setUint64(data[i].distinct_count);
         cIter[3]->writeItem(v);
@@ -248,7 +259,8 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
 
                 if (!firstValue)
                 {
-                    min = max = v;
+                    min = v;
+                    max = v;
                     firstValue = true;
                 }
 
@@ -302,6 +314,13 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
                 {
                     ++(*cIter);
                     continue;
+                }
+
+                if (!firstValue)
+                {
+                    min = v;
+                    max = v;
+                    firstValue = true;
                 }
 
                 DC.addValue(hash(*(uint64_t *)v.data()));
@@ -495,9 +514,11 @@ void PhysicalAnalyze::analyzeBuiltInType(AnalyzeData *data, boost::shared_ptr<Co
     }
     //end of send/receive
 
-    data->min = ValueToString(typeId, min);
-    data->max = ValueToString(typeId, max);
-
+    if (data->non_null_count)
+    {
+        data->min = ValueToString(typeId, min);
+        data->max = ValueToString(typeId, max);
+    }
     data->distinct_count = useDC ? DC.getCount() : valueContainer.size();
 }
 
@@ -515,30 +536,29 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
     ExpressionContext eContext(expr);
 
     Value min, max;
-
-    if (!arrIt->end())
-    {
-        max = min = arrIt->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS    | 
-                                                       ConstChunkIterator::IGNORE_EMPTY_CELLS | 
-                                                       ConstChunkIterator::IGNORE_NULL_VALUES)->getItem();
-    }
+    bool maxMinSet = false;
 
     while (!arrIt->end())
     {
         boost::shared_ptr<ConstChunkIterator> cIter = arrIt->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS    | 
                                                                                          ConstChunkIterator::IGNORE_EMPTY_CELLS | 
                                                                                          ConstChunkIterator::IGNORE_NULL_VALUES);
-
         if (!useDC)
         {
             while (!cIter->end())
             {
                 Value &v = cIter->getItem();
-
                 if (v.isNull())
                 {
                     ++(*cIter);
                     continue;
+                }
+
+                if (!maxMinSet)
+                {
+                    max = v;
+                    min = v;
+                    maxMinSet=true;
                 }
 
                 if (!useDC)
@@ -596,6 +616,13 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
                     continue;
                 }
 
+                if (!maxMinSet)
+                {
+                    max = v;
+                    min = v;
+                    maxMinSet=true;
+                }
+
                 DC.addValue(hash((uint8_t *)v.data(), v.size()));
                     
                 //min/max checks
@@ -649,7 +676,7 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
 
                     eContext[0] = minValue;
                     eContext[1] = min;
-                    if (*(uint64_t *)expr.evaluate(eContext).data())
+                    if (min.isNull() || *(uint64_t *)expr.evaluate(eContext).data())
                         min = minValue;
                 }
 
@@ -661,7 +688,7 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
 
                     eContext[0] = maxValue;
                     eContext[1] = max;
-                    if (!*(uint64_t *)expr.evaluate(eContext).data())
+                    if (max.isNull() || !*(uint64_t *)expr.evaluate(eContext).data())
                         max = maxValue;
                 }
             }
@@ -819,35 +846,37 @@ void PhysicalAnalyze::analyzeStringsAndUDT(AnalyzeData *data, boost::shared_ptr<
     //end of send/receive
 
     //conversions to string
-    if (typeId != TID_STRING)
+    if (data->non_null_count)
     {
-        FunctionPointer p = FunctionLibrary::getInstance()->findConverter(typeId, TID_STRING);
-
-        if (p)
+        if (typeId != TID_STRING)
         {
-            boost::shared_ptr<const Value *> args = boost::shared_ptr<const Value *>(new const Value*);
-            Value res;
-            
-            *args = &min;
-            p(args.get(), &res, 0);
-            data->min = res.getString();
-            
-            *args = &max;
-            p(args.get(), &res, 0);
-            data->max = res.getString();
+            FunctionPointer p = FunctionLibrary::getInstance()->findConverter(typeId, TID_STRING);
+
+            if (p)
+            {
+                boost::shared_ptr<const Value *> args = boost::shared_ptr<const Value *>(new const Value*);
+                Value res;
+
+                *args = &min;
+                p(args.get(), &res, 0);
+                data->min = res.getString();
+
+                *args = &max;
+                p(args.get(), &res, 0);
+                data->max = res.getString();
+            }
+            else
+            {
+                data->min = ValueToString(typeId, min);
+                data->max = ValueToString(typeId, max);
+            }
         }
         else
         {
-            data->min = ValueToString(typeId, min);
-            data->max = ValueToString(typeId, max);
+            data->min = min.getString();
+            data->max = max.getString();
         }
     }
-    else
-    {
-        data->min = min.getString();
-        data->max = max.getString();
-    }
-
     data->distinct_count = useDC ? DC.getCount() : valueContainerForStrings.size();
 }
 

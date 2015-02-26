@@ -433,28 +433,6 @@ namespace scidb
     {
       //Inner Structures
       private:
-        struct CoordinateMap
-        {
-            shared_ptr<AttributeMultiMap> attrMap;
-            shared_ptr<MemoryBuffer> coordMap;
-            ArrayDesc indexArrayDesc;
-            bool functionalMapping;
-            bool initialized;
-            bool raw;
-            bool waiting;
-
-            CoordinateMap() : functionalMapping(false), initialized(false), raw(false), waiting(false) {}
-        };
-        struct CoordinateMapInitializer 
-        { 
-            CachedStorage& storage;
-            CoordinateMap& cm;
-            bool initialized;
-
-            CoordinateMapInitializer(CachedStorage* sto, CoordinateMap* map) : storage(*sto), cm(*map), initialized(false) {}
-            ~CoordinateMapInitializer();
-        };
-
         struct ChunkInitializer 
         { 
             CachedStorage& storage;
@@ -772,8 +750,6 @@ namespace scidb
             char          _filler[HEADER_SIZE];
         };
 
-        map< string, boost::shared_ptr<CoordinateMap> > _coordinateMap;
-
         vector<Compressor*> _compressors;
 
         typedef map <StorageAddress, boost::shared_ptr<PersistentChunk> > InnerChunkMap;
@@ -822,8 +798,6 @@ namespace scidb
         ReplicationManager* _replicationManager;
 
         //Methods:
-        boost::shared_ptr<CoordinateMap> getCoordinateMap(string const& indexName, DimensionDesc const& dim,
-                                                          const boost::shared_ptr<Query>& query);
         /**
          * Perform metadata/lock recovery and storage rollback as part of the intialization.
          * It may block waiting for the remote coordinator recovery to occur.
@@ -965,9 +939,8 @@ namespace scidb
         /**
          * Helper: remove an immutable or unversioned array from the storage
          * @param arrID the id of the array
-         * @param timestamp, values above 0 optional. If above 0, remove only chunks whose timestamp is >= timestamp
          */
-        void removeUnversionedArray(ArrayID arrID, uint64_t timestamp);
+        void removeUnversionedArray(ArrayID arrID);
 
         /**
          * Helper: remove a mutable array from the storage
@@ -1038,23 +1011,7 @@ namespace scidb
         /**
          * @see Storage::remove
          */
-        void remove(ArrayUAID uaId, ArrayID arrId, uint64_t timestamp);
-
-        /**
-         * @see Storage::mapCoordinate
-         */
-        Coordinate mapCoordinate(string const& indexName, DimensionDesc const& dim, Value const& value,
-                                 CoordinateMappingMode mode, const boost::shared_ptr<Query>& query);
-
-        /**
-         * @see Storage::reverseMapCoordinate
-         */
-        Value reverseMapCoordinate(string const& indexName, DimensionDesc const& dim, Coordinate pos, const boost::shared_ptr<Query>& query);
-
-        /**
-         * @see Storage::removeCoordinateMap
-         */
-        void removeCoordinateMap(string const& indexName);
+        void remove(ArrayUAID uaId, ArrayID arrId);
 
         /**
          * @see Storage::cloneLocalChunk

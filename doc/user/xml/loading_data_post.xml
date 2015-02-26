@@ -322,7 +322,7 @@ Note: the -q and -p options are mutually exclusive.
       almost ready to load the data into SciDB. But first you must create an
       array to serve as the load array. The array must have one dimension and
       N attributes, where N is the number of columns in the original CSV file.
-      For the olympic data, the array that you create must have four
+      For the Olympic data, the array that you create must have four
       attributes, like this:</para>
 
       <para><para><programlisting>AQL% <command>CREATE ARRAY</command> winnersFlat &lt; event:string, year:int64, person:string, time:double &gt; [i=0:*,1000000,0];  </programlisting></para></para>
@@ -431,11 +431,39 @@ Note: the -q and -p options are mutually exclusive.
         </indexterm>The following query creates the target array:</para>
 
       <para><programlisting>AQL% <command>CREATE ARRAY</command> winners &lt;person:string, time:double&gt; 
-[year=1996:2008,1000,0, event(string)=3,1000,0]  </programlisting><para>The result of that query is an array that can accommodate the data
-      about Olympic winners. To populate this array with the data, run the
-      following query:</para>
+[year=1996:2008,1000,0, event_id=0:3,1000,0];  </programlisting><para>The result of that query is an array that can accommodate the data
+      about Olympic winners.</para>
 
-      <para><programlisting>AFL% redimension_store(winnersFlat,winners);  </programlisting><para><indexterm>
+      <para>We then use the operators <code>uniq()</code> and
+      <code>index_lookup()</code> to create an index array:<para><programlisting>AFL% create array event_index &lt;event:string&gt;[event_id=0:*,10,0];  </programlisting><programlisting>AFL% store(uniq(sort(project(winnersFlat,event)),'chunk_size=10'),event_index);
+</programlisting><screen>{event_id} event
+{0} 'dash'
+{1} 'marathon'
+{2} 'steeplechase'
+</screen></para></para>
+
+      <para>To populate this array with the data, run the following
+      query:</para>
+
+      <para><programlisting>AFL% store(redimension
+        (project
+           (index_lookup(winnersFlat,event_index,winnersFlat.event, event_id),
+         year,person,time,event_id),winners),
+       winners);
+</programlisting><screen>{year,event_id} person,time
+{1996,0} 'Bailey',9.84
+{1996,1} 'Thugwane',7956
+{1996,2} 'Keter',487.12
+{2000,0} 'Greene',9.87
+{2000,1} 'Abera',7811
+{2000,2} 'Kosgei',503.17
+{2004,0} 'Gatlin',9.85
+{2004,1} 'Baldini',7855
+{2004,2} 'Kemboi',485.81
+{2008,0} 'Bolt',9.69
+{2008,1} 'Wanjiru',7596
+{2008,2} 'Kipruto',490.34
+</screen><para><indexterm>
           <primary>select into</primary>
         </indexterm><indexterm>
           <primary>redimension</primary>
@@ -449,19 +477,19 @@ Note: the -q and -p options are mutually exclusive.
       ... INTO</command></code> syntax:<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> winners <command>FROM</command> winnersFlat;  </programlisting></para></para>
 
       <para>The result of this query is the desired array; you have completed
-      the CSV load procedure.<para><screen>{year,event} person,time
-{1996,'dash'} 'Bailey',9.84
-{1996,'marathon'} 'Thugwane',7956
-{1996,'steeplechase'} 'Keter',487.12
-{2000,'dash'} 'Greene',9.87
-{2000,'marathon'} 'Abera',7811
-{2000,'steeplechase'} 'Kosgei',503.17
-{2004,'dash'} 'Gatlin',9.85
-{2004,'marathon'} 'Baldini',7855
-{2004,'steeplechase'} 'Kemboi',485.81
-{2008,'dash'} 'Bolt',9.69
-{2008,'marathon'} 'Wanjiru',7596
-{2008,'steeplechase'} 'Kipruto',490.34
+      the CSV load procedure.<para><screen>{year,event_id} person,time
+{1996,0} 'Bailey',9.84
+{1996,1} 'Keter',487.12
+{1996,2} 'Thugwane',7956
+{2000,0} 'Greene',9.87
+{2000,1} 'Kosgei',503.17
+{2000,2} 'Abera',7811
+{2004,0} 'Gatlin',9.85
+{2004,1} 'Kemboi',485.81
+{2004,2} 'Baldini',7855
+{2008,0} 'Bolt',9.69
+{2008,1} 'Kipruto',490.34
+{2008,2} 'Wanjiru',7596
 </screen></para></para>
     </para></para></para></section>
   </section>
@@ -1474,18 +1502,31 @@ Note: the -q and -p options are mutually exclusive.
       operator, see the <xref linkend="analyze"/> section in SciDB Operator
       Reference.</para></para>
 
+      <para>Currently, only data that is of type int64 can be converted into a
+      SciDB dimension. We can create an index array for the exposure values,
+      and then store the IDs into the redimensioned array. The following query
+      creates the exposure_index array:<para><programlisting>AFL% store(uniq(sort(project(intensityFlat,exposure)),'chunk_size=10'),exposure_index);
+       </programlisting><screen>{exposure_id} exposure
+{0} 'High'
+{1} 'Low'
+{2} 'Medium'
+</screen></para></para>
+
       <para>The following query creates the desired 2-dimensional, 1-attribute
       array:</para>
 
-      <para><para><programlisting>AQL% <command>CREATE ARRAY</command> 
-            intensity 
-           &lt;measuredIntensity:int64 null&gt; 
-           [exposure(string)=3,3,0,
-            elapsedTime=0:40000,10000,0];  </programlisting> The result of that query is an array that can accommodate
-      the data about measured intensity after exposure. To populate this array
+      <para><para><programlisting>AFL% CREATE ARRAY intensity 
+      &lt;measuredIntensity:int64 null&gt;
+      [elapsedTime=0:40000,10000,0, exposure_id=0:2,3,0];  </programlisting>The result of that query is an array that can accommodate the
+      data about measured intensity after exposure. To populate this array
       with the data, use the following query:</para></para>
 
-      <para><para><programlisting>AFL% redimension_store(intensityFlat,intensity);  </programlisting></para></para>
+      <para><para><programlisting>AFL% store(redimension
+         (project
+           (index_lookup
+               (intensityFlat,exposure_index,intensityFlat.exposure, exposure_id),
+         elapsedTime,measuredIntensity,exposure_id),
+      intensity),intensity);  </programlisting></para></para>
 
       <para><indexterm>
           <primary>select into</primary>
@@ -1810,16 +1851,16 @@ Note: the -q and -p options are mutually exclusive.
 
 &lt; measuredIntensity:int64 NULL DEFAULT null &gt;
 
-[exposure(string)=3,3,0,
-elapsedTime=0:40000,10000,0]</screen></para></para>
+[elapsedTime=0:40000,10000,0,
+exposure_id=0:2,3,0]</screen></para></para>
 
       <para>With that information, you can now create the array in the
       destination installation of SciDB. The following command creates an
       array that is compatible with the data in the opaque-formatted load
       file: <para><programlisting>AQL% <command>CREATE ARRAY</command> intensityCopy 
          &lt; measuredIntensity:int64 NULL &gt; 
-         [ exposure(string)=3,3,0,
-           duration=0:40000,10000,0]  </programlisting>Notice that the array differs from the source array in two
+         [duration=0:40000,10000,0,
+          exposure_id=0:3,3,0]  </programlisting>Notice that the array differs from the source array in two
       regards that do not compromise the compatibility with the
       opaque-formated load file. The source array is called "intensity" but
       the destination array is called "intensityCopy." A dimension of the
@@ -1833,11 +1874,11 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
         </indexterm>Now that the destination array exists, you can load the
       data into it:</para>
 
-      <para><para><programlisting>AQL% <command>LOAD</command> intensityCopy
+      <para><programlisting>AQL% <command>LOAD</command> intensityCopy
      <command>FROM</command> <command>CURRENT INSTANCE</command> '../tests/harness/testcases/data/doc/intensity_data.opaque'
-     <command>AS</command> 'OPAQUE';  </programlisting> The result of this command is the array in the destination
-      installation of SciDB. You have completed the opaque loading
-      procedure.</para></para>
+     <command>AS</command> 'OPAQUE';  </programlisting> The result of this
+      command is the array in the destination installation of SciDB. You have
+      completed the opaque loading procedure.</para>
     </section>
   </section>
 

@@ -488,8 +488,8 @@ void Arena::exhausted(size_t size) const
  *  in the given options structure.
  *
  *  This is the preferred way to construct an Arena, as opposed to including a
- *  header file and calling the constructor correctly, because it isolates the
- *  caller from the exact type of Arena they receive.
+ *  header file and invoking the constructor directly, because it isolates the
+ *  caller from needing to know the exact type of the Arena that they receive.
  */
 ArenaPtr newArena(const Options& options)
 {

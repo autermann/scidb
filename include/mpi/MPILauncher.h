@@ -105,6 +105,13 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
 
     uint64_t getLaunchId() { return _launchId; /* no need to lock because never changes */ }
 
+    /**
+     * Initialize a shared memory region for writing
+     * @return a pointer to the begining of the region
+     * @throws scidb::SystemException if any errors are encountered
+     */
+    static char* initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize);
+
  protected:
 
     MpiLauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
@@ -137,9 +144,11 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
         return _ipcNames.insert(name).second;
     }
 
-    static char* initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize);
+    bool isPreallocateShm()
+    {
+        return _preallocateShm;
+    }
 
-    
     static void resolveHostNames(boost::shared_ptr<std::vector<std::string> >& hosts);
     static void handleHostNameResolve(const boost::shared_ptr<WorkQueue>& workQueue,
                                       boost::shared_ptr<std::vector<std::string> >& hosts,
@@ -189,6 +198,7 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
     std::set<std::string> _ipcNames;
     scidb::Mutex _mutex;
     const uint32_t _MPI_LAUNCHER_KILL_TIMEOUT;
+    bool _preallocateShm;
 };
 
 class MpiLauncherOMPI : public MpiLauncher

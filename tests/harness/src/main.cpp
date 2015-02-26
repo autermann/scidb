@@ -38,7 +38,10 @@ int main (int argc, char** argv)
 {
 	interface::Application *a = new scidbtestharness::SciDBTestHarness;
 	int rv;
+	stringstream hpid;
 
+	hpid << (uint64_t) getpid();
+	setenv ("HPID", hpid.str().c_str(), 1);
 	try
 	{
 		if ((rv = a->run (argc, argv, COMMANDLINE)) == FAILURE)

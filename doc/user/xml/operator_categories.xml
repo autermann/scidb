@@ -442,14 +442,6 @@
 
           <row>
             <entry><literal><link
-            linkend="multiplyOperator">multiply</link></literal></entry>
-
-            <entry>Produces a result array via matrix multiplication of two
-            input arrays .</entry>
-          </row>
-
-          <row>
-            <entry><literal><link
             linkend="normalizeOperator">normalize</link></literal></entry>
 
             <entry>Produces a result array that scales the values of a

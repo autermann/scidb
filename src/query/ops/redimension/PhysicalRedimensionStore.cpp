@@ -74,17 +74,15 @@ void storeToDBArray(shared_ptr<Array> srcArray, shared_ptr<Array>& dstArray, sha
         jobs[errorJob]->rethrow();
     }
 
-    if(!dstArrayDesc.isImmutable())
-    {   //Destination array is mutable: collect the coordinates of all chunks created by all jobs
-        set<Coordinates, CoordinatesLess> createdChunks;
-        for(size_t i =0; i < nJobs; i++)
-        {
-            createdChunks.insert(jobs[i]->getCreatedChunks().begin(), jobs[i]->getCreatedChunks().end());
-        }
-        //Insert tombstone entries
-        StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
+    //Destination array is mutable: collect the coordinates of all chunks created by all jobs
+    set<Coordinates, CoordinatesLess> createdChunks;
+    for(size_t i =0; i < nJobs; i++)
+    {
+        createdChunks.insert(jobs[i]->getCreatedChunks().begin(), jobs[i]->getCreatedChunks().end());
     }
-
+    //Insert tombstone entries
+    StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
+    
     SystemCatalog::getInstance()->updateArrayBoundaries(dstArrayDesc, bounds);
 }
 
@@ -135,13 +133,6 @@ public:
 
         } else if (_schema.getId() != parentArrayDesc.getId()) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << _schema.getName();
-        }
-
-        if (parentArrayDesc.isImmutable()) {
-            _lock->setArrayId(parentArrayDesc.getId());
-            rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
-            assert(rc);
-            return;
         }
 
         _arrayUAID = parentArrayDesc.getUAId();
@@ -203,8 +194,6 @@ public:
         LOG4CXX_DEBUG(logger, "[RedimStore] Begins.");
         ElapsedMilliSeconds timing;
 
-        Dimensions const& destDims = _schema.getDimensions();
-
         // Does the dest array have a synthetic dimension?
         bool hasSynthetic = false;
         for (size_t i=0; i<dimMapping.size(); ++i) {
@@ -229,37 +218,11 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "PhysicalRedimensionStore.cpp::transform";
         }
 
-        // Build mapping indices for flipped coordinates
-        vector< shared_ptr<AttributeMultiMap> > coordinateMultiIndices(destDims.size());
-        vector< shared_ptr<AttributeMap> > coordinateIndices(destDims.size());
-
-        for (size_t i = 0; i < destDims.size(); i++)
-        {
-            size_t j = dimMapping[i];
-            if (j == SYNTHETIC) {
-                continue;
-            }
-            if (isFlipped(j) && (destDims[i].getType() != TID_INT64)) {
-                AttributeID attID = static_cast<AttributeID>(turnOff(j, FLIP));
-                string indexMapName = _schema.getMappingArrayName(i);
-                coordinateMultiIndices[i] = buildFunctionalMapping(destDims[i]); // first try to locate method performing functional mapping for this type
-                if (!coordinateMultiIndices[i]) { // if there are no such functions, then build mapping index
-                    if (srcArray->getSupportedAccess() == Array::SINGLE_PASS)  {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << "redimension_store";
-                    }
-                    coordinateIndices[i] = buildSortedIndex(srcArray, attID, query, indexMapName, destDims[i].getStart(), destDims[i].getLength());
-                }
-            }
-        }
-        timing.logTiming(logger, "[RedimStore] build mapping index");
-
         shared_ptr<Array> withAggregates = redimensionArray(srcArray,
                                                             attrMapping,
                                                             dimMapping,
                                                             aggregates,
                                                             query,
-                                                            coordinateMultiIndices,
-                                                            coordinateIndices,
                                                             timing);
 
         // Store to the DBArray.
@@ -325,11 +288,6 @@ public:
             shared_ptr<ArrayDesc> fromCatalog = SystemCatalog::getInstance()->getArrayDesc(arrayId);
             Dimensions const& dimsFromCatalog = fromCatalog->getDimensions();
             assert(_updateableDims.size()==dimsFromCatalog.size());
-            for (size_t i=0; i<_updateableDims.size(); ++i) {
-            	if (dimsFromCatalog[i].getMappingArrayName().empty()) {
-            		_updateableDims[i].setMappingArrayName("");
-            	}
-            }
 
             SystemCatalog::getInstance()->updateArray(ArrayDesc(arrayId,
                                                                 _arrayUAID,

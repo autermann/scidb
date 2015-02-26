@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd" [
 <!ENTITY % myents SYSTEM "scidb_ug.ent">
-<!ENTITY scidb_version "13.9">
-<!ENTITY scidb_revision "6590">
+<!ENTITY scidb_version "13.11">
+<!ENTITY scidb_revision "6759">
 ]>
 <chapter id="creatingArraysChapter">
   <title>Creating and Removing SciDB Arrays</title>
@@ -168,22 +168,13 @@
                   has a name. Just like attributes, each dimension must be
                   named, and dimension names cannot be repeated in the same
                   array. The maximum length of a dimension name is 1024 bytes.
-                  Optionally, you may want to create a non-integer dimension.
-                  In this case, you will need to specify the dimension data
-                  type in the name argument like this:
-                  <replaceable>dimension_name</replaceable>
-                  (<replaceable>dimension_dataype</replaceable>). Note that
-                  version &scidb_version; of SciDB and Paradigm4 support
-                  non-integer dimensions only partially. Dimension names may
-                  only contain alphanumeric characters and underscores
-                  (_).</para>
+                  Dimension names may only contain alphanumeric characters and
+                  underscores (_).</para>
                 </listitem>
               </itemizedlist><itemizedlist>
                 <listitem>
                   <para><emphasis>Dimension start</emphasis>: The starting
-                  coordinate of a dimension. The default data type is 64-bit
-                  integer. If you created a non-integer dimension, this
-                  argument is omitted.</para>
+                  coordinate of a dimension.</para>
                 </listitem>
               </itemizedlist><itemizedlist>
                 <listitem>
@@ -240,12 +231,6 @@
             </orderedlist>
           </listitem>
         </itemizedlist></para>
-
-      <para>This statement creates a different array: <para><programlisting>AQL% <command>CREATE ARRAY</command> B &lt;val:double&gt;[sample (string)=6,6,0];  </programlisting>Array
-      B has one attribute named <code>val</code> of type <code>double</code>
-      and one dimension named <code>sample</code> of type <code>string</code>.
-      Dimension <code>sample</code> has length 6, chunk size 6, and chunk
-      overlap 0.</para></para>
     </section>
 
     <section id="dimensionDefaults">
@@ -337,7 +322,7 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
     <code><literal>remove</literal></code> operator: <para><programlisting>AFL% remove(default_1)  </programlisting></para></para>
   </section>
 
-  <section>
+  <section id="arrayAttributes">
     <title>Array Attributes</title>
 
     <para><indexterm>
@@ -405,6 +390,12 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
             are two SciDB functions that are associated with missing value
             codes: <literal>missing()</literal> and
             <literal>missing_reason()</literal>. For more details, see <xref linkend="missingValues"/>.</para>
+
+            <para>For clarity, throughout the document the term "null" is
+            equivalent to "?0", that is, a missing value with missing reason
+            code 0. All other missing values will be specified with the
+            corresponding missing value code, e.g. "missing value code 100"
+            will be represented by "?100".</para>
           </listitem>
 
           <listitem>
@@ -439,22 +430,22 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
         </itemizedlist></para>
 
       <para>Additionally, there are some floating-point values that behave
-      specially. The following values are applicable to the SciDB datatypes
+      specially. The following values are applicable to the SciDB data types
       double and float.<itemizedlist>
           <listitem>
             <para><emphasis role="bold">Infinity.</emphasis> During
             calculations, it is possible to divide by 0 and store the result
-            into an attribute value. SciDB represents this as either
-            <literal>inf</literal> or <literal>-inf</literal>, depending on
-            the sign of the dividend.</para>
+            into an attribute value. SciDB represents this as either <emphasis role="bold">inf</emphasis> or <emphasis role="bold">-inf</emphasis>, depending on the sign of the
+            dividend.</para>
           </listitem>
 
           <listitem>
-            <para><emphasis role="bold">NaN values. </emphasis>"Not a Number,"
-            these are floating-point values that do not actually represent
-            floating-point numbers. When arithmetic is performed and one of
-            the arguments is a NaN, a NaN is always the result. They are not
-            able to take part in join operations. The following operations can
+            <para><emphasis role="bold">NaN. </emphasis>"Not a Number." This
+            behaves the same as the IEEE floating point special value of the
+            same name. It is a floating-point value that does not actually
+            represent a floating-point number. When arithmetic is performed,
+            and one of the arguments is NaN, NaN is always the result. NaN
+            cannot take part in join operations. The following operations can
             return NaN:<itemizedlist>
                 <listitem>
                   <para>Operations with a NaN as at least one operand.</para>
@@ -630,7 +621,7 @@ or
           <listitem>
             <para>For ordinary attribute values, it returns -1.</para>
           </listitem>
-        </itemizedlist><itemizedlist>
+
           <listitem>
             <para>For the standard null value, it returns 0.</para>
           </listitem>
@@ -679,6 +670,129 @@ or
           </listitem>
         </itemizedlist></para>
     </section>
+
+    <section>
+      <title>Semantics of Special Values</title>
+
+      <para><indexterm>
+          <primary>special values</primary>
+
+          <secondary>behavior</secondary>
+        </indexterm>This section describes the behavior of the SciDB-specific
+      special values <emphasis role="bold">empty</emphasis> and <emphasis role="bold">missing</emphasis>, and IEEE floating-point special value
+      <emphasis role="bold">NaN</emphasis>, as well as <emphasis role="bold">inf</emphasis>/<emphasis role="bold">-inf</emphasis>,</para>
+
+      <para>Note the following representations:<itemizedlist>
+          <listitem>
+            <para><emphasis role="bold">?m</emphasis> denotes missing with a
+            non-negative integer <replaceable>m</replaceable> representing the
+            missing code.</para>
+          </listitem>
+
+          <listitem>
+            <para>Null is defined as <emphasis role="bold">?0</emphasis>, a
+            special case of <emphasis role="bold">missing</emphasis>.</para>
+          </listitem>
+
+          <listitem>
+            <para><command>op()</command> denotes a unary or binary expression
+            or function, such as <emphasis role="bold">x + y</emphasis>,
+            <emphasis role="bold">x &lt; y</emphasis>, or
+            <command>sin(x)</command>.</para>
+          </listitem>
+
+          <listitem>
+            <para>An <emphasis>aggregator</emphasis> is a function or operator
+            that computes aggregates, such as
+            <command>count()</command>.</para>
+          </listitem>
+
+          <listitem>
+            <para>A <emphasis>floating point value</emphasis> is a SciDB
+            attribute of type <code>float</code> or <code>double</code>. In
+            this section, it is restricted to "normal" floating-point values
+            (such 1.4, -3.75, and so on), plus <emphasis role="bold">NaN</emphasis>, <emphasis role="bold">+inf</emphasis>,
+            and <emphasis role="bold">-inf</emphasis>, but does not include
+            <emphasis role="bold">empty </emphasis>nor <emphasis role="bold">missing</emphasis>.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>When <command>op()</command> is not an aggregator:<itemizedlist>
+          <listitem>
+            <para>If at least one operand is <emphasis role="bold">empty</emphasis>, the result is <emphasis role="bold">empty</emphasis>.</para>
+          </listitem>
+
+          <listitem>
+            <para>If at least one of x or y is<emphasis role="bold">
+            missing</emphasis>, but neither is <emphasis role="bold">empty</emphasis>: <command>op(x,y)</command> and
+            <command>op(?m)</command> both return <emphasis role="bold">?0</emphasis>.</para>
+          </listitem>
+
+          <listitem>
+            <para>If at least one of the floating point values x or y is
+            <emphasis role="bold">NaN</emphasis>: <itemizedlist>
+                <listitem>
+                  <para>When <command>op(x,y)</command> is a comparison
+                  expression: x {==,&lt;,&gt;,&lt;=,&gt;=} y returns FALSE,
+                  and x &lt;&gt; y returns TRUE</para>
+                </listitem>
+
+                <listitem>
+                  <para>When <command>op(x,y)</command> is not a comparison
+                  expression: <command>op(x,y)</command> and
+                  <command>op(NaN)</command> both return <emphasis role="bold">NaN</emphasis>.</para>
+                </listitem>
+              </itemizedlist></para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>For aggregators:<itemizedlist>
+          <listitem>
+            <para><emphasis role="bold">Empty</emphasis> is ignored during
+            aggregation. That is, empty cells do not participate in
+            aggregation.</para>
+          </listitem>
+
+          <listitem>
+            <para>For details on how aggregates handle <emphasis role="bold">missing</emphasis>, see the documentation for the
+            individual aggregate.</para>
+          </listitem>
+
+          <listitem>
+            <para><emphasis role="bold">NaN</emphasis> is included during
+            aggregation. For instance, the sum of a set of double numbers is
+            <emphasis role="bold">NaN</emphasis>, if at least one of the
+            numbers is <emphasis role="bold">NaN</emphasis>.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>Whenever possible, SciDB computations adhere to the IEEE Standard
+      for Floating-Point Arithmetic (IEEE 754). Exceptions are documented in
+      the appropriate place for the specific operator or function.</para>
+
+      <para><indexterm>
+          <primary>sort</primary>
+        </indexterm><indexterm>
+          <primary>special values</primary>
+
+          <secondary>sort order</secondary>
+        </indexterm>For the <command>sort()</command> operator, note the
+      following sort order regarding special values:<programlisting>?m &lt; NaN &lt; x</programlisting>where:<itemizedlist>
+          <listitem>
+            <para>'&lt;' indicates "comes before"</para>
+          </listitem>
+
+          <listitem>
+            <para>For <emphasis role="bold">missing</emphasis> values, the
+            sort order is based on the value of the missing code. Thus,
+            <emphasis role="bold">?0</emphasis> comes before <emphasis role="bold">?10</emphasis> which comes before <emphasis role="bold">?72</emphasis>.</para>
+          </listitem>
+
+          <listitem>
+            <para>x represents any floating point number, other than <emphasis role="bold">NaN</emphasis>.</para>
+          </listitem>
+        </itemizedlist></para>
+    </section>
   </section>
 
   <section id="array_dimensions">
@@ -686,8 +800,8 @@ or
 
     <para>A SciDB array must have at least one dimension. Dimensions form the
     coordinate system for a SciDB array. There are several special types of
-    dimensions: dimensions with overlapping chunks, unbounded dimensions, and
-    non-integer dimensions.</para>
+    dimensions: dimensions with overlapping chunks and unbounded
+    dimensions.</para>
 
     <note>
       <para>The dimension size is determined by the range from the dimension
@@ -758,77 +872,6 @@ or
           </listitem>
         </itemizedlist><para><programlisting>AQL% <command>CREATE ARRAY</command> open &lt;val:double&gt;[I=0:9,10,0,J=0:*,10,0];  </programlisting></para></para>
     </section>
-
-    <section xml:id="Non-integerdimensionsandMappingarrays">
-      <title>Non-integer Dimensions and Mapping Arrays</title>
-
-      <note>
-        <para>Version &scidb_version; of SciDB only partially supports
-        non-integer dimensions. And, in SciDB, any dimension that is not an
-        int64 is a "non-integer dimension."</para>
-      </note>
-
-      <para><indexterm>
-          <primary>dimensions</primary>
-
-          <secondary>non-integer</secondary>
-        </indexterm><indexterm>
-          <primary>mapping arrays</primary>
-        </indexterm><indexterm>
-          <primary>non-integer dimensions</primary>
-        </indexterm>Basic arrays in SciDB use the int64 data type for
-      dimensions. This means that when you declare dimensions, the default
-      data type is int64. You must explicitly declare a dimension to use any
-      other data type. The exception is if you use redimension_store to change
-      an attribute to a dimension. In this case, the dimension takes on the
-      data type of the original attribute.</para>
-
-      <para>SciDB also supports arrays with non-integer dimensions. These
-      arrays map dimension <emphasis>values</emphasis> of a declared type to
-      an internal int64-array <emphasis>position</emphasis>. Mapping is done
-      through special mapping arrays internal to SciDB. Such arrays are useful
-      when you are transforming data into multidimensional format where some
-      dimensions represent factors or categories.</para>
-
-      <para><indexterm>
-          <primary>AQL</primary>
-
-          <secondary>create array</secondary>
-        </indexterm>For example, the array winners has a non-integer dimension
-      named <code>event</code>: <para><programlisting>AFL% CREATE ARRAY winners &lt;person:string, time:double&gt; [year=1996:2008,1000,0, event(string)=3,1000,0];  </programlisting><programlisting>AFL% show(winners)</programlisting><screen><command>winners</command>
-
-&lt; person:string,
-time:double &gt;
-
-[year=1996:2008,1000,0,
-event(string)=3,1000,0]</screen><indexterm>
-          <primary>AQL</primary>
-
-          <secondary>select</secondary>
-        </indexterm>The dimension <code>event</code> is a special
-      one-dimensional SciDB array mapping each distinct value in the dimension
-      to an integer coordinate. You can view the mapping array by running the
-      following query:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners:event;</programlisting><screen>{no} value
-{0} 'dash'
-{1} 'marathon'
-{2} 'steeplechase'
-</screen>
-      The attributes of the array <code>person</code> and <code>time</code>
-      are: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> winners;</programlisting><screen>{year,event} person,time
-{1996,'dash'} 'Bailey',9.84
-{1996,'marathon'} 'Thugwane',7956
-{1996,'steeplechase'} 'Keter',487.12
-{2000,'dash'} 'Greene',9.87
-{2000,'marathon'} 'Abera',7811
-{2000,'steeplechase'} 'Kosgei',503.17
-{2004,'dash'} 'Gatlin',9.85
-{2004,'marathon'} 'Baldini',7855
-{2004,'steeplechase'} 'Kemboi',485.81
-{2008,'dash'} 'Bolt',9.69
-{2008,'marathon'} 'Wanjiru',7596
-{2008,'steeplechase'} 'Kipruto',490.34
-</screen></para></para></para></para>
-    </section>
   </section>
 
   <section>
@@ -846,9 +889,15 @@ event(string)=3,1000,0]</screen><indexterm>
         <primary>select into</primary>
       </indexterm>An array name is its unique identifier. You can use the AQL
     <code> <command>SELECT ... INTO</command> </code> statement to copy an
-    array into another array with a new name. <para> This means that both <code>winners</code> and
+    array into another array with a new name.<para><programlisting>AFL% CREATE ARRAY winners &lt;person:string, time:double, event:string&gt; [year=1996:2008,1000,0];  </programlisting><programlisting>AFL% show(winners)</programlisting><screen><command>winners</command>
+
+&lt; person:string,
+time:double,
+event:string &gt;
+
+[year=1996:2008,1000,0]</screen><para> This means that both <code>winners</code> and
     <code>OlympicWinners</code> are distinct arrays in the database. To change
-    an array name use the <code>rename</code> command: <para><programlisting>AFL% rename(winners, OlympicWinners);  </programlisting></para></para></para>
+    an array name use the <code>rename</code> command: <para><programlisting>AFL% rename(winners, OlympicWinners);  </programlisting></para></para></para></para>
 
     <para>You can use the <code>cast</code> command to change the name of the
     array, array attributes, and array dimensions. Unlike <code>rename</code>,
@@ -860,34 +909,25 @@ event(string)=3,1000,0]</screen><indexterm>
     and types of dimensions. <para><programlisting>AFL% show(OlympicWinners)</programlisting><screen><command>OlympicWinners</command>
 
 &lt; person:string,
-time:double &gt;
+time:double,
+event:string &gt;
 
-[year=1996:2008,1000,0,
-event(string)=3,1000,0]</screen>
-    This query creates an array <code>winnerGrid</code> with integer
-    dimensions that has renamed attributes <code>LastName</code> and
-    <code>elapsedTime</code> and dimensions <code>Year</code> and
-    <code>Event</code>. <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> winnerGrid <command>FROM</command> cast(OlympicWinners, &lt; LastName: string, elapsedTime: double&gt;
-[x=1996:2008,1000,0,y=0:*,1000,0] );  </programlisting><screen>{x,y} LastName,elapsedTime
-{1996,0} 'Bailey',9.84
-{1996,1} 'Thugwane',7956
-{1996,2} 'Keter',487.12
-{2000,0} 'Greene',9.87
-{2000,1} 'Abera',7811
-{2000,2} 'Kosgei',503.17
-{2004,0} 'Gatlin',9.85
-{2004,1} 'Baldini',7855
-{2004,2} 'Kemboi',485.81
-{2008,0} 'Bolt',9.69
-{2008,1} 'Wanjiru',7596
-{2008,2} 'Kipruto',490.34
+[year=1996:2008,1000,0]</screen>
+    This query creates an array <code>winnerGrid</code> that has renamed
+    attributes <code>LastName</code> and <code>elapsedTime</code> and
+    dimension <code>Year</code>. <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> winnerGrid <command>FROM</command> cast(OlympicWinners, &lt; LastName: string, elapsedTime: double, event:string&gt;
+[x=1996:2008,1000,0] );  </programlisting><screen>{x} LastName,elapsedTime,event
+{1996} 'Bailey',9.84,'dash'
+{2000} 'Greene',9.87,'dash'
+{2004} 'Gatlin',9.85,'dash'
+{2008} 'Bolt',9.69,'dash'
 </screen><screen><command>winnerGrid</command>
 
 &lt; LastName:string,
-elapsedTime:double &gt;
+elapsedTime:double,
+event:string &gt;
 
-[x=1996:2008,1000,0,
-y=0:2,1000,0]</screen></para></para></para>
+[x=1996:2008,1000,0]</screen></para></para></para>
   </section>
 
   <section id="array_dimensions_1">

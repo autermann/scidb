@@ -204,14 +204,14 @@ SCIDB QUERY : <select * from subarray (m4x4,-2,1,-1,2),subarray(m4x4,-1,2,0,3)>
 
 SCIDB QUERY : <select max(expr),max(expr_2) from SP>
 {i} max,max_1
-{0} 0.96017,0.707107
+{0} nan,nan
 
 SCIDB QUERY : <select min(expr),min(expr_2) from SP group by a>
 {a} min,min_1
-{-2} -0.416147,null
-{-1} null,null
-{0} -0.653644,null
-{1} -0.801144,0
+{-2} -0.416147,nan
+{-1} nan,nan
+{0} -0.653644,nan
+{1} -0.801144,nan
 
 SCIDB QUERY : <select sum(val) from m4x4_A group by a>
 {a} sum
@@ -294,8 +294,12 @@ SCIDB QUERY : <select count(sum),avg(sum),min(sum) from c>
 {i} count,avg_2,min_3
 {0} 3,inf,-1
 
-SCIDB QUERY : < update c set sum=inf where a=1>
-[An error expected at this place for the query " update c set sum=inf where a=1". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_REF_NOT_FOUND. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_REF_NOT_FOUND.]
+SCIDB QUERY : <update c set sum=inf where a=1>
+{a} sum,avg_1
+{-2} 26,6.5
+{-1} inf,inf
+{0} null,-2.5
+{1} inf,-0.25
 
 SCIDB QUERY : <remove(m4x4)>
 Query was executed successfully

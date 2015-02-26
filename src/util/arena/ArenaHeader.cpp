@@ -80,6 +80,13 @@ void Header::finalize(count_t count)
         byte_t* p = getPayload();                        // ...head of payload
         byte_t* q = p + c * n;                           // ...tail of payload
 
+     /* Clear the 'finalizer' flag to signal that the finalization has been
+        taken care of. We do so *before* invoking 'f', in case 'f' goes and
+        frees the entire allocation in which the header sits, as happens to
+        the underlying pages of class ScopedArena, for example...*/
+
+        _flags &= ~finalizer;                            // ...taken care of
+
      /* Finalize each of the elements from the end of the array back toward
         its beginning, that is, in the opposite order to that in which they
         were first constructed...*/
@@ -89,9 +96,7 @@ void Header::finalize(count_t count)
             f(q -= n);                                   // ....call finalizer
         }
 
-     /* Clear the 'finalizer' flag to signal that the allocation is dead...*/
-
-        _flags &= ~finalizer;                            // ...dead as a dodo
+     /* It is now no longer safe to access any of this object's members...*/
     }
 }
 

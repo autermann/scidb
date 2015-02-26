@@ -111,8 +111,8 @@ public:
     {
         Attributes atts;
         atts.push_back(AttributeDesc(0, "attribute_name", TID_STRING, 0, 0));
-        atts.push_back(AttributeDesc(1, "min", TID_STRING, 0, 0));
-        atts.push_back(AttributeDesc(2, "max", TID_STRING, 0, 0));
+        atts.push_back(AttributeDesc(1, "min", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
+        atts.push_back(AttributeDesc(2, "max", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
         atts.push_back(AttributeDesc(3, "distinct_count", TID_UINT64, 0, 0));
         atts.push_back(AttributeDesc(4, "non_null_count", TID_UINT64, 0, 0));
 

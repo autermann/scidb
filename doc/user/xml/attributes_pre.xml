@@ -54,23 +54,34 @@
 
       <procedure>
         <step>
-          <para>Show the source_array:<programlisting language="test">
---afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winnersFew.csv &gt; $DOC_DATA/winnersFew.scidb --show-query=no --show-output=no
---aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' --show-query=no --show-output=no
---afl create array champions &lt;person:string,country:string,time:double null&gt; [year=1996:2008,13,0, event(string)=3,3,0] --show-query=no --show-output=no
---afl redimension_store(winnersFlat,champions) --show-query=no --show-output=no
---afl scan(champions)</programlisting></para>
+          <para>Show the source_array:<programlisting language="test">--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array year &lt;year:int64 null&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array person &lt;person:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array country &lt;country:string null&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array time &lt;time:double&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl store(build(event,iif(i&lt;4,'dash',iif(i&lt;8,'steeplechase','marathon'))),event);
+      --show-query=no --show-output=no  
+--afl store(build(year,1996+(i%4 * 4)),year); --show-query=no --show-output=no
+--afl store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,Kemboi,
+      Kipruto,Thugwane,Abera,Baldini,Wanjiru]',true),person);
+      --show-query=no --show-output=no
+--afl store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,Kenya,Kenya,
+      USA,Ethiopia,Italy,Kenya]',true),country); --show-query=no --show-output=no
+--afl store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),
+      (490.34),(7956),(7811),(7855),(7596)]',true),time); --show-query=no --show-output=no
+--afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat); --show-query=no --show-output=no
+--afl scan(winnersFlat); --show-query=no --output-format=dcsv
+</programlisting></para>
         </step>
 
         <step>
           <para>Create a result array describing the attributes of the named
-          array:<programlisting language="test">--afl attributes(champions);</programlisting></para>
+          array:<programlisting language="test">--afl attributes(winnersFlat); --output-format=dcsv</programlisting></para>
         </step>
 
         <step>
           <para>Create a result array describing the nullable attributes of
-          the named array:<programlisting language="test">--aql select * from attributes(champions) where nullable = true;</programlisting></para>
+          the named array:<programlisting language="test">--afl filter(attributes(winnersFlat),nullable=true); --output-format=dcsv</programlisting></para>
         </step>
       </procedure>
     </informalexample>

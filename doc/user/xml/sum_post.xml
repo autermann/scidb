@@ -5,6 +5,13 @@
     <refname>sum</refname>
 
     <refpurpose>Sum attribute values.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>sum</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>sum</code> operator may be removed in the future. Use the <link linkend="sumAggregate">sum aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -16,14 +23,14 @@
 
     <para><indexterm>
         <primary>sum</primary>
-      </indexterm>The sum operator calculates the cumulative sum of a group of
-    values. For the corresponding aggregate, see the <link linkend="sumAggregate">sum aggregate</link> reference.</para>
+</indexterm>The <code>sum</code> operator calculates the cumulative sum of a group of
+    values.</para>
   </refsect1>
 
   <refsect1>
     <title>Inputs</title>
 
-    <para>The <literal>sum</literal> operator takes the following
+    <para>The <code>sum</code> operator takes the following
     arguments:<itemizedlist>
         <listitem>
           <para><emphasis role="bold">array</emphasis>: A source array with

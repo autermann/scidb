@@ -46,7 +46,26 @@ class PhysicalAggregate: public AggregatePartitioningOperator
     void initializeOperator(ArrayDesc const& inputSchema)
     {
         AggregatePartitioningOperator::initializeOperator(inputSchema);
-        _grouping = DimensionGrouping(inputSchema.getDimensions(), _schema.getDimensions());
+        Dimensions const& inputDims = inputSchema.getDimensions();
+        Dimensions groupBy;
+        for (size_t i =0, n = _parameters.size(); i<n; i++)
+        {
+            if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)
+            {
+                boost::shared_ptr<OperatorParamReference> const& reference =
+                                                (boost::shared_ptr<OperatorParamReference> const&) _parameters[i];
+                string const& dimName = reference->getObjectName();
+                string const& dimAlias = reference->getArrayName();
+                for (size_t j = 0; j < inputDims.size(); j++)
+                {
+                    if (inputDims[j].hasNameAndAlias(dimName, dimAlias)) {
+                        groupBy.push_back(inputDims[j]);
+                        break;
+                    }
+                }
+            }
+        }
+        _grouping = DimensionGrouping(inputSchema.getDimensions(), groupBy);
     }
 
     virtual void transformCoordinates(Coordinates const & inPos, Coordinates & outPos)

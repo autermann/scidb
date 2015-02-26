@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE appendix PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<appendix id="trouble">
+  <title id="a_title">Troubleshooting</title>
+
+  <para>This appendix contains troubleshooting information.</para>
+
+  <section>
+    <title>gemm or gesvd crash</title>
+
+    <para><indexterm>
+        <primary>gemm</primary>
+      </indexterm><indexterm>
+        <primary>gesvd</primary>
+      </indexterm>If you run a query that uses the <command>gemm()</command>
+    or <command>gesvd()</command> operator, and it crashes, it could be
+    because you have run out of shared memory. If this occurs, you should
+    increase the value for the <code>max-memory-limit</code> parameter in your
+    SciDB config.ini file. For details, see <xref
+    linkend="configMemory"/>.</para>
+
+    <para>Also, you can run <code>mpi_init()</code> to try to clear space on
+    the partition. For details, see <xref linkend="mpi_init"/>.</para>
+  </section>
+
+  <section>
+    <title>Configuration Troubleshooting</title>
+
+    <para>The Installation chapter contains a section on some guidelines for
+    optimizing the SciDB configuration parameters. For details, see <xref
+    linkend="configTrouble"/>.</para>
+  </section>
+</appendix>

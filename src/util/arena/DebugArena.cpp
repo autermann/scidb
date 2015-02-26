@@ -127,13 +127,15 @@ bool DebugArena::consistent() const
 
 ArenaPtr newDebugArena(const Options& o)
 {
+    using boost::make_shared;                            // For make_shared()
+
     if (o.locking())                                     // Needs locking too?
     {
-        return ArenaPtr(new Locking<DebugArena>(o));     // ...locking arena
+        return make_shared< Locking<DebugArena> >(o);    // ...locking arena
     }
     else                                                 // No locking needed
     {
-        return ArenaPtr(new DebugArena(o));              // ...vanilla arena
+        return make_shared<DebugArena>(o);               // ...vanilla arena
     }
 }
 

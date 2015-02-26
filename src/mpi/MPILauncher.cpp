@@ -73,7 +73,8 @@ MpiLauncher::MpiLauncher(uint64_t launchId, const boost::shared_ptr<Query>& q)
     _query(q),
     _waiting(false),
     _inError(false),
-    _MPI_LAUNCHER_KILL_TIMEOUT(scidb::getLivenessTimeout())
+    _MPI_LAUNCHER_KILL_TIMEOUT(scidb::getLivenessTimeout()),
+    _preallocateShm(Config::getInstance()->getOption<bool>(CONFIG_PREALLOCATE_SHM))
 {
 }
 
@@ -85,7 +86,8 @@ MpiLauncher::MpiLauncher(uint64_t launchId, const boost::shared_ptr<Query>& q, u
     _query(q),
     _waiting(false),
     _inError(false),
-    _MPI_LAUNCHER_KILL_TIMEOUT(timeout)
+    _MPI_LAUNCHER_KILL_TIMEOUT(timeout),
+    _preallocateShm(Config::getInstance()->getOption<bool>(CONFIG_PREALLOCATE_SHM))
 {
 }
 
@@ -178,7 +180,7 @@ void MpiLauncher::launch(const vector<string>& slaveArgs,
         _exit(1);
     }
     throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
-	   << "MpiLauncher::launch");
+           << "MpiLauncher::launch");
 }
 
 bool MpiLauncher::isRunning()
@@ -264,7 +266,7 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
     for (std::set<std::string>::const_iterator i=_ipcNames.begin();
          i != _ipcNames.end(); ++i) {
         const std::string& ipcName = *i;
-        boost::scoped_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName));
+        boost::scoped_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName,isPreallocateShm()));
         shmIpc->remove();
         shmIpc.reset();
     }
@@ -399,7 +401,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
         const string& installPath = desc->getPath();
         setInstallPath(installPath);
         args[0] = MpiManager::getInstance()->getLauncherBinFile(installPath);
-	validateLauncherArg(args[0]);
+        validateLauncherArg(args[0]);
 
         //XXX HACK: this will place the coordinator first on the list and thus give it rank=0
         //XXX this works only if the coordinator is the zeroth instance.
@@ -446,19 +448,8 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipc = " << ipcName);
 
-    boost::scoped_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName));
-    char* ptr(NULL);
-    try {
-        shmIpc->create(SharedMemoryIpc::RDWR);
-        shmIpc->truncate(shmSize);
-        ptr = reinterpret_cast<char*>(shmIpc->get());
-    } catch(scidb::SharedMemoryIpc::SystemErrorException& e) {
-        LOG4CXX_ERROR(logger, "Cannot map shared memory: " << e.what());
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_mmap");
-    } catch(scidb::SharedMemoryIpc::InvalidStateException& e) {
-        LOG4CXX_ERROR(logger, "Unexpected error while mapping shared memory: " << e.what());
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
-    }
+    boost::scoped_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName,isPreallocateShm()));
+    char* ptr = initIpcForWrite(shmIpc.get(), shmSize);
     assert(ptr);
 
     size_t off = 0;
@@ -475,9 +466,9 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
             *(ptr+off) = ' ';
             ++off;
         }
-         memcpy((ptr+off), arg.data(), arg.size());
-         off += arg.size();
-         arg.clear();
+        memcpy((ptr+off), arg.data(), arg.size());
+        off += arg.size();
+        arg.clear();
     }
     *(ptr+off) = '\n';
     ++off;
@@ -521,7 +512,7 @@ void MpiLauncherOMPI::addPerInstanceArgsOMPI(const InstanceID myId, const Instan
 
     validateLauncherArg(installPath);
     args.push_back("-wd");
-    args.push_back(installPath); 
+    args.push_back(installPath);
 
     if (currId != myId) {
         // XXX NOTE: --prefix is not appended for this instance (the coordinator)
@@ -709,7 +700,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     string nic = scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_IF);
     if (!nic.empty()) {
         args.push_back(string("-iface"));
-	validateLauncherArg(nic);
+        validateLauncherArg(nic);
         args.push_back(nic);
         ARGS_PER_LAUNCH +=2;
         totalArgsNum +=2;
@@ -721,7 +712,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     // args.push_back(string("1"));
 
     // HYDRA_PROXY_RETRY_COUNT: The value of this environment variable determines the
-    // number of retries a proxy does to establish a connection to the main server. 
+    // number of retries a proxy does to establish a connection to the main server.
 
     // loop over all the instances
     size_t count = 0;
@@ -771,7 +762,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
 
     string execContents = getLauncherSSHExecContent(clusterUuid, queryId, launchId,
                                                     MpiManager::getInstance()->getDaemonBinFile(getInstallPath()));
-    
+
     bool rc = addIpcName(ipcNameArgs);
     assert(rc);
     rc = addIpcName(ipcNameHosts);
@@ -780,11 +771,11 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     assert(rc); rc=rc;
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipcArgs = " << ipcNameArgs <<
-	  ", ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
+          ", ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
 
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcArgs (mpi::newSharedMemoryIpc(ipcNameArgs));
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts));
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec));
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcArgs (mpi::newSharedMemoryIpc(ipcNameArgs, isPreallocateShm()));
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts,isPreallocateShm()));
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec, isPreallocateShm()));
 
     char* ptrArgs (MpiLauncher::initIpcForWrite(shmIpcArgs.get(),  shmSizeArgs));
     char* ptrHosts(MpiLauncher::initIpcForWrite(shmIpcHosts.get(), shmSizeHosts));
@@ -868,14 +859,14 @@ void MpiLauncher::resolveHostNames(boost::shared_ptr<vector<string> >& hosts)
     boost::shared_ptr<JobQueue>  jobQueue  = boost::make_shared<JobQueue>();
     boost::shared_ptr<WorkQueue> workQueue = boost::make_shared<WorkQueue>(jobQueue, hosts->size(), hosts->size());
     workQueue->start();
-    
+
     for (size_t i=0; i<hosts->size(); ++i) {
         string& host = (*hosts)[i];
         string service;
         scidb::ResolverFunc func = boost::bind(&MpiLauncher::handleHostNameResolve, workQueue, hosts, i, _1, _2);
         scidb::resolveAsync(host, service, func);
     }
-    
+
     for (size_t i=0; i<hosts->size(); ++i) {
         jobQueue->popJob()->execute();
     }
@@ -1016,9 +1007,13 @@ char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize)
         shmIpc->create(SharedMemoryIpc::RDWR);
         shmIpc->truncate(shmSize);
         ptr = reinterpret_cast<char*>(shmIpc->get());
+    }  catch(scidb::SharedMemoryIpc::NoShmMemoryException& e) {
+        LOG4CXX_ERROR(logger, "Not enough shared memory: " << e.what());
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_MEMORY_ALLOCATION_ERROR) << e.what());
     } catch(scidb::SharedMemoryIpc::SystemErrorException& e) {
         LOG4CXX_ERROR(logger, "Cannot map shared memory: " << e.what());
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "shared_memory_mmap");
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED_WITH_ERRNO)
+               << "shared_memory_mmap" << e.getErrorCode());
     } catch(scidb::SharedMemoryIpc::InvalidStateException& e) {
         LOG4CXX_ERROR(logger, "Unexpected error while mapping shared memory: " << e.what());
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
@@ -1093,11 +1088,11 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
             assert(args[0].empty());
             setInstallPath(desc->getPath());
             args[0] = MpiManager::getInstance()->getLauncherBinFile(getInstallPath());
-	    validateLauncherArg(args[0]);
-	    args[EXEC_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
-	    validateLauncherArg(args[EXEC_INDX]);
-	    args[HOST_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameHosts);
-	    validateLauncherArg(args[HOST_INDX]);
+            validateLauncherArg(args[0]);
+            args[EXEC_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
+            validateLauncherArg(args[EXEC_INDX]);
+            args[HOST_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameHosts);
+            validateLauncherArg(args[HOST_INDX]);
         }
         addPerInstanceArgsMPICH(myId, desc, clusterUuid, queryId,
                                 launchId, slaveArgs, args, *hosts, false);
@@ -1129,8 +1124,8 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
 
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts));
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec));
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts,isPreallocateShm()));
+    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec, isPreallocateShm()));
 
     char* ptrHosts(MpiLauncher::initIpcForWrite(shmIpcHosts.get(), shmSizeHosts));
     char* ptrExec (MpiLauncher::initIpcForWrite(shmIpcExec.get(),  execContents.size()));
@@ -1159,7 +1154,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
       //make exec shm/file executable
       int err=errno;
       throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
-	     << "chmod" << rc << err << args[EXEC_INDX]+" S_IRUSR|S_IXUSR");
+             << "chmod" << rc << err << args[EXEC_INDX]+" S_IRUSR|S_IXUSR");
     }
     // trim the last ':'
     assert(args[args.size()-1]==string(":"));
@@ -1168,7 +1163,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
     if (logger->isTraceEnabled()) {
       size_t sizeArgs = 0;
       for (vector<string>::iterator iter=args.begin();
-	   iter!=args.end(); ++iter) {
+           iter!=args.end(); ++iter) {
         string& arg = (*iter);
         sizeArgs += arg.size();
       }

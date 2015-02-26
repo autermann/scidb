@@ -210,44 +210,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
 
     for (size_t i = 0; i < nDims; i++) {
         DimensionDesc const& srcDim = srcDims[i];
-        if (srcDim.getType() != TID_INT64) {
-            string mappingArrayName = inputArrayName + '.' + srcDim.getBaseName();
-            string tmpMappingArrayName;
-            size_t tmpArrayNo = 0;
-            do {
-                std::stringstream ss;
-                ss << mappingArrayName << '$' << ++tmpArrayNo;
-                tmpMappingArrayName = ss.str();
-            } while (query->getTemporaryArray(tmpMappingArrayName));
-
-            Dimensions indexMapDim(1);
-            Attributes indexMapAttr(1);
-            // Actual boundaries of NID array are not know now. So just use some "estimations"...
-            // Them will be updated lately when NID will be loaded. But please notice that printing result of such query
-            // with coordinates in iquery may not work correctly.
-            Coordinate from = srcDim.getStart();
-            Coordinate till = srcDim.getEndMax();
-            int64_t chunkInterval = int64_t(till-from+1);
-            indexMapDim[0] = DimensionDesc("no", from, from, till, till, chunkInterval, 0);
-            indexMapAttr[0] = AttributeDesc(0, "value", srcDim.getType(), 0, 0);
-            ArrayDesc mappingArrayDesc(tmpMappingArrayName,
-                                       indexMapAttr,
-                                       indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY);
-            query->setTemporaryArray(shared_ptr<Array>(new MemArray(mappingArrayDesc,query)));
-
-
-            dstDims[i] = DimensionDesc(srcDim.getBaseName(), srcDim.getNamesAndAliases(),
-                                       srcDim.getStartMin(), srcDim.getCurrStart(), srcDim.getCurrEnd(), srcDim.getEndMax(),
-                                       srcDim.getChunkInterval(), srcDim.getChunkOverlap(),
-                                       srcDim.getType(),
-                                       srcDim.getFlags(),
-                                       tmpMappingArrayName,
-                                       srcDim.getComment(),
-                                       srcDim.getFuncMapOffset(),
-                                       srcDim.getFuncMapScale());
-        } else {
-            dstDims[i] = srcDim;
-        }
+        dstDims[i] = srcDim;
     }
     ArrayDesc newDesc(inputArrayName, arrayDesc.getAttributes(), dstDims, arrayDesc.getFlags());
     newDesc.setPartitioningSchema(partitioningSchema);

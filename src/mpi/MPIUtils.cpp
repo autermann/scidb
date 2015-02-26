@@ -49,10 +49,10 @@ SharedMemoryIpc::SharedMemoryIpcType_t getShmIpcType()
     return SharedMemoryIpc::SHM_TYPE;
 }
 
-SharedMemoryIpc* newSharedMemoryIpc(const std::string& name)
+SharedMemoryIpc* newSharedMemoryIpc(const std::string& name, bool preallocate)
 {
     if (getShmIpcType() == scidb::SharedMemoryIpc::SHM_TYPE) {
-        return new SharedMemory(name);
+        return new SharedMemory(name, preallocate);
     } else if (getShmIpcType() == scidb::SharedMemoryIpc::FILE_TYPE) {
         return new SharedFile(name);
     }
@@ -139,13 +139,6 @@ std::string getProcDirName()
     return dir;
 }
 
-struct FdCleaner
-{
-    FdCleaner(int fd) : _fd(fd) {}
-    ~FdCleaner() { scidb::File::closeFd(_fd); }
-    int _fd;
-};
-
 void connectStdIoToLog(const std::string& logFile, bool closeStdin)
 {
     int fd = scidb::File::openFile(logFile, (O_WRONLY|O_CREAT|O_EXCL));
@@ -154,7 +147,7 @@ void connectStdIoToLog(const std::string& logFile, bool closeStdin)
         _exit(1);
     }
     {
-        struct FdCleaner fdCleaner(fd);
+        struct scidb::FdCleaner fdCleaner(fd);
 
         if (::dup2(fd, STDERR_FILENO) != STDERR_FILENO) {
             perror("dup2(stderr)");
@@ -176,7 +169,7 @@ void connectStdIoToLog(const std::string& logFile, bool closeStdin)
         perror("open");
         _exit(1);
     }
-    struct FdCleaner stdinCleaner(fd);
+    struct scidb::FdCleaner stdinCleaner(fd);
 
     if (::dup2(fd, STDIN_FILENO) != STDIN_FILENO) {
         perror("dup2(stdin)");
@@ -191,7 +184,7 @@ void recordPids(const std::string& fileName)
         perror("open");
         _exit(1);
     }
-    struct FdCleaner fdCleaner(fd);
+    struct scidb::FdCleaner fdCleaner(fd);
 
     // XXX TODO tigor: consider using std::stringstream
     char outBuf[128];
@@ -258,7 +251,7 @@ bool readProcName(const std::string& pid, std::string& procName)
     if (fd < 0) {
         return false;
     }
-    struct FdCleaner fdCleaner(fd);
+    struct scidb::FdCleaner fdCleaner(fd);
 
     const size_t readSize(1024);
     std::vector<char> buf(readSize);
@@ -310,9 +303,9 @@ parseScidbMPIEnvVar(const string& envVarValue,
 {
   string uuid;
   bool rc = parseScidbMPIEnvVar(envVarValue,
-				queryId,
-				launchId,
-				uuid);
+                                queryId,
+                                launchId,
+                                uuid);
   return (rc && (uuid==clusterUuid));
 }
 
@@ -320,7 +313,7 @@ bool
 parseScidbMPIEnvVar(const string& envVarValue,
                     uint64_t& queryId,
                     uint64_t& launchId,
-		    string& clusterUuid)
+                    string& clusterUuid)
 {
   std::vector<char> buf(envVarValue.size()+1);
   string format("%"PRIu64".%"PRIu64".%s""%n");
@@ -333,7 +326,7 @@ parseScidbMPIEnvVar(const string& envVarValue,
   clusterUuid = string(&buf[0]);
   return true;
 }
- 
+
 bool matchEnvVar(const std::string& varName,
                  char* varPair,
                  std::string& varValue)
@@ -360,7 +353,7 @@ bool readProcEnvVar(const std::string& pid,
     if (fd < 0) {
         return false;
     }
-    struct FdCleaner fdCleaner(fd);
+    struct scidb::FdCleaner fdCleaner(fd);
 
     char buf[8196];
     const size_t readSize(8196);

@@ -1,11 +1,11 @@
 --setup
 --start-query-logging
-# Tests covers non-numerical attributes. Also covers attribute value as null, NA , inf
+# Tests covers non-numerical attributes. Also covers attribute value as null, inf
 # Tests for sort-rank and quantile
 
 create array A <r:string NULL>[x=10:17,2,0]
 store(build(A,20*x+1),A)
-store(apply(A,s, iif(x=13,na,iif(x=16,null,x))),B)
+store(apply(A,s, iif(x=13,null,iif(x=16,null,x))),B)
 
 --test
 
@@ -18,7 +18,7 @@ sort(filter(A, x<> 14 and x<>16),20)
 sort(filter(A, x<> 14 and x<>16))
 sort(reverse(filter(A, x<> 14 and x<>16)),2)
 
-# reported ticket for worng sort result: ticket#1830 
+# reported ticket for worng sort result: ticket#1830
 sort(B,s)
 sort(B,r)
 sort(subarray(B,12,14),r)

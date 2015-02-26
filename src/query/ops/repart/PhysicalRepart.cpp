@@ -104,7 +104,6 @@ public:
         }
 
         Attributes const& destAttrs = _schema.getAttributes(true); // true = exclude empty tag.
-        Dimensions const& destDims = _schema.getDimensions();
 
         vector<AggregatePtr> aggregates (destAttrs.size());
         vector<size_t> attrMapping(destAttrs.size());
@@ -119,17 +118,12 @@ public:
             dimMapping[i]=i;
         }
 
-        vector< shared_ptr<AttributeMultiMap> > coordinateMultiIndices(destDims.size());
-        vector< shared_ptr<AttributeMap> > coordinateIndices(destDims.size());
         ElapsedMilliSeconds timing;
-
         shared_ptr<Array> res = redimensionArray(input,
                                                  attrMapping,
                                                  dimMapping,
                                                  aggregates,
                                                  query,
-                                                 coordinateMultiIndices,
-                                                 coordinateIndices,
                                                  timing,
                                                  false);
         return res;

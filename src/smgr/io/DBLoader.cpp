@@ -215,38 +215,22 @@ namespace scidb
     }
 
     static void s_fprintCoordinate(FILE *f,
-                                   Coordinate ordinalCoord,
-                                   DimensionDesc const& dimension,
-                                   Value const& origCoord, 
-                                   FunctionPointer const dimConverter)
+                                   Coordinate ordinalCoord)
     {
-        if (dimension.isInteger())
-        {
-            fprintf(f, "%"PRIi64, ordinalCoord);
-        }
-        else
-        {
-            s_fprintValue(f,
-                    &origCoord,
-                    isBuiltinType(dimension.getType()) ? dimension.getType() : TID_STRING,
-                    dimConverter);
-        }
+        fprintf(f, "%"PRIi64, ordinalCoord);
     }
 
     static void s_fprintCoordinates(FILE *f,
-                                    Coordinates const& coords,
-                                    Dimensions const& dims,
-                                    vector<Value> const& origCoords, 
-                                    vector <FunctionPointer> const& dimConverters)
+                                    Coordinates const& coords)
     {
         putc('{', f);
-        for (size_t i = 0; i < dims.size(); i++)
+        for (size_t i = 0; i < coords.size(); i++)
         {
             if (i != 0)
             {
                 putc(',', f);
             }
-            s_fprintCoordinate(f, coords[i], dims[i], origCoords[i], dimConverters[i]);
+            s_fprintCoordinate(f, coords[i]);
         }
         putc('}', f);
     }
@@ -669,7 +653,6 @@ namespace scidb
                     while (!chunkIterators[0]->end())
                     {
                         Coordinates const& pos = chunkIterators[0]->getPosition();
-                        array.getOriginalPosition(origPos, pos, query);
 
                         if (dcsv)
                             fputc('{', f);
@@ -679,7 +662,7 @@ namespace scidb
                             {
                                 fputc(',', f);
                             }
-                            s_fprintCoordinate(f, pos[i], dims[i], origPos[i], dimConverters[i]);
+                            s_fprintCoordinate(f, pos[i]);
                         }
                         if (dcsv)
                         {
@@ -787,7 +770,6 @@ namespace scidb
                                 if (!chunkIterators[0]->getChunk().isSparse())
                                 {
                                     Coordinates const& pos = chunkIterators[0]->getPosition();
-                                    array.getOriginalPosition(origPos, pos, query);
                                     int nbr = 0;
                                     for (i = nDimensions-1; pos[i] != ++coord[i]; i--)
                                     {
@@ -827,7 +809,7 @@ namespace scidb
                                     }
                                     if (gap)
                                     {
-                                        s_fprintCoordinates(f, pos, dims, origPos, dimConverters);
+                                        s_fprintCoordinates(f, pos);
                                         for (i = 0; i < nDimensions; i++)
                                         {
                                             coord[i]=pos[i];
@@ -846,7 +828,7 @@ namespace scidb
                                     {
                                         putc('[', f);
                                     }
-                                    s_fprintCoordinates(f, pos, dims, origPos, dimConverters);
+                                    s_fprintCoordinates(f, pos);
                                 }
                                 else
                                 {
@@ -862,8 +844,7 @@ namespace scidb
                                         }
                                         startOfArray = false;
                                     }
-                                    array.getOriginalPosition(origPos, chunkIterators[0]->getPosition(), query);
-                                    s_fprintCoordinates(f, chunkIterators[0]->getPosition(), dims, origPos, dimConverters);
+                                    s_fprintCoordinates(f, chunkIterators[0]->getPosition());
                                 }
                                 putc('(', f);
                                 if (!chunkIterators[0]->isEmpty())
@@ -980,33 +961,6 @@ namespace scidb
             }
             for (size_t i = 0; i < nAttrs; i++) {
                 ++(*arrayIterators[i]);
-            }
-        }
-        Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0; i < dims.size(); i++) { 
-            if (dims[i].getType() != TID_INT64) {
-                string indexName = dims[i].getMappingArrayName();
-                if (!indexName.empty()) { 
-                    boost::shared_ptr<Array> indexArray = query->getArray(indexName);
-                    boost::shared_ptr<ConstArrayIterator> it = indexArray->getConstIterator(0);
-                    ConstChunk const& chunk = it->getChunk();
-                    Coordinates const& pos = chunk.getFirstPosition(false);
-                    PinBuffer scope(chunk);
-                    size_t chunkInterval = indexArray->getArrayDesc().getDimensions()[0].getChunkInterval();
-                    hdr.size = chunkInterval == 0 ? 0 : chunk.getSize();
-                    hdr.attrId = i;
-                    hdr.compressionMethod = 0;
-                    hdr.flags = OpaqueChunkHeader::COORDINATE_MAPPING;                
-                    hdr.nDims = pos.size();
-                    assert(hdr.nDims == 1);
-                    if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
-                        || fwrite(&pos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims
-                        || fwrite(&chunkInterval, sizeof(chunkInterval), 1, f) != 1
-                        || (chunkInterval != 0 && fwrite(chunk.getData(), 1, hdr.size, f) != hdr.size)) 
-                    { 
-                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
-                    }
-                }
             }
         }
         return n;

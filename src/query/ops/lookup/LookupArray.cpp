@@ -50,12 +50,12 @@ namespace scidb {
             Coordinates pos(nDims);
             for (size_t i = 0; i < nDims; i++) {
                 if (!_converters[i])
-                    pos[i] = sourceArrayDesc.getOrdinalCoordinate(i, templateChunkIterators[i]->getItem(), cmExact, _query);
+                    pos[i] = templateChunkIterators[i]->getItem().getInt64();
                 else {
                     Value val;
                     const Value* v = &templateChunkIterators[i]->getItem();
                     _converters[i](&v, &val, NULL);
-                    pos[i] =  sourceArrayDesc.getOrdinalCoordinate(i, val, cmExact, _query);
+                    pos[i] =  val.getInt64();
                 }
             }
             if (sourceArrayIterator->setPosition(pos)) { 
@@ -143,7 +143,7 @@ namespace scidb {
 
         for (size_t i = 0, n = templateChunkIterators.size(); i < n; i++) {
             const TypeId attType = templateChunkIterators[i]->getChunk().getArrayDesc().getAttributes(true)[i].getType();
-            const TypeId dimType = sourceArrayDesc.getDimensions()[i].getType();
+            const TypeId dimType = TID_INT64;
             _converters[i] = attType == dimType ? NULL :
                 FunctionLibrary::getInstance()->findConverter(attType, dimType);
         }

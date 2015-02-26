@@ -178,9 +178,7 @@ ArenaPtr getRootArena()
     shared_ptr. We can work around this, however, by supplying our own custom
     deleter function...*/
 
-    struct local {static void deleter(Arena*){}};        // Trivial deleter
-
-    return ArenaPtr(Singleton<RootArena>::getInstance(),&local::deleter);
+    return ArenaPtr(Singleton<RootArena>::getInstance(),null_deleter());
 }
 
 /****************************************************************************/

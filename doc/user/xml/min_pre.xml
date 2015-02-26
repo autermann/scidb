@@ -9,6 +9,14 @@
         <primary>min</primary>
       </indexterm>Selects the minimum value for the specified attribute,
     optionally over one or more dimensions.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>min</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>min</code> operator may be removed in the future. Use the <link
+    linkend="minAggregate">min aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,9 +26,8 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The min operator selects the minimum value from an array attribute.
-    For the corresponding aggregate, see the <link
-    linkend="minAggregate">min</link> aggregate reference.</para>
+    <para>The <code>min</code> operator selects the minimum value from an array
+    attribute.</para>
   </refsect1>
 
   <refsect1>
@@ -78,10 +85,10 @@
 
       <procedure>
         <step>
-                <para>Find the minimum value, and <indexterm>
-                        <primary>aliases</primary>
-                        </indexterm>alias it so that we can use it in
-          a cross join:<programlisting language="test">--afl aggregate(m3x3,min(val) as m) --show-output-in-test-file=no</programlisting></para>
+          <para>Find the minimum value, and <indexterm>
+              <primary>aliases</primary>
+            </indexterm>alias it so that we can use it in a cross
+          join:<programlisting language="test">--afl aggregate(m3x3,min(val) as m) --show-output-in-test-file=no</programlisting></para>
         </step>
 
         <step>

@@ -44,9 +44,6 @@ class ThinArrayIterator;
 class ThinChunk;
 class ThinChunkIterator;
 
-void thinMappingArray(string const& dimName, string const& mappingArrayName, string const& tmpMappingArrayName, 
-                      Coordinate from, Coordinate step, Coordinate last, boost::shared_ptr<Query> const& query);
-
 class ThinChunkIterator : public ConstChunkIterator
 {  
     ThinArray const& array;

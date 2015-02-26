@@ -20,24 +20,14 @@
 * END_COPYRIGHT
 */
 
+#ifndef  AQL_SCANNER_H_
+#define  AQL_SCANNER_H_
 
-/**
- * @file
- *
- * @brief Derived scanner from base FlexLexer
- *
- * @author Artyom Smirnov <smirnoffjr@gmail.com>
- */
-
-#ifndef AQL_SCANNER_H_
-#define AQL_SCANNER_H_
-
-#undef yyFlexLexer
-#define yyFlexLexer AQLBaseFlexLexer
-#include "FlexLexer.h"
-
+#include <util/arena/ScopedArena.h>
 #include "AQLParser.hpp"
-#include "util/StackAlloc.h"
+#undef   yyFlexLexer
+#define  yyFlexLexer AQLBaseFlexLexer
+#include "FlexLexer.h"
 
 namespace scidb
 {
@@ -47,22 +37,22 @@ class QueryParser;
 class AQLScanner : public AQLBaseFlexLexer
 {
 public:
-    AQLScanner(QueryParser& glue, std::istream* arg_yyin = 0,    std::ostream* arg_yyout = 0);
+    AQLScanner(QueryParser& glue,std::istream* = 0,std::ostream* = 0);
 
-    virtual ~AQLScanner();
+    virtual ~AQLScanner() {}
 
-    virtual AQLParser::token_type lex(AQLParser::semantic_type* yylval, AQLParser::location_type* yylloc);
+    virtual short lex(AQLParser::semantic_type*,AQLParser::location_type*);
 
-    void set_debug(bool b);
-
-    void error(const std::string &msg, const  AQLParser::location_type* location);
+    void set_debug(bool);
 
 private:
-    QueryParser &_glue;
+    char* copyLexeme(size_t,const char*);
 
-    scidb::StackAlloc<char> stringsAllocator;
+private:
+    QueryParser&       _glue;
+    arena::ScopedArena _arena;
 };
 
 }
 
-#endif /* AQL_SCANNER_H_ */
+#endif

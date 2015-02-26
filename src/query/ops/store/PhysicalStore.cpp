@@ -101,60 +101,14 @@ class PhysicalStore: public PhysicalOperator
             if (_schema.getId() != parentArrayDesc.getId()) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
             }
-            if (!parentArrayDesc.isImmutable()) { 
-                _lastVersion = SystemCatalog::getInstance()->getLastVersion(parentArrayDesc.getId());
-            } 
+            _lastVersion = SystemCatalog::getInstance()->getLastVersion(parentArrayDesc.getId());
         }
-
-        Dimensions const& dstDims = parentArrayDesc.getDimensions();        
-        bool changeMapping = false;
 
         for (size_t i = 0; i < nDims; i++) {
             DimensionDesc const& dim = dims[i];
-            string const& mappingArrayName = dim.getMappingArrayName();
             newVersionDims[i] = dim;
             newVersionDims[i].setCurrStart(MAX_COORDINATE);
             newVersionDims[i].setCurrEnd(MIN_COORDINATE);
-            if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) {
-                if (arrayExists && parentArrayDesc.isImmutable() &&
-                    mappingArrayName != dstDims[i].getMappingArrayName() &&
-                    !dstDims[i].getMappingArrayName().empty()) {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CAN_NOT_CHANGE_MAPPING) << arrayName;
-                }
-                changeMapping = true;
-                boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(mappingArrayName);
-                if (tmpMappingArray) {
-                    ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
-                    string newMappingArrayName = parentArrayDesc.createMappingArrayName(i, _lastVersion+1);
-                    if (SystemCatalog::getInstance()->containsArray(newMappingArrayName)) {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << newMappingArrayName;
-                    }
-                    ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(),
-                                               tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
-                    SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
-                    assert(mappingArrayDesc.getId()>0);
-                    newVersionDims[i] = DimensionDesc(dim.getBaseName(),
-                                                      dim.getNamesAndAliases(),
-                                                      dim.getStartMin(), MAX_COORDINATE,
-                                                      MIN_COORDINATE, dim.getEndMax(), dim.getChunkInterval(),
-                                                      dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
-                                                      newMappingArrayName,
-                                                      dim.getComment(),
-                                                      dim.getFuncMapOffset(),
-                                                      dim.getFuncMapScale());
-                 }
-            }
-        }
-        if (parentArrayDesc.isImmutable()) {
-            if (changeMapping) {
-                SystemCatalog::getInstance()->updateArray(ArrayDesc(parentArrayDesc.getId(),
-                                                                    parentArrayDesc.getUAId(),
-                                                                    parentArrayDesc.getVersionId(),
-                                                                    parentArrayDesc.getName(),
-                                                                    parentArrayDesc.getAttributes(),
-                                                                    newVersionDims));
-            };
-            return;
         }
 
         _arrayUAID = parentArrayDesc.getUAId();
@@ -243,7 +197,6 @@ class PhysicalStore: public PhysicalOperator
         size_t nJobs = srcArray->getSupportedAccess() == Array::RANDOM ? Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS) : 1;
         vector< shared_ptr<StoreJob> > jobs(nJobs);
         Dimensions const& dims = dstArrayDesc.getDimensions();
-        Dimensions const& srcDims = srcArrayDesc.getDimensions();
         size_t nDims = dims.size();
         for (size_t i = 0; i < nJobs; i++) {
             jobs[i] = shared_ptr<StoreJob>(new StoreJob(i, nJobs, dstArray, srcArray, nDims, nAttrs, query));
@@ -266,54 +219,19 @@ class PhysicalStore: public PhysicalOperator
             jobs[errorJob]->rethrow();
         }
 
-        if(!dstArrayDesc.isImmutable())
-        {   //Destination array is mutable: collect the coordinates of all chunks created by all jobs
-            set<Coordinates, CoordinatesLess> createdChunks;
-            for(size_t i =0; i < nJobs; i++)
-            {
-                createdChunks.insert(jobs[i]->getCreatedChunks().begin(), jobs[i]->getCreatedChunks().end());
-            }
-            //Insert tombstone entries
-            StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
+        //Destination array is mutable: collect the coordinates of all chunks created by all jobs
+        set<Coordinates, CoordinatesLess> createdChunks;
+        for(size_t i =0; i < nJobs; i++)
+        {
+            createdChunks.insert(jobs[i]->getCreatedChunks().begin(), jobs[i]->getCreatedChunks().end());
         }
+        //Insert tombstone entries
+        StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
 
         SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
         query->getReplicationContext()->replicationSync(dstArrayDesc.getId());
         query->getReplicationContext()->removeInboundQueue(dstArrayDesc.getId());
 
-        // XXX this business with NIDs is NOT transactional -> NID are not rolled back = storage+memory leak
-        // XXX however, NIDs are not replicated (they are stored on each instance anyway)
-        for (size_t i = 0; i < nDims; i++) {
-            string const& dstMappingArrayName = dims[i].getMappingArrayName();
-            string const& srcMappingArrayName = srcDims[i].getMappingArrayName();
-            if (dims[i].getType() != TID_INT64 && srcMappingArrayName != dstMappingArrayName) { 
-                boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(srcMappingArrayName);
-                if (tmpMappingArray) {
-                    shared_ptr<DBArray> dbMappingArray(DBArray::newDBArray(dstMappingArrayName, query));
-                    ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
-                    ArrayDesc const& dbMappingArrayDesc = dbMappingArray->getArrayDesc();
-                    if (query->getCoordinatorID() == COORDINATOR_INSTANCE 
-                        && tmpMappingArrayDesc.getDimensions()[0].getChunkInterval() != dbMappingArrayDesc.getDimensions()[0].getChunkInterval()) { 
-                        SystemCatalog::getInstance()->updateArray(ArrayDesc(dbMappingArrayDesc.getId(),
-                                                                            dbMappingArrayDesc.getUAId(),
-                                                                            dbMappingArrayDesc.getVersionId(),
-                                                                            dbMappingArrayDesc.getName(),
-                                                                            dbMappingArrayDesc.getAttributes(),
-                                                                            tmpMappingArrayDesc.getDimensions(),
-                                                                            dbMappingArrayDesc.getFlags()));
-                    }
-                    shared_ptr<ArrayIterator> srcArrayIterator = tmpMappingArray->getIterator(0);
-                    shared_ptr<ArrayIterator> dstArrayIterator = dbMappingArray->getIterator(0);
-                    Chunk& dstChunk = dstArrayIterator->newChunk(srcArrayIterator->getPosition(), 0);
-                    ConstChunk const& srcChunk = srcArrayIterator->getChunk();
-                    PinBuffer scope(srcChunk);
-                    dstChunk.setRLE(false);
-                    dstChunk.allocate(srcChunk.getSize());
-                    memcpy(dstChunk.getData(), srcChunk.getData(), srcChunk.getSize());
-                    dstChunk.write(query);
-                }
-            }
-        }
         StorageManager::getInstance().flush();
         getInjectedErrorListener().check();
         return dstArray;

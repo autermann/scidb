@@ -389,9 +389,8 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                 desc = shadowArrayDesc;
                 SystemCatalog::getInstance()->addArray(desc, psHashPartitioned);
             } else { 
-                if (desc.isImmutable()
-                    || desc.getAttributes().size() != shadowArrayDesc.getAttributes().size()
-                    || desc.getDimensions().size() != shadowArrayDesc.getDimensions().size())
+                if (desc.getAttributes().size() != shadowArrayDesc.getAttributes().size() ||
+                    desc.getDimensions().size() != shadowArrayDesc.getDimensions().size())
                 {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAY_ALREADY_EXIST) << desc.getName();
                 }
@@ -469,29 +468,6 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
         shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         if (shadowArray) { 
             redistributeShadowArray(query);
-        }
-        Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0; i < dims.size(); i++) { 
-            DimensionDesc const& dim = dims[i];
-            string const& mappingArrayName = dim.getMappingArrayName();
-            if (!mappingArrayName.empty()) {                 
-                shared_ptr<Array> mappingArray = query->getTemporaryArray(mappingArrayName);
-                if (query->getCoordinatorID() != COORDINATOR_INSTANCE) { 
-                    Dimensions indexMapDim(1);
-                    Attributes indexMapAttr(1);
-                    Coordinate from = dim.getStart();
-                    Coordinate till = dim.getEndMax();
-                    int64_t chunkInterval = (till-from+1);
-                    indexMapDim[0] = DimensionDesc("no", from, from, till, till, chunkInterval, 0);
-                    indexMapAttr[0] = AttributeDesc(0, "value", dim.getType(), 0, 0);
-                    ArrayDesc mappingArrayDesc(mappingArrayName,
-                                               indexMapAttr,
-                                               indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
-                    mappingArray = shared_ptr<Array>(new MemArray(mappingArrayDesc,query));
-                }
-                mappingArray = redistribute(mappingArray, query, psReplication);
-                query->setTemporaryArray(mappingArray);
-            }
         }
     }
 
@@ -586,9 +562,6 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
         }
         for (size_t i = 0; i < nDims; i++) {
-            if (dims1[i].getType() != dims2[i].getType()) { 
-                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-            }
             if (dims1[i].getChunkInterval() != dims2[i].getChunkInterval()) { 
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
             }
@@ -652,43 +625,10 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             if (fread(&chunkPos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims) { 
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
             }
-            if (hdr.flags & OpaqueChunkHeader::COORDINATE_MAPPING) {
-                if (hdr.attrId > nDims || hdr.nDims != 1) {                         
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION) << hdr.attrId;
-                }
-                string const& mappingArrayName = dims[hdr.attrId].getMappingArrayName();
-                assert(!mappingArrayName.empty() && query->getTemporaryArray(mappingArrayName));
-                Dimensions indexMapDim(1);
-                Attributes indexMapAttr(1);
-                size_t chunkInterval;
-                
-                if (fread(&chunkInterval, sizeof(chunkInterval), 1, f) != 1) { 
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
-                }                        
-                LOG4CXX_DEBUG(logger, "Load opque chunk with chunkInterval=" << chunkInterval << "of array " << mappingArrayName);
-                Coordinate from = chunkPos[0];
-                Coordinate till = from + chunkInterval - 1;
-                indexMapDim[0] = DimensionDesc("no", from, from, till, till, chunkInterval, 0);
-                indexMapAttr[0] = AttributeDesc(0, "value", dims[hdr.attrId].getType(), 0, 0);
-                ArrayDesc mappingArrayDesc(mappingArrayName,
-                                           indexMapAttr,
-                                           indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
-                shared_ptr<Array> mappingArray = boost::shared_ptr<Array>(new MemArray(mappingArrayDesc,query));
-                if (chunkInterval != 0) { 
-                    Coordinates mapChunkPos(1);
-                    mapChunkPos[0] = chunkPos[0];
-                    shared_ptr<ArrayIterator> arrayIterator = mappingArray->getIterator(0);
-                    Chunk& chunk = arrayIterator->newChunk(mapChunkPos, 0);
-                    chunk.setRLE(false);
-                    PinBuffer scope(chunk);
-                    chunk.allocate(hdr.size);
-                    if (fread(chunk.getData(), 1, hdr.size, f) != hdr.size) { 
-                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(f);
-                    }
-                    chunk.write(query);
-                }
-                query->setTemporaryArray(mappingArray);
-                i -= 1; // compencate increment in for: repeat loop and try to load more mapping arrays
+            if (hdr.flags & OpaqueChunkHeader::COORDINATE_MAPPING)
+            {
+                //TODO-3667: remove this in next release (give folks one release cycle to adjust with proper error message)
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ILLEGAL_OPERATION) << "Cannot re-load old style non-integer dimensions";
             } else { 
                 if (hdr.nDims != nDims) { 
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_WRONG_NUMBER_OF_DIMENSIONS);

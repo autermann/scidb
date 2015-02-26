@@ -514,6 +514,7 @@ public:
             resetIterators(dciters, nDstAttrs);
         } BOOST_SCOPE_EXIT_END
 
+        Value buf;
         while ( !saiters[0]->end() )
         {
             Coordinates const& chunkPos = saiters[0]->getPosition();
@@ -541,7 +542,8 @@ public:
                 for(size_t i=0; i<nSrcDims; i++)
                 {
                     dciters[i]->setPosition(outputCellPos);
-                    dciters[i]->writeItem(inputSchema.getOriginalCoordinate(i, inputCellPos[i], query));
+                    buf.setInt64(inputCellPos[i]);
+                    dciters[i]->writeItem(buf);
                 }
                 for(size_t i=0; i<nSrcAttrs; i++)
                 {

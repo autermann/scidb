@@ -25,20 +25,19 @@
 
 /****************************************************************************/
 
-#include <util/Arena.h>                                  // For Arena
 #include <limits>                                        // For numeric_limits
+#include <util/Arena.h>                                  // For Arena
 
 /****************************************************************************/
 namespace scidb { namespace arena {
 /****************************************************************************/
-
 /**
  *  @brief      Describes the layout of an individual memory allocation.
  *
  *  @details    Class Header describes the  layout and  finalization semantics
- *              of the allocation in which sits. Its actual shape depends upon
- *              the manner in which the allocation is to be finalized which in
- *              is described by a bit field of flags:
+ *              of the allocation in which it sits. Its actual size depends on
+ *              the manner in which the allocation is to be finalized and this
+ *              in turn is described by a bit field of flags:
  *
  *              - @b finalizer: the allocation (still) requires finalization.
  *
@@ -46,7 +45,7 @@ namespace scidb { namespace arena {
  *              the allocation header itself.
  *
  *              - @b vectorFinalizer: the finalizer should be applied to every
- *              element of an array whose size is stored within the allocation
+ *              element of a vector whose size is stored within the allocation
  *              header itself.
  *
  *              The goal here is to ensure that only allocations that actually
@@ -55,22 +54,22 @@ namespace scidb { namespace arena {
  *
  *              An allocation is laid out as follows:
  *  @code
- *              | - - - - - - - - - - H e a d e r - - - - - - - - - - |
- *              [element_count] [finalizer] <element_size:61,flags:3> | payload ...
+ *              |- - - - - - - - - - H e a d e r - - - - - - - - -|
+ *              [ElementCount] [Finalizer] [ElementSize:61;Flags:3] Payload...
  *  @endcode
  *              where:
  *
- *              - @b flags is a bit field of flags describing the finalization
+ *              - @b Flags is a bit field of flags describing the finalization
  *              semantics of the allocation as above.
  *
- *              - @b element_size   (size_t) is the size of each array element
+ *              - @b ElementSize   (size_t) is the size of each vector element
  *              in bytes.
  *
- *              - @b element_count  (count_t) is the number of elements in the
- *              array; it's present only if the 'vectorFinalizer' flag is set;
- *              if not, the value '1' is implied.
+ *              - @b ElementCount (count_t) is the length of the vector; it is
+ *              present only if the 'vectorFinalizer' flag is set; if not, the
+ *              value '1' is implied.
  *
- *              - @b finalizer (finalizer_t) carries a pointer to the function
+ *              - @b Finalizer (finalizer_t) carries a pointer to the function
  *              with which each element is to be finalized; it is present only
  *              if the 'customFinalizer' flag is set: if not,the special value
  *              'allocated' is implied if the 'finalizer' flag is set, and the
@@ -148,7 +147,7 @@ class Header
  * @class Header::POD
  *
  * Class POD (Plain Old Data) describes the layout of an allocation that needs
- * no finalization at all, hence neither a custom finalizer point nor an array
+ * no finalization at all,  so neither a custom finalizer pointer nor a vector
  * length need be stored. This is the simplest and most compact header type.
  *
  * @class Header::AS
@@ -171,10 +170,11 @@ class Header
  * the header itself.
  *
  * @class Header::CV
- * Class CV (Custom Vector) describes the layout of vecotr of objects that are
- * to be finalized by applying a user defined function whose address is stored
- * within the header itself. In addtion, the header records the length of this
- * vector. This is most complex and largest type of header.
+ *
+ * Class CV  (Custom Vector)  describes the layout of a vector of objects that
+ * are to  be finalized by applying a user supplied function whose  address is
+ * stored within the header itself. In addition, the header records the length
+ * of this vector. This is the largest and most complex type of header.
  */
 struct Header::POD{                          Header _h;POD(size_t n)                        :            _h(n,0)                                        {}};
 struct Header::AS {                          Header _h;AS (size_t n)                        :            _h(n,finalizer)                                {}};

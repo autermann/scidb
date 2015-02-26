@@ -61,7 +61,8 @@ SciDB - database for extra large data processing
 %package -n %{scidb}-dbg
 Summary: Description: SciDB - database for extra large data processing (debug symbols)
 Group: Applications/Databases
-Requires: %{scidb} = %{version}-%{release} 
+Requires: %{scidb} = %{version}-%{release}
+Requires: gdb
 %description -n %{scidb}-dbg
 Description: SciDB - database for extra large data processing (debug symbols)
 
@@ -74,21 +75,23 @@ SciDB client library
 %package -n %{libscidbclient}-dbg
 Summary: SciDB client library (debug symbols)
 Group: Applications/Databases
-Requires: %{libscidbclient} = %{version}-%{release} 
+Requires: %{libscidbclient} = %{version}-%{release}
+Requires: gdb
 %description -n %{libscidbclient}-dbg
 SciDB client library (debug symbols)
 
 %package -n %{scidb}-utils
 Summary: SciDB querying tool and other utilities
 Group: Applications/Databases
-Requires: %{libscidbclient} >= %{version}-%{release} 
+Requires: %{libscidbclient} >= %{version}-%{release}
 %description -n %{scidb}-utils
 SciDB querying tool and other utilities
 
 %package -n %{scidb}-utils-dbg
 Summary: SciDB querying tool and other utilities (debug symbols)
 Group: Applications/Databases
-Requires: %{scidb}-utils = %{version}-%{release} 
+Requires: %{scidb}-utils = %{version}-%{release}
+Requires: gdb
 %description -n %{scidb}-utils-dbg
 SciDB querying tool and other utilities (debug symbols)
 
@@ -105,21 +108,23 @@ SciDB developer and tester utilities
 %package -n %{scidb}-dev-tools-dbg
 Summary: SciDB developer and tester utilities (debug symbols)
 Group: Applications/Databases
-Requires: %{scidb}-dev-tools = %{version}-%{release} 
+Requires: %{scidb}-dev-tools = %{version}-%{release}
+Requires: gdb
 %description -n %{scidb}-dev-tools-dbg
 SciDB developer and tester utilities (debug symbols)
 
 %package -n %{scidb}-plugins
 Summary: SciDB server and client plugins
 Group: Applications/Databases
-Requires: %{libscidbclient} >= %{version}-%{release} 
+Requires: %{libscidbclient} = %{version}-%{release}
 %description -n %{scidb}-plugins
 SciDB server and client plugins
 
 %package -n %{scidb}-plugins-dbg
 Summary: SciDB developer and tester utilities (debug symbols)
 Group: Applications/Databases
-Requires: %{scidb}-plugins-dbg = %{version}-%{release} 
+Requires: %{scidb}-plugins = %{version}-%{release}
+Requires: gdb
 %description -n %{scidb}-plugins-dbg
 SciDB developer and tester utilities (debug symbols)
 
@@ -134,7 +139,8 @@ SciDB client library python connector
 %package -n %{libscidbclient}-python-dbg
 Summary: SciDB client library python connector (debug symbols)
 Group: Applications/Databases
-Requires: %{libscidbclient}-python = %{version}-%{release} 
+Requires: %{libscidbclient}-python = %{version}-%{release}
+Requires: gdb
 %description -n %{libscidbclient}-python-dbg
 SciDB client library python connector (debug symbols)
 

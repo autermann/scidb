@@ -157,7 +157,8 @@
 
         <step>
           <para>Multiply the matrices together. The product becomes the input
-          to the <literal>gesvd</literal> operator.<para><programlisting>AFL% store(multiply(multiply(A,B),C),product);  </programlisting><screen>[
+          to the <literal>gesvd</literal> operator.<para><programlisting>AFL% store(gemm(gemm(A,B, build(A,0)),C, build(A,0)),product); 
+     </programlisting><screen>[
 [(1.75),(0.433013)],
 [(0.433013),(1.25)]
 ]</screen></para></para>

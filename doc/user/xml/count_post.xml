@@ -7,6 +7,13 @@
     <refpurpose><indexterm>
         <primary>count</primary>
       </indexterm>Returns a count of non-empty cells.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>count</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>count</code> operator may be removed in the future. Use the <link linkend="countAggregate">count aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -16,10 +23,9 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The count operator counts nonempty cells of the input array. When
+    <para>The <code>count</code> operator counts nonempty cells of the input array. When
     dimensions are provided they are used to do a group-by, and a count per
-    resulting group is returned. For the corresponding aggregate, see the
-    <link linkend="countAggregate">count aggregate</link> reference.</para>
+    resulting group is returned.</para>
   </refsect1>
 
   <refsect1>

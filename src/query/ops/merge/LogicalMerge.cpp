@@ -110,18 +110,11 @@ public:
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
 
             for (size_t i = 0; i < nDims; i++) {
-                if (//leftDimensions[i].getLength() != rightDimensions[i].getLength() ||
-                    leftDimensions[i].getType() != rightDimensions[i].getType()
-                    || leftDimensions[i].getStart() != rightDimensions[i].getStart()
+                if (   leftDimensions[i].getStart() != rightDimensions[i].getStart()
                     || leftDimensions[i].getChunkInterval() != rightDimensions[i].getChunkInterval()
                     || leftDimensions[i].getChunkOverlap() != rightDimensions[i].getChunkOverlap())
                 {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-                }
-
-                if (leftDimensions[i].getType() != TID_INT64)
-                {
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_NOT_IMPLEMENTED) << "merging dimensions of type other than int64";
                 }
 
                 DimensionDesc& dim = newDims[i];
@@ -132,13 +125,7 @@ public:
                                     max(dim.getCurrEnd(), rightDimensions[i].getCurrEnd()),
                                     max(dim.getEndMax(), rightDimensions[i].getEndMax()),
                                     dim.getChunkInterval(), 
-                                    dim.getChunkOverlap(), 
-                                    dim.getType(), 
-                                    dim.getFlags(), 
-                                    dim.getMappingArrayName(), 
-                                    dim.getComment(),
-                                    dim.getFuncMapOffset(),
-                                    dim.getFuncMapScale());
+                                    dim.getChunkOverlap());
             }
             if (leftAttributes.size() != rightAttributes.size()
                     && (leftAttributes.size() != rightAttributes.size()+1

@@ -34,10 +34,6 @@ Query was executed successfully
 
 [An error expected at this place for the query "sort(zz.A,1,1)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED.]
 
-[An error expected at this place for the query "multiply(A,zz.A)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED.]
-
-[An error expected at this place for the query "multiply(zz.A,A)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED.]
-
 [An error expected at this place for the query "unpack(zz.A,row)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED.]
 
 [An error expected at this place for the query "transpose(zz.A)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED.]

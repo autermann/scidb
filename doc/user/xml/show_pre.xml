@@ -53,16 +53,32 @@
 
       <procedure>
         <step>
-          <para>Show the schema for the original array <programlisting
-          language="test">
---afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winners2.csv &gt; $DOC_DATA/winners2.scidb
---aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2.scidb'; --show-query=no --show-output=no
---afl CREATE ARRAY champions&lt;person:string,country:string,time:double&gt; 
-   [year=1996:2008,13,0,event(string)=3,3,0]; --show-query=no --show-output=no
---afl redimension_store(winnersFlat,champions); --show-query=no --show-output=no
-</programlisting> <programlisting language="test">--aql select * from show(champions); --show-query=yes --show-output=yes
-</programlisting></para>
+          <para>Show the schema for the original array.<programlisting
+          language="test">--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array year &lt;year:int64&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array person &lt;person:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array country &lt;country:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl create array time &lt;time:double&gt;[i=0:11,12,0]; --show-query=no --show-output=no
+--afl store(build(event,iif(i&lt;4,'dash',iif(i&lt;8,'steeplechase','marathon'))),event);
+       --show-query=no --show-output=no
+--afl store(build(year,1996+(i%4 * 4)),year); --show-query=no --show-output=no
+--afl store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,
+      Kemboi,Kipruto,Thugwane,Abera,Baldini,Wanjiru]',true),person); --show-query=no --show-output=no
+--afl store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,
+      Kenya,Kenya,USA,Ethiopia,Italy,Kenya]',true),country); --show-query=no --show-output=no
+--afl store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),
+      (503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time); --show-query=no --show-output=no
+--afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat);
+       --show-query=no --show-output=no
+--afl create array event_index&lt;event:string&gt;[event_id=0:*,5,0]; --show-query=no --show-output=no
+--afl store(uniq(sort(project(winnersFlat,event)),'chunk_size=5'),event_index); --show-query=no --show-output=no
+--afl create_array(champions,&lt;person:string,country:string,time:double&gt; 
+   [year=1996:2008,13,0,event_id=0:3,3,0]); --show-query=no --show-output=no
+--afl store(redimension
+       (project(index_lookup(winnersFlat,event_index, winnersFlat.event, event_id),person,year,country,time,event_id)
+       ,champions),champions); --show-query=no --show-output=no
+
+--afl show(champions);</programlisting></para>
         </step>
 
         <step>
@@ -87,14 +103,14 @@
       <procedure>
         <step>
           <para>Create two arrays, and fill them with some
-          data.<programlisting language="test">--afl store(build(&lt;val1:int64&gt; [i=0:4,5,0, j=0:0,1,0], i),A); --output-format=dense
---afl store(build(&lt;val2:int64&gt; [i=0:0,1,0, j=0:4,5,0], 10-j),B); --output-format=dense
-</programlisting></para>
+          data.<programlisting language="test">--afl store(build(&lt;val1:double&gt; [i=0:4,32,0, j=0:0,32,0], i),A); --output-format=dense
+--afl store(build(&lt;val2:double&gt; [i=0:0,32,0, j=0:4,32,0], 10-j),B); --output-format=dense
+--afl store(build(&lt;val3:double&gt; [i=0:4,32,0, j=0:4,32,0], 0),C); --output-format=dense</programlisting></para>
         </step>
 
         <step>
-          <para>View the schema of the result of multiplying A and B.
-          <programlisting language="test">--afl show('multiply(A,B)','afl'); --output-format=dense</programlisting></para>
+          <para>View the schema of the result of multiplying A and B (using
+          the <code>gemm</code> operator).<programlisting language="test">--afl show('gemm(A,B,C)','afl'); --output-format=dense</programlisting></para>
         </step>
 
         <step>

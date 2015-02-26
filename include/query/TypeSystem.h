@@ -279,13 +279,13 @@ public:
     /**
      * @return base type id
      */
-    TypeId baseType() const { 
+    TypeId baseType() const {
         return _baseType;
     }
 
 
      /**
-     * Check if this supertype is base type for subtype 
+     * Check if this supertype is base type for subtype
      * return true if subtype is direct or indirect subtype of supertype
      */
    static bool isSubtype(TypeId const& subtype, TypeId const& supertype);
@@ -294,7 +294,7 @@ public:
      * Check if this type is subtype of the specified type
      * return true if this type is direct or indirect subtype of the specified type
      */
-    bool isSubtypeOf(TypeId const& type) const { 
+    bool isSubtypeOf(TypeId const& type) const {
         return _baseType != TID_VOID && (_baseType == type || isSubtype(_baseType, type));
     }
 
@@ -325,8 +325,8 @@ public:
     }
 
     bool isVoid() const {
-		return (0 ==  _typeId.compare(TID_VOID));
-	}
+                return (0 ==  _typeId.compare(TID_VOID));
+        }
 
     bool operator<(const Type& ob) const {
         return (0 > _typeId.compare(ob.typeId()));
@@ -361,9 +361,9 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Type>& ob );
 std::ostream& operator<<(std::ostream& stream, const std::vector<TypeId>& ob );
 
 /**
- * The Value class is data storage for type Type. It has only data, as the 
+ * The Value class is data storage for type Type. It has only data, as the
  * type descriptor will be stored separately.
- * 
+ *
  * The main goal of this class implementing is keep all methods of it inline.
  */
 #define BUILTIN_METHODS(TYPE_NAME, METHOD_NAME) \
@@ -376,30 +376,30 @@ private:
     typedef int64_t builtinbuf_t ;
 
     /**
-     *  _missingReason is an overloaded element. It contains information 
-	 *  related to the 'missing' code for data, but also details about 
-     *  cases where the data is stored in a buffer allocated outside the 
-     *  class instance, and merely linked to it here. 
-	 * 
-     * _missingReason >= 0 means value is NULL and _missingReason has a code 
-	 *  of reason.
-     * _missingReason = -1 means value is not NULL and data() returns relevant 
-	 *  buffer with value.
-     * _missingReason = -2 means _data contains linked vector data that should 
+     *  _missingReason is an overloaded element. It contains information
+         *  related to the 'missing' code for data, but also details about
+     *  cases where the data is stored in a buffer allocated outside the
+     *  class instance, and merely linked to it here.
+         *
+     * _missingReason >= 0 means value is NULL and _missingReason has a code
+         *  of reason.
+     * _missingReason = -1 means value is not NULL and data() returns relevant
+         *  buffer with value.
+     * _missingReason = -2 means _data contains linked vector data that should
      *  not be freed. Methods changing *data() are disallowed.
      */
     int _missingReason;
-	/*
-	** For variable length data, the size of this data in bytes. 
-	*/
+        /*
+        ** For variable length data, the size of this data in bytes.
+        */
     uint32_t _size;
-	/*
-	** A union type. If _missingReason is -2, or the _size > 8, then the data 
-	** is found in a buffer pointed to out of _data. Otherwise, the data 
-	** associated with this instance of the Value class is found in the 
-	** 8-byte _builtinBuf. 
-	*/
-    union { 
+        /*
+        ** A union type. If _missingReason is -2, or the _size > 8, then the data
+        ** is found in a buffer pointed to out of _data. Otherwise, the data
+        ** associated with this instance of the Value class is found in the
+        ** 8-byte _builtinBuf.
+        */
+    union {
         void*   _data;
         builtinbuf_t _builtinBuf;
     };
@@ -411,7 +411,7 @@ private:
      */
     RLEPayload* _tile;
 
-    inline void init (bool allocate = true) 
+    inline void init (bool allocate = true)
     {
         if (allocate && _size > sizeof(_builtinBuf))
         {
@@ -424,12 +424,12 @@ private:
     }
 
 public:
-    Value() : _missingReason(0), _size(0), _builtinBuf(0), _tile(NULL) {}
-    
+    explicit Value() : _missingReason(0), _size(0), _builtinBuf(0), _tile(NULL) {}
+
     /**
      * Construct Value for some size.
      */
-    Value(size_t size):
+    explicit Value(size_t size):
         _missingReason(-1), _size(size), _builtinBuf(0), _tile(NULL)
     {
         init();
@@ -438,7 +438,7 @@ public:
     /**
      * Construct Value for some Type.
      */
-    Value(const Type& type):
+    explicit Value(const Type& type):
         _missingReason(-1), _size(type.byteSize()), _builtinBuf(0), _tile(NULL)
     {
         init(type.typeId()!=TID_VOID);
@@ -447,7 +447,7 @@ public:
     /**
      * Construct Value for some Type with tile mode support.
      */
-    Value(const Type& type, bool tile):
+    explicit Value(const Type& type, bool tile):
         _missingReason(tile ? -3 : -1), _size(type.byteSize()), _builtinBuf(0), _tile(tile ? new RLEPayload(type) : NULL)
     {
         init(type.typeId() != TID_VOID);
@@ -458,7 +458,7 @@ public:
      * @param data a pointer to linked data
      * @param size a size of linked data buffer
      */
-    inline Value(void* data, size_t size, bool isVector = true)
+    inline explicit Value(void* data, size_t size, bool isVector = true)
         : _size(size), _builtinBuf(0), _tile(NULL)
     {
         if (isVector) {
@@ -472,24 +472,24 @@ public:
                 if (!ptr) {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
                 }
-            } else { 
+            } else {
                 ptr = (void*)&_builtinBuf;
             }
             memcpy(ptr, data, size);
         }
     }
 
-	/**
-	 * Copy constructor.
-	 * @param Value object to be copied. 
-	 */
-    inline Value(const Value& val): 
-        _missingReason(-1), _size(0), _builtinBuf(0), _tile(NULL) 
-	{
+        /**
+         * Copy constructor.
+         * @param Value object to be copied.
+         */
+    inline Value(const Value& val):
+        _missingReason(-1), _size(0), _builtinBuf(0), _tile(NULL)
+        {
         *this = val;
     }
 
-    inline ~Value() 
+    inline ~Value()
     {
         if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
             free(_data);
@@ -515,11 +515,11 @@ public:
         }
     }
 
-	/**
-	 * Link data buffer of some size to the Value object. 
-	 * @param pointer to data buffer
-	 * @param size of data buffer in bytes
-	 */
+        /**
+         * Link data buffer of some size to the Value object.
+         * @param pointer to data buffer
+         * @param size of data buffer in bytes
+         */
     inline void linkData(void* data, size_t size)
     {
         if (((NULL != data) || (0 != size)) &&
@@ -536,37 +536,37 @@ public:
         _data = data;
     }
 
-	/**
+        /**
      * Get (void *) to data contents of Value object.
      * @return (void *) to data
-	 */
-    inline void* data() const 
+         */
+    inline void* data() const
     {
         return _missingReason != -2 && _size <= sizeof(_builtinBuf) ? (void*)&_builtinBuf : _data;
     }
 
-	/**
-	 * Get size of data contents in bytes.
-	 * @return size_t length of data in bytes
-	 */
+        /**
+         * Get size of data contents in bytes.
+         * @return size_t length of data in bytes
+         */
     inline size_t size() const {
         return _size;
     }
-	
-	/**
-	 * Equality operator
-	 * Very basic, byte-wise equality. 
-	 */
-    inline bool operator == (Value const& other) const 
+
+        /**
+         * Equality operator
+         * Very basic, byte-wise equality.
+         */
+    inline bool operator == (Value const& other) const
     {
         return _missingReason == other. _missingReason
-               && (_missingReason >= 0 
-                || (_size == other._size && (_size > sizeof(_builtinBuf) 
+               && (_missingReason >= 0
+                || (_size == other._size && (_size > sizeof(_builtinBuf)
                                              ? memcmp(_data, other._data, _size) == 0
                                              : _builtinBuf == other._builtinBuf)));
     }
 
-    inline bool operator != (Value const& other) const { 
+    inline bool operator != (Value const& other) const {
         return !(*this == other);
     }
 
@@ -592,42 +592,42 @@ public:
     }
 
     /**
-     * Set the Value to zero. 
+     * Set the Value to zero.
      */
     inline void setZero()
     {
         if (_missingReason == -2)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
-		// TODO: Fix this. Should be able to set a Vector of 
-		//       values to default. 
+                // TODO: Fix this. Should be able to set a Vector of
+                //       values to default.
         if (_missingReason == -3)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_SET_VALUE_VECTOR_TO_DEFAULT);
 
         _missingReason = -1;
-        if (_size > sizeof(_builtinBuf)) { 
+        if (_size > sizeof(_builtinBuf)) {
             memset(_data, 0, _size);
-        } else { 
+        } else {
             _builtinBuf = 0;
         }
     }
 
-	/**
-	 * Set up memory to hold a vector of data values in this Value.
-	 * @param size of the memory to hold the vector in bytes.
-	*/
+        /**
+         * Set up memory to hold a vector of data values in this Value.
+         * @param size of the memory to hold the vector in bytes.
+        */
     inline void setVector(const size_t size)
     {
         if (_missingReason == -2)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
-        if (size > sizeof(_builtinBuf)) { 
+        if (size > sizeof(_builtinBuf)) {
             _data = (_size <= sizeof(_builtinBuf)) ? malloc(size) : realloc(_data, size);
-            if (_data == NULL) { 
+            if (_data == NULL) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
             }
-        } else { 
-            if (_size > sizeof(_builtinBuf)) { 
+        } else {
+            if (_size > sizeof(_builtinBuf)) {
                 free(_data);
             }
         }
@@ -635,22 +635,22 @@ public:
 //        _missingReason = -3;
     }
 
-    /** 
+    /**
      * Allocate space for value
-	 * @param size in bytes of the data buffer.
-	 */
+         * @param size in bytes of the data buffer.
+         */
     inline void setSize(const size_t size)
     {
         if (_missingReason == -2)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
-        if (size > sizeof(_builtinBuf)) { 
+        if (size > sizeof(_builtinBuf)) {
             _data = (_size <= sizeof(_builtinBuf)) ? malloc(size) : realloc(_data, size);
-            if (_data == NULL) { 
+            if (_data == NULL) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
             }
-        } else { 
-            if (_size > sizeof(_builtinBuf)) { 
+        } else {
+            if (_size > sizeof(_builtinBuf)) {
                 free(_data);
             }
         }
@@ -658,26 +658,26 @@ public:
         _missingReason = -1;
     }
 
-	/**
-  	 * Copy data buffer into the value object.
+        /**
+         * Copy data buffer into the value object.
      * @param (void *) to data buffer to be copied.
-	 * @param size in bytes of the data buffer.
-	 */
-    inline void setData(const void* data, size_t size) 
+         * @param size in bytes of the data buffer.
+         */
+    inline void setData(const void* data, size_t size)
     {
         void* ptr;
 
         if (_missingReason == -2)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
 
-        if (size > sizeof(_builtinBuf)) { 
+        if (size > sizeof(_builtinBuf)) {
             ptr = (_size <= sizeof(_builtinBuf)) ? malloc(size) : realloc(_data, size);
-            if (ptr == NULL) { 
+            if (ptr == NULL) {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_TYPESYSTEM, SCIDB_LE_NO_MEMORY_FOR_VALUE);
             }
             _data = ptr;
-        } else { 
-            if (_size > sizeof(_builtinBuf)) { 
+        } else {
+            if (_size > sizeof(_builtinBuf)) {
                 free(_data);
             }
             ptr = (void*)&_builtinBuf;
@@ -713,10 +713,10 @@ public:
         return _missingReason <= -2;
     }
 
-	/**
-	 * Assignment operator.
-	 */
-    inline Value& operator=(const Value& val) 
+        /**
+         * Assignment operator.
+         */
+    inline Value& operator=(const Value& val)
     {
         if (this == &val)
         {
@@ -726,8 +726,8 @@ public:
         if (val._missingReason != -2) {
             // TODO: It's better to have special indicator of using tile mode in vector.
             // I will add it later.
-            if (val._tile != NULL) { 
-                if (_tile == NULL) { 
+            if (val._tile != NULL) {
+                if (_tile == NULL) {
                     _tile = new RLEPayload();
                 }
                 *_tile = *val._tile;
@@ -753,8 +753,8 @@ public:
                 _missingReason = val._missingReason;
             }
         } else {
-            // Here we have source with linked data buffer and just copy 
-			// pointer and size to this.
+            // Here we have source with linked data buffer and just copy
+                        // pointer and size to this.
             //
             // PGB: Woah. This is a bit risky, no? If you free the first
             //      Value object, and free the memory associated with it,
@@ -772,9 +772,9 @@ public:
 
     void makeTileConstant(const TypeId& typeId);
 
-	/*
-	** Serialization of the Value object for I/O
-	*/
+        /*
+        ** Serialization of the Value object for I/O
+        */
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -783,15 +783,15 @@ public:
 
         // Serialization data
         if (!isNull()) {
-        	char* ptr = NULL;
+                char* ptr = NULL;
             if (Archive::is_loading::value) {
-				ptr =_size > sizeof(_builtinBuf) ? (char*)(_data = malloc(_size)) : (char*)&_builtinBuf;
+                                ptr =_size > sizeof(_builtinBuf) ? (char*)(_data = malloc(_size)) : (char*)&_builtinBuf;
             } else {
-        		ptr = (char*) data();
-        	}
+                        ptr = (char*) data();
+                }
             for (size_t i = 0, n = _size; i < n; i++) {
-				ar & ptr[i];
-			}
+                                ar & ptr[i];
+                        }
         }
 
         // Serialization payload
@@ -905,18 +905,18 @@ public:
         return T();
     }
 
-	/**
- 	* Return (char *) to to the contents of the Value object
-	*/
+        /**
+        * Return (char *) to to the contents of the Value object
+        */
     inline const char* getString() const
     {
         return _size == 0 ? "" : (const char*)data();
     }
 
-	/**
- 	* Set the data contents of the 
-	* @param Pointer to null terminated 'C' string
-	*/
+        /**
+        * Set the data contents of the
+        * @param Pointer to null terminated 'C' string
+        */
     inline void setString(const char* str)
     {
         //

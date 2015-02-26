@@ -609,7 +609,7 @@ def generateDiagonal(vector, result, autoCleanup=True):
       afl("show(%s)" % VEC_1)
 
    OUTER_PRODUCT="OUTER_PRODUCT"
-   outerProductAfl="multiply(transpose(adddim(%s, c)),%s)" % (vector, VEC_1)
+   outerProductAfl="aggregate(apply(cross_join(transpose(adddim(%s, c) as A),%s as B, A.c, B.r), prod, A.sigma * B.v), sum(prod) as multiply, A.i, B.c)" % (vector, VEC_1)
    eliminateAndStore(outerProductAfl, OUTER_PRODUCT)
 
    # then we just use iif to set off-diagonal values to 0
@@ -1003,7 +1003,7 @@ def doSvdMetric2(MAT_U, nrow, ncol, chunkSize, MAT_ERROR, rms_ulp_error):
     createMatrix(I, newSize, newSize, chunkSize, chunkSize)
     populateMatrix(I, getMatrixTypeAfl(newSize, newSize, chunkSize, "identity"))
 
-    UTxU_Afl = "multiply(transpose(%s),%s)" % (MAT_U,MAT_U)
+    UTxU_Afl = "aggregate(apply(cross_join(transpose(%s) as A, %s as B, A.r, B.r), prod, A.u*B.u), sum(prod) as multiply, A.i, B.i)" % (MAT_U,MAT_U)
 
     residualAfl = computeResidualMeasures(I, "v", UTxU_Afl, "multiply", "resid")
     residualNormAfl = norm(residualAfl, "resid", "resid_norm")
@@ -1037,7 +1037,7 @@ def doSvdMetric3(MAT_VT, nrow, ncol, chunkSize, MAT_ERROR, rms_ulp_error):
     createMatrix(I, newSize, newSize, chunkSize, chunkSize)
     populateMatrix(I, getMatrixTypeAfl(newSize, newSize, chunkSize, "identity"))
 
-    VTxV_Afl = "multiply(%s, transpose(%s))" % (MAT_VT,MAT_VT) # 2nd arg becomes "untransposed"
+    VTxV_Afl = "aggregate(apply(cross_join(%s as A, transpose(%s) as B, A.c, B.c), prod, A.v * B.v), sum(prod) as multiply, A.i, B.i)" % (MAT_VT,MAT_VT) # 2nd arg becomes "untransposed"
 
     residualAfl = computeResidualMeasures(I, "v", VTxV_Afl, "multiply", "resid")
     residualNormAfl = norm(residualAfl, "resid", "resid_norm")
@@ -1399,9 +1399,8 @@ def testGEMM(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
    printDebug("GEMM(A,transpose(A)) vs multiply(A,transpose(A)) nrow %s, ncol %s, chunkSize %s" % (nrow, ncol, chunkSize))
    transposeAfl = "cast(transpose(%s), %s)" % (INPUT, getMatrixSchema(ncol, nrow, chunkSize, chunkSize)) # note row,col reversal
 
-   
    gemmAfl = "gemm(%s, %s, build(%s,0))" % (INPUT, transposeAfl, getMatrixSchema(nrow, nrow, chunkSize, chunkSize)) # note output is square
-   referenceAfl = "multiply(%s, %s)" % (INPUT, transposeAfl)
+   referenceAfl = "aggregate(apply(cross_join(%s as A, %s as B, A.c, B.r), prod, A.v * B.v), sum(prod) as multiply, A.r, B.c)" % (INPUT, transposeAfl)
 
    printDebug("Computing GEMM error metric")
    ARRAY_RMS_ERROR="RMS_ERROR"

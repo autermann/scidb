@@ -175,19 +175,19 @@ public:
 };
 
 template<typename T> inline
-bool skipValue(T value)
+bool isNanValue(T value)
 {
     return false;
 }
 
 template<> inline
-bool skipValue<double>(double value)
+bool isNanValue<double>(double value)
 {
     return isnan(value);
 }
 
 template<> inline
-bool skipValue<float>(float value)
+bool isNanValue<float>(float value)
 {
     return isnan(value);
 }
@@ -235,9 +235,7 @@ public:
     void accumulate(Value& state, Value const& input)
     {
         T value = *reinterpret_cast<T*>(input.data());
-        if (!skipValue(value)) {
-            A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), value);
-        }
+        A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), value);
     }
 
     virtual void accumulatePayload(Value& state, ConstRLEPayload const* tile)
@@ -250,16 +248,12 @@ public:
                 continue;
             if (v._same) {
                 T value = getPayloadValue<T>(tile, v._valueIndex);
-                if (!skipValue(value)) {
-                    A<T, TR>::multAggregate(s, value, v.length());
-                }
+                A<T, TR>::multAggregate(s, value, v.length());
             } else {
                 const size_t end = v._valueIndex + v.length();
                 for (size_t j = v._valueIndex; j < end; j++) {
                     T value = getPayloadValue<T>(tile, j);
-                    if (!skipValue(value)) {
-                        A<T, TR>::aggregate(s, value);
-                    }
+                    A<T, TR>::aggregate(s, value);
                 }
             }
         }
@@ -329,13 +323,9 @@ public:
         if (state.isNull())
         {
             T value = *reinterpret_cast<T*>(input.data());
-            if (!skipValue(value)) {
-                state.setVector(sizeof(typename A<T, TR>::State));
-                A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()), value);
-                state.setNull(-1);
-            } else {
-                return;
-            }
+            state.setVector(sizeof(typename A<T, TR>::State));
+            A<T, TR>::init(*static_cast<typename A<T, TR>::State* >(state.data()), value);
+            state.setNull(-1);
         }
         A<T, TR>::aggregate(*static_cast< typename A<T, TR>::State* >(state.data()), *reinterpret_cast<T*>(input.data()));
     }
@@ -350,13 +340,11 @@ public:
         {
             for (size_t i = 0; i < tile->payloadCount(); i++) {
                 T value = getPayloadValue<T>(tile, i);
-                if (!skipValue(value)) {
-                    state.setVector(sizeof(typename A<T, TR>::State));
-                    typename A<T, TR>::State& si = *static_cast< typename A<T, TR>::State* >(state.data());
-                    A<T, TR>::init(si, value);
-                    state.setNull(-1);
-                    break;
-                }
+                state.setVector(sizeof(typename A<T, TR>::State));
+                typename A<T, TR>::State& si = *static_cast< typename A<T, TR>::State* >(state.data());
+                A<T, TR>::init(si, value);
+                state.setNull(-1);
+                break;
             }
         }
         if (state.isNull()) {

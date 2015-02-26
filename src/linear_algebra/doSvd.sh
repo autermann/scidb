@@ -136,8 +136,17 @@ while [ "$ORD" -le "$ORD_MAX_VERBOSE" ] ; do
     #echo "$0: ${PFX}VALSmat:" ;
     #iquery -ocsv+ -aq "scan(${PFX}VALSmat)" | sort                          #| tee /dev/stderr
 
-    # remultiply (should be very close to ${PFX}IN)
-    iquery -ocsv+ -aq "multiply(${PFX}LEFT, multiply(${PFX}VALSmat, ${PFX}RIGHT))" | sort #| tee /dev/stderr
+    iquery -ocsv+ -aq "
+     aggregate ( 
+      apply(
+       cross_join(${PFX}LEFT as C,  
+                  aggregate(apply(cross_join(${PFX}VALSmat as A, ${PFX}RIGHT as B, A.c, B.i), s2, A.s * B.v), sum(s2) as multiply, A.i, B.c) as D,
+                  C.i, D.i
+       ), 
+       s, C.u * D.multiply
+      ), 
+      sum(s) as multiply, C.r, D.c
+    )" | sort #| tee /dev/stderr
     echo
 
     # at small sizes, increment (to catch bugs), at larger sizes, double the size (to scale up faster)

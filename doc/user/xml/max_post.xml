@@ -8,6 +8,13 @@
         <primary>max</primary>
       </indexterm>Selects the maximum value for the specified attribute,
     optionally over one or more dimensions.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>max</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>max</code> operator may be removed in the future. Use the <link linkend="maxAggregate">max</link> aggregate instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -17,10 +24,9 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The max operator calculates the maximum of the specified attribute
+    <para>The <code>max</code> operator calculates the maximum of the specified attribute
     in the array. Result is an array with single element containing the
-    maximum of the specified attribute. For the corresponding aggregate, see
-    the <link linkend="maxAggregate">max</link> aggregate reference.</para>
+    maximum of the specified attribute.</para>
   </refsect1>
 
   <refsect1>

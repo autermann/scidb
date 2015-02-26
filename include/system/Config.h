@@ -50,24 +50,25 @@ namespace scidb
 enum
 {
     CONFIG_PRECISION,
-	CONFIG_CATALOG_CONNECTION_STRING,
-	CONFIG_LOG4CXX_PROPERTIES,
-	CONFIG_PORT,
-	CONFIG_ADDRESS,
-	CONFIG_COORDINATOR,
-	CONFIG_REGISTER,
-	CONFIG_INITIALIZE,
-	CONFIG_STORAGE_URL,
-	CONFIG_PLUGINS,
+        CONFIG_CATALOG_CONNECTION_STRING,
+        CONFIG_LOG4CXX_PROPERTIES,
+        CONFIG_PORT,
+        CONFIG_ADDRESS,
+        CONFIG_COORDINATOR,
+        CONFIG_REGISTER,
+        CONFIG_INITIALIZE,
+        CONFIG_STORAGE_URL,
+        CONFIG_PLUGINS,
     CONFIG_METADATA,
-	CONFIG_CACHE_SIZE,
-	CONFIG_HELP,
-	CONFIG_CONFIGURATION_FILE,
+        CONFIG_CACHE_SIZE,
+        CONFIG_HELP,
+        CONFIG_CONFIGURATION_FILE,
     CONFIG_SPARSE_CHUNK_INIT_SIZE,
     CONFIG_SPARSE_CHUNK_THRESHOLD,
     CONFIG_DENSE_CHUNK_THRESHOLD,
     CONFIG_STRING_SIZE_ESTIMATION,
-    CONFIG_CHUNK_CLUSTER_SIZE,
+    CONFIG_CHUNK_CLUSTER_SIZE_BYTES,
+    CONFIG_CHUNK_CLUSTER_SIZE_MB,
     CONFIG_READ_AHEAD_SIZE,
     CONFIG_DAEMONIZE,
     CONFIG_SAVE_RAM,
@@ -121,7 +122,8 @@ enum
     CONFIG_QUERY_MAX_SIZE,
     CONFIG_MAX_REQUESTS,
     CONFIG_ENABLE_CATALOG_UPGRADE,
-    CONFIG_REDIM_CHUNKSIZE
+    CONFIG_REDIM_CHUNKSIZE,
+    CONFIG_PREALLOCATE_SHM
 };
 
 enum RepartAlgorithm
@@ -147,20 +149,20 @@ std::vector< std::string > getDefinition(size_t elementCount)
 class Config: public Singleton<Config>
 {
 public:
-	typedef enum
-	{
+        typedef enum
+        {
             STRING,
             INTEGER,
             REAL,
             BOOLEAN,
             STRING_LIST,
             SET
-	} ConfigOptionType;
+        } ConfigOptionType;
 
-	class ConfigAddOption
-	{
-	public:
-		ConfigAddOption(Config *owner);
+        class ConfigAddOption
+        {
+        public:
+                ConfigAddOption(Config *owner);
 
         ConfigAddOption& operator()(
                 int32_t option,
@@ -184,14 +186,14 @@ public:
                 const boost::any &value = boost::any(),
                 bool required = true);
     private:
-		Config *_owner;
-	};
+                Config *_owner;
+        };
 
-	class ConfigOption
-	{
+        class ConfigOption
+        {
     private:
         void init(const boost::any &value);
-	public:
+        public:
         ConfigOption(
                 char shortCmdLineArg,
                 const std::string &longCmdLineArg,
@@ -271,18 +273,18 @@ public:
 
         std::string getValueAsString() const;
 
-	private:
-		char _short;
-		std::string _long;
-		std::string _config;
-		std::string _env;
-		ConfigOptionType _type;
+        private:
+                char _short;
+                std::string _long;
+                std::string _config;
+                std::string _env;
+                ConfigOptionType _type;
         std::vector< std::string > _set;
-		boost::any _value;
-		bool _required;
-		bool _activated;
-		std::string _description;
-	};
+                boost::any _value;
+                bool _required;
+                bool _activated;
+                std::string _description;
+        };
 
     ConfigAddOption addOption(
             int32_t option,
@@ -308,12 +310,12 @@ public:
 
     void addHook(void (*hook)(int32_t));
 
-	void parse(int argc, char **argv, const char* configFileName);
+        void parse(int argc, char **argv, const char* configFileName);
 
     template<class T>
     const T& getOption(int32_t option)
     {
-    	assert(_values[option]);
+        assert(_values[option]);
         return boost::any_cast<const T&>(_values[option]->getValue());
     }
 
@@ -327,20 +329,20 @@ public:
         return _values[option]->getLongName();
     }
 
-	/**
-	 * With this function it able to reinit config file path during parsing
-	 * command line arguments or environment variables inside config hooks before
-	 * opening default config.
-	 *
-	 * @param configFileName Path to config file
-	 */
-	void setConfigFileName(const std::string& configFileName);
+        /**
+         * With this function it able to reinit config file path during parsing
+         * command line arguments or environment variables inside config hooks before
+         * opening default config.
+         *
+         * @param configFileName Path to config file
+         */
+        void setConfigFileName(const std::string& configFileName);
 
-	const std::string& getDescription() const;
+        const std::string& getDescription() const;
 
-	const std::string& getConfigFileName() const;
+        const std::string& getConfigFileName() const;
 
-	bool optionActivated(int32_t option);
+        bool optionActivated(int32_t option);
 
     void setOption(int32_t option, const boost::any &value);
 
@@ -351,19 +353,19 @@ public:
     std::string toString();
 
 private:
-	~Config();
+        ~Config();
 
-	std::map<int32_t, ConfigOption*> _values;
+        std::map<int32_t, ConfigOption*> _values;
 
-	std::map<std::string, int32_t> _longArgToOption;
+        std::map<std::string, int32_t> _longArgToOption;
 
-	std::vector<void (*)(int32_t)> _hooks;
+        std::vector<void (*)(int32_t)> _hooks;
 
-	std::string _configFileName;
+        std::string _configFileName;
 
-	std::string _description;
+        std::string _description;
 
-	friend class Singleton<Config>;
+        friend class Singleton<Config>;
 };
 
 }

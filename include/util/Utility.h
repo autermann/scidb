@@ -72,6 +72,39 @@ class stackonly
             void              operator delete[](void*);
 };
 
+/**
+ *  @brief      A trivial custom deleter for use with class shared_ptr.
+ *
+ *  @details    Sometimes it is desirable to create a shared_ptr to an already
+ *              existing object so that the shared_ptr does not try to destroy
+ *              the object when there are no remaining references. The factory
+ *              function:
+ *  @code
+ *                  shared_ptr<X>   newX();
+ *  @endcode
+ *              might sometimes wish to return a statically allocated instance
+ *              for example. The solution is to use a null_deleter:
+ *  @code
+ *                  shared_ptr<X> newX()
+ *                  {
+ *                      static X x;                      // Must Not delete x
+ *
+ *                      return shared_ptr<X>(&x,null_deleter());
+ *                  }
+ *  @endcode
+ *              This same technique also works for any object that is known to
+ *              outlive the shared_ptr that is aimed at it.
+ *
+ *  @see        http://www.boost.org/doc/libs/1_55_0/libs/smart_ptr/sp_techniques.html
+ *              for use of class shared_ptr with statically allocated objects.
+ *
+ *  @author     jbell@paradigm4.com
+ */
+struct null_deleter
+{
+            void              operator()(const void*) const {}
+};
+
 /****************************************************************************/
 }
 /****************************************************************************/

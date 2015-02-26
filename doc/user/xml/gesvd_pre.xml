@@ -159,7 +159,8 @@
           <para>Multiply the matrices together. The product becomes the input
           to the <literal>gesvd</literal> operator.<programlisting
           language="test">--afl create array product&lt;val:double&gt;[i=0:1,32,0,j=0:1,32,0]; --show-query=no --show-output=no
---afl store(multiply(multiply(A,B),C),product); --output-format=dense --chunkify=yes</programlisting></para>
+--afl store(gemm(gemm(A,B, build(A,0)),C, build(A,0)),product); 
+    --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>

@@ -104,12 +104,7 @@ Value& ApplyChunkIterator::getItem()
                     }
                     else
                     {
-
-                        _params[i]
-                                = _array.getInputArray()->getArrayDesc().getOriginalCoordinate(
-                                                                                               _bindings[i].resolvedId,
-                                                                                               inputIterator->getPosition()[_bindings[i].resolvedId],
-                                                                                               _query);
+                        _params[i].setInt64(inputIterator->getPosition()[_bindings[i].resolvedId]);
                     }
                     break;
                 default:

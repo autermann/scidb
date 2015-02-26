@@ -158,13 +158,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    dims[0].getCurrEnd(),
                                    dims[0].getEndMax(),
                                    dims[0].getChunkInterval(),
-                                   ZERO_OUTPUT_OVERLAP,
-                                   dims[0].getType(),
-                                   dims[0].getFlags(),
-                                   dims[0].getMappingArrayName(),
-                                   dims[0].getComment(),
-                                   dims[0].getFuncMapOffset(),
-                                   dims[0].getFuncMapScale());
+                                   ZERO_OUTPUT_OVERLAP);
 
        // nCol out has size min(nRow,nCol).  It takes us to the subspace of the diagonal matrix "SIGMA"
        // note that it in a different basis than the original, so it cannot actually
@@ -176,8 +170,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                   Coordinate(minRowCol - 1),    // end
                                   Coordinate(minRowCol - 1),    // curEnd
                                   dims[1].getChunkInterval(),   // inherit
-                                  ZERO_OUTPUT_OVERLAP,
-                                  TID_INT64);
+                                  ZERO_OUTPUT_OVERLAP);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "u", TID_DOUBLE, 0, 0);
         ArrayDesc result("U", addEmptyTagAttribute(atts), outDims);
@@ -200,8 +193,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    Coordinate(minRowCol - 1), // end
                                    Coordinate(minRowCol - 1), // curEnd
                                    dims[0].getChunkInterval(), // inherit
-                                   ZERO_OUTPUT_OVERLAP,
-                                   TID_INT64);
+                                   ZERO_OUTPUT_OVERLAP);
 
         // nCol out is in the same space as nCol in
         outDims[1] = DimensionDesc(distinctNames.second,
@@ -210,13 +202,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                 dims[1].getCurrEnd(),
                                 dims[1].getEndMax(),
                                 dims[1].getChunkInterval(),
-                                ZERO_OUTPUT_OVERLAP,
-                                dims[1].getType(),
-                                dims[1].getFlags(),
-                                dims[1].getMappingArrayName(),
-                                dims[1].getComment(),
-                                dims[1].getFuncMapOffset(),
-                                dims[1].getFuncMapScale());
+                                ZERO_OUTPUT_OVERLAP);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "v", TID_DOUBLE, 0, 0);
         ArrayDesc result("VT", addEmptyTagAttribute(atts), outDims);
@@ -236,8 +222,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    Coordinate(minRowCol - 1), // end
                                    Coordinate(minRowCol - 1), // curEnd
                                    dims[0].getChunkInterval(), // inherit
-                                   ZERO_OUTPUT_OVERLAP,
-                                   TID_INT64);
+                                   ZERO_OUTPUT_OVERLAP);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "sigma", TID_DOUBLE, 0, 0);
         ArrayDesc result("SIGMA", addEmptyTagAttribute(atts), outDims);

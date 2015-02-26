@@ -45,7 +45,7 @@ store(build(m4x4_A, a*a+b/(3.0-a-4)), m4x4_A)
 --aql select * from d join e on d.b=e.b
 --aql update c set sum=NULL where a=0
 --aql select count(sum),avg(sum),min(sum) from c
---error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_REF_NOT_FOUND --aql=" update c set sum=inf where a=1"
+--aql update c set sum=inf where a=1
 
 
 

@@ -201,7 +201,7 @@
 
           <para>
             <ulink
-            url="&lt;?xml version=&quot;1.0&quot;?&gt; &lt;ns:clipboard xmlns:ns=&quot;http://www.xmlmind.com/xmleditor/namespace/clipboard&quot; &gt;http://downloads.paradigm4.com/QuickStart/&lt;ns:clipboard ns2:inclusion=&quot;com.xmlmind.xml.load.EntityRef:scidb_version &amp;lt;!DOCTYPE []&amp;gt; file:/home/smarcus/writing/1312/doc/user/xml/scidb-r_qs_pre.xml&quot; ns2:readOnly=&quot;true&quot; xmlns:ns2=&quot;http://www.xmlmind.com/xmleditor/namespace/property&quot; &gt;13.9&lt;/ns:clipboard &gt;/SciDB&lt;ns:clipboard ns2:inclusion=&quot;com.xmlmind.xml.load.EntityRef:scidb_version &amp;lt;!DOCTYPE []&amp;gt; file:/home/smarcus/writing/1312/doc/user/xml/scidb-r_qs_pre.xml&quot; ns2:readOnly=&quot;true&quot; xmlns:ns2=&quot;http://www.xmlmind.com/xmleditor/namespace/property&quot; &gt;13.9&lt;/ns:clipboard &gt;-CentOS6-VirtualBox4.2.10.ova&lt;/ns:clipboard &gt; ">http://downloads.paradigm4.com/QuickStart/&scidb_version;/SciDB&scidb_version;-CentOS6-VirtualBox4.2.10.ova</ulink>
+            url="http://downloads.paradigm4.com/QuickStart/13.9/SciDB13.9-CentOS6-VirtualBox-4.2.10.ova">http://downloads.paradigm4.com/QuickStart/&scidb_version;/SciDB&scidb_version;-CentOS6-VirtualBox4.2.10.ova</ulink>
           </para>
 
           <para>Download the .ova file to a partition with at least 8GB of

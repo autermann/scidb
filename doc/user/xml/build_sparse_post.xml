@@ -14,10 +14,18 @@
         <secondary>sparse</secondary>
       </indexterm>Produces a sparse result array and assigns values to its
     non-empty cells.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>build_sparse</secondary>
+      </indexterm><emphasis role="bold">Deprecated. </emphasis>The
+    <code>build_sparse</code> operator may be removed in the future. We
+    recommend that you use <code>redimension(build())</code> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AFL% build_sparse(<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>,
+    <synopsis>build_sparse(<replaceable>template_array</replaceable>|<replaceable>schema_definition</replaceable>,
                   <replaceable>expression</replaceable>,<replaceable>boolean_expression</replaceable>);</synopsis>
   </refsynopsisdiv>
 

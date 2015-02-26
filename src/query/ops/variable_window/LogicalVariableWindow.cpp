@@ -143,13 +143,7 @@ public:
                                        srcDim.getCurrEnd(),
                                        srcDim.getEndMax(),
                                        srcDim.getChunkInterval(),
-                                       0,
-                                       srcDim.getType(),
-                                       srcDim.getFlags(),
-                                       srcDim.getMappingArrayName(),
-                                       srcDim.getComment(),
-                                       srcDim.getFuncMapOffset(),
-                                       srcDim.getFuncMapScale());
+                                       0);
         }
 
         ArrayDesc output (schemas[0].getName(), Attributes(), outDims);

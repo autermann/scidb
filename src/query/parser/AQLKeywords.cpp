@@ -20,42 +20,101 @@
 * END_COPYRIGHT
 */
 
+#include <string.h>                                      // For strcasecmp()
+#include <boost/tuple/tuple.hpp>                         // For tie()
+#include <util/Platform.h>                               // For SCISB_SIZE
+#include "AQLParser.hpp"                                 // For token numbers
+#include "ALKeywords.h"                                  // For our interface
 
-/**
- * @file
- *
- * @brief Routines for manipulating registered keywords of AQL parser
- *
- * @author Artyom Smirnov <smirnoffjr@gmail.com>
- */
-#include <string.h>
+/****************************************************************************/
+namespace scidb {
+/****************************************************************************/
 
-#include "query/parser/AQLKeywords.h"
-
-using namespace std;
-
-namespace scidb
+namespace {
+struct byName
 {
+    bool operator()(const ALKeyword& k,const char* s) const {return strcasecmp(k.name,s) < 0;}
+    bool operator()(const char* s,const ALKeyword& k) const {return strcasecmp(s,k.name) < 0;}
+};}
 
-const AQLKeyword AQLKeywords[] =
+const ALKeyword* getAQLKeyword(const char* nm)
 {
-    #include "query/parser/AQLKeywordsList.h"
-    {NULL,  AQLParser::token::EOQ, false} // just array end marker for loop
-};
-
-
-const AQLKeyword* FindAQLKeyword(const char *keyword)
-{
-    const AQLKeyword *kw = &AQLKeywords[0];
-
-    while(kw->name)
+    static const ALKeyword map[] =                       // Must remain sorted
     {
-        if (!strcasecmp(kw->name, keyword))
-            return kw;
-        ++kw;
-    }
+        {"all",         AQLParser::token::ALL,          false},
+        {"and",         AQLParser::token::AND,          true },
+        {"array",       AQLParser::token::ARRAY,        false},
+        {"as",          AQLParser::token::AS,           false},
+        {"asc",         AQLParser::token::ASC,          false},
+        {"between",     AQLParser::token::BETWEEN,      false},
+        {"by",          AQLParser::token::BY,           false},
+        {"cancel",      AQLParser::token::CANCEL,       true },
+        {"case",        AQLParser::token::CASE,         true },
+        {"compression", AQLParser::token::COMPRESSION,  false},
+        {"create",      AQLParser::token::CREATE,       false},
+        {"cross",       AQLParser::token::CROSS,        true },
+        {"current",     AQLParser::token::CURRENT,      false},
+        {"default",     AQLParser::token::DEFAULT,      false},
+        {"desc",        AQLParser::token::DESC,         false},
+        {"drop",        AQLParser::token::DROP,         false},
+        {"else",        AQLParser::token::ELSE,         true },
+        {"empty",       AQLParser::token::EMPTY,        true },
+        {"end",         AQLParser::token::END,          false},
+        {"errors",      AQLParser::token::ERRORS,       false},
+        {"false",       AQLParser::token::FALSE,        true },
+        {"fixed",       AQLParser::token::FIXED,        true },
+        {"following",   AQLParser::token::FOLLOWING,    false},
+        {"from",        AQLParser::token::FROM,         true },
+        {"group",       AQLParser::token::GROUP,        true },
+        {"if",          AQLParser::token::IF,           true },
+        {"insert",      AQLParser::token::INSERT,       true },
+        {"instance",    AQLParser::token::INSTANCE,     false},
+        {"instances",   AQLParser::token::INSTANCES,    false},
+        {"into",        AQLParser::token::INTO,         true },
+        {"is",          AQLParser::token::IS,           false},
+        {"join",        AQLParser::token::JOIN,         true },
+        {"library",     AQLParser::token::LIBRARY,      false},
+        {"load",        AQLParser::token::LOAD,         false},
+        {"not",         AQLParser::token::NOT,          true },
+        {"null",        AQLParser::token::NULL_VALUE,   true },
+        {"on",          AQLParser::token::ON,           true },
+        {"or",          AQLParser::token::OR,           true },
+        {"order",       AQLParser::token::ORDER,        true },
+        {"over",        AQLParser::token::OVER,         false},
+        {"partition",   AQLParser::token::PARTITION,    false},
+        {"preceding",   AQLParser::token::PRECEDING,    false},
+        {"query",       AQLParser::token::QUERY,        false},
+        {"redimension", AQLParser::token::REDIMENSION,  true },
+        {"regrid",      AQLParser::token::REGRID,       true },
+        {"rename",      AQLParser::token::RENAME,       true },
+        {"reserve",     AQLParser::token::RESERVE,      false},
+        {"save",        AQLParser::token::SAVE,         false},
+        {"select",      AQLParser::token::SELECT,       true },
+        {"set",         AQLParser::token::SET,          true },
+        {"shadow",      AQLParser::token::SHADOW,       false},
+        {"start",       AQLParser::token::START,        false},
+        {"step",        AQLParser::token::STEP,         false},
+        {"then",        AQLParser::token::THEN,         true },
+        {"thin",        AQLParser::token::THIN,         false},
+        {"to",          AQLParser::token::TO,           false},
+        {"true",        AQLParser::token::TRUE,         true },
+        {"unbound",     AQLParser::token::UNBOUND,      false},
+        {"unload",      AQLParser::token::UNLOAD,       true },
+        {"update",      AQLParser::token::UPDATE,       true },
+        {"values",      AQLParser::token::VALUES,       false},
+        {"variable",    AQLParser::token::VARIABLE,     true },
+        {"when",        AQLParser::token::WHEN,         true },
+        {"where",       AQLParser::token::WHERE,        true },
+        {"window",      AQLParser::token::WINDOW,       true }
+    };
 
-    return NULL;
+    const ALKeyword *f,*l;
+
+    boost::tie(f,l) = std::equal_range(map,map+SCIDB_SIZE(map),nm,byName());
+
+    return f == l ? 0 : f;
 }
 
+/****************************************************************************/
 }
+/****************************************************************************/

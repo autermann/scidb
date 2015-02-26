@@ -22,6 +22,14 @@
     of a source array, potentially changing some or all of those variables
     from dimensions to attributes or vice versa, and optionally calculating
     aggregates to be included in the new array.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>redimension_store</secondary>
+      </indexterm><emphasis role="bold">Deprecated. </emphasis>The
+    <code>redimension_store</code> operator may be removed in the future. We
+    recommend that you use <code>store(redimension())</code> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -37,7 +45,12 @@
     data from a source array. Many of the considerations and details are the
     same as for the redimension operator, the main difference being that
     redimension_store saves the results to the
-    <replaceable>named_target_array</replaceable>. For details, see the <link linkend="redimension">redimension reference documentation</link>.</para>
+    <replaceable>named_target_array</replaceable>.</para>
+
+    <para>In fact, <command>redimension_store(...)</command> works exactly the
+    same as <command>store(redimension(...)</command>. For details, see the
+    <link linkend="redimension">redimension reference
+    documentation</link>.</para>
 
     <para>The argument <replaceable>named_target_array</replaceable> must be
     an array that was previously created in SciDB. The target array's schema
@@ -292,291 +305,6 @@
 {3,120,508} 78
 {3,300,212} 78
 </screen></para></para>
-        </step>
-      </procedure>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Example Four</title>
-
-    <informalexample>
-      <para>This example shows three different ways to handle
-      collisions.</para>
-
-      <procedure>
-        <step>
-          <para>Show the source array.<para><screen>{event,year} person,country,time
-{'dash',1996} 'Bailey','Canada',9.84
-{'dash',2000} 'Greene','USA',9.87
-{'dash',2004} 'Gatlin','USA',9.85
-{'dash',2008} 'Bolt','Jamaica',9.69
-{'marathon',1996} 'Thugwane','RSA',7956
-{'marathon',2000} 'Abera','Ethiopia',7811
-{'marathon',2004} 'Baldini','Italy',7855
-{'marathon',2008} 'Wanjiru','Kenya',7596
-{'steeplechase',1996} 'Keter','Kenya',487.12
-{'steeplechase',2000} 'Kosgei','Kenya',503.17
-{'steeplechase',2004} 'Kemboi','Kenya',485.81
-{'steeplechase',2008} 'Kipruto','Kenya',490.34
-</screen></para></para>
-        </step>
-
-        <step>
-          <para>Create an array to accommodate data where each non-empty cell
-          will show a (country,year) pair of a country with at least one
-          victory in that year, along with a count of the number of victories
-          that country had during that year.<para><programlisting>AQL% <command>CREATE ARRAY</command> victoryCountPerCountryYear 
-      &lt;victoryCount:uint64 null&gt; 
-      [year=1996:2008,13,0,country(string)=300,300,0];
-  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters a collision (as
-          revealed by the cell with a count greater than 1 in the
-          result).<para><programlisting>AFL% redimension_store
-      (nationWinners,
-       victoryCountPerCountryYear,
-       count(*) as victoryCount)
-  </programlisting><screen>{year,country} victoryCount
-{1996,'Canada'} 1
-{1996,'Kenya'} 1
-{1996,'RSA'} 1
-{2000,'Ethiopia'} 1
-{2000,'Kenya'} 1
-{2000,'USA'} 1
-{2004,'Italy'} 1
-{2004,'Kenya'} 1
-{2004,'USA'} 1
-{2008,'Jamaica'} 1
-{2008,'Kenya'} 2
-</screen></para></para>
-        </step>
-
-        <step>
-          <para><indexterm>
-              <primary>synthetic dimensions</primary>
-            </indexterm>Create an array that includes a synthetic dimension
-          (synD) for collisions. The other (non-synthetic) dimensions define
-          (country,year) pairs. The attributes accommodate all other variables
-          from the original array, nationWinners.<para><programlisting>AQL% <command>CREATE ARRAY</command> vPer_CY_Synthetic 
-      &lt;person:string,event:string,time:double&gt; 
-      [country(string)=300,300,0,year=1996:2008,13,0,synD=1:6,6,0]
-  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters a collision (as
-          revealed by the cell whose value for synD is greater than
-          1).<para><programlisting>AFL% redimension_store(nationWinners,vPer_CY_Synthetic)
-  </programlisting><screen>{country,year,synD} person,event,time
-{'Canada',1996,1} 'Bailey','dash',9.84
-{'Ethiopia',2000,1} 'Abera','marathon',7811
-{'Italy',2004,1} 'Baldini','marathon',7855
-{'Jamaica',2008,1} 'Bolt','dash',9.69
-{'Kenya',1996,1} 'Keter','steeplechase',487.12
-{'Kenya',2000,1} 'Kosgei','steeplechase',503.17
-{'Kenya',2004,1} 'Kemboi','steeplechase',485.81
-{'Kenya',2008,1} 'Wanjiru','marathon',7596
-{'Kenya',2008,2} 'Kipruto','steeplechase',490.34
-{'RSA',1996,1} 'Thugwane','marathon',7956
-{'USA',2000,1} 'Greene','dash',9.87
-{'USA',2004,1} 'Gatlin','dash',9.85
-</screen></para></para>
-        </step>
-
-        <step>
-          <para>Create an array whose dimensions define (country,year) pairs.
-          The attributes accommodate all other variables from the original
-          array, nationWinners. Note that the array schema includes neither a
-          synthetic dimension nor any attribute to accommodate aggregate
-          values.<para><programlisting>AQL% <command>CREATE ARRAY</command> arbitraryWinner 
-      &lt;person:string,event:string,time:double&gt; 
-      [country(string)=300,300,0,year=1996:2008,13,0]
-  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters a collision (for
-          Kenya, 2008), and resolves it by arbitrarily choosing one of the
-          Kenyan victories of that year.<para><programlisting>AFL% redimension_store(nationWinners,arbitraryWinner)
-  </programlisting><screen>{country,year} person,event,time
-{'Canada',1996} 'Bailey','dash',9.84
-{'Ethiopia',2000} 'Abera','marathon',7811
-{'Italy',2004} 'Baldini','marathon',7855
-{'Jamaica',2008} 'Bolt','dash',9.69
-{'Kenya',1996} 'Keter','steeplechase',487.12
-{'Kenya',2000} 'Kosgei','steeplechase',503.17
-{'Kenya',2004} 'Kemboi','steeplechase',485.81
-{'Kenya',2008} 'Wanjiru','marathon',7596
-{'RSA',1996} 'Thugwane','marathon',7956
-{'USA',2000} 'Greene','dash',9.87
-{'USA',2004} 'Gatlin','dash',9.85
-</screen></para></para>
-        </step>
-      </procedure>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Example Five</title>
-
-    <informalexample>
-      <para>This example shows that a single synthetic dimension applies, even
-      if the redimension_store operator eliminates multiple dimensions from
-      the source array.</para>
-
-      <procedure>
-        <step>
-          <para>Show the source array.<para><programlisting>AFL% scan(nationWinners) 
-  </programlisting><screen>{event,year} person,country,time
-{'dash',1996} 'Bailey','Canada',9.84
-{'dash',2000} 'Greene','USA',9.87
-{'dash',2004} 'Gatlin','USA',9.85
-{'dash',2008} 'Bolt','Jamaica',9.69
-{'marathon',1996} 'Thugwane','RSA',7956
-{'marathon',2000} 'Abera','Ethiopia',7811
-{'marathon',2004} 'Baldini','Italy',7855
-{'marathon',2008} 'Wanjiru','Kenya',7596
-{'steeplechase',1996} 'Keter','Kenya',487.12
-{'steeplechase',2000} 'Kosgei','Kenya',503.17
-{'steeplechase',2004} 'Kemboi','Kenya',485.81
-{'steeplechase',2008} 'Kipruto','Kenya',490.34
-</screen></para></para>
-        </step>
-
-        <step>
-          <para>Create an array to accommodate data where each non-empty cell
-          will describe a country with at least one victory in the original
-          data, along with a count of the number of victories that country
-          has.<para><programlisting>AQL% <command>CREATE ARRAY</command> victoryCountPerCountry 
-      &lt;victoryCount:uint64 null&gt; 
-      [country(string)=300,300,0];
-  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters collisions (as
-          revealed by the cells with a count greater than 1 in the
-          result).<para><programlisting>AFL% redimension_store
-        (nationWinners,
-         victoryCountPerCountry,
-         count(*) as victoryCount)
-  </programlisting><screen>{country} victoryCount
-{'Canada'} 1
-{'Ethiopia'} 1
-{'Italy'} 1
-{'Jamaica'} 1
-{'Kenya'} 5
-{'RSA'} 1
-{'USA'} 2
-</screen></para></para>
-        </step>
-
-        <step>
-          <para>Create an array that includes a synthetic dimension (synD) for
-          collisions. The other (non-synthetic) dimension defines countries.
-          The attributes accommodate all other attributes from the original
-          array.<para><programlisting>AQL% <command>CREATE ARRAY</command> vPer_C_Synthetic 
-      &lt;person:string,event:string,time:double&gt; 
-      [country(string)=300,300,0,synD=1:6,6,0]
-  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the array with data. Note
-          that the redimension_store operator encounters collisions for two
-          reasons:</para>
-
-          <itemizedlist>
-            <listitem>
-              <para>Event is not a dimension in the target array, and one
-              country (Kenya) has won multiple events (steeplechase and
-              marathon)</para>
-            </listitem>
-
-            <listitem>
-              <para>Year is not a dimension in the target array, and two
-              countries (Kenya and USA) have won in multiple years.</para>
-            </listitem>
-          </itemizedlist>
-
-          <para>Also note that despite the two reasons collisions, a single
-          synthetic dimension suffices to accommodate all the cells that
-          constitute the collisions.<para><programlisting>AFL% redimension_store(nationWinners,vPer_C_Synthetic)
-  </programlisting><screen>{country,synD} person,event,time
-{'Canada',1} 'Bailey','dash',9.84
-{'Ethiopia',1} 'Abera','marathon',7811
-{'Italy',1} 'Baldini','marathon',7855
-{'Jamaica',1} 'Bolt','dash',9.69
-{'Kenya',1} 'Wanjiru','marathon',7596
-{'Kenya',2} 'Keter','steeplechase',487.12
-{'Kenya',3} 'Kosgei','steeplechase',503.17
-{'Kenya',4} 'Kemboi','steeplechase',485.81
-{'Kenya',5} 'Kipruto','steeplechase',490.34
-{'RSA',1} 'Thugwane','marathon',7956
-{'USA',1} 'Greene','dash',9.87
-{'USA',2} 'Gatlin','dash',9.85
-</screen></para></para>
-        </step>
-      </procedure>
-    </informalexample>
-  </refsect1>
-
-  <refsect1>
-    <title>Example Six</title>
-
-    <informalexample>
-      <para>This example shows a collision-handling strategy in which the
-      target array includes some attributes with values from an arbitrarily
-      chosen candidate cell and other attributes whose values are aggregates
-      calculated over the set of candidate cells.</para>
-
-      <procedure>
-        <step>
-          <para>Show the source array.<para><screen>{givenName,surname} a,b,c,d
-{'Adam','Richards'} 77,5555,-5111,800
-{'Adam','Welch'} 44,8888,-8111,300
-{'Adam','Zwick'} 22,9999,-9111,100
-{'Bill','Welch'} 55,7777,-7111,400
-{'Bill','Zwick'} 33,null,-2111,233
-{'Cathy','Welch'} 66,6666,-6111,550
-</screen></para></para>
-        </step>
-
-        <step>
-          <para>Create an array to be the target of the redimension_store
-          operator. Note that the array excludes one attribute (a) from the
-          source array, includes two other attributes (b and c), and declares
-          another attribute (avgD) to accommodate the value of an aggregate.
-          Notice also that the target array excludes one of the dimensions
-          (givenName) of the source array, so the redimension_store operator
-          will generate collisions.<para><programlisting>AQL% <command>CREATE ARRAY</command> namesRedimensioned 
-        &lt;b:int64 null, c:int64, avgD:double null&gt; 
-        [surname(string)=5,5,0]
-  </programlisting></para></para>
-        </step>
-
-        <step>
-          <para>Use redimension_store to populate the target array with data.
-          <para><programlisting>AFL% redimension_store
-       (names,
-        namesRedimensioned,
-        avg(d) as avgD)
-  </programlisting><screen>{surname} b,c,avgD
-{'Richards'} 5555,-5111,800
-{'Welch'} 8888,-8111,416.667
-{'Zwick'} 9999,-9111,166.5
-</screen>The redimension_store operation yields a
-          target array with three cells. The first cell is not the result of a
-          collision (because the source array included only one person with
-          surname "Richards.") The second and third cells are the result of
-          collisions.</para></para>
         </step>
       </procedure>
     </informalexample>

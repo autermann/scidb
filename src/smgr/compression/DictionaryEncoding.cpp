@@ -107,15 +107,10 @@ namespace scidb {
         size_t elementSize = TypeLibrary::getType(type).byteSize();
         size_t nElems;
 
-        if(elementSize == 0 || elementSize > 8 || chunk.isRLE() || !chunk.getArrayDesc().isImmutable() || chunk.isSparse() || chunk.getAttributeDesc().isNullable())
-        {
-            nElems = chunkSize;
-            elementSize = 1;
-        }
-        else
-        {
-            nElems = chunkSize / elementSize;
-        }
+        /* No more immutable arrays, to keep consistent with old code, always treat data as string
+         */
+        nElems = chunkSize;
+        elementSize = 1;
 
         size_t i;
         uint64_t value = 0;
@@ -123,15 +118,10 @@ namespace scidb {
         ByteOutputItr out((uint8_t *) dst, chunkSize - 1);
         BitOutputItr outBits(&out);
 
-
-
-
         uint32_t uniques = (uint32_t) createDictionary(readPtr, elementSize, nElems, out);
   
         size_t codeLength;
         uniques <= 2 ? codeLength = 1 : codeLength = ceil(log2(uniques-1)) + 1;  // 0-indexed, so values span from 0...uniques-1, log is 0-based, so bring it back to 1...n bits
-    
-     
   
         // project size and terminate if it will be too large
         size_t codesSize = (nElems * codeLength + 7) >> 3;
@@ -184,16 +174,10 @@ namespace scidb {
         size_t elementSize = TypeLibrary::getType(type).byteSize();
         size_t nElems;
 
-        if(elementSize == 0 || elementSize > 8 || chunk.isSparse() || !chunk.getArrayDesc().isImmutable() || chunk.isRLE() || chunk.getAttributeDesc().isNullable())
-        {
-            nElems = chunkSize;
-            elementSize = 1;
-        }
-        else
-        {
-            nElems = chunkSize / elementSize;
-        }
-
+        /* No more immutable arrays, to keep consistent with old code, always treat data as string
+         */
+        nElems = chunkSize;
+        elementSize = 1;
 
         uint32_t uniques = (uint32_t ) rebuildDictionary(in, elementSize);
         BitInputItr inBits(&in);

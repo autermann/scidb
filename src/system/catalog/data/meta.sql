@@ -67,9 +67,6 @@ create table "cluster"
 --      version of basic arrays. Each new version of a Basic array gets its 
 --      own entry in public.array.
 --
---   3. NID arrays. NID rrays are used to hold the values of non-integer 
---      dimensions. 
---
 --   SciDB creates rows in the public.array catalog to record the existance 
 --  of many things; arrays created by users, each version of these arrays, 
 --  and arrays created to hold non-integer dimension values and their 
@@ -84,10 +81,7 @@ create table "cluster"
 --            array the public.array.name reflects the name as it appears in 
 --            the CREATE ARRAY statement. If the entry corresponds to a 
 --            version of an array, then the contents of this field consist of 
---            the array name plus the version number. If the entry in this 
---            catalog correspond to an NID then the name consists of the base 
---            array name, the version number, and the name of the array's 
---            dimension. 
+--            the array name plus the version number.
 --
 --public.array.partitiong_scheme - SciDB supports several partitioning schemes. 
 --
@@ -96,16 +90,13 @@ create table "cluster"
 --
 -- public.array.flags - records details about the array's status. 
 --
--- public.array.comment - comment on the array. 
--- 
 -- 
 create table "array"
 (
   id bigint primary key default nextval('array_id_seq'),
   name varchar unique,
   partitioning_schema integer,
-  flags integer,
-  comment varchar
+  flags integer
 );
 --
 --   Table: public.array_version
@@ -228,8 +219,6 @@ create table "array_partition"
 --            the default value is recorded here. When a DEFAULT value is 
 --            calculated from an expression, the expression is placed here. 
 --
--- public.array_attribute.comment - comment on the attribute. 
---
 create table "array_attribute"
 (
   array_id bigint references "array" (id) on delete cascade,
@@ -241,7 +230,6 @@ create table "array_attribute"
   reserve int,
   default_missing_reason int not null,
   default_value varchar null,
-  comment varchar,
   primary key(array_id, id),
   unique ( array_id, name )
 );
@@ -294,21 +282,6 @@ create table "array_attribute"
 --   and the maximum end value for the dimension. The dimension's length is 
 --   currEnd - currStart. 
 --
---  public.array_dimension.funcMapOffset - when we use operators to change the 
---               shape of an array, we want to avoid copying the data in the 
---               NID array, and we want t understand how to scale arrays 
---               that use a functional mapping. When we use an operator like 
---               subarray ( A, start, end ), we store the value of 'start' 
---               (or rather, the value of the integer offset in the dimension
---               corresponding to the 'start' value) in this column. 
---   
---  public.array_dimension.funcMapScale - when we use operators to change 
---               the shape of the array, we want to avoid copying data in the 
---               NID arrays. Operators like thin() pick values from their 
---               source array at intervals to construct their output 
---               array. This funcMapScale-the step length in thin()-is 
---               stored here. 
---
 --  public.array_dimension.chunk_interval - length of the chunks in this 
 --               dimension. 
 -- 
@@ -318,24 +291,6 @@ create table "array_attribute"
 --  public.array_dimension.type - name of the data type for the dimension, if 
 --               the dimension is declared as a non-integer type. 
 --
---   NID belong to one of two types. Either the values of the dimension's type 
---  are converted to an integer with a function, or else the values of the type
---  in the NID are mapped to the underlying integer offset using a mapping 
---  array. 
--- 
---  public.array_dimension.flags - flag describing the properties of the 
---                                 dimension. 
---
---  public.array_dimension.mapping_array_name - If this dimension has an NID 
---               array, the mapping_array_name field of the catalog contains 
---               the name of the array containing the NID data. These NID 
---               arrays have a single dimension named "no".
---
---  public.array_dimension.comment - comment on the dimension.
---
--- PGB: There's a small problem here. If a user starts with an NID that uses a 
---      mapping array, and then adds functions to convert between instances of
---      that type and the int64, there's a potential for problems. 
 --
 create table "array_dimension"
 (
@@ -346,15 +301,9 @@ create table "array_dimension"
   currStart bigint,
   currEnd bigint,
   endMax bigint,
-  funcMapOffset bigint,
-  funcMapScale bigint,
 --
   chunk_interval bigint,
   chunk_overlap bigint,
-  type varchar,
-  flags int,
-  mapping_array_name varchar,
-  comment varchar,
   primary key(array_id, id),
   unique ( array_id, name )
 );

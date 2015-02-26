@@ -52,32 +52,32 @@
 
       <procedure>
         <step>
-          <para>Show the schema for the original array <para><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(champions);  </programlisting><screen>{i} schema
-{0} 'champions&lt;person:string,country:string,time:double&gt; [year=1996:2008,13,0,event(string)=3,3,0]'
-</screen></para></para></para>
+          <para>Show the schema for the original array.<para><programlisting>AFL% show(champions);</programlisting><screen>{i} schema
+{0} 'champions&lt;person:string,country:string,time:double&gt; [year=1996:2008,13,0,event_id=0:3,3,0]'
+</screen></para></para>
         </step>
 
         <step>
           <para>Use the project and store operators to create an abridged
-          array that excludes the country and time attributes: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> championsAbridged <command>FROM</command> project(champions,person);  </programlisting><screen>{year,event} person
-{1996,'dash'} 'Bailey'
-{1996,'marathon'} 'Thugwane'
-{1996,'steeplechase'} 'Keter'
-{2000,'dash'} 'Greene'
-{2000,'marathon'} 'Abera'
-{2000,'steeplechase'} 'Kosgei'
-{2004,'dash'} 'Gatlin'
-{2004,'marathon'} 'Baldini'
-{2004,'steeplechase'} 'Kemboi'
-{2008,'dash'} 'Bolt'
-{2008,'marathon'} 'Wanjiru'
-{2008,'steeplechase'} 'Kipruto'
+          array that excludes the country and time attributes: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> championsAbridged <command>FROM</command> project(champions,person);  </programlisting><screen>{year,event_id} person
+{1996,0} 'Bailey'
+{1996,1} 'Thugwane'
+{1996,2} 'Keter'
+{2000,0} 'Greene'
+{2000,1} 'Abera'
+{2000,2} 'Kosgei'
+{2004,0} 'Gatlin'
+{2004,1} 'Baldini'
+{2004,2} 'Kemboi'
+{2008,0} 'Bolt'
+{2008,1} 'Wanjiru'
+{2008,2} 'Kipruto'
 </screen></para></para>
         </step>
 
         <step>
           <para>Show the schema for the abridged array: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(championsAbridged);  </programlisting><screen>{i} schema
-{0} 'championsAbridged&lt;person:string&gt; [year=1996:2008,13,0,event(string)=3,3,0]'
+{0} 'championsAbridged&lt;person:string&gt; [year=1996:2008,13,0,event_id=0:3,3,0]'
 </screen></para></para>
         </step>
       </procedure>
@@ -90,20 +90,21 @@
       <procedure>
         <step>
           <para>Create two arrays, and fill them with some
-          data.<para><programlisting>AFL% store(build(&lt;val1:int64&gt; [i=0:4,5,0, j=0:0,1,0], i),A);  </programlisting><screen>[[(0)],[(1)],[(2)],[(3)],[(4)]]
-</screen><programlisting>AFL% store(build(&lt;val2:int64&gt; [i=0:0,1,0, j=0:4,5,0], 10-j),B);  </programlisting><screen>[[(10),(9),(8),(7),(6)]]
+          data.<para><programlisting>AFL% store(build(&lt;val1:double&gt; [i=0:4,32,0, j=0:0,32,0], i),A);  </programlisting><screen>[[(0)],[(1)],[(2)],[(3)],[(4)]]
+</screen><programlisting>AFL% store(build(&lt;val2:double&gt; [i=0:0,32,0, j=0:4,32,0], 10-j),B);  </programlisting><screen>[[(10),(9),(8),(7),(6)]]
+</screen><programlisting>AFL% store(build(&lt;val3:double&gt; [i=0:4,32,0, j=0:4,32,0], 0),C);  </programlisting><screen>[[(0),(0),(0),(0),(0)],[(0),(0),(0),(0),(0)],[(0),(0),(0),(0),(0)],[(0),(0),(0),(0),(0)],[(0),(0),(0),(0),(0)]]
 </screen></para></para>
         </step>
 
         <step>
-          <para>View the schema of the result of multiplying A and B.
-          <para><programlisting>AFL% show('multiply(A,B)','afl');  </programlisting><screen>[('not empty Multiply&lt;multiply:int64&gt; [i=0:4,5,0,j=0:4,5,0]')]
+          <para>View the schema of the result of multiplying A and B (using
+          the <code>gemm</code> operator).<para><programlisting>AFL% show('gemm(A,B,C)','afl');  </programlisting><screen>[('GEMM&lt;gemm:double&gt; [i=0:4,32,0,j=0:4,32,0]')]
 </screen></para></para>
         </step>
 
         <step>
           <para>You can use the show operator to view the output type of an
-          aggregate. <para><programlisting>AFL% show('select sum(val1) from A');  </programlisting><screen>[('not empty A@1&lt;sum:int64 NULL DEFAULT null&gt; [i=0:0,1,0]')]
+          aggregate. <para><programlisting>AFL% show('select sum(val1) from A');  </programlisting><screen>[('not empty A@1&lt;sum:double NULL DEFAULT null&gt; [i=0:0,1,0]')]
 </screen><para><programlisting>AFL% show('select stdev(val1) from A');  </programlisting><screen>[('not empty A@1&lt;stdev:double NULL DEFAULT null&gt; [i=0:0,1,0]')]
 </screen></para></para></para>
         </step>

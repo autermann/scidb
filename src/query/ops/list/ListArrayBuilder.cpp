@@ -131,7 +131,7 @@ Attributes ListChunkDescriptorsArrayBuilder::getAttributes() const
     attrs[UNCOMPRESSED_SIZE]  = AttributeDesc(UNCOMPRESSED_SIZE, "usize",           TID_UINT32, 0, 0);
     attrs[ALLOCATED_SIZE]     = AttributeDesc(ALLOCATED_SIZE,    "asize",           TID_UINT32, 0, 0);
     attrs[FREE]               = AttributeDesc(FREE,              "free",            TID_BOOL,   0, 0);
-    attrs[EMPTY_INDICATOR]    = AttributeDesc(EMPTY_INDICATOR,   "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+    attrs[EMPTY_INDICATOR]    = AttributeDesc(EMPTY_INDICATOR,   DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
     return attrs;
 }
 
@@ -208,7 +208,7 @@ Attributes ListChunkMapArrayBuilder::getAttributes() const
     attrs[LAST_POS_OVERLAP]    = AttributeDesc(LAST_POS_OVERLAP,  "lposo",           TID_STRING, 0, 0);
     attrs[STORAGE]             = AttributeDesc(STORAGE,           "strge",           TID_UINT64, 0, 0);
     attrs[LOADER]              = AttributeDesc(LOADER,            "loadr",           TID_UINT64, 0, 0);
-    attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+    attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
     return attrs;
 }
 
@@ -311,7 +311,7 @@ Attributes ListLibrariesArrayBuilder::getAttributes() const
     attrs[PATCH]               = AttributeDesc(PATCH,             "patch",           TID_UINT32, 0, 0);
     attrs[BUILD]               = AttributeDesc(BUILD,             "build",           TID_UINT32, 0, 0);
     attrs[BUILD_TYPE]          = AttributeDesc(BUILD_TYPE,        "build_type",      TID_STRING, AttributeDesc::IS_NULLABLE, 0);
-    attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+    attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
     return attrs;
 }
 

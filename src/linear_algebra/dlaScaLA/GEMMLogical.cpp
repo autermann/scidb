@@ -200,13 +200,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
                                  dimsCC[ROW].getCurrEnd(),
                                  dimsCC[ROW].getEndMax(),
                                  dimsCC[ROW].getChunkInterval(),
-                                 0,
-                                 dimsCC[ROW].getType(),
-                                 dimsCC[ROW].getFlags(),
-                                 dimsCC[ROW].getMappingArrayName(),
-                                 dimsCC[ROW].getComment(),
-                                 dimsCC[ROW].getFuncMapOffset(),
-                                 dimsCC[ROW].getFuncMapScale());
+                                 0);
 
     outDims[COL] = DimensionDesc(distinctNames.second,
                                  dimsCC[COL].getStart(),
@@ -214,13 +208,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
                                  dimsCC[COL].getCurrEnd(),
                                  dimsCC[COL].getEndMax(),
                                  dimsCC[COL].getChunkInterval(),
-                                 0,
-                                 dimsCC[COL].getType(),
-                                 dimsCC[COL].getFlags(),
-                                 dimsCC[COL].getMappingArrayName(),
-                                 dimsCC[COL].getComment(),
-                                 dimsCC[COL].getFuncMapOffset(),
-                                 dimsCC[COL].getFuncMapScale());
+                                 0);
 
     Attributes atts(1); atts[0] = AttributeDesc(AttributeID(0), "gemm", TID_DOUBLE, 0, 0);
 

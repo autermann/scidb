@@ -72,7 +72,6 @@ typedef enum
     attributeIsNullable,
     distinct,
     dimension,
-    nonIntegerDimension,
     dimensionsList,
     dimensionName,
     dimensionBoundaries,
@@ -179,14 +178,6 @@ typedef enum
     dimensionArgChunkInterval,
     dimensionArgChunkOverlap,
     dimensionArgCount,
-
-    nIdimensionArgName              = 0,
-    nIdimensionArgDistinct,
-    nIdimensionArgTypeName,
-    nIdimensionArgBoundary,
-    nIdimensionArgChunkInterval,
-    nIdimensionArgChunkOverlap,
-    nIdimensionArgCount,
 
     dimensionBoundaryArgLowBoundary    = 0,
     dimensionBoundaryArgHighBoundary,
@@ -327,18 +318,18 @@ typedef enum
     caseWhenClauseArgExpr = 0,
     caseWhenClauseArgResult,
     caseWhenClauseArgCount,
-    
+
     // loadLibraryStatement
     loadLibraryStatementArgLibrary = 0,
     loadLibraryStatementArgCount,
-    
+
     // unloadLibraryStatement
     unloadLibraryStatementArgLibrary = 0,
     unloadLibraryStatementArgCount,
-    
+
     dropArrayStatementArgArray = 0,
     dropArrayStatementArgCount,
-    
+
     //anonymousSchema
     anonymousSchemaClauseEmpty = 0,
     anonymousSchemaClauseSchema,
@@ -483,18 +474,18 @@ public:
     AstNodeBool* asNodeBool() const;
 
     AstNodeInt64* asNodeInt64() const;
-    
+
     AstNodeNull* asNodeNull() const;
-    
+
     AstNodeReal* asNodeReal() const;
-    
+
     AstNodeString* asNodeString() const;
 
 
     void setComment(std::string const& comment);
     std::string const& getComment() const;
 
-   
+
 private:
     void setQueryString(std::string* queryString);
 
@@ -632,7 +623,7 @@ public:
 
 /**
  * Constructing function node for binary scalar operator
- * 
+ *
  * @param opName scalar operator name
  * @param left left operand node
  * @param right right operand node
@@ -644,7 +635,7 @@ AstNode* makeBinaryScalarOp(const std::string &opName, AstNode *left, AstNode *r
 
 /**
  * Constructing function node for unary scalar operator
- * 
+ *
  * @param opName scalar operator name
  * @param left left operand node
  * @param parsingContext context from parser

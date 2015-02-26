@@ -107,12 +107,6 @@ class LogicalSubstitute: public LogicalOperator
         {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_SUBSTITUTE_ERROR2) << substDesc.getName();
         }
-        if (!substDims[0].isInteger())
-        {
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_SUBSTITUTE_ERROR3) <<
-                (substDesc.getName() + "." + substDims[0].getBaseName());
-
-        }
         if (substDims[0].getStart() != 0)
         {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_SUBSTITUTE_ERROR4) <<

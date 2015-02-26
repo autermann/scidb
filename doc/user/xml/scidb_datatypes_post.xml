@@ -519,23 +519,25 @@
     between the datetime data type and the datetime with timezone, datetimetz
     data type. The date time with time zone data type, datetimetz, uses a
     timezone offset relative to GMT. You can cast datetime to datetimetz by
-    appending an offset using the following example: <para><programlisting>AFL% create array T&lt;td: datetime&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(build(T, now()), T);  </programlisting><screen>[('2013-05-31 15:10:27')]
+    appending an offset using the following example: <para><programlisting>AFL% create array T&lt;td: datetime&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(build(T, now()), T);  </programlisting><screen>[('2013-12-02 22:06:44')]
 </screen><programlisting>AFL% apply(T, dst, append_offset(td, 3600));  </programlisting><screen>{i} td,dst
-{0} '2013-05-31 15:10:27','2013-05-31 15:10:27 +01:00'
+{0} '2013-12-02 22:06:44','2013-12-02 22:06:44 +01:00'
 </screen></para></para>
 
     <para>To append an offset and apply it to the time, use the
-    <code>apply_offset</code> function, which adds a timezone offset to the
-    datetime. The offset must be expressed in seconds. <para><programlisting>AFL% create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(project(apply(T,dst,apply_offset(td,3600)),dst),T1);  </programlisting><screen>{i} t
-{0} '2013-05-31 16:10:27 +01:00'
+    <code>apply_offset</code> function, which converts a UTC datetime to local
+    datetime by subtracting the offset timezone value, and stores the result
+    as datetimetz including the offset timezone value. The offset must be
+    expressed in seconds. <para><programlisting>AFL% create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(project(apply(T,dst,apply_offset(td,3600)),dst),T1);  </programlisting><screen>{i} t
+{0} '2013-12-02 23:06:44 +01:00'
 </screen>
     To return the datetime portion of a datetimetz value, use the
     <code>strip_offset </code>function: <para><programlisting>AFL% apply(T1,dst,strip_offset(t));  </programlisting><screen>{i} t,dst
-{0} '2013-05-31 16:10:27 +01:00','2013-05-31 16:10:27'
+{0} '2013-12-02 23:06:44 +01:00','2013-12-02 23:06:44'
 </screen>
     To apply the offset to the datetime and return a GMT datetime, use the
     <code>togmt</code> function: <para><programlisting>AFL% apply(T1,dst,togmt(t))  </programlisting><screen>{i} t,dst
-{0} '2013-05-31 16:10:27 +01:00','2013-05-31 15:10:27'
+{0} '2013-12-02 23:06:44 +01:00','2013-12-02 22:06:44'
 </screen></para></para></para></para>
 
     <para>For more details on the SciDB temporal functions, see <xref linkend="temporalFunctions"/>.</para>

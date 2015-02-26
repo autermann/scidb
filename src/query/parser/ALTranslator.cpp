@@ -447,25 +447,18 @@ static int64_t estimateChunkInterval(const AstNodes& nodes, const shared_ptr<Que
 
     BOOST_FOREACH(const AstNode* dimNode, nodes)
     {
-        if (dimNode->getType() == dimension)
+        assert(dimNode->getType() == dimension);
+
+        if (dimNode->getChild(dimensionArgChunkInterval))
         {
-            if (dimNode->getChild(dimensionArgChunkInterval))
-                knownChunksSize *=
-                		passConstantExpression(
-                				dimNode->getChild(dimensionArgChunkInterval),
-                				TID_INT64, query).getInt64();
-            else
-                ++unkownChunksCount;
+            knownChunksSize *=
+                    passConstantExpression(
+                            dimNode->getChild(dimensionArgChunkInterval),
+                            TID_INT64, query).getInt64();
         }
         else
         {
-            if (dimNode->getChild(nIdimensionArgChunkInterval))
-                knownChunksSize *=
-                		passConstantExpression(
-                				dimNode->getChild(nIdimensionArgChunkInterval),
-                				TID_INT64, query).getInt64();
-            else
-                ++unkownChunksCount;
+            ++unkownChunksCount;
         }
     }
 
@@ -512,11 +505,9 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
     int64_t estimatedChunkLength = 0;
     BOOST_FOREACH(const AstNode* dimNode, ast->getChilds())
     {
-        assert(dimNode->getType() == dimension || dimNode->getType() == nonIntegerDimension );
+        assert(dimNode->getType() == dimension);
 
-        const string &dim_name = dimNode->getType() == dimension ?
-            dimNode->getChild(dimensionArgName)->asNodeString()->getVal() :
-            dimNode->getChild(nIdimensionArgName)->asNodeString()->getVal();
+        const string &dim_name = dimNode->getChild(dimensionArgName)->asNodeString()->getVal();
 
         if (usedNames.find(dim_name) != usedNames.end())
         {
@@ -525,135 +516,71 @@ static void passDimensionsList(AstNode *ast, Dimensions &dimensions, const strin
         }
         usedNames.insert(dim_name);
 
-        if (dimNode->getType() == dimension)
+        const AstNode *boundaries = dimNode->getChild(dimensionArgBoundaries);
+        const int64_t dim_l = passConstantExpression(boundaries->getChild(dimensionBoundaryArgLowBoundary), TID_INT64, query).getInt64();
+
+        if (dim_l <= MIN_COORDINATE || dim_l >= MAX_COORDINATE)
         {
-            const AstNode *boundaries = dimNode->getChild(dimensionArgBoundaries);
-            const int64_t dim_l = passConstantExpression(boundaries->getChild(dimensionBoundaryArgLowBoundary), TID_INT64, query).getInt64();
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
+                    boundaries->getChild(dimensionBoundaryArgLowBoundary)->getParsingContext())
+                            << MIN_COORDINATE << MAX_COORDINATE;
+        }
 
-            if (dim_l <= MIN_COORDINATE || dim_l >= MAX_COORDINATE)
-            {
-            	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
-            			boundaries->getChild(dimensionBoundaryArgLowBoundary)->getParsingContext())
-            					<< MIN_COORDINATE << MAX_COORDINATE;
-            }
-
-            int64_t dim_h;
-            if (asterisk == boundaries->getChild(dimensionBoundaryArgHighBoundary)->getType())
-            {
-            	dim_h = MAX_COORDINATE;
-            }
-            else
-            {
-            	dim_h = passConstantExpression(boundaries->getChild(dimensionBoundaryArgHighBoundary), TID_INT64, query).getInt64();
-				if (dim_h <= MIN_COORDINATE || dim_h >= MAX_COORDINATE)
-				{
-					throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
-							boundaries->getChild(dimensionBoundaryArgHighBoundary)->getParsingContext())
-									<< MIN_COORDINATE << MAX_COORDINATE;
-				}
-            }
-
-            const int64_t dim_o = passConstantExpression(dimNode->getChild(dimensionArgChunkOverlap), TID_INT64, query).getInt64();
-            if (dim_o < 0 )
-            {
-            	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_OVERLAP_SIZE,
-            			dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext())
-            					<< std::numeric_limits<int64_t>::max();
-            }
-
-            int64_t dim_i = 0;
-            if (dimNode->getChild(dimensionArgChunkInterval))
-            {
-                dim_i = passConstantExpression(dimNode->getChild(dimensionArgChunkInterval), TID_INT64, query).getInt64();
-
-                if (dim_i <= 0 )
-                {
-                	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_CHUNK_SIZE,
-                			dimNode->getChild(dimensionArgChunkInterval)->getParsingContext())
-                					<< std::numeric_limits<int64_t>::max();
-                }
-            }
-            else
-            {
-                if (!estimatedChunkLength)
-                    estimatedChunkLength = estimateChunkInterval(ast->getChilds(), query);
-                dim_i = estimatedChunkLength;
-            }
-
-
-            if (dim_l == MAX_COORDINATE)
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,
-                                           boundaries->getChild(dimensionBoundaryArgLowBoundary)->getParsingContext());
-            if (dim_h < dim_l && dim_h+1 != dim_l)
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW,
-                                           boundaries->getChild(dimensionBoundaryArgHighBoundary)->getParsingContext());
-            if (dim_o > dim_i)
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,
-                                           dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext());
-
-            dimensions.push_back(DimensionDesc(dim_name, dim_l, dim_h, dim_i, dim_o, TID_INT64, 0,
-                                               "", dimNode->getComment()));
+        int64_t dim_h;
+        if (asterisk == boundaries->getChild(dimensionBoundaryArgHighBoundary)->getType())
+        {
+            dim_h = MAX_COORDINATE;
         }
         else
         {
-            const string &dimTypeName = dimNode->getChild(nIdimensionArgTypeName)->asNodeString()->getVal();
-            const int64_t dim_o = passConstantExpression(dimNode->getChild(nIdimensionArgChunkOverlap), TID_INT64, query).getInt64();
-
-            int64_t boundary;
-            if (asterisk == dimNode->getChild(nIdimensionArgBoundary)->getType())
+            dim_h = passConstantExpression(boundaries->getChild(dimensionBoundaryArgHighBoundary), TID_INT64, query).getInt64();
+            if (dim_h <= MIN_COORDINATE || dim_h >= MAX_COORDINATE)
             {
-            	boundary = MAX_COORDINATE;
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
+                        boundaries->getChild(dimensionBoundaryArgHighBoundary)->getParsingContext())
+                                << MIN_COORDINATE << MAX_COORDINATE;
             }
-            else
-            {
-            	boundary = passConstantExpression(dimNode->getChild(nIdimensionArgBoundary), TID_INT64, query).getInt64();
-                if (boundary <= MIN_COORDINATE || boundary >= MAX_COORDINATE)
-                {
-                	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,
-                			dimNode->getChild(nIdimensionArgBoundary)->getParsingContext())
-                					<< MIN_COORDINATE << MAX_COORDINATE;
-                }
-            }
-
-            if (dim_o < 0 || dim_o > std::numeric_limits<uint32_t>::max())
-            {
-            	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_OVERLAP_SIZE,
-            			dimNode->getChild(nIdimensionArgChunkOverlap)->getParsingContext())
-            					<< std::numeric_limits<uint32_t>::max();
-
-            }
-
-            int64_t dim_i = 0;
-            if (dimNode->getChild(nIdimensionArgChunkInterval))
-            {
-                dim_i = passConstantExpression(dimNode->getChild(nIdimensionArgChunkInterval), TID_INT64, query).getInt64();
-
-                if (dim_i <= 0 || dim_i > std::numeric_limits<uint32_t>::max())
-                {
-                	throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_CHUNK_SIZE,
-                			dimNode->getChild(nIdimensionArgChunkInterval)->getParsingContext())
-                					<< std::numeric_limits<uint32_t>::max();
-                }
-            }
-            else
-            {
-                if (!estimatedChunkLength)
-                    estimatedChunkLength = estimateChunkInterval(ast->getChilds(), query);
-                dim_i = estimatedChunkLength;
-            }
-
-            const Type dimType(TypeLibrary::getType(dimTypeName));
-            if (boundary <= 0)
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSIONS_NOT_SPECIFIED,
-                                           dimNode->getChild(nIdimensionArgBoundary)->getParsingContext());
-            if (dim_o > dim_i)
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,
-                                           dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext());
-
-            const int64_t maxCoordinate = boundary >= MAX_COORDINATE ? MAX_COORDINATE : boundary - 1;
-
-            dimensions.push_back(DimensionDesc(dim_name, 0, maxCoordinate, dim_i, dim_o, dimType.typeId(), 0, "", dimNode->getComment()));
         }
+
+        const int64_t dim_o = passConstantExpression(dimNode->getChild(dimensionArgChunkOverlap), TID_INT64, query).getInt64();
+        if (dim_o < 0 )
+        {
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_OVERLAP_SIZE,
+                    dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext())
+                            << std::numeric_limits<int64_t>::max();
+        }
+
+        int64_t dim_i = 0;
+        if (dimNode->getChild(dimensionArgChunkInterval))
+        {
+            dim_i = passConstantExpression(dimNode->getChild(dimensionArgChunkInterval), TID_INT64, query).getInt64();
+
+            if (dim_i <= 0 )
+            {
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_INCORRECT_CHUNK_SIZE,
+                        dimNode->getChild(dimensionArgChunkInterval)->getParsingContext())
+                                << std::numeric_limits<int64_t>::max();
+            }
+        }
+        else
+        {
+            if (!estimatedChunkLength)
+                estimatedChunkLength = estimateChunkInterval(ast->getChilds(), query);
+            dim_i = estimatedChunkLength;
+        }
+
+
+        if (dim_l == MAX_COORDINATE)
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,
+                                       boundaries->getChild(dimensionBoundaryArgLowBoundary)->getParsingContext());
+        if (dim_h < dim_l && dim_h+1 != dim_l)
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW,
+                                       boundaries->getChild(dimensionBoundaryArgHighBoundary)->getParsingContext());
+        if (dim_o > dim_i)
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,
+                                       dimNode->getChild(dimensionArgChunkOverlap)->getParsingContext());
+
+        dimensions.push_back(DimensionDesc(dim_name, dim_l, dim_h, dim_i, dim_o));
     }
 
 }
@@ -749,12 +676,10 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
             if (attNode->getChild(attributeArgReserve) != NULL) {
                 const int16_t attReserve = attNode->getChild(attributeArgReserve)->asNodeInt64()->getVal();
                 att = AttributeDesc(attrId, attName, attType.typeId(), attFlags, attCompressor->getType(),
-                    std::set<std::string>(), attReserve, &defaultValue, serializedDefaultValueExpr,
-                    attNode->getComment());
+                    std::set<std::string>(), attReserve, &defaultValue, serializedDefaultValueExpr);
             } else {
                 att = AttributeDesc(attrId, attName, attType.typeId(), attFlags, attCompressor->getType(),
-                    std::set<std::string>(), &defaultValue, serializedDefaultValueExpr,
-                    attNode->getComment());
+                    std::set<std::string>(), &defaultValue, serializedDefaultValueExpr);
             }
             attributes.push_back(att);
         }
@@ -782,7 +707,7 @@ static void passSchema(AstNode *ast, ArrayDesc &schema, const string &arrayName,
 
     int flags = 0;
 
-    schema = ArrayDesc(0,0,0, arrayName, attributes, dimensions, flags, comment);
+    schema = ArrayDesc(0,0,0, arrayName, attributes, dimensions, flags);
 }
 
 static shared_ptr<LogicalQueryPlanNode> passAFLOperator(AstNode *ast, const shared_ptr<Query> &query)
@@ -992,7 +917,7 @@ static shared_ptr<OperatorParamArrayReference> createArrayReferenceParam(const A
         assert(!arrayReferenceAST->getChild(referenceArgTimestamp));
         assert(!arrayReferenceAST->getChild(referenceArgIndex));
         return make_shared<OperatorParamArrayReference>(arrayReferenceAST->getParsingContext(), "",
-            arrayName, inputSchema, 0, "");
+            arrayName, inputSchema, 0);
     }
 
     SystemCatalog *systemCatalog = SystemCatalog::getInstance();
@@ -1015,7 +940,7 @@ static shared_ptr<OperatorParamArrayReference> createArrayReferenceParam(const A
                                            arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext());
 
             return make_shared<OperatorParamArrayReference>(arrayReferenceAST->getParsingContext(), "",
-                                                            arrayName, inputSchema, ALL_VERSIONS, "");
+                                                            arrayName, inputSchema, ALL_VERSIONS);
         }
         else
         {
@@ -1049,36 +974,15 @@ static shared_ptr<OperatorParamArrayReference> createArrayReferenceParam(const A
                                    arrayReferenceAST->getChild(referenceArgTimestamp)->getParsingContext()) << arrayName;
     systemCatalog->getArrayDesc(arrayName, version, schema);
 
-    if (arrayReferenceAST->getChild(referenceArgIndex))
+    if (arrayReferenceAST->getChild(referenceArgIndex)) //TODO-3667: make sure to remove the foo@X:dim syntax from parser
     {
-        dimName = arrayReferenceAST->getChild(referenceArgIndex)->asNodeString()->getVal();
-        const Dimensions &dims = schema.getDimensions();
-        size_t i, n = dims.size();
-        for (i = 0; i < n && dims[i].getBaseName() != dimName; i++) ;
-        if (i == n)
-        {
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_DIMENSION_NOT_EXIST,
-                arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext()) << dimName;
-        }
-
-        if (dims[i].getType() == TID_INT64)
-        {
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_NO_MAPPING_ARRAY,
-                arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext()) << dimName << arrayName;
-        }
-
-        const string& mappingArray = schema.getMappingArrayName(i);
-        if (!SystemCatalog::getInstance()->containsArray(mappingArray))
-        {
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_ARRAY_DOESNT_EXIST,
-                arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext()) <<
-                mappingArray;
-        }
+        throw USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_NO_MAPPING_ARRAY,
+                        arrayReferenceAST->getChild(referenceArgIndex)->getParsingContext()) << dimName << arrayName;
     }
 
     assert(arrayName.find('@') == string::npos);
     return make_shared<OperatorParamArrayReference>(arrayReferenceAST->getParsingContext(), "",
-        arrayName, inputSchema, version, dimName);
+        arrayName, inputSchema, version);
 }
 
 
@@ -3367,10 +3271,9 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
             case redimensionClause:
                 BOOST_FOREACH (const AstNode *dimensionAST, grwAsClause->getChild(0)->getChilds())
                 {
-                    assert(dimension == dimensionAST->getType() || nonIntegerDimension == dimensionAST->getType());
+                    assert(dimension == dimensionAST->getType());
                     groupedDimensions.insert(
-                        dimensionAST->getChild(dimension == dimensionAST->getType()
-                            ? dimensionArgName : nIdimensionArgName )->asNodeString()->getVal());
+                        dimensionAST->getChild(dimensionArgName)->asNodeString()->getVal());
                 }
                 break;
             case regridClause:
@@ -3385,7 +3288,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                 }
                 break;
             default:
-                assert(0);
+                SCIDB_UNREACHABLE();
                 break;
         }
     }
@@ -4259,15 +4162,14 @@ static shared_ptr<LogicalQueryPlanNode> fitInput(
         && destinationSchema.getEmptyBitmapAttribute())
     {
         vector<shared_ptr<OperatorParam> > betweenParams;
-        BOOST_FOREACH(const DimensionDesc& dim, destinationSchema.getDimensions())
+        for (size_t i=0, n=destinationSchema.getDimensions().size(); i<n; ++i)
         {
-            TypeId dimType = dim.getType();
-            Value bval(TypeLibrary::getType(dimType));
+            Value bval(TypeLibrary::getType(TID_INT64));
             bval.setNull();
             shared_ptr<OperatorParamLogicalExpression> param = make_shared<OperatorParamLogicalExpression>(
                 input->getParsingContext(),
-                make_shared<Constant>(input->getParsingContext(), bval, dimType),
-                TypeLibrary::getType(dimType), true);
+                make_shared<Constant>(input->getParsingContext(), bval, TID_INT64),
+                TypeLibrary::getType(TID_INT64), true);
             betweenParams.push_back(param);
             betweenParams.push_back(param);
         }
@@ -4323,7 +4225,6 @@ static shared_ptr<LogicalQueryPlanNode> fitInput(
 
             //... but if length or type of dimension differ we cant cast and repart
             if (inDim.getStart() != destDim.getStart()
-                || inDim.getType() != destDim.getType()
                 || !(inDim.getEndMax() == destDim.getEndMax()
                     || (inDim.getEndMax() < destDim.getEndMax()
                         && ((inDim.getLength() % inDim.getChunkInterval()) == 0
@@ -4447,8 +4348,7 @@ static shared_ptr<LogicalQueryPlanNode> canonicalizeTypes(
             inputSchema.getName(),
             attrs,
             inputSchema.getDimensions(),
-            inputSchema.getFlags(),
-            inputSchema.getComment());
+            inputSchema.getFlags());
 
     castParams[0] = make_shared<OperatorParamSchema>(pc, castSchema);
 

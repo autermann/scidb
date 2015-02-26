@@ -20,7 +20,7 @@
   <para>For the default values of the configuration parameters described in
   this section, see <xref linkend="configParameters"/>.</para>
 
-  <section>
+  <section id="configMemory">
     <title>Configuring Memory Usage</title>
 
     <para>SciDB provides the following parameters for configuring the usage of
@@ -156,8 +156,8 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
   <section>
     <title>Configuring Disk Usage</title>
 
-    <para>SciDB provides the following <parameter
-    role="bold">chunk-segment-size</parameter> (megabytes) parameter for
+    <para>SciDB provides the <parameter
+    role="bold">chunk-segment-size-in-mb</parameter> (megabytes) parameter for
     configuring the usage of your disks.</para>
 
     <para>If this is 0, then chunks are stored contiguously and densely in the
@@ -183,8 +183,8 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
     utilization.</para>
   </section>
 
-  <section>
-    <title>Troubleshooting</title>
+  <section id="configTrouble">
+    <title>Configuration Troubleshooting</title>
 
     <para>Beyond using the configuration parameters for optimizing your SciDB
     installation, this section provides a few useful guidelines.</para>
@@ -213,7 +213,11 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
     <section id="max-memory-limit">
       <title>Max-memory-limit</title>
 
-      <para>You should <emphasis role="bold">always</emphasis> set the
+      <para><indexterm>
+          <primary>memory, parameter</primary>
+        </indexterm><indexterm>
+          <primary>max-memory-limit</primary>
+        </indexterm>You should <emphasis role="bold">always</emphasis> set the
       <parameter role="bold">max-memory-limit</parameter> parameter.</para>
 
       <para>If this parameter is not set, you will not receive "out of memory"
@@ -350,9 +354,11 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
     <section id="ulimit">
       <title>Useful Linux Commands</title>
 
-      <para>The <command>ulimit</command> command provides control over the
-      resources available to the shell and to processes started by it. We
-      recommend that you always set this limit to <emphasis
+      <para><indexterm>
+          <primary>Linux commands</primary>
+        </indexterm>The <command>ulimit</command> command provides control
+      over the resources available to the shell and to processes started by
+      it. We recommend that you always set this limit to <emphasis
       role="bold">unlimited</emphasis> by issuing the following
       command:<programlisting>sudo ulimit -c unlimited</programlisting></para>
 
@@ -376,6 +382,8 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
 
     <para><indexterm>
         <primary>MPI</primary>
+      </indexterm><indexterm>
+        <primary>troubleshooting</primary>
       </indexterm>MPICH is a high performance and widely portable
     implementation of the Message Passing Interface (MPI) standard. SciDB
     depends upon <emphasis role="bold">mpich2-1.2</emphasis> being installed
@@ -446,6 +454,10 @@ none    /dev/shm     tmpfs   defaults,size=48G     0 0</programlisting>Running
 2013-5-14 0:2:0 (ppid=23581): SciDB child (pid=23604) terminated by signal = 7, core dumped</programlisting>
         </listitem>
       </itemizedlist></para>
+
+    <para>If you have run out of shared memory, you can increase the value for
+    the <code>max-memory-limit</code> parameter in your SciDB config.ini
+    file.</para>
   </section>
 
   <section>

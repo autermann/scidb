@@ -84,7 +84,7 @@ TMP_VEC_1=$3
 TMP_OUTER_PRODUCT=$4
 
 # get length of VEC_IN
-LENGTHS=`iquery -aq "project(dimensions(${VEC_IN}),length)"`
+LENGTHS=`iquery -o dense -aq "project(dimensions(${VEC_IN}),length)"`
 
 # NOTE: there was a suggestion that maybe -ocsv[+] might make the parsing below easier
 #COLS="${LENGTHS:2:-2}"
@@ -93,7 +93,7 @@ LENGTHS=`iquery -aq "project(dimensions(${VEC_IN}),length)"`
 SUBSTR_LEN=`expr length ${LENGTHS} - 4` # length that will drop trailing ")]"
 COLS="${LENGTHS:2:$SUBSTR_LEN}"         # 2: is to drop the leading "[("
 
-CHUNK_INTERVAL=`iquery -aq "project(dimensions(${VEC_IN}),chunk_interval)"`
+CHUNK_INTERVAL=`iquery -o dense -aq "project(dimensions(${VEC_IN}),chunk_interval)"`
 SUBSTR_LEN=`expr length ${CHUNK_INTERVAL} - 4` # length that will drop trailing ")]"
 CHUNKSZ="${CHUNK_INTERVAL:2:$SUBSTR_LEN}"
 
@@ -135,9 +135,9 @@ fi
 
 #
 # make a vector from the original vector with the "add dim" operator, and multiply it
-#
+# ... or use gemm, or just use redimension, buddy!
 
-nafl -q "store(multiply(transpose(adddim(${VEC_IN},c)),${TMP_VEC_1}),${TMP_OUTER_PRODUCT})"
+iquery -naq "store(aggregate(apply(cross_join(transpose(adddim(${VEC_IN},c)) as A, ${TMP_VEC_1} as B, A.c, B.r), s, A.sigma*B.v), sum(s) as multiply, A.i, B.c),${TMP_OUTER_PRODUCT})" >> /dev/null
 
 # then we just use iif to set off-diagonal values to 0
 #  

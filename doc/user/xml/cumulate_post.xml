@@ -45,7 +45,7 @@
 
       <procedure>
         <step>
-          <para>Create a matrix and store values into it:<para><programlisting>AFL% store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:3,4,0],i*4+j+1),A);  </programlisting><screen>[
+          <para>Create a matrix and store values into it:<para><programlisting>AFL% store(build(&lt;val:double&gt;[row=0:2,3,0,col=0:3,4,0],row*4+col+1),A);  </programlisting><screen>[
 [(1),(2),(3),(4)],
 [(5),(6),(7),(8)],
 [(9),(10),(11),(12)]
@@ -54,7 +54,7 @@
 
         <step>
           <para>Calculate the cumulative sum along the first
-          dimension:<para><programlisting>AFL% cumulate(A,sum(val),i);  </programlisting><screen>[
+          dimension:<para><programlisting>AFL% cumulate(A,sum(val),row);  </programlisting><screen>[
 [(1),(2),(3),(4)],
 [(6),(8),(10),(12)],
 [(15),(18),(21),(24)]
@@ -62,8 +62,17 @@
         </step>
 
         <step>
+          <para>Calculate the cumulative product along the first
+          dimension:<para><programlisting>AFL% cumulate(A,prod(val),row);  </programlisting><screen>[
+[(1),(2),(3),(4)],
+[(5),(12),(21),(32)],
+[(45),(120),(231),(384)]
+]</screen></para></para>
+        </step>
+
+        <step>
           <para>Calculate the cumulative average along the second
-          dimension:<para><programlisting>AFL% cumulate(A,avg(val),j);  </programlisting><screen>[
+          dimension:<para><programlisting>AFL% cumulate(A,avg(val),col);  </programlisting><screen>[
 [(1),(1.5),(2),(2.5)],
 [(5),(5.5),(6),(6.5)],
 [(9),(9.5),(10),(10.5)]
@@ -72,26 +81,10 @@
 
         <step>
           <para>Calculate the the average, min, and max values along the first
-          dimension:<para><programlisting>AFL% cumulate(A,avg(val),min(val),max(val),i);  </programlisting><screen>[
+          dimension:<para><programlisting>AFL% cumulate(A,avg(val),min(val),max(val),row);  </programlisting><screen>[
 [(1,1,1),(2,2,2),(3,3,3),(4,4,4)],
 [(3,1,5),(4,2,6),(5,3,7),(6,4,8)],
 [(5,1,9),(6,2,10),(7,3,11),(8,4,12)]
-]</screen></para></para>
-        </step>
-
-        <step>
-          <para>To calculate a cumulative product, it is a bit more
-          complicated. The following query calculates the cumulative product
-          over the first dimension, <emphasis role="bold">i</emphasis>.<para><programlisting>AFL% project
-        (apply
-          (cumulate
-             (apply(A,lv,log(val)),
-              sum(lv) as slv),
-           eslv, exp(slv))
-        ,eslv);  </programlisting><screen>[
-[(1),(2),(3),(4)],
-[(5),(12),(21),(32)],
-[(45),(120),(231),(384)]
 ]</screen></para></para>
         </step>
       </procedure>

@@ -156,7 +156,6 @@ public:
                                                             srcAttr.getAliases(),
                                                             &srcAttr.getDefaultValue(),
                                                             srcAttr.getDefaultValueExpr(),
-                                                            srcAttr.getComment(),
                                                             srcAttr.getVarSize()));
             }
         }
@@ -194,11 +193,6 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE)
                             << dstAttr.getName() << TID_INT64;
                     }
-                    if (srcDim.getType() != TID_INT64)
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_SOURCE_DIMENSION_TYPE)
-                            << dstAttr.getName() << TID_INT64;
-                    }
                     if (dstAttr.getFlags() != 0)
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_FLAGS)
@@ -234,14 +228,9 @@ public:
                         if (srcAttr.getName() == aggregatedNames[i])
                             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_ERROR2);
                     }
-                    if (srcAttr.getType() != TID_INT64)
+                    if ( !IS_INTEGRAL(srcAttr.getType())  || srcAttr.getType() == TID_UINT64 )
                     {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE)
-                            << srcAttr.getName() << TID_INT64;
-                    }
-                    if (dstDim.getType() != TID_INT64)
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_DIMENSION_TYPE)
                             << srcAttr.getName() << TID_INT64;
                     }
                     outputDims.push_back(dstDim);
@@ -252,21 +241,13 @@ public:
             {
                 if (srcDim.hasNameAndAlias(dstDim.getBaseName()))
                 {
-                    if (dstDim.getType() != srcDim.getType() ||
-                        (dstDim.getType() != TID_INT64 &&             //if this is a NID, we can't change its origin
-                         dstDim.getStart() != srcDim.getStart()))     //(old code on the way out)
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSIONS_DONT_MATCH)
-                            << srcDim.getBaseName() << dstDim.getBaseName();
-                    }
                     DimensionDesc outputDim = dstDim;
-                    outputDim.setMappingArrayName(srcDim.getMappingArrayName());
                     outputDims.push_back(outputDim);
                     goto NextDim;
                 }
             }
             //one synthetic dimension allowed
-            if (nNewDims++ != 0 || !aggregatedNames.empty() || dstDim.getType() != TID_INT64)
+            if (nNewDims++ != 0 || !aggregatedNames.empty() )
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION) << dstDim.getBaseName();
             }

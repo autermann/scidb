@@ -6,7 +6,7 @@ load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data2.txt')
 --test
 --start-query-logging
 
-CREATE ARRAY Data < V : double NULL > [ I(int64)=1000,10,0, J(int64)=1000,10,0  ]
+CREATE ARRAY Data < V : double NULL > [ I=0:999,10,0, J=0:999,10,0 ]
 
 redimension_store(Raw_Test_Data, Data)
 

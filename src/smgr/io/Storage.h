@@ -274,40 +274,11 @@ namespace scidb
          * specified array is not present.
          * This routine must be called on either all versions of uaId in sequence
          * (as in "remove(array)") or on the last version of uaId only (as in "rollback").
-         * If uaId==arrId and timestamp==0, all chunks for uaId are removed.
+         * If uaId==arrId, all chunks for uaId are removed.
          * @param uaId the Unversioned Array ID
          * @param arrId the Versioned Array ID
-         * @param timestamp optional - if set, remove only chunks older than timestamp
          */
-        virtual void remove(ArrayUAID uaId, ArrayID arrId, uint64_t timestamp = 0) = 0;
-
-        /**
-         * Map value of this coordinate to the integer value
-         * @param indexName name of coordinate index
-         * @param value original coordinate value
-         * @param query performing the mapping
-         * @return ordinal number to which this value is mapped
-         */
-        virtual Coordinate mapCoordinate(string const& indexName, DimensionDesc const& dim,
-                                         Value const& value, CoordinateMappingMode mode,
-                                         const boost::shared_ptr<Query>& query) = 0;
-
-        /**
-         * Perform reverse mapping of integer dimension to the original dimension domain
-         * @param indexName name of coordinate index
-         * @param pos integer coordinate
-         * @param query performing the mapping
-         * @return original value for the coordinate
-         */
-        virtual Value reverseMapCoordinate(string const& indexName,
-                                           DimensionDesc const& dim, Coordinate pos,
-                                           const boost::shared_ptr<Query>& query) = 0;
-
-        /**
-         * Remove coordinate mapping 
-         * @param indexName name of coordinate index        
-         */
-        virtual void removeCoordinateMap(string const& indexName) = 0;
+        virtual void remove(ArrayUAID uaId, ArrayID arrId) = 0;
 
         /**
          * Rollback uncompleted updates

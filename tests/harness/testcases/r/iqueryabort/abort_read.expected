@@ -2726,21 +2726,21 @@ SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o cs
 
 SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq $'gesvd(M1024x1024, \'right\')'  | true>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  0 'aggregate(COPY, count(*), equity)' 1> /tmp/${PPID}_1.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  0 'aggregate(COPY, count(*), equity)' 1> /tmp/${HPID}_1.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  0 'filter(COPY, equity=1)' 1> /tmp/${PPID}_2.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  0 'filter(COPY, equity=1)' 1> /tmp/${HPID}_2.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'between(COPY, null,null,null,null)' 1> /tmp/${PPID}_3.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'between(COPY, null,null,null,null)' 1> /tmp/${HPID}_3.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'between(COPY, 1,0,null,null)' 1> /tmp/${PPID}_4.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'between(COPY, 1,0,null,null)' 1> /tmp/${HPID}_4.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'between(COPY, 0,0,null,null)' 1> /tmp/${PPID}_5.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'between(COPY, 0,0,null,null)' 1> /tmp/${HPID}_5.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'join(COPY, COPY)' 1> /tmp/${PPID}_6.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'join(COPY, COPY)' 1> /tmp/${HPID}_6.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))' 1> /tmp/${PPID}_7.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  1 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))' 1> /tmp/${HPID}_7.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9  1 $'gesvd(M1024x1024, \'values\')' 1> /tmp/${PPID}_8.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9  1 $'gesvd(M1024x1024, \'values\')' 1> /tmp/${HPID}_8.stdout || echo FAILURE>
 
 Query was executed successfully
 

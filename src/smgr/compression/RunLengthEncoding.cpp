@@ -48,16 +48,10 @@ namespace scidb
 	size_t nElems;
 	char const* dataSrc = (char const*)chunk.getData();
 
-
-	if(elementSize == 0 || elementSize > 8 || !chunk.getArrayDesc().isImmutable() || chunk.getAttributeDesc().isNullable())	// too big or too small = regard it as a string 
-	  {
-	    nElems = chunkSize;
-	    elementSize = 1;
-	  }
-	else
-	  {
-	    nElems = chunkSize / elementSize;
-	  }
+        /* No more immutable arrays, to keep consistent with old code, always regard as string
+         */
+        nElems = chunkSize;
+        elementSize = 1;
 
         if(!nElems) { return chunkSize; }
 
@@ -152,16 +146,11 @@ namespace scidb
     size_t elementSize = TypeLibrary::getType(type).byteSize();
     size_t nElems;
 
-    if(elementSize == 0 || elementSize > 8  || !chunk.getArrayDesc().isImmutable() || chunk.getAttributeDesc().isNullable())	// too big or too small = regard it as a string 
-      {
-	nElems = chunkSize;
-	elementSize = 1;
-      }
-    else
-      {
-	nElems = chunkSize / elementSize;
-      }
-       
+    /* No more immutable arrays, to keep consistent with old code, always regard as string
+     */
+    nElems = chunkSize;
+    elementSize = 1;
+
     char* dst = (char*)chunk.getData();
     uint32_t i, j;
 

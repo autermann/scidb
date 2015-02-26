@@ -208,7 +208,7 @@ ArrayDesc::ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
                      const std::string &name,
                      const Attributes& attributes,
                      const Dimensions &dimensions,
-                     int32_t flags, std::string const& comment) :
+                     int32_t flags) :
     _accessCount(0),
     _arrId(arrId),
     _uAId(uAId),
@@ -217,7 +217,6 @@ ArrayDesc::ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
     _attributes(attributes),
     _dimensions(dimensions),
     _flags(flags),
-    _comment(comment),
     _ps(psUndefined)
 {
     //either both 0 or not...
@@ -238,7 +237,6 @@ ArrayDesc::ArrayDesc(ArrayDesc const& other) :
     _dimensions(other._dimensions),
     _bitmapAttr(other._bitmapAttr != NULL ? &_attributes[other._bitmapAttr->getId()] : NULL),
     _flags(other._flags),
-    _comment(other._comment),
     _ps(other._ps)
 {
     initializeDimensions();
@@ -264,7 +262,6 @@ ArrayDesc& ArrayDesc::operator = (ArrayDesc const& other)
     _dimensions = other._dimensions;
     _bitmapAttr = (other._bitmapAttr != NULL) ? &_attributes[other._bitmapAttr->getId()] : NULL;
     _flags = other._flags;
-    _comment = other._comment;
     initializeDimensions();
     _ps = other._ps;
     return *this;
@@ -313,57 +310,6 @@ void ArrayDesc::trim()
             dim._endMax = (dim._startMin + (dim._currEnd - dim._startMin + dim._chunkInterval) / dim._chunkInterval * dim._chunkInterval + dim._chunkOverlap - 1);
         }
     }
-}
-
-std::string const& ArrayDesc::getMappingArrayName(size_t dimension) const
-{
-    std::string const& mappingArrayName = _dimensions[dimension].getMappingArrayName();
-    if (mappingArrayName.empty()) {
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_ARRAY) << _dimensions[dimension].getBaseName() << _name;
-    }
-    return mappingArrayName;
-}
-
-string ArrayDesc::createMappingArrayName(size_t dimension, VersionID version) const
-{
-    stringstream ss;
-    ss << "NID_" << _arrId << '@' << version << ':' << _dimensions[dimension].getBaseName();
-    return ss.str();
-}
-
-Coordinate ArrayDesc::getOrdinalCoordinate(size_t dimension, Value const& value,
-                                           CoordinateMappingMode mode,
-                                           const boost::shared_ptr<Query>& query) const
-{
-#ifndef SCIDB_CLIENT
-   return (_dimensions[dimension].isInteger())
-   ? value.getInt64()
-   : StorageManager::getInstance().mapCoordinate(getMappingArrayName(dimension),
-                                                 _dimensions[dimension], value, mode, query);
-#else
-   return value.getInt64();
-#endif
-}
-
-Value ArrayDesc::getOriginalCoordinate(size_t dimension, Coordinate pos,
-                                       const boost::shared_ptr<Query>& query) const
-{
-#ifndef SCIDB_CLIENT
-    if (!_dimensions[dimension].isInteger()) {
-       return StorageManager::getInstance().reverseMapCoordinate(getMappingArrayName(dimension),
-                                                                 _dimensions[dimension], pos, query);
-    }
-#endif
-    Value value;
-    value.setInt64(pos);
-    return value;
-}
-
-void ArrayDesc::getMappingArrayDesc(size_t dimension, ArrayDesc& indexDesc) const
-{
-#ifndef SCIDB_CLIENT
-    SystemCatalog::getInstance()->getArrayDesc(getMappingArrayName(dimension), indexDesc);
-#endif
 }
 
 uint64_t ArrayDesc::getHashedChunkNumber(Coordinates const& pos) const
@@ -531,21 +477,7 @@ Dimensions ArrayDesc::grabDimensions(VersionID version) const
     Dimensions dims(_dimensions.size());
     for (size_t i = 0; i < dims.size(); i++) {
         DimensionDesc const& dim = _dimensions[i];
-        if (dim._mappingArrayName == createMappingArrayName(i, 0)) {
-            dims[i] = DimensionDesc(dim.getBaseName(),
-                                    dim.getNamesAndAliases(),
-                                    dim.getStartMin(), dim.getCurrStart(),
-                                    dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(),
-                                    dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
-                                    createMappingArrayName(i, version),
-                                    dim.getComment(),
-                                    dim.getFuncMapOffset(),
-                                    dim.getFuncMapScale()
-                );
-
-        } else {
-            dims[i] = dim;
-        }
+        dims[i] = dim;
     }
     return dims;
 }
@@ -606,7 +538,6 @@ bool ArrayDesc::coordsAreAtChunkEnd(Coordinates const& coords) const
 void ArrayDesc::addAttribute(AttributeDesc const& newAttribute)
 {
     assert(newAttribute.getId() == _attributes.size());
-
     for (size_t i = 0; i< _dimensions.size(); i++)
     {
         if (_dimensions[i].getBaseName() == newAttribute.getName() || newAttribute.hasAlias(_dimensions[i].getBaseName()))
@@ -622,9 +553,7 @@ void ArrayDesc::addAttribute(AttributeDesc const& newAttribute)
             throw USER_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_DUPLICATE_ATTRIBUTE_NAME) << newAttribute.getName();
         }
     }
-
     _attributes.push_back(newAttribute);
-
     if (newAttribute.getType() == TID_INDICATOR)
     {
         assert(_bitmapAttr == NULL);
@@ -650,9 +579,6 @@ double ArrayDesc::getNumChunksAlongDimension(size_t dimension, Coordinate start,
 
 void printSchema(std::ostream& stream,const ArrayDesc& ob)
 {
-    if (!ob.getComment().empty()) {
-        stream << "\n--- " << ob.getComment() << "\n";
-    }
 #ifndef SCIDB_CLIENT
     if (Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT)) {
         if (ob.getEmptyBitmapAttribute() == NULL) {
@@ -673,9 +599,6 @@ void printSchema(std::ostream& stream,const ArrayDesc& ob)
 
 std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob)
 {
-    if (!ob.getComment().empty()) {
-        stream << "\n--- " << ob.getComment() << "\n";
-    }
 #ifndef SCIDB_CLIENT
     if (Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT)) {
         if (ob.getEmptyBitmapAttribute() == NULL) {
@@ -715,7 +638,6 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
                              const std::set<std::string> &aliases,
                              int16_t reserve, Value const* defaultValue,
                              const string &defaultValueExpr,
-                             std::string const& comment,
                              size_t varSize):
     _id(id),
     _name(name),
@@ -723,8 +645,7 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
     _type(type),
     _flags(flags | (type ==  TID_INDICATOR ? IS_EMPTY_INDICATOR : 0)),
     _defaultCompressionMethod(defaultCompressionMethod),
-    _reserve((flags & ArrayDesc::IMMUTABLE) ? 0 : reserve),
-    _comment(comment),
+    _reserve(reserve),
     _varSize(varSize),
     _defaultValueExpr(defaultValueExpr)
 {
@@ -738,13 +659,20 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
             _defaultValue = TypeLibrary::getDefaultValue(type);
         }
     }
+    if(name == DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME &&  (_flags & AttributeDesc::IS_EMPTY_INDICATOR) == 0)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Empty tag attribute name misuse";
+    }
+    if(name != DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME && (_flags & AttributeDesc::IS_EMPTY_INDICATOR))
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Empty tag attribute not named properly";
+    }
 }
 
 AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId type, int16_t flags,
         uint16_t defaultCompressionMethod, const std::set<std::string> &aliases,
         Value const* defaultValue,
         const string &defaultValueExpr,
-        std::string const& comment,
         size_t varSize) :
     _id(id),
     _name(name),
@@ -754,12 +682,11 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
     _defaultCompressionMethod(defaultCompressionMethod),
     _reserve(
 #ifndef SCIDB_CLIENT
-        (flags & ArrayDesc::IMMUTABLE) ? 0 : Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE)
+        Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE)
 #else
         0
 #endif
     ),
-    _comment(comment),
     _varSize(varSize),
     _defaultValueExpr(defaultValueExpr)
 {
@@ -772,6 +699,14 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
         } else {
             _defaultValue = TypeLibrary::getDefaultValue(type);
         }
+    }
+    if(name == DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME &&  (_flags & AttributeDesc::IS_EMPTY_INDICATOR) == 0)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Empty tag attribute name misuse";
+    }
+    if(name != DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME && (_flags & AttributeDesc::IS_EMPTY_INDICATOR))
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Empty tag attribute not named properly";
     }
 }
 
@@ -855,11 +790,6 @@ int16_t AttributeDesc::getReserve() const
     return _reserve;
 }
 
-std::string const& AttributeDesc::getComment() const
-{
-    return _comment;
-}
-
 size_t AttributeDesc::getSize() const
 {
     Type const& type = TypeLibrary::getType(_type);
@@ -888,9 +818,6 @@ std::ostream& operator<<(std::ostream& stream,const Attributes& atts)
 
 std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
 {
-    if (!att.getComment().empty()) {
-        stream << "\n--- " << att.getComment() << "\n";
-    }
     //don't print NOT NULL because it default behaviour
     stream << att.getName() << ':' << att.getType()
                  << (att.getFlags() & AttributeDesc::IS_NULLABLE ? " NULL" : "");
@@ -928,20 +855,13 @@ DimensionDesc::DimensionDesc() :
     _endMax(0),
 
     _chunkInterval(0),
-    _chunkOverlap(0),
-
-    _funcMapOffset(0),
-    _funcMapScale(1),
-
-    _type(TID_INT64),
-    _flags(0),
-    _isInteger(true)
+    _chunkOverlap(0)
 {
     validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordinate end, int64_t chunkInterval,
-                             int64_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
+                             int64_t chunkOverlap) :
     ObjectNames(name),
 
     _startMin(start),
@@ -950,22 +870,13 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordina
     _endMax(end),
 
     _chunkInterval(chunkInterval),
-    _chunkOverlap(chunkOverlap),
-
-    _funcMapOffset(0),
-    _funcMapScale(1),
-
-    _type(type),
-    _flags(flags),
-    _mappingArrayName(mappingArrayName),
-    _comment(comment),
-    _isInteger(type == TID_INT64)
+    _chunkOverlap(chunkOverlap)
 {
     validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names, Coordinate start, Coordinate end,
-                             int64_t chunkInterval, int64_t chunkOverlap, TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment) :
+                             int64_t chunkInterval, int64_t chunkOverlap) :
     ObjectNames(baseName, names),
 
     _startMin(start),
@@ -974,24 +885,13 @@ DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names
     _endMax(end),
 
     _chunkInterval(chunkInterval),
-    _chunkOverlap(chunkOverlap),
-
-    _funcMapOffset(0),
-    _funcMapScale(1),
-
-    _type(type),
-    _flags(flags),
-    _mappingArrayName(mappingArrayName),
-    _comment(comment),
-    _isInteger(type == TID_INT64)
+    _chunkOverlap(chunkOverlap)
 {
     validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coordinate currStart, Coordinate currEnd,
-                             Coordinate endMax, int64_t chunkInterval, int64_t chunkOverlap, TypeId type, int flags,
-                             std::string const& mappingArrayName, std::string const& comment,
-                             Coordinate funcMapOffset, Coordinate funcMapScale) :
+                             Coordinate endMax, int64_t chunkInterval, int64_t chunkOverlap) :
     ObjectNames(name),
 
     _startMin(startMin),
@@ -999,22 +899,13 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coord
     _currEnd(currEnd),
     _endMax(endMax),
     _chunkInterval(chunkInterval),
-    _chunkOverlap(chunkOverlap),
-    _funcMapOffset(funcMapOffset),
-    _funcMapScale(funcMapScale),
-    _type(type),
-    _flags(flags),
-    _mappingArrayName(mappingArrayName),
-    _comment(comment),
-    _isInteger(type == TID_INT64)
+    _chunkOverlap(chunkOverlap)
 {
     validate();
 }
 
 DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names, Coordinate startMin,
-                             Coordinate currStart, Coordinate currEnd, Coordinate endMax, int64_t chunkInterval, int64_t chunkOverlap,
-                             TypeId type, int flags, std::string const& mappingArrayName, std::string const& comment,
-                             Coordinate funcMapOffset, Coordinate funcMapScale) :
+                             Coordinate currStart, Coordinate currEnd, Coordinate endMax, int64_t chunkInterval, int64_t chunkOverlap) :
     ObjectNames(baseName, names),
 
     _startMin(startMin),
@@ -1022,26 +913,9 @@ DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names
     _currEnd(currEnd),
     _endMax(endMax),
     _chunkInterval(chunkInterval),
-    _chunkOverlap(chunkOverlap),
-    _funcMapOffset(funcMapOffset),
-    _funcMapScale(funcMapScale),
-    _type(type),
-    _flags(flags),
-    _mappingArrayName(mappingArrayName),
-    _comment(comment),
-    _isInteger(type == TID_INT64)
+    _chunkOverlap(chunkOverlap)
 {
     validate();
-}
-
-std::string const& DimensionDesc::getMappingArrayName() const
-{
-    return _mappingArrayName;
-}
-
-std::string const& DimensionDesc::getComment() const
-{
-    return _comment;
 }
 
 bool DimensionDesc::operator == (DimensionDesc const& other) const
@@ -1051,9 +925,7 @@ bool DimensionDesc::operator == (DimensionDesc const& other) const
         _startMin == other._startMin &&
         _endMax == other._endMax &&
         _chunkInterval == other._chunkInterval &&
-        _chunkOverlap == other._chunkOverlap &&
-        _flags == other._flags;
-        _type == other._type;
+        _chunkOverlap == other._chunkOverlap;
 }
 
 Coordinate DimensionDesc::getLowBoundary() const
@@ -1157,11 +1029,6 @@ int64_t DimensionDesc::getChunkOverlap() const
     return _chunkOverlap;
 }
 
-TypeId  DimensionDesc::getType() const
-{
-    return _type;
-}
-
 void DimensionDesc::validate() const
 {
     if (_startMin > _endMax)
@@ -1189,80 +1056,34 @@ std::ostream& operator<<(std::ostream& stream,const Dimensions& dims)
 
 std::ostream& operator<<(std::ostream& stream,const DimensionDesc& dim)
 {
-    if (!dim.getComment().empty())
-    {
-        stream << "\n--- " << dim.getComment() << "\n";
-    }
-    if (dim.isInteger())
-    {
-        Coordinate start = dim.getStart();
-        stringstream ssstart;
-        ssstart << start;
+    Coordinate start = dim.getStart();
+    stringstream ssstart;
+    ssstart << start;
 
-        Coordinate end = dim.getEndMax();
-        stringstream ssend;
-        ssend << end;
+    Coordinate end = dim.getEndMax();
+    stringstream ssend;
+    ssend << end;
 
-        stream << dim.getNamesAndAliases() << '=' << (start == MIN_COORDINATE ? "*" : ssstart.str()) << ':'
-            << (end == MAX_COORDINATE ? "*" : ssend.str()) << ","
-            << dim.getChunkInterval() << "," << dim.getChunkOverlap();
-    }
-    else
-    {
-        stringstream bound;
-        if (dim.getLength() == INFINITE_LENGTH)
-        {
-            bound <<"*";
-        }
-        else
-        {
-            bound <<dim.getLength();
-        }
-
-        stream << dim.getNamesAndAliases() << '(' << dim.getType() << ")=" << bound.str() << ','
-               << dim.getChunkInterval() << ',' << dim.getChunkOverlap();
-    }
-
+    stream << dim.getNamesAndAliases() << '=' << (start == MIN_COORDINATE ? "*" : ssstart.str()) << ':'
+           << (end == MAX_COORDINATE ? "*" : ssend.str()) << ","
+           << dim.getChunkInterval() << "," << dim.getChunkOverlap();
     return stream;
 }
 
 void printSchema (std::ostream& stream,const DimensionDesc& dim)
 {
-    if (!dim.getComment().empty())
-    {
-        stream << "\n--- " << dim.getComment() << "\n";
-    }
-    if (dim.isInteger())
-    {
-        Coordinate start = dim.getStart();
-        stringstream ssstart;
-        ssstart << start;
+    Coordinate start = dim.getStart();
+    stringstream ssstart;
+    ssstart << start;
 
-        Coordinate end = dim.getEndMax();
-        stringstream ssend;
-        ssend << end;
+    Coordinate end = dim.getEndMax();
+    stringstream ssend;
+    ssend << end;
 
-        printNames(stream, dim.getNamesAndAliases());
-        stream << '=' << (start == MIN_COORDINATE ? "*" : ssstart.str()) << ':'
-               << (end == MAX_COORDINATE ? "*" : ssend.str()) << ","
-               << dim.getChunkInterval() << "," << dim.getChunkOverlap();
-    }
-    else
-    {
-        stringstream bound;
-        if (dim.getLength() == INFINITE_LENGTH)
-        {
-            bound <<"*";
-        }
-        else
-        {
-            bound <<dim.getLength();
-        }
-
-        printNames(stream, dim.getNamesAndAliases());
-        stream << '(' << dim.getType() << ")=" << bound.str() << ','
-               << dim.getChunkInterval() << ',' << dim.getChunkOverlap();
-    }
+    printNames(stream, dim.getNamesAndAliases());
+    stream << '=' << (start == MIN_COORDINATE ? "*" : ssstart.str()) << ':'
+           << (end == MAX_COORDINATE ? "*" : ssend.str()) << ","
+           << dim.getChunkInterval() << "," << dim.getChunkOverlap();
 }
 
 

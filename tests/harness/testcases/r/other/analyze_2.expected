@@ -97,7 +97,7 @@ Query was executed successfully
 {1} 'val2','1','inf',10,16
 
 {attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} 'a','null','null',0,0
+{0} 'a',null,null,0,0
 
 {x} a
 {0} null

@@ -139,7 +139,6 @@ public:
                                                   attr.getReserve(),
                                                   &attr.getDefaultValue(),
                                                   attr.getDefaultValueExpr(),
-                                                  attr.getComment(),
                                                   attr.getVarSize()));
             }
         }
@@ -197,7 +196,6 @@ public:
                                               emptyTag->getReserve(),
                                               &emptyTag->getDefaultValue(),
                                               emptyTag->getDefaultValueExpr(),
-                                              emptyTag->getComment(),
                                               emptyTag->getVarSize()));
         }
 

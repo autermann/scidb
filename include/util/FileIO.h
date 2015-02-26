@@ -129,6 +129,15 @@ namespace scidb
         static int openFile(const std::string& fileName, int flags);
     };
 
+    struct FdCleaner
+    {
+        FdCleaner(int fd) : _fd(fd) {}
+        ~FdCleaner() {
+            if (_fd>-1) { File::closeFd(_fd); }
+        }
+        int _fd;
+    };
+
 #ifndef SCIDB_CLIENT
     class BackgroundFileFlusher: public Singleton<BackgroundFileFlusher>
     {

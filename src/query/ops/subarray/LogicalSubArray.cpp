@@ -46,32 +46,11 @@ ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos,
 
     for (size_t i = 0, n = dims.size(); i < n; i++) {
         DimensionDesc const& srcDim = dims[i];
-        string mappingArrayName = srcDim.getMappingArrayName();
-        if (highPos[i] >= lowPos[i] && !mappingArrayName.empty()
-                && srcDim.getType() != TID_INT64) {
-            string tmpMappingArrayName;
-            size_t tmpArrayNo = 0;
-            do {
-                std::stringstream ss;
-                ss << mappingArrayName << '$' << ++tmpArrayNo;
-                tmpMappingArrayName = ss.str();
-            } while (query->getTemporaryArray(tmpMappingArrayName));
-
-            subarrayMappingArray(srcDim.getBaseName(), mappingArrayName,
-                    tmpMappingArrayName, lowPos[i], highPos[i], query);
-            mappingArrayName = tmpMappingArrayName;
-        }
         size_t end = std::max(highPos[i] - lowPos[i],0L);
         newDims[i] = DimensionDesc(srcDim.getBaseName(),
                 srcDim.getNamesAndAliases(), 0, 0, end,
                 end, srcDim.getChunkInterval(),
-                srcDim.getChunkOverlap(), srcDim.getType(),
-                srcDim.getFlags()
-                        | (srcDim.getFuncMapScale() != 1 ?
-                                DimensionDesc::COMPLEX_TRANSFORMATION : 0),
-                mappingArrayName, srcDim.getComment(),
-                srcDim.getFuncMapOffset() + lowPos[i] - srcDim.getStart(),
-                srcDim.getFuncMapScale());
+                srcDim.getChunkOverlap());
     }
 
     /***
@@ -138,8 +117,7 @@ public:
         Dimensions const& dims = schemas[0].getDimensions();
         size_t nDims = dims.size();
         if (i < nDims * 2) {
-            res.push_back(
-                    PARAM_CONSTANT(dims[i < nDims ? i : i - nDims].getType()));
+            res.push_back( PARAM_CONSTANT(TID_INT64));
         }
         if (i == 0 || i >= nDims * 2) {
             res.push_back(END_OF_VARIES_PARAMS());
@@ -180,12 +158,11 @@ public:
                         evaluate(
                                 ((boost::shared_ptr<
                                         OperatorParamLogicalExpression>&) _parameters[i])->getExpression(),
-                                query, dims[i].getType());
+                                query, TID_INT64);
                 if (low.isNull()) {
                     lowPos[i] = dims[i].getLowBoundary();
                 } else {
-                    lowPos[i] = desc.getOrdinalCoordinate(i, low, cmLowerBound,
-                            query);
+                    lowPos[i] = low.getInt64();
                     if (dims[i].getStart() != MIN_COORDINATE
                             && lowPos[i] < dims[i].getStart()) {
                         lowPos[i] = dims[i].getStart();
@@ -196,12 +173,11 @@ public:
                                 ((boost::shared_ptr<
                                         OperatorParamLogicalExpression>&) _parameters[i
                                         + nDims])->getExpression(), query,
-                                dims[i].getType());
+                                TID_INT64);
                 if (high.isNull()) {
                     highPos[i] = dims[i].getHighBoundary();
                 } else {
-                    highPos[i] = desc.getOrdinalCoordinate(i, high,
-                            cmUpperBound, query);
+                    highPos[i] = high.getInt64();
                     if (highPos[i] > dims[i].getEndMax()) {
                         highPos[i] = dims[i].getEndMax();
                     }

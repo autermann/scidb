@@ -1,0 +1,11 @@
+--setup
+--start-query-logging
+# make sure we report an error when we are out of space on /dev/shm
+# it tries to multiply two 8GB matricies, the default /dev/shm partition is 8G
+# it should try to allocate about 3*8GB worth of shared memory (by default /dev/shm size is RAM/2)
+create array ZERO_8GBc1024 <a: double >   [r=0:32*1024-1,1024,0, c=0:32*1024-1,1024,0]
+load_library('dense_linear_algebra')
+--test
+--error --code=scidb::SCIDB_SE_NO_MEMORY::SCIDB_LE_MEMORY_ALLOCATION_ERROR "gemm(build(ZERO_8GBc1024, 0), build(ZERO_8GBc1024, 0), build(ZERO_8GBc1024, 0))"
+--cleanup
+remove(ZERO_8GBc1024)

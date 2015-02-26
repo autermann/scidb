@@ -12,12 +12,12 @@ SCIDB QUERY : <store(build(A,20*x+1),A)>
 {16} '321'
 {17} '341'
 
-SCIDB QUERY : <store(apply(A,s, iif(x=13,na,iif(x=16,null,x))),B)>
+SCIDB QUERY : <store(apply(A,s, iif(x=13,null,iif(x=16,null,x))),B)>
 {x} r,s
 {10} '201',10
 {11} '221',11
 {12} '241',12
-{13} '261',NA
+{13} '261',null
 {14} '281',14
 {15} '301',15
 {16} '321',null
@@ -90,7 +90,7 @@ SCIDB QUERY : <sort(reverse(filter(A, x<> 14 and x<>16)),2)>
 SCIDB QUERY : <sort(B,s)>
 {n} r,s
 {0} '321',null
-{1} '261',NA
+{1} '261',null
 {2} '201',10
 {3} '221',11
 {4} '241',12
@@ -103,7 +103,7 @@ SCIDB QUERY : <sort(B,r)>
 {0} '201',10
 {1} '221',11
 {2} '241',12
-{3} '261',NA
+{3} '261',null
 {4} '281',14
 {5} '301',15
 {6} '321',null
@@ -112,23 +112,23 @@ SCIDB QUERY : <sort(B,r)>
 SCIDB QUERY : <sort(subarray(B,12,14),r)>
 {n} r,s
 {0} '241',12
-{1} '261',NA
+{1} '261',null
 {2} '281',14
 
 SCIDB QUERY : <sort(subarray(B,12,14),s)>
 {n} r,s
-{0} '261',NA
+{0} '261',null
 {1} '241',12
 {2} '281',14
 
 SCIDB QUERY : <sort(filter(B, x< 15 and x>12),r)>
 {n} r,s
-{0} '261',NA
+{0} '261',null
 {1} '281',14
 
 SCIDB QUERY : <sort(filter(B, x< 15 and x>12),s)>
 {n} r,s
-{0} '261',NA
+{0} '261',null
 {1} '281',14
 
 SCIDB QUERY : <rank(A)>
@@ -216,7 +216,7 @@ SCIDB QUERY : <rank(B,s)>
 {10} 10,1
 {11} 11,2
 {12} 12,3
-{13} NA,null
+{13} null,null
 {14} 14,4
 {15} 15,5
 {16} null,null
@@ -224,7 +224,7 @@ SCIDB QUERY : <rank(B,s)>
 
 SCIDB QUERY : <rank(filter(B, x< 15 and x>12),s)>
 {x} s,s_rank
-{13} NA,null
+{13} null,null
 {14} 14,1
 
 SCIDB QUERY : <rank(filter(B, x< 15 and x>12),r)>

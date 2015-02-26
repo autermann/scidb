@@ -131,8 +131,6 @@ public:
         vector<size_t> dimMapping(_schema.getDimensions().size());
 
         setupMappings(srcArrayDesc, aggregates, attrMapping, dimMapping, destAttrs, destDims);
-        vector< shared_ptr<AttributeMultiMap> > coordinateMultiIndices(destDims.size());
-        vector< shared_ptr<AttributeMap> > coordinateIndices(destDims.size());
         ElapsedMilliSeconds timing;
 
         return redimensionArray(srcArray,
@@ -140,8 +138,6 @@ public:
                                 dimMapping,
                                 aggregates,
                                 query,
-                                coordinateMultiIndices,
-                                coordinateIndices,
                                 timing,
                                 haveAggregatesOrSynthetic(srcArrayDesc));
     }

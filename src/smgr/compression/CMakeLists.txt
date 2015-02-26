@@ -35,4 +35,4 @@ file(GLOB compression_include "*.h")
 
 add_library(compression_lib STATIC ${compression_src} ${compression_include})
 
-target_link_libraries(compression_lib ${Boost_LIBRARIES} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES})
+target_link_libraries(compression_lib ${Boost_LIBRARIES} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES} system_lib)

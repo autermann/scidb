@@ -1,27 +1,35 @@
+/*
+**
+* BEGIN_COPYRIGHT
+*
+* This file is part of SciDB.
+* Copyright (C) 2008-2013 SciDB, Inc.
+*
+* SciDB is free software: you can redistribute it and/or modify
+* it under the terms of the AFFERO GNU General Public License as published by
+* the Free Software Foundation.
+*
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+* NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+* the AFFERO GNU General Public License for the complete license terms.
+*
+* You should have received a copy of the AFFERO GNU General Public License
+* along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+*
+* END_COPYRIGHT
+*/
+
 %{
-#include <string>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/format.hpp>
-
-#include "system/Exceptions.h"
-
 #include "query/parser/AFLScanner.h"
-#include "query/parser/AFLKeywords.h"
+#include "query/parser/ALKeywords.h"
 #include "query/parser/ParsingContext.h"
 #include "query/parser/QueryParser.h"
 
 typedef scidb::AFLParser::token token;
-typedef scidb::AFLParser::token_type token_type;
-#define yyterminate() return token::EOQ
-
-#define    YY_DECL                                    \
-    scidb::AFLParser::token_type                \
-    scidb::AFLScanner::lex(                        \
-        scidb::AFLParser::semantic_type* yylval,\
-        scidb::AFLParser::location_type* yylloc    \
-    )
 %}
 
 %option c++
@@ -32,35 +40,31 @@ typedef scidb::AFLParser::token_type token_type;
 %option stack
 
 %{
-#define YY_USER_ACTION  yylloc->columns(yyleng);
-
+#define YY_USER_ACTION     yylloc->columns(yyleng);
 #define YY_USER_INIT \
-        yylloc->begin.column = yylloc->begin.line = 1; \
-        yylloc->end.column = yylloc->end.line = 1;
+    yylloc->begin.column = yylloc->begin.line = 1; \
+    yylloc->end.column   = yylloc->end.line   = 1;
+#define yyterminate()      return token::EOQ
+#define YY_DECL                             \
+    short scidb::AFLScanner::lex(           \
+        AFLParser::semantic_type* yylval,   \
+        AFLParser::location_type* yylloc)
 %}
 
-Space [ \t\r\f]
-
-NewLine [\n]
-
-NonNewLine [^\n]
-
-OneLineComment ("--"{NonNewLine}*)
-
-Whitespace ({Space}+|{OneLineComment})
-
-
-IdentifierFirstChar [A-Za-z_\$]
-IdentifierOtherChars [A-Za-z0-9_\$]
-Identifier {IdentifierFirstChar}{IdentifierOtherChars}*
-QuotedIdentifier \"{IdentifierFirstChar}{IdentifierOtherChars}*\"
-
-Digit [0-9]
-Integer    {Digit}+
-Decimal            (({Digit}*\.{Digit}+)|({Digit}+\.{Digit}*))
-Real            ({Integer}|{Decimal})[Ee][-+]?{Digit}+
-
-Other .
+Space                   [ \t\r\f]
+NewLine                 [\n]
+NonNewLine              [^\n]
+OneLineComment          ("--"{NonNewLine}*)
+Whitespace              ({Space}+|{OneLineComment})
+IdentifierFirstChar     [A-Za-z_\$]
+IdentifierOtherChars    [A-Za-z0-9_\$]
+Identifier              {IdentifierFirstChar}{IdentifierOtherChars}*
+QuotedIdentifier        \"{IdentifierFirstChar}{IdentifierOtherChars}*\"
+Digit                   [0-9]
+Integer                 {Digit}+
+Decimal                 (({Digit}*\.{Digit}+)|({Digit}+\.{Digit}*))
+Real                    ({Integer}|{Decimal})[Ee][-+]?{Digit}+
+Other                   .
 
 %%
 
@@ -68,61 +72,16 @@ Other .
     yylloc->step();
 %}
 
-"<=" {
-    return token::LSEQ;
-}
-
-"<>" {
-    return token::NEQ;
-}
-
-"!=" {
-    return token::NEQ;
-}
-
-">=" {
-    return token::GTEQ;
-}
-
-(?i:not) {
-    return token::NOT;
-}
-
-(?i:and) {
-    return token::AND;
-}
-
-(?i:or) {
-    return token::OR;
-}
+"<="        {return token::LSEQ;}
+"<>"        {return token::NEQ;}
+"!="        {return token::NEQ;}
+">="        {return token::GTEQ;}
 
 {OneLineComment} {
-    if (strncmp(yytext, "---", 3) == 0)  {
+    if (strncmp(yytext, "---", 3) == 0)
+    {
         _glue.setComment(yytext+3);
     }
-}
-
-{Identifier} {
-    CHECK_LEXEM_SIZE(yyleng + 1U);
-
-    if (const AFLKeyword *kw = FindAFLKeyword(yytext))
-    {
-        //Allocate string for keyword only for non-reserved keywords. It will be freed in identifier_clause
-        //in case of successful parsing (or in bison destructor in case unsuccessfull parsing).
-        if (!kw->reserved)
-        {
-            yylval->keyword = stringsAllocator.allocate(yyleng + 1);
-            strcpy(yylval->keyword, yytext);
-        }
-        else
-        {
-            yylval->keyword = NULL;
-        }
-        return kw->tok;
-    }
-    yylval->stringVal = stringsAllocator.allocate(yyleng + 1);
-    strcpy(yylval->stringVal, yytext);
-    return token::IDENTIFIER;
 }
 
 {Integer} {
@@ -138,14 +97,9 @@ Other .
     return token::INTEGER;
 }
 
-{QuotedIdentifier} {
-    std::string str = std::string(yytext, 1, yyleng - 2);
-    CHECK_LEXEM_SIZE(str.size() + 1)
-    yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
-    strcpy(yylval->stringVal, str.c_str());
-    return token::IDENTIFIER;
-}
-
+"inf" |
+"nan" |
+"NaN" |
 {Real} {
     try
     {
@@ -175,15 +129,29 @@ Other .
 }
 
 L?'(\\.|[^'])*' {
-    //FIXME: Ugly unescaping.
-    std::string str = std::string(yytext, 1, yyleng - 2);
-    boost::replace_all(str, "\\'", "'");
+    std::string  s(yytext, 1, yyleng - 2);
+    boost::replace_all(s,"\\'","'"); //FIXME: Ugly unescaping.
 
-    CHECK_LEXEM_SIZE(str.size() + 1)
-    yylval->stringVal = stringsAllocator.allocate(str.size() + 1);
-    strcpy(yylval->stringVal, str.c_str());
-
+    yylval->stringVal = copyLexeme(s.size(),&s[0]);
     return token::STRING_LITERAL;
+}
+
+{Identifier} {
+    if (const ALKeyword* kw = getAFLKeyword(yytext))
+    {
+        yylval->keyword = kw->name; // NB: keyword names are statically allocated
+        return kw->token;
+    }
+    else
+    {
+        yylval->stringVal = copyLexeme(yyleng,yytext);
+        return token::IDENTIFIER;
+    }
+}
+
+{QuotedIdentifier} {
+    yylval->stringVal = copyLexeme(yyleng-2,yytext+1);
+    return token::IDENTIFIER;
 }
 
 {Whitespace} {
@@ -192,38 +160,33 @@ L?'(\\.|[^'])*' {
 
 {NewLine} {
     yylloc->lines(yyleng);
-        yylloc->end.column = yylloc->begin.column = 1;
+    yylloc->end.column = yylloc->begin.column = 1;
     yylloc->step();
 }
 
-{Other} {
-    return static_cast<token_type>(*yytext);
-}
+{Other}     {return yytext[0];}
 
 %%
 
-namespace scidb {
+scidb::AFLScanner::AFLScanner(QueryParser& glue,std::istream* in,std::ostream* out)
+    : AFLBaseFlexLexer(in, out),
+      _glue(glue),
+      _arena("AFLScanner")
+{}
 
-AFLScanner::AFLScanner(QueryParser &glue, std::istream* in,
-    std::ostream* out)
-    : AFLBaseFlexLexer(in, out), _glue(glue)
-{
-}
-
-AFLScanner::~AFLScanner()
-{
-}
-
-void AFLScanner::set_debug(bool b)
+void scidb::AFLScanner::set_debug(bool b)
 {
     yy_flex_debug = b;
 }
 
-}
+char* scidb::AFLScanner::copyLexeme(size_t n,const char* p)
+{
+    assert(p!=0 && yyleng>=0 && n<=size_t(yyleng));
 
-#ifdef yylex
-#undef yylex
-#endif
+    void* q = _arena.calloc(n + 1);
+    memcpy(q,p,n);
+    return static_cast<char*>(q);
+}
 
 int AFLBaseFlexLexer::yylex()
 {

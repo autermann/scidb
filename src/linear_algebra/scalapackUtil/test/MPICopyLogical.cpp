@@ -96,26 +96,14 @@ ArrayDesc MPICopyLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::sha
                             d0.getCurrEnd(),
                             d0.getEndMax(), 
                             d0.getChunkInterval(), 
-                            0,
-                            d0.getType(),
-                            d0.getFlags(),
-                            d0.getMappingArrayName(),
-                            d0.getComment(),
-                            d0.getFuncMapOffset(),
-                            d0.getFuncMapScale());
+                            0);
     outDims[1] = DimensionDesc(d0.getBaseName() + "_2", 
                             d1.getStart(), 
                             d1.getCurrStart(),
                             d1.getCurrEnd(),
                             d1.getEndMax(), 
                             d1.getChunkInterval(), 
-                            0,
-                            d1.getType(),
-                            d1.getFlags(),
-                            d1.getMappingArrayName(),
-                            d1.getComment(),
-                            d1.getFuncMapOffset(),
-                            d1.getFuncMapScale());
+                            0);
     return ArrayDesc("mpicopy", atts, outDims);
 }
 

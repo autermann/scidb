@@ -156,13 +156,7 @@ public:
                                                             dim.getCurrEnd(),
                                                             dim.getEndMax(),
                                                             dim.getChunkInterval(),
-                                                            0,
-                                                            dim.getType(),
-                                                            dim.getFlags(),
-                                                            dim.getMappingArrayName(),
-                                                            dim.getComment(),
-                                                            dim.getFuncMapOffset(),
-                                                            dim.getFuncMapScale()));
+                                                            0));
                         break;
                     }
                 }

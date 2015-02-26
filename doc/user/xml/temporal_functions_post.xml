@@ -39,7 +39,7 @@
 
             <entry>Syntax</entry>
 
-            <entry>Returned Datatype</entry>
+            <entry>Returned Data type</entry>
           </row>
         </thead>
 
@@ -80,8 +80,9 @@
           <row>
             <entry>apply_offset</entry>
 
-            <entry>Converts a datetime value into its equivalent value, based
-            on the offset supplied (in seconds).</entry>
+            <entry>Converts a UTC datetime to local datetime by subtracting
+            the offset timezone value, and stores the result as datetimetz
+            including the offset timezone value.</entry>
 
             <entry>apply_offset(datetime,int64)</entry>
 
@@ -322,11 +323,11 @@
 
         <step>
           <para>Get the date and time, as a datetimetz value, and then convert
-          it to a datetime value that adds the GMT offset.<para><programlisting>AFL% store(build(&lt;current:datetimetz&gt;[i=0:0,1,0],tznow()),nowDate);  </programlisting><screen>[('2013-05-31 10:41:11 -04:00')]
+          it to a datetime value that adds the GMT offset.<para><programlisting>AFL% store(build(&lt;current:datetimetz&gt;[i=0:0,1,0],tznow()),nowDate);  </programlisting><screen>[('2013-12-02 17:06:58 -05:00')]
 </screen>The
           <emphasis role="bold">nowDate</emphasis> array has the current date
           and time. Now use the <literal>apply</literal> operator to return
-          the GMT date and time.<para><programlisting>AFL%  project(apply(nowDate,GMTdate,togmt(current)),GMTdate);  </programlisting><screen>[('2013-05-31 14:41:11')]
+          the GMT date and time.<para><programlisting>AFL%  project(apply(nowDate,GMTdate,togmt(current)),GMTdate);  </programlisting><screen>[('2013-12-02 22:06:58')]
 </screen></para></para></para>
         </step>
       </procedure>
@@ -344,7 +345,7 @@
       <procedure>
         <step>
           <para>Get the time and date as a datetime value, and store it to an
-          array.<para><programlisting>AFL% store(build(&lt;current:datetime&gt;[i=0:0,1,0],now()),currentDate);  </programlisting><screen>[('2013-05-31 14:41:12')]
+          array.<para><programlisting>AFL% store(build(&lt;current:datetime&gt;[i=0:0,1,0],now()),currentDate);  </programlisting><screen>[('2013-12-02 22:06:59')]
 </screen></para></para>
         </step>
 
@@ -352,7 +353,7 @@
           <para>Assume that we know that our time is GMT -5 hours. We can use
           the <literal>append_offset</literal> function to convert our
           datetime value into the correct datetimetz value.<para><programlisting>AFL% apply(currentDate, currentGMT, append_offset(current, (-5*3600)));  </programlisting><screen>{i} current,currentGMT
-{0} '2013-05-31 14:41:12','2013-05-31 14:41:12 -05:00'
+{0} '2013-12-02 22:06:59','2013-12-02 22:06:59 -05:00'
 </screen></para></para>
         </step>
 
@@ -362,7 +363,7 @@
           our time zone, which happens to be GMT -5 hours. Here, we can use
           the <literal>apply_offset</literal> function to convert our datetime
           value into the correct datetimetz value.<para><programlisting>AFL% apply(currentDate, currentGMT, apply_offset(current, (-5*3600)));  </programlisting><screen>{i} current,currentGMT
-{0} '2013-05-31 14:41:12','2013-05-31 09:41:12 -05:00'
+{0} '2013-12-02 22:06:59','2013-12-02 17:06:59 -05:00'
 </screen></para></para>
         </step>
       </procedure>

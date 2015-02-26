@@ -82,9 +82,7 @@ namespace scidb {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (attrID < array.dims.size()) {
-           _value = array.getInputArray()->getArrayDesc().getOriginalCoordinate(attrID,
-                                                                                inputIterator->getPosition()[attrID],
-                                                                                _query);
+           _value.setInt64(inputIterator->getPosition()[attrID]);
             return _value;
         } else {
             return inputIterator->getItem();

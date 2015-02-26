@@ -6,7 +6,7 @@ load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data1_str.txt')
 --test
 --start-query-logging
 
-CREATE ARRAY Data < AV : double NULL DEFAULT 9.999 > [ I(int64)=1000,4,2, J(int64)=1000,6,2, W(string)=1000,5,1 ]
+CREATE ARRAY Data < AV : double NULL DEFAULT 9.999 > [ I=0:999,4,2, J=0:999,6,2, W(string)=1000,5,1 ]
 
 --set-format csv+
 redimension_store(Raw_Test_Data, Data, avg ( V ) as AV)

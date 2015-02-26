@@ -1,3 +1,4 @@
+
 /*
 **
 * BEGIN_COPYRIGHT
@@ -503,7 +504,7 @@ int main(int argc, char* argv[])
             (CONFIG_NO_FETCH, 'n', "no-fetch", "", "", scidb::Config::BOOLEAN,
                 "Skip data fetching. Disabled by default'", false, false)
             (CONFIG_RESULT_FORMAT, 'o', "format", "format", "", scidb::Config::STRING,
-                "Output format: auto, csv, dense, csv+, lcsv+, text, sparse, lsparse, store, text, opaque, dcsv. Default is 'auto'.", string("auto"), false)
+                "Output format: auto, csv, dense, csv+, lcsv+, text, sparse, lsparse, store, text, opaque, dcsv. Default is 'dcsv'.", string("dcsv"), false)
             (CONFIG_PLUGINS_DIRECTORY, 'u', "plugins", "plugins", "", scidb::Config::STRING,
                 "Path to the plugins directory",
                 string(scidb::SCIDB_INSTALL_PREFIX()) + string("/lib/scidb/plugins"),

@@ -15,19 +15,19 @@ count(ABRLOAD)
 count(ABRREDIM)
 
 --echo "killquery redimension_store (signal 2)"
---shell --command "../utils/killquery.sh -afl 2 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${PPID}_1.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 2 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_1.stdout"
+--shell --command "cat /tmp/${HPID}_1.stdout"
 
 --echo "killquery redimension_store (signal 15)"
---shell --command "../utils/killquery.sh -afl 15 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${PPID}_2.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 15 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_2.stdout"
+--shell --command "cat /tmp/${HPID}_2.stdout"
 
 --echo "killquery redimension_store (signal 9)"
---shell --command "../utils/killquery.sh -afl 9 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${PPID}_3.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9 1 'redimension_store (ABRLOAD, ABRREDIM)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
 # log the output
---shell --command "cat /tmp/${PPID}_3.stdout"
+--shell --command "cat /tmp/${HPID}_3.stdout"
 
 count(ABRLOAD)
 project(versions(ABRLOAD),version_id)
@@ -45,6 +45,6 @@ project(sort(filter(list('arrays'), regex(name,'ABR.*'))),name,schema)
 --stop-query-logging
 remove(ABRLOAD)
 remove(ABRREDIM)
---shell --command "rm -f /tmp/${PPID}_1.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_2.stdout 2>/dev/null"
---shell --command "rm -f /tmp/${PPID}_3.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_1.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_2.stdout 2>/dev/null"
+--shell --command "rm -f /tmp/${HPID}_3.stdout 2>/dev/null"

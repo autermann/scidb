@@ -9,6 +9,14 @@
         <primary>approximate count</primary>
       </indexterm>Produces a result array containing approximate counts of the
     number of distinct values of an attribute.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>approxdc</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>approxdc</code> operator may be removed in the future. Use the <link
+    linkend="approxdcAgg">approxdc aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,7 +26,7 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The <literal>approxdc</literal> operator takes a set of values from
+    <para>The <code>approxdc</code> operator takes a set of values from
     an array attribute and returns an approximate count of the number of
     distinct values present.</para>
 
@@ -29,9 +37,8 @@
     being aggregated on.</para>
 
     <para>If you do not specify an attribute, the first attribute is used, You
-    can also specify one or more dimensions to group the results by dimension.
-    For the corresponding aggregate, see the <link
-    linkend="approxdcAgg">approxdc aggregate</link> reference</para>
+    can also specify one or more dimensions to group the results by
+    dimension.</para>
   </refsect1>
 
   <refsect1>

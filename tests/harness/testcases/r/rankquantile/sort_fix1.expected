@@ -12,12 +12,12 @@ SCIDB QUERY : <store(build(A,20*x+1),A)>
 {16} '321'
 {17} '341'
 
-SCIDB QUERY : <store(apply(A,s, iif(x=13,na,iif(x=16,null,x))),B)>
+SCIDB QUERY : <store(apply(A,s, iif(x=13,null,iif(x=16,null,x))),B)>
 {x} r,s
 {10} '201',10
 {11} '221',11
 {12} '241',12
-{13} '261',NA
+{13} '261',null
 {14} '281',14
 {15} '301',15
 {16} '321',null
@@ -101,7 +101,7 @@ SCIDB QUERY : <sort(A, desc)>
 SCIDB QUERY : <sort(B,s)>
 {n} r,s
 {0} '321',null
-{1} '261',NA
+{1} '261',null
 {2} '201',10
 {3} '221',11
 {4} '241',12
@@ -117,13 +117,13 @@ SCIDB QUERY : <sort(B, s desc)>
 {3} '241',12
 {4} '221',11
 {5} '201',10
-{6} '261',NA
-{7} '321',null
+{6} '321',null
+{7} '261',null
 
 SCIDB QUERY : <sort(B, s asc)>
 {n} r,s
 {0} '321',null
-{1} '261',NA
+{1} '261',null
 {2} '201',10
 {3} '221',11
 {4} '241',12

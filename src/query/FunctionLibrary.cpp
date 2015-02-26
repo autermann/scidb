@@ -128,13 +128,13 @@ void FunctionLibrary::registerBuiltInFunctions()
 #ifndef SCIDB_CLIENT
     addFunction(FunctionDescription("format", list_of(TID_DOUBLE)(TID_STRING), TypeId(TID_STRING), &formatDouble, (size_t)0));
     addFunction(FunctionDescription("length", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &length, (size_t)0));
-    addFunction(FunctionDescription("first", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &first, (size_t)0));
-    addFunction(FunctionDescription("last", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &last, (size_t)0));
+    addFunction(FunctionDescription("first_index", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &first_index, (size_t)0));
+    addFunction(FunctionDescription("last_index", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &last_index, (size_t)0));
     addFunction(FunctionDescription("low", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &low, (size_t)0));
     addFunction(FunctionDescription("high", list_of(TID_STRING)(TID_STRING), TypeId(TID_INT64), &high, (size_t)0));
     addFunction(FunctionDescription("length", list_of(TID_STRING), TypeId(TID_INT64), &length1, (size_t)0));
-    addFunction(FunctionDescription("first", list_of(TID_STRING), TypeId(TID_INT64), &first1, (size_t)0));
-    addFunction(FunctionDescription("last", list_of(TID_STRING), TypeId(TID_INT64), &last1, (size_t)0));
+    addFunction(FunctionDescription("first_index", list_of(TID_STRING), TypeId(TID_INT64), &first_index1, (size_t)0));
+    addFunction(FunctionDescription("last_index", list_of(TID_STRING), TypeId(TID_INT64), &last_index1, (size_t)0));
     addFunction(FunctionDescription("low", list_of(TID_STRING), TypeId(TID_INT64), &low1, (size_t)0));
     addFunction(FunctionDescription("high", list_of(TID_STRING), TypeId(TID_INT64), &high1, (size_t)0));
     addFunction(FunctionDescription("instanceid", vector<TypeId>(), TypeId(TID_INT64), &instanceId, (size_t)0));
@@ -609,7 +609,7 @@ bool FunctionLibrary::_findFunction(const std::string& name,
                                    bool tile, ConversionCost& convCost, bool& swapInputs)
 {
     convCost = 0;
-    // Hard coded iif function because it has no parameter types except the 
+    // Hard coded iif function because it has no parameter types except the
     // first bool. So, we create a special FunctionDescription, and return it.
     string lowCaseName = name;
     transform(lowCaseName.begin(), lowCaseName.end(), lowCaseName.begin(), ::tolower);
@@ -618,9 +618,9 @@ bool FunctionLibrary::_findFunction(const std::string& name,
             std::vector< TypeId> inputTypes = inputArgTypes;
             TypeId outputType;
             if (inputArgTypes[1] != inputArgTypes[2]) {
-                if (Type::isSubtype(inputArgTypes[1], inputArgTypes[2])) { 
+                if (Type::isSubtype(inputArgTypes[1], inputArgTypes[2])) {
                     outputType = inputArgTypes[2];
-                } else if (Type::isSubtype(inputArgTypes[2], inputArgTypes[1])) { 
+                } else if (Type::isSubtype(inputArgTypes[2], inputArgTypes[1])) {
                     outputType = inputArgTypes[1];
                 } else {
                     converters.resize(inputTypes.size());
@@ -632,7 +632,7 @@ bool FunctionLibrary::_findFunction(const std::string& name,
                             converters[1] = NULL;
                             convCost = cost[2];
                             outputType = inputTypes[2] = inputArgTypes[1];
-                        } else { 
+                        } else {
                             outputType = inputTypes[1] = inputArgTypes[2];
                             converters[2] = NULL;
                             convCost = cost[1];
@@ -640,7 +640,7 @@ bool FunctionLibrary::_findFunction(const std::string& name,
                     } else if (converters[2]) {
                         outputType = inputTypes[2] = inputArgTypes[1];
                         convCost = cost[2];
-                    } else { 
+                    } else {
                         return false;
                     }
                 }
@@ -696,7 +696,7 @@ bool FunctionLibrary::_findFunction(const std::string& name,
 
     bool cnvVectorModeForBestMatch = true;
     bool foundMatch = false;
-    // We have no found a function with the specified argument types. Trying 
+    // We have no found a function with the specified argument types. Trying
     // to find with converters.
     vector<ArgTypes> possibleArgTypes;
     vector<TypeId> possibleResultTypes;
@@ -810,7 +810,7 @@ FunctionPointer FunctionLibrary::findConverter(
                     TypeId const& destType,
                     bool& supportsVectorMode,
                     bool tile,
-                    bool raiseException, 
+                    bool raiseException,
                     ConversionCost* cost)
 {
     if (srcType == destType) {
@@ -831,8 +831,8 @@ FunctionPointer FunctionLibrary::findConverter(
     if (cnv == NULL) {
         TypeId baseType = srcType;
         while ((baseType = TypeLibrary::getType(baseType).baseType()) != TID_VOID) {
-            if (baseType == destType) { 
-                if (cost != NULL) { 
+            if (baseType == destType) {
+                if (cost != NULL) {
                     *cost = 0;
                 }
                 return &identicalConversion;
@@ -842,21 +842,21 @@ FunctionPointer FunctionLibrary::findConverter(
             }
         }
     }
-    if (cnv == NULL) { 
+    if (cnv == NULL) {
         TypeId baseType = destType;
         while ((baseType = TypeLibrary::getType(baseType).baseType()) != TID_VOID) {
-            if (baseType == srcType) { 
-                if (cost != NULL) { 
+            if (baseType == srcType) {
+                if (cost != NULL) {
                     *cost = 0;
                 }
                 return &identicalConversion;
             }
-            if ((cnv = findDirectConverter(srcType, baseType, tile)) != NULL) { 
+            if ((cnv = findDirectConverter(srcType, baseType, tile)) != NULL) {
                 break;
             }
         }
     }
-    if (cnv == NULL) { 
+    if (cnv == NULL) {
         if (raiseException) {
             throw USER_EXCEPTION(SCIDB_SE_TYPE, SCIDB_LE_CANT_FIND_CONVERTER)
                 << TypeLibrary::getType(srcType).name() << TypeLibrary::getType(destType).name();
@@ -866,7 +866,7 @@ FunctionPointer FunctionLibrary::findConverter(
         }
     }
     if (cost != NULL) {
-        if (*cost <= cnv->cost) { 
+        if (*cost <= cnv->cost) {
             if (raiseException)
             {
                 throw USER_EXCEPTION(SCIDB_SE_TYPE, SCIDB_LE_CANT_FIND_IMPLICIT_CONVERTER)
@@ -936,7 +936,7 @@ void FunctionLibrary::addConverter( TypeId srcType,
 
 void FunctionLibrary::addVConverter( TypeId srcType,
                                     TypeId destType,
-                                    FunctionPointer func, 
+                                    FunctionPointer func,
                                     ConversionCost cost)
 {
     // TODO: implement the check of ability to add converter

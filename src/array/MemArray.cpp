@@ -43,8 +43,6 @@
 #include "query/Statistics.h"
 #include <system/Utils.h>
 
-#define OPTIMIZED_SEQUENTIAL_MODE true
-
 namespace scidb
 {
     using namespace boost;
@@ -87,7 +85,7 @@ namespace scidb
         _swapFile = -1;
         _usedFileSize = 0;
     }
-    
+
     inline void MemArray::pinChunk(LruMemChunk& chunk)
     {
         Query::getValidQueryPtr(_query);
@@ -128,7 +126,7 @@ namespace scidb
             }
             chunk.initialize(this, &desc, addr, desc.getAttributes()[addr.attId].getDefaultCompressionMethod());
             chunk.setBitmapChunk(bitmapChunk);
-            if (bitmapChunk != NULL) { 
+            if (bitmapChunk != NULL) {
                 bitmapChunk->unPin();
             }
             chunk.prune();
@@ -161,12 +159,12 @@ namespace scidb
         array = NULL;
     }
 
-    Array const& MemChunk::getArray() const 
+    Array const& MemChunk::getArray() const
     {
         return *array;
     }
 
-    boost::shared_ptr<ConstRLEEmptyBitmap> MemChunk::getEmptyBitmap() const 
+    boost::shared_ptr<ConstRLEEmptyBitmap> MemChunk::getEmptyBitmap() const
     {
         return emptyBitmap ? emptyBitmap : bitmapChunk ? bitmapChunk->getEmptyBitmap() : ConstChunk::getEmptyBitmap();
     }
@@ -201,20 +199,20 @@ namespace scidb
         return bitmapChunk != NULL ? bitmapChunk : getAttributeDesc().isEmptyIndicator() ? this : NULL;
     }
 
-    void MemChunk::setEmptyBitmap(boost::shared_ptr<ConstRLEEmptyBitmap> const& bitmap) 
-    {         
+    void MemChunk::setEmptyBitmap(boost::shared_ptr<ConstRLEEmptyBitmap> const& bitmap)
+    {
         emptyBitmap = bitmap;
-        if (bitmap) { 
+        if (bitmap) {
             bitmapChunk = this;
         }
     }
 
     void MemChunk::setBitmapChunk(Chunk* newBitmapChunk)
     {
-        bitmapChunk = newBitmapChunk != NULL 
+        bitmapChunk = newBitmapChunk != NULL
             && (arrayDesc == NULL || !getAttributeDesc().isEmptyIndicator())
-            && (newBitmapChunk->getAttributeDesc().isEmptyIndicator() 
-                || (isRLE() && arrayDesc->getEmptyBitmapAttribute() != NULL)) 
+            && (newBitmapChunk->getAttributeDesc().isEmptyIndicator()
+                || (isRLE() && arrayDesc->getEmptyBitmapAttribute() != NULL))
             ? (Chunk*)newBitmapChunk->getBitmapChunk() : NULL;
     }
 
@@ -222,7 +220,7 @@ namespace scidb
     {
         assert(false);
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "LruMemChunk::initialize";
-    } 
+    }
 
     void MemChunk::initialize(ConstChunk const& srcChunk)
     {
@@ -234,7 +232,7 @@ namespace scidb
         setSparse(srcChunk.isSparse());
 #ifndef SCIDB_CLIENT
         setRLE((srcChunk.getAttributeDesc().isEmptyIndicator() && Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT)) || srcChunk.isRLE());
-#else 
+#else
         setRLE(srcChunk.isRLE());
 #endif
     }
@@ -243,7 +241,7 @@ namespace scidb
     {
         assert(arr);
         MemChunk::initialize(arr, desc, firstElem, compMethod);
-    } 
+    }
 
     void LruMemChunk::initialize(Array const* arr, ArrayDesc const* desc, const Address& firstElem, int compMethod)
     {
@@ -378,8 +376,8 @@ namespace scidb
         this->rle = rle;
     }
 
-    void MemChunk::fillRLEBitmap() 
-    { 
+    void MemChunk::fillRLEBitmap()
+    {
         boost::shared_ptr<Query> emptyQuery;
         RLEChunkIterator iterator(*arrayDesc, addr.attId, this, NULL, ChunkIterator::NO_EMPTY_CHECK, emptyQuery);
         boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap = iterator.getEmptyBitmap();
@@ -399,7 +397,7 @@ namespace scidb
     boost::shared_ptr<ChunkIterator> MemChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
     {
         return boost::shared_ptr<ChunkIterator>(
-            isRLE() 
+            isRLE()
             ? new RLEChunkIterator(*arrayDesc, addr.attId, this, bitmapChunk, iterationMode, query)
             : ((iterationMode & ChunkIterator::SPARSE_CHUNK) || isSparse())
                 ? (ChunkIterator*)new SparseChunkIterator(*arrayDesc, addr.attId, this, bitmapChunk,
@@ -446,14 +444,14 @@ namespace scidb
     {
         ConstChunk const* src = this;
         MemChunk closure;
-        if (emptyBitmap && rle && getBitmapSize() == 0) { 
+        if (emptyBitmap && rle && getBitmapSize() == 0) {
             closure.initialize(*this);
             makeClosure(closure, emptyBitmap);
             src = &closure;
         }
         PinBuffer scope(*src);
         size_t decompressedSize = src->getSize();
-        if (!emptyBitmap) { 
+        if (!emptyBitmap) {
             decompressedSize -= src->getBitmapSize();
         }
         buf.allocate(decompressedSize);
@@ -712,7 +710,7 @@ namespace scidb
             reset();
         }
     }
-    
+
     MemArrayIterator::MemArrayIterator(MemArray& arr, AttributeID attId)
     : _array(arr)
     {
@@ -866,7 +864,7 @@ namespace scidb
             size_t rawSize = (elemSize == 0) ? (tileSize + 7) >> 3 : tileSize * elemSize;
             RLEPayload* tile = value.getTile(attr->getType());
             tile->unpackRawData(bufPos, rawSize, 0, elemSize, tileSize, elemSize == 0);
-            if (varyingOffs) { 
+            if (varyingOffs) {
                 tile->setVarPart(buf + varyingOffs, dataChunk->getSize() - varyingOffs - nullBitmapSize);
             }
             return value;
@@ -945,9 +943,9 @@ namespace scidb
         }
         if (mode & TILE_MODE) {
             currElem += maxTileSize;
-            if (elemSize == 0) { 
+            if (elemSize == 0) {
                 bufPos += (maxTileSize+7) >> 3;
-            } else { 
+            } else {
                 bufPos += maxTileSize*elemSize;
             }
             hasCurrent = currElem < lastElem;
@@ -1069,17 +1067,17 @@ namespace scidb
         if (mode & TILE_MODE) {
             RLEPayload* tile = item.getTile();
             char* dst = bufPos;
-            for (size_t i = 0, n = tile->nSegments(); i < n; i++) { 
+            for (size_t i = 0, n = tile->nSegments(); i < n; i++) {
                 RLEPayload::Segment const& s = tile->getSegment(i);
                 assert(!s._null);
                 char* src = tile->getRawValue(s._valueIndex);
                 size_t len = (size_t)s.length();
                 if (s._same) {
-                    for (size_t j = 0; j < len; j++) { 
+                    for (size_t j = 0; j < len; j++) {
                         memcpy(dst, src, elemSize);
                         dst += elemSize;
                     }
-                } else { 
+                } else {
                     memcpy(dst, src, elemSize*len);
                     dst += elemSize*len;
                 }
@@ -1226,7 +1224,7 @@ namespace scidb
         value =  Value(type);
         trueValue.setBool(true);
         defaultValue = attr->getDefaultValue();
-        
+
         // Calculate number of elements in the chunk
         const Dimensions& dim = array.getDimensions();
         size_t n = 1;
@@ -1257,7 +1255,7 @@ namespace scidb
             elemSize >>= 3; // in case of boolean type (size = 1 bit), elemSize becomes equal to zero
             nElemsPerStride = (elemSize == 0) ? STRIDE_SIZE * 8 : STRIDE_SIZE / elemSize;
         }
-        
+
         // Get or allocate chunk data buffer
         size_t bitmapSize = (nElems + 7) >> 3;
         if (newChunk) {
@@ -1274,7 +1272,7 @@ namespace scidb
         } else {
             buf = (char*)dataChunk->getData();
         }
-        
+
         // Set empty bitmap
         emptyBitmap = NULL;
         if (!(iterationMode & NO_EMPTY_CHECK) && bitmapChunk != NULL) {
@@ -1303,7 +1301,7 @@ namespace scidb
                 emptyBitmap = (char*)buf;
             }
         }
-        
+
         // Set null bitmap
         if (attr->isNullable()) {
             nullBitmap = buf;
@@ -1388,7 +1386,7 @@ namespace scidb
             }
         }
 
-        if (dataChunkPinned) { 
+        if (dataChunkPinned) {
             dataChunk->unPin();
         }
         if (bitmapChunkPinned) {
@@ -1959,7 +1957,7 @@ namespace scidb
             }
         }
 
-        if (dataChunkPinned) { 
+        if (dataChunkPinned) {
             dataChunk->unPin();
         }
         if (bitmapChunkPinned) {
@@ -1969,9 +1967,9 @@ namespace scidb
 
     //
     // RLEChunkIterator
-    // 
     //
-    boost::shared_ptr<ConstRLEEmptyBitmap> BaseChunkIterator::getEmptyBitmap() 
+    //
+    boost::shared_ptr<ConstRLEEmptyBitmap> BaseChunkIterator::getEmptyBitmap()
     {
         return emptyBitmap;
     }
@@ -1988,14 +1986,14 @@ namespace scidb
 
     void BaseChunkIterator::setVectorMode(bool enabled)
     {
-        if (enabled) { 
+        if (enabled) {
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "BaseChunkIterator::setVectorMode";
         }
     }
 
     bool BaseChunkIterator::isEmpty()
     {
-        return false; 
+        return false;
     }
 
     bool BaseChunkIterator::end()
@@ -2033,21 +2031,21 @@ namespace scidb
         if (mode & TILE_MODE) {
             tilePos += tileSize;
             hasCurrent = tilePos < _logicalChunkSize;
-        } else {             
+        } else {
             ++emptyBitmapIterator;
             hasCurrent = !emptyBitmapIterator.end();
         }
     }
 
     bool BaseChunkIterator::setPosition(Coordinates const& coord)
-    { 
+    {
         if (mode & TILE_MODE) {
             tilePos = coord2pos(coord);
             if (tilePos % tileSize)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TILE_NOT_ALIGNED);
             return hasCurrent = tilePos < _logicalChunkSize;
-        } else { 
-            if (!dataChunk->contains(coord, !(mode & IGNORE_OVERLAPS))) { 
+        } else {
+            if (!dataChunk->contains(coord, !(mode & IGNORE_OVERLAPS))) {
                 return hasCurrent = false;
             }
             position_t pos = coord2pos(coord);
@@ -2061,7 +2059,7 @@ namespace scidb
         LOG4CXX_TRACE(logger, "~BCI this=" << this
                       << ", chunk=" << dataChunk
                       << ", pinned=" << dataChunkPinned);
-        if (dataChunkPinned) { 
+        if (dataChunkPinned) {
             dataChunk->unPin();
         }
     }
@@ -2107,7 +2105,7 @@ namespace scidb
         Coordinates const& firstPos(data->getFirstPosition(true));
         Coordinates const& lastPos(data->getLastPosition(true));
 
-        if ((iterationMode & INTENDED_TILE_MODE) && !attr.isNullable() && type.bitSize() >= 8) { 
+        if ((iterationMode & INTENDED_TILE_MODE) && !attr.isNullable() && type.bitSize() >= 8) {
             mode |= TILE_MODE;
         }
 
@@ -2150,7 +2148,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
 
         if (((iterationMode & APPEND_CHUNK) || bitmap == NULL) && payload.packedSize() < data->getSize()) {
             emptyBitmap = boost::shared_ptr<ConstRLEEmptyBitmap>(new ConstRLEEmptyBitmap((char*)data->getData() + payload.packedSize()));
-        } else if (bitmap != NULL) { 
+        } else if (bitmap != NULL) {
             emptyBitmap = bitmap->getEmptyBitmap();
         }
         if (!emptyBitmap) {
@@ -2244,9 +2242,9 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         }
         return true;
     }
- 
+
     //
-    // RLE Bitmap chunk iterator 
+    // RLE Bitmap chunk iterator
     //
 
     RLEBitmapChunkIterator::RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr,
@@ -2255,9 +2253,9 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
     : BaseChunkIterator(desc, attr, data, iterationMode, query),
       value(type)
     {
-        if (data->getData() == NULL) { 
+        if (data->getData() == NULL) {
             emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
-        } else { 
+        } else {
             emptyBitmap = data->getEmptyBitmap();
             if (hasOverlap && (iterationMode & IGNORE_OVERLAPS)) {
                 emptyBitmap = emptyBitmap->cut(data->getFirstPosition(true),
@@ -2294,6 +2292,8 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                                        int iterationMode,
                                        boost::shared_ptr<Query> const& query)
     : BaseChunkIterator(desc, attrID, data, iterationMode, query),
+      _arena (arena::newArena(arena::Options("RLEValueMap").pagesize(64*KB).resetting(true))),
+      values(*new(*_arena) ValueMap(_arena)),
       tileValue(type, true),
       payload(type),
       bitmapChunk(bitmap),
@@ -2314,21 +2314,21 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                     values[coord2pos(it->getPosition())] = it->getItem();
                     ++(*it);
                 }
-            } else { 
+            } else {
                 ConstRLEPayload payload((char*)data->getData());
                 ConstRLEPayload::iterator it(&payload);
-                while (!it.end()) { 
-                    if (it.isDefaultValue(defaultValue)) { 
+                while (!it.end()) {
+                    if (it.isDefaultValue(defaultValue)) {
                         it.toNextSegment();
-                    } else { 
+                    } else {
                         it.getItem(values[it.getPPos()]);
                         ++it;
                     }
                 }
-            }                
+            }
         }
         falseValue.setBool(false);
-        if (bitmap != NULL && !(iterationMode & NO_EMPTY_CHECK)) { 
+        if (bitmap != NULL && !(iterationMode & NO_EMPTY_CHECK)) {
             trueValue.setBool(true);
             bitmap->pin();
             mode &= ~TILE_MODE;
@@ -2346,8 +2346,8 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         }
     }
 
-    bool RLEChunkIterator::setPosition(Coordinates const& pos) 
-    {        
+    bool RLEChunkIterator::setPosition(Coordinates const& pos)
+    {
         position_t prevTilePos = tilePos;
         if (BaseChunkIterator::setPosition(pos))
         {
@@ -2363,8 +2363,8 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
     {
         return values.find(getPos()) == values.end();
     }
-    
-    
+
+
     Value& RLEChunkIterator::getItem()
     {
         if (!hasCurrent)
@@ -2374,7 +2374,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
             tileValue.getTile()->unPackTile(payload, *emptyBitmap, tilePos, end);
             return tileValue;
         } else {
-            if (isEmpty()) { 
+            if (isEmpty()) {
                 tmpValue = defaultValue;
                 return tmpValue;
             }
@@ -2388,7 +2388,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
             RLEPayload* tile = item.getTile();
-            if (tile->count() == INFINITE_LENGTH) { 
+            if (tile->count() == INFINITE_LENGTH) {
                 position_t end = min(tilePos + tileSize, _logicalChunkSize);
                 tile->trim(end - tilePos);
             }
@@ -2396,44 +2396,25 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         } else {
             if (item.isNull() && !attr.isNullable())
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
-            if (mode & SEQUENTIAL_WRITE) { 
-#if OPTIMIZED_SEQUENTIAL_MODE
-                if (isEmptyIndicator) { 
+            if (mode & SEQUENTIAL_WRITE) {
+                if (isEmptyIndicator) {
                     position_t pos = emptyBitmapIterator.getLPos();
-                    if (pos != prevPos) { 
+                    if (pos != prevPos) {
                         assert(pos > prevPos);
                         appender.add(falseValue, pos - prevPos);
-                    }                    
+                    }
                     prevPos = pos+1;
-                } else if (!isEmptyable) { 
+                } else if (!isEmptyable) {
                     position_t pos = emptyBitmapIterator.getPPos();
-                    if (pos != prevPos) { 
+                    if (pos != prevPos) {
                         assert(pos > prevPos);
                         appender.add(defaultValue, pos - prevPos);
-                    }                    
+                    }
                     prevPos = pos+1;
                 }
                 appender.add(item);
-#else
-                position_t pos = emptyBitmapIterator.getLPos();
-                if (pos < tilePos)
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_INVALID_OPERATION_FOR_SEQUENTIAL_MODE);
-                    
-                if (values.size() == size_t(tileSize)) {
-                    RLEPayload tile(values, pos - tilePos, type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, !attr.isEmptyIndicator());
-                    payload.append(tile);
-#ifdef USE_STACK_ALLOCATOR_FOR_VALUE_MAP
-                    values.~ValueMap();
-                    new (&values) ValueMap();
-#else                    
-                    values.clear();
-#endif
-                    tilePos = pos;
-                }
-                values[pos - tilePos] = item;
-#endif
-            } else { 
-                if (!type.variableSize() && item.size() > type.byteSize()) { 
+            } else {
+                if (!type.variableSize() && item.size() > type.byteSize()) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << item.size() << type.byteSize();
                 }
                 values[getPos()] = item;
@@ -2449,14 +2430,14 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
     void RLEChunkIterator::flush()
     {
         _needsFlush = false;
-        if (!(mode & (SEQUENTIAL_WRITE|TILE_MODE))) { 
-            if (isEmptyIndicator) { 
+        if (!(mode & (SEQUENTIAL_WRITE|TILE_MODE))) {
+            if (isEmptyIndicator) {
                 RLEEmptyBitmap bitmap(values);
                 dataChunk->allocate(bitmap.packedSize());
                 bitmap.pack((char*)dataChunk->getData());
-            } else { 
+            } else {
                 RLEPayload payload(values, emptyBitmap->count(), type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, isEmptyable);
-                if (isEmptyable && (mode & APPEND_CHUNK)) { 
+                if (isEmptyable && (mode & APPEND_CHUNK)) {
                     RLEEmptyBitmap bitmap(values, true);
                     dataChunk->allocate(payload.packedSize() + bitmap.packedSize());
                     payload.pack((char*)dataChunk->getData());
@@ -2480,7 +2461,6 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
             }
 
             else {
-#if OPTIMIZED_SEQUENTIAL_MODE
                 if ((mode & (TILE_MODE|SEQUENTIAL_WRITE)) == SEQUENTIAL_WRITE) {
                     if (!isEmptyable) {
                         position_t count = emptyBitmap->count();
@@ -2491,21 +2471,15 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                     }
                     appender.flush();
                 }
-#else
-                if ((mode & SEQUENTIAL_WRITE) && tilePos != _logicalChunkSize) {
-                    RLEPayload tile(values, _logicalChunkSize - tilePos, type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, !isEmptyIndicator);
-                    payload.append(tile);
-                }
-#endif
             }
 
             if (emptyChunkIterator && (mode & TILE_MODE))
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_UPDATE_BITMAP_IN_TILE_MODE);
-            if (isEmptyIndicator) { 
+            if (isEmptyIndicator) {
                 RLEEmptyBitmap bitmap(payload);
                 dataChunk->allocate(bitmap.packedSize());
                 bitmap.pack((char*)dataChunk->getData());
-            } else { 
+            } else {
                 if (isEmptyable && (mode & APPEND_CHUNK))
                 {
                     if (!bitmapChunk)
@@ -2525,7 +2499,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                 }
             }
         }
-        if (mode & SPARSE_CHUNK) { 
+        if (mode & SPARSE_CHUNK) {
             dataChunk->setSparse(true);
         }
         boost::shared_ptr<Query> query(getQuery());

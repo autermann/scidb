@@ -36,42 +36,6 @@ namespace scidb {
     using namespace boost;
     using namespace std;
 
-    void thinMappingArray(string const& dimName, string const& mappingArrayName, string const& tmpMappingArrayName, 
-                          Coordinate from, Coordinate step, Coordinate last, boost::shared_ptr<Query> const& query)
-    {
-        shared_ptr<Array> srcMappingArray = query->getArray(mappingArrayName);
-        ArrayDesc const& srcMappingArrayDesc = srcMappingArray->getArrayDesc();
-        shared_ptr<ConstArrayIterator> srcArrayIterator = srcMappingArray->getConstIterator(0);
-        Coordinates origin(1);
-        origin[0] = srcMappingArrayDesc.getDimensions()[0].getStart();
-        srcArrayIterator->setPosition(origin);
-        ConstChunk const& srcChunk = srcArrayIterator->getChunk();
-        shared_ptr<ConstChunkIterator> srcChunkIterator = srcChunk.getConstIterator();
-        
-        Dimensions indexMapDim(1);
-        indexMapDim[0] = DimensionDesc("no", 0, 0, last, last, last+1, 0);                
-        ArrayDesc dstMappingArrayDesc(tmpMappingArrayName,
-                                      srcMappingArrayDesc.getAttributes(), 
-                                      indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
-        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc,query));
-        if (last != -1) { 
-            shared_ptr<ArrayIterator> dstArrayIterator = dstMappingArray->getIterator(0);
-            Coordinates pos(1);
-            Chunk& dstChunk = dstArrayIterator->newChunk(pos, 0);
-            dstChunk.setRLE(false);
-            shared_ptr<ChunkIterator> dstChunkIterator = dstChunk.getIterator(query);
-            
-            pos[0] = from;
-            while (srcChunkIterator->setPosition(pos)) {
-                dstChunkIterator->writeItem(srcChunkIterator->getItem());
-                pos[0] += step;
-                ++(*dstChunkIterator);
-            }
-            dstChunkIterator->flush();
-        }
-        query->setTemporaryArray(dstMappingArray);
-    }
-
     //
     // Thin chunk iterator methods
     //

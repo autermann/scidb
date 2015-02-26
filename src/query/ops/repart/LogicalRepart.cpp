@@ -98,8 +98,6 @@ public:
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR1);
         for (size_t i = 0, n = srcDimensions.size(); i < n; i++)
         {
-            if (srcDimensions[i].getType() != dstDimensions[i].getType())
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR2);
             if (srcDimensions[i].getStart() != dstDimensions[i].getStart())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR3);
             if (!(srcDimensions[i].getEndMax() == dstDimensions[i].getEndMax() 
@@ -109,7 +107,6 @@ public:
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR4);
             if (srcDimensions[i].getStart() == MIN_COORDINATE)
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR5);
-            dstDimensions[i].setMappingArrayName(srcDimensions[i].getMappingArrayName());
         }
         return ArrayDesc(schemaParam.getName(), srcAttributes, dstDimensions, schemaParam.getFlags());
     }

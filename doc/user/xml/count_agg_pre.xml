@@ -16,15 +16,15 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> count(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;
+    <synopsis>AQL% <command>SELECT</command> count(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable> <optional><command>GROUP BY</command> <replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>
 
-AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>))</synopsis>
+AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
 
     <para>OR</para>
 
-    <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
+    <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable> <optional><command>GROUP BY</command> <replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
 
-    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,count(*))</synopsis>
+    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,count(*) <optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -56,12 +56,9 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
       <procedure>
         <step>
-          <para>Create an array:<programlisting language="test">--afl CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no</programlisting></para>
-        </step>
-
-        <step>
-          <para>Put values 1 along the diagonal of m3x3 and leave the
-          remaining cells empty:<programlisting language="test">--afl store(build_sparse(m3x3,1,i=j),m3x3); --output-format=dense --chunkify=yes</programlisting></para>
+          <para>Create an array with values 1 along the diagonal of m3x3, and
+          the remaining cells empty.<programlisting language="test">--afl store(build_sparse(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],1,i=j),m3x3);
+      --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>
@@ -77,39 +74,15 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
       <procedure>
         <step>
-          <para>Show the contents of count_array:<programlisting
-          language="test">--aql create array aFlat 
-      &lt;row:int64, col:int64, value:string null&gt; 
-      [csvRow=0:5,6,0]
- --show-query=no
- --show-output=no
+          <para>Show the contents of array <emphasis
+          role="bold">A</emphasis>:<programlisting language="test">--afl store(build(&lt;value:string null&gt;
+           [row=0:2,3,0, col=0:2,3,0],
+           '[[(),(),()],[(null),(null),
+           (null)],[(a7),(a8),(a9)]]',
+            true),A); --show-query=no --show-output=no
 
---shell --command=csv2scidb -s 1 -p NNs 
-            &lt; $DOC_DATA/aInsert.csv &gt; 
-              $DOC_DATA/aInsert.scidb
- --show-query=no
- --show-output=no
-
---aql load aFlat 
-      from '../tests/harness/testcases/data/doc/aInsert.scidb'
- --show-query=no
- --show-output=no
-
---aql create array A 
-      &lt;value:string null&gt; 
-      [row=1:3,3,0, col=1:3,3,0]
- --show-query=no
- --show-output=no
-
---afl redimension_store(aFlat,A)
- --show-query=no
- --show-output=no
-
---aql select * from A
- --output-format=dense
- --chunkify=yes
- --show-query=no
- --show-output=yes</programlisting></para>
+--afl scan(A); --output-format=dense  --chunkify=yes
+    --show-query=no  --show-output=yes</programlisting></para>
         </step>
 
         <step>
@@ -119,7 +92,8 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
         <step>
           <para>Count the number of nonempty and non-null cells for the
-          <literal>value</literal> attribute:<programlisting language="test">--aql select count(value) from A; --output-format=dense
+          <literal>value</literal> attribute, along the first
+          dimension:<programlisting language="test">--aql select count(value) from A group by row; --output-format=dense
 </programlisting></para>
         </step>
       </procedure>

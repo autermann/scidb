@@ -54,7 +54,7 @@ public:
             if (coord.isNull()) {
                 result[i] = dims[i].getLowBoundary();
             } else {
-               result[i] = _schema.getOrdinalCoordinate(i, coord, cmLowerBound, query);
+                result[i] = coord.getInt64();
                 if (dims[i].getStart() != MIN_COORDINATE && result[i] < dims[i].getStart())
                 {
                     result[i] = dims[i].getStart();
@@ -75,7 +75,7 @@ public:
             if (coord.isNull()) {
                 result[i] = dims[i].getHighBoundary();
             } else {
-               result[i] = _schema.getOrdinalCoordinate(i, coord, cmUpperBound, query);
+                result[i] = coord.getInt64();
                 if (result[i] > dims[i].getEndMax())
                 {
                     result[i] = dims[i].getEndMax();

@@ -121,6 +121,21 @@ class SharedMemoryIpc
         }
     };
 
+    class NoShmMemoryException : public SystemErrorException, std::bad_alloc
+    {
+    public:
+        NoShmMemoryException(int err, const char* file, const char* function, int32_t line)
+        : SystemErrorException(err, file, function, line)
+        {
+        }
+        virtual ~NoShmMemoryException() throw () {}
+        virtual void raise() const { throw *this; }
+        virtual const char* what() const throw()
+        {
+            return "SharedMemoryIpc::NoShmMemoryException: unable to allocate shared memory";
+        }
+    };
+
     /// Access modes
     typedef enum { RDONLY=boost::interprocess::read_only,
                    RDWR=boost::interprocess::read_write } AccessMode;
@@ -242,8 +257,8 @@ public:
 class SharedMemory : public SharedMemoryIpc
 {
 public:
-    explicit SharedMemory(const std::string& name)
-    : SharedMemoryIpc(name)
+    explicit SharedMemory(const std::string& name, bool prealloc=false)
+    : SharedMemoryIpc(name), _isPreallocate(prealloc)
     { }
     virtual ~SharedMemory();
     virtual void create(AccessMode amode);
@@ -272,10 +287,17 @@ public:
     SharedMemory(const SharedMemory&);
     SharedMemory& operator=(const SharedMemory&);
 
+    /**
+     * Pre-allocate the space in the /dev/shm partition
+     *  to avoid running out of space later and being killed by SIGBUS
+     */
+    void preallocateShmMemory();
+
     boost::scoped_ptr<boost::interprocess::shared_memory_object> _shm;
     boost::scoped_ptr<boost::interprocess::mapped_region> _region;
+    bool _isPreallocate;
 };
- 
+
 ///
 /// Class for interfaces that require {std,boost}::shared_ptr get() method
 ///

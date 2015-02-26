@@ -147,8 +147,6 @@ public:
         for (size_t i = 0, n = srcDimensions.size(); i < n; i++) {
             DimensionDesc const& srcDim = srcDimensions[i];
             DimensionDesc const& dstDim = dstDimensions[i];
-            if (srcDim.getType() != dstDim.getType() && dstDim.getType() != TID_INT64)
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR9, pc);
             if (!(srcDim.getEndMax() == dstDim.getEndMax() 
                   || (srcDim.getEndMax() < dstDim.getEndMax() 
                       && ((srcDim.getLength() % srcDim.getChunkInterval()) == 0
@@ -175,13 +173,7 @@ public:
                                              srcDim.getCurrEnd(), 
                                              dstDim.getEndMax() == MAX_COORDINATE && srcDim.getCurrEnd() != MIN_COORDINATE ? srcDim.getEndMax() : dstDim.getEndMax(),
                                              dstDim.getChunkInterval(), 
-                                             dstDim.getChunkOverlap(), 
-                                             dstDim.getType(), 
-                                             dstDim.getFlags(), 
-                                             srcDim.getMappingArrayName(), 
-                                             dstDim.getComment(),
-                                             srcDim.getFuncMapOffset(),
-                                             srcDim.getFuncMapScale());
+                                             dstDim.getChunkOverlap());
         }
         return ArrayDesc(schemaParam.getName(), dstAttributes, dstDimensions, schemaParam.getFlags());
     }

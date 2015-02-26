@@ -142,7 +142,6 @@ public:
 
        ArrayDesc parentDesc;
        SystemCatalog::getInstance()->getArrayDesc(arrayName, parentDesc, false); //Must exist, checked at logical phase
-       SCIDB_ASSERT(parentDesc.isImmutable() == false);                          //also checked at logical phase
        VersionID newVersion = SystemCatalog::getInstance()->getLastVersion(parentDesc.getId()) + 1;
 
        ArrayUAID uaid = parentDesc.getUAId();
@@ -404,8 +403,6 @@ public:
               throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK) << baseArrayName;
            }
         }
-
-        SCIDB_ASSERT(_schema.isImmutable() == false);
 
         size_t nDims = _schema.getDimensions().size();
         Coordinates currentLo(nDims, MAX_COORDINATE);

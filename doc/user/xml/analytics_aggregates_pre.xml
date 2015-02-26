@@ -194,14 +194,37 @@
 
     <para>In most cases, SciDB aggregates exclude null-valued data. For
     example, consider the following array <code>m4x4_null</code>:
-    <programlisting language="test">
---afl CREATE ARRAY m4x4_null&lt; attr1: int32 NULL&gt;[i=1:4,4,0, j=1:4,4,0]; --show-output=no --show-query=no
+    <programlisting language="test">--afl CREATE ARRAY m4x4_null&lt; attr1: int32 NULL&gt;[i=1:4,4,0, j=1:4,4,0]; --show-output=no --show-query=no
 --afl store(build(m4x4_null,iif(i=2,0,null)),m4x4_null); --output-format=dense --chunkify=yes
 </programlisting>The commands <code>count(attr1)</code> and
     <code>count(*)</code> return different results because the first ignores
-    null values, while the second does not: <programlisting language="test">
---aql SELECT count(attr1) AS a, count(*) AS b FROM m4x4_null; 
+    null values, while the second does not: <programlisting language="test">--aql SELECT count(attr1) AS a, count(*) AS b FROM m4x4_null; 
 </programlisting></para>
+
+    <para><indexterm>
+        <primary>special values</primary>
+
+        <secondary>aggregates</secondary>
+      </indexterm><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>special values</secondary>
+      </indexterm>The rules for aggregates concerning missing values and empty
+    cells:<itemizedlist>
+        <listitem>
+          <para>All aggregate operators and functions exclude empty
+          cells.</para>
+        </listitem>
+
+        <listitem>
+          <para>Except for <code>count(*)</code>, aggregate operators and
+          functions exclude missing values.</para>
+        </listitem>
+
+        <listitem>
+          <para><code>count(*)</code> includes missing values.</para>
+        </listitem>
+      </itemizedlist></para>
   </section>
 
   <section>
@@ -479,18 +502,18 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
       </indexterm>The preceding sections of this chapter describe those
     features of SciDB that were designed exclusively to calculate aggregates.
     You can also calculate aggregates "in-line" as part of other data
-    management or rearrangement steps: the redimension and redimension_store
-    operators support this type of usage. Those operators are used to
+    management or rearrangement steps: the redimension 
+    operator supports this type of usage. The redimension operator is used to
     transform a source array into a result array with different schema or
     dimensions. In those cases, aggregates can be useful in summarizing
     multiple elements from the source array that are mapped to a single
     element in the destination array.</para>
 
-    <para>For example, suppose you have a 2-dimensional array describing some
-    recent olympic champions, and you want to produce a 1-dimensional array
-    that shows the gold-medal count for each country.</para>
+    <para>For example, suppose you have an array describing some recent
+    Olympic champions, and you want to produce an array that shows the
+    gold-medal count for each country.</para>
 
-    <para>The schema of the original 2-dimensional array (named "winners")
+    <para>The schema of the array, <emphasis role="bold">winners</emphasis>,
     appears below:</para>
 
     <programlisting language="test">--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
@@ -506,40 +529,33 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
       --show-query=no --show-output=no
 --afl store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time);
       --show-query=no --show-output=no
---afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat); --show-query=no --show-output=no
---aql CREATE ARRAY winners &lt;person:string,country:string,time:double&gt; [year=1996:2008,13,0,event(string)=3,3,0];
-     --show-query=no --show-output=no
---afl redimension_store(winnersFlat, winners); --show-query=no --show-output=no
---schema winners; --show-output=yes --show-query=yes</programlisting>
+--afl store(join(event,join(person,join(year,join(country,time)))),winners_temp); --show-query=no --show-output=no
+--afl store(uniq(sort(project(winners_temp,country)),'chunk_size=12'),country_index); --show-query=no --show-output=no
+--afl store(apply(country_index,country_id, i),countries); --show-query=no --show-output=no
+--afl store(project(filter(cross_join(winners_temp,countries),winners_temp.country=countries.country),
+      event,person,year,time,winners_temp.country,country_id),winners); --show-query=no --show-output=no
+--afl store(project(unpack(winners,i),event,person,year,time,country,country_id),Farquar); --show-query=no --show-output=no
+--afl remove(winners); --show-query=no --show-output=no
+--afl rename(Farquar,winners); --show-query=no --show-output=no
+--schema winners</programlisting>
 
-    <para>To examine the data in the "winners" array, use the following AQL
-    statement with the -o lcsv+ format: <programlisting language="test">
---aql SELECT * FROM winners;
-</programlisting></para>
+    <para>To examine the data in the <emphasis role="bold">winners
+    </emphasis>array, use the following AFL statement with the -o lcsv+
+    format: <programlisting language="test">--afl scan(winners) --output-format=lcsv+</programlisting></para>
 
     <para>To create the schema for the desired array, execute the following
-    AQL statement:</para>
+    statement:<programlisting language="test">--afl CREATE ARRAY perCountryMedalCount &lt;country:string, medalCount: uint64 null&gt; [country_id=0:*,20,0];
+      --show-output=no --show-query=yes
+</programlisting></para>
 
-    <programlisting language="test">
---aql CREATE ARRAY perCountryMedalCount &lt;medalCount: uint64 null&gt; [country(string)=20,20,0]; --show-output=no --show-query=yes
-</programlisting>
+    <para>Notice that the sole dimension is the country ID (<emphasis
+    role="bold">country_id</emphasis>), which is an attribute (not a
+    dimension) of the original<emphasis role="bold"> winners </emphasis>array.
+    To populate the desired array with data, use the following AFL
+    statement:<programlisting language="test">--afl store(redimension(winners, perCountryMedalCount, count(*) as medalCount),perCountryMedalCount); --output-format=dcsv</programlisting></para>
 
-    <para>Notice that the sole dimension is country, which is an attribute
-    (not a dimension) of the original "winners" array. To populate the desired
-    array with data, use the following AFL statement:</para>
-
-    <programlisting language="test">
---afl redimension_store (winners, perCountryMedalCount, count(*) as medalCount)
-</programlisting>
-
-    <para>The result of this redimension_store operation is the desired array.
-    You can examine the contents with the following AQL statement:</para>
-
-    <programlisting language="test">
---aql SELECT * FROM perCountryMedalCount;
-</programlisting>
-
-    <para>Notice that the sum of the counts is 12—the number of nonempty cells
-    in the "winners" array.</para>
+    <para>The result of this redimension operation is the desired array.
+    Notice that the sum of the counts is 12, the number of nonempty cells in
+    the <emphasis role="bold">winners </emphasis>array.</para>
   </section>
 </section>

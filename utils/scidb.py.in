@@ -22,7 +22,7 @@
 # END_COPYRIGHT
 #
 
-# prompt initall 
+# prompt initall
 # prompt init_syscat
 # check_running_scidb
 # check_nfs_env
@@ -46,24 +46,24 @@ import datetime
 import select
 
 def usage():
-	print ""
-	print "\t Usage: scidb.py <command> <db> [<conffile>]"
-	print ""
-	print " Use this script to control the initialization, startup and "
-	print " stop of SciDB. "
-	print "$ scidb.py <command> <db> <conffile>"
-	print ""
-	print "Commands:"
-	print "   version "
-	print "   init_syscat | initall | initall-force | startall | stopall | status | dbginfo | dbginfo-lt | purge | version | check-version | check-pids"
+        print ""
+        print "\t Usage: scidb.py <command> <db> [<conffile>]"
+        print ""
+        print " Use this script to control the initialization, startup and "
+        print " stop of SciDB. "
+        print "$ scidb.py <command> <db> <conffile>"
+        print ""
+        print "Commands:"
+        print "   version "
+        print "   init_syscat | initall | initall-force | startall | stopall | status | dbginfo | dbginfo-lt | purge | version | check-version | check-pids"
 # end def usage
 
 
 
 # Very basic check.
 if (len(sys.argv) < 2 or len(sys.argv) > 4):
-	usage()
-	sys.exit(2)
+        usage()
+        sys.exit(2)
 # end if
 
 # Defaults
@@ -71,19 +71,19 @@ if (len(sys.argv) < 2 or len(sys.argv) > 4):
 d = {}
 
 if (len(sys.argv) >= 2):
-	cmd = sys.argv[1]
+        cmd = sys.argv[1]
 # end if
-	
+
 if (len(sys.argv) < 4):
-	configfile = "@CONFIGURE_SCIDBPY_CONFIG@"
+        configfile = "@CONFIGURE_SCIDBPY_CONFIG@"
 # end if
 
 if (len(sys.argv) >= 3):
-	db = sys.argv[2]
+        db = sys.argv[2]
 # end if
-	
-if (len(sys.argv) >= 4): 
-	configfile = sys.argv[3]
+
+if (len(sys.argv) >= 4):
+        configfile = sys.argv[3]
 # end if
 
  #print configfile, db, cmd
@@ -97,42 +97,42 @@ keyFilenameList = []
 
 # Parse a ini file
 def parse_global_options(filename):
-	config = RawConfigParser()
-	try:
-		config.readfp(open(filename, 'r'))
-	except Exception, e:
-		print "Cannot read config file: %s" % e
-		sys.exit(1)
-	section_name = db
-	
-	 # First process the "global" section.
-	try:
-	   #print "Parsing %s section." % (section_name)
-		for (key, value) in config.items(section_name):
-			d[key] = value
-		# end for
-		# make a srv & instance list
-		# srv 0 hosts the coordinator
-		# format: server-N=ip, number of local workers
-		#         (server0 always has a coordinator)
-			if (key[0:7] == 'server-'):
-				srv = [ int(key[7:]) ]
-				srv.extend(value.split(','))
-				srv[2] = int(srv[2])
-				srvList.append(srv)
-			# end if
-			
-	except Exception, e:
-		print "config file parser error in file %s: %s" % (filename,e)
-		sys.exit(1)
-	# end try
+        config = RawConfigParser()
+        try:
+                config.readfp(open(filename, 'r'))
+        except Exception, e:
+                print "Cannot read config file: %s" % e
+                sys.exit(1)
+        section_name = db
 
-	srvList.sort()
-	d['db_name'] = db
+         # First process the "global" section.
+        try:
+           #print "Parsing %s section." % (section_name)
+                for (key, value) in config.items(section_name):
+                        d[key] = value
+                # end for
+                # make a srv & instance list
+                # srv 0 hosts the coordinator
+                # format: server-N=ip, number of local workers
+                #         (server0 always has a coordinator)
+                        if (key[0:7] == 'server-'):
+                                srv = [ int(key[7:]) ]
+                                srv.extend(value.split(','))
+                                srv[2] = int(srv[2])
+                                srvList.append(srv)
+                        # end if
+
+        except Exception, e:
+                print "config file parser error in file %s: %s" % (filename,e)
+                sys.exit(1)
+        # end try
+
+        srvList.sort()
+        d['db_name'] = db
 # end def parse_global_options
 
 def removeInstDir(srv, liid, dt):
-	ldir = getInstanceDataPath(srv, liid)
+        ldir = getInstanceDataPath(srv, liid)
         print "Removing data directory %s on server %d (%s), local instance %d "%\
               (ldir, srv[0],srv[1],liid)
         if len(ldir) > 0 and len(ldir) > ldir.count('/'):
@@ -150,8 +150,8 @@ def removeInstDir(srv, liid, dt):
 
 # get the path for a srv (parent) directory
 def getSrvDataPath(srv, liid):
-	global baseDataPath
-	return "%s/%03d"%(baseDataPath, srv[0])
+        global baseDataPath
+        return "%s/%03d"%(baseDataPath, srv[0])
 # end def getSrvDataPath
 
 # get the path for a specific instance
@@ -161,177 +161,315 @@ def getInstanceFS(srv, liid):
            return d[perInstanceKey]
 
         global datadirPrefix
-	if (datadirPrefix == None): 
-		return ""
-	# end if
-	if (srv[0] == 0 and liid == 0): 
-		suffix=""
-	else:
-		suffix="%s"%(liid)
-	# end if
-	return "%s%s"%(datadirPrefix, suffix)
+        if (datadirPrefix == None):
+                return ""
+        # end if
+        if (srv[0] == 0 and liid == 0):
+                suffix=""
+        else:
+                suffix="%s"%(liid)
+        # end if
+        return "%s%s"%(datadirPrefix, suffix)
 # end def getInstanceFS
 
 # get the path for a specific instance
 def getInstanceDataPath(srv, liid):
-	 global baseDataPath
-	 return "%s/%03d/%d"%(baseDataPath, srv[0], liid)
+         global baseDataPath
+         return "%s/%03d/%d"%(baseDataPath, srv[0], liid)
 # end def getInstanceDataPath
 
 def getInstancesCount():
-	nInstances = 0
-	for n in srvList:
-		if n[0] == 0:
-			nInstances += 1
-		nInstances += n[2]
-	return nInstances
+        nInstances = 0
+        for n in srvList:
+                if n[0] == 0:
+                        nInstances += 1
+                nInstances += n[2]
+        return nInstances
 #end def getInstancesCount
 
 # Get IP address of an interface
 def get_ip_address(ifname):
-	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	return socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))[20:24])
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))[20:24])
 # end def get_ip_address
 
 # Connection string
 def createConnstr(remote=False):
-	connstr="host=" + masterSrv[1] + " port=" + pgPort + " dbname=" + d.get('db_name') + \
-		" user=" + d.get('db_user') + " password=" + d.get('db_passwd')
-	if remote:
-		connstr = "'"+connstr+"'"
-	# end if
-	return connstr
+        connstr="host=" + masterSrv[1] + " port=" + pgPort + " dbname=" + d.get('db_name') + \
+                " user=" + d.get('db_user') + " password=" + d.get('db_passwd')
+        if remote:
+                connstr = "'"+connstr+"'"
+        # end if
+        return connstr
 # end def createConnstr
 
 
+def runRemoteCommands(clients,cmds,timeout=600):
+    channels = map(lambda client: client.get_transport().open_session(),clients)
+    _ = map(lambda client: client.get_transport().set_keepalive(0),clients)
+    _ = map(lambda channel: channel.settimeout(timeout),channels)
+    _ = map(lambda chCmdZip: chCmdZip[0].exec_command(chCmdZip[1]),zip(channels,cmds))
+    return channels
+
+def trackRemoteCommandExecution(
+    clients,
+    remoteChannels,
+    cmds,
+    auto_close=False,
+    wait=True,
+    timeout=600,
+    read_max=10*1024*1024
+    ):
+    #...............................................................
+    read_max = int(read_max / 2)
+    stdins = map(lambda x: x.makefile('wb', -1),remoteChannels)
+    validStdins = [x for x in stdins if x]
+
+    # Send shutdown to valid stdin descriptors and close them:
+    map(lambda x: x.channel.shutdown_write(),validStdins)
+    map(lambda x: x.close(), validStdins)
+    
+    stdouts = map(lambda x: x.makefile('rb', -1),remoteChannels)
+    stderrs = map(lambda x: x.makefile_stderr('rb', -1),remoteChannels)
+
+    # Set up status-checking functions for stdouts:
+    stdoutsDone = [False for i in range(len(remoteChannels))]
+    stderrsDone = [False for i in range(len(remoteChannels))]
+    statusDone = [False for i in range(len(remoteChannels))]
+
+    stdoutsText = ['' for i in range(len(stdouts))]
+    stderrsText = ['' for i in range(len(stderrs))]
+    exits = [-1 for i in range(len(remoteChannels))]
+
+    # No wait + auto_close: close clients (ssh connections).
+    if (not wait):
+        if (auto_close):
+            map(lambda x: x.close(),clients)
+	return exits,stdoutsText,stderrsText
+    
+    start_time = time.time()
+    activeChannels = list(remoteChannels)
+
+    getExitFunctions = [lambda i: exits[i],lambda i: remoteChannels[i].recv_exit_status()]
+    getStatusFunctions = [lambda i: statusDone[i],lambda i: True]
+
+    while (len(activeChannels) > 0):
+        stderrsStatus = map(
+	    lambda x: getStreamStatus(x[0],x[1],x[2],x[3],x[2].channel.recv_stderr_ready,read_max),
+	    zip(stderrsDone,statusDone,stderrs,stderrsText)
+	    )
+        stdoutsStatus = map(
+	    lambda x: getStreamStatus(x[0],x[1],x[2],x[3],x[2].channel.recv_ready,read_max),
+	    zip(stdoutsDone,statusDone,stdouts,stdoutsText)
+	    )
+
+	# Update lists:
+	stderrsDone = [x[0] for x in stderrsStatus]
+	stderrsText = [x[1] for x in stderrsStatus]
+	stdoutsDone = [x[0] for x in stdoutsStatus]
+	stdoutsText = [x[1] for x in stdoutsStatus]
+
+	# Check channels exit status:
+	exitsStatus = [
+	    ((not statusDone[i]) and remoteChannels[i].exit_status_ready()) for i in range(len(remoteChannels))
+	    ]
+
+	exits = [getExitFunctions[exitsStatus[i]](i) for i in range(len(exitsStatus))]
+	statusDone = [getStatusFunctions[exitsStatus[i]](i) for i in range(len(exitsStatus))]
+
+	activeChannels = [
+	    remoteChannels[i] for i in range(len(remoteChannels)) if (not statusDone[i]) or (not stdoutsDone[i]) or (not (stderrsDone[i]))
+	    ]
+
+	# Timeouts handling
+	time2wait = (int(start_time) + (timeout*len(remoteChannels))) - int(time.time())
+	if (time2wait <= 0):
+            timeoutIndices = [x for i in range(len(cmds)) if not statusDone[i]]
+	    for i in timeoutIndices:
+                print "remote_exec(%s) timed out" % cmds[i]
+		stderrsText[i] += "\nexit_status("+str(exits[i])+") after timeout ("+str(timeout)+")"
+            break
+
+	if (len(activeChannels) > 0):
+	    select.select(activeChannels,activeChannels,[],time2wait)
+    
+    map(lambda x: x.close(),stdins)
+    map(lambda x: x.close(),stdouts)
+    map(lambda x: x.close(),stderrs)
+    
+    if (auto_close):
+        map(lambda client: client.close(),clients)
+    
+    return exits,stdoutsText,stderrsText
+
+def parallelRemoteExec(
+    clients,
+    cmds,
+    waitFlag=True,
+    ignoreError=False,
+    silent=False
+    ):
+    channels = runRemoteCommands(clients,cmds,timeout=600)
+    try:
+        exits,outputs,errors = trackRemoteCommandExecution(clients,channels,cmds,wait=waitFlag)
+	if (waitFlag):
+            abExitIndices = [i for i in range(len(exits)) if exits[i] != 0 ]
+	    if (len(abExitIndices) > 0):
+	        index = abExitIndices[0]
+	        raise Exception("Abnormal return code: %s stderr: %s" % (exits[index],errors[index]))
+    except Exception, e1:
+        if (not silent):
+            print 'Remote command exceptions!'
+	    print cmds
+	    print e1
+	if (ignoreError):
+            pass
+	else:
+            sys.exit(1)
+    return exits,outputs,errors
+
 # Run remote command over SSH
 def remote_exec(client, lcmd, auto_close=False, wait=True, tmo=600, read_max=10*1024*1024):
-	output = ''
-	err = ''
-	read_max = int(read_max/2)
-	exit_status = -1
-	
-	chan = client.get_transport().open_session()
-	client.get_transport().set_keepalive(0)
-	chan.settimeout(tmo)
-	chan.exec_command(lcmd)
-    
-	stdin = chan.makefile('wb', -1)
-	if stdin:
-		stdin.channel.shutdown_write()
-		stdin.close()
-	# end if
-	stdout = chan.makefile('rb', -1)
-	stderr = chan.makefile_stderr('rb', -1)
-  
-	start_time = time.time()
-	
-	if (not wait):
-		if (auto_close): 
-			client.close
-		# end if
-		return (exit_status, output, err)
-	# end if
+        output = ''
+        err = ''
+        read_max = int(read_max/2)
+        exit_status = -1
 
-	stdoutDone=False
-	stderrDone=False
-	statusDone=False
+        chan = client.get_transport().open_session()
+        client.get_transport().set_keepalive(0)
+        chan.settimeout(tmo)
+        chan.exec_command(lcmd)
 
-	# Wait for status
-	while True:
-		if (not stderrDone) and (statusDone or stderr.channel.recv_stderr_ready()):
-			try: 
-				ret = stderr.read(read_max)
-				if ret:
-					err += ret
-			# print "Reading stderr ..."
-				else:
-					# print "Closing stderr ..."
-					stderr.close()
-					stderrDone=True
-				# end if
-			except socket.timeout:
-				pass
-			# end try
-		# end if
-      
-		if (not stdoutDone) and (statusDone or stdout.channel.recv_ready()):
-			try:
-				ret = stdout.read(read_max)
-				if ret:
-					output += ret
-				# print "Reading stdout ..."
-				else:
-					# print "Closing stdout ..."
-					stdout.close()
-					stdoutDone=True
-				# end if
-			except socket.timeout:
-				pass
-			# end try
-		# end if
+        stdin = chan.makefile('wb', -1)
+        if stdin:
+                stdin.channel.shutdown_write()
+                stdin.close()
+        # end if
+        stdout = chan.makefile('rb', -1)
+        stderr = chan.makefile_stderr('rb', -1)
 
-		# Start the remote command, but only wait for stdout and stderr.
-		if (not statusDone) and chan.exit_status_ready():
-			exit_status = chan.recv_exit_status()
-			statusDone=True
-		# end if
-		# print "Exit status %s" % (format(exit_status))
-			
-		if (statusDone and stdoutDone and stderrDone):
-			break
-		# end if
+        start_time = time.time()
+
+        if (not wait):
+                if (auto_close):
+                        client.close
+                # end if
+                return (exit_status, output, err)
+        # end if
+
+        stdoutDone=False
+        stderrDone=False
+        statusDone=False
+
+        # Wait for status
+        while True:
+		stderrDone, err = getStreamStatus(
+			stderrDone,
+			statusDone,
+			stderr,
+			err,
+			stderr.channel.recv_stderr_ready,
+			read_max
+			)
+		stdoutDone, output = getStreamStatus(
+			stdoutDone,
+			statusDone,
+			stdout,
+			output,
+			stdout.channel.recv_ready,
+			read_max
+			)
+
+                # Start the remote command, but only wait for stdout and stderr.
+                if (not statusDone) and chan.exit_status_ready():
+                        exit_status = chan.recv_exit_status()
+                        statusDone=True
+                # end if
+                # print "Exit status %s" % (format(exit_status))
+
+                if (statusDone and stdoutDone and stderrDone):
+                        break
+                # end if
 
                 time2wait = (int(start_time) + tmo) - int(time.time())
-		if time2wait <= 0:
-			print "remote_exec(%s) timed out" % lcmd
-			err += "exit_status("+str(exit_status)+") after timeout ("+str(tmo)+")"
-			break
-		# end if
+                if time2wait <= 0:
+                        print "remote_exec(%s) timed out" % lcmd
+                        err += "exit_status("+str(exit_status)+") after timeout ("+str(tmo)+")"
+                        break
+                # end if
 
                 select.select([chan], [chan], [], time2wait)
-	# end while
+        # end while
 
-	stdin.close()
-	stdout.close()
-	stderr.close()
+        stdin.close()
+        stdout.close()
+        stderr.close()
 
-	if auto_close:
-		client.close()
-	# end if
+        if auto_close:
+                client.close()
+        # end if
 
-	return (exit_status, output, err)
+        return (exit_status, output, err)
 # end def remote_exec
-
+#.............................................................................
+# getStreamStatus: returns whether or not a given stream has any more bytes
+# in it along with the current (appended) output text.
+def getStreamStatus(
+	streamDone, # Flag indicating if this stream is finished or not.
+	statusDone, # Flag indicating if the stream parent has all of its streams exhausted.
+	stream,     # I/O stream for reading.
+	streamText, # Current text from the stream in string form.
+	readyFunction, # Callable function to check if stream has bytes in it for reading.
+	read_max  # Maximum number of bytes to read from the stream.
+	):
+	outText = [streamText]
+	sDone = streamDone
+	if (not streamDone) and (statusDone or readyFunction()):
+		try:
+			ret = stream.read(read_max)
+			if ret:
+				outText.append(ret)
+				# print "Reading stderr ..."
+			else:
+				# print "Closing stderr ..."
+				stream.close()
+				sDone=True
+		# end if
+		except socket.timeout:
+			pass
+		# end try
+        # end if
+	return sDone,''.join(outText)
+#.............................................................................
 # Use globals sshPort, keyFilenameList
 def sshconnect(srv):
-	sshc = paramiko.SSHClient()
-	sshc.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	try:
-		sshc.connect(srv[1],port=sshPort,key_filename=keyFilenameList,timeout=10)
-	except Exception, s:
-		print "ssh failure: server=%s port=%d %s" % (srv[1], sshPort, s)
-		sys.exit(1)
-	# end try
-	return sshc
+        sshc = paramiko.SSHClient()
+        sshc.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+                sshc.connect(srv[1],port=sshPort,key_filename=keyFilenameList,timeout=10)
+        except Exception, s:
+                print "ssh failure: server=%s port=%d %s" % (srv[1], sshPort, s)
+                sys.exit(1)
+        # end try
+        return sshc
 # end def sshconnect
 
 def sshclose(sshc):
-	sshc.close()
+        sshc.close()
 # end def sshclose
 
 def print_output():
-	for line in stdout:
-		print line,
-	# end for
-	for line in stderr:
-		print line,
-	# end for
-	if check_exit_status and exit_status != 0:
-		print_output()
-	# end if
-	print 'non-zero exit status (%d) when running "%s"' % (exit_status, cmd)
-	return(exit_status) 
+        for line in stdout:
+                print line,
+        # end for
+        for line in stderr:
+                print line,
+        # end for
+        if check_exit_status and exit_status != 0:
+                print_output()
+        # end if
+        print 'non-zero exit status (%d) when running "%s"' % (exit_status, cmd)
+        return(exit_status)
 # end def print_output
 
 
@@ -341,13 +479,13 @@ def confirm(prompt=None, resp=False):
     """
     if prompt is None:
         prompt = 'Confirm'
-        
+
     if resp:
         prompt = '%s [%s]|%s: ' % (prompt, 'y', 'n')
     # end if
     else:
         prompt = '%s [%s]|%s: ' % (prompt, 'n', 'y')
-        
+
     while True:
         ans = raw_input(prompt)
         if not ans:
@@ -372,174 +510,174 @@ def confirm(prompt=None, resp=False):
 # by the identity of the srv, it decides whether to run locally or remotely
 # also if supplied with an existing connection, it uses it
 def executeIt(cmdList, srv, liid, waitFlag=True, nocwd=False, useConnstr=True, executable=None,
-			   sshc=None, stdoutFile=None, stderrFile=None, useSSH4Local=False, useShell=False, ignoreError=False, silent=False):
-	# print " ".join(cmdList), " on ", srv," (",liid,")"
-	ret = 0
-	out = ''
-	err = ''
-	
-	dataDir = getInstanceDataPath(srv,liid)
-	if nocwd:
-		currentDir = None
-	else:
-		currentDir = dataDir
-	# end if
+                           sshc=None, stdoutFile=None, stderrFile=None, useSSH4Local=False, useShell=False, ignoreError=False, silent=False):
+        # print " ".join(cmdList), " on ", srv," (",liid,")"
+        ret = 0
+        out = ''
+        err = ''
 
-	# print currentDir
-	if srv[0] == 0 and not useSSH4Local :
-		sout = None
-		if stdoutFile != None:
-			# print "local - about to open stdoutFile log file:", stdoutFile
-			sout=open(dataDir+"/"+stdoutFile,"a+")
-		elif not waitFlag:
-			sout=open("/dev/null","a")
-		# end if
-		serr = None
-		if stderrFile != None:
-		   #print "local - about to open stderrFile log file:", stderrFile
-		  serr=open(dataDir+"/"+stderrFile,"a+")
-		elif not waitFlag:
-		  serr=open("/dev/null","a")
-		# end if
-		# print "local - about to Popen - currentDir = %s" % (currentDir)
-		if useConnstr:
-		  cmdList.append('-c')
-		  if useShell:
-			cmdList.append("'"+createConnstr()+"'")
-		  else:
-			cmdList.append(createConnstr())
-		  # end if
-		# end if
-		# print 'Using modified cmdList: ', cmdList
-		my_env = os.environ
-		if d.get('malloc_check_'):
-		  my_env["MALLOC_CHECK_"] = d.get('malloc_check_')
-		# end if
-		if d.get('malloc_arena_max'):
-		  my_env["MALLOC_ARENA_MAX"] = d.get('malloc_arena_max')
-		# end if
-		if d.get('gcov_prefix'):
-		  my_env["GCOV_PREFIX"] = dataDir
-		  print "gcov_prefix = %s" % (dataDir)
-		# end if
+        dataDir = getInstanceDataPath(srv,liid)
+        if nocwd:
+                currentDir = None
+        else:
+                currentDir = dataDir
+        # end if
 
-		if (d.get('tcmalloc') in  ['true', 'True', 'on', 'On']): 
-			if "LD_LIBRARY_PATH" in my_env: 
-				my_env["LD_LIBRARY_PATH"] = "@CMAKE_INSTALL_PREFIX@/lib:" + my_env["LD_LIBRARY_PATH"]
-			else: 
-				my_env["LD_LIBRARY_PATH"] = "@CMAKE_INSTALL_PREFIX@/lib:"
-			my_env["LD_PRELOAD"] = "libtcmalloc.so"                                              
-			my_env["HEAPPROFILE"] = "/tmp/heapprof"                                              
-			# end if
-		# end if
+        # print currentDir
+        if srv[0] == 0 and not useSSH4Local :
+                sout = None
+                if stdoutFile != None:
+                        # print "local - about to open stdoutFile log file:", stdoutFile
+                        sout=open(dataDir+"/"+stdoutFile,"a+")
+                elif not waitFlag:
+                        sout=open("/dev/null","a")
+                # end if
+                serr = None
+                if stderrFile != None:
+                   #print "local - about to open stderrFile log file:", stderrFile
+                  serr=open(dataDir+"/"+stderrFile,"a+")
+                elif not waitFlag:
+                  serr=open("/dev/null","a")
+                # end if
+                # print "local - about to Popen - currentDir = %s" % (currentDir)
+                if useConnstr:
+                  cmdList.append('-c')
+                  if useShell:
+                        cmdList.append("'"+createConnstr()+"'")
+                  else:
+                        cmdList.append(createConnstr())
+                  # end if
+                # end if
+                # print 'Using modified cmdList: ', cmdList
+                my_env = os.environ
+                if d.get('malloc_check_'):
+                  my_env["MALLOC_CHECK_"] = d.get('malloc_check_')
+                # end if
+                if d.get('malloc_arena_max'):
+                  my_env["MALLOC_ARENA_MAX"] = d.get('malloc_arena_max')
+                # end if
+                if d.get('gcov_prefix'):
+                  my_env["GCOV_PREFIX"] = dataDir
+                  print "gcov_prefix = %s" % (dataDir)
+                # end if
 
-		if useShell:
-		  cmdList=[" ".join(cmdList)]
-		# end if
+                if (d.get('tcmalloc') in  ['true', 'True', 'on', 'On']):
+                        if "LD_LIBRARY_PATH" in my_env:
+                                my_env["LD_LIBRARY_PATH"] = "@CMAKE_INSTALL_PREFIX@/lib:" + my_env["LD_LIBRARY_PATH"]
+                        else:
+                                my_env["LD_LIBRARY_PATH"] = "@CMAKE_INSTALL_PREFIX@/lib:"
+                        my_env["LD_PRELOAD"] = "libtcmalloc.so"
+                        my_env["HEAPPROFILE"] = "/tmp/heapprof"
+                        # end if
+                # end if
 
-		try: 
-		  # print currentDir, cmdList, sout, executable, useShell
-		  p = subprocess.Popen(cmdList, env=my_env, cwd=currentDir, stderr=serr, stdout=sout, executable=executable, shell=useShell)
+                if useShell:
+                  cmdList=[" ".join(cmdList)]
+                # end if
 
-		  if waitFlag:
-			p.wait()
-			ret = p.returncode
-			if ret != 0 :
-			  raise Exception("Abnormal return code: %s" % (ret))
-			if (sout != None): 
-				out = sout.read()
-			# end if
-			if (serr != None): 
-				err = serr.read()
-			# end if
-		  # end if
-		except Exception, e1:
-		  if (ignoreError): 
-			pass
-		  else: 
-			if (not silent): 
-			  print e1 
-			  print "error in command %s: " % (" ".join(cmdList))
-			  logs = ""
-			  if (stderrFile): 
-				logs = logs + stderrFile
-			  # end if
-			  if (stdoutFile): 
-				logs = logs + " " + stdoutFile
-			  # end if
-			  if (logs != ""): 
-				print "Check logs in", (logs)
-			  # end if
-			# end if
-			sys.exit(1)
-		  # end if
-		# end try
+                try:
+                  # print currentDir, cmdList, sout, executable, useShell
+                  p = subprocess.Popen(cmdList, env=my_env, cwd=currentDir, stderr=serr, stdout=sout, executable=executable, shell=useShell)
 
-	else:
-		# remote execution
-		needsClose = False
-		if sshc == None:
-		  sshc = sshconnect(srv)
-		  needsClose = True
-		# end if
-		if useConnstr:
-		   cmdList.append('-c')
-		   cmdList.append(createConnstr(True))
-		# end if
-		   # print 'Using modified cmdList: ', cmdList
-		if stdoutFile != None:
-		   cmdList.append('1>')
-		   cmdList.append(stdoutFile)
-		# end if
-		if stderrFile != None:
-		   cmdList.append('2>')
-		   cmdList.append(stderrFile)
-		# end if
+                  if waitFlag:
+                        p.wait()
+                        ret = p.returncode
+                        if ret != 0 :
+                          raise Exception("Abnormal return code: %s" % (ret))
+                        if (sout != None):
+                                out = sout.read()
+                        # end if
+                        if (serr != None):
+                                err = serr.read()
+                        # end if
+                  # end if
+                except Exception, e1:
+                  if (ignoreError):
+                        pass
+                  else:
+                        if (not silent):
+                          print e1
+                          print "error in command %s: " % (" ".join(cmdList))
+                          logs = ""
+                          if (stderrFile):
+                                logs = logs + stderrFile
+                          # end if
+                          if (stdoutFile):
+                                logs = logs + " " + stdoutFile
+                          # end if
+                          if (logs != ""):
+                                print "Check logs in", (logs)
+                          # end if
+                        # end if
+                        sys.exit(1)
+                  # end if
+                # end try
 
-		if currentDir:
-			cmdString = "cd "+currentDir+";"+(" ".join(cmdList))
-		else:
-			cmdString = " ".join(cmdList)
-		# end if
-		# print "cmdString: ",cmdString
-		try:
-		  (ret,out,err) = remote_exec(sshc, cmdString, wait=waitFlag)
-		  if needsClose:
-			sshclose(sshc)
-		  # end if
-		  if waitFlag:
-			if ret != 0 or err :
-			  raise Exception("Abnormal return code: %s stderr: %s" % (ret,err))
-			# end if
-		  # end if
-		except Exception, e1:
-		  if (not silent): 
-			print "Remote command exception:"
-			print cmdString
-			print e1
-		  # end if
-		  if (ignoreError): 
-			pass
-		  else: 
-			sys.exit(1)
-		  # end if
-		# end try
-	# end if
-#	print ret, out, err
-	return (ret, out, err)
-	# end if
+        else:
+                # remote execution
+                needsClose = False
+                if sshc == None:
+                  sshc = sshconnect(srv)
+                  needsClose = True
+                # end if
+                if useConnstr:
+                   cmdList.append('-c')
+                   cmdList.append(createConnstr(True))
+                # end if
+                   # print 'Using modified cmdList: ', cmdList
+                if stdoutFile != None:
+                   cmdList.append('1>')
+                   cmdList.append(stdoutFile)
+                # end if
+                if stderrFile != None:
+                   cmdList.append('2>')
+                   cmdList.append(stderrFile)
+                # end if
+
+                if currentDir:
+                        cmdString = "cd "+currentDir+";"+(" ".join(cmdList))
+                else:
+                        cmdString = " ".join(cmdList)
+                # end if
+                # print "cmdString: ",cmdString
+                try:
+                  (ret,out,err) = remote_exec(sshc, cmdString, wait=waitFlag)
+                  if needsClose:
+                        sshclose(sshc)
+                  # end if
+                  if waitFlag:
+                        if ret != 0 or err :
+                          raise Exception("Abnormal return code: %s stderr: %s" % (ret,err))
+                        # end if
+                  # end if
+                except Exception, e1:
+                  if (not silent):
+                        print "Remote command exception:"
+                        print cmdString
+                        print e1
+                  # end if
+                  if (ignoreError):
+                        pass
+                  else:
+                        sys.exit(1)
+                  # end if
+                # end try
+        # end if
+#       print ret, out, err
+        return (ret, out, err)
+        # end if
 # end def executeIt
 
  # Cleanup logs/storage files and initialize storage file.
 def cleanup(srv, liid, dt):
    print "Cleaning up old logs and storage files."
    try:
-	 removeInstDir(srv, liid, dt)
+         removeInstDir(srv, liid, dt)
    except OSError, detail:
-	 if detail.errno != errno.ENOENT:
-	   print "OSError:", detail
-	   sys.exit(detail.errno)
-	 # end if
+         if detail.errno != errno.ENOENT:
+           print "OSError:", detail
+           sys.exit(detail.errno)
+         # end if
    # end try
 # end def cleanup
 
@@ -571,9 +709,9 @@ def createDirsAndLinks(srv, liid):
       executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
       cmdList = ['ln', '-s', ddir, ldir]
       executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
-   else: 
-	 cmdList = ['mkdir', '-p', ldir]
-	 executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
+   else:
+         cmdList = ['mkdir', '-p', ldir]
+         executeIt(cmdList, srv, liid, nocwd=True, useConnstr=False)
    # end if
 
    relink_binary(srv, liid)
@@ -588,212 +726,438 @@ def relink_binary(srv, liid):
 
 def get_scidb_pids(srv, liid):
    cmdList = [ getScidbPidsCmd(srv, liid) ]
-   (ret,out,err)=executeIt(cmdList, srv, liid, useSSH4Local=True, useConnstr=False, 
+   (ret,out,err)=executeIt(cmdList, srv, liid, useSSH4Local=True, useConnstr=False,
                            useShell=True, ignoreError=True, silent=True, nocwd=True,
                            stdoutFile=None, stderrFile=None)
 
    # Drop additional whitespace characters
    ports = []
-   if (out != ''): 
-	   ports = out.splitlines()
+   if (out != ''):
+           ports = out.splitlines()
    # end if
    print "checking (server %d (%s) local instance %d) %s... " % (srv[0], srv[1], liid, " ".join(ports))
    return ports
 # end def get_scidb_pids
+#............................................................................
+# getAllScidbInstancePids: return all of the process ids of scidb instances on a
+#                     given server.
+def getAllScidbInstancePids(
+    srv, # List structure describing a scidb server.
+    liid, # Number of a running scidb instance (unused here).
+    sshConn=None # Optional ssh connection object.
+    ):
+    cmdList = [ getAllScidbPidsCmd(srv) ]
+    (ret,out,err)=executeIt(cmdList, srv, liid, sshc=sshConn,useSSH4Local=True, useConnstr=False, 
+                           useShell=True, ignoreError=True, silent=True, nocwd=True,
+                           stdoutFile=None, stderrFile=None)
 
+    # Drop additional whitespace characters
+    ports = []
+    if (out != ''): 
+        ports = out.splitlines()
+    # end if
+    print "checking (server %d (%s) local instance %d) %s... " % (srv[0], srv[1], liid, " ".join(ports))
+    return ports
+#............................................................................
  # init dirs and links and initialize/register all instances. Assumes
  # that syscat init script was already run.
 def initAll(force=False):
    # Timestamp for backup directory
-   if (check_scidb_running() > 0): 
-	 print "SciDB is still running."
-	 sys.exit(1)
+   if (check_scidb_running() > 0):
+         print "SciDB is still running."
+         sys.exit(1)
 
-   if (not force): 
-	   if (confirm('This will delete all data and reinitialize storage', False) == False):
-		   sys.exit(1)
-	   # end if
+   if (not force):
+           if (confirm('This will delete all data and reinitialize storage', False) == False):
+                   sys.exit(1)
+           # end if
    # end if
-	
+
    checkRedundancy()
 
    now = datetime.datetime.now()
    dt = now.strftime("%Y%m%d-%H%M%S")
 
    for n in srvList:
-	 if n[0]==0:
-	   #print 'Init master on ', n
-	   init(n,0,dt)
-	 # end if
-	 for i in range(1, n[2]+1):
-	 #print 'Register worker srv ',n,' liid ',i
-	   init(n,i,dt)
-	 # end for
+         if n[0]==0:
+           #print 'Init master on ', n
+           init(n,0,dt)
+         # end if
+         for i in range(1, n[2]+1):
+         #print 'Register worker srv ',n,' liid ',i
+           init(n,i,dt)
+         # end for
    # end for
 # end def initAll
 
 def purgeBackupAll():
    purgeDays = "2"
    if (d.get('purge-days')):
-	 purgeDays = d.get('purge-days')
+         purgeDays = d.get('purge-days')
    # end if
    print "Purge backups older than " + purgeDays
 
    for n in srvList:
-	 if n[0] == 0:
-	   purgeBackup(n, 0, purgeDays)
-	 # end if
-	 for i in range(1, n[2]+1):
-	   purgeBackup(n, i, purgeDays)
-	 # end for
+         if n[0] == 0:
+           purgeBackup(n, 0, purgeDays)
+         # end if
+         for i in range(1, n[2]+1):
+           purgeBackup(n, i, purgeDays)
+         # end for
    # end for
 # end def purgeBackupAll
 
  # Run the syscat init script on coordinator.
-def init_syscat(srv, liid): 
-	 # print "sudo privileges are required to configure the postgres database."
-	 # Check for sudo priv?
-	 user   = d.get('db_user')
-	 db     = d.get('db_name')
-	 passwd = d.get('db_passwd')
-	 cmdList = [binpath + "/init-db.sh", user, db, passwd, pgPort]
-	 (ret,out,err)=executeIt(cmdList, srv, liid, useConnstr=False, nocwd=True,
-							 stdoutFile=None, stderrFile=None)
-	 if (err): 
-		 print err
-		 sys.exit(1)
+def init_syscat(srv, liid):
+         # print "sudo privileges are required to configure the postgres database."
+         # Check for sudo priv?
+         user   = d.get('db_user')
+         db     = d.get('db_name')
+         passwd = d.get('db_passwd')
+         cmdList = [binpath + "/init-db.sh", user, db, passwd, pgPort]
+         (ret,out,err)=executeIt(cmdList, srv, liid, useConnstr=False, nocwd=True,
+                                                         stdoutFile=None, stderrFile=None)
+         if (err):
+                 print err
+                 sys.exit(1)
 # end def init_syscat
 
 # Register this instance (single/master)
 def init(srv, liid, dt):
-	 print "init(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
-	 print "Initializing local scidb instance/storage.\n"
+         print "init(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
+         print "Initializing local scidb instance/storage.\n"
 
          cleanup(srv,liid,dt)
 
-	 createDirsAndLinks(srv, liid)
-	 os.chdir(getInstanceDataPath(masterSrv,0))
+         createDirsAndLinks(srv, liid)
+         os.chdir(getInstanceDataPath(masterSrv,0))
 
-	 cmdList = [binpath + "/scidb", "--register"]
+         cmdList = [binpath + "/scidb", "--register"]
 
-	 if srv[0]==0 and liid==0:
-		 initFlag = "--initialize"
-		 cmdList.extend(["-p", str(basePort+liid), initFlag])
-	 else:
-		 cmdList.extend(["-p", str(basePort+liid)])
-	 # end if
+         if srv[0]==0 and liid==0:
+                 initFlag = "--initialize"
+                 cmdList.extend(["-p", str(basePort+liid), initFlag])
+         else:
+                 cmdList.extend(["-p", str(basePort+liid)])
+         # end if
 
-	 logconf = d.get('logconf')
-	 cmdList.extend(["-i", srv[1], #get_ip_address(d.get('interface')),
-					 "-s", getInstanceDataPath(srv,liid) + '/storage.cfg',
-					 "-l", logconf])
+         logconf = d.get('logconf')
+         cmdList.extend(["-i", srv[1], #get_ip_address(d.get('interface')),
+                                         "-s", getInstanceDataPath(srv,liid) + '/storage.cfg',
+                                         "-l", logconf])
 
-   ## XXX temp setting for trac #. 
-	 if d.get('enable-delta-encoding') in ['true', 'True', 'on', 'On']:
-		 deltaClause = "--enable-delta-encoding"
-		 cmdList.extend([deltaClause])
-	 # end if
+         ## XXX temp setting for trac #.
+         if d.get('enable-delta-encoding') in ['true', 'True', 'on', 'On']:
+                 deltaClause = "--enable-delta-encoding"
+                 cmdList.extend([deltaClause])
+         # end if
 
-	 if d.get('rle-chunk-format') in ['false', 'False', 'off', 'Off']:
-		 rlechunkClause = "--rle-chunk-format=False"
-		 cmdList.extend([rlechunkClause])
-	 else:
-		 rlechunkClause = "--rle-chunk-format=True"
-		 cmdList.extend([rlechunkClause])
-	 # end if
+         if d.get('daemon-mode') in ['true', 'True', 'on', 'On']:
+                 daemonClause = "--daemon"
+                 cmdList.extend([daemonClause])
+         # end if
 
-	 if d.get('chunk-segment-size'):
-		 clusterClause = "--chunk-segment-size=%s" % d.get('chunk-segment-size')
-		 cmdList.extend([clusterClause])
-	 # end if
+         if d.get('rle-chunk-format') in ['false', 'False', 'off', 'Off']:
+                 rlechunkClause = "--rle-chunk-format=False"
+                 cmdList.extend([rlechunkClause])
+         else:
+                 rlechunkClause = "--rle-chunk-format=True"
+                 cmdList.extend([rlechunkClause])
+         # end if
 
-	 if d.get('chunk-reserve'):
-		 reserveClause = "--chunk-reserve=%s" % d.get('chunk-reserve')
-		 cmdList.extend([reserveClause])
-	 # end if
+         if d.get('chunk-segment-size'):
+                 clusterClauseOld = "--chunk-segment-size-old=%s" % d.get('chunk-segment-size')
+                 cmdList.extend([clusterClauseOld])
+         # end if
 
-	 executeIt(cmdList, srv, liid,
-			   stdoutFile="init-stdout.log", stderrFile="init-stderr.log")
+         if d.get('chunk-segment-size-in-mb'):
+                 clusterClause = "--chunk-segment-size-in-mb=%s" % d.get('chunk-segment-size-in-mb')
+                 cmdList.extend([clusterClause])
+         # end if
+
+         if d.get('chunk-reserve'):
+                 reserveClause = "--chunk-reserve=%s" % d.get('chunk-reserve')
+                 cmdList.extend([reserveClause])
+         # end if
+
+         executeIt(cmdList, srv, liid,
+                           stdoutFile="init-stdout.log", stderrFile="init-stderr.log")
 # end def init
 
 def check_scidb_ready(srv, liid):
    # listing queries should very cheap
-   cmdList = [binpath + "/iquery", "-c", "localhost", "-p", str(basePort), "-naq", "\"list(\'queries\')\"", "1>/dev/null", "2>/dev/null"] 
+   cmdList = [binpath + "/iquery", "-c", "localhost", "-p", str(basePort), "-naq", "\"list(\'queries\')\"", "1>/dev/null", "2>/dev/null"]
    (ret,out,err)=executeIt(cmdList, srv, liid,
                            useConnstr=False,
                            nocwd=True,
                            ignoreError=True,
                            useShell=True)
    return (ret==0)
+#..................................................................
+# check_scidb_running: check if scidb is running on the specified
+#                      servers.
+def check_scidb_running(
+    sshConns=[], # Optional list of ssh connections to servers.
+    servers=srvList, # Optionsl list of servers (must match connections).
+    checkAll=True # Optional flag: if true, the function exits as soon as 
+    ):            # even one scidb process found on one server.
+    #.............................................................
+    # Prepare some default return values.
+    c = 0
+    pids = []
+    # Sort the server list: currently, passed in servers must be 
+    # sorted in the exact same way; otherwise their optional ssh
+    # connection objects will be mismatched.
+    sortedSrvList = sorted(list(servers),key=lambda x: x[0])
+    #.............................................................
+    # Prepare the ssh connections.
+    sshc = list(sshConns)
+    needToCloseSSH = False
+    if (len(sshConns) == 0):
+        needToCloseSSH = True
+        sshc = [sshconnect(srv) for srv in sortedSrvList]
+    #.............................................................
+    if (checkAll): # Check all servers for all of their instances at once.
+        #.............................................................
+        # Gather a list of pid-collection commands for every server.
+        cmds = [getAllScidbPidsCmd(srv) for srv in sortedSrvList]
+	#.............................................................
+	# Run all of the server pid-collecting commands in parallel.
+	(ret,out,err) = parallelRemoteExec(sshc,cmds)
+	#.............................................................
+	# Analyze the results.
+	pids = [o.splitlines() for o in out]
+	c = sum([len(p) for p in pids])
+	if (c > 0):
+            msgs = [
+	        "checking (server %d (%s)) %s..." % (tpl[0][0], tpl[0][1], " ".join(tpl[1])) for tpl in zip(sortedSrvList,pids)
+		]
+	    print '\n'.join(msgs)
+    else: # Pid-collecting commands will be run one-by-one.
+        #.............................................................
+        # Set up arguments for calls to getAllScidbInstancePids in a list.
+        argLists = [[sortedSrvList[0],0]]
+        argLists.extend([[n,1] for n in sortedSrvList[1:]])
 
-def check_scidb_running(): 
-	 c = 0
-	 for n in sorted(srvList): 
-		 if (n[0] == 0): 
-			 c = c + len(get_scidb_pids(n, 0))
-		 # end if
-
-		 for i in range(1, n[2]+1): 
-			 c = c + len(get_scidb_pids(n, i))
-		 # end for
-	 # end for
-	 print "Found %d scidb processes" % (c)
-	 return c
+        for i in range(len(sortedSrvList)):
+            #.............................................................
+	    # Get pids for one server.
+	    pids = getAllScidbInstancePids(*argLists[i],sshConn=sshc[i])
+	    #print "checking (server %d (%s)) %s..." % (sortedSrvList[i][0], sortedSrvList[i][1], " ".join(pids))
+	    c = len(pids)
+	    if (c > 0):
+                break # No need to check further: scidb is running on at least one server.
+    #.................................................................
+    # Close SSH connections if we opened them.
+    if (needToCloseSSH):
+        map(lambda con: con.close(),sshc)
+	print "Found %d scidb processes" % (c)
+    # Can modify the function to return pids also:
+    # this would enable more targeted calls to this function
+    # (only check servers that had running pids from the 
+    # previous call).
+    return c
 # end def check_scidb_running
 
 # Check that all instances are running the same version.
 def check_scidb_version(srv, liid):
-	cmdList=["@CMAKE_INSTALL_PREFIX@/bin/scidb", "--version"]
-	(ret,out,err) = executeIt(cmdList, srv, liid, useSSH4Local=True, useConnstr=False, useShell=False, ignoreError=False, 
-							  silent=True, nocwd=True, stdoutFile=None, stderrFile=None)
-	return out
+        cmdList=["@CMAKE_INSTALL_PREFIX@/bin/scidb", "--version"]
+        (ret,out,err) = executeIt(cmdList, srv, liid, useSSH4Local=True, useConnstr=False, useShell=False, ignoreError=False,
+                                                          silent=True, nocwd=True, stdoutFile=None, stderrFile=None)
+        return out
 # end def check_scidb_version
 
-def check_scidb_versions_all(): 
-	coordver=""
-	for n in sorted(srvList): 
-		# liid only necessary for the base-path.
-		if (n[0] == 0): 
-			print "version (server %d (%s)) "% (n[0],n[1])
-			coordver=check_scidb_version(n, 0)
-			print coordver
-	# Check for any mismatched version strings.
-	for n in sorted(srvList): 
-		if (n[0] != 0): 
-			wrkver = check_scidb_version(n, 1)
-			if (wrkver != coordver): 
-				print "version mismatch (server %d (%s)) "% (n[0],n[1])
-				print wrkver
-				print "Check SciDB installation!"
-			# end if
-		# end if
-	# end for
+def check_scidb_versions_all():
+        coordver=""
+        for n in sorted(srvList):
+                # liid only necessary for the base-path.
+                if (n[0] == 0):
+                        print "version (server %d (%s)) "% (n[0],n[1])
+                        coordver=check_scidb_version(n, 0)
+                        print coordver
+        # Check for any mismatched version strings.
+        for n in sorted(srvList):
+                if (n[0] != 0):
+                        wrkver = check_scidb_version(n, 1)
+                        if (wrkver != coordver):
+                                print "version mismatch (server %d (%s)) "% (n[0],n[1])
+                                print wrkver
+                                print "Check SciDB installation!"
+                        # end if
+                # end if
+        # end for
 # end def check_scidb_versions_all
 
  # start the whole database
  # loop through all srvs and instances
 def startAll():
-   if (check_scidb_running() > 0): 
-	 print "SciDB is still running. Try the stopall command before starting."
-	 sys.exit(1)
+   if (check_scidb_running() > 0):
+         print "SciDB is still running. Try the stopall command before starting."
+         sys.exit(1)
    # end if
 
    checkRedundancy()
 
    for n in sorted(srvList):
-	 if n[0]==0:
-	 #print 'Starting master on ', n
-	   start(n,0)
-	 # end if
-	 for i in range(1, n[2]+1):
-	  #print 'Starting worker srv ',n,' liid ',i
-	   start(n,i)
-	 # end for
+         if n[0]==0:
+         #print 'Starting master on ', n
+           start(n,0)
+         # end if
+         for i in range(1, n[2]+1):
+          #print 'Starting worker srv ',n,' liid ',i
+           start(n,i)
+         # end for
    # end for
 # end def startAll
+#............................................................................
+# Separately create shell commands to first unlink and then re-link all of 
+# the paths to scidb binary files on all servers.
+def makeRelinkBinaryCommands(coordinator,workers):
+    #........................................................................
+    crdRange = range(0,coordinator[2]+1)
+    workerRmLinkCmds = [
+        ['rm -f '+ os.path.join(getInstanceDataPath(worker,i_id),binFile(worker,i_id)) for i_id in range(1,worker[2]+1)] for worker in workers
+	]
+    workerLinkCmds = [
+	['ln -fs '+ binpath + '/scidb ' + os.path.join(getInstanceDataPath(worker,i_id),binFile(worker,i_id)) for i_id in range(1,worker[2]+1)] for worker in workers
+	]
+    allWorkerCommands = [
+        [cmdZip[0] + ' && ' + cmdZip[1] for cmdZip in zip(listZip[0],listZip[1])] for listZip in zip(workerRmLinkCmds,workerLinkCmds)
+        ]
+    coordinatorRmLinkCmds = [
+        'rm -f '+ os.path.join(getInstanceDataPath(coordinator,i_id),binFile(coordinator,i_id)) for i_id in crdRange
+        ]
+    coordinatorLinkCmds = [
+        'ln -fs '+ binpath + '/scidb ' + os.path.join(getInstanceDataPath(coordinator,i_id),binFile(coordinator,i_id)) for i_id in crdRange
+	]
+    allCoordinatorCommands = [
+        coordCmdZip[0] + ' && ' + coordCmdZip[1] for coordCmdZip in zip(coordinatorRmLinkCmds,coordinatorLinkCmds)
+	]
+    allCommands = [allCoordinatorCommands]
+    allCommands.extend(allWorkerCommands)
+    return allCommands
+#............................................................................
+# Put together commands to start all scidb instances on all servers in
+# config.ini.  
+def startAllServers():
+    #........................................................................
+    # Allegedly, list comprehensions are faster than the equivalent explicit
+    # for-loops.  Hence, the command lists and commands themselves are
+    # constructed via the list comprehensions.
+    #
+    # First, we sort the server list in ascending order: the greater the
+    # sequential number of the server, the further down the list it will be
+    # placed.
+    sortedSrvList = sorted(srvList,key=lambda x: x[0])
+    #........................................................................
+    # Establish ssh connections with all servers (possibly including the 
+    # local coordinator machine).
+    sshConnections = [sshconnect(x) for x in sortedSrvList]
+    #........................................................................
+    # Check if the scidb is already running: the "cached" ssh connections 
+    # are used to communicate with all of the scidb servers.
+    pidCounts = check_scidb_running(sshConnections,checkAll=False)
+    if (pidCounts > 0): 
+    	 print "SciDB is still running. Try the stopall command before starting."
+    	 sys.exit(1)
+    # end if
+
+    checkRedundancy()
+    #........................................................................
+    coordinator = sortedSrvList[0] # Master (coordinator) is the first item in the 
+                              # sorted list.
+    workers = sortedSrvList[1:] # The rest of the entries are worker servers.
+    #........................................................................
+    # Create the re-linking commands "on the side": these remove and recreate
+    # links to the scidb executables on all servers (will be inserted into 
+    # command lists at a later time).
+    relinkCmds = makeRelinkBinaryCommands(coordinator,workers)
+    #........................................................................
+    # Then, we set up argument lists to startCommandOnly function for the 
+    # coordinator server scidb instances.
+    # The resulting list should look like this:
+    # [
+    #  [<server info list>,<instance id1>],
+    #  [<server info list>,<instance id2>],
+    #   ...
+    #  [<server info list>,<instance idN>]
+    # ]
+    # Here, server item is the same - coordinator server structure from srvList.
+    coordinatorArgsList = [[coordinator,i] for i in range(0,coordinator[2]+1)]
+    #........................................................................
+    # Next, we set up the same startCommandOnly arguments for the worker 
+    # servers.  This list is for multiple servers, so it will look as folows:
+    # [ [
+    #    [<server info list1>,<instance id1>],
+    #    [<server info list1>,<instance id2>],
+    #     ...
+    #    [<server info list1>,<instance idN>]
+    #   ],
+    #   [
+    #    [<server info list2>,<instance id1>],
+    #    [<server info list2>,<instance id2>],
+    #     ...
+    #    [<server info list2>,<instance idM>]
+    #   ],
+    #   ...
+    # ]
+    workerArgsLists = [[[n,i] for i in range(1,n[2]+1)] for n in workers]
+    allArgsLists = [coordinatorArgsList]
+    allArgsLists.extend(workerArgsLists)
+    #........................................................................
+    # Now the "real" work begins: startCommandOnly is called repeatedly to 
+    # obtain the "real" command-line arguments to start each instance of 
+    # scidb server on the server machines.  The command arguments are
+    # grouped by server. The resulting list looks as the following comment:
+    # [ [ # server 0 (coordinator)
+    #    <command-line args list for instance1>,
+    #    <command-line args list for instance2>,
+    #     ...
+    #    <command-line args list for instanceN>
+    #   ],
+    #   [ # server 1
+    #    <command-line args list for instance1>,
+    #    <command-line args list for instance2>,
+    #     ...
+    #    <command-line args list for instanceM>
+    #   ],
+    #    ...
+    # ]
+    #........................................................................
+    allCmds = [[startCommandOnly(*y) for y in x] for x in allArgsLists]
+    # Create CD commands for each instance:
+    cdCmds = [['cd ' + getInstanceDataPath(*y) for y in x] for x in allArgsLists]
+    #........................................................................
+    # Strip out blank command-line args: when command-line argument lists 
+    # are put together in the statement above, they contain quite a few
+    # "blank" options.
+    allCmds = [ [[z for z in y if len(z) > 0] for y in x] for x in allCmds] 
+    #........................................................................
+    # Convert all of the commands into strings.
+    allCmds = [[' '.join(y) for y in x] for x in allCmds]
+    #........................................................................
+    # Append binary relinking commands to instance-spawning commands.
+    allCmds = [
+        [y[0] + ' && ' + y[1] for y in zip(x[0],x[1])] for x in zip(relinkCmds,allCmds)
+	]
+    # Finally, append the CD commands to all instances
+    allCmds = [
+        [y[0] + ' && ' + y[1] for y in zip(x[0],x[1])] for x in zip(cdCmds,allCmds)
+	]
+    allCmds = [['(' + y + ' ) &' for y in x] for x in allCmds]
+    #........................................................................
+    # Lump all of the instance starting commands for each server into strings:
+    # one string with all of the instances per one server.
+    allCmds = [' '.join(x) for x in allCmds]
+    #........................................................................
+    # Run all of the commands.
+    exits,outputs,errors = parallelRemoteExec(sshConnections,allCmds,waitFlag=False)
+    #........................................................................
+    # Close down all of the ssh connections.
+    map(sshclose,sshConnections)
 
  # Start this liid (single/cluster).
-def start(srv, liid):
+def start(srv, liid, dryRun=False):
    print "start(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
    db = d.get('db_name')
    pluginsdir = d.get('pluginsdir')
@@ -801,21 +1165,21 @@ def start(srv, liid):
    threadsClause = ''
 
    if d.get('redundancy'):
-	  redundancy = "--redundancy=%s" % d.get('redundancy')
+          redundancy = "--redundancy=%s" % d.get('redundancy')
    else:
-	  redundancy = ''
+          redundancy = ''
    # end if
 
    if d.get('tmp-path'):
-	  tmpPathClause = "--tmp-path=%s" % d.get('tmp-path')
+          tmpPathClause = "--tmp-path=%s" % d.get('tmp-path')
    else:
-	  tmpPathClause = ''
+          tmpPathClause = ''
    # end if
 
    if d.get('merge-sort-buffer'):
-	  mergeSortClause = "--merge-sort-buffer=%s" % d.get('merge-sort-buffer')
+          mergeSortClause = "--merge-sort-buffer=%s" % d.get('merge-sort-buffer')
    else:
-	  mergeSortClause = ''
+          mergeSortClause = ''
    # end if
 
    if d.get('merge-sort-nstreams'):
@@ -831,63 +1195,69 @@ def start(srv, liid):
    # end if
 
    if d.get('redimension-chunksize'):
-	  redimChunksizeClause = "--redimension-chunksize=%s" % d.get('redimension-chunksize')
+          redimChunksizeClause = "--redimension-chunksize=%s" % d.get('redimension-chunksize')
    else:
-	  redimChunksizeClause = ''
+          redimChunksizeClause = ''
    # end if
 
    if d.get('smgr-cache-size'):
-	  smgrCacheSize = d.get('smgr-cache-size')
+          smgrCacheSize = d.get('smgr-cache-size')
    else:
-	  smgrCacheSize = '256'
+          smgrCacheSize = '256'
    # end if
 
    if d.get('mem-array-threshold'):
-	  memArrayClause = "--mem-array-threshold=%s" % d.get('mem-array-threshold')
+          memArrayClause = "--mem-array-threshold=%s" % d.get('mem-array-threshold')
    else:
-	  memArrayClause = ''
+          memArrayClause = ''
    # end if
 
    if d.get('network-buffer'):
-	  netbuffClause = "--network-buffer=%s" % d.get('network-buffer')
+          netbuffClause = "--network-buffer=%s" % d.get('network-buffer')
    else:
-	  netbuffClause = ''
+          netbuffClause = ''
    # end if
 
    if d.get('save-ram') in ['true', 'True', 'on', 'On']:
-	  saveRamClause = "--save-ram"
+          saveRamClause = "--save-ram"
    else:
-	  saveRamClause = ''
+          saveRamClause = ''
+   # end if
+
+   if d.get('daemon-mode') in ['true', 'True', 'on', 'On']:
+          daemonClause = "--daemon"
+   else:
+          daemonClause = ''
    # end if
 
    if d.get('rle-chunk-format') in ['false', 'False', 'off', 'Off']:
-	  rlechunkClause = "--rle-chunk-format=False"
+          rlechunkClause = "--rle-chunk-format=False"
    else:
-	  rlechunkClause = "--rle-chunk-format=True"
+          rlechunkClause = "--rle-chunk-format=True"
    # end if
 
    if d.get('parallel-sort') in ['false', 'False', 'off', 'Off']:
-	  plsortClause = "--parallel-sort=False"
+          plsortClause = "--parallel-sort=False"
    else:
-	  plsortClause = "--parallel-sort=True"
+          plsortClause = "--parallel-sort=True"
    # end if
 
    if d.get('liveness-timeout'):
-	  liveness = "--liveness-timeout=%s" % d.get('liveness-timeout')
+          liveness = "--liveness-timeout=%s" % d.get('liveness-timeout')
    else:
-	  liveness = ''
+          liveness = ''
    # end if
 
    if d.get('repart-algorithm'):
-	  repartAlgo = "--repart-algorithm=%s" % d.get('repart-algorithm')
+          repartAlgo = "--repart-algorithm=%s" % d.get('repart-algorithm')
    else:
-	  repartAlgo = ''
+          repartAlgo = ''
    # end if
 
    if d.get('repart-dense-open-once') in ['true', 'True', 'on', 'On']:
-	  repartDenseOpenOnce = "--repart-dense-open-once"
+          repartDenseOpenOnce = "--repart-dense-open-once"
    else:
-	  repartDenseOpenOnce = ''
+          repartDenseOpenOnce = ''
    # end if
 
    if d.get('repart-disable-tile-mode') in ['true', 'True', 'on', 'On']:
@@ -898,83 +1268,89 @@ def start(srv, liid):
 
  # Shared pool
    if d.get('execution-threads'):
-	  threadsClause = threadsClause + " -j %s" % d.get('execution-threads')
+          threadsClause = threadsClause + " -j %s" % d.get('execution-threads')
    # end if
 
  # Per instantiation of an operator (only for multi-threaded ops)
    if d.get('operator-threads'):
-	  threadsClause = threadsClause + " -x %s" % d.get('operator-threads')
+          threadsClause = threadsClause + " -x %s" % d.get('operator-threads')
    # end if
 
  # Shared pool
    if d.get('result-prefetch-threads'):
-	  threadsClause = threadsClause + " -t %s" % d.get('result-prefetch-threads')
+          threadsClause = threadsClause + " -t %s" % d.get('result-prefetch-threads')
    # end if
 
  # Per-query queue of chunks, will consume memory
    if d.get('result-prefetch-queue-size'):
-	  threadsClause = threadsClause + " -q  %s" % d.get('result-prefetch-queue-size')
+          threadsClause = threadsClause + " -q  %s" % d.get('result-prefetch-queue-size')
    # end if
 
    if d.get('chunk-segment-size'):
-	  clusterClause = "--chunk-segment-size=%s" % d.get('chunk-segment-size')
+          clusterClauseOld = "--chunk-segment-size-old=%s" % d.get('chunk-segment-size')
    else:
-	  clusterClause = ''
+          clusterClauseOld = ''
+   # end if
+
+   if d.get('chunk-segment-size-in-mb'):
+          clusterClause = "--chunk-segment-size-in-mb=%s" % d.get('chunk-segment-size-in-mb')
+   else:
+          clusterClause = ''
    # end if
 
    if d.get('chunk-reserve'):
-	  reserveClause = "--chunk-reserve=%s" % d.get('chunk-reserve')
+          reserveClause = "--chunk-reserve=%s" % d.get('chunk-reserve')
    else:
-	  reserveClause = ''
+          reserveClause = ''
    # end if
 
    no_watchdog = (d.get('no-watchdog') in ['true', 'True', 'on', 'On'])
    if no_watchdog:
-	  noWatchDogClause = "--no-watchdog"
+          noWatchDogClause = "--no-watchdog"
    else:
-	  noWatchDogClause = ''
+          noWatchDogClause = ''
    # end if
 
    if d.get('sync-io-interval'):
-	  sitClause = "--sync-io-interval=%s" % d.get('sync-io-interval')
+          sitClause = "--sync-io-interval=%s" % d.get('sync-io-interval')
    else:
-	  sitClause = ''
+          sitClause = ''
    # end if
 
    if d.get('io-log-threshold'):
-	  wrtClause = "--io-log-threshold=%s" % d.get('io-log-threshold')
+          wrtClause = "--io-log-threshold=%s" % d.get('io-log-threshold')
    else:
-	  wrtClause = ''
+          wrtClause = ''
    # end if
 
    if d.get('max-memory-limit'):
-	  memLimit = "--max-memory-limit=%s" % d.get('max-memory-limit')
+          memLimit = "--max-memory-limit=%s" % d.get('max-memory-limit')
    else:
-	  memLimit = ''
+          memLimit = ''
    # end if
 
    if d.get('small-memalloc-size'):
-	  malloc_mmap_threshold = "--small-memalloc-size=%s" % d.get('small-memalloc-size')
+          malloc_mmap_threshold = "--small-memalloc-size=%s" % d.get('small-memalloc-size')
    else:
-	  malloc_mmap_threshold = ''
+          malloc_mmap_threshold = ''
    # end if
 
    if d.get('large-memalloc-limit'):
-	  mmap_count_limit = "--large-memalloc-limit=%s" % d.get('large-memalloc-limit')
+          mmap_count_limit = "--large-memalloc-limit=%s" % d.get('large-memalloc-limit')
    else:
-	  mmap_count_limit = ''
+          mmap_count_limit = ''
    # end if
 
    if d.get('replication-send-queue-size'):
-	  repSendQSize = "--replication-send-queue-size=%s" % d.get('replication-send-queue-size')
+          repSendQSize = "--replication-send-queue-size=%s" % d.get('replication-send-queue-size')
    else:
-	  repSendQSize = ''
+          repSendQSize = ''
    # end if
 
    if d.get('replication-receive-queue-size'):
-	  repRecvQSize = "--replication-receive-queue-size=%s" % d.get('replication-receive-queue-size')
+          repRecvQSize = "--replication-receive-queue-size=%s" % d.get('replication-receive-queue-size')
    else:
-	  repRecvQSize = ''
+          repRecvQSize = ''
    # end if
 
    if d.get('requests'):
@@ -984,42 +1360,48 @@ def start(srv, liid):
    # end if
 
    if d.get('enable-delta-encoding') in ['true', 'True', 'on', 'On']:
-	  deltaClause = "--enable-delta-encoding"
+          deltaClause = "--enable-delta-encoding"
    else:
-	  deltaClause = ''
+          deltaClause = ''
    # end if
 
    if d.get('load-scan-buffer'):
-	  lsbClause = "--load-scan-buffer=%s" % d.get('load-scan-buffer')
+          lsbClause = "--load-scan-buffer=%s" % d.get('load-scan-buffer')
    else:
-	  lsbClause = ''
+          lsbClause = ''
    # end if
 
    if d.get('mpi-dir'):
-	  mpiClause = "--mpi-dir=%s" % d.get('mpi-dir')
+          mpiClause = "--mpi-dir=%s" % d.get('mpi-dir')
    else:
-	  mpiClause = ''
+          mpiClause = ''
    # end if
 
    if d.get('mpi-type'):
-	  mpiTypeClause = "--mpi-type=%s" % d.get('mpi-type')
+          mpiTypeClause = "--mpi-type=%s" % d.get('mpi-type')
    else:
-	  mpiTypeClause = ''
+          mpiTypeClause = ''
+   # end if
+
+   if d.get('preallocate-shared-mem') in ['false', 'False', 'off', 'Off']:
+          preallocateShmClause = "--preallocate-shared-mem=False"
+   else:
+          preallocateShmClause = ""
    # end if
 
    if d.get('materialized-window-threshhold'):
-	  materializeWindowThreshholdTypeClause = "--materialized-window-threshhold=%s" % d.get('materialized-window-threshhold')
+          materializeWindowThreshholdTypeClause = "--materialized-window-threshhold=%s" % d.get('materialized-window-threshhold')
    else:
-	  materializeWindowThreshholdTypeClause = ''
+          materializeWindowThreshholdTypeClause = ''
    # end if
-   
+
    if d.get('enable-catalog-upgrade') in  ['true', 'True', 'on', 'On']:
       upgradeClause = "--enable-catalog-upgrade"
    else:
       upgradeClause = ''
    # end if
 
-   relink_binary(srv, liid)
+   #relink_binary(srv, liid)
    print "Starting SciDB server."
    cmdList = [ "LD_LIBRARY_PATH="+"@CMAKE_INSTALL_PREFIX@/lib:@CMAKE_INSTALL_PREFIX@/lib/scidb/plugins:" + os.environ.get("LD_LIBRARY_PATH", "") + " ", "exec" ]
 
@@ -1043,11 +1425,13 @@ def start(srv, liid):
                 tmpPathClause,
                 mpiClause,
                 mpiTypeClause,
+                preallocateShmClause,
                 materializeWindowThreshholdTypeClause,
                 memArrayClause] + threadsClause.split() + [ netbuffClause,
                 plsortClause,
                 rlechunkClause,
                 clusterClause,
+                clusterClauseOld,
                 reserveClause,
                 liveness,
                 repartAlgo,
@@ -1062,27 +1446,32 @@ def start(srv, liid):
                 deltaClause,
                 lsbClause,
                 upgradeClause,
+                daemonClause,
                 "-s", getInstanceDataPath(srv,liid) + '/storage.cfg']
 
-   cmdList=[" ".join(cmdList)]
-   executeIt(cmdList, srv, liid, waitFlag=False,
-			 stdoutFile="scidb-stdout.log", stderrFile="scidb-stderr.log", useShell=True)
+   if (not dryRun):
+       cmdList=[" ".join(cmdList)]
+       executeIt(cmdList, srv, liid, waitFlag=False,
+                         stdoutFile="scidb-stdout.log", stderrFile="scidb-stderr.log", useShell=True)
+       return None
+   else:
+       return cmdList
+   
 # end def start
-
-
+def startCommandOnly(srv, liid):
+	cmdList = start(srv,liid,dryRun=True)
+	cmdList.extend(['-c',createConnstr(True)])
+	cmdList.extend(['1>',os.path.join(getInstanceDataPath(srv,liid),'scidb-stdout.log')])
+	cmdList.extend(['2>',os.path.join(getInstanceDataPath(srv,liid),'scidb-stderr.log')])
+	return cmdList
  # stop the whole system
  # loop through all srvs and liids, master last
 def stopAll(force=False):
-	 for n in sorted(srvList, reverse=True):
-		 #print 'Stopping worker srv ', n, ' Instance', i
-		 for i in range(n[2],0,-1):
-			 stop(n,i,force)
-		 # end for
-		 if n[0] == 0:
-			 #print 'Stopping master ', n
-			 stop(n,0,force)
-		 # end if
-	 # end for
+	sortedSrvList = sorted(srvList, reverse=True)
+	kwargs = {'force':force}
+	argsList = [[n,n[2]] for n in sortedSrvList[:-1]]
+	argsList.append([sortedSrvList[-1],0])
+	map(lambda x: stop(*x,**kwargs),argsList)
 # end def stopAll
 
  # Collect debug
@@ -1091,22 +1480,23 @@ def collectDbgAll(mode='full'):
    now = datetime.datetime.now()
    dt = now.strftime("%Y%m%d-%H%M%S")
    for n in sorted(srvList, reverse=True):
-	 for i in range(n[2],0,-1):
-	   collectDbg(n, i, dt, mode)
-	 # end for
-	 if n[0] == 0:
-	   collectDbg(n, 0, dt, mode)
-	 # end if
+         for i in range(n[2],0,-1):
+           collectDbg(n, i, dt, mode)
+         # end for
+         if n[0] == 0:
+           collectDbg(n, 0, dt, mode)
+         # end if
    # end for
 # end def collectDbgAll
 
 
 def collectDbg(srv, liid, dt, mode='full'):
 
+   subdir = dt
    if (mode == 'stacksonly'):
-     filelist='`ls *.log* mpi_*/* stack* 2> /dev/null`'
+     filelist='`ls *.log* mpi_*/* '+subdir+'/stack* 2> /dev/null`'
    else:
-     filelist='`ls *.log* mpi_*/* core* stack* 2> /dev/null`'
+     filelist='`ls *.log* mpi_*/* core* '+subdir+'/stack* 2> /dev/null`'
 
    conn = sshconnect(srv)
 
@@ -1114,13 +1504,17 @@ def collectDbg(srv, liid, dt, mode='full'):
    print "collect logs, cores, install files (srv %d (%s) local instance %d)"%(srv[0],srv[1],liid)
 
    if (srv[0] == 0 and liid == 0):
-	 tgzname    = "coord-"   + dt + ".tgz"
-	 instgzname = "install-" + tgzname
-         instlsname = "install-" + dt + ".txt"
-	 allname    = 'all-'+      dt +'.tar'
-	 dmpfiles   = '`ls [sci]*'+ dt +'* 2>/dev/null`'
-         tgzfiles   = '`ls *'+      dt +'*.tgz 2>/dev/null`'
+         name        = "coord-"   + dt + ".tgz"
+         tgzname     = subdir+"/" + name
+         instgzname  = subdir+"/install-" + name
+         instlsname  = subdir+"/install-" + dt + ".txt"
+         tgzfiles    = subdir+"/*"+ dt +"*.tgz"
+         remote_tgzs = "*"+         dt +"*.tgz"
+         allname     = "all-"+      dt +".tar"
          installRoot = d.get('install_root')
+
+         cmdList0 = ['mkdir', '-p', subdir]
+         cmdList00 = ['mv', remote_tgzs, subdir]
 
          if (mode != 'stacksonly'):
            cmdList01 = ["tar", "cvPfz", instgzname, installRoot]
@@ -1129,61 +1523,67 @@ def collectDbg(srv, liid, dt, mode='full'):
            cmdList02  = ["tar", "cvPfz", instgzname, installRoot+"/"+"etc ", installRoot+"/"+"share ", instlsname]
 
          cmdList1 = [binpath + "/" + "scidb_cores", dt]
-	 cmdList2 = ["tar", "cvPfz", tgzname, filelist]
-	 cmdList3 = ['tar', 'cvPf', allname, tgzfiles]
-         cmdList4 = ['rm', "-f", dmpfiles]
+         cmdList2 = ["tar", "cvPfz", tgzname, filelist]
 
-	 try:
+         cmdList3 = ['tar', 'cvPf', allname, tgzfiles]
+         cmdList4 = ['rm', "-rf", subdir]
+
+         try:
+           executeIt(cmdList0, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=False)
+           executeIt(cmdList00, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
            executeIt(cmdList01, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
            if (mode == 'stacksonly'):
              executeIt(cmdList02, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
-	   executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
-	   executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
-	   executeIt(cmdList3, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
-	   executeIt(cmdList4, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
-	 except IOError, detail:
-	   if detail.errno != errno.ENOENT:
-		 print detail
-		 raise
+           executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile='/dev/null', ignoreError=True)
+           executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+           executeIt(cmdList3, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+           executeIt(cmdList4, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+         except IOError, detail:
+           if detail.errno != errno.ENOENT:
+                 print detail
+                 raise
    else:
-	 tgzname = "srv-" + "%03d" % srv[0] + "-" + "%d" % liid + "-" + dt + ".tgz"
-         instgzname = "install-" + tgzname
-         instlsname = "install-" + dt + ".txt"
-         dmpfiles   = '`ls *'+     dt +'* 2>/dev/null`'
+         name = "srv-" + "%03d" % srv[0] + "-" + "%d" % liid + "-" + dt + ".tgz"
+         instname = "install-" + name
+         tgzname     = subdir+"/"+name
+         instgzname  = subdir+"/"+instname
+         instlsname  = subdir+"/install-" + dt + ".txt"
          installRoot = d.get('install_root')
 
+         cmdList0 = ['mkdir', '-p', subdir]
          cmdList1 = ["(find "+installRoot+" | xargs ls -l 1> "+instlsname+")"]
          cmdList2 = ["tar", "cvPfz", instgzname, installRoot+"/"+"etc", installRoot+"/"+"share", instlsname]
-	 cmdList3 = [binpath + "/" + "scidb_cores", dt]
-	 cmdList4 = ["tar", "cvPfz", tgzname, filelist]
-         cmdList5 = ['rm', "-f", dmpfiles]
-	 prefix = getInstanceDataPath(srv, liid)
+         cmdList3 = [binpath + "/" + "scidb_cores", dt]
+         cmdList4 = ["tar", "cvPfz", tgzname, filelist]
+         cmdList5 = ['rm', "-rf", subdir]
+         prefix = getInstanceDataPath(srv, liid)
 
-	 try:
-	   executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
-	   executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+         try:
+           executeIt(cmdList0, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+           executeIt(cmdList1, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
+           executeIt(cmdList2, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
            executeIt(cmdList3, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
            executeIt(cmdList4, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
 
-	   sftp = paramiko.SFTPClient.from_transport(conn.get_transport())
+           sftp = paramiko.SFTPClient.from_transport(conn.get_transport())
 
            remotep = prefix + "/" + tgzname
-           localp = getInstanceDataPath(masterSrv, 0) + "/" + tgzname
+           localp = getInstanceDataPath(masterSrv, 0) + "/" + name
 
-	   print "Running sftp remote: %s -> local: %s" % (remotep, localp)
-	   sftp.get(remotep, localp)
+           print "Running sftp remote: %s -> local: %s" % (remotep, localp)
+           sftp.get(remotep, localp)
 
            remotep = prefix + "/" + instgzname
-	   localp = getInstanceDataPath(masterSrv, 0) + "/" + instgzname
+           localp = getInstanceDataPath(masterSrv, 0) + "/" + instname
 
-	   print "Running sftp remote: %s -> local: %s" % (remotep, localp)
-	   sftp.get(remotep, localp)
+           print "Running sftp remote: %s -> local: %s" % (remotep, localp)
+           sftp.get(remotep, localp)
 
-	   sftp.close()
+           sftp.close()
            executeIt(cmdList5, srv, liid, sshc=conn, useConnstr=False, useSSH4Local=True, stdoutFile="/dev/null", ignoreError=True)
-	 except IOError, detail:
-	   if detail.errno != errno.ENOENT:
-		 raise
+         except IOError, detail:
+           if detail.errno != errno.ENOENT:
+                 raise
    conn.close()
 # end def collectDbg
 
@@ -1194,13 +1594,22 @@ def getScidbPidsCmd(srv, liid):
    return ('ps --no-headers -e -o pid,cmd | awk \'{print $1 \" \" $2}\' | grep ' +
            getInstanceDataPath(srv, liid)+'/' + ' | awk \'{print $1}\'')
 
+#.............................................................................
+# getAllScidbPidsCmd: returns a "ps"-type command to get pids of all running 
+#                     scidb processes.  The returned command is for one 
+#                     server: it finds all scidbs running on that machine
+#                     Returned value is a simple string.
+def getAllScidbPidsCmd(srv):
+   path = "%s/%03d/"%(baseDataPath, srv[0])
+   return ('ps --no-headers -e -o pid,cmd | awk \'{print $1 \" \" $2}\' | grep "' +
+           path +'*"' + ' | awk \'{print $1}\'')
 # stop a particular liid
 def stop(srv, liid, force=False):
    if (not force):
-	 print "stop(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
-         cmdList = [getScidbPidsCmd(srv,liid) + ' | xargs kill']
+         print "stop(server %d (%s) local instance %d)"%(srv[0],srv[1],liid)
+	 cmdList = [getAllScidbPidsCmd(srv) + ' | xargs kill']
    else:
-         cmdList = [getScidbPidsCmd(srv,liid) + ' | xargs kill -9']
+         cmdList = [getAllScidbPidsCmd(srv) + ' | xargs kill -9']
    # end if
    executeIt(cmdList, srv, liid, waitFlag=False, useConnstr=False, nocwd=True, useShell=True)
    return
@@ -1209,48 +1618,48 @@ def stop(srv, liid, force=False):
  # check the system status. at the moment a trivial view into the postgres Srv table.
 def checkSystemStatus():
    cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select instance_id,host,port,online_since from instance order by instance_id"' % (
-					   d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
+                                           d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
    executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
 # end def checkSystemStatus
 
 
 def checkLocks():
    cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select array_name,query_id,instance_id,instance_role,lock_mode from array_version_lock"' % (
-	   d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
+           d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
    executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
 # end def checkLocks
 
 def checkRedundancy():
-	if d.get('redundancy'):
-		nInstances = getInstancesCount()
+        if d.get('redundancy'):
+                nInstances = getInstancesCount()
 
-		red = int(d.get('redundancy'))
-		if not 0 <= red < nInstances:
-			print "Error: redundancy (%d) must be >= 0 and < number of nodes (%d)" % (red, nInstances)
-			sys.exit(1)
+                red = int(d.get('redundancy'))
+                if not 0 <= red < nInstances:
+                        print "Error: redundancy (%d) must be >= 0 and < number of nodes (%d)" % (red, nInstances)
+                        sys.exit(1)
 # end def checkRedundancy
 
 def dumpSyscat():
  #  cmdList = 'select AR.name from \"array\" as AR where not exists (select AD.array_id from array_dimension as AD where AR.name=AD.mapping_array_name) and AR.name like '%:%'" '
    cmdList = [ 'export PGPASSWORD=%s;psql -h localhost --username %s --dbname %s -c "select array_name,query_id,instance_id,instance_role,lock_mode from array_version_lock"' % (
-	   d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
+           d.get('db_passwd'), d.get('db_user'), d.get('db_name'))]
    executeIt(cmdList, masterSrv, 0, useConnstr=False, nocwd=True, useShell=True)
 # end def dumpSyscat
 
  # s.Popen(cmdList, stdout=open('purge.txt'))
  # Add ts to purge.txt.
 def purgeBackup(srv, inst, ndays):
-   if (getSrvDataPath(srv, inst) != ""): 
-	 print "purge backups (server %d (%s) local instance %d)" % (srv[0], srv[1], inst)
-	 instPrefix = "'%s-*'" % (inst)
+   if (getSrvDataPath(srv, inst) != ""):
+         print "purge backups (server %d (%s) local instance %d)" % (srv[0], srv[1], inst)
+         instPrefix = "'%s-*'" % (inst)
 
-	 # Purge all backups more than ndays old.
-	 cmdList = ["find", getSrvDataPath(srv, inst)+"/", "-maxdepth", "1", "-type", "d", "-mtime",
-				ndays, "-name", instPrefix, "-exec", "/bin/rm -rf {} \;", "-print"]
+         # Purge all backups more than ndays old.
+         cmdList = ["find", getSrvDataPath(srv, inst)+"/", "-maxdepth", "1", "-type", "d", "-mtime",
+                                ndays, "-name", instPrefix, "-exec", "/bin/rm -rf {} \;", "-print"]
 
-	 print " ".join(cmdList), " on ", srv," (",inst,")"
-	 executeIt(cmdList, srv, inst, useConnstr=False, stdoutFile='purge-out.log', nocwd=False,
-			   useShell=True, stderrFile='purge-err.log', useSSH4Local=True)
+         print " ".join(cmdList), " on ", srv," (",inst,")"
+         executeIt(cmdList, srv, inst, useConnstr=False, stdoutFile='purge-out.log', nocwd=False,
+                           useShell=True, stderrFile='purge-err.log', useSSH4Local=True)
    # end if
 # end def purgeBackup
 
@@ -1266,51 +1675,51 @@ def checkVersion():
    p = subprocess.Popen(cmdList)
    p.wait()
    if p.returncode != 0 :
-	 raise Exception("Abnormal return code: %s" % (p.returncode))
+         raise Exception("Abnormal return code: %s" % (p.returncode))
    # end if
 # end def checkVersion
 
 if __name__ == "__main__":
 
-	if (cmd == "version"): 
-		checkVersion()
-		sys.exit(0)
-	# end if
+        if (cmd == "version"):
+                checkVersion()
+                sys.exit(0)
+        # end if
 
-	if (cmd == "help"): 
-		usage()
-		sys.exit(0)
-	# end if
-		
-	parse_global_options(configfile)
-	binpath = d.get('install_root') + "/bin"
-	baseDataPath = d.get('base-path')
-	datadirPrefix = d.get('data-dir-prefix')
-	basePort = int(d.get('base-port'))
-	
-	masterSrv = srvList[0]
-		
-	if d.get('ssh-port'):
-		sshPort = int(d.get('ssh-port'))
-	# end if
-	if d.get('pg-port'):
-		pgPort = d.get('pg-port')
-	# end if
-		
-	if d.get('key-file-list'):
-		keyFilenameList = d.get('key-file-list').split(',')
-	# end if
-	  #print 'keyFilenameList is ',keyFilenameList
-		
-	if cmd == "init_syscat":
-		init_syscat(masterSrv, 0)
-	elif cmd == "initall":
-		initAll()
-	elif cmd == "initall-force":
-		initAll(force=True)
-	elif cmd == "startall":
-#		os.chdir(getInstanceDataPath(masterSrv,0))
-		startAll()
+        if (cmd == "help"):
+                usage()
+                sys.exit(0)
+        # end if
+
+        parse_global_options(configfile)
+        binpath = d.get('install_root') + "/bin"
+        baseDataPath = d.get('base-path')
+        datadirPrefix = d.get('data-dir-prefix')
+        basePort = int(d.get('base-port'))
+
+        masterSrv = srvList[0]
+
+        if d.get('ssh-port'):
+                sshPort = int(d.get('ssh-port'))
+        # end if
+        if d.get('pg-port'):
+                pgPort = d.get('pg-port')
+        # end if
+
+        if d.get('key-file-list'):
+                keyFilenameList = d.get('key-file-list').split(',')
+        # end if
+          #print 'keyFilenameList is ',keyFilenameList
+
+        if cmd == "init_syscat":
+                init_syscat(masterSrv, 0)
+        elif cmd == "initall":
+                initAll()
+        elif cmd == "initall-force":
+                initAll(force=True)
+        elif cmd == "startall":
+#               os.chdir(getInstanceDataPath(masterSrv,0))
+		startAllServers()
                 attempts=0
                 while not check_scidb_ready(masterSrv,0):
                    attempts += 1
@@ -1318,11 +1727,14 @@ if __name__ == "__main__":
                       print "Failed to start SciDB!"
                       sys.exit(1)
                    time.sleep(1)
-	elif cmd == "stopall":
-#		os.chdir(getInstanceDataPath(masterSrv,0))
-		stopAll()
+        elif cmd == "stopall":
+#               os.chdir(getInstanceDataPath(masterSrv,0))
+		servers = sorted(srvList,key=lambda x: x[0])
+		conns = [sshconnect(srv) for srv in servers]
+                stopAll()
                 attempts=0
-		while check_scidb_running() > 0:
+		pidCounts = check_scidb_running(sshConns=conns,servers=servers)
+		while pidCounts > 0:
                    attempts += 1
                    if attempts>5:
                       stopAll(force=True)
@@ -1330,27 +1742,28 @@ if __name__ == "__main__":
                       print "Failed to stop SciDB!"
                       sys.exit(1)
                    time.sleep(1)
-	elif cmd == "dbginfo":
-#		os.chdir(getInstanceDataPath(masterSrv,0))
-		collectDbgAll()
-	elif cmd == "dbginfo-lt":
-#		os.chdir(getInstanceDataPath(masterSrv,0))
-		collectDbgAll(mode='stacksonly')
-	elif cmd == "status":
-		checkSystemStatus()
-	elif cmd == "check-pids":
-#		os.chdir(getInstanceDataPath(masterSrv,0))
-		check_scidb_running()
-	elif cmd == "check-version":
-		check_scidb_versions_all()
-	elif cmd == "purge":
-		purgeBackupAll()
-	elif cmd == "metadata":
-		checkLocks()
-	else:
-		usage()
-	# end if
-		
-	sys.exit(0)
+		   pidCounts = check_scidb_running(sshConns=conns,servers=servers)
+        elif cmd == "dbginfo":
+#               os.chdir(getInstanceDataPath(masterSrv,0))
+                collectDbgAll()
+        elif cmd == "dbginfo-lt":
+#               os.chdir(getInstanceDataPath(masterSrv,0))
+                collectDbgAll(mode='stacksonly')
+        elif cmd == "status":
+                checkSystemStatus()
+        elif cmd == "check-pids":
+#               os.chdir(getInstanceDataPath(masterSrv,0))
+                check_scidb_running()
+        elif cmd == "check-version":
+                check_scidb_versions_all()
+        elif cmd == "purge":
+                purgeBackupAll()
+        elif cmd == "metadata":
+                checkLocks()
+        else:
+                usage()
+        # end if
+
+        sys.exit(0)
 # end if
-					
+

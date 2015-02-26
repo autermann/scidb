@@ -101,8 +101,10 @@ void initConfig(int argc, char* argv[])
             "Maximal ratio of filled elements of sparse chunk.", 0.1, false)
         (CONFIG_STRING_SIZE_ESTIMATION, 0, "string-size-estimation", "STRING_SIZE_ESTIMATION", "", Config::INTEGER,
             "Average string size (bytes).", DEFAULT_STRING_SIZE_ESTIMATION, false)
-        (CONFIG_CHUNK_CLUSTER_SIZE, 0, "chunk-segment-size", "CHUNK_SEGMENT_SIZE", "", Config::INTEGER,
-         "Size of chunks segment (bytes).", 85*1024*1024, false)
+        (CONFIG_CHUNK_CLUSTER_SIZE_BYTES, 0, "chunk-segment-size-old", "CHUNK_SEGMENT_SIZE_BYTES", "", Config::INTEGER,
+         "Size of chunks segment in bytes.", 0, false)
+        (CONFIG_CHUNK_CLUSTER_SIZE_MB, 0, "chunk-segment-size-in-mb", "CHUNK_SEGMENT_SIZE_MB", "", Config::INTEGER,
+         "Size of chunks segment in megabytes.", 85, false)
         (CONFIG_READ_AHEAD_SIZE, 0, "read-ahead-size", "READ_AHEAD_SIZE", "", Config::INTEGER,
             "Total size of read ahead chunks (bytes).", 64*1024*1024, false)
         (CONFIG_DAEMONIZE, 'd', "daemon", "", "", Config::BOOLEAN, "Run scidb in background.",
@@ -162,7 +164,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_SMALL_MEMALLOC_SIZE, 0, "small-memalloc-size", "SMALL-MEMALLOC-SIZE", "", Config::INTEGER, "Maximum size of a memory allocation request which is considered small (in bytes). Larger memory allocation requests may be allocated according to a different policy.", 64 * 1024, false)
 
         (CONFIG_LARGE_MEMALLOC_LIMIT, 0, "large-memalloc-limit", "LARGE-MEMALLOC-LIMIT", "", Config::INTEGER, "Maximum number of large  (vs. small) memory allocations. The policy for doing large memory allocations may be different from the (default) policy used for small memory allocations. This parameter limits the number of outstanding allocations performed using the (non-default) large-size allocation policy.", std::numeric_limits<int>::max(), false)
-    
+
         (CONFIG_STRICT_CACHE_LIMIT, 0, "strict-cache-limit", "STRICT_CACHE_LIMIT", "", Config::BOOLEAN, "Block thread if cache is overflown", false, false)
         (CONFIG_REPART_SEQ_SCAN_THRESHOLD, 0, "repart-seq-scan-threshold", "REPART_SEQ_SCAN_THRESHOLD", "", Config::INTEGER, "Number of chunks in array cause repart to use sequential scan through source array", 1000000, false)
         /*
@@ -198,6 +200,7 @@ void initConfig(int argc, char* argv[])
          "Max. number of client query requests queued for execution. Any requests in excess of the limit are returned to the client with an error.", 1000, false)
         (CONFIG_ENABLE_CATALOG_UPGRADE, 0, "enable-catalog-upgrade", "ENABLE_CATALOG_UPGRADE", "", Config::BOOLEAN, "Set to true to enable the automatic upgrade of SciDB catalog", false, false)
         (CONFIG_REDIM_CHUNKSIZE, 0, "redimension-chunksize", "REDIMENSION_CHUNKSIZE", "", Config::INTEGER, "Chunksize for internal intermediate array used in operator redimension", 10240, false)
+        (CONFIG_PREALLOCATE_SHM, 0, "preallocate-shared-mem", "PREALLOCATE_SHM", "", Config::BOOLEAN, "Make sure shared memory backing (e.g. /dev/shm) is preallocated", true, false)
         ;
 
     cfg->addHook(configHook);

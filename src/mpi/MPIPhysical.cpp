@@ -171,24 +171,18 @@ std::vector<MPIPhysical::SMIptr_t> MPIPhysical::allocateMPISharedMemory(size_t n
     }
 
     std::vector<SMIptr_t> shmIpc(numBufs);
-
+    bool preallocate = Config::getInstance()->getOption<bool>(CONFIG_PREALLOCATE_SHM);
     for(size_t ii=0; ii<numBufs; ii++) {
         std::stringstream suffix;
         suffix << "." << ii ;
         std::string ipcNameFull= _ipcName + suffix.str();
         LOG4CXX_TRACE(logger, "IPC name = " << ipcNameFull);
-        shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcNameFull)); // can I get 'em off ctx instead?
+        shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcNameFull, preallocate)); // can I get 'em off ctx instead?
         _ctx->addSharedMemoryIpc(_launchId, shmIpc[ii]);
 
-        try {
-            shmIpc[ii]->create(SharedMemoryIpc::RDWR);
-            shmIpc[ii]->truncate(elemSizes[ii] * numElems[ii]);
-        } catch(SharedMemoryIpc::SystemErrorException& e) {
-            std::stringstream ss; ss << "shared_memory_mmap " << e.what();
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << ss.str()) ;
-        } catch(SharedMemoryIpc::InvalidStateException& e) {
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << e.what());
-        }
+        assert (elemSizes[ii] * numElems[ii] <= std::numeric_limits<int64_t>::max());
+        char* ptr = MpiLauncher::initIpcForWrite(shmIpc[ii].get(), static_cast<int64_t>(elemSizes[ii] * numElems[ii]));
+        assert(ptr);
     }
     return shmIpc;
 }

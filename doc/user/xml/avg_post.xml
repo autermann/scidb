@@ -5,6 +5,13 @@
     <refname>avg</refname>
 
     <refpurpose>Calculates the average (mean) value.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>avg</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>avg</code> operator may be removed in the future. Use the <link linkend="avgAggregate">avg aggregate</link> instead.</para>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -16,8 +23,8 @@
 
     <para><indexterm>
         <primary>average</primary>
-      </indexterm>The avg operator finds the average value of an array
-    attribute. For the corresponding aggregate, see the <link linkend="avgAggregate">avg aggregate</link> reference.</para>
+</indexterm>The <code>avg</code> operator finds the average value of an array
+    attribute.</para>
   </refsect1>
 
   <refsect1>
@@ -66,10 +73,10 @@
 
         <step>
           <para>Find the average value along the dimension j:<para><programlisting>AFL% avg(avg_array,val,j);</programlisting><screen>{i} val_avg
-{0} 1.5
-{1} 5.5
-{2} 9.5
-{3} 13.5
+{0} 6
+{1} 7
+{2} 8
+{3} 9
 </screen></para></para>
         </step>
       </procedure>

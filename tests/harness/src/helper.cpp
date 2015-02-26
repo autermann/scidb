@@ -313,11 +313,11 @@ int diff (const string &file1, const string &file2, const string &diff_file)
 
 void print_execution_stats (const struct ExecutionStats &es)
 {
-	cerr << "testcases_total = " << es.testcasesTotal << endl;
-	cerr << "testcases_passed = " << es.testcasesPassed << endl;
-	cerr << "testcases_failed = " << es.testcasesFailed << endl;
-	cerr << "testcases_skipped = " << es.testcasesSkipped << endl;
-	cerr << "testsuites_skipped = " << es.testsuitesSkipped << endl;
+	cout << "testcases_total = " << es.testcasesTotal << endl;
+	cout << "testcases_passed = " << es.testcasesPassed << endl;
+	cout << "testcases_failed = " << es.testcasesFailed << endl;
+	cout << "testcases_skipped = " << es.testcasesSkipped << endl;
+	cout << "testsuites_skipped = " << es.testsuitesSkipped << endl;
 }
 
 bool check_regex_match (const string fmt, const string str)

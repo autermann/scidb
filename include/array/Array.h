@@ -913,7 +913,8 @@ public:
      * @param last maximal coordinates of extract box
      * @return number of extracted chunks
      */
-    virtual size_t extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last) const;
+    enum extractInit_t { EXTRACT_INIT_ZERO=0, EXTRACT_INIT_NAN };
+    virtual size_t extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last, extractInit_t init=EXTRACT_INIT_ZERO) const;
 
     /**
      * Append data from the array
@@ -959,15 +960,6 @@ public:
      * @param iterationMode chunk iteration mode
      */
     virtual boost::shared_ptr<ConstItemIterator> getItemIterator(AttributeID attr, int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const;
-
-    /**
-     * Convert intgeger coordiantes to original coordinates
-     * @param origCoords [OUT] original coordiantes
-     * @param intCoords [IN] integer coordiantes
-     */
-    virtual void getOriginalPosition(std::vector<Value>& origCoords,
-                                     Coordinates const& intCoords,
-                                     const boost::shared_ptr<Query>& query) const;
 
     /**
      * Scan entire array and print contents to logger

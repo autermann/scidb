@@ -128,6 +128,8 @@ AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<
 
   <xi:include href="min_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="prod_agg_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="stdev_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="sum_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>

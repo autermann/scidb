@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry id="trigonometricFunctions">
@@ -52,7 +51,9 @@
           <row>
             <entry>acos</entry>
 
-            <entry>Inverse (arc) cosine in radians</entry>
+            <entry><indexterm>
+                <primary>inverse cosine</primary>
+              </indexterm>Inverse (arc) cosine in radians</entry>
 
             <entry>acos(scalar)</entry>
 
@@ -62,7 +63,9 @@
           <row>
             <entry>asin</entry>
 
-            <entry>Inverse (arc) sine in radians</entry>
+            <entry><indexterm>
+                <primary>inverse sine</primary>
+              </indexterm>Inverse (arc) sine in radians</entry>
 
             <entry>asin(scalar)</entry>
 
@@ -72,7 +75,9 @@
           <row>
             <entry>atan</entry>
 
-            <entry>Inverse (arc) tangent in radians</entry>
+            <entry><indexterm>
+                <primary>inverse tangent</primary>
+              </indexterm>Inverse (arc) tangent in radians</entry>
 
             <entry>atan(scalar)</entry>
 

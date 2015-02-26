@@ -939,7 +939,7 @@ class Query : public boost::enable_shared_from_this<Query>
 class UpdateErrorHandler : public Query::ErrorHandler
 {
  public:
-    typedef boost::function< void(VersionID,ArrayID,ArrayID,uint64_t) > RollbackWork;
+    typedef boost::function< void(VersionID,ArrayID,ArrayID) > RollbackWork;
 
     UpdateErrorHandler(const boost::shared_ptr<SystemCatalog::LockDesc> & lock)
     : _lock(lock) { assert(_lock); }
@@ -957,8 +957,7 @@ class UpdateErrorHandler : public Query::ErrorHandler
  private:
     static void doRollback(VersionID lastVersion,
                            ArrayID   baseArrayId,
-                           ArrayID   newArrayId,
-                           uint64_t  timestamp);
+                           ArrayID   newArrayId);
     void _handleError(const boost::shared_ptr<Query>& query);
 
     UpdateErrorHandler(const UpdateErrorHandler&);

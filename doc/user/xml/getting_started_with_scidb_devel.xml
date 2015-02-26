@@ -446,6 +446,9 @@ quit or exit   - End iquery session</programlisting></para>
             <entry>
               <para>Set the format of query output. Options are csv, csv+,
               dcsv, lcsv+, sparse, and lsparse.</para>
+
+              <para>We <emphasis>strongly</emphasis> recommend that you set
+              your format to lcsv+ or dcsv.</para>
             </entry>
           </row>
 
@@ -777,29 +780,34 @@ Maudi,Convertible,45000
     dimension names, or attribute names). The lists are
     language-dependent.</para>
 
-    <para>The following words are reserved when using AFL.<screen>agg     and
-case    else
-empty   false
-if      NA
-not     null
-or      then
-true    when</screen></para>
+    <para>The following words are reserved when using AFL.<screen>and          array    as
+asc          between  case
+compression  create   default
+desc         else     empty
+end          false    if
+is           not      null
+or           reserve  then
+true         when</screen></para>
 
     <para><indexterm>
         <primary>AQL</primary>
 
         <secondary>reserved words</secondary>
-      </indexterm>The following words are reserved when using AQL.<screen>and         cancel       case
-cross       else         empty
-false       fixed        from
-group       if           insert
-into        join         not
-null        on           or
-order       redimension  regrid
-rename      select       set
-then        true         unload
-update      variable     when
-where       window</screen></para>
+      </indexterm>All the AFL reserved words are also reserved words in AQL.
+    In addition, AQL also has the following set of reserved words.<screen>all         by           cancel
+cross       current      drop
+errors      fixed        following
+from        group        insert
+instance    instances    into
+join        library      load
+on          order        over
+partition   preceding    query
+redimension regrid       rename
+save        select       set
+shadow      start        step
+thin        to           unbound
+unload      update       values
+variable    where        window</screen></para>
 
     <para>To avoid possible errors, we recommend that you avoid using
     <emphasis role="bold">all </emphasis>of the reserved words as

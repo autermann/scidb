@@ -120,50 +120,13 @@ private:
             assert(rc);
             desc = _schema;
             SystemCatalog::getInstance()->addArray(desc, psHashPartitioned);
-        } else { 
-            if (!desc.isImmutable()) { 
-                lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
-            } 
+        } else {
+            lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
         }
  
-        Dimensions const& dstDims = desc.getDimensions();        
-        bool changeMapping = false;
         for (size_t i = 0; i < nDims; i++) {
             DimensionDesc const& dim = dims[i];
-            string const& mappingArrayName = dim.getMappingArrayName();
             newVersionDims[i] = dim;
-            if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) { 
-                if (arrayExists && desc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName() && !dstDims[i].getMappingArrayName().empty()) { 
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CAN_NOT_CHANGE_MAPPING) << arrayName;
-                }
-                changeMapping = true;
-                boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(mappingArrayName);
-                if (tmpMappingArray) { 
-                    ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
-                    string newMappingArrayName = desc.createMappingArrayName(i, lastVersion+1);
-                    if (SystemCatalog::getInstance()->containsArray(newMappingArrayName)) { 
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << newMappingArrayName;
-                    }
-                    ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(), tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
-                    SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
-                    assert(mappingArrayDesc.getId()>0);
-                    newVersionDims[i] = DimensionDesc(dim.getBaseName(),
-                                                      dim.getNamesAndAliases(),
-                                                      dim.getStartMin(), dim.getCurrStart(),
-                                                      dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(),
-                                                      dim.getChunkOverlap(), dim.getType(), dim.getFlags(),
-                                                      newMappingArrayName,
-                                                      dim.getComment(),
-                                                      dim.getFuncMapOffset(),
-                                                      dim.getFuncMapScale());
-                 }
-            }
-        }
-        if (desc.isImmutable()) {
-            if (changeMapping) { 
-                SystemCatalog::getInstance()->updateArray(ArrayDesc(desc.getId(), desc.getUAId(), desc.getVersionId(), desc.getName(), desc.getAttributes(), newVersionDims));
-            };
-            return;
         }
         _updateableArrayID = desc.getId();
 

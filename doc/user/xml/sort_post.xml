@@ -77,19 +77,19 @@
 
       <procedure>
         <step>
-          <para>Show the source_array: <para><para><programlisting>AFL% scan(champions);  </programlisting><screen>{year,event} person,country,time
-{1996,'dash'} 'Bailey','Canada',9.84
-{1996,'marathon'} 'Thugwane','USA',7956
-{1996,'steeplechase'} 'Keter','Kenya',487.12
-{2000,'dash'} 'Greene','USA',9.87
-{2000,'marathon'} 'Abera','Ethiopia',7811
-{2000,'steeplechase'} 'Kosgei','Kenya',503.17
-{2004,'dash'} 'Gatlin','USA',9.85
-{2004,'marathon'} 'Baldini','Italy',7855
-{2004,'steeplechase'} 'Kemboi','Kenya',485.81
-{2008,'dash'} 'Bolt','Jamaica',9.69
-{2008,'marathon'} 'Wanjiru','Kenya',7596
-{2008,'steeplechase'} 'Kipruto','Kenya',490.34
+          <para>Show the source_array: <para><para><programlisting>AFL% scan(champions);  </programlisting><screen>{year,event_id} person,country,time
+{1996,0} 'Bailey','Canada',9.84
+{1996,1} 'Thugwane','USA',7956
+{1996,2} 'Keter','Kenya',487.12
+{2000,0} 'Greene','USA',9.87
+{2000,1} 'Abera','Ethiopia',7811
+{2000,2} 'Kosgei','Kenya',503.17
+{2004,0} 'Gatlin','USA',9.85
+{2004,1} 'Baldini','Italy',7855
+{2004,2} 'Kemboi','Kenya',485.81
+{2008,0} 'Bolt','Jamaica',9.69
+{2008,1} 'Wanjiru','Kenya',7596
+{2008,2} 'Kipruto','Kenya',490.34
 </screen></para></para></para>
         </step>
 

@@ -82,6 +82,7 @@
   <xi:include href="scidb_function_reference.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="operator_categories.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="scidb_operator_ref.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="appendix_trouble.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="appendix_A.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="appendix_B.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 

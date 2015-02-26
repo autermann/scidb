@@ -373,7 +373,6 @@ namespace scidb
         boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
                                                      int iterationMode);
     };
-    
 
     /**
      * Structure to share mem chunks.
@@ -575,7 +574,7 @@ namespace scidb
             // XXX note: there is still code that does not set the query context correctly
             // e.g. Chunk::materialize() and other cases of using intermediate MemChunk objects
             // so we dont try to validate _query here. At the points where this context must absolutely
-            // be present (i.e. DBArray, MemArray, InputArray, BuildArray, etc.), it will be validate 
+            // be present (i.e. DBArray, MemArray, InputArray, BuildArray, etc.), it will be validate
             return _query.lock();
         }
 
@@ -850,15 +849,15 @@ namespace scidb
         virtual ~RLEChunkIterator();
 
       private:
-        position_t getPos() { 
+        position_t getPos() {
             return isEmptyable ? emptyBitmapIterator.getLPos() : emptyBitmapIterator.getPPos();
         }
-
-        ValueMap values;
-        Value    trueValue;
-        Value    falseValue;
-        Value    tmpValue;
-        Value    tileValue;
+        arena::ArenaPtr const _arena;
+        ValueMap& values;
+        Value     trueValue;
+        Value     falseValue;
+        Value     tmpValue;
+        Value     tileValue;
         shared_ptr<ChunkIterator> emptyChunkIterator;
         RLEPayload payload;
         Chunk* bitmapChunk;

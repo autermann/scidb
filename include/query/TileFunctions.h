@@ -609,6 +609,45 @@ public:
 };
 
 template <typename TS, typename TSR>
+class AggProd
+{
+public:
+    struct State {
+        TSR _prod;
+    };
+
+    static void init(State& state)
+    {
+        state._prod = 1;
+    }
+
+    static void aggregate(State& state, const TS& value)
+    {
+        state._prod *= static_cast<TSR>(value);
+    }
+
+    static void multAggregate(State& state, const TS& value, uint64_t count)
+    {
+        if (count==0)
+        {
+            return;
+        }
+        state._prod *= static_cast<TSR>( pow(static_cast<double>(value), static_cast<double>(count)) );
+    }
+
+    static void merge(State& state, const State& newState)
+    {
+        state._prod *= newState._prod;
+    }
+
+    static bool final(State& state, bool stateNull, TSR& result)
+    {
+        result = stateNull ? 0 : state._prod;
+        return true;
+    }
+};
+
+template <typename TS, typename TSR>
 class AggCount
 {
 public:
@@ -658,19 +697,19 @@ public:
 
     static void aggregate(State& state, const TS& value)
     {
-        if (value < state._min)
+        if (value < state._min || isNanValue(value))
             state._min = value;
     }
 
     static void multAggregate(State& state, const TS& value, uint64_t count)
     {
-        if (value < state._min)
+        if (value < state._min || isNanValue(value))
             state._min = value;
     }
 
     static void merge(State& state, const State& new_state)
     {
-        if (new_state._min < state._min)
+        if (new_state._min < state._min || isNanValue(new_state._min))
             state._min = new_state._min;
     }
 
@@ -698,19 +737,19 @@ public:
 
     static void aggregate(State& state, const TS& value)
     {
-        if (value > state._max)
+        if (value > state._max || isNanValue(value))
             state._max = value;
     }
 
     static void multAggregate(State& state, const TS& value, uint64_t count)
     {
-        if (value > state._max)
+        if (value > state._max || isNanValue(value))
             state._max = value;
     }
 
     static void merge(State& state, const State& new_state)
     {
-        if (new_state._max > state._max)
+        if (new_state._max > state._max || isNanValue(new_state._max))
             state._max = new_state._max;
     }
 

@@ -1075,7 +1075,7 @@ void length(const Value** args, Value* res, void*)
     throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_DIMENSION_NOT_EXIST) << dimName;
 }
 
-void first(const Value** args, Value* res, void*)
+void first_index(const Value** args, Value* res, void*)
 {
     const string arrayName = args[0]->getString();
     const string dimName = args[1]->getString();
@@ -1093,7 +1093,7 @@ void first(const Value** args, Value* res, void*)
     throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_DIMENSION_NOT_EXIST) << dimName;
 }
 
-void last(const Value** args, Value* res, void*)
+void last_index(const Value** args, Value* res, void*)
 {
     const string arrayName = args[0]->getString();
     const string dimName = args[1]->getString();
@@ -1160,7 +1160,7 @@ void length1(const Value** args, Value* res, void*)
     res->setInt64(dims[0].getLength());
 }
 
-void first1(const Value** args, Value* res, void*)
+void first_index1(const Value** args, Value* res, void*)
 {
     const string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;
@@ -1171,7 +1171,7 @@ void first1(const Value** args, Value* res, void*)
     res->setInt64(dims[0].getStart());
 }
 
-void last1(const Value** args, Value* res, void*)
+void last_index1(const Value** args, Value* res, void*)
 {
     const string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;

@@ -54,43 +54,31 @@ SCIDB QUERY : <load (foo3, '../tests/harness/testcases/data/nanull2d.txt')>
 
 SCIDB QUERY : <min(foo)>
 {i} val_min
-{0} 1
+{0} nan
 
 SCIDB QUERY : <max(foo)>
 {i} val_max
-{0} 4
+{0} nan
 
 SCIDB QUERY : <min(foo1)>
 {i} val_min
-{0} 1
+{0} nan
 
 SCIDB QUERY : <max(foo1)>
 {i} val_max
-{0} 4
+{0} nan
 
-SCIDB QUERY : <aggregate(foo,min(val),max(val))>
+SCIDB QUERY : <aggregate(foo, min(val),max(val))>
 {i} val_min,val_max
-{0} 1,4
+{0} nan,nan
 
 SCIDB QUERY : <aggregate(foo1,min(val),max(val))>
 {i} val_min,val_max
-{0} 1,4
+{0} nan,nan
 
 SCIDB QUERY : <aggregate(foo2,min(val),max(val))>
 {i} val_min,val_max
-{0} null,null
-
-SCIDB QUERY : <aggregate(build(foo1,iif(x=0,na,x)), min(val),max(val),avg(val))>
-{i} val_min,val_max,val_avg
-{0} 1,4,2.5
-
-SCIDB QUERY : <aggregate(build(foo1,iif(x=2,na,x)), min(val),max(val),avg(val))>
-{i} val_min,val_max,val_avg
-{0} 0,4,2
-
-SCIDB QUERY : <aggregate(build(foo1,iif(x=1,na,x)), min(val),max(val),avg(val))>
-{i} val_min,val_max,val_avg
-{0} 0,4,2.25
+{0} nan,nan
 
 SCIDB QUERY : <update foo2 set val= 1 where x=0>
 {x} val
@@ -102,7 +90,7 @@ SCIDB QUERY : <update foo2 set val= 1 where x=0>
 
 SCIDB QUERY : <aggregate(foo2, min(val),max(val),avg(val))>
 {i} val_min,val_max,val_avg
-{0} 1,1,1
+{0} nan,nan,nan
 
 SCIDB QUERY : <load (foo2, '../tests/harness/testcases/data/nan2.txt')>
 {x} val
@@ -122,7 +110,7 @@ SCIDB QUERY : <update foo2 set val= 1 where x=3>
 
 SCIDB QUERY : <aggregate(foo2, min(val),max(val),avg(val))>
 {i} val_min,val_max,val_avg
-{0} 1,1,1
+{0} nan,nan,nan
 
 SCIDB QUERY : < update foo2 set val= 1/(1.0-1.0) where x=2>
 {x} val
@@ -134,7 +122,7 @@ SCIDB QUERY : < update foo2 set val= 1/(1.0-1.0) where x=2>
 
 SCIDB QUERY : <aggregate(foo2, min(val),max(val),avg(val))>
 {i} val_min,val_max,val_avg
-{0} 1,inf,inf
+{0} nan,nan,nan
 
 SCIDB QUERY : <sort(foo3,10)>
 {n} val
@@ -156,19 +144,19 @@ SCIDB QUERY : <sort(foo3,10)>
 
 SCIDB QUERY : <aggregate(foo3, min(val),max(val),avg(val))>
 {i} val_min,val_max,val_avg
-{0} 0,inf,inf
+{0} NA,NA,NA
 
 SCIDB QUERY : <max(subarray(foo3,0,1,1,2))>
 {i} val_max
-{0} 2.5
+{0} NA
 
 SCIDB QUERY : <min(subarray(foo3,0,1,1,2))>
 {i} val_min
-{0} 0.2
+{0} NA
 
 SCIDB QUERY : <avg(subarray(foo3,0,1,1,2))>
 {i} val_avg
-{0} 1.35
+{0} NA
 
 SCIDB QUERY : <remove(foo)>
 Query was executed successfully

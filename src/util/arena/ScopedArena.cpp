@@ -274,13 +274,15 @@ bool ScopedArena::consistent() const
  */
 ArenaPtr newScopedArena(const Options& o)
 {
+    using boost::make_shared;                            // For make_shared()
+
     if (o.locking())                                     // Needs locking too?
     {
-        return ArenaPtr(new Locking<ScopedArena>(o));    // ...locking arena
+        return make_shared< Locking<ScopedArena> >(o);   // ...locking arena
     }
     else                                                 // No locking needed
     {
-        return ArenaPtr(new ScopedArena(o));             // ...vanilla arena
+        return make_shared<ScopedArena>(o);              // ...vanilla arena
     }
 }
 

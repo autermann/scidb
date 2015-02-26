@@ -69,7 +69,7 @@ CPPUNIT_TEST_SUITE(OptimizerTests);
         CPPUNIT_TEST(testConcatSgInsert);
         CPPUNIT_TEST(testHabilisCollapse);
 //        CPPUNIT_TEST(testTwoPhase);
-        CPPUNIT_TEST(testMultiply);
+//        CPPUNIT_TEST(testMultiply);
         CPPUNIT_TEST(testFlipStoreRewrite);
         CPPUNIT_TEST(testReplication);
     CPPUNIT_TEST_SUITE_END();
@@ -208,7 +208,7 @@ public:
         Attributes dummyFlippedAttributes;
         dummyFlippedAttributes.push_back(AttributeDesc(0, "x", TID_INT64, 0, (uint16_t) CompressorFactory::NO_COMPRESSION));
         dummyFlippedAttributes.push_back(AttributeDesc(1, "y", TID_INT64, 0, (uint16_t) CompressorFactory::NO_COMPRESSION));
-        dummyFlippedAttributes.push_back(AttributeDesc(2, "empty_indicator",  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+        dummyFlippedAttributes.push_back(AttributeDesc(2, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
         _dummyFlippedArray = ArrayDesc("opttest_dummy_flipped", dummyFlippedAttributes, dummyFlippedDimensions);
         _dummyFlippedId = s_addArray(_dummyFlippedArray);

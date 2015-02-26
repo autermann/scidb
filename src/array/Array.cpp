@@ -793,16 +793,6 @@ namespace scidb
         delete materializedChunk;
     }
 
-    void Array::getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query) const
-    {
-        size_t nDims = intCoords.size();
-        origCoords.resize(nDims);
-        ArrayDesc const& desc = getArrayDesc();
-        for (size_t i = 0; i < nDims; i++) {
-            origCoords[i] = desc.getOriginalCoordinate(i, intCoords[i], query);
-        }
-    }
-
     std::string const& Array::getName() const
     {
         return getArrayDesc().getName();
@@ -920,7 +910,8 @@ namespace scidb
         return src;
     }
 
-    size_t Array::extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last) const
+    size_t Array::extractData(AttributeID attrID, void* buf, Coordinates const& first, Coordinates const& last,
+                              Array::extractInit_t init) const
     {
         ArrayDesc const& arrDesc =  getArrayDesc();
         AttributeDesc const& attrDesc = arrDesc.getAttributes()[attrID];
@@ -951,8 +942,32 @@ namespace scidb
             hasOverlap |= dims[j].getChunkOverlap() != 0;
             bufSize *= last[j] - first[j] + 1;
         }
+
         size_t attrSize = attrType.byteSize();
-        memset(buf, 0, bufSize*attrSize);
+
+        switch(init) {
+        case EXTRACT_INIT_ZERO:
+            memset(buf, 0, bufSize*attrSize);
+            break;
+        case EXTRACT_INIT_NAN:
+            {
+                TypeEnum typeEnum = typeId2TypeEnum(attrType.typeId());
+                if (typeEnum == TE_FLOAT) {
+                    float * bufFlt = reinterpret_cast<float*>(buf);
+                    std::fill(bufFlt, bufFlt+bufSize, NAN);
+                } else if (typeEnum == TE_DOUBLE) {
+                    double * bufDbl = reinterpret_cast<double*>(buf);
+                    std::fill(bufDbl, bufDbl+bufSize, NAN);
+                } else {
+                    assert(false); // there is no such thing as NAN for these types.  The calling programmer made a serious error.
+                    SCIDB_UNREACHABLE();
+                }
+            }
+            break;
+        default:
+            SCIDB_UNREACHABLE(); // all cases should have been enumerated.;
+        }
+
         size_t nExtracted = 0;
         for (boost::shared_ptr<ConstArrayIterator> i = getConstIterator(attrID); !i->end(); ++(*i)) {
             size_t j, chunkOffs = 0;

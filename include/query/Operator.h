@@ -458,11 +458,9 @@ public:
     OperatorParamArrayReference(
             const boost::shared_ptr<ParsingContext>& parsingContext,
             const std::string& arrayName, const std::string& objectName, bool inputScheme,
-            VersionID version = 0,
-            std::string index = ""):
+            VersionID version = 0):
         OperatorParamReference(PARAM_ARRAY_REF, parsingContext, arrayName, objectName, inputScheme),
-        _version(version),
-        _index(index)
+        _version(version)
     {
     }
 
@@ -471,7 +469,6 @@ public:
     {
         ar & boost::serialization::base_object<OperatorParamReference>(*this);
         ar & _version;
-        ar & _index;
     }
 
     /**
@@ -486,11 +483,8 @@ public:
 
     VersionID getVersion() const;
 
-    const std::string& getIndex() const;
-
 private:
     VersionID _version;
-    std::string _index;
 };
 
 class OperatorParamAttributeReference: public OperatorParamReference
@@ -2416,7 +2410,7 @@ public:
         _resultSG(res),
         _aggregateList(aggregateList),
         onSGCompletionCallback(NULL),
-        _targetVersioned(res->getArrayDesc().getId() != 0 && !res->getArrayDesc().isImmutable())
+        _targetVersioned(res->getArrayDesc().getId() != 0)
     {
     }
 };
@@ -2473,80 +2467,6 @@ boost::shared_ptr<MemArray> redistributeAggregate(boost::shared_ptr<MemArray> in
 PhysicalBoundaries findArrayBoundaries(shared_ptr<Array> srcArray,
                                        boost::shared_ptr<Query> query,
                                        bool global = true);
-
-
-/**
- * Build functional attribute mapping
- * @param dim dimension for which mapping should be build
- * @return AttributeMultiMap providing required mapping
- */
-boost::shared_ptr<AttributeMultiMap> buildFunctionalMapping(DimensionDesc const& dim);
-
-/**
- * Build a sorted index from the given attribute set.
- * In order to save memory footprint, the given attrSet is sorted in-place; therefore it is mutated.
- * @param attrSet the attributes to index
- * @param query for reference
- * @param indexArrayName the name under which the index will be stored. Index is not stored if empty.
- * @param indexStart the desired minimum coordinate of index array and index position of first element in index
- * @param maxElements maximum index size. If set, throw exception if index size exceeds this value.
- * @return AttributeMap containing the entire index.
- */
-boost::shared_ptr<AttributeMap> buildSortedIndex( AttributeSet& attrSet,
-                                                  boost::shared_ptr<Query> query,
-                                                  string const& indexArrayName = "",
-                                                  Coordinate indexStart = 0,
-                                                  uint64_t maxElements = 0);
-
-/**
- * Build a sorted index based on an attribute of the given array, persist if necessary.
- * @param srcArray a pointer to local part of array
- * @param attrID the attribute to index
- * @param query a query context
- * @param indexArrayName the name under which the index will be stored. Index is not stored if empty.
- * @param indexStart the desired minimum coordinate of index array and index position of first element in index
- * @param maxElements maximum index size. If set, throw exception if index size exceeds this value.
- * @return AttributeMap containing the entire index.
- */
-boost::shared_ptr<AttributeMap> buildSortedIndex( shared_ptr<Array> srcArray,
-                                                  AttributeID attrID,
-                                                  boost::shared_ptr<Query> query,
-                                                  string const& indexArrayName = "",
-                                                  Coordinate indexStart = 0,
-                                                  uint64_t maxElements = 0);
-
-/**
- * Build a sorted index from the given attribute set.
- * In order to save memory footprint, the given attrSet is sorted in-place; therefore it is mutated.
- * @param attrSet the attributes to index
- * @param query for reference
- * @param indexArrayName the name under which the index will be stored. Index is not stored if empty.
- * @param indexStart the desired minimum coordinate of index array and index position of first element in index
- * @param maxElements maximum index size. If set, throw exception if index size exceeds this value.
- * @return AttributeMap containing the entire index.
- */
-boost::shared_ptr<AttributeMultiMap> buildSortedMultiIndex( AttributeSet& attrSet,
-                                                            boost::shared_ptr<Query> query,
-                                                            string const& indexArrayName = "",
-                                                            Coordinate indexStart = 0,
-                                                            uint64_t maxElements = 0);
-
-/**
- * Build a sorted index based on an attribute of the given array, persist if necessary.
- * @param srcArray a pointer to local part of array
- * @param attrID the attribute to index
- * @param query a query context
- * @param indexArrayName the name under which the index will be stored. Index is not stored if empty.
- * @param indexStart the desired minimum coordinate of index array and index position of first element in index
- * @param maxElements maximum index size. If set, throw exception if index size exceeds this value.
- * @return AttributeMap containing the entire index.
- */
-boost::shared_ptr<AttributeMultiMap> buildSortedMultiIndex( shared_ptr<Array> srcArray,
-                                                            AttributeID attrID,
-                                                            boost::shared_ptr<Query> query,
-                                                            string const& indexArrayName = "",
-                                                            Coordinate indexStart = 0,
-                                                            uint64_t maxElements = 0);
 
 /**
  * It is common practice that in implementing some PhysicalOperator's execute() method, some code is extracted to a sub-routine.

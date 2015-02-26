@@ -94,7 +94,7 @@ public:
             tuple[5].setInt64(lowBoundary[i]);
             tuple[6] = Value(TypeLibrary::getType(TID_INT64));
             tuple[6].setInt64(highBoundary[i]);
-            tuple[7].setData(dims[i].getType().c_str(), dims[i].getType().length() + 1);
+            tuple[7].setString(TID_INT64); //TODO-3667: remove type from dimensions output. NOTE: requires a lot of test changes
         }
 
         _result = boost::shared_ptr<Array>(new TupleArray(_schema, tuples));

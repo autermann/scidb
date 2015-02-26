@@ -62,7 +62,7 @@
       </listitem>
 
       <listitem>
-        <para>The chunks of the input array must be square, and must have a
+        <para>The chunks of the input matrices must be square, and must have a
         chunk interval between 32 and 1024.</para>
       </listitem>
 
@@ -78,19 +78,11 @@
             </listitem>
 
             <listitem>
-              <para>Currently, the chunk size must be 32.</para>
-            </listitem>
-
-            <listitem>
               <para>Currently, the chunk overlap must be zero.</para>
             </listitem>
           </itemizedlist></para>
       </listitem>
 
-      <listitem>
-        <para>Currently, <literal>gemm</literal> only accepts square matrices
-        as arguments, that is m<symbol role="symbolfont">≡</symbol>n<symbol role="symbolfont">≡</symbol>p.</para>
-      </listitem>
     </itemizedlist>
   </refsect1>
 

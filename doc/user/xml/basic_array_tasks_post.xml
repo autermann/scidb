@@ -125,10 +125,10 @@
           <primary>AQL</primary>
 
           <secondary>from</secondary>
-        </indexterm>The <code>show</code> command returns an array result
+        </indexterm>The <code>show()</code> operator returns an array result
       containing an array's schema. To see the entire schema, use a
-      <code><command>SELECT</command> *</code> statement with the
-      <code>show</code> command: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(A);  </programlisting><screen>[('A&lt;val_a:double&gt; [i=0:9,10,0]')]
+      <command>SELECT</command> statement that contains the <code>show</code>
+      operator:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(A);  </programlisting><screen>[('A&lt;val_a:double&gt; [i=0:9,10,0]')]
 </screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> show(B);  </programlisting><screen>[('B&lt;val_b:double&gt; [j=0:9,10,0]')]
 </screen></para></para></para></para></para>
 
@@ -193,7 +193,7 @@
 &lt; val_a:double,
 val_b:double &gt;
 
-[i=0:9,10,0]</screen> The attributes maintain the
+[i=0:9,10,0]</screen>The attributes maintain the
     names from A and B; the dimension takes the name from the first array of
     the join operation.</para></para></para>
 
@@ -209,7 +209,9 @@ val_b:double &gt;
 
     <para>If two arrays have an attribute with the same name, you can select
     the attributes to use with array dot notation: <para><programlisting>AQL% <command>SELECT</command>  C.val_b + D.val_b <command>FROM</command> C,D;  </programlisting><screen>[(202),(204),(206),(208),(210),(212),(214),(216),(218),(220)]
-</screen>If you are using attributes that have the same fully
+</screen><indexterm>
+        <primary>aliases</primary>
+      </indexterm>If you are using attributes that have the same fully
     qualified name, for example, you are joining an array with itself, you can
     use an alias to rename an array for the particular query. This query
     aliases array A to a1 and a2, then uses dot notation to use the attribute
@@ -240,10 +242,17 @@ val_b:double &gt;
     <para>An attribute predicate in the <command>ON</command> clause is used
     to filter the output of the multidimensional array.</para>
 
-    <para>For example, consider a 2-dimensional array <code>m3x3</code>schema
-    and attributes values: <para><programlisting>AQL% <command>CREATE ARRAY</command> m3x3&lt;a:double&gt; [i=1:3,3,0,j=1:3,3,0]; 
-</programlisting><screen>Query was executed successfully
-</screen> Now consider also a 1-dimensional array <code>vector3</code>
+    <para>For example, consider a 2-dimensional array, <code>m3x3</code>:
+    <para><programlisting>AFL% show(m3x3)</programlisting><screen><command>m3x3</command>
+
+&lt; a:double &gt;
+
+[i=1:3,3,0,
+j=1:3,3,0]</screen><screen>[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]</screen> Now consider also a 1-dimensional array <code>vector3</code>
     whose schema and attributes are: <para><programlisting>AFL% show(vector3)</programlisting><screen><command>vector3</command>
 
 &lt; b:double &gt;
@@ -254,8 +263,11 @@ val_b:double &gt;
     <para>A dimension join returns a 2-dimensional array with coordinates
     <code>{i,j}</code> in which the cell at coordinate <code>{i,j}</code>
     combines the cell at <code>{i,j}</code> of <code>m3x3</code> with the cell
-    at coordinate <code>{k=j}</code> of <code>vector3</code>: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> m3x3 <command>JOIN</command> vector3 ON m3x3.j = vector3.k;  </programlisting><screen>[[(0,21),(1,20.5),(2,20.3333)],[(3,21),(4,20.5),(5,20.3333)],[(6,21),(7,20.5),(8,20.3333)]]
-</screen></para></para>
+    at coordinate <code>{k=j}</code> of <code>vector3</code>: <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> m3x3 <command>JOIN</command> vector3 ON m3x3.j = vector3.k;  </programlisting><screen>[
+[(0,21),(1,20.5),(2,20.3333)],
+[(3,21),(4,20.5),(5,20.3333)],
+[(6,21),(7,20.5),(8,20.3333)]
+]</screen></para></para>
   </section>
 
   <section id="aliases">
@@ -339,8 +351,7 @@ val_b:double &gt;
     cells based upon a given probability. For example, you can use the
     <code>bernoulli</code> operator to randomly sample data from an array one
     element at a time. The syntax of <code>bernoulli</code> is:
-    <programlisting>
-bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
+    <programlisting>bernoulli(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting></para>
 
     <para>The <code>sample</code> command allows you to randomly sample data
     one array chunk at a time:<programlisting>sample(<replaceable>array</replaceable>, <replaceable>probability:double</replaceable>  <optional>, <replaceable>seed:int64</replaceable></optional>) </programlisting>The

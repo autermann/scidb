@@ -36,10 +36,10 @@ gemm(ROWS, filter(COLUMNS, 0) , build(M4x4C4, pow(2,i)))
 gemm(filter(ROWS, 0), filter(COLUMNS, 0) , build(M4x4C4, pow(2,i)))
 
 
---echo test to check the output for adding -inf/inf, NA and NaN
-gemm(ROWS, COLUMNS, build(M4x4C4, 1.0/(1.0-1.0)))
-gemm(ROWS, COLUMNS, build(M4x4C4, -1.0/(1.0-1.0)))
-gemm(ROWS, COLUMNS, build(M4x4C4, NA))
+--echo test to check the output for adding +inf,-inf, and nan
+gemm(ROWS, COLUMNS, build(M4x4C4, inf))
+gemm(ROWS, COLUMNS, build(M4x4C4,-inf))
+gemm(ROWS, COLUMNS, build(M4x4C4, nan))
 gemm(ROWS, COLUMNS, build(M4x4C4, log10(-1)))
 
 

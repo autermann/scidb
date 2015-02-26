@@ -8,6 +8,8 @@ export IQUERY_HOST=${SCIDB_HOST:=localhost}
 export IQUERY_PORT=${SCIDB_PORT:=1239}
 export SCIDB_CLUSTER_NAME=$DB_NAME
 
+export PYTHONPATH="${SCIDB_SOURCE_PATH}/tests/harness/pyLib/"
+
 if [ "${SCIDB_BUILD_PATH}" != "" -a "${SCIDB_DATA_PATH}" != "" ] ; then
    rm -f ${SCIDB_DATA_PATH}/000/tests
    ln -s ${SCIDB_BUILD_PATH}/tests ${SCIDB_DATA_PATH}/000/tests

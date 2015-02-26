@@ -62,10 +62,10 @@
             base path folder. Repeat this for each of your arrays. When
             reloading the data, you can feed the saved data through
             <command>loadcsv.py</command>.<note>
-                <para>If you are upgrading from 13.6 to 13.9, <emphasis
+                <para>If you are upgrading from 13.6 to 13.12, <emphasis
                 role="bold">DO NOT USE THE OPAQUE METHOD TO BACKUP YOUR
                 DATA</emphasis>. The changes to the system catalog for 13.9
-                make it impossible to load data files that were saved using
+                made it impossible to load data files that were saved using
                 the opaque method in 13.6 or earlier. You can perform the
                 upgrade in place (that is, skip the backup step), or save your
                 data using one of the other, available formats.</para>
@@ -157,7 +157,7 @@ sudo yum install scidb-&scidb_version;-all</programlisting></para>
             from its current value to the <emphasis
             role="bold">scidbNewVersion</emphasis>. Old
             version:<programlisting>export SCIDB_VER=<emphasis role="bold">scidbOldVersion</emphasis> # This should be set in your environment.</programlisting>Set
-            to new version:<programlisting>export SCIDB_VER=13.9</programlisting>For
+            to new version:<programlisting>export SCIDB_VER=&scidb_version;</programlisting>For
             details, see <xref linkend="environmentVariables"/>.</para>
           </listitem>
 
@@ -199,8 +199,9 @@ logconf=/opt/scidb/13.9/share/scidb/log4cxx.properties</programlisting></para>
 
     <step>
       <para><emphasis role="bold">Restore. </emphasis>After you have the new
-      version of SciDB running, restore any data that you backed up in step
-      1.</para>
+      version of SciDB running, restore any data that you backed up in step 1.
+      Unless you saved your arrays using the OPAQUE method, you need to reload
+      your arrays as 1-dimensional arrays, and then redimension them.</para>
     </step>
   </procedure>
 

@@ -18,7 +18,7 @@
 #              note that the behavior is subject to change, we stated in the manual, and discouraged its use
 #              however, we want to be aware if the values of the interim behavior were to change
 #              so we do have some limited testing of this. finishing this correctly depends on
-#              completing #2202, titled "Create rules of math operations on NaN, NA, null, empty" but which
+#              completing #2202, titled "Create rules of math operations on NaN, nan, null, empty" but which
 #              also requires a careful specification of the behaviors of arrays which are not numbered like matrices
 #              when used by matrix operators.
 # <R><C>nnzc<I> would be the same as that, but with a negative number ("nnz" means negative non-zero) [ not supported, not tested]

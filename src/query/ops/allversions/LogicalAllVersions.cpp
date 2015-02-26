@@ -119,13 +119,7 @@ public:
                                          dim.getCurrEnd(), 
                                          dim.getEndMax(),
                                          dim.getChunkInterval(), 
-                                         dim.getChunkOverlap(), 
-                                         TID_INT64,
-                                         dim.getFlags(), 
-                                         "",
-                                         dim.getComment(),
-                                         dim.getFuncMapOffset(),
-                                         dim.getFuncMapScale());
+                                         dim.getChunkOverlap());
         }
         return ArrayDesc(arrayDesc.getName(), arrayDesc.getAttributes(), dstDims);
 

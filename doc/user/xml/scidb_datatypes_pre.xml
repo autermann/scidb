@@ -485,9 +485,10 @@
 </programlisting></para>
 
     <para>To append an offset and apply it to the time, use the
-    <code>apply_offset</code> function, which adds a timezone offset to the
-    datetime. The offset must be expressed in seconds. <programlisting
-    language="test">--afl create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0]; --show-output=no
+    <code>apply_offset</code> function, which converts a UTC datetime to local
+    datetime by subtracting the offset timezone value, and stores the result
+    as datetimetz including the offset timezone value. The offset must be
+    expressed in seconds. <programlisting language="test">--afl create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0]; --show-output=no
 --afl store(project(apply(T,dst,apply_offset(td,3600)),dst),T1); --show-output-in-test-file=no</programlisting>
     To return the datetime portion of a datetimetz value, use the
     <code>strip_offset </code>function: <programlisting language="test">--afl apply(T1,dst,strip_offset(t)); --show-output-in-test-file=no</programlisting>

@@ -249,8 +249,8 @@ SCIDB QUERY : <gemm(filter(ROWS, 0), filter(COLUMNS, 0) , build(M4x4C4, pow(2,i)
 {3,2} 8
 {3,3} 8
 
-test to check the output for adding -inf/inf, NA and NaN
-SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, 1.0/(1.0-1.0)))>
+test to check the output for adding +inf,-inf, and nan
+SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, inf))>
 {i,j} gemm
 {0,0} inf
 {0,1} inf
@@ -269,7 +269,7 @@ SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, 1.0/(1.0-1.0)))>
 {3,2} inf
 {3,3} inf
 
-SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, -1.0/(1.0-1.0)))>
+SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4,-inf))>
 {i,j} gemm
 {0,0} -inf
 {0,1} -inf
@@ -288,7 +288,7 @@ SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, -1.0/(1.0-1.0)))>
 {3,2} -inf
 {3,3} -inf
 
-SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, NA))>
+SCIDB QUERY : <gemm(ROWS, COLUMNS, build(M4x4C4, nan))>
 {i,j} gemm
 {0,0} NA
 {0,1} NA

@@ -66,7 +66,7 @@ enum
     DLA_ERROR29,//ssvdNorm: Argument #%1% must be bounded"
     DLA_ERROR30,//linregr:: final parameter must be \n'coefficients', \n'residuals', \n'multiple R2',  \n'adjusted R2', \n'F-statistic', \n'p-value', \n'residual stderror', \n'stderror', \n'tvalue', \n'P-statistic', \n'confidence intervals'
     DLA_ERROR31,//logistregr:: last parameter must be 'coefficients' or 'summary'
-    DLA_ERROR32,//'use' = ['everything' | 'all.obs' | 'complete.obs' | 'na.or.complete' | 'pairwise.complete.obs']
+    DLA_ERROR32,//'use' = ['everything' | 'all.obs' | 'complete.obs' | 'nan.or.complete' | 'pairwise.complete.obs']
     DLA_ERROR33,//SVD accepts 'left', 'right' and 'values' parameters
     DLA_ERROR34,//corr accepts 'kendall', 'spearman' and 'pearson' parameters
     DLA_ERROR35,//Singular values overflow

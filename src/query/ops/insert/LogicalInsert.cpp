@@ -133,12 +133,6 @@ public:
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
         }
 
-        if(dstDesc.isImmutable())
-        {
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION)
-                    << "Target of INSERT must be a mutable array";
-        }
-
         Dimensions const& srcDims = srcDesc.getDimensions();
         Dimensions const& dstDims = dstDesc.getDimensions();
 
@@ -152,12 +146,6 @@ public:
 
         for (size_t i = 0, n = srcDims.size(); i < n; i++)
         {
-            if( srcDims[i].getType() != TID_INT64 || dstDims[i].getType() != TID_INT64)
-            {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION)
-                    << "Temporary restriction: INSERT only supports integer dimensions";
-            }
-
             //TODO: we can also allow arrays that are smaller whose length is not evenly divided by chunk interval
             //but then we have to detect "edge chunks" and rewrite them cleverly
             if( srcDims[i].getStartMin() != dstDims[i].getStartMin() ||

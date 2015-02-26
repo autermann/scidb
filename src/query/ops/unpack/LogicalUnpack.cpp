@@ -49,7 +49,7 @@ inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName, siz
     for (size_t j = 0; j < dims.size(); j++, i++)
     {
         arrayLength *= dims[j].getLength();
-        newAttributes[i] = AttributeDesc(i, dims[j].getBaseName(), dims[j].getType(), 0, 0);
+        newAttributes[i] = AttributeDesc(i, dims[j].getBaseName(), TID_INT64, 0, 0);
     }
 
     for (size_t j = 0; j < oldAttributes.size(); j++, i++)

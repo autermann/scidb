@@ -51,17 +51,16 @@ namespace scidb
 
 QueryParser::QueryParser(bool trace) :
     _trace(trace),
-    _aqlScanner(NULL),
-    _aflScanner(NULL),
-    _ast(NULL)
+    _aqlScanner(0),
+    _aflScanner(0),
+    _ast(0)
 {}
-
 
 boost::shared_ptr<AstNode> QueryParser::parse(const std::string& input, bool aql)
 {
     _parsingContext = boost::shared_ptr<ParsingContext>(new ParsingContext(input));
     _errorContext.reset();
-    _errorString = "";
+    _errorString.clear();
 
     if (aql)
     {
@@ -84,7 +83,6 @@ boost::shared_ptr<AstNode> QueryParser::parse(const std::string& input, bool aql
         }
     }
 
-
     return boost::shared_ptr<AstNode>(_ast);
 }
 
@@ -100,7 +98,7 @@ void QueryParser::error(const class location& loc, const std::string& msg)
     _errorString = msg;
 }
 
-void QueryParser::error(boost::shared_ptr<ParsingContext> context, const std::string& msg)
+void QueryParser::error(const boost::shared_ptr<ParsingContext>& context, const std::string& msg)
 {
     if (_errorContext)
         return;

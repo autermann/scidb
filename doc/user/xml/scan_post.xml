@@ -15,7 +15,7 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>scan(<replaceable>stored_array</replaceable><optional>:<replaceable>mapped_dimension</replaceable></optional>);</synopsis>
+    <synopsis>scan(<replaceable>stored_array</replaceable>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -27,12 +27,8 @@
     <replaceable>stored_array</replaceable> must be an array that was
     previously created and stored in SciDB.</para>
 
-    <para>If an array contains any non-integer dimensions, you can use the
-    <literal>scan</literal> operator to view the mapping array for the
-    <replaceable>mapped_dimension</replaceable>.</para>
-
     <para>The scan operator is most useful for displaying a stored array on
-    stdout from the AFL language.</para>
+    <emphasis role="bold">stdout </emphasis>from the AFL language.</para>
   </refsect1>
 
   <refsect1>
@@ -53,17 +49,11 @@
         </step>
 
         <step>
-          <para>Use scan in an AFL statement to display m3x3: <para><programlisting>AFL% scan(m3x3);  </programlisting><screen>{i,j} val
-{0,0} 0
-{0,1} 1
-{0,2} 2
-{1,0} 3
-{1,1} 4
-{1,2} 5
-{2,0} 6
-{2,1} 7
-{2,2} 8
-</screen></para></para>
+          <para>Use scan in an AFL statement to display m3x3: <para><programlisting>AFL% scan(m3x3);  </programlisting><screen>[
+[(0),(1),(2)],
+[(3),(4),(5)],
+[(6),(7),(8)]
+]</screen></para></para>
         </step>
       </procedure>
     </informalexample>
