@@ -74,7 +74,6 @@ else(${Boost_MAJOR_VERSION} LESS 2 AND ${Boost_MINOR_VERSION} LESS 46)
         set_target_properties(scidbtestharness PROPERTIES COMPILE_DEFINITIONS "BOOST_FS_VER=3")
 endif(${Boost_MAJOR_VERSION} LESS 2 AND ${Boost_MINOR_VERSION} LESS 46)
 
-configure_file(test_config.ini config.ini)
 configure_file(runN.py "${GENERAL_HARNESSTEST_DIRECTORY}/runN.py" COPYONLY)
 configure_file(scidbtestprep.py "${GENERAL_OUTPUT_DIRECTORY}/scidbtestprep.py" COPYONLY)
 configure_file(mu_admin.py "${GENERAL_OUTPUT_DIRECTORY}/mu_admin.py")

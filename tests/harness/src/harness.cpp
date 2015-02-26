@@ -488,7 +488,8 @@ int SciDBTestHarness :: validateParameters (void)
 	if (!bfs :: exists (log4j_properties_file))
 	{
 		stringstream ss;
-		ss << "Specify valid path for log4j.properties file using --log-properties-file option of scidbtestharness.";
+		ss << "log4j.properties file '" << log4j_properties_file << "'does not exist.";
+                ss << " Please check --log-properties-file option of scidbtestharness for a valid path to a log4j.properties file.";
 		throw SystemError (FILE_LINE_FUNCTION, ss.str());
 	}
 	_c.log_prop_file = log4j_properties_file;

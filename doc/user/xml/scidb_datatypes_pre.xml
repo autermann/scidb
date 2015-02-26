@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This document was created with Syntext Serna Free. -->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<chapter id="dataTypes">
+  <title>SciDB Data Types and Casting</title>
+
+  <para><indexterm>
+      <primary>data types</primary>
+    </indexterm>SciDB supports the following data types. You can access this
+  list by using <code>list('types')</code> at the AFL command line.</para>
+
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <colspec colname="c1" colwidth="20*"/>
+
+      <colspec colname="cgen1" colwidth="30*"/>
+
+      <colspec colname="c2" colwidth="50*"/>
+
+      <thead>
+        <row>
+          <entry>Data Type</entry>
+
+          <entry>Default Value</entry>
+
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+        <row>
+          <entry>bool</entry>
+
+          <entry>false</entry>
+
+          <entry>Boolean TRUE (1) or FALSE (0)</entry>
+        </row>
+
+        <row>
+          <entry>char</entry>
+
+          <entry>\0</entry>
+
+          <entry>Single-character</entry>
+        </row>
+
+        <row>
+          <entry>datetime</entry>
+
+          <entry>1970-01-01 00:00:00</entry>
+
+          <entry>Date and time</entry>
+        </row>
+
+        <row>
+          <entry>datetimetz</entry>
+
+          <entry>1970-01-01 00:00:00 -00:00</entry>
+
+          <entry>Date and time with timezone offset.</entry>
+        </row>
+
+        <row>
+          <entry>double</entry>
+
+          <entry>0</entry>
+
+          <entry>Double-precision decimal</entry>
+        </row>
+
+        <row>
+          <entry>float</entry>
+
+          <entry>0</entry>
+
+          <entry>Floating-point number</entry>
+        </row>
+
+        <row>
+          <entry>int8</entry>
+
+          <entry>0</entry>
+
+          <entry>Signed 8-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>int16</entry>
+
+          <entry>0</entry>
+
+          <entry>Signed 16-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>int32</entry>
+
+          <entry>0</entry>
+
+          <entry>Signed 32-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>int64</entry>
+
+          <entry>0</entry>
+
+          <entry>Signed 64-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>string</entry>
+
+          <entry>""</entry>
+
+          <entry>Variable length character string</entry>
+        </row>
+
+        <row>
+          <entry>uint8</entry>
+
+          <entry>0</entry>
+
+          <entry>Unsigned 8-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>uint16</entry>
+
+          <entry>0</entry>
+
+          <entry>Unsigned 16-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>uint32</entry>
+
+          <entry>0</entry>
+
+          <entry>Unsigned 32-bit integer</entry>
+        </row>
+
+        <row>
+          <entry>uint64</entry>
+
+          <entry>0</entry>
+
+          <entry>Unsigned 64-bit integer</entry>
+        </row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <section>
+    <title>Casting Between Data Types</title>
+
+    <para><indexterm>
+        <primary>attributes</primary>
+
+        <secondary>casting</secondary>
+      </indexterm><indexterm>
+        <primary>converting data types</primary>
+      </indexterm><indexterm>
+        <primary>type conversions</primary>
+      </indexterm><indexterm>
+        <primary>casting</primary>
+      </indexterm>Attribute values in SciDB can be cast or converted from one
+    data type to another. SciDB permits type conversions between numerical
+    data types (for example, from int8 to int32 or int8 to double). SciDB also
+    supports the conversion of numeric data types to non-numeric data types,
+    such as string.</para>
+
+    <para>Attribute type conversion can be requested explicitly. For example,
+    if you have an integer data type and would like to use an operator only
+    defined to accept double data type attributes, you can use the following
+    conversion to derive an attribute of the correct type.</para>
+
+    <procedure>
+      <step>
+        <para>Create an array that contains an integer
+        attribute.<programlisting language="test">--afl store(build(&lt;a1: int32&gt;[i=0:0,1,0],2),A); --output-format=dense
+</programlisting></para>
+      </step>
+
+      <step>
+        <para>Convert the integer values to doubles.<programlisting
+        language="test">--afl apply(A, a2, double(a1)); --output-format=dcsv</programlisting>This
+        generates a new attribute, a2, with double data type from a1.</para>
+      </step>
+
+      <step>
+        <para>A numeric data type can also be converted to string, which
+        returns a UTF-8 encoded string.<programlisting language="test">--afl apply(A, a2, string(a1)); --output-format=dcsv</programlisting></para>
+      </step>
+    </procedure>
+  </section>
+
+  <section>
+    <title>Casting Between Temporal Data Types</title>
+
+    <para>SciDB includes special functions for converting between temporal
+    data types.</para>
+
+    <para>The following examples demonstrate how to use conversion functions
+    between the datetime data type and the datetime with timezone, datetimetz
+    data type. The date time with time zone data type, datetimetz, uses a
+    timezone offset relative to GMT. You can cast datetime to datetimetz by
+    appending an offset using the following example: <programlisting
+    language="test">--afl create array T&lt;td: datetime&gt;[i=0:0,1,0]; --show-output=no
+--afl store(build(T, now()), T); --show-output-in-test-file=no --output-format=dense
+--afl apply(T, dst, append_offset(td, 3600)); --show-output-in-test-file=no
+</programlisting></para>
+
+    <para>To append an offset and apply it to the time, use the
+    <code>apply_offset</code> function, which adds a timezone offset to the
+    datetime. The offset must be expressed in seconds. <programlisting
+    language="test">--afl create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0]; --show-output=no
+--afl store(project(apply(T,dst,apply_offset(td,3600)),dst),T1); --show-output-in-test-file=no</programlisting>
+    To return the datetime portion of a datetimetz value, use the
+    <code>strip_offset </code>function: <programlisting language="test">--afl apply(T1,dst,strip_offset(t)); --show-output-in-test-file=no</programlisting>
+    To apply the offset to the datetime and return a GMT datetime, use the
+    <code>togmt</code> function: <programlisting language="test">--afl apply(T1,dst,togmt(t)) --show-output-in-test-file=no</programlisting></para>
+  </section>
+</chapter>

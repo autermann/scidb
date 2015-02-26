@@ -81,7 +81,8 @@ namespace scidb
         /// Constructor
         MpiOperatorContext(const boost::weak_ptr<scidb::Query>& query)
         : _query(query),
-          _launchId(0)
+        _launchId(0),
+        _lastLaunchIdInUse(0)
         {}
 
         /// Destructor
@@ -117,7 +118,13 @@ namespace scidb
             return iter->second->_slave;
         }
 
-        /// Set a launcher for a given launch ID
+        /// Get the launch ID of the last slave (in which this instance participated)
+        uint64_t getLastLaunchIdInUse() const
+        {
+            return _lastLaunchIdInUse;
+        }
+
+        /// Set a slave proxy for a given launch ID
         void setSlave(uint64_t launchId, const boost::shared_ptr<MpiSlaveProxy>& slave)
         {
             ScopedMutexLock lock(_mutex);
@@ -182,7 +189,8 @@ namespace scidb
         void pushMsg(uint64_t launchId, const boost::shared_ptr<scidb::ClientMessageDescription>& msg)
         {
             ScopedMutexLock lock(_mutex);
-            LaunchMap::iterator iter = getIter(launchId);
+            const bool dontUpdateLastInUse = false;
+            LaunchMap::iterator iter = getIter(launchId, dontUpdateLastInUse);
             iter->second->_msg = msg;
 
              _event.signal();
@@ -200,7 +208,7 @@ namespace scidb
         uint64_t getNextLaunchId()
         {
             ScopedMutexLock lock(_mutex);
-            return _launchId++;
+            return ++_launchId;
         }
 
     private:
@@ -256,10 +264,18 @@ namespace scidb
             return true;
         }
 
-        LaunchMap::iterator getIter(uint64_t launchId)
+        LaunchMap::iterator getIter(uint64_t launchId, bool updateLastLaunchId=true)
         {
             LaunchMap::iterator iter = _launches.find(launchId);
             if (iter == _launches.end()) {
+
+                if(updateLastLaunchId && (_lastLaunchIdInUse > launchId)) {
+                    // When we are populating a new context from the operator,
+                    // the last launch ID in use can not decrease.
+                    // The contract is that the launch IDs must strictly increase.
+                    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                           << "MPI-based operator context does not allow for decreasing launch IDs");
+                }
                 if (_launches.size() > 1) {
                     // each launch must be serialized by the coordinator,
                     // workers also process launches serially, so at any moment
@@ -269,6 +285,9 @@ namespace scidb
                 }
                 boost::shared_ptr<LaunchInfo> linfo(new LaunchInfo);
                 iter = _launches.insert(make_pair(launchId, linfo)).first;
+                if(updateLastLaunchId) {
+                    _lastLaunchIdInUse = std::max(_lastLaunchIdInUse,launchId);
+                }
             }
             return iter;
         }
@@ -278,6 +297,7 @@ namespace scidb
         scidb::Event _event;
         scidb::Mutex _mutex;
         uint64_t _launchId;
+        uint64_t _lastLaunchIdInUse;
     };
 
     /**

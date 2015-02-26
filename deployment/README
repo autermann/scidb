@@ -59,12 +59,13 @@ First host would considered as coordinator.
 
 8) Configure SciDB cluster
 
-./deploy.sh scidb_prepare <username> <password> <database> <base_path> <instance_count> <coordinator> <hostname 2> <hostname 3> ...
+./deploy.sh scidb_prepare <username> <password> <db_user> <db_password> <database> <base_path> <instance_count> <redundancy> <coordinator> <hostname 2> ...
 
 <instance_count> - count of instance on each host
+<redundancy> - number of additional data replicas (<instance_count)
 First host would considered as coordinator.
 
 9) Start SciDB:
 
-./deploy.sh scidb_start <username> <coordinator>
+./deploy.sh scidb_start <username> <database> <coordinator>
 

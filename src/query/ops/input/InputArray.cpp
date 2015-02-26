@@ -739,6 +739,7 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
             chunkIterators[i] = chunk.getIterator(query, ChunkIterator::NO_EMPTY_CHECK | ConstChunkIterator::SEQUENTIAL_WRITE);
         }
         size_t nCols = templ.columns.size();
+        vector<uint8_t> buf(8);
         while (!chunkIterators[0]->end() && (ch = getc(f)) != EOF) { 
             ungetc(ch, f);
             lastBadAttr = -1;
@@ -758,7 +759,10 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << errno;
                         }
                     }
-                    if (fseek(f, size, SEEK_CUR) != 0) { 
+                    if (buf.size() < size) {
+                        buf.resize(size * 2);
+                    }
+                    if (fread(&buf[0], size, 1, f) != 1) {
                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << errno;
                     }
                 }
@@ -778,8 +782,11 @@ InputArray::InputArray(ArrayDesc const& array, string const& input, string const
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << errno;
                             }
                         }
-                        if (missingReason >= 0) { 
-                            if (fseek(f, size, SEEK_CUR) != 0) { 
+                        if (missingReason >= 0) {
+                            if (buf.size() < size) {
+                                buf.resize(size * 2);
+                            }
+                            if (fread(&buf[0], size, 1, f) != 1) {
                                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << errno;
                             }
                             attrVal[i].setNull(missingReason);

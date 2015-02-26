@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCIDB_VER="${1}"
+
 function ubuntu1204
 {
 # SciDB
@@ -10,8 +12,7 @@ function centos63()
 {
 /sbin/chkconfig iptables off
 /sbin/service iptables stop
-yum remove -y boost*
-yum install -y zlib bzip2 readline python-paramiko libpqxx protobuf log4cxx boost-system boost-program-options boost-serialization boost-regex boost-filesystem boost-thread python-argparse sudo postgresql expect cppunit mpich2 lapack blas time
+yum install -y zlib bzip2 readline python-paramiko libpqxx protobuf log4cxx scidb-boost-${SCIDB_VER}-system scidb-boost-${SCIDB_VER}-program-options scidb-boost-${SCIDB_VER}-serialization scidb-boost-${SCIDB_VER}-regex scidb-boost-${SCIDB_VER}-filesystem scidb-boost-${SCIDB_VER}-thread python-argparse sudo postgresql expect cppunit mpich2 lapack blas time
 }
 
 OS=`./os_detect.sh`

@@ -356,7 +356,7 @@ ERRMSG(SCIDB_LE_INVALID_MONTH_REPRESENTATION,       "Invalid month representatio
 ERRMSG(SCIDB_LE_INVALID_USER_ERROR_CODE,            "Cannot register error namespace '%1%' with error code '%2%': user-defined error codes must be greater than %3%. Use constant SCIDB_USER_ERROR_CODE_START to define your first error code.");
 ERRMSG(SCIDB_LE_ATTRIBUTES_MISMATCH,                "Attributes mismatch");
 ERRMSG(SCIDB_LE_INVALID_FUNCTION_ARGUMENT,          "Invalid function argument: %1%");
-ERRMSG(SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE,       "Chunk size should not exceed 2^64");
+ERRMSG(SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE,       "Chunk size should not exceed 2^63");
 ERRMSG(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES,         "File '%1%' not found on instance(s) %2%");
 ERRMSG(SCIDB_LE_FILE_IMPORT_FAILED,                 "Import from file '%1%' (instance %2%) to array '%3%' failed at line %4%, column %5%, offset %6%, value='%7%': %8%");
 ERRMSG(SCIDB_LE_ACCESS_TO_RAW_CHUNK,                "Access to raw chunk of array '%3%'");

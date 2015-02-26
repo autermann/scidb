@@ -148,27 +148,15 @@ include(LinuxDistroVersion)
 
 # Set option for static linking
 message("DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
-set(LIBREADLINE_STATIC OFF)
 if(${DISTRO_NAME_VER} MATCHES "RedHat-6")
- message(error "We do not support RedHat build. Use CentOS instead")
+ message(FATAL_ERROR "We do not support RedHat build. Use CentOS instead")
 endif()
 
-if(${DISTRO_NAME_VER} MATCHES "RedHat-[0-9][.][0-9]" OR ${DISTRO_NAME_VER} MATCHES "SUSE")
-    set(Boost_USE_STATIC_LIBS ON)
-    set(LOG4CXX_USE_STATIC_LIBS ON)
-    set(PROTOBUF_USE_STATIC_LIBS ON)
-    set(LIBREADLINE_STATIC ON)
-    find_package(Curses REQUIRED)
-    message(STATUS "This is Red Hat based distro and we switch on static building for some libs")
-endif()
-
-if(${DISTRO_NAME_VER} MATCHES "Fedora") 
-    string(REPLACE "Fedora-" "" FEDORA_VERSION "${DISTRO_NAME_VER}")
-    if (FEDORA_VERSION LESS "16")
-      set(Boost_USE_STATIC_LIBS ON)
-      message(STATUS "This is Fedora less then 16 and we switch on static building for boost")
-    endif(FEDORA_VERSION LESS "16")
-endif(${DISTRO_NAME_VER} MATCHES "Fedora")
+if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
+ set(BOOST_ROOT /opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR})
+ set(Boost_NO_SYSTEM_PATHS TRUE)
+ set(Boost_NO_BOOST_CMAKE TRUE)
+endif(${DISTRO_NAME_VER} MATCHES "CentOS-6")
 
 find_package(Boost REQUIRED system program_options serialization regex filesystem thread)
 find_package(Protobuf REQUIRED)
@@ -176,6 +164,16 @@ find_package(Log4CXX REQUIRED)
 find_package(Doxygen)
 find_package(LibPQXX REQUIRED)
 find_package(LibPQ REQUIRED)
+
+if(NOT Boost_FOUND)
+ message(FATAL_ERROR "Could not find the required 1.46 version of boost")
+endif(NOT Boost_FOUND)
+
+if(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND 
+        ${Boost_MINOR_VERSION} EQUAL 46))
+ message(FATAL_ERROR "Could not find the required 1.46 version of boost")
+endif(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND 
+           ${Boost_MINOR_VERSION} EQUAL 46))
 
 if (APPLE)
     FIND_PATH(CPPUNIT_INCLUDE_DIR cppunit/TestCase.h /usr/local/include /usr/include)
@@ -215,6 +213,7 @@ find_package(BISON REQUIRED)
 find_package(SED REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(BZip2 REQUIRED)
+set(LIBREADLINE_STATIC OFF)
 find_package(LibReadline REQUIRED)
 find_package(Threads REQUIRED)
 find_package(XsltProc)
@@ -289,7 +288,7 @@ endif()
 ENABLE_TESTING()
 INCLUDE(CTest)
 
-ADD_TEST(NightlyTest "/bin/bash" ${GENERAL_HARNESSTEST_DIRECTORY}/runharness.sh)
+ADD_TEST(NightlyTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash/SciDB_Build-Packages_Install_Test.sh)
 if (NOT HARNESS_TEST_TIMEOUT)
   set(HARNESS_TEST_TIMEOUT 32000)
 endif(NOT HARNESS_TEST_TIMEOUT)
@@ -319,13 +318,19 @@ file(GLOB MISC_FILES_SRC
     "doc/*.txt"
 )
 
-# Mirror the test and doc files to the build area
+# Mirror the cdash, test, doc and version files to the build area
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/cdash
+                                                           ${CMAKE_BINARY_DIR}/cdash)
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/tests
                                                            ${CMAKE_BINARY_DIR}/tests)
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/doc
                                                            ${CMAKE_BINARY_DIR}/doc)
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/version
+                                                 ${CMAKE_BINARY_DIR}/version)
 
 add_library(misc_files EXCLUDE_FROM_ALL examples/point/point.cpp ${MISC_FILES_SRC})
 # End of dummy target

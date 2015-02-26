@@ -21,6 +21,10 @@ function die()
 
 [ ! "$#" -eq 1 ] && usage
 
+export SCIDB_VERSION_MAJOR=`awk -F . '{print $1}' $(dirname "$0")/../../version`
+export SCIDB_VERSION_MINOR=`awk -F . '{print $2}' $(dirname "$0")/../../version`
+export SCIDB_VERSION_PATCH=`awk -F . '{print $3}' $(dirname "$0")/../../version`
+
 build_dir="`mktemp -d /tmp/scidb_packaging.XXXXX`"
 chroot_result_dir="$1"
 source_dir=~/scidb_3rd_party_sources
@@ -39,6 +43,7 @@ https://fedorahosted.org/mock/raw-attachment/wiki/MockTarballs/mock-1.1.24.tar.x
 http://www.sai.msu.su/apache/logging/log4cxx/0.10.0/apache-log4cxx-0.10.0.tar.gz
 http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.bz2
 http://argparse.googlecode.com/files/argparse-1.2.1.tar.gz
+http://apache-mirror.rbc.ru/pub/apache/maven/maven-3/3.0.4/binaries/apache-maven-3.0.4-bin.tar.gz
 "
 
 echo Preparing dirs
@@ -56,7 +61,9 @@ echo Copying sources to "${build_dir}/SOURCES"
 cp "${source_dir}"/*  "${script_dir}"/centos-6.3-x86_64.cfg "${script_dir}"/log4cxx-cstring.patch "${build_dir}/SOURCES"
 
 echo Copying specs to "${build_dir}/SOURCES"
-cp "${script_dir}"/*.spec "${build_dir}"/SPECS
+for spec_file_name in `(cd ${script_dir}; ls *.spec)`; do
+    cat "${script_dir}"/${spec_file_name} | sed -e "s/SCIDB_VERSION_MAJOR/${SCIDB_VERSION_MAJOR}/" | sed -e "s/SCIDB_VERSION_MINOR/${SCIDB_VERSION_MINOR}/" | sed -e "s/SCIDB_VERSION_PATCH/${SCIDB_VERSION_PATCH}/" > "${build_dir}"/SPECS/${spec_file_name}
+done;
 
 echo Building source packages
 pushd "${build_dir}"/SPECS

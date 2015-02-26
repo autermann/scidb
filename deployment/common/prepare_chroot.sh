@@ -16,8 +16,8 @@ chmod a-wx,o-r,ug+r ${CHROOT_SUDOERS}
 
 function update_mock_config ()
 {
-MOCK_CONFIG=/etc/mock/centos-6.3-x86_64.cfg
-if [ "0" == `cat ${MOCK_CONFIG} | grep scidb | wc -l` ]; then
+    MOCK_CONFIG=/etc/mock/centos-6.3-x86_64.cfg
+#if [ "0" == `cat ${MOCK_CONFIG} | grep scidb | wc -l` ]; then
     NEW_MOCK_CONFIG=${MOCK_CONFIG}.new
     REPO_FILE=/etc/yum.repos.d/SciDB.repo
     head -n-1 "${MOCK_CONFIG}" > ${NEW_MOCK_CONFIG}
@@ -26,7 +26,7 @@ if [ "0" == `cat ${MOCK_CONFIG} | grep scidb | wc -l` ]; then
     echo "\"\"\"" >> ${NEW_MOCK_CONFIG}
     cat ${NEW_MOCK_CONFIG} > ${MOCK_CONFIG}
     rm ${NEW_MOCK_CONFIG}
-fi;
+#fi;
 }
 
 function centos63 ()

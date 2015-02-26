@@ -21,100 +21,104 @@
 # END_COPYRIGHT
 ########################################
 
-#
-# if required set EXECUTABLE_CMAKE_PATH and EXECUTABLE_CTEST_PATH to those paths with cmake, ctest versions >= 2.8
-# and then use this script
-# <source_path> is a path of the directory containing scidb code
-# <build_path> is a path to be used for out-of-source builds
+set -eu
 
-set -u
-
+# Print help message and exit
 function print_help ()
 {
-echo "Usage : SciDBSubmitBuild.sh <source_path> <build_path> <base_path> <branch_name> <coordinator> <platform>"
-echo "        <source_path> : is a path of the directory containing scidb code"
-echo "        <build_path>  : is a path to be used for out-of-source builds"
-echo "        <base_path>   : is a path to database"
-echo "        <branch_name> : is the tag of branch (trunk, rel_11_12)"
-echo "        <coordinator>    : platform name"
-echo "        <platform>    : platform name used for cdash build name"
-echo "        <thread_count>: thread count (-jX)"
-echo ""
-exit 1
+echo <<EOF "Usage: 
+  SciDBSubmitBuild.sh <source_path> <build_path> <packages_path> <platform> <build_thread_count> <db_user> <db_passwd> <db_name> <network> <base_path> <instance_count> <redundancy> <username> <coordinator> [host_list]
+
+    source_path           path to SciDB source
+    build_path            path to SciDB build (if source_path != build_path, then build path !!!would be recreated!!!)
+    packages_path         path to SciDB packages
+    platform              cdash platform name (used in CDash panel build name)
+    build_thread_count    used in 'make -f<build_thread_count>'
+    db_user               database user name (PostgreSQL)
+    db_passwd             database user password (PostgreSQL)
+    db_name               database name (SciDB)
+    network               network of test cluster ('a.b.c.d/e' format)
+    base_path             base path (SciDB)
+    instance_count        count of SciDB instance per machine
+    redundancy            redundancy config option
+    username              linux username for access to test machines
+    coordinator           IP address or hostname of the coordinator
+    [host_list]           IP addresses or hostnames of another test machines"
+EOF
+exit 1;
 }
 
-if [ $# -ne 7 ]; then
-    print_help 
-fi
-
-export TESTMODEL="Continuous"
+# Read arguments
+if [ $# -lt 14 ]; then
+  print_help
+fi;
 
 export SOURCE_PATH=`readlink -f ${1}`
-export BUILD_TYPE="RelWithDebInfo"
 export BUILD_PATH=`readlink -f ${2}`
-export BASE_PATH=`readlink -f ${3}`
-export BRANCH_NAME="${4}"
-export COORDINATOR="${5}"
-export PLATFORM="${6}"
-export THREAD_COUNT="${7}"
+export PACKAGES_PATH=`readlink -f ${3}`
+export PLATFORM=${4}
+export THREAD_COUNT=${5}
+export DB_USER=${6}
+export DB_PASSWD=${7}
+export DB_NAME=${8}
+export NETWORK="${9}"
+export BASE_PATH=${10}
+export INSTANCE_COUNT=${11}
+export REDUNDANCY=${12}
+export USERNAME=${13}
+shift 13
+TEST_HOST_LIST=($@)
+export COORDINATOR=${TEST_HOST_LIST[0]}
+echo "Coordinator: ${COORDINATOR}"
+export TEST_HOST_LIST="$@"
+echo "Host list: ${TEST_HOST_LIST}"
+
+# We use in-source build for simplification (for right now)
+# Feel free to change it to out-of-source build - we can find extra bugs
+if [ "${SOURCE_PATH}" != "${BUILD_PATH}" ]; then
+    rm -rf ${BUILD_PATH}
+    mkdir -p ${BUILD_PATH}
+fi;
+rm -f ${BUILD_PATH}/CMakeCache.txt
+cp -R ${SOURCE_PATH}/cdash ${BUILD_PATH}/cdash
+
+cd ${BUILD_PATH}
+
+# Workaround CTest problem: variables with space inside value are not available
+# inside SciDB_DashboardSubmission.cmake 
+# (for example TEST_HOST_LIST="10.0.20.233 10.0.20.236")
+echo "${COORDINATOR}" > ${BUILD_PATH}/coordinator
+echo "${TEST_HOST_LIST}" > ${BUILD_PATH}/host_list
+
+# Define variables 
+export BUILD_TYPE="RelWithDebInfo"
 export SCIDB_VER=`awk -F . '{print $1"."$2}' ${SOURCE_PATH}/version`
-export SCIDB_CLUSTER_NAME=scidb
-export SCIDB_CONFIG_FILE=/opt/scidb/${SCIDB_VER}/etc/config.in
-CTESTScriptLOCATION="$BUILD_PATH/cdash"
+export TEST_MODEL="Continuous"
+export TIMESTAMP=$(date +%Y.%m.%d_%H-%M-%S)
+export BUILD_REVISION=`(cd ${SOURCE_PATH} && svn info | grep Revision | awk '{ print $2 }')`
+export BRANCH_NAME=`(cd ${SOURCE_PATH} && svn info | grep '^URL:' | egrep -o '(tags|branches)/[^/]+|trunk' | egrep -o '[^/]+$')`
+export BUILD_TAG="${PLATFORM}-${BRANCH_NAME}-${BUILD_REVISION}-${TIMESTAMP}" 
 
-if ! test -f "${SOURCE_PATH}/cdash/SciDB_DashboardSubmission.cmake"
-then
-echo "File $CTESTScriptLOCATION/SciDB_DashboardSubmission.cmake does not exist"
-exit 1
-fi
+# Path to CDash log, added as "Notes" to build
+export CDASH_LOG="/tmp/${BUILD_TAG}"
+echo "CDash log: ${CDASH_LOG}"
 
-rm -f ${SOURCE_PATH}/CTestConfig.cmake
-cp ${SOURCE_PATH}/cdash/CTestConfig.cmake ${SOURCE_PATH}/CTestConfig.cmake
-if ! test -f "$SOURCE_PATH/CTestConfig.cmake"
-then
-echo "File $SOURCE_PATH/CTestConfig.cmake does not exist"
-exit 1
-fi
-export EXECUTABLE_CMAKE_PATH=/usr/bin/cmake
-export EXECUTABLE_CTEST_PATH=/usr/bin/ctest
+export CDASH_PATH_ROOT="/var/www"
+export CDASH_PATH_RELATIVE="cdash_logs/scidb-${BUILD_TAG}"
+export CDASH_PATH_RESULT="${CDASH_PATH_ROOT}/${CDASH_PATH_RELATIVE}"
+mkdir -p ${CDASH_PATH_RESULT}
+echo "CDash result path: ${CDASH_PATH_RESULT}"
 
-domain='.local.paradigm4.com'
-export cdashclientip=`hostname`$domain
+# Copy CTest config file
+rm -f ${BUILD_PATH}/CTestConfig.cmake
+cp ${SOURCE_PATH}/cdash/CTestConfig.cmake ${BUILD_PATH}/CTestConfig.cmake
 
-export LOCALHOST_ROOT_DIRECTORY=/var/www
-CDASH_CUSTOM_FOLDER="cdash_logs"
-echo ""
+export scidbtestresultsURL=$CDASH_PATH_RELATIVE/r/
+export scidbtestcasesURL=$CDASH_PATH_RELATIVE/t/
 
-origdir=$(pwd)
-echo "Info : Cleaning up build directory $BUILD_PATH"
-rm -rf $BUILD_PATH
-mkdir -p `dirname ${BUILD_PATH}`
- 
-cp -R $SOURCE_PATH $BUILD_PATH
-export SOURCE_PATH=$BUILD_PATH
-cd $BUILD_PATH
-rm -f CMakeCache.txt
-cmake . -DSCIDB_DOC_TYPE=NONE
-
-export BUILD_REVISION=$(cat $BUILD_PATH/revision)
-export BUILD_TAG="${PLATFORM}-${BRANCH_NAME}-${BUILD_REVISION}"
-export PATH=${BUILD_PATH}/bin:${PATH}
-
-TIMESTAMP=$(date +%H-%M-%S_%d.%m.%Y)
-
-LOGFILE="/tmp/scidb_${TESTMODEL}_${BRANCH_NAME}_build.log_${TIMESTAMP}"
-export CDASH__LOGFILE=$LOGFILE
-
-export CDASH_TESTCASES_FOLDER="$CDASH_CUSTOM_FOLDER/scidb_${TESTMODEL}Build.log_${TIMESTAMP}"
-mkdir -p "$LOCALHOST_ROOT_DIRECTORY/$CDASH_TESTCASES_FOLDER"
-export scidbtestresultsURL=$CDASH_TESTCASES_FOLDER/r/
-export scidbtestcasesURL=$CDASH_TESTCASES_FOLDER/t/
-
-echo "Log file is ${LOGFILE}"
-echo "Build rev $BUILD_REVISION"
+echo "Build revision ${BUILD_REVISION}"
 echo "Build tag is ${BUILD_TAG}"
-$EXECUTABLE_CTEST_PATH -S "cdash/SciDB_DashboardSubmission.cmake" -VV > "$LOGFILE" 2>&1
-cd $origdir
+/usr/bin/ctest -S "cdash/SciDB_DashboardSubmission.cmake" -VV > "${CDASH_LOG}" 2>&1
 
 export USE_VALGRIND=0
 echo "Done."

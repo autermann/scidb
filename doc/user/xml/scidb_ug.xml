@@ -12,7 +12,7 @@
       <year>2008&ndash;2013</year>
       <holder>SciDB, Inc.</holder>
     </copyright>
-    <releaseinfo>Version 13.1</releaseinfo>
+    <releaseinfo>Version 13.2</releaseinfo>
     <legalnotice>
       <para>SciDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
             License, version 3, as published by the Free Software Foundation.
@@ -35,7 +35,7 @@
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="aggregates_post.xml" encoding="UTF-8"/>
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="updating_and_array_versions_post.xml" encoding="UTF-8"/>
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="changing_array_schemas_post.xml" encoding="UTF-8"/>
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="scidb_dataypes_ref.xml" encoding="UTF-8"/>
+  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="scidb_datatypes_post.xml" encoding="UTF-8"/>
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="scidb_aggregates_ref.xml" encoding="UTF-8"/>
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="scidb_function_reference.xml" encoding="UTF-8"/>
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="scidb_operator_ref.xml" encoding="UTF-8"/>

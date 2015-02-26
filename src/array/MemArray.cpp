@@ -1593,7 +1593,7 @@ namespace scidb
             if (hasCurrent) {
                 currElem += 1;
             }
-            while ((position_t)currElem < _logicalChunkSize) {
+            while (currElem < _logicalChunkSize) {
                 setCurrPosition();
                 if ((!(mode & IGNORE_NULL_VALUES) || !isNull)
                     && (!(mode & IGNORE_EMPTY_CELLS) || !isEmptyCell()))
@@ -1833,7 +1833,7 @@ namespace scidb
         for (size_t i = 0; i < nDims; i++) {
             visibleElems *= lastPos[i] - firstPos[i] + 1;
         }
-        checkBounds = (position_t)visibleElems != _logicalChunkSize;
+        checkBounds = visibleElems != _logicalChunkSize;
 
         if (newChunk) {
             double expectedDensity = dataChunk->getExpectedDensity();
@@ -2085,7 +2085,7 @@ namespace scidb
         tileSize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
         size_t tilesPerChunk = Config::getInstance()->getOption<int>(CONFIG_TILES_PER_CHUNK);
         if (tilesPerChunk != 0) {
-            tileSize = max(tileSize, position_t(_logicalChunkSize/tilesPerChunk));
+            tileSize = max(tileSize, _logicalChunkSize/tilesPerChunk);
         }
 #else
         tileSize = 1;
@@ -2153,7 +2153,7 @@ namespace scidb
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
-            const position_t end = min(tilePos + tileSize, _logicalChunkSize);
+            position_t end = min(tilePos + tileSize, _logicalChunkSize);
             value.getTile(typeId)->unPackTile(payload, *emptyBitmap, tilePos, end);
         } else {
             payloadIterator.getItem(value);
@@ -2240,7 +2240,7 @@ namespace scidb
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
-            const position_t end = min(tilePos + tileSize, _logicalChunkSize);
+            position_t end = min(tilePos + tileSize, _logicalChunkSize);
             value.getTile(typeId)->unPackTile(*emptyBitmap, tilePos, end);
             return value;
         } else {
@@ -2311,7 +2311,8 @@ namespace scidb
         position_t prevTilePos = tilePos;
         if (BaseChunkIterator::setPosition(pos))
         {
-            if ((mode & TILE_MODE) && payload.nSegments() && prevTilePos >= tilePos)
+            assert(tilePos <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
+            if ((mode & TILE_MODE) && payload.nSegments() && prevTilePos >= static_cast<position_t>(tilePos))
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TILE_MODE_EXPECTED_STRIDE_MAJOR_ORDER);
             return true;
         }
@@ -2329,7 +2330,7 @@ namespace scidb
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         if (mode & TILE_MODE) {
-            const position_t end = min(tilePos + tileSize, _logicalChunkSize);
+            position_t end = min(tilePos + tileSize, _logicalChunkSize);
             tileValue.getTile()->unPackTile(payload, *emptyBitmap, tilePos, end);
             return tileValue;
         } else {
@@ -2348,7 +2349,7 @@ namespace scidb
         if (mode & TILE_MODE) {
             RLEPayload* tile = item.getTile();
             if (tile->count() == INFINITE_LENGTH) { 
-                const position_t end = min(tilePos + tileSize, _logicalChunkSize);
+                position_t end = min(tilePos + tileSize, _logicalChunkSize);
                 tile->trim(end - tilePos);
             }
             payload.append(*tile);

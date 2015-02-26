@@ -2,6 +2,8 @@
 
 set -eu
 
+SCIDB_VER="${1}"
+
 function centos63_ccache()
 {
 wget -c http://dl.fedoraproject.org/pub/epel/6/x86_64/ccache-3.1.6-2.el6.x86_64.rpm
@@ -36,8 +38,7 @@ function centos63 ()
 echo "Prepare CentOS 6.3 for build SciDB"
 
 # Build dependencies:
-yum remove -y boost*
-yum install -y gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make boost-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel
+yum install -y gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make scidb-boost-${SCIDB_VER}-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel
 
 yum install -y git git-svn
 # Reduce build time
@@ -45,7 +46,7 @@ yum install -y wget
 centos63_ccache
 
 # Documentation
-yum install -y fop libxslt docbook-style-xsl java-1.7.0-openjdk
+yum install -y fop libxslt docbook-style-xsl
 
 # Testing:
 yum install -y postgresql postgresql-server postgresql-contrib python-argparse

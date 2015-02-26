@@ -2,6 +2,7 @@
 
 set -u
 
-username=${1}
-scidb.py startall ${username}
-until iquery -aq "list()" > /dev/null 2>&1; do sleep 1; done
+database=${1}
+SCIDB_VER="${2}"
+/opt/scidb/${SCIDB_VER}/bin/scidb.py startall ${database}
+until /opt/scidb/${SCIDB_VER}/bin/iquery -aq "list()" > /dev/null 2>&1; do sleep 1; done

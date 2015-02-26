@@ -116,10 +116,50 @@ class PhysicalMpiTest: public MPIPhysical
         for ( size_t i=0; i < NUM_LAUNCH_TESTS; ++i)
         {
             LOG4CXX_DEBUG(logger, "XXXX MULTI-LAUNCH test "<<i);
+            _ctx->getNextLaunchId();
             uint64_t launchId =_ctx->getNextLaunchId();
+            uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+            if (launchId-2 != oldLaunchId) {
+                throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                       << "XXXX Bug in manging last launch ID");
+            }
 
             boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+
+            if (i>0) {
+                try {
+                    _ctx->setSlave(launchId-3, slave);
+                    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                           << "XXXX Bug in MPI context: MpiOperatorContext::setSave did not fail");
+
+                } catch(scidb::SystemException& e) {
+                    if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
+                        throw;
+                    }
+                    if (e.getErrorMessage().find("MPI-based operator context does not allow for decreasing launch IDs")
+                        == std::string::npos) {
+                        throw;
+                    }
+                    // expected
+                }
+            }
+
             _ctx->setSlave(launchId, slave);
+
+            try {
+                _ctx->setSlave(launchId-1, slave);
+                throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                           << "XXXX Bug in MPI context: MpiOperatorContext::setSave did not fail");
+            } catch(scidb::SystemException& e) {
+                if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
+                    throw;
+                }
+                if (e.getErrorMessage().find("MPI-based operator context does not allow for decreasing launch IDs")
+                    == std::string::npos) {
+                    throw;
+                }
+                // expected
+            }
 
             boost::shared_ptr<MpiLauncher> launcher;
             if (_mustLaunch) {
@@ -143,6 +183,20 @@ class PhysicalMpiTest: public MPIPhysical
                 if (launcher->isRunning()) {
                     throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                            << "XXXX Bug in MPI launcher: MpiLauncher::isRunning returned true");
+                }
+                try {
+                    _ctx->setLauncher(launchId-1, launcher);
+                    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                           << "XXXX Bug in MPI context: MpiOperatorContext::setLauncher did not fail");
+                } catch(scidb::SystemException& e) {
+                    if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
+                        throw;
+                    }
+                    if (e.getErrorMessage().find("MPI-based operator context does not allow for decreasing launch IDs")
+                        == std::string::npos) {
+                        throw;
+                    }
+                    // expected
                 }
 
                 _ctx->setLauncher(launchId, launcher);
@@ -186,16 +240,32 @@ class PhysicalMpiTest: public MPIPhysical
             slave->waitForHandshake(_ctx);
 
             // After the handshake the old slave must be gone
-            boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+            boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 
             // cleanup the slave from the previous launch (if any)
             if (oldSlave) {
                 oldSlave->destroy();
                 oldSlave.reset();
             }
-            _ctx->complete(launchId-1);
+            _ctx->complete(oldLaunchId);
 
             boost::shared_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName));
+
+            try {
+                _ctx->addSharedMemoryIpc(launchId-1, shmIpc);
+                throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                       << "XXXX Bug in MPI context: MpiOperatorContext::addSharedMemoryIpc did not fail");
+            } catch(scidb::SystemException& e) {
+                if (e.getLongErrorCode() != SCIDB_LE_UNKNOWN_ERROR) {
+                    throw;
+                }
+                if (e.getErrorMessage().find("MPI-based operator context does not allow for decreasing launch IDs")
+                    == std::string::npos) {
+                    throw;
+                }
+                // expected
+            }
+
             _ctx->addSharedMemoryIpc(launchId, shmIpc);
 
             LOG4CXX_DEBUG(logger, "XXXX IPC name = " << ipcName);
@@ -380,7 +450,12 @@ class PhysicalMpiTest: public MPIPhysical
                   boost::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX ECHO test");
-	uint64_t launchId =_ctx->getNextLaunchId();
+	uint64_t launchId    = _ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(launchId, slave);
@@ -397,12 +472,12 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
 	//-------------------- Create IPCs
 	string clusterUuid = Cluster::getInstance()->getUuid();
@@ -511,6 +586,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
         LOG4CXX_DEBUG(logger, "XXXX SLOW_SLAVE test");
 	uint64_t launchId =_ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
         syncBarrier(static_cast<int>(launchId), query);
 
@@ -566,12 +646,12 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
         // Send command
         mpi::Command cmd;
@@ -642,6 +722,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
         LOG4CXX_DEBUG(logger, "XXXX ABNORMAL_EXIT test");
 	uint64_t launchId =_ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath, SLAVE_TIMEOUT_SEC));
 	_ctx->setSlave(launchId, slave);
@@ -680,12 +765,12 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
         // Send command
         mpi::Command cmd;
@@ -751,6 +836,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_MSG from slave test");
 	uint64_t launchId =_ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(launchId, slave);
@@ -767,12 +857,12 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
         mpi::Command cmd;
         cmd.setCmd(string("BAD_MSG"));
@@ -818,6 +908,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_MSG_FLOOD from slave test");
 	uint64_t launchId =_ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(launchId, slave);
@@ -834,12 +929,12 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
         mpi::Command cmd;
         cmd.setCmd(string("BAD_MSG_FLOOD"));
@@ -870,6 +965,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_HANDSHAKE from slave test");
 	uint64_t launchId =_ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(launchId, slave);
@@ -886,12 +986,12 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
         mpi::Command cmd;
         cmd.setCmd(string("BAD_HANDSHAKE"));
@@ -934,6 +1034,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_STATUS from slave test");
 	uint64_t launchId =_ctx->getNextLaunchId();
+        uint64_t oldLaunchId = _ctx->getLastLaunchIdInUse();
+        if (launchId-1 != oldLaunchId) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
+                   << "XXXX Bug in manging last launch ID");
+        }
 
 	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(launchId, slave);
@@ -951,12 +1056,12 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(launchId-1);
+	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
 	}
-	_ctx->complete(launchId-1);
+	_ctx->complete(oldLaunchId);
 
         mpi::Command cmd;
         cmd.setCmd(string("BAD_STATUS"));

@@ -276,51 +276,31 @@ procNum_t getFactorizationSpecialCases(procNum_t numMPIProc)
     return procNum_t( ::sqrt(numMPIProc) ) ; // e.g for  50, would return 7 -> 7 x 7
 }
 
-///
-/// Compute instanceID for the SciDB instance that is the master
-/// to the ScaLAPACK-MPI process where the chunk will be processed by
-/// ScaLAPACK.  Currently, the InstanceID == MPI rank because we mapped them
-/// with an identity transform, but nothing n SciDB should assume that.
-/// 
-/// @param chunkPos coordinates of the upper-left corner of the chunk
-/// @param dims     dimension of the Array which contains the chunk
-/// @param query    provides all context information for the chunk distribution pattern
-///
-InstanceID iidForScaLAPACK(const Coordinates& chunkPos, const Dimensions& dims, const Query& query) {
-
-    const procNum_t bogus = numeric_limits<procNum_t>::max();
-    procRowCol_t matrixSize;
-    matrixSize.row =  dims[0].getLength();
-    matrixSize.col =  (dims.size() > 1) ? dims[1].getLength() : bogus;
-
-    procRowCol_t chunkSize;
-    chunkSize.row =  dims[0].getChunkInterval();
-    chunkSize.col =  (dims.size() > 1) ? dims[1].getChunkInterval(): bogus;
+InstanceID PartitioningSchemaDataForScaLAPACK::getInstanceID(const Coordinates& chunkPos, const Query& query) const {
+    //
+    // Compute instanceID for the SciDB instance that is the master
+    // to the ScaLAPACK-MPI process where the chunk will be processed by
+    // ScaLAPACK.
+    // Currently, the InstanceID == MPI rank because the MPI code mapped them that way,
+    // but nothing in SciDB should assume that, because it can easily need to change in the
+    // future.  So here we simply forward to the procGrid code that manages the MPI/ScaLAPACK side
+    // of things.
+    //
 
     const ProcGrid * const procGrid = query.getProcGrid();
 
-    // we will only start this many mpi processes, so we have
-    // and we need to number them in this subset, not in the original
-    // number of instances, which is potentially much larger
-    procRowCol_t useGridSize = procGrid->useableGridSize(matrixSize, chunkSize);
-
-    //const uint64_t cSizeRow = dims[0].getChunkInterval(); now chunkSize.row
-    //const uint64_t pRow = query.getInstanceRow(chunkPos[0], cSizeRow);
-    // const uint64_t pRow = getProcGrid()->gridPos1D(chunkPos[0], cSizeRow,
-                                                // getProcGrid()->refMaxGridSize().row);
-
     procRowCol_t gridPos;
-    gridPos.row = procGrid->gridPos1D(chunkPos[0], chunkSize.row, useGridSize.row);
-    gridPos.col = procGrid->gridPos1D(chunkPos[1], chunkSize.col, useGridSize.col);
+    gridPos.row = procGrid->gridPos1D(chunkPos[0], _blacsBlockSize.row, _blacsGridSize.row);
+    gridPos.col = procGrid->gridPos1D(chunkPos[1], _blacsBlockSize.col, _blacsGridSize.col);
+    procNum_t mpiRank = procGrid->procNum(gridPos, _blacsGridSize);
 
-    procNum_t mpiRank = procGrid->procNum(gridPos, useGridSize);
-
-    LOG4CXX_DEBUG(logger, "iidForScaLAPACK(chunkPos=(" << chunkPos[0] << ", " <<chunkPos[1] << ")"
-                          << ", chunkSz (" << chunkSize.row << "," << chunkSize.col << ")"
-                          << ", useGridSize (" << useGridSize.row << "," << useGridSize.col << ")"
+    LOG4CXX_TRACE(logger, "PartitioningSchemaDataScaLAPACK::getInstanceID(chunkPos=(" << chunkPos[0] << ", " <<chunkPos[1] << ")"
+                          << ", _blacsBlockSize (" << _blacsBlockSize.row << "," << _blacsBlockSize.col << ")"
+                          << ", _blacsGridSize (" << _blacsGridSize.row << "," << _blacsGridSize.col << ")"
                           << "-> gridPos (" << gridPos.row << "," << gridPos.col << ")"
                           << "-> rank " << mpiRank);
     return mpiRank;
+
 }
 
 } // namespace

@@ -1,0 +1,55 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+--aql CREATE ARRAY test <val:double>[i=0:4,5,0, j=0:4,5,0] 
+--set-format dense
+--stop-igdata
+--aql SELECT * FROM test 
+scan(test) 
+build(test,1) 
+scan(test) 
+store(build(test,1),test) 
+store(build(test,0), myNewMatrix) 
+show(test) 
+show(myNewMatrix) 
+--start-igdata
+store(build(<randomVal:double>[i=0:3,4,0, j=0:3,4,0],random()%10),random_10) 
+--stop-igdata
+--start-igdata
+store(build(<randomVal:int64>[i=0:2,3,0, j=0:3,4,0],random()%90+10),random_100) 
+--stop-igdata
+store(build(test,(i*5) +1 +j),test) 
+store(build(test,iif(i=j,1,0)),test)  
+store(build(test,iif(i>j,1,iif(i=1,7,0))),test)  
+--shell  --command="cat ../examples/m4x4.scidb" --store
+--set-format dcsv
+--start-igdata
+create array A <val:int64> [i=1:4,4,0, j=1:4,4,0] 
+--set-format dense
+--stop-igdata
+load(A, '../examples/m4x4.scidb') 
+--aql load A from '../examples/m4x4.scidb' 
+--set-format dcsv
+--start-igdata
+list('arrays') 
+--stop-igdata
+--start-igdata
+list('arrays', true) 
+--set-format dense
+--stop-igdata
+scan(test@2) 
+--aql select * from test@3 
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(test)
+remove(myNewMatrix)
+remove(random_10)
+remove(random_100)
+remove(A)

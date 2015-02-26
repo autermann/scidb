@@ -77,12 +77,12 @@ namespace scidb
     }
 
     /**
-     *   Calculate next value using materialized input chunk 
+     *   Calculate next value using materialized input chunk
      *
      *   Private function used when the input chunk's contents
      *  have been materialized. As we scan the cells in the input
      *  chunk, this method computes the window aggregate(s) for each
-     *  non-empty cell in the input.  
+     *  non-empty cell in the input.
      */
     void MaterializedWindowChunkIterator::calculateNextValue()
     {
@@ -158,7 +158,7 @@ namespace scidb
             }
             _aggregate->accumulate(state, windowIteratorCurr->second);
             windowIteratorCurr++;
-  
+
             nextIter:;
         }
         _aggregate->finalResult(_nextValue, state);
@@ -226,15 +226,14 @@ namespace scidb
 
     void MaterializedWindowChunkIterator::stepToNextValidValue()
     {
-        while( ((_iterationMode & IGNORE_NULL_VALUES && _nextValue.isNull()) ||
-                (_iterationMode & IGNORE_DEFAULT_VALUES && _nextValue == _defaultValue)) &&
-                !end() )
-        {
-            ++(*this);
-        }
-
-        if (!end() ) {
+        while (!end()) {
             calculateNextValue();
+            if ((_iterationMode & IGNORE_NULL_VALUES && _nextValue.isNull()) ||
+                (_iterationMode & IGNORE_DEFAULT_VALUES && _nextValue == _defaultValue)) {
+                ++ _iter;
+            } else {
+                break;
+            }
         }
     }
 
@@ -320,7 +319,6 @@ namespace scidb
             }
             _emptyTagIterator = _emptyTagArrayIterator->getChunk().getConstIterator(IGNORE_EMPTY_CELLS);
         }
-
 
         reset();
     }
@@ -551,7 +549,7 @@ namespace scidb
         return _array;
     }
 
-    inline uint64_t WindowChunk::getStep() const 
+    inline uint64_t WindowChunk::getStep() const
     {
         if (false == isMaterialized()) {
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OP_WINDOW_ERROR6);
@@ -795,7 +793,7 @@ namespace scidb
             //  complete iteration through the inputChunk's values, which
             //  means that we might be computing a sub-query's results
             //  for the operator twice.
-            // 
+            //
             //  Consider: window ( filter ( A, expr ), ... ).
             //
             //  FIXME: Need to support some kind of cheap and reasonably
@@ -823,7 +821,7 @@ namespace scidb
             if (_arrayIterator->getMethod() == WindowArray::MATERIALIZE)
             {
                 materialize();
-            } else if (_arrayIterator->getMethod() == WindowArray::PROBE)
+            } else if (_arrayIterator->getMethod() != WindowArray::PROBE)
             {
                 //
                 //  The operator has expressed no preference about the
@@ -881,7 +879,7 @@ namespace scidb
         if (hasCurrent)
         {
             currPos = iterator->getPosition();
-        }           
+        }
     }
 
     /**

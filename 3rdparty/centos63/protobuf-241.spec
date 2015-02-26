@@ -1,12 +1,12 @@
 Summary:        Protocol Buffers - Google's data interchange format
 Name:           protobuf
 Version:        2.4.1
-Release:        1
+Release:        2
 License:        BSD
 Group:          Development/Libraries
 Source:         http://protobuf.googlecode.com/files/%{name}-%{version}.tar.bz2
 URL:            http://code.google.com/p/protobuf/
-BuildRequires:  libtool pkgconfig 
+BuildRequires:  libtool pkgconfig
 
 %description
 Protocol Buffers are a way of encoding structured data in an efficient
@@ -87,6 +87,30 @@ The "optimize_for = LITE_RUNTIME" option causes the compiler to generate code
 which only depends libprotobuf-lite, which is much smaller than libprotobuf but
 lacks descriptors, reflection, and some other features.
 
+%package java
+Summary: Java Protocol Buffers runtime library
+Group:   Development/Languages
+BuildRequires:    java-devel >= 1.6
+BuildRequires:    jpackage-utils
+BuildRequires:    apache-maven
+#BuildRequires:    maven-compiler-plugin
+#BuildRequires:    maven-install-plugin
+#BuildRequires:    maven-jar-plugin
+#BuildRequires:    maven-javadoc-plugin
+#uildRequires:    maven-resources-plugin
+#BuildRequires:    maven-surefire-plugin
+#BuildRequires:    maven-antrun-plugin
+#BuildRequires:    maven-doxia
+#BuildRequires:    maven-doxia-sitetools
+Requires:         java
+Requires:         jpackage-utils
+Conflicts:        %{name}-compiler > %{version}
+Conflicts:        %{name}-compiler < %{version}
+BuildArch:        noarch
+
+%description java
+This package contains Java Protocol Buffers runtime library.
+
 %prep
 %setup -q
 
@@ -94,10 +118,19 @@ lacks descriptors, reflection, and some other features.
 %configure
 make %{?_smp_mflags}
 
+pushd java
+mvn package
+popd
+
 %install
 rm -rf %{buildroot}
 make %{?_smp_mflags} install DESTDIR=%{buildroot} STRIPBINARIES=no INSTALL="%{__install} -p" CPPROG="cp -p"
 find %{buildroot} -type f -name "*.la" -exec rm -f {} \;
+
+pushd java
+install -d -m 755 %{buildroot}%{_javadir}
+install -pm 644 target/%{name}-java-%{version}.jar %{buildroot}%{_javadir}/%{name}.jar
+popd
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -148,3 +181,7 @@ rm -rf %{buildroot}
 %files lite-static
 %defattr(-, root, root, -)
 %{_libdir}/libprotobuf-lite.a
+
+%files java
+%defattr(-, root, root, -)
+%{_javadir}/%{name}.jar

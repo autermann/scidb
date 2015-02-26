@@ -731,15 +731,15 @@ InstanceID getInstanceForChunk(boost::shared_ptr< Query> query,
 
         case psScaLAPACK:
         {
-            if (dims.size() <= 2) {      // not defined for > 2
-                result = iidForScaLAPACK(chunkPosition, dims, *(query.get()));
-                if(false) { // needed for debugging ScaLAPACK until the end of Cheshire
-                    std::cerr << "getInstanceForChunk to ScaLAPACK, chunkPos= " << chunkPosition << std::endl;
-                    std::cerr << " -> " <<result<< " shift:" <<shift<< " IC:" <<instanceCount<< std::endl ;
-                }
-            } else {
+            if ( dims.size() < 1 ||  // distribution is defined only for vectors
+                 dims.size() > 2) {  // and matrices, (not tensors, etc)
                 throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
             }
+            PartitioningSchemaDataForScaLAPACK* repartInfo = dynamic_cast<PartitioningSchemaDataForScaLAPACK*>(psData);
+            if (!repartInfo) {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
+            }
+            result = repartInfo->getInstanceID(chunkPosition, *(query.get()));
 
         } break;
 

@@ -170,6 +170,11 @@ public:
         Attributes outAttrs;
         Dimensions outDims;
 
+        if (_parameters.empty())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_SYNTAX, SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2) << "aggregate";
+        }
+
         for (size_t i =0, n = _parameters.size(); i<n; i++)
         {
             if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)

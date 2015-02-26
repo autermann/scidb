@@ -82,8 +82,10 @@ class ScaLAPACKPhysical : public MPIPhysical
 public:
     static const slpp::int_t DEFAULT_BAD_INFO = -99;                 // scalapack negative errors are the position of the bad argument
 
-
-ScaLAPACKPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+    /**
+     * @see     MPIPhysical::MPIPhysical
+     */
+    ScaLAPACKPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
     :
         MPIPhysical(logicalName, physicalName, parameters, schema)
     {
@@ -101,8 +103,21 @@ ScaLAPACKPhysical(const std::string& logicalName, const std::string& physicalNam
     virtual ArrayDesc               getRepartSchema(ArrayDesc const& inputSchema) const;
 
     // extending API
-    std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
-    bool                            doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query> query);
+    std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query);
+    /**
+     * Initialize the ScaLAPACK BLACS (Basic Linear Algebra Communications Systems).
+     * @param redistInputs  The final inputs to the operator (already repartitioned and redistributed
+     * @param query         Current query
+     * @return              Whether the instance participates in the ScaLAPACK computation or may instead
+     */
+    bool                            doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query);
+
+    /**
+     * compute the correct ScaLAPACK BLACS process grid size for a particular set of input Arrays (Matrices)
+     * @param redistInputs  the matrices
+     * @return              the BLACS grid size
+     */
+    virtual procRowCol_t            getBlacsGridSize(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query);
 
 protected:
     /// routines that make dealing with matrix parameters

@@ -107,11 +107,6 @@
               </listitem>
             </itemizedlist></para>
         </listitem>
-
-        <listitem>
-          <para>Currently, <literal>gesvd</literal> is implemented only on the
-          Ubuntu operating system.</para>
-        </listitem>
       </itemizedlist></para>
   </refsect1>
 

@@ -143,7 +143,8 @@ public:
                 SystemCatalog::getInstance()->getArrayDesc(list[i], desc, false, exception);
                 if (exception.get())
                 {
-                    if (exception->getLongErrorCode() == SCIDB_LE_TYPE_NOT_REGISTERED)
+                    if (exception->getLongErrorCode() == SCIDB_LE_TYPE_NOT_REGISTERED ||
+                        exception->getLongErrorCode() == SCIDB_LE_FUNCTION_NOT_FOUND)
                     {
                         available = false;
                     }

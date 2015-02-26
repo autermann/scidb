@@ -138,7 +138,7 @@
                   In this case, you will need to specify the dimension data
                   type in the name argument like this:
                   <replaceable>dimension_name</replaceable>(<replaceable>dimension_dataype</replaceable>).
-                  Note that version 13.1 of SciDB and Paradigm4 support
+                  Note that version 13.2 of SciDB and Paradigm4 support
                   non-integer dimensions only partially. Dimension names may
                   only contain alphanumeric characters and underscores
                   (_).</para>
@@ -279,19 +279,23 @@ CREATE ARRAY product_null &lt;name:string NULL,price:float NULL,sold:datetime NU
           <secondary>default values</secondary>
         </indexterm><indexterm>
           <primary>default attribute values</primary>
-        </indexterm>SciDB offers functionality to work with missing data.
-      Consider the data set m4x4_missing.txt, shown here: <programlisting
-      language="test">
+        </indexterm>SciDB offers functionality to work with missing data. This
+      functionality includes special handling for empty cells, null values,
+      and default values. For more details about empty cells and missing
+      values, see <xref linkend="dataSpecial"/>.</para>
+
+      <para>Consider the data set m4x4_missing.txt, shown here:
+      <programlisting language="test">
 --shell --command=cat ../examples/m4x4_missing.txt; --show-query=no
 </programlisting></para>
 
       <para>The array m4x4_missing has two issues: the attribute val2 is
       missing for the elements at coordinates <code>{x=1, y=0}</code> and
-      <code>{x=3, y=1}</code>, and the cell at <code>{2, 2}</code> is
-      completely empty. You can tell SciDB how you want to handle the missing
-      data with various array options.</para>
+      <code>{x=3, y=1}</code>, and the cell at <code>{2, 2}</code> is empty.
+      You can tell SciDB how you want to handle the missing data with various
+      array options.</para>
 
-      <para>First, consider the case of the completely empty cell, <code>{x=2,
+      <para>First, consider the case of the empty cell, <code>{x=2,
       y=2}</code>. By default, SciDB will leave empty cells unchanged and
       replace NULL attributes with 0: <programlisting language="test">--afl CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32&gt;[x=0:3,4,0,y=0:3,4,0]; --show-output=no 
 --afl load(m4x4_missing, '../examples/m4x4_missing.txt'); --output-format=auto --chunkify=yes
@@ -518,7 +522,7 @@ or
       <title>Non-integer Dimensions and Mapping Arrays</title>
 
       <note>
-        <para>Version 13.1 of SciDB only partially supports non-integer
+        <para>Version 13.2 of SciDB only partially supports non-integer
         dimensions.</para>
       </note>
 

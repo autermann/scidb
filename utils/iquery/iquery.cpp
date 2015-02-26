@@ -130,6 +130,11 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
     scidb::Config *cfg = scidb::Config::getInstance();
     const vector<string> plugins = queryResult.plugins;
 
+    if (iqueryState.verbose)
+    {
+        cout << "Query ID: " << queryResult.queryID << endl;
+    }
+
     sciDB.executeQuery(queryString, !iqueryState.aql, queryResult, iqueryState.connection);
 
     if (queryResult.selective && !iqueryState.nofetch)

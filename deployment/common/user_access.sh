@@ -4,7 +4,7 @@ set -eu
 
 user=${1}
 key=${2}
-
+OS=`./os_detect.sh`
 update=0
 
 function add_public_key ()
@@ -24,20 +24,24 @@ function disable_host_checking ()
     echo "   UserKnownHostsFile=/dev/null" >> ~/.ssh/config
 }
 
+function selinux_home_ssh ()
+{
+    chcon -R -v -t user_ssh_home_t ~/.ssh
+}
+
 # Update right to ~/.ssh directory
 function update_rights ()
 {
-    if [ 1 -eq $update ]; then 
-	disable_host_checking
-	chmod go-rwx,u+rwx ${HOME}/.ssh
-	chmod a-x,go-rw,u+rw ${HOME}/.ssh/*
-# RedHat and CentOS selinux issue: http://stackoverflow.com/questions/9741574/redhat-6-oracle-linux-6-is-not-allowing-key-authentication-via-ssh
-	restorecon=`whereis restorecon | awk '{print $2}'`
-	if [ -n "${restorecon}" ]; then
-	    echo "Fix SELinux contextes for ${HOME}/.ssh"
-	    ${restorecon} -R -v ${HOME}/.ssh
-	fi;
-    fi;
+    disable_host_checking
+    chmod go-rwx,u+rwx ${HOME}/.ssh
+    chmod a-x,go-rw,u+rw ${HOME}/.ssh/*
+    if [ "${OS}" = "CentOS 6.3" ]; then
+	selinux_home_ssh
+    fi 
+
+    if [ "${OS}" = "RedHat 6.3" ]; then
+	selinux_home_ssh
+    fi
 }
 
 mkdir -p ${HOME}/.ssh

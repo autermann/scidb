@@ -790,50 +790,39 @@ namespace scidb
                     } else {
                         defaultValueExpr = i.at("default_value").as(string());
 
-                        // Evaluate expression if present and set default value
-                        if (defaultValueExpr != "")
+                        try
                         {
-                            Expression expr = deserializePhysicalExpression(defaultValueExpr);
-                            defaultValue = expr.evaluate();
-                        }
-                        // Else fallback to null or zero as before
-                        else
-                        {
+                            // Do type check before constructor check in the next if.
                             TypeId typeId = i.at("type").as(TypeId());
-                            try
-                            {
-                                defaultValue = Value(TypeLibrary::getType(typeId));
-                            }
-                            catch (const SystemException &e)
-                            {
-                                if (throwException)
-                                    throw;
+                            defaultValue = Value(TypeLibrary::getType(typeId));
 
-                                if (!exception.get())
-                                {
-                                    exception = e.copy();
-                                }
-                            }
-                            if (i.at("flags").as(int16_t()) & AttributeDesc::IS_NULLABLE)
+                            // Evaluate expression if present and set default value
+                            if (defaultValueExpr != "")
                             {
-                                defaultValue.setNull();
+                                Expression expr = deserializePhysicalExpression(defaultValueExpr);
+                                defaultValue = expr.evaluate();
                             }
+                            // Else fallback to null or zero as before
                             else
                             {
-                                try
+                                if (i.at("flags").as(int16_t()) & AttributeDesc::IS_NULLABLE)
+                                {
+                                    defaultValue.setNull();
+                                }
+                                else
                                 {
                                     defaultValue = TypeLibrary::getDefaultValue(typeId);
                                 }
-                                catch (const UserException &e)
-                                {
-                                    if (throwException)
-                                        throw;
+                            }
+                        }
+                        catch (const Exception &e)
+                        {
+                            if (throwException)
+                                throw;
 
-                                    if (!exception.get())
-                                    {
-                                        exception = e.copy();
-                                    }
-                                }
+                            if (!exception.get())
+                            {
+                                exception = e.copy();
                             }
                         }
                     }

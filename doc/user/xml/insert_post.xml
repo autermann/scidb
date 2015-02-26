@@ -12,6 +12,10 @@
         <primary>data</primary>
 
         <secondary>inserting</secondary>
+      </indexterm><indexterm>
+        <primary>insert</primary>
+
+        <secondary>operator</secondary>
       </indexterm>Insert values from a source array into a target
     array.</refpurpose>
   </refnamediv>
@@ -189,8 +193,8 @@
           version of B. Version 2 is the version resulting from the insert
           operation of the previous step. <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> versions(B)
   </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2012-12-17 18:39:09"
-{2} 2,"2012-12-17 18:39:09"
+{1} 1,"2013-03-05 17:31:41"
+{2} 2,"2013-03-05 17:31:41"
 </screen></para></para>
         </step>
 

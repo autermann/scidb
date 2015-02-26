@@ -61,7 +61,9 @@
 
       <listitem>
         <para><indexterm>
-            <primary>insert into</primary>
+            <primary>insert</primary>
+
+            <secondary>into</secondary>
           </indexterm>The AQL INSERT INTO statement lets you update attribute
         values and insert new cells into an existing array. The new values
         come from another array with a compatible schema. The INSERT INTO

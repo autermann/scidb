@@ -52,7 +52,7 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
     size_t nInstances = query->getInstancesCount();
     slpp::int_t instanceID = query->getInstanceID();
 
-    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): checkBlacsInfo "
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::checkBlacsInfo "
                            << "(invoke) blacs_gridinfo_(ctx " << ICTXT << ")"
                            << " = NPROC (" << NPROW  << ", " << NPCOL << ")"
                            << " ; MYPROC (" << MYPROW << ", " << MYPCOL << ")");
@@ -99,7 +99,7 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT, slpp::int_t NPR
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
     }
 
-    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit(): checkBlacsInfo"
+    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::checkBlacsInfo"
                            << " NPE/nInstances " << NPE
                            << " MYPE/instanceID " << MYPE);
 }
@@ -218,7 +218,7 @@ ArrayDesc ScaLAPACKPhysical::getRepartSchema(ArrayDesc const& inputSchema) const
 
 ///
 /// + converts inputArrays to psScaLAPACK distribution
-std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query)
 {
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): begin");
     //
@@ -245,10 +245,22 @@ std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::
         } else
 #endif
         // redistribute to psScaLAPACK
+        procRowCol_t firstChunkSize = { chunkRow(redistInputs[0]), chunkCol(redistInputs[0]) };
         for(size_t ii=0; ii < inputArrays.size(); ii++) {
             if (redistInputs[ii]->getArrayDesc().getPartitioningSchema() != psScaLAPACK) {
                 Timing redistTime;
-                redistInputs[ii]=redistribute(inputArrays[ii], query, psScaLAPACK);
+
+                // when automatic repartitioning is introduced, have to decide which of the chunksizes will be the target.
+                // Until then, we assert they all are the same (already checked in each Logical operator)
+                assert(chunkRow(redistInputs[ii]) == firstChunkSize.row &&
+                       chunkCol(redistInputs[ii]) == firstChunkSize.col );
+
+                // get the parameters of the block-cyclic distribution required for this operator
+                PartitioningSchemaDataForScaLAPACK schemeData(getBlacsGridSize(inputArrays, query), firstChunkSize);
+
+                // do the redistribute
+                redistInputs[ii]=redistribute(inputArrays[ii], query, psScaLAPACK, "", ALL_INSTANCES_MASK,
+                                               boost::shared_ptr<DistributionMapper>(), /*shift*/0, &schemeData);
                 if(doCerrTiming()) std::cerr << "ScaLAPACKPhysical: redist["<<ii<<"] took " << redistTime.stop() << std::endl;
                 LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays():"
                                        << " redistributed input " << ii
@@ -271,38 +283,27 @@ std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::
     return redistInputs;
 }
 
-///
-///.... Initialize the (imitation)BLACS used by the instances to calculate sizes
-///     AS IF they are MPI processes (which they are not)
-///
-/// + intersects the array chunkGrid with the maximum process grid
-/// + sets up the ScaLAPACK grid accordingly and if not participating, return early
-/// + calls invokeMPISvd()
-/// + returns the output OpArray.
-///
-bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query> query)
+bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query)
 {
+    //
+    //.... Initialize the (imitation)BLACS used by the instances to calculate sizes
+    //     AS IF they are MPI processes (which they are not).  But the API is as if we were
+    //     actually going to do the ScaLAPACK in-process.  (This is important because we may well
+    //     port the BLACS directly into SciDB and have the option of skipping the MPI layer
+    //     altogether.  This will work only for ScaLAPACK which has this additional portability layer
+    //     most modern numeric codes are coded directly to MPI, so it is still extremely useful that
+    //     we built the MPI layer.)
+    //
+    // + get the size of the blacs grid we are going to use
+    // + get our position in the grid
+    // + sets up the ScaLAPACK grid accordingly and if not participating, return early
+    //
 
-    // find max (union) size of all array/matrices.
-    size_t maxSize[2];
-    maxSize[0] = 0;
-    maxSize[1] = 0;
-    BOOST_FOREACH( shared_ptr<Array> input, redistInputs ) {
-        matSize_t inputSize = getMatSize(input);
-        maxSize[0] = std::max(maxSize[0], inputSize[0]);
-        maxSize[1] = std::max(maxSize[1], inputSize[1]);
-    }
-    if (!maxSize[0] || !maxSize[1] ) {
-        throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_OPERATOR, DLA_ERROR7);
-    }
+    // get size of the grid we are going to use
+    procRowCol_t blacsGridSize = getBlacsGridSize(redistInputs, query);
 
     slpp::int_t instanceID = query->getInstanceID();
     const ProcGrid* procGrid = query->getProcGrid();
-
-    procRowCol_t MN = { maxSize[0], maxSize[1]};
-    procRowCol_t MNB = { chunkRow(redistInputs[0]), chunkCol(redistInputs[0]) };
-
-    procRowCol_t blacsGridSize = procGrid->useableGridSize(MN, MNB);
     procRowCol_t myGridPos = procGrid->gridPos(instanceID, blacsGridSize);
 
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
@@ -345,6 +346,39 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
 
     return true;
 }
+
+
+procRowCol_t ScaLAPACKPhysical::getBlacsGridSize(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query)
+{
+    // find max (union) size of all array/matrices.  this works for most ScaLAPACK operators
+    // its possible this might need to be overloaded for some particular operators
+
+    // find the maximum 
+    size_t maxSize[2];
+    maxSize[0] = 0;
+    maxSize[1] = 0;
+    BOOST_FOREACH( shared_ptr<Array> input, redistInputs ) {
+        matSize_t inputSize = getMatSize(input);
+        maxSize[0] = std::max(maxSize[0], inputSize[0]);  // add max() operator to matSize_t?
+        maxSize[1] = std::max(maxSize[1], inputSize[1]);
+    }
+    if (!maxSize[0] || !maxSize[1] ) {
+        throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_OPERATOR, DLA_ERROR7);
+    }
+
+    const ProcGrid* procGrid = query->getProcGrid();
+    procRowCol_t MN = { maxSize[0], maxSize[1]};
+    procRowCol_t MNB = { chunkRow(redistInputs[0]), chunkCol(redistInputs[0]) };
+    // TODO: when automatic repartitioning is introduced, have to decide which of the
+    //       chunksizes will be the target chunksize, MNB
+    //       Right now, we assert they were the same (presently checked in each Logical operator)
+    BOOST_FOREACH( shared_ptr<Array> input, redistInputs ) {
+        assert(chunkRow(input) == MNB.row && chunkCol(input) == MNB.col);
+    }
+
+    return  procGrid->useableGridSize(MN, MNB);
+}
+
 
 } // namespace
 

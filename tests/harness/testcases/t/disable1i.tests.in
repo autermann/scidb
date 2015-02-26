@@ -52,39 +52,53 @@ checkin.other.inverse
 docscript.inverse
 other.basic_matrix_inverse
 
-# re-enable after closing ticket 2234
+# re-enable after solving ticket 2234
 docscript.load
 
-# re-enable after closing ticket 2235
+# re-enable after solving ticket 2235
 injecterror.inject_2_redim
 
-# re-enable after closing ticket 2236
+# re-enable after solving ticket 2236
 injecterror.inject_2_store
 
-# re-enable after closing ticket 2237
+# re-enable after solving ticket 2237
 injecterror.inject_2_update
 
-# re-enable after closing ticket 2238
+# re-enable after solving ticket 2238
 injecterror.inject_4_mapping
 
-# re-enable after closing ticket 2239
+# re-enable after solving ticket 2239
 iqueryabort.abort_load
 
-# re-enable after closing ticket 2240
+# re-enable after solving ticket 2240
 pload.loadcsv_shadow_array
 
-#re-enable after closing ticket 2200, test is on rectangular inputs
+#re-enable after solving ticket 2200, test is on rectangular inputs
 scalapack.gemm_01
 
-#re-enable after closing ticket 2200, test is on rectangular inputs
+#re-enable after solving ticket 2200, test is on rectangular inputs
 scalapack.gesvd_01
 
-#re-enable after closing ticket 2222
+#re-enable after solving ticket 2222
 scalapack.gemm_sparse_dense
 
-#re-enable after closing ticket 2174
+#re-enable after solving ticket 2174
 other.bernoulli_2
 
-#re-enable after closing ticket 2232
+#re-enable after solving ticket 2232
 docscript.allversions
 
+#re-enable after solving tickets 2171 and 2278
+pload.loadcsv_shadow_array
+
+#re-enable after solving ticket 2158
+client.python_1
+
+#re-enable after solving ticket 2218
+other.binary_loader
+
+#re-enable after solving ticket 2272
+other.loadlib
+
+#re-enable after solving ticket 2258
+other.random_check

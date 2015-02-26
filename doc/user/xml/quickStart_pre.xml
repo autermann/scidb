@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<article>
+  <info>
+    <title>SciDB Quick Start</title>
+
+    <author>
+      <personname>
+        <firstname>Version</firstname>
+
+        <surname>13.3</surname>
+      </personname>
+    </author>
+
+    <pubdate>3/31/2013</pubdate>
+
+    <copyright>
+      <year>2008 - 2013 SciDB, Inc.</year>
+    </copyright>
+  </info>
+
+  <section>
+    <title>Prerequisites</title>
+
+    <para>This guide is meant to help new users begin working with SciDB. It
+    assumes the following:<itemizedlist>
+        <listitem>
+          <para>You have an installation of SciDB that is ready to use.</para>
+        </listitem>
+
+        <listitem>
+          <para>You have credentials to access a SciDB installation.</para>
+        </listitem>
+
+        <listitem>
+          <para>You have a SciDB database that is running.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>If you do not meet all of these requirements, contact
+    <email>support@scidb.org</email> for help getting started.</para>
+  </section>
+
+  <section>
+    <title>Terminology</title>
+
+    <para>SciDB uses multidimensional arrays as its basic storage and
+    processing unit.</para>
+
+    <variablelist>
+      <?dbfo term-width="0.5in"?>
+
+      <varlistentry>
+        <term>Attributes and Dimensions</term>
+
+        <listitem>
+          <para><emphasis>Attributes </emphasis>contain the data.
+          <emphasis>Dimensions </emphasis>form the coordinate system. A few
+          things to note:<itemizedlist>
+              <listitem>
+                <para>The presence of dimensions is one way that SciDB
+                separates itself from other engines. Dimensions unite what
+                other databases call "indexing" and "clustering" in one
+                feature.</para>
+              </listitem>
+
+              <listitem>
+                <para>Filtering over dimensions is much faster than filtering
+                over attributes.</para>
+              </listitem>
+
+              <listitem>
+                <para>Grouped aggregating is done over dimensions.</para>
+              </listitem>
+
+              <listitem>
+                <para>Operators such as <literal>slice </literal>and
+                <literal>subarray </literal>use dimensions to quickly select
+                subregions.</para>
+              </listitem>
+
+              <listitem>
+                <para>Joins of arrays are performed with dimensions; if two
+                arrays have the same exact coordinate system, then join/merge
+                commands are efficient.</para>
+              </listitem>
+
+              <listitem>
+                <para>Based on the dimensions and chunk sizes that you choose,
+                you can guarantee that data that is spatially located in the
+                same chunk is stored together on the same instance.</para>
+              </listitem>
+            </itemizedlist></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>AFL (Array Functional Language)</term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>AFL</primary>
+            </indexterm>AFL is a functional language for working with SciDB
+          arrays. AFL operators are used to compose queries or statements. AFL
+          contains operators for performing both data definition and data
+          manipulation. All queries in this guide are composed of AFL
+          operators.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>Array</term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>arrays</primary>
+
+              <secondary>definition</secondary>
+            </indexterm>An array is a data structure that is used to represent
+          data. An array has any number of dimensions and attributes. For more
+          details, see the "Array Data Model" section of the the
+          <emphasis>SciDB User's Guide</emphasis>.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </section>
+
+  <section>
+    <title>Tasks</title>
+
+    <para>To get acquainted with SciDB, you will perform the following
+    tasks.</para>
+
+    <orderedlist>
+      <listitem>
+        <para><link linkend="matrixCreate">Create a simple array</link> and
+        <link linkend="matrixInfo">retrieve some information about the
+        array</link>.</para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="matrixLoad">Load data into an array</link>. There
+        are several ways to do this. We describe a few of them.</para>
+      </listitem>
+
+      <listitem>
+        <para>Examine ways to <link linkend="operationsExamples">select
+        sub-regions from an array</link>.</para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="advancedExample">Walk through an advanced
+        example</link> that combines several operators into a single
+        query.</para>
+      </listitem>
+    </orderedlist>
+  </section>
+
+  <section id="matrixCreate">
+    <title>Creating an Array</title>
+
+    <para>The basic way to create an array in SciDB is to use the CREATE ARRAY
+    statement.</para>
+
+    <procedure>
+      <step>
+        <para>From a command prompt, start iquery with AFL as the
+        language.<programlisting>$ iquery -a
+</programlisting>This opens an AFL command prompt.<programlisting>AFL%</programlisting></para>
+      </step>
+
+      <step>
+        <para>Use the CREATE ARRAY statement to create an
+        array.<programlisting language="test">--afl CREATE ARRAY test &lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0]; --show-output=no</programlisting>This
+        creates a 5<symbol>x</symbol>5 array, with a single, double precision
+        floating-point attribute. Note the following about the CREATE ARRAY
+        statement:<itemizedlist>
+            <listitem>
+              <para>The first argument in the name for the array, in this case
+              <literal>test</literal>.</para>
+            </listitem>
+
+            <listitem>
+              <para>The next argument is the attribute list, contained within
+              '&lt;&gt;'. Here we have only a single attribute, so we specify
+              its name and data type.</para>
+            </listitem>
+
+            <listitem>
+              <para>The third argument is the dimension list, contained within
+              '[]'.</para>
+            </listitem>
+
+            <listitem>
+              <para>For each dimension, we specify its name, lower bound,
+              upper bound, chunk size, and chunk overlap.</para>
+            </listitem>
+
+            <listitem>
+              <para>The first dimension is <literal>i</literal>, starting at 0
+              and ranging to 4, setting the dimension size to 5. The chunk
+              size for both dimensions is set to 6. In this guide, we always
+              use 0 for the value of the chunk overlap. For details about
+              chunk overlap, see the "Array Dimensions" section of the
+              <emphasis>SciDB User's Guide</emphasis>.</para>
+            </listitem>
+
+            <listitem>
+              <para>In this case, the second dimension, <literal>j</literal>,
+              has the same values as the first dimension, but that does not
+              need to be the case.</para>
+            </listitem>
+          </itemizedlist></para>
+      </step>
+    </procedure>
+  </section>
+
+  <section id="matrixInfo">
+    <title>Getting Array Information</title>
+
+    <para>After you create an array, you can retrieve information about the
+    array.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>List all of the existing arrays.<programlisting language="test">--afl list('arrays'); --output-format=csv --show-output-in-test-file=no</programlisting></para>
+      </listitem>
+
+      <listitem>
+        <para>Retrieve the schema for a particular array.<programlisting
+        language="test">--afl show(test); --output-format=dense</programlisting></para>
+      </listitem>
+
+      <listitem>
+        <para>Retrieve the contents for a particular array.<programlisting
+        language="test">--afl scan(test); --output-format=dense</programlisting>As
+        you can see, <literal>test </literal>is currently empty.</para>
+      </listitem>
+    </itemizedlist>
+  </section>
+
+  <section id="matrixLoad">
+    <title>Populating an Array with Data</title>
+
+    <para>SciDB offers several ways to get data into an array.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          <link linkend="loadConstant">Populate the array with the same value
+          in every cell</link>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <link linkend="loadExpression">Populate the array using an
+          expression</link>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <link linkend="loadFile">Populate the array from a file</link>
+        </para>
+      </listitem>
+    </itemizedlist>
+
+    <section id="loadConstant">
+      <title>Constant Values</title>
+
+      <para>This section describes how to populate an array with a single
+      value. We use the <command>build </command>operator, which takes two
+      arguments:<itemizedlist>
+          <listitem>
+            <para>A <emphasis role="bold">schema</emphasis>, which is the list
+            of attributes and dimensions, with their details. Note that for
+            the <command>build </command>operator, you must specify
+            <emphasis>exactly </emphasis>one attribute.</para>
+          </listitem>
+
+          <listitem>
+            <para>An <emphasis role="bold">expression</emphasis>, which
+            specifies the values for the attribute.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <orderedlist>
+        <listitem>
+          <para>Populate an array. The following query fills a
+          5<symbol>x</symbol>5 array with 1's.<programlisting language="test">--afl build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0],1); --output-format=dense --chunkify=yes</programlisting>Note
+          that this query does not store the result anywhere—that is, SciDB
+          does not create a new array filled with 1's.</para>
+        </listitem>
+
+        <listitem>
+          <para>To store the result of our previous query, we need to use the
+          <command>store</command> operator.<programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0],1),test); --output-format=dense --chunkify=yes</programlisting>This
+          stores the output from the <command>build</command> operator into
+          the array, <literal>test</literal>.</para>
+        </listitem>
+      </orderedlist>
+    </section>
+
+    <section id="loadExpression">
+      <title>Calculated Values</title>
+
+      <para>This section describes how to use expressions to populate an array
+      with values.</para>
+
+      <procedure>
+        <step>
+          <para>SciDB has a random function, <command>random()</command>, that
+          is useful for populating an array with randomly-generated values.
+          Here, we create a 3<symbol>x</symbol>4 array, and fill it with
+          random numbers between 10 and 99.<programlisting language="test">--afl store(build(&lt;randomVal:int64&gt;[i=0:2,3,0, j=0:3,4,0],random()%90+10),random_100); --output-format=dense --show-output-in-test-file=no --chunkify=yes</programlisting>Note
+          that in this query, our attribute is of type int64 (an integer data
+          type).</para>
+        </step>
+
+        <step>
+          <para>This example uses the <command>iif</command> operator—inline
+          if—to populate an array with two different values.<programlisting
+          language="test">--afl store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0],iif(i=j,1,0)),test); --output-format=dense --chunkify=yes</programlisting>Note
+          that we have created a 5<symbol>x</symbol>5 identity array. The
+          <command>iif</command> operator takes three arguments:<itemizedlist>
+              <listitem>
+                <para>An expression to evaluate. In this case, the expression
+                is i=j.</para>
+              </listitem>
+
+              <listitem>
+                <para>A value to store into a cell if the expression is
+                true.</para>
+              </listitem>
+
+              <listitem>
+                <para>A value to store into a cell if the expression is
+                false.</para>
+              </listitem>
+            </itemizedlist>So, in this example, when i=j, we store 1, and in
+          all other cells, we store 0.</para>
+        </step>
+
+        <step>
+          <para>You can nest the <command>iif</command> operator to get more
+          control over the values to add.<programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0],iif(i&gt;j,1,iif(i=1,7,0))),test); --output-format=dense --chunkify=yes</programlisting>In
+          this example, if i &gt; j, we add a 1 to the array, and if i &lt;=
+          j, SciDB evaluates the nested <command>iif</command> function, and
+          adds a 7 or 0 to the array, depending on whether the second
+          expression is true.</para>
+        </step>
+      </procedure>
+    </section>
+
+    <section id="loadFile">
+      <title>Load from a File</title>
+
+      <para>In many cases, your data exists in a file on disk. Here we
+      describe how to load files from a file into a SciDB array. There are
+      several other approaches to loading data from disk files, and they are
+      discussed in the <emphasis>SciDB User's Guide</emphasis>.</para>
+
+      <para>Suppose that you have a file, <literal>/tmp/m4x4.scidb</literal>,
+      with the following content:<programlisting language="test">--shell
+--command=cat ../examples/m4x4.scidb --show-query=no</programlisting></para>
+
+      <para>Note that the file contains integer data, formatted to fit into a
+      4<symbol>x</symbol>4 array. This is the format that SciDB expects when
+      loading a text file from disk. There is a SciDB utility available that
+      can convert a CSV file into this format.</para>
+
+      <procedure>
+        <step>
+          <para>Create a SciDB array to hold the data.<programlisting
+          language="test">--afl create array A &lt;val:int64&gt; [i=1:4,4,0, j=1:4,4,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Load the data from
+          <literal>m4x4.scidb</literal>.<programlisting>AFL% load(A, '/tmp/m4x4.scidb');</programlisting><programlisting
+          language="test">--afl load(A, '../examples/m4x4.scidb'); --show-query=no --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+      </procedure>
+    </section>
+  </section>
+
+  <section id="operationsExamples">
+    <title>Reducing Operators</title>
+
+    <para>One common task is selecting subsets of an array. SciDB allows you
+    to reduce matrices to contiguous or noncontiguous subsets of its
+    cells.</para>
+
+    <para>Let's look at a single array to compare the three SciDB reduction
+    operators, <literal>subarray</literal>, <literal>slice</literal>, and
+    <literal>thin</literal>.</para>
+
+    <procedure>
+      <step>
+        <para>We will use the array that we created earlier, <emphasis
+        role="bold">test</emphasis>, and fill it with values.<programlisting
+        language="test">--afl store(build(&lt;val:double&gt;[i=0:4,6,0, j=0:4,6,0], i*5 +j+1),test); --show-output=no</programlisting></para>
+      </step>
+
+      <step>
+        <para>Select a 3x3 sub array from the interior of the
+        array:<programlisting language="test">--afl subarray(test,1,1,3,3); --output-format=dense --chunkify=yes</programlisting></para>
+      </step>
+
+      <step>
+        <para>Slice the third column (j=2), and then the second row (i=1):
+        <programlisting language="test">--afl slice(test,j,2); --output-format=dense</programlisting><programlisting
+        language="test">--afl slice(test,i,1); --output-format=dense</programlisting></para>
+      </step>
+
+      <step>
+        <para>Use the <literal role="bold">thin </literal>operator to
+        uniformly sample data from the array. <programlisting language="test">--afl thin(test,0,2,0,2); --output-format=dense --chunkify=yes</programlisting><programlisting
+        language="test">--afl thin(test,1,3,1,2); --output-format=dense --chunkify=yes</programlisting>The
+        thin operator selects elements from given array dimensions at defined
+        intervals.</para>
+      </step>
+    </procedure>
+  </section>
+
+  <section id="advancedExample">
+    <title>The Power of Operator Composition</title>
+
+    <para>You can use combinations of operations on SciDB data. This allows
+    you to view and analyze data in a nearly endless variety of ways.</para>
+
+    <para>For example, let's look at a query to list the SciDB
+    functions:<programlisting language="test">--afl list('functions'); --show-output=no
+</programlisting></para>
+
+    <para>If you run this query, it returns several hundred elements. Here are
+    the first few items:<screen>{No} name,profile,deterministic,library
+{0} "%","double %(double,double)",true,"scidb"
+{1} "%","int16 %(int16,int16)",true,"scidb"
+{2} "%","int32 %(int32,int32)",true,"scidb"
+{3} "%","int64 %(int64,int64)",true,"scidb"
+{4} "%","int8 %(int8,int8)",true,"scidb"
+{5} "%","uint16 %(uint16,uint16)",true,"scidb"
+{6} "%","uint32 %(uint32,uint32)",true,"scidb"
+{7} "%","uint64 %(uint64,uint64)",true,"scidb"
+{8} "%","uint8 %(uint8,uint8)",true,"scidb"
+{9} "*","double *(double,double)",true,"scidb"
+{10} "*","float *(float,float)",true,"scidb"
+{11} "*","int16 *(int16,int16)",true,"scidb"
+{12} "*","int32 *(int32,int32)",true,"scidb"</screen>Note that the remainder
+    function, %, is overloaded—it can be used on most of the numeric data
+    types. Several of the other SciDB functions are also overloaded.</para>
+
+    <para>Now let's say that you want only the names of functions, and you
+    want them sorted, and you only want one record per function name. One way
+    to do this is as follows:</para>
+
+    <procedure>
+      <step>
+        <para>Run the following query to create an array:<programlisting
+        language="test">--afl store(sort(project(filter(list('functions'),
+   library='scidb'),name)),functionsArray); --show-output=no
+</programlisting>Let's break down the actions in this query:<itemizedlist>
+            <listitem>
+              <para>Starting from the inside—which is where the SciDB engine
+              starts—we have <literal>list('functions')</literal>, which lists
+              information about all functions.</para>
+            </listitem>
+
+            <listitem>
+              <para>We <literal>filter</literal> the list of functions to
+              return only the ones in SciDB itself (not in any add-on
+              libraries).</para>
+            </listitem>
+
+            <listitem>
+              <para>Next, we <literal>project </literal>only the name of the
+              functions—this is similar to <command>SELECT name </command>from
+              SQL.</para>
+            </listitem>
+
+            <listitem>
+              <para>We then <literal>sort </literal>the list and
+              <literal>store </literal>it to a SciDB array.</para>
+            </listitem>
+          </itemizedlist></para>
+      </step>
+
+      <step>
+        <para>Let's take a look at the schema of
+        <literal>functionsArray</literal>:<programlisting language="test">--afl show(functionsArray) --output-format=dense</programlisting></para>
+      </step>
+
+      <step>
+        <para>We will use <literal>redimension_store </literal>to convert the
+        attribute, <emphasis role="bold">name</emphasis>, to a dimension which
+        removes duplicate values. First, we need to create a target array that
+        has a string dimension to match the string attribute, <emphasis
+        role="bold">name</emphasis>. And since all arrays need at least one
+        attribute, we the <command>count </command>function to create an
+        attribute that counts the number of occurrences of each function
+        name.<programlisting language="test">--afl create array target &lt;count:uint64 null&gt; [name(string)=*,1000,0]; --show-output=no
+</programlisting></para>
+      </step>
+
+      <step>
+        <para>And finally, we redimension the source array into the
+        target.<programlisting language="test">--afl redimension_store(functionsArray, target, count(*) as count); --output-format=dcsv</programlisting>As
+        you can see, the dimension actually contains the names of the SciDB
+        functions. The attribute, <emphasis role="bold">count</emphasis>,
+        contains the number of variations of the corresponding
+        function.</para>
+      </step>
+    </procedure>
+  </section>
+</article>

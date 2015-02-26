@@ -16,7 +16,7 @@ case `./os_detect.sh` in
 	usermod -G apache -a ${username}
 	mkdir -p /var/www/cdash_logs
 	chmod g+wx -R /var/www/cdash_logs
-	chown apache:apache -R /var/www
+	chown apache:apache -R /var/www/cdash_logs
 	CONFIG=/etc/sysconfig/selinux
 	cat ${CONFIG} | sed -e "s/enforcing/disabled/g" > ${CONFIG}.new
 	cat ${CONFIG}.new > ${CONFIG}
@@ -32,7 +32,7 @@ case `./os_detect.sh` in
 	usermod -G www-data -a ${username}
 	mkdir -p /var/www/cdash_logs
 	chmod g+wxr -R /var/www/cdash_logs
-	chown www-data:www-data -R /var/www
+	chown www-data:www-data -R /var/www/cdash_logs
 	;;
     *)
 	echo "Not supported OS"

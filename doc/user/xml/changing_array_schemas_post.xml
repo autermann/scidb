@@ -341,31 +341,31 @@ val3:double &gt;
           <listitem>
             <para><emphasis role="bold">Reshaping </emphasis> an array by
             changing the dimension sizes. This is performed with the
-            <code>reshape </code> command.</para>
+            <code>reshape </code> operator.</para>
           </listitem>
 
           <listitem>
             <para><emphasis role="bold">Unpacking </emphasis> a
             multidimensional array into a 1-dimensional array is performed
-            with the <code>unpack </code> command.</para>
+            with the <code>unpack </code> operator.</para>
           </listitem>
 
           <listitem>
             <para><emphasis role="bold">Reversing </emphasis> the cells in an
-            array is performed with the <code>reverse </code> command.</para>
+            array is performed with the <code>reverse </code> operator.</para>
           </listitem>
 
           <listitem>
             <para><emphasis role="bold">Sorting </emphasis> the cells in an
             array or within subarrays corresponding to each dimension, is
-            performed with the <code>sort </code> command.</para>
+            performed with the <code>sort </code> operator.</para>
           </listitem>
         </itemizedlist></para>
 
       <para>For example, you might want to reshape your array from an
       <emphasis>m </emphasis>-by- <emphasis>n </emphasis> array to a 2
       <emphasis>m </emphasis>-by- <emphasis>n </emphasis>/2 array. The
-      <code>reshape </code> command allows you to transform an array into
+      <code>reshape </code> operator allows you to transform an array into
       another compatible schema. Consider a 4 <symbol role="symbolfont">×
       </symbol>4 array, <code>m4x4 </code>, with contents and schema as
       follows: <para><programlisting>AFL% CREATE ARRAY m4x4 &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];  </programlisting><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
@@ -397,7 +397,7 @@ j=0:3,4,0]</screen> As long as the two array schemas have the same number of
       planning to save your data to csv format. Unpacking also excludes all
       empty cells from the result array.</para>
 
-      <para>The <code>unpack</code> command takes the second and higher
+      <para>The <code>unpack</code> operator takes the second and higher
       dimensions of an array and transforms them into attributes along the
       first dimension. The result array consists of the dimension values of
       the input array with the attribute values from the corresponding cells
@@ -415,7 +415,7 @@ val:double &gt;
 [k=0:*,9,0]</screen></para></para>
 
       <para>You can reverse the ordering of the data in each dimension of an
-      array with the <code>reverse </code> command: <para><screen><command>m3x3</command>
+      array with the <code>reverse </code> operator: <para><screen><command>m3x3</command>
 
 &lt; val:double &gt;
 
@@ -450,28 +450,26 @@ j=0:2,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>FRO
           <listitem>
             <para>A <emphasis role="bold">subarray </emphasis> is a contiguous
             block of cells from an array. This action is performed by the
-            <code>subarray </code> operator.</para>
+            <code>subarray </code>operator.</para>
           </listitem>
 
           <listitem>
             <para>An array <emphasis role="bold">slice </emphasis> is a subset
             of the array defined by planes of the array. This action is
-            performed by the <code>slice </code> operator.</para>
+            performed by the <code>slice </code>operator.</para>
           </listitem>
 
           <listitem>
             <para>A dimension can be winnowed or <emphasis role="bold">thinned
             </emphasis> by selecting data at intervals along its entirety.
-            This action is performed by the <code>thin </code>
-            operator.</para>
+            This action is performed by the <code>thin </code>operator.</para>
           </listitem>
         </itemizedlist></para>
 
       <para>You can select part of an existing array into another array with
-      the <code>subarray </code> command. For example, you can select a 2-by-2
+      the <code>subarray </code>operator. For example, you can select a 2-by-2
       array of the last two values from each dimension of the array <code>m4x4
-      </code> with the following <code>subarray </code> command:
-      <para><programlisting>AFL% show(m4x4)</programlisting><screen><command>m4x4</command>
+      </code>with the following <code>subarray </code>query: <para><programlisting>AFL% show(m4x4)</programlisting><screen><command>m4x4</command>
 
 &lt; val:double &gt;
 
@@ -502,7 +500,7 @@ j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
 
       <para>For example, you can select the data in a horizontal slice in the
       middle of a 3-dimensional array <code>m3x3x3 </code> by using the
-      <code>slice </code> command and specifying the value for dimension
+      <code>slice </code>operator and specifying the value for dimension
       <code>k</code>: <para><programlisting>AFL% show(m3x3x3)</programlisting><screen><command>m3x3x3</command>
 
 &lt; val:double &gt;
@@ -532,7 +530,7 @@ k=0:2,3,0]</screen><programlisting>AFL% scan(m3x3x3);   </programlisting><screen
 ]</screen></para></para>
 
       <para>You may want to sample data uniformly across an entire dimension.
-      The <code>thin </code> command selects elements from given array
+      The <code>thin </code> operator selects elements from given array
       dimensions at defined intervals. For example, you can select every other
       element from every other row: <para><programlisting>AFL% show(m4x4)</programlisting><screen><command>m4x4</command>
 
@@ -637,7 +635,7 @@ j=0:3,4,0]</screen><programlisting>AFL% scan(m4x4);  </programlisting><screen>[
 
         <secondary>renaming</secondary>
       </indexterm>You can change the name of an attribute with the
-    <code>attribute_rename </code> command: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m3x3_new <command>FROM</command> attribute_rename(m3x3,val,val2);  </programlisting><screen>[
+    <code>attribute_rename </code> operator: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m3x3_new <command>FROM</command> attribute_rename(m3x3,val,val2);  </programlisting><screen>[
 [(0),(1),(2)],
 [(3),(4),(5)],
 [(6),(7),(8)]
@@ -653,7 +651,7 @@ j=0:2,3,0]</screen></para></para>
 
         <secondary>adding</secondary>
       </indexterm>You can add attributes to an existing array with the
-    <code>apply</code> command: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m3x3_new_attr <command>FROM</command> apply(m3x3,val2,val+10,val3,pow(val,2));  </programlisting><screen>[
+    <code>apply</code> operator: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> m3x3_new_attr <command>FROM</command> apply(m3x3,val2,val+10,val3,pow(val,2));  </programlisting><screen>[
 [(0,10,0),(1,11,1),(2,12,4)],
 [(3,13,9),(4,14,16),(5,15,25)],
 [(6,16,36),(7,17,49),(8,18,64)]
@@ -757,7 +755,7 @@ j=0:2,3,0]</screen></para></para>
 t(string)=5,5,0]</screen></para></para>
 
       <para>Suppose you want to examine a sample plane from each dimension of
-      the array. You can use the slice command to select array slices from
+      the array. You can use the slice operator to select array slices from
       array <code>Dsp </code>: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_0 <command>FROM</command> slice(Dsp, d, 'device-0');  </programlisting><screen>{t} val
 {"probe-0"} 0.01
 {"probe-1"} 30.36
@@ -799,7 +797,7 @@ t(string)=5,5,0]</screen></para></para>
 
 [t=0:9,5,0]</screen> To
       concatenate these arrays into a 2-dimensional array, you need to add a
-      dimension to both. The <code>adddim</code> command will add a stub
+      dimension to both. The <code>adddim</code> operator will add a stub
       dimension to the array to increase its dimensionality. <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_new <command>FROM</command> concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d));
 </programlisting><screen>{d,t} val
 {0,"probe-0"} 0.01

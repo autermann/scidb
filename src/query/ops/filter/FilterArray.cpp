@@ -86,8 +86,7 @@ namespace scidb {
         if (!inputIterator->end()) {
             for (size_t i = 0, n = _iterators.size(); i < n; i++) {
                 if (_iterators[i] && _iterators[i] != inputIterator) {
-                    if (!_iterators[i]->setPosition(inputIterator->getPosition()))
-                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                    ++(*_iterators[i]);
                 }
             }
         }
@@ -111,7 +110,7 @@ namespace scidb {
         if (!inputIterator->end()) {
             for (size_t i = 0, n = _iterators.size(); i < n; i++) {
                 if (_iterators[i] && _iterators[i] != inputIterator) {
-                    _iterators[i]->setPosition(inputIterator->getPosition());
+                    _iterators[i]->reset();
                 }
             }
         }

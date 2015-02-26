@@ -65,7 +65,7 @@ class MPIInitPhysical: public MPIPhysical
     {
         MpiManager::getInstance()->forceInitMpi();
 
-        launchMPISlaves(query, std::numeric_limits<size_t>::max());
+        launchMPISlaves(query, query->getInstancesCount());
         boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
         mpi::Command cmd;
         cmd.setCmd(string("EXIT"));

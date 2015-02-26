@@ -408,7 +408,7 @@ ERRCODE(SCIDB_LE_INVALID_MONTH_REPRESENTATION,      332); //Invalid month repres
 ERRCODE(SCIDB_LE_INVALID_USER_ERROR_CODE,           333); //Can not register errors namespace '%1%' with error code '%2%': user defined error codes must be greater than %3%. Use constant SCIDB_USER_ERROR_CODE_START to define your first error code.
 ERRCODE(SCIDB_LE_ATTRIBUTES_MISMATCH,               334); //Attributes mismatch
 ERRCODE(SCIDB_LE_INVALID_FUNCTION_ARGUMENT,         335); //Invalid function argument: %1%
-ERRCODE(SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE,      336); //Chunk size should not exceed 2^64
+ERRCODE(SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE,      336); //Chunk size should not exceed 2^63
 ERRCODE(SCIDB_W_FILE_NOT_FOUND_ON_INSTANCES,            337); //File '%1%' not found on instance(s) %2%
 ERRCODE(SCIDB_LE_FILE_IMPORT_FAILED,                338); //Import from file '%1%' (instance %2%) to array '%3%' failed at line %4%, column %5%, offset %6%, value='%7%': %8%
 ERRCODE(SCIDB_LE_ACCESS_TO_RAW_CHUNK,               339); //Failed to fetch chunk body

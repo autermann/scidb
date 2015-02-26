@@ -53,13 +53,11 @@ void ApplyChunkIterator::reset()
     inputIterator->reset();
     if (!inputIterator->end())
     {
-        Coordinates const& pos = inputIterator->getPosition();
         for (size_t i = 0, n = _iterators.size(); i < n; i++)
         {
             if (_iterators[i] && _iterators[i] != inputIterator)
             {
-                if (!_iterators[i]->setPosition(pos))
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                _iterators[i]->reset();
             }
         }
         if (isNull())
@@ -133,13 +131,11 @@ void ApplyChunkIterator::operator ++()
         ++(*inputIterator);
         if (!inputIterator->end())
         {
-            Coordinates const& pos = inputIterator->getPosition();
             for (size_t i = 0, n = _iterators.size(); i < n; i++)
             {
                 if (_iterators[i] && _iterators[i] != inputIterator)
                 {
-                    if (!_iterators[i]->setPosition(pos))
-                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+                    ++(*_iterators[i]);
                 }
             }
         }

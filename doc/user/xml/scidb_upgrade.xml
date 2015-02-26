@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE sect1 PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+<!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<sect1 remap="h2">
+<section>
   <title>Upgrading SciDB</title>
 
   <para><indexterm>
@@ -23,13 +23,13 @@
       </listitem>
     </itemizedlist></para>
 
-  <para>For example, if you are upgrading from 12.10 to 13.1:<itemizedlist>
+  <para>For example, if you are upgrading from 12.10 to 13.2:<itemizedlist>
       <listitem>
         <para><emphasis role="bold">scidbOldVersion</emphasis> = 12.10</para>
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">scidbNewVersion</emphasis> = 13.1</para>
+        <para><emphasis role="bold">scidbNewVersion</emphasis> = 13.2</para>
       </listitem>
     </itemizedlist></para>
 
@@ -51,14 +51,8 @@
 
           <listitem>
             <para>Note the schema for each of your arrays. You can use
-            <literal>list('arrays')</literal> to get a list of your arrays,
-            and then use <literal>show(array-name)</literal> for each
-            array.<programlisting>AFL% list('arrays');
-AFL% show(<replaceable>array_1</replaceable>);
-AFL% show(<replaceable>array_2</replaceable>);
-:
-AFL% show(<replaceable>array_n</replaceable>);
-</programlisting></para>
+            <literal>list('arrays')</literal> to get a list of your arrays and
+            their schemas.<programlisting>AFL% list('arrays');</programlisting></para>
           </listitem>
 
           <listitem>
@@ -105,16 +99,21 @@ AFL% show(<replaceable>array_n</replaceable>);
     </step>
 
     <step>
-      <para>If you copied your existing config.ini file, make sure to change
-      all occurrences of <emphasis role="bold">scidbOldVersion </emphasis>to
-      <emphasis role="bold">scidbNewVersion</emphasis>. After you edit the
-      file, copy it to the <literal>/opt/scidb/13.1/etc/
-      </literal>folder.</para>
+      <para>To continue the upgrade process, proceed to <xref
+      linkend="PackageInstall"/>.</para>
     </step>
 
     <step>
-      <para>To continue the upgrade process, proceed to <xref
-      linkend="PackageInstall"/>.</para>
+      <para>If you copied your existing config.ini file, make sure to change
+      all occurrences of <emphasis role="bold">scidbOldVersion </emphasis>to
+      <emphasis role="bold">scidbNewVersion</emphasis>. After you edit the
+      file, copy it to the <literal>/opt/scidb/</literal><emphasis
+      role="bold">scidbNewVersion</emphasis><literal>/etc/
+      </literal>folder.</para>
+
+      <para>For example, if you are upgrading to version is 13.2, you would
+      copy your file to the <literal>/opt/scidb/13.2/etc/</literal>
+      folder.</para>
     </step>
 
     <step>
@@ -123,4 +122,4 @@ AFL% show(<replaceable>array_n</replaceable>);
       linkend="opaqueLoad"/>.</para>
     </step>
   </procedure>
-</sect1>
+</section>

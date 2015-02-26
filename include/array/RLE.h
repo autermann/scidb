@@ -71,9 +71,10 @@ public:
         position_t _pPosition; // index of value in payload
     };
 
+    // This structure must use platform independent data types with fixed size.
     struct Header { 
         uint64_t _magic;
-        size_t   _nSegs;
+        uint64_t _nSegs;
         uint64_t _nNonEmptyElements;
     };
 
@@ -567,20 +568,21 @@ public:
         BOOST_SERIALIZATION_SPLIT_MEMBER()
     } __attribute__ ((packed));
 
+    // This structure must have platform independent data types because we use it in chunk format data structure
     struct Header { 
-        uint64_t _magic;
-        size_t   _nSegs;
-        size_t   _elemSize;
-        size_t   _dataSize;
-        size_t   _varOffs;
-        bool     _isBoolean;
+        uint64_t  _magic;
+        uint64_t  _nSegs;
+        uint64_t  _elemSize;
+        uint64_t  _dataSize;
+        uint64_t  _varOffs;
+        bool      _isBoolean;
     };
 
   protected:
-    size_t _nSegs;
-    size_t _elemSize;
-    size_t _dataSize;
-    size_t _varOffs;
+    uint64_t _nSegs;
+    uint64_t _elemSize;
+    uint64_t _dataSize;
+    uint64_t _varOffs;
     bool   _isBoolean;
 
     Segment* _seg;
@@ -607,6 +609,16 @@ public:
     }
 
     /**
+     * Given the beginning byte address of a var-part datum in an RLE payload, get the size of the datum including header size.
+     * @param[in]  address    the byte address of the var-part datum
+     * @param[out] sizeHeader the size of the header, that stores the size of the actual datum; either 1 or 5
+     * @param[out] sizeDatum  the size of the datum (not including the header)
+     * @note If the size is less than 256, one byte is used to store the datum length.
+     *       Otherwise, five bytes are used to store the length. In particular, the first byte is 0, and the next four bytes stores the length.
+     */
+    inline static void getSizeOfVarPartForOneDatum(char* const address, size_t& sizeHeader, size_t& sizeDatum);
+
+    /**
      * Given an offset into the var part (the value that is stored in the fixed part), tell how many bytes the var part of the datum has.
      * @pre Must be var-size type.
      * @pre The offset must be within the range of the var part of the payload.
@@ -614,25 +626,24 @@ public:
      * @param[in] offset    the offset of the data in the var part
      * @return    #bytes of the var-part of the datum
      */
-    size_t getSizeOfVarPartForOneDatum(size_t offset)
-    {
-        assert(_elemSize==0);
-        assert(offset+_varOffs<_dataSize);
+    inline size_t getSizeOfVarPartForOneDatum(size_t offset);
 
-        char* address = getVarData() + offset;
-        int len1 = *address;
-        int ret;
-        if (len1 > 0) { // if the first byte is not zero, it stores the length
-            ret = 1 + len1;
-        } else {  // if the first byte is zero, the next four bytes store the length
-            int len2 = *((int*)(address+1));
-            ret = 5+len2;
-        }
+    /**
+     * Given an existing varPart of some RLEPayload, append a var-size value to the end of it.
+     * @param[inout] varPart  an existing var part
+     * @param[in]    datumInRLEPayload a var-type value, from another RLEPayload, to be appended
+     * @note varPart will be resized to include both the (1-or-5-byte) header and the actual value
+     */
+    inline static void appendValueToTheEndOfVarPart(std::vector<char>& varPart, char* const datumInRLEPayload);
 
-        assert(ret>=0);
-        assert(offset + static_cast<size_t>(ret) <= _dataSize-_varOffs); // the var part must hold the whole datum
-        return static_cast<size_t>(ret);
-    }
+    /**
+     * Given an existing varPart of some RLEPayload, append a var-size value to the end of it.
+     * @param[inout] varPart  an existing var part
+     * @param[in]    value    a new value to be appended
+     * @pre the value must be var-size type
+     * @note varPart will be resized to include both the (1-or-5-byte) header and the actual value
+     */
+    inline static void appendValueToTheEndOfVarPart(std::vector<char>& varPart, Value const& value);
 
     /**
      * Get value data by the given index

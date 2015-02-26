@@ -90,45 +90,63 @@ void MPIPhysical::setQuery(const boost::shared_ptr<Query>& query)
     query->pushFinalizer(f);
 }
 
-void MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves)
+bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves)
 {
     if(DBG) std::cerr << "launchNewMPISlave slave creation" << std::endl ;
-    Cluster* cluster = Cluster::getInstance();
 
-    const boost::shared_ptr<const InstanceMembership> membership =
-       cluster->getInstanceMembership();
+    assert(maxSlaves <= query->getInstancesCount());
 
-    const string& installPath = MpiManager::getInstallPath(membership);
-    _launchId = _ctx->getNextLaunchId();
+    _launchId = _ctx->getNextLaunchId(); // bump the launch ID by 1
 
-    boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(_launchId, query, installPath));
-    _ctx->setSlave(_launchId, slave);
+    // check if our logical ID is within the set of instances that will have a corresponding slave
+    if ( query->getInstanceID() < maxSlaves) {
 
-    _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
-    if (_mustLaunch) {
-        _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
-        _ctx->setLauncher(_launchId, _launcher);
-        std::vector<std::string> args;
-        _launcher->launch(args, membership, maxSlaves);
+        uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
+        assert(lastIdInUse < _launchId);
+
+        Cluster* cluster = Cluster::getInstance();
+        const boost::shared_ptr<const InstanceMembership> membership =
+           cluster->getInstanceMembership();
+
+        const string& installPath = MpiManager::getInstallPath(membership);
+
+        boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(_launchId, query, installPath));
+        _ctx->setSlave(_launchId, slave);
+
+        _mustLaunch = (query->getCoordinatorID() == COORDINATOR_INSTANCE);
+        if (_mustLaunch) {
+            _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
+            _ctx->setLauncher(_launchId, _launcher);
+            std::vector<std::string> args;
+            _launcher->launch(args, membership, maxSlaves);
+        }
+
+        //-------------------- Get the handshake
+        if(DBG) std::cerr << "launchNewMPISlave slave waitForHandshake 1" << std::endl ;
+        if(DBG) std::cerr << "-------------------------------------" << std::endl ;
+        slave->waitForHandshake(_ctx);
+        if(DBG) std::cerr << "launchNewMPISlave slave waitForHandshake 1 done" << std::endl ;
+
+        // After the handshake the old slave must be gone
+        if(DBG) std::cerr << "launchNewMPISlave lastLaunchIdInUse=" << lastIdInUse << std::endl ;
+        if(DBG) std::cerr << "launchNewMPISlave _launchId=" << _launchId << std::endl ;
+
+        boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(lastIdInUse);
+        if (oldSlave) {
+            assert(lastIdInUse == oldSlave->getLaunchId());
+            if(DBG) std::cerr << "launchNewMPISlave oldSlave->destroy()" << std::endl ;
+            oldSlave->destroy();
+            oldSlave.reset();
+        }
+        _ctx->complete(lastIdInUse);
+
+        _ipcName = mpi::getIpcName(installPath, cluster->getUuid(), query->getQueryID(),
+                                   cluster->getLocalInstanceId(), _launchId);
+        return true;
+    } else {
+        assert(query->getCoordinatorID() != COORDINATOR_INSTANCE);
     }
-
-    //-------------------- Get the handshake
-    if(DBG) std::cerr << "launchNewMPISlave slave waitForHandshake 1" << std::endl ;
-    if(DBG) std::cerr << "-------------------------------------" << std::endl ;
-    slave->waitForHandshake(_ctx);
-    if(DBG) std::cerr << "launchNewMPISlave slave waitForHandshake 1 done" << std::endl ;
-
-    // After the handshake the old slave must be gone
-    boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(_launchId-1);
-    if (oldSlave) {
-        if(DBG) std::cerr << "launchNewMPISlave oldSlave->destroy()" << std::endl ;
-        oldSlave->destroy();
-        oldSlave.reset();
-    }
-    _ctx->complete(_launchId-1);
-
-    _ipcName = mpi::getIpcName(installPath, cluster->getUuid(), query->getQueryID(),
-                               cluster->getLocalInstanceId(), _launchId);
+    return false;
 }
 
 

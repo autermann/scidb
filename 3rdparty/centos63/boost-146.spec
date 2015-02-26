@@ -1,28 +1,31 @@
-Name: boost
+%define scidb_boost scidb-boost-SCIDB_VERSION_MAJOR.SCIDB_VERSION_MINOR
+%define scidb_path  /opt/scidb/SCIDB_VERSION_MAJOR.SCIDB_VERSION_MINOR
+Name: %{scidb_boost}
 Summary: The free peer-reviewed portable C++ source libraries
 Version: 1.46.1
-Release: 1
+Release: SCIDB_VERSION_PATCH
 License: Boost
 URL: http://www.boost.org/
 Group: System Environment/Libraries
 Source: http://sourceforge.net/projects/boost/files/boost/1.46.1/boost_1_46_1.tar.bz2
 %define srcdir boost_1_46_1
-
-Requires: boost-date-time = %{version}-%{release}
-Requires: boost-filesystem = %{version}-%{release}
-Requires: boost-graph = %{version}-%{release}
-Requires: boost-iostreams = %{version}-%{release}
-Requires: boost-program-options = %{version}-%{release}
-Requires: boost-python = %{version}-%{release}
-Requires: boost-regex = %{version}-%{release}
-Requires: boost-serialization = %{version}-%{release}
-Requires: boost-signals = %{version}-%{release}
-Requires: boost-system = %{version}-%{release}
-Requires: boost-test = %{version}-%{release}
-Requires: boost-thread = %{version}-%{release}
-Requires: boost-wave = %{version}-%{release}
-Requires: boost-random = %{version}-%{release}
-Requires: boost-math = %{version}-%{release}
+%define _docdir %{scidb_path}/doc
+%define _libdir %{scidb_path}/lib
+Requires: %{scidb_boost}-date-time = %{version}-%{release}
+Requires: %{scidb_boost}-filesystem = %{version}-%{release}
+Requires: %{scidb_boost}-graph = %{version}-%{release}
+Requires: %{scidb_boost}-iostreams = %{version}-%{release}
+Requires: %{scidb_boost}-program-options = %{version}-%{release}
+Requires: %{scidb_boost}-python = %{version}-%{release}
+Requires: %{scidb_boost}-regex = %{version}-%{release}
+Requires: %{scidb_boost}-serialization = %{version}-%{release}
+Requires: %{scidb_boost}-signals = %{version}-%{release}
+Requires: %{scidb_boost}-system = %{version}-%{release}
+Requires: %{scidb_boost}-test = %{version}-%{release}
+Requires: %{scidb_boost}-thread = %{version}-%{release}
+Requires: %{scidb_boost}-wave = %{version}-%{release}
+Requires: %{scidb_boost}-random = %{version}-%{release}
+Requires: %{scidb_boost}-math = %{version}-%{release}
 
 BuildRequires: libstdc++-devel
 BuildRequires: bzip2-libs
@@ -78,7 +81,7 @@ Group: System Environment/Libraries
 This package is a stub that used to contain runtime component of boost
 math library.  Now that boost math library is header-only, this
 package is empty.  It's kept around only so that during yum-assisted
-update, old libraries from boost-math package aren't left around.
+update, old libraries from %{scidb_boost}-math package aren't left around.
 
 %package program-options
 Summary:  Runtime component of boost program_options library
@@ -159,17 +162,17 @@ useful properties, such as uniform distribution.
 %package devel
 Summary: The Boost C++ headers and shared development libraries
 Group: Development/Libraries
-Requires: boost = %{version}-%{release}
-Provides: boost-python-devel = %{version}-%{release}
+Requires: %{scidb_boost} = %{version}-%{release}
+Provides: %{scidb_boost}-python-devel = %{version}-%{release}
 %description devel
 Headers and shared object symlinks for the Boost C++ libraries.
 
 %package static
 Summary: The Boost C++ static development libraries
 Group: Development/Libraries
-Requires: boost-devel = %{version}-%{release}
-Obsoletes: boost-devel-static < 1.34.1-14
-Provides: boost-devel-static = %{version}-%{release}
+Requires: %{scidb_boost}-devel = %{version}-%{release}
+Obsoletes: %{scidb_boost}-devel-static < 1.34.1-14
+Provides: %{scidb_boost}-devel-static = %{version}-%{release}
 %description static
 Static Boost C++ libraries.
 
@@ -177,7 +180,7 @@ Static Boost C++ libraries.
 Summary: HTML documentation for the Boost C++ libraries
 Group: Documentation
 BuildArch: noarch
-Provides: boost-python-docs = %{version}-%{release}
+Provides: %{scidb_boost}-python-docs = %{version}-%{release}
 %description doc
 This package contains the documentation in the HTML format of the Boost C++
 libraries. The documentation provides the same content as that on the Boost
@@ -194,9 +197,9 @@ web page (http://www.boost.org/doc/libs/1_40_0).
 rm -rf $RPM_BUILD_ROOT
 cd %{_builddir}/%{srcdir}/
 ./bjam --prefix=$RPM_BUILD_ROOT/usr install
-%ifarch x86_64
-    mv "$RPM_BUILD_ROOT/usr/lib" "$RPM_BUILD_ROOT/usr/lib64"
-%endif
+mkdir -p "$RPM_BUILD_ROOT/%{scidb_path}"
+mv "$RPM_BUILD_ROOT/usr/lib" "$RPM_BUILD_ROOT/%{scidb_path}"
+mv "$RPM_BUILD_ROOT/usr/include" "$RPM_BUILD_ROOT/%{scidb_path}"
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -338,15 +341,13 @@ rm -rf $RPM_BUILD_ROOT
 
 %files doc
 %defattr(-, root, root, -)
-%doc %{_docdir}/boost-*-%{version}
+%doc %{_docdir}/scidb-boost-*-%{version}
 
 %files devel
 %defattr(-, root, root, -)
 %doc LICENSE_1_0.txt
-%{_includedir}/%{name}
+%{scidb_path}/include/boost
 %{_libdir}/libboost_*.so
-#%{_datadir}/%{name}-%{version}
-#%{_libdir}/boost/Boost*.cmake
 
 %files static
 %defattr(-, root, root, -)

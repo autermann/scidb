@@ -394,6 +394,11 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
             for (size_t i=1; i<items.size(); ++i) {
                 position_t currPosition = items[i][destAttrs.size()].getInt64();
                 if (prevPosition == currPosition) {
+                    // make sure the number of duplicates is less than chunk interval (for the synthetic dim)
+                    if (offset >= destDims[dimSynthetic].getChunkInterval()) {
+                        throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_REDIMENSION_STORE_ERROR7);
+                    }
+
                     // found a duplicate ==> recalculate the position, with an increased coordinate in the synthetic dim.
                     arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, prevPosition, coordinates);
                     coordinates[dimSynthetic] += offset;
@@ -518,7 +523,6 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     beforeRedistribution.reset();
 
     timing.logTiming(logger, "[RedimStore] redistributeAggregate");
-    LOG4CXX_DEBUG(logger, "[RedimStore] begin afterRedistribution --> withAggregates");
 
     // Scan through afterRedistribution to write the aggregate result to withAggregates (only if there are aggregate fields).
     //
@@ -526,6 +530,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     if (! hasAggregate) {
         withAggregates = afterRedistribution;
     } else {
+        LOG4CXX_DEBUG(logger, "[RedimStore] begin afterRedistribution --> withAggregates");
         withAggregates = make_shared<MemArray>(
                 ArrayDesc(_schema.getName(), _schema.getAttributes(), _schema.getDimensions()));
 

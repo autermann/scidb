@@ -25,7 +25,7 @@
 
 if [ 4 != $# ]; then
 	echo "Usage: $0 owner_name database_name owner's_database_password";
-	exit;
+	exit 1
 fi
 
 PD_DIR=$(dirname $(readlink -f $0))
@@ -36,8 +36,8 @@ pgPort=$4
 
 function die()
 {
-    echo "$1"
-    exit
+    echo "$1" 1>&2
+    exit 1
 }
 
 function read_yn()

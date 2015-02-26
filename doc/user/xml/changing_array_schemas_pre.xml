@@ -301,31 +301,31 @@
           <listitem>
             <para><emphasis role="bold">Reshaping </emphasis> an array by
             changing the dimension sizes. This is performed with the
-            <code>reshape </code> command.</para>
+            <code>reshape </code> operator.</para>
           </listitem>
 
           <listitem>
             <para><emphasis role="bold">Unpacking </emphasis> a
             multidimensional array into a 1-dimensional array is performed
-            with the <code>unpack </code> command.</para>
+            with the <code>unpack </code> operator.</para>
           </listitem>
 
           <listitem>
             <para><emphasis role="bold">Reversing </emphasis> the cells in an
-            array is performed with the <code>reverse </code> command.</para>
+            array is performed with the <code>reverse </code> operator.</para>
           </listitem>
 
           <listitem>
             <para><emphasis role="bold">Sorting </emphasis> the cells in an
             array or within subarrays corresponding to each dimension, is
-            performed with the <code>sort </code> command.</para>
+            performed with the <code>sort </code> operator.</para>
           </listitem>
         </itemizedlist></para>
 
       <para>For example, you might want to reshape your array from an
       <emphasis>m </emphasis>-by- <emphasis>n </emphasis> array to a 2
       <emphasis>m </emphasis>-by- <emphasis>n </emphasis>/2 array. The
-      <code>reshape </code> command allows you to transform an array into
+      <code>reshape </code> operator allows you to transform an array into
       another compatible schema. Consider a 4 <symbol role="symbolfont">×
       </symbol>4 array, <code>m4x4 </code>, with contents and schema as
       follows: <programlisting language="test">
@@ -354,7 +354,7 @@
       planning to save your data to csv format. Unpacking also excludes all
       empty cells from the result array.</para>
 
-      <para>The <code>unpack</code> command takes the second and higher
+      <para>The <code>unpack</code> operator takes the second and higher
       dimensions of an array and transforms them into attributes along the
       first dimension. The result array consists of the dimension values of
       the input array with the attribute values from the corresponding cells
@@ -370,7 +370,7 @@
 </programlisting></para>
 
       <para>You can reverse the ordering of the data in each dimension of an
-      array with the <code>reverse </code> command: <programlisting
+      array with the <code>reverse </code> operator: <programlisting
       language="test">
 --schema m3x3  --show-query=no --show-output=yes
 --aql SELECT * FROM m3x3;  --show-query=yes --show-output=yes --output-format=dense --chunkify=yes
@@ -397,31 +397,30 @@
           <listitem>
             <para>A <emphasis role="bold">subarray </emphasis> is a contiguous
             block of cells from an array. This action is performed by the
-            <code>subarray </code> operator.</para>
+            <code>subarray </code>operator.</para>
           </listitem>
 
           <listitem>
             <para>An array <emphasis role="bold">slice </emphasis> is a subset
             of the array defined by planes of the array. This action is
-            performed by the <code>slice </code> operator.</para>
+            performed by the <code>slice </code>operator.</para>
           </listitem>
 
           <listitem>
             <para>A dimension can be winnowed or <emphasis role="bold">thinned
             </emphasis> by selecting data at intervals along its entirety.
-            This action is performed by the <code>thin </code>
-            operator.</para>
+            This action is performed by the <code>thin </code>operator.</para>
           </listitem>
         </itemizedlist></para>
 
       <para>You can select part of an existing array into another array with
-      the <code>subarray </code> command. For example, you can select a 2-by-2
+      the <code>subarray </code>operator. For example, you can select a 2-by-2
       array of the last two values from each dimension of the array <code>m4x4
-      </code> with the following <code>subarray </code> command:
-      <programlisting language="test">
+      </code>with the following <code>subarray </code>query: <programlisting
+      language="test">
 --schema m4x4 --show-output=yes --show-query=yes
---afl scan(m4x4); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes
-	</programlisting> <programlisting language="test">
+--afl scan(m4x4); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes	</programlisting>
+      <programlisting language="test">
 --aql SELECT * FROM subarray(m4x4, 2, 2, 3, 4); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes</programlisting></para>
 
       <para>If you have a 3-dimensional array, you might want to select just a
@@ -442,7 +441,7 @@
 
       <para>For example, you can select the data in a horizontal slice in the
       middle of a 3-dimensional array <code>m3x3x3 </code> by using the
-      <code>slice </code> command and specifying the value for dimension
+      <code>slice </code>operator and specifying the value for dimension
       <code>k</code>: <programlisting language="test">--afl CREATE ARRAY m3x3x3 &lt; val: double &gt;[i=0:2,3,0,j=0:2,3,0,k=0:2,3,0]; --show-query=no --show-output=no 
 --schema m3x3x3
 --afl store(build(m3x3x3, i+j+k), m3x3x3); --show-query=no --show-output=no --output-format=dense --chunkify=yes
@@ -451,7 +450,7 @@
 </programlisting></para>
 
       <para>You may want to sample data uniformly across an entire dimension.
-      The <code>thin </code> command selects elements from given array
+      The <code>thin </code> operator selects elements from given array
       dimensions at defined intervals. For example, you can select every other
       element from every other row: <programlisting language="test">--schema m4x4 --show-query=yes --show=output=yes
 --afl scan(m4x4); --show-query=yes --show=output=yes --output-format=dense --chunkify=yes
@@ -533,7 +532,7 @@
 
         <secondary>renaming</secondary>
       </indexterm>You can change the name of an attribute with the
-    <code>attribute_rename </code> command: <programlisting language="test">
+    <code>attribute_rename </code> operator: <programlisting language="test">
 --aql SELECT * INTO m3x3_new FROM attribute_rename(m3x3,val,val2); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes
 --schema m3x3_new --show-query=yes --show-output=yes
       </programlisting></para>
@@ -543,7 +542,7 @@
 
         <secondary>adding</secondary>
       </indexterm>You can add attributes to an existing array with the
-    <code>apply</code> command: <programlisting language="test">
+    <code>apply</code> operator: <programlisting language="test">
 --aql SELECT * INTO m3x3_new_attr FROM apply(m3x3,val2,val+10,val3,pow(val,2)); --output-format=dense --chunkify=yes
 --schema m3x3_new_attr
       </programlisting></para>
@@ -617,7 +616,7 @@
 </programlisting></para>
 
       <para>Suppose you want to examine a sample plane from each dimension of
-      the array. You can use the slice command to select array slices from
+      the array. You can use the slice operator to select array slices from
       array <code>Dsp </code>: <programlisting language="test">--aql SELECT * INTO Dsp_slice_0 FROM slice(Dsp, d, 'device-0'); --show-query=yes
 --aql SELECT * INTO Dsp_slice_1 FROM slice(Dsp, d, 'device-1'); --show-query=yes
 --aql SELECT * INTO Dsp_slice_2 FROM slice(Dsp, d, 'device-2'); --show-query=yes</programlisting>The
@@ -626,7 +625,7 @@
       language="test">--aql SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2); --show-query=yes --show-output=yes
 --schema Dsp_1d --show-query=yes --show-output=yes</programlisting> To
       concatenate these arrays into a 2-dimensional array, you need to add a
-      dimension to both. The <code>adddim</code> command will add a stub
+      dimension to both. The <code>adddim</code> operator will add a stub
       dimension to the array to increase its dimensionality. <programlisting
       language="test">--aql SELECT * into Dsp_new FROM concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d));
 --schema Dsp_new</programlisting></para>

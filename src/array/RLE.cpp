@@ -853,14 +853,11 @@ namespace scidb
         if (_elemSize == 0) { // varying size
             int offs = *(int*)rawData;
             char* src = _payload + _varOffs + offs;
-            size_t len;
-            if (*src == 0) {
-                len = *(int*)(src + 1);
-                src += 5;
-            } else {
-                len = *src++ & 0xFF;
-            }
-            value.setData(src, len);
+
+            size_t sizeHeader, sizeDatum;
+            getSizeOfVarPartForOneDatum(src, sizeHeader, sizeDatum);
+
+            value.setData(src + sizeHeader, sizeDatum);
         } else {
             value.setData(rawData, fixedSize);
         }
@@ -1060,13 +1057,9 @@ namespace scidb
         if (_elemSize == 0) { // varying size
             int offs = *(int*)(_payload + index * 4);
             char* src = _payload + _varOffs + offs;
-            if (*src == 0) {
-                size = *(int*)(src + 1);
-                src += 5;
-            } else {
-                size = *src++ & 0xFF;
-            }
-            return src;
+            size_t sizeHeader;
+            getSizeOfVarPartForOneDatum(src, sizeHeader, size);
+            return src + sizeHeader;
         } else if (_isBoolean)
         {
             size = 1;
@@ -1218,17 +1211,7 @@ namespace scidb
             {
                 int offs = varPart.size();
                 *(int*)&_data[_dataSize] = offs;
-                size_t len = val.size();
-                if (len-1 >= 0xFF) {
-                    varPart.resize(offs + len + 5);
-                    varPart[offs++] = 0;
-                    *(int*)&varPart[offs] = len;
-                    offs += 4;
-                } else {
-                    varPart.resize(offs + len + 1);
-                    varPart[offs++] = len;
-                }
-                memcpy(&varPart[offs], val.data(), len);
+                appendValueToTheEndOfVarPart(varPart, val);
             }
             else
             {
@@ -1708,15 +1691,8 @@ namespace scidb
                                     while (src < end) {
                                         size_t offs = varPart.size();
                                         *dst++ = offs;
-                                        int bodyLen;
                                         char* body = payload.getVarData() + *src++;
-                                        if (*body == 0) {
-                                            bodyLen = 5 + *(int*)(body + 1);
-                                        } else {
-                                            bodyLen = 1 + (*body & 0xFF);
-                                        }
-                                        varPart.resize(offs + bodyLen);
-                                        memcpy(&varPart[offs], body, bodyLen);
+                                        appendValueToTheEndOfVarPart(varPart, body);
                                     }
                                 } else {
                                     _data.resize(_data.size() + nItems*_elemSize);
@@ -1794,15 +1770,8 @@ namespace scidb
                                 while (src < end) {
                                     size_t offs = varPart.size();
                                     *dst++ = offs;
-                                    int bodyLen;
                                     char* body = payload.getVarData() + *src++;
-                                    if (*body == 0) {
-                                        bodyLen = 5 + *(int*)(body + 1);
-                                    } else {
-                                        bodyLen = 1 + (*body & 0xFF);
-                                    }
-                                    varPart.resize(offs + bodyLen);
-                                    memcpy(&varPart[offs], body, bodyLen);
+                                    appendValueToTheEndOfVarPart(varPart, body);
                                 }
                             } else {
                                 _data.resize(_data.size() + nItems*_elemSize);
@@ -2088,5 +2057,62 @@ uint64_t RLEPayload::append_iterator::add(iterator& ii, uint64_t limit, bool set
     {
         delete prevVal;
     }
+
+    void ConstRLEPayload::getSizeOfVarPartForOneDatum(char* const address, size_t& sizeHeader, size_t& sizeDatum)
+    {
+        if (*address!=0) { // if the first byte is not zero, it stores the length
+            sizeHeader = 1;
+            sizeDatum = (*address & 0xFF);
+        } else {  // if the first byte is zero, the next four bytes store the length
+            sizeHeader = 5;
+            sizeDatum = *((int*)(address+1));
+            assert(sizeDatum==0 || sizeDatum > 0xFF);
+        }
+    }
+
+    size_t ConstRLEPayload::getSizeOfVarPartForOneDatum(size_t offset)
+    {
+        assert(_elemSize==0);
+        assert(offset+_varOffs<_dataSize);
+
+        char* address = getVarData() + offset;
+        size_t sizeHeader, sizeDatum;
+        getSizeOfVarPartForOneDatum(address, sizeHeader, sizeDatum);
+        size_t sizeTotal = sizeHeader + sizeDatum;
+        assert(offset + sizeTotal <= _dataSize-_varOffs); // the var part must hold the whole datum
+        return sizeTotal;
+    }
+
+    void ConstRLEPayload::appendValueToTheEndOfVarPart(std::vector<char>& varPart, char* const datumInRLEPayload)
+    {
+        size_t offs = varPart.size();
+        size_t len;
+        if (*datumInRLEPayload == 0) {
+            len = 5 + *(int*)(datumInRLEPayload + 1);
+        } else {
+            len = 1 + (*datumInRLEPayload & 0xFF);
+        }
+        varPart.resize(offs + len);
+        memcpy(&varPart[offs], datumInRLEPayload, len);
+    }
+
+    void ConstRLEPayload::appendValueToTheEndOfVarPart(std::vector<char>& varPart, Value const& value)
+    {
+        int offs = varPart.size();
+        size_t len = value.size();
+
+        if (len==0 || len > 0xFF) {
+            varPart.resize(offs + len + 5);
+            varPart[offs++] = 0;
+            *(int*)&varPart[offs] = len;
+            offs += 4;
+        } else {
+            varPart.resize(offs + len + 1);
+            varPart[offs++] = len;
+        }
+        memcpy(&varPart[offs], value.data(), len);
+    }
+
+
 }
 

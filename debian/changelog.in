@@ -1,4 +1,4 @@
-scidb (VERSION-BUILD) stable; urgency=low
+scidb-VERSION_MAJOR.VERSION_MINOR (VERSION_PATCH-BUILD) stable; urgency=low
 
   * Cheshire Release.
 

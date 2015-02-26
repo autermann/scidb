@@ -1404,8 +1404,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para>The first pair of statements includes all fields:</para>
 
-      <para><para><programlisting>AQL% <command>CREATE ARRAY</command>  
-       intensityFlat 
+      <para><para><programlisting>AQL% <command>CREATE ARRAY</command> intensityFlat 
          &lt; exposure:string, 
            elapsedTime:int64, 
            measuredIntensity:int64 null &gt;
@@ -1423,7 +1422,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
      <command>AS</command>   '(skip, 
             int64, 
             int64 null)';  </programlisting> The third pair of statements excludes two int64 fields, one
-      of which allows null values: <para><programlisting>AQL% <command>CREATE ARRAY</command>  intensityFlat_NoTime_NoMeasurement 
+      of which allows null values: <para><programlisting>AQL% <command>CREATE ARRAY</command> intensityFlat_NoTime_NoMeasurement 
  &lt; exposure:string &gt; 
  [i=0:*,1000000,0];   </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat_NoTime_NoMeasurement
      <command>FROM</command> '../examples/intensity_data.bin'
@@ -1713,7 +1712,7 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
     </section>
   </section>
 
-  <section>
+  <section id="dataSpecial">
     <title>Data with Special Values</title>
 
     <para>This section discusses default attribute values for missing values,

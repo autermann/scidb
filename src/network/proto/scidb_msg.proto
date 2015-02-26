@@ -23,6 +23,7 @@
 
 package scidb_msg;
 
+option java_package = "org.scidb.io.network";
 /**
  *  Add creating new object according to new message type in 
  *  MessageDesc::createRecordByType (../src/BaseConnection.cpp)

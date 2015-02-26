@@ -75,7 +75,7 @@ public:
             value.setBool(rand()%100<50);
         } else if (type==TID_STRING) {
             vector<char> str;
-            const size_t maxLength = 100;
+            const size_t maxLength = 300;
             const size_t minLength = 1;
             assert(minLength>0);
             size_t length = rand()%(maxLength-minLength) + minLength;

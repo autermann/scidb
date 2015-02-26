@@ -105,7 +105,7 @@ namespace scidb
     void CompressedBuffer::allocate(size_t size)
     {
         data = ::malloc(size);
-        if (data == NULL) { 
+        if (data == NULL) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
         compressedSize = size;
@@ -116,7 +116,7 @@ namespace scidb
     void CompressedBuffer::reallocate(size_t size)
     {
         data = ::realloc(data, size);
-        if (data == NULL) { 
+        if (data == NULL) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
         compressedSize = size;
@@ -192,23 +192,23 @@ namespace scidb
 
     size_t ConstChunk::getBitmapSize() const
     {
-        if (isRLE() && isMaterialized() && !getAttributeDesc().isEmptyIndicator()) { 
+        if (isRLE() && isMaterialized() && !getAttributeDesc().isEmptyIndicator()) {
             PinBuffer scope(*this);
             ConstRLEPayload payload((char*)getData());
             return getSize() - payload.packedSize();
         }
         return 0;
     }
-    
+
     Coordinates ConstChunk::getHighBoundary(bool withOverlap) const
     {
         boost::shared_ptr<ConstChunkIterator> i = getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS | (withOverlap ? 0 : ConstChunkIterator::IGNORE_OVERLAPS));
         Coordinates high = getFirstPosition(withOverlap);
         size_t nDims = high.size();
-        while (!i->end()) { 
+        while (!i->end()) {
             Coordinates const& pos = i->getPosition();
             for (size_t j = 0; j < nDims; j++) {
-                if (pos[j] > high[j]) { 
+                if (pos[j] > high[j]) {
                     high[j] = pos[j];
                 }
             }
@@ -222,10 +222,10 @@ namespace scidb
         boost::shared_ptr<ConstChunkIterator> i = getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS | (withOverlap ? 0 : ConstChunkIterator::IGNORE_OVERLAPS));
         Coordinates low = getLastPosition(withOverlap);
         size_t nDims = low.size();
-        while (!i->end()) { 
+        while (!i->end()) {
             Coordinates const& pos = i->getPosition();
             for (size_t j = 0; j < nDims; j++) {
-                if (pos[j] < low[j]) { 
+                if (pos[j] < low[j]) {
                     low[j] = pos[j];
                 }
             }
@@ -249,25 +249,25 @@ namespace scidb
 
     ConstChunk* ConstChunk::materialize() const
     {
-        if (materializedChunk == NULL || materializedChunk->getFirstPosition(false) != getFirstPosition(false)) { 
-            if (materializedChunk == NULL) { 
+        if (materializedChunk == NULL || materializedChunk->getFirstPosition(false) != getFirstPosition(false)) {
+            if (materializedChunk == NULL) {
                 ((ConstChunk*)this)->materializedChunk = new MemChunk();
             }
             materializedChunk->initialize(*this);
             materializedChunk->setBitmapChunk((Chunk*)getBitmapChunk());
-            boost::shared_ptr<ConstChunkIterator> src 
-                = getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE
-                                   |(materializedChunk->getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
+            boost::shared_ptr<ConstChunkIterator> src
+                = getConstIterator((getArrayDesc().getEmptyBitmapAttribute() == NULL ?  ChunkIterator::IGNORE_DEFAULT_VALUES : 0 )|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(materializedChunk->getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
+
             shared_ptr<Query> emptyQuery;
-            boost::shared_ptr<ChunkIterator> dst 
-                = materializedChunk->getIterator(emptyQuery, 
+            boost::shared_ptr<ChunkIterator> dst
+                = materializedChunk->getIterator(emptyQuery,
                                                  (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
             bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
             src->setVectorMode(vectorMode);
             dst->setVectorMode(vectorMode);
             size_t count = 0;
             while (!src->end()) {
-                if (!dst->setPosition(src->getPosition())) { 
+                if (!dst->setPosition(src->getPosition())) {
                     Coordinates const& pos = src->getPosition();
                     dst->setPosition(pos);
                     throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
@@ -348,10 +348,7 @@ namespace scidb
                 Coordinates coord = srcIterator->getPosition();
                 syntheticDimHelper.calcNewCoord(coord, mapCoordToCount);
                 if (!dstIterator->setPosition(coord)) {
-                    char buf[100];
-                    sprintf(buf, "setPosition failed; the object has synthetic-dim coord=%ld; chunk interval is %d.",
-                            coord[redimInfo->_dimSynthetic], redimInfo->_dim.getChunkInterval());
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << buf;
+                    throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_REDIMENSION_STORE_ERROR7);
                 }
                 Value const& value = srcIterator->getItem();
                 dstIterator->writeItem(value);
@@ -734,13 +731,13 @@ namespace scidb
 
     boost::shared_ptr<ConstRLEEmptyBitmap> ConstChunk::getEmptyBitmap() const
     {
-        if (isRLE() && getAttributeDesc().isEmptyIndicator()/* && isMaterialized()*/) { 
+        if (isRLE() && getAttributeDesc().isEmptyIndicator()/* && isMaterialized()*/) {
             PinBuffer scope(*this);
             return boost::shared_ptr<ConstRLEEmptyBitmap>(scope.isPinned() ? new ConstRLEEmptyBitmap(*this) : new RLEEmptyBitmap(ConstRLEEmptyBitmap(*this)));
         }
         AttributeDesc const* emptyAttr = getArrayDesc().getEmptyBitmapAttribute();
         if (emptyAttr != NULL) {
-            if (!emptyIterator) { 
+            if (!emptyIterator) {
                 ((ConstChunk*)this)->emptyIterator = getArray().getConstIterator(emptyAttr->getId());
             }
             if (!emptyIterator->setPosition(getFirstPosition(false))) {
@@ -760,7 +757,7 @@ namespace scidb
 
     ConstChunk::~ConstChunk()
     {
-        delete materializedChunk; 
+        delete materializedChunk;
     }
 
     void Array::getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query) const
@@ -768,7 +765,7 @@ namespace scidb
         size_t nDims = intCoords.size();
         origCoords.resize(nDims);
         ArrayDesc const& desc = getArrayDesc();
-        for (size_t i = 0; i < nDims; i++) { 
+        for (size_t i = 0; i < nDims; i++) {
             origCoords[i] = desc.getOriginalCoordinate(i, intCoords[i], query);
         }
     }
@@ -941,7 +938,7 @@ namespace scidb
                          !ci->end(); ++(*ci))
                     {
                         Value& v = ci->getItem();
-                        if (!v.isNull()) { 
+                        if (!v.isNull()) {
                             Coordinates const& itemPos = ci->getPosition();
                             size_t itemOffs = 0;
                             for (j = 0; j < nDims; j++) {
@@ -1030,7 +1027,7 @@ namespace scidb
             {
                 PinBuffer scope(chunk);
                 outChunk.setRLE(chunk.isRLE());
-                if (emptyBitmap && chunk.getBitmapSize() == 0) { 
+                if (emptyBitmap && chunk.getBitmapSize() == 0) {
                     size_t size = chunk.getSize() + emptyBitmap->packedSize();
                     outChunk.allocate(size);
                     memcpy(outChunk.getData(), chunk.getData(), chunk.getSize());
@@ -1043,10 +1040,10 @@ namespace scidb
                 outChunk.setCount(chunk.isCountKnown() ? chunk.count() : 0);
                 outChunk.write(query);
             } else {
-                if (emptyBitmap) { 
+                if (emptyBitmap) {
                     chunk.makeClosure(outChunk, emptyBitmap);
                     outChunk.write(query);
-                } else { 
+                } else {
                     boost::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(
                             ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(outChunk.getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
                     boost::shared_ptr<ChunkIterator> dst = outChunk.getIterator(query,

@@ -122,7 +122,8 @@ protected:
     /// @param query
     /// @param maxSlaves
     /// @xxxxx (sets state): _launchId, _mustLaunch, _ctx, _launcher, _ipcName
-    void launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves);
+    /// @return true if this instance participates in the computation and should handshake with a slave; false otherwise
+    bool launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves);
 
     /// @param numBufs : how many to allocate
     /// @param elemSize : sizeof(float) or sizeof(double) or sizeof(complex)

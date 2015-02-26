@@ -161,7 +161,7 @@ namespace scidb
     {
       protected:
         size_t      _nDims;
-        position_t  _logicalChunkSize;
+        uint64_t  _logicalChunkSize;
         Coordinates _origin;
         Coordinates _chunkIntervals;
 
@@ -923,8 +923,8 @@ namespace scidb
         TypeId typeId;
         Type   type;
         Value const& defaultValue;
-        position_t tilePos;
-        position_t tileSize;
+        uint64_t tilePos;
+        uint64_t tileSize;
         bool isEmptyIndicator;
 
         BaseChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, int iterationMode);

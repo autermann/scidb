@@ -1379,8 +1379,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para><programlisting language="test">
 --afl remove(intensityFlat); --show-query=no --show-output=no
---aql CREATE ARRAY  
-       intensityFlat 
+--aql CREATE ARRAY intensityFlat 
          &lt; exposure:string, 
            elapsedTime:int64, 
            measuredIntensity:int64 null &gt;
@@ -1395,7 +1394,6 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       field:</para>
 
       <para><programlisting language="test">
-
 --aql CREATE ARRAY intensityFlat_NoExposure 
  &lt; elapsedTime:int64, measuredIntensity:int64 null &gt; 
  [i=0:*,1000000,0]; --show-output=no 
@@ -1406,7 +1404,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
             int64 null)'; --show-output=no
 </programlisting> The third pair of statements excludes two int64 fields, one
       of which allows null values: <programlisting language="test">
---aql CREATE ARRAY  intensityFlat_NoTime_NoMeasurement 
+--aql CREATE ARRAY intensityFlat_NoTime_NoMeasurement 
  &lt; exposure:string &gt; 
  [i=0:*,1000000,0];  --show-output=no
 
@@ -1701,7 +1699,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     </section>
   </section>
 
-  <section>
+  <section id="dataSpecial">
     <title>Data with Special Values</title>
 
     <para>This section discusses default attribute values for missing values,

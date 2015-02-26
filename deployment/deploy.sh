@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eux
+set -eu
 
 function print_help ()
 {
@@ -23,8 +23,8 @@ Build packages/repositories:
 SciDB control on remote machines:
   deploy.sh scidb_install    <packages_path> [host]
   deploy.sh scidb_remove     <packages_path> [host]
-  deploy.sh scidb_prepare    <username> <password> <database> <base_path> <instance_count> [host]
-  deploy.sh scidb_start      <username> <coordinator>
+  deploy.sh scidb_prepare    <username> <password> <db_user> <db_pwd> <database> <base_path> <instance_count> <redundancy> [host]
+  deploy.sh scidb_start      <username> <database> <coordinator>
 
 Description:
   access               provide password-less ssh access to [host] for <username> with <password> by <public_key> (use "" for if you want use ~/.ssh/id_rsa.pub)
@@ -39,19 +39,22 @@ Description:
 
   scidb_install        Install SciDB packages on [host]. The required repositories for the SciDB packages are expected to be already registered on [host]. First host would considered as coordinator.
   scidb_remove         remove SciDB packages from [host]
-  scidb_prepare        prepare for running SciDB cluster on [host] (with <instance_count> on every host). First host would considered as coordinator.
-  scidb_start          start SciDB cluster asm <username> on <coordinator>"
+  scidb_prepare        prepare for running SciDB cluster on [host] (with <instance_count> on every host and <redundancy>). First host would considered the coordinator.
+  scidb_start          start SciDB cluster <database> as <username> on <coordinator>"
 EOF
 exit 1
 }
 
 # detect directory where we run
-source_path=`dirname $0`
-source_path=`readlink -f ${source_path}/../`
-SCIDB_VER=`awk -F . '{print $1"."$2}' ${source_path}/version`
+source_path=${SCIDB_SOURCE_PATH:=$(readlink -f $(dirname $0)/../)}
 bin_path=${source_path}/deployment/common
+build_path=${SCIDB_BUILD_PATH:=$(pwd)}
 echo "Source path: ${source_path}"
 echo "Script common path: ${bin_path}"
+echo "Build path: ${build_path}"
+
+SCIDB_VER=${SCIDB_VERSION:=`awk -F . '{print $1"."$2}' ${source_path}/version`}
+echo "SciDB version: ${SCIDB_VER}"
 
 SCP="scp -r -q -o StrictHostKeyChecking=no"
 SSH="ssh -o StrictHostKeyChecking=no"
@@ -70,8 +73,10 @@ log_user 1
 set timeout -1
 spawn $@
 expect {
-  eof                                   { }  
+  eof                                   { }
 }
+catch wait result
+exit [lindex \$result 3]
 EOF
 else
 expect <<EOF
@@ -80,43 +85,45 @@ set timeout -1
 spawn $@
 expect {
   "${username}@${hostname}'s password:" { send "${password}\r"; exp_continue }
-  eof                                   { }  
+  eof                                   { }
 }
+catch wait result
+exit [lindex \$result 3]
 EOF
-fi;
+fi
+if [ $? -ne 0 ]; then
+echo "Remote command failed!"
+exit 1
+fi
 }
 
 # Run command on remote host (with some prepared scripts/files)
 # 1) copy ./deployment/common to remote host to /tmp/deployment
-# 2) (If) specified files would be copied to remote host to /tmp/deployment
+# 2) (If) specified files would be copied to remote host to /tmp/${username}/deployment
 # 3) execute ${4} command on remote host
-# 4) remove /tmp/deployment from remote host
+# 4) remove /tmp/${username}/deployment from remote host
 function remote ()
 {
 local username=${1}
 local password=${2}
 local hostname=${3}
 local files=${5-""}
-remote_no_password "${username}" "${password}" "${hostname}" "${SCP} ${bin_path} ${username}@${hostname}:/tmp/deployment"
+remote_no_password "${username}" "${password}" "${hostname}" "${SSH} ${username}@${hostname}  \"rm -rf /tmp/${username}/deployment && mkdir -p /tmp/${username}\""
+remote_no_password "${username}" "${password}" "${hostname}" "${SCP} ${bin_path} ${username}@${hostname}:/tmp/${username}/deployment"
 if [ -n "${files}" ]; then
-    remote_no_password "${username}" "${password}" "${hostname}" "${SCP} ${files} ${username}@${hostname}:/tmp/deployment"
+    remote_no_password "${username}" "${password}" "${hostname}" "${SCP} ${files} ${username}@${hostname}:/tmp/${username}/deployment"
 fi;
-remote_no_password "${username}" "${password}" "${hostname}" "${SSH} ${username}@${hostname} \"cd /tmp/deployment && ${4}\""
-remote_no_password "${username}" "${password}" "${hostname}" "${SSH} ${username}@${hostname}  \"rm -rf /tmp/deployment\""
+remote_no_password "${username}" "${password}" "${hostname}" "${SSH} ${username}@${hostname} \"cd /tmp/${username}/deployment && ${4}\""
+remote_no_password "${username}" "${password}" "${hostname}" "${SSH} ${username}@${hostname}  \"rm -rf /tmp/${username}/deployment\""
 }
 
 # Provide password-less access to remote host
-# If user missed - it would be created (with specified password)
 function provide_password_less_ssh_access ()
 {
     local username=${1}
     local password="${2}"
     local key=${3}
     local hostname=${4}
-    if [ "${username}" != "root" ]; then
-	echo "Check for ${username} on ${hostname}"
-	remote root "${password}" "${hostname}" "./user_create.sh \\\"${username}\\\" \\\"${password}\\\""
-    fi;
     echo "Provide access by ~/.ssh/id_rsa.pub to ${username}@${hostname}"
     remote "${username}" "${password}" "${hostname}" "./user_access.sh \\\"${username}\\\" \\\"${key}\\\""
 }
@@ -126,9 +133,9 @@ function push_source ()
 {
     local username=${1}
     local hostname=${2}
-    local source_path=`readlink -f ${3}`
+    local source_path="${3}"
     local source_name=`basename ${source_path}`
-    local remote_path=`readlink -f ${4}`
+    local remote_path="${4}"
     local remote_name=`basename ${remote_path}`
     echo "Archive the ${source_path} to ${source_path}.tar.gz"
     rm -f ${source_path}.tar.gz
@@ -249,7 +256,7 @@ function build_scidb_packages ()
     local packages_path=`readlink -f ${1}`
     local way="${2}"
     rm -rf ${packages_path}
-    (cd ${source_path}; /bin/bash -x ./utils/make_packages.sh ${kind} ${way} ${packages_path} ${target})
+    (cd ${build_path}; ${source_path}/utils/make_packages.sh ${kind} ${way} ${packages_path} ${target})
 }
 
 # Setup ccache on remote host
@@ -261,11 +268,11 @@ function setup_ccache ()
 }
 
 # Register main SciDB repository on remote host
-function setup_main_scidb_repository()
+function register_main_scidb_repository()
 {
     local hostname=${1}
-    echo "Setup main SciDB repository on ${hostname}"
-    remote root "" ${hostname} "./setup_main_scidb_repository.sh"
+    echo "Register main SciDB repository on ${hostname}"
+    remote root "" ${hostname} "./register_main_scidb_repository.sh ${SCIDB_VER}"
 }
 
 # Stop virtual bridge on remote host
@@ -291,8 +298,8 @@ function prepare_host_for_developer ()
     local username=${1}
     local hostname=${2}
     echo "Prepare ${username}@${hostname} for developer"
-    setup_main_scidb_repository "${hostname}"
-    remote root "" ${hostname} "./prepare_toolchain.sh"
+    register_main_scidb_repository "${hostname}"
+    remote root "" ${hostname} "./prepare_toolchain.sh ${SCIDB_VER}"
     setup_ccache ${username} ${hostname}
     stop_virtual_bridge_zero "${hostname}"
 }
@@ -303,7 +310,7 @@ function prepare_chroot ()
     local username=${1}
     local hostname=${2}
     echo "Prepare for build SciDB packages in chroot on ${hostname}"
-    setup_main_scidb_repository "${hostname}"
+    register_main_scidb_repository "${hostname}"
     remote root "" ${hostname} "./prepare_chroot.sh ${username}"
     remote ${username} "" ${hostname} "./chroot_build.sh" "${source_path}/utils/chroot_build.py"
 }
@@ -314,8 +321,8 @@ function prepare_runtime ()
     local username=${1}
     local hostname=${2}
     echo "Prepare for run SciDB on ${hostname}"
-    setup_main_scidb_repository "${hostname}"
-    remote root "" ${hostname} "./prepare_runtime.sh"
+    register_main_scidb_repository "${hostname}"
+    remote root "" ${hostname} "./prepare_runtime.sh ${SCIDB_VER}"
     stop_virtual_bridge_zero "${hostname}"
 }
 
@@ -343,6 +350,7 @@ function scidb_install()
 {
     local hostname=${2}
     local with_coordinator=${3}
+    register_main_scidb_repository "${hostname}"
     configure_package_manager ${hostname} 1
     local packages_path=`readlink -f ${1}`
     if [ ${with_coordinator} -eq 1 ]; then
@@ -362,8 +370,9 @@ local password="${2}"
 local database="${3}"
 local base_path="${4}"
 local instance_count="${5}"
-local coordinator="${6}"
-shift 6
+local redundancy="${6}"
+local coordinator="${7}"
+shift 7
 echo "[${database}]"
 local coordinator_instance_count=${instance_count}
 let coordinator_instance_count--
@@ -376,11 +385,11 @@ for hostname in $@; do
 done;
 echo "db_user=${username}"
 echo "db_passwd=${password}"
+echo "redundancy=${redundancy}"
 echo "install_root=/opt/scidb/${SCIDB_VER}"
 echo "pluginsdir=/opt/scidb/${SCIDB_VER}/lib/scidb/plugins"
 echo "logconf=/opt/scidb/${SCIDB_VER}/share/scidb/log4cxx.properties"
 echo "base-path=${base_path}"
-echo "tmp-path=/tmp"
 echo "base-port=1239"
 echo "interface=eth0"
 echo "no-watchdog=false"
@@ -392,7 +401,7 @@ function scidb_prepare_node ()
     local username=${1}
     local hostname=${2}
     remote ${username} "" ${hostname} "./scidb_prepare.sh ${SCIDB_VER}"
-    remote root "" ${hostname} "cat config.ini > /opt/scidb/${SCIDB_VER}/etc/config.ini" `readlink -f ./config.ini`
+    remote root "" ${hostname} "cat config.ini > /opt/scidb/${SCIDB_VER}/etc/config.ini && chown ${username} /opt/scidb/${SCIDB_VER}/etc/config.ini" `readlink -f ./config.ini`
 }
 
 # Prepare SciDB cluster
@@ -400,29 +409,41 @@ function scidb_prepare ()
 {
     local username=${1}
     local password=${2}
-    local database=${3}
-    local base_path=${4}
-    local instance_count=${5}
-    local coordinator=${6}
-    shift 6
+    local db_user=${3}
+    local db_pwd=${4}
+    local database=${5}
+    local base_path=${6}
+    local instance_count=${7}
+    local redundancy=${8}
+    local coordinator=${9}
+    shift 9
+
+    # grab coordinator public key
     local coordinator_key="`${SSH} ${username}@${coordinator} \"cat ~/.ssh/id_rsa.pub\"`"
-    scidb_config ${username} "${password}" ${database} ${base_path} ${instance_count} ${coordinator} "$@" | tee ./config.ini
+
+    # generate config.ini locally
+    scidb_config ${db_user} "${db_pwd}" ${database} ${base_path} ${instance_count} ${redundancy} ${coordinator} "$@" | tee ./config.ini
+
+    # deposit config.ini to coordinator
+
     scidb_prepare_node ${username} ${coordinator}
     local hostname
     for hostname in $@; do
-	scidb_prepare_node ${username} ${hostname}
-	provide_password_less_ssh_access ${username} "" "${coordinator_key}" ${hostname}
+        # generate scidb environment for username
+	scidb_prepare_node ${username} ${hostname} # not ideal to modify the environment
+	provide_password_less_ssh_access ${username} "${password}" "${coordinator_key}" ${hostname}
     done;
     rm -f ./config.ini
-    remote ${username} "" ${coordinator} "./scidb_prepare_coordinator.sh ${username} \\\"${password}\\\" ${database} ${SCIDB_VER}" 
+    remote root "" ${coordinator} "./scidb_prepare_coordinator.sh ${username} ${database} ${SCIDB_VER}" 
 }
 
 # Start SciDB
 function scidb_start ()
 {
     local username=${1}
-    local coordinator=${2}
-    remote ${username} "" ${coordinator} "./scidb_start.sh ${username}"
+    local database=${2}
+    local coordinator=${3}
+    remote ${username} "" ${coordinator} "./scidb_start.sh ${database} ${SCIDB_VER}"
 }
 
 # Install & configure Apache (required for CDash on build machines)
@@ -437,9 +458,11 @@ if [ $# -lt 1 ]; then
     print_help
 fi
 
+echo "Executing: $@"
+
 case ${1} in
     access)
-	if [ $# -lt 4 ]; then
+	if [ $# -lt 5 ]; then
 	    print_help
 	fi
 	username=${2}
@@ -576,24 +599,20 @@ case ${1} in
 	done;
 	;;
     scidb_prepare)
-	if [ $# -lt 7 ]; then
+	if [ $# -lt 9 ]; then
 	    print_help
 	fi
-	username=${2}
-	password=${3}
-	database=${4}
-	base_path=${5}
-	instance_count=${6}
-	shift 6
-	scidb_prepare ${username} "${password}" ${database} ${base_path} ${instance_count} $@
+	shift 1
+	scidb_prepare $@
 	;;
     scidb_start)
-	if [ $# -lt 3 ]; then
+	if [ $# -lt 4 ]; then
 	    print_help
 	fi
 	username=${2}
-	coordinator=${3}
-	scidb_start ${username} ${coordinator}
+	database=${3}
+	coordinator=${4}
+	scidb_start ${username} ${database} ${coordinator}
 	;;
     prepare_httpd_cdash)
 	if [ $# -lt 3 ]; then

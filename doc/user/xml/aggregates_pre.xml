@@ -19,7 +19,7 @@
   <emphasis>sort</emphasis> which rearranges array data and returns a vector
   of sorted items.</para>
 
-  <section>
+  <section id="aggregateList">
     <title>Aggregates</title>
 
     <para><indexterm>
