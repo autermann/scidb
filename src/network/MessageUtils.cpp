@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@
 #include <boost/make_shared.hpp>
 
 #include "network/MessageUtils.h"
-#include "query/parser/ParsingContext.h"
+#include "query/ParsingContext.h"
 
 using namespace boost;
 
@@ -47,7 +47,7 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
     boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
     errorMessage->setQueryID(queryID);
-    
+
     errorRecord->set_file(e.getFile());
     errorRecord->set_function(e.getFunction());
     errorRecord->set_line(e.getLine());
@@ -70,7 +70,7 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     {
         errorRecord->set_type(3);
         const shared_ptr<ParsingContext> &ctxt = ((const UserQueryException&) e).getParsingContext();
-        ::scidb_msg::Error_ParsingContext *mCtxt = errorRecord->mutable_parsing_context(); 
+        ::scidb_msg::Error_ParsingContext *mCtxt = errorRecord->mutable_parsing_context();
         mCtxt->set_query_string(ctxt->getQueryString());
         mCtxt->set_line_start(ctxt->getLineStart());
         mCtxt->set_col_start(ctxt->getColStart());
@@ -101,7 +101,7 @@ boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID)
 static bool parseInstanceList(shared_ptr<InstanceLiveness>& queryLiveness,
                           const scidb_msg::PhysicalPlan_InstanceList& instanceList,
                           const bool isDeadList)
-            
+
 {
    assert(queryLiveness);
 

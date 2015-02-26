@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -296,6 +296,21 @@ void PhysicalOperator::dumpArrayToLog(shared_ptr<Array> const& input, log4cxx::L
             ++(*aiters[i]);
         }
     }
+}
+
+shared_ptr<Array> PhysicalOperator::ensureRandomAccess(shared_ptr<Array>& input, shared_ptr<Query>const& query)
+{
+    if (input->getSupportedAccess() == Array::RANDOM)
+    {
+        return input;
+    }
+    LOG4CXX_DEBUG(logger, "Query "<<query->getQueryID()<<
+                          " op "<<getPhysicalName()<<
+                          " materializing input "<<input->getArrayDesc());
+    bool vertical = (input->getSupportedAccess() == Array::MULTI_PASS);
+    shared_ptr<MemArray> memCopy(new MemArray(input, query, vertical));
+    input.reset();
+    return memCopy;
 }
 
 /*

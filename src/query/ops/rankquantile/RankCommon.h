@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -1015,9 +1015,13 @@ public:
                        size_t chunkID):
        DelegateChunkIterator(sourceChunk, ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS),
        _pRCChunk(pRCChunk), _chunkID(chunkID),
-       _outputValue(TypeLibrary::getType(TID_DOUBLE))
+       _outputValue(TypeLibrary::getType(TID_DOUBLE)),
+       _validPosToLocInRow(false),
+       _locInRow2D(2)
     {
-        _rcIterator = boost::shared_ptr<RIChunk>(_pRCChunk->openRow(_pRCChunk->rowIdFromExistingGroup(_chunkID)));
+        size_t rowId = _pRCChunk->rowIdFromExistingGroup(_chunkID);
+        _rcIterator = boost::shared_ptr<RIChunk>(_pRCChunk->openRow(rowId));
+        _locInRow2D[0] = rowId;
     }
 
     virtual ~GroupbyRankChunkIterator()
@@ -1040,14 +1044,55 @@ public:
         return _outputValue;
     }
 
+    /**
+     * setPosition
+     *
+     * @param pos a position in the space of the input array (e.g. it could have many dimensions)
+     * @see ConstChunkIterator::setPosition()
+     *
+     * The function essentially changes the _locInRow variable stored in RowIterator _rcIterator.
+     * The _locInRow variable is a sequence number of pos, if the input chunk is scanned from beginning until pos.
+     * To support finding this sequence number, the first time setPosition() is called, we scan the input chunk
+     * and build a map from pos to sequence number.
+     *
+     */
     virtual bool setPosition(const Coordinates& pos) {
-        assert(false);
-        return false;
+        // Did some one call setPosition at the current position?
+        if (coordinatesCompare(pos, getPosition()) == 0) {
+            return true;
+        }
+
+        // The first time setPosition is called, build a map that supports subsequent calls to setPosition.
+        if (!_validPosToLocInRow) {
+            _validPosToLocInRow = true;
+
+            // store a copy of the inputIterator's current pos
+            Coordinates posInInput = inputIterator->getPosition();
+
+            // Scan inputIterator and build the map _posToLocInRow
+            inputIterator->reset();
+            size_t locInRow = 0;
+            while (!inputIterator->end()) {
+                _posToLocInRow.insert(std::pair<Coordinates, size_t>(inputIterator->getPosition(), locInRow));
+                ++locInRow;
+                ++(*inputIterator);
+            }
+
+            // restore inputIterator's current pos
+            inputIterator->setPosition(posInInput);
+        }
+
+        // call RowIterator::setPosition()
+        boost::unordered_map<Coordinates, size_t>::const_iterator it = _posToLocInRow.find(pos);
+        if ( it == _posToLocInRow.end()) {
+            return false;
+        }
+        _locInRow2D[1] = it->second;
+        return _rcIterator->setPosition(_locInRow2D);
     }
 
     virtual void reset() {
-        assert(false);
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "GroupbyRankChunkIterator::reset()";
+        _rcIterator->reset();
     }
 
     virtual bool end() {
@@ -1059,6 +1104,20 @@ protected:
     size_t _chunkID;
     Value _outputValue;
     boost::shared_ptr<RIChunk> _rcIterator;
+
+    // _posToLocInRow is used to turn a Coordinates to RowIterator::_locInRow,
+    // which is needed to call RowIterator::setPosition()
+    boost::unordered_map<Coordinates, size_t> _posToLocInRow;
+
+    // _validPosToLocInRow indicates whether _posToLocInRow has been computed.
+    // It is computed in the first call of setPosition().
+    bool _validPosToLocInRow;
+
+    // _locInRow2D is used to support setPosition.
+    // It is a 2D coordinates, where:
+    //   - the row is fixed as rowId in the RowCollection
+    //   - the column is the desired RowIterator::_posInRow
+    Coordinates _locInRow2D;
 };
 
 /**
@@ -1077,9 +1136,9 @@ protected:
 public:
     GroupbyRankArray (ArrayDesc const& desc,
                boost::shared_ptr<Array> const& inputArray,
-               boost::shared_ptr<RCChunk>& pRCChunk,
-               AttributeID inputAttributeID,
-               boost::shared_ptr<MapChunkPosToID>& mapChunkPosToID
+               boost::shared_ptr<RCChunk>const& pRCChunk,
+               AttributeID const& inputAttributeID,
+               boost::shared_ptr<MapChunkPosToID> const& mapChunkPosToID
                ):
         DelegateArray(desc, inputArray),
         _pRCChunk(pRCChunk),

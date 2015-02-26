@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,7 +33,6 @@
 #include "query/ops/subarray/SubArray.h"
 #include "network/NetworkManager.h"
 
-
 namespace scidb {
 
 class PhysicalSubArray: public  PhysicalOperator
@@ -43,7 +42,8 @@ public:
              PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
-   inline Coordinates getWindowStart(ArrayDesc const& inputSchema, const boost::shared_ptr<Query>& query) const
+    //Return the starting coordinates of the subarray window, relative to the input schema
+    inline Coordinates getWindowStart(ArrayDesc const& inputSchema) const
     {
         Dimensions const& dims = inputSchema.getDimensions();
         size_t nDims = dims.size();
@@ -75,7 +75,8 @@ public:
         return result;
     }
 
-   inline Coordinates getWindowEnd(ArrayDesc const& inputSchema, const boost::shared_ptr<Query>& query) const
+    //Return the ending coordinates of the subarray window, relative to the input schema
+    inline Coordinates getWindowEnd(ArrayDesc const& inputSchema) const
     {
         Dimensions const& dims = inputSchema.getDimensions();
         size_t nDims = dims.size();
@@ -107,35 +108,54 @@ public:
         return result;
     }
 
-    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
+    /**
+     * @see PhysicalOperator::changesDistribution
+     */
+    virtual bool changesDistribution(std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return true;
+        //If the entire schema is inside the window - we don't change the distribution.
+        //Some packages (ahem) like to use subarray(A, null, null, null, null) often to recenter the array at 0,
+        //and that does not need an SG.
+        ArrayDesc const& inputSchema = inputSchemas[0];
+        Coordinates const windowStart = getWindowStart(inputSchema);
+        Coordinates const windowEnd = getWindowEnd(inputSchema);
+        size_t const nDims = windowStart.size();
+        Dimensions const& dims = inputSchema.getDimensions();
+        for (size_t i =0; i<nDims; ++i)
+        {
+            DimensionDesc const& dim = dims[i];
+            if( windowStart[i] > dim.getStartMin() || windowEnd[i] < dim.getEndMax())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
+    /**
+     * @see PhysicalOperator::outputFullChunks
+     */
     virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
     {
-        shared_ptr<Query> query(Query::getValidQueryPtr(PhysicalOperator::_query));
         ArrayDesc const& input = inputSchemas[0];
-        Coordinates windowStart = getWindowStart(input, query);
-        Coordinates windowEnd = getWindowEnd(input, query);
-
+        Coordinates windowStart = getWindowStart(input);
+        Coordinates windowEnd = getWindowEnd(input);
         if ( input.coordsAreAtChunkStart(windowStart) &&
              input.coordsAreAtChunkEnd(windowEnd) )
         {
             return true;
         }
-
         return false;
     }
 
+    //return the delta between the subarray window origin and the input array origin
     virtual DimensionVector getOffsetVector(const std::vector< ArrayDesc> & inputSchemas) const
     {
         ArrayDesc const& desc = inputSchemas[0];
         Dimensions const& inputDimensions = desc.getDimensions();
         size_t numCoords = inputDimensions.size();
         DimensionVector result(numCoords);
-        shared_ptr<Query> query(Query::getValidQueryPtr(PhysicalOperator::_query));
-        Coordinates windowStart = getWindowStart(inputSchemas[0], query);
+        Coordinates windowStart = getWindowStart(inputSchemas[0]);
 
         for (size_t i = 0; i < numCoords; i++)
         {
@@ -146,14 +166,22 @@ public:
         return result;
     }
 
+    /**
+     * @see PhysicalOperator::getOutputDistribution
+     */
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
+        if (!changesDistribution(inputSchemas))
+        {
+            return inputDistributions[0];
+        }
         DimensionVector offset = getOffsetVector(inputSchemas);
         boost::shared_ptr<DistributionMapper> distMapper;
         ArrayDistribution inputDistro = inputDistributions[0];
-
-        if (inputDistro.isUndefined())
+        if (inputDistro.isUndefined() ||
+            inputDistro.getPartitioningSchema() == psScaLAPACK ||
+            inputDistro.getPartitioningSchema() == psGroupby)
         {
             return ArrayDistribution(psUndefined);
         }
@@ -172,13 +200,15 @@ public:
         }
     }
 
+    /**
+     * @see PhysicalOperator::getOutputBoundaries
+     */
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                    const std::vector< ArrayDesc> & inputSchemas) const
     {
         size_t nDims = _schema.getDimensions().size();
-        shared_ptr<Query> query(Query::getValidQueryPtr(PhysicalOperator::_query));
-        PhysicalBoundaries window(getWindowStart(inputSchemas[0], query),
-                                  getWindowEnd(inputSchemas[0], query));
+        PhysicalBoundaries window(getWindowStart(inputSchemas[0]),
+                                  getWindowEnd(inputSchemas[0]));
         PhysicalBoundaries result = inputBoundaries[0].intersectWith(window);
 
         if (result.isEmpty())
@@ -196,29 +226,24 @@ public:
         return PhysicalBoundaries(newStart, newEnd, result.getDensity());
     }
 
-        /***
-         * SubArray is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-         * that overrides the chunkiterator method.
-         */
+    /**
+     * @see PhysicalOperator::execute
+     */
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
                                       boost::shared_ptr< Query> query)
     {
         assert(inputArrays.size() == 1);
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
+        shared_ptr<Array> input = ensureRandomAccess(inputArrays[0], query);
 
-        boost::shared_ptr< Array> array = inputArrays[0];
-        ArrayDesc const& desc = array->getArrayDesc();
+        ArrayDesc const& desc = input->getArrayDesc();
         Dimensions const& srcDims = desc.getDimensions();
         size_t nDims = srcDims.size();
         
         /***
          * Fetch and calculate the subarray window
          */
-        Coordinates lowPos = getWindowStart(desc, query);
-        Coordinates highPos = getWindowEnd(desc, query);
+        Coordinates lowPos = getWindowStart(desc);
+        Coordinates highPos = getWindowEnd(desc);
         for(size_t i=0; i<nDims; i++)
         {
             if (lowPos[i] > highPos[i]) {
@@ -228,7 +253,7 @@ public:
         /***
          * Create an iterator-based array implementation for the operator
          */
-        boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, inputArrays[0],query));
+        boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, input, query));
         return arr;
     }
 };

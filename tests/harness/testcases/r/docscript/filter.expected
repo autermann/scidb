@@ -7,5 +7,11 @@ SCIDB QUERY : <store(build(m4x4,iif(i=j,100+i,i*4+j)),m4x4)>
 SCIDB QUERY : <filter(m4x4,val<100)>
 [[(),(1),(2),(3)],[(4),(),(6),(7)],[(8),(9),(),(11)],[(12),(13),(14),()]]
 
+SCIDB QUERY : <filter(list('operators'),regex(name,'(.*)z(.*)'))>
+name,library
+'analyze','scidb'
+'materialize','scidb'
+'normalize','scidb'
+
 Query was executed successfully
 

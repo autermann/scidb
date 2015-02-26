@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -298,7 +298,7 @@ namespace scidb
   size_t DictionaryEncoding::decompress(void const* src, size_t size, Chunk& chunk)
   {
     size_t chunkSize = chunk.getSize();
-    uint8_t* dst = (uint8_t *)chunk.getData();
+    uint8_t* dst = (uint8_t *)chunk.getDataForLoad();
     ByteInputItr in((uint8_t *) src, size);
     uint32_t i;
     uint32_t code = 0;
@@ -346,7 +346,7 @@ namespace scidb
     
 
 
-    return dst - (uint8_t *) chunk.getData();
+    return dst - (uint8_t *) chunk.getDataForLoad();
 	    
   } // end decompress
 

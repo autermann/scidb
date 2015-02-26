@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -59,7 +59,7 @@ public:
     {
         return inputBoundaries[0];
     }
-    
+
     int64_t getSourceInstanceID() const
     {
         if (_parameters.size() >= 2)
@@ -96,17 +96,17 @@ public:
         assert(_parameters.size() >= 1);
 
         assert(_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
-        const string& fileName = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+        const string fileName = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
         string format = "store";
         if (_parameters.size() >= 3) {
             format = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getString();
         }
         InstanceID sourceInstanceID = getSourceInstanceID();
-        if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) { 
+        if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) {
             sourceInstanceID = query->getCoordinatorInstanceID();
         }
         InstanceID myInstanceID = query->getInstanceID();
-        if (sourceInstanceID == ALL_INSTANCES_MASK || sourceInstanceID == myInstanceID) { 
+        if (sourceInstanceID == ALL_INSTANCES_MASK || sourceInstanceID == myInstanceID) {
             DBLoader::defaultPrecision = Config::getInstance()->getOption<int>(CONFIG_PRECISION);
             DBLoader::save(*inputArrays[0], fileName, query, format);
         }

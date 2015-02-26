@@ -24,12 +24,12 @@ SCIDB QUERY : <show(A2)>
 {i} schema
 {0} 'A2<val1:double,val2:int64,val3:string,val4:int64> [x=0:3,2,0,y=0:3,2,0]'
 
-SCIDB QUERY : <ApproxDC(A1)>
-{i} val1_adc
+SCIDB QUERY : <aggregate(A1,approxdc(val1))>
+{i} val1_ApproxDC
 {0} 0
 
-SCIDB QUERY : <ApproxDC(A2)>
-{i} val1_adc
+SCIDB QUERY : <aggregate(A2,approxdc(val1))>
+{i} val1_ApproxDC
 {0} 7
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val1))>

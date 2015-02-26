@@ -5,7 +5,7 @@
 create array quantile3dtmp <x:int64, y:int64, z:int64, a:int64>[dummy=0:*,1,0]
 create array quantile3d <a:int64 null> [x=0:1,1,0, y=0:3,2,0, z=0:3,2,0]
 load(quantile3dtmp, '../tests/harness/testcases/data/quantile_3d.txt')
-redimension_store(quantile3dtmp, quantile3d)
+store(redimension(quantile3dtmp, quantile3d), quantile3d)
 --reset-format
 
 --test

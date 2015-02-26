@@ -11,7 +11,7 @@ CREATE ARRAY m3x3 <val:double>[i=0:2,3,0,j=0:2,3,0]
 store(build(m3x3,random()%10),m3x3)  
 --stop-igdata
 --start-igdata
-var(m3x3,val,i)  
+aggregate(m3x3,var(val),i)  
 --stop-igdata
 
 --stop-query-logging

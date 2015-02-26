@@ -3,7 +3,7 @@ create array dense <a: double > [x=0:5,3,0, y=0:5,3,0]
 load(dense,'../tests/harness/testcases/data/dense.txt')
 
 --test
-min(dense, a)
+aggregate(dense, min(a))
 
 --cleanup
 remove (dense)

@@ -30,9 +30,9 @@ scan(B)
 insert(repart(D,<val:double> [x=0:3,2,0]),B)
 insert(repart(D,<sal:double> [x=0:3,2,0]),B)
 insert(subarray(A,2,3),B)
-count(versions(A))
+aggregate(versions(A),count(*))
 insert(filter(A,true),B)
-count(versions(B))
+aggregate(versions(B),count(*))
 
 
 --cleanup

@@ -1,7 +1,7 @@
 SCIDB QUERY : <create array a<x:double>[s(string)=10,10,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(join(build(<s:string>[i=1:10,10,0],i),build(<x:double>[i=1:10,10,0],0)),a)>
+SCIDB QUERY : <store(redimension(join(build(<s:string>[i=1:10,10,0],i),build(<x:double>[i=1:10,10,0],0)),a),a)>
 {s} x
 {'1'} 0
 {'10'} 0
@@ -49,7 +49,7 @@ SCIDB QUERY : <avg(b)>
 {i} x_avg
 {0} null
 
-SCIDB QUERY : <cross(a,sum(a))>
+SCIDB QUERY : <cross_join(a,sum(a))>
 {s,i} x,x_sum
 {'1',0} 0,0
 {'10',0} 0,0
@@ -62,7 +62,7 @@ SCIDB QUERY : <cross(a,sum(a))>
 {'8',0} 0,0
 {'9',0} 0,0
 
-SCIDB QUERY : <cross(a,aggregate(b,sum(x)))>
+SCIDB QUERY : <cross_join(a,aggregate(b,sum(x)))>
 {s,i} x,x_sum
 {'1',0} 0,0
 {'10',0} 0,0
@@ -75,7 +75,7 @@ SCIDB QUERY : <cross(a,aggregate(b,sum(x)))>
 {'8',0} 0,0
 {'9',0} 0,0
 
-SCIDB QUERY : <cross(a,aggregate(b,avg(x)))>
+SCIDB QUERY : <cross_join(a,aggregate(b,avg(x)))>
 {s,i} x,x_avg
 {'1',0} 0,null
 {'10',0} 0,null
@@ -88,7 +88,7 @@ SCIDB QUERY : <cross(a,aggregate(b,avg(x)))>
 {'8',0} 0,null
 {'9',0} 0,null
 
-SCIDB QUERY : <cross(a,avg(b))>
+SCIDB QUERY : <cross_join(a,avg(b))>
 {s,i} x,x_avg
 {'1',0} 0,null
 {'10',0} 0,null
@@ -114,7 +114,7 @@ SCIDB QUERY : <cross_join(a,max(b))>
 {'8',0} 0,null
 {'9',0} 0,null
 
-SCIDB QUERY : <cross(a,min(b))>
+SCIDB QUERY : <cross_join(a,min(b))>
 {s,i} x,x_min
 {'1',0} 0,null
 {'10',0} 0,null

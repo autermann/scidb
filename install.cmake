@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,13 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/ssdbgen" DESTINATION bin COMPONENT
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbLoadCsv.sh" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/splitcsv" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/loadcsv.py" DESTINATION bin COMPONENT scidb-utils)
- 
+
+#scidb-jdbc package
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/scidb4j.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/jiquery.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/example.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/jdbctest.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
+
 #scidb-dev-tools package
 install(PROGRAMS "${CMAKE_BINARY_DIR}/tests/unit/unit_tests" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestharness" DESTINATION bin COMPONENT scidb-dev-tools)
@@ -52,6 +58,7 @@ install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libcomplex${CMAKE_SHARED_LIBR
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libra_decl${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmore_math${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmisc${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libtile_integration${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfindstars${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libgroupstars${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
@@ -69,6 +76,7 @@ if (NOT WITHOUT_SERVER)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidb-prepare-db.sh" DESTINATION bin COMPONENT scidb)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/init-db.sh" DESTINATION bin COMPONENT scidb)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidb.py" DESTINATION bin COMPONENT scidb)
+    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidb_backup.py" DESTINATION bin COMPONENT scidb)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/scidb_cores" DESTINATION bin COMPONENT scidb)
 
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/data/meta.sql" DESTINATION share/scidb COMPONENT scidb)
@@ -134,6 +142,7 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo" AND NOT APPLE)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libra_decl${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmore_math${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmisc${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libtile_integration${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libgroupstars${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libfindstars${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)

@@ -22,11 +22,7 @@ Query was executed successfully
 SCIDB QUERY : <CREATE ARRAY Raw_CSVLoad_8 < attr_2 : string > [ I=0:*,4,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load ' )>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load '
-
-SCIDB QUERY : < cat ./testcases/data/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load >
+SCIDB QUERY : < cat ${TEST_DATA_DIR}/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load >
 
 SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load' )>
 {Offset} symbl,time,price,qry
@@ -81,10 +77,6 @@ SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load' )>
 {48} 'Wump','T_010',5.5,150
 {49} 'Wump','T_012',6,150
 
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_2.csv | csv2scidb -d "|" -c 10 -s 1 -p NNSSNSNS > /tmp/csv2scidb_test_2.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_2.csv | csv2scidb -d "|" -c 10 -s 1 -p NNSSNSNS > /tmp/csv2scidb_test_2.load'
-
 SCIDB QUERY : <load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load' )>
 {Offset} tax_id,gene_id,go_id,evidence,qualifier,term,pubmed_id,category
 {0} 9606,54879,'GO:0005488','IEA',null,'binding',null,'Function'
@@ -107,10 +99,6 @@ SCIDB QUERY : <load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load' )>
 {17} 9606,2,'GO:0019899','IPI',null,'enzyme binding',11435418,'Function'
 {18} 9606,2,'GO:0019959','IPI',null,'interleukin-8 binding',10880251,'Function'
 
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 > /tmp/csv2scidb_test_3.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 > /tmp/csv2scidb_test_3.load'
-
 SCIDB QUERY : <load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )>
 {Line} Probe_ID,Platform_ID,Entrez_Gene_ID,Symbol,Synonyms,Description,TaxOn_ID,Count_Gene,Count_RefSeq,Unique_to_Gene,Unique_to_Genome,Unique_to_RefSeq
 {0} '213828_x_at','HG_U133_Plus_2',100133109,'','','',9606,10,15,false,false,false
@@ -122,10 +110,6 @@ SCIDB QUERY : <load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )>
 {6} '229179_at','HG_U133_Plus_2',100288901,'','','',9606,2,4,false,false,false
 {7} '230554_at','HG_U133_Plus_2',100291873,'','','',9606,2,3,false,false,false
 {8} '214069_at','HG_U133_Plus_2',100291873,'','','',9606,3,5,false,false,false
-
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 > /tmp/csv2scidb_test_4.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_3.csv | csv2scidb -q -s 1 > /tmp/csv2scidb_test_4.load'
 
 SCIDB QUERY : <load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load' )>
 [Query was executed successfully, ignoring data output by this query.]
@@ -146,10 +130,6 @@ SCIDB QUERY : <show ( Raw_CSVLoad_4 )>
 {i} schema
 {0} 'Raw_CSVLoad_4<Probe_ID:string,Platform_ID:string,Entrez_Gene_ID:int32,Symbol:string,Synonyms:string,Description:string,TaxOn_ID:int32,Count_Gene:int32,Count_RefSeq:int32,Unique_to_Gene:bool,Unique_to_Genome:bool,Unique_to_RefSeq:bool> [Line=0:*,500000,0]'
 
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_5.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_5.load'
-
 SCIDB QUERY : <load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load' )>
 {I} attr_1
 {0} 1
@@ -157,10 +137,6 @@ SCIDB QUERY : <load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load' )>
 {2} 3
 {3} 4
 {4} 5
-
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_6.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_6.load'
 
 SCIDB QUERY : <load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load' )>
 {I} attr_1
@@ -170,10 +146,6 @@ SCIDB QUERY : <load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load' )>
 {3} 4
 {4} 5
 
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_7.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_7.load'
-
 SCIDB QUERY : <load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load' )>
 {I} attr_1
 {0} 'foo'
@@ -181,10 +153,6 @@ SCIDB QUERY : <load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load' )>
 {2} 'mug'
 {3} 'wump'
 {4} 'foobar'
-
-SCIDB QUERY : <echo ('cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_8.load')>
-{i} text
-{0} 'cat ./testcases/data/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_8.load'
 
 SCIDB QUERY : <load ( Raw_CSVLoad_8, '/tmp/csv2scidb_test_8.load' )>
 {I} attr_2

@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -378,6 +378,11 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/d
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/tests
                                                            ${CMAKE_BINARY_DIR}/tests)
+
+# Remove the actual test cases and expected results from the build area:
+# they will be accessed directly from the SVN tree.
+execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/tests/harness/testcases/t)
+execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/tests/harness/testcases/data)
 
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/version

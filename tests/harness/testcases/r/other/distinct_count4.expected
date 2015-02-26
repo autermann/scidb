@@ -38,12 +38,12 @@ SCIDB QUERY : <store(build(M4x4, a*a+b/(3.0-a-4)), M4x4)>
 {1,3} -0.5
 {1,4} -1
 
-SCIDB QUERY : <ApproxDC(A)>
-{i} a_adc
+SCIDB QUERY : <aggregate(A,approxdc(a))>
+{i} a_ApproxDC
 {0} 12
 
-SCIDB QUERY : <ApproxDC(subarray(A,0,3))>
-{i} a_adc
+SCIDB QUERY : <aggregate(subarray(A,0,3),approxdc(a))>
+{i} a_ApproxDC
 {0} 4
 
 SCIDB QUERY : <aggregate(A,ApproxDC(a))>
@@ -54,8 +54,8 @@ SCIDB QUERY : <aggregate(A,ApproxDC(a), sum(a),min(a),count(a),max(a))>
 {i} a_ApproxDC,a_sum,a_min,a_count,a_max
 {0} 12,inf,0.324273,12,inf
 
-SCIDB QUERY : <ApproxDC(M4x4)>
-{i} val_adc
+SCIDB QUERY : <aggregate(M4x4,approxdc(val))>
+{i} val_ApproxDC
 {0} 12
 
 SCIDB QUERY : <aggregate(M4x4,ApproxDC(val))>
@@ -66,8 +66,8 @@ SCIDB QUERY : <aggregate(M4x4,ApproxDC(val), sum(val),min(val),count(val),max(va
 {i} val_ApproxDC,val_sum,val_min,val_count,val_max
 {0} 12,inf,-4,16,inf
 
-SCIDB QUERY : <ApproxDC(xgrid(M4x4,2,2))>
-{i} val_adc
+SCIDB QUERY : <aggregate(xgrid(M4x4,2,2),approxdc(val))>
+{i} val_ApproxDC
 {0} 12
 
 SCIDB QUERY : <select ApproxDC(a) from A>

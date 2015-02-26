@@ -72,13 +72,13 @@
 
         <step>
           <para>Sum the values of m3x3 along dimension j. This sums the
-          columns of m3x3: <para><programlisting>AFL% sum(m3x3,val,j);  </programlisting><screen>[(9),(12),(15)]
+          columns of m3x3: <para><programlisting>AFL% aggregate(m3x3,sum(val),j);  </programlisting><screen>[(9),(12),(15)]
 </screen></para></para>
         </step>
 
         <step>
           <para>Sum the values of m3x3 along dimension i. This sums the rows
-          of m3x3: <para><programlisting>AFL% sum(m3x3,val,i);  </programlisting><screen>[(3),(12),(21)]
+          of m3x3: <para><programlisting>AFL% aggregate(m3x3,sum(val),i);  </programlisting><screen>[(3),(12),(21)]
 </screen></para></para>
         </step>
       </procedure>

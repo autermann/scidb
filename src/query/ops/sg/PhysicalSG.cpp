@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,7 +39,6 @@
 #include "array/DBArray.h"
 #include "array/DelegateArray.h"
 #include "query/QueryProcessor.h"
-#include "query/parser/ParsingContext.h"
 #include <smgr/io/Storage.h>
 
 using namespace boost;
@@ -109,12 +108,12 @@ private:
         bool rc = false;
         PartitioningSchema ps = (PartitioningSchema)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
 
-        Dimensions const& dims =  _schema.getDimensions();        
+        Dimensions const& dims =  _schema.getDimensions();
         size_t nDims = dims.size();
         Dimensions newVersionDims(nDims);
         bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(arrayName, desc, false);
         VersionID lastVersion = 0;
-        if (!arrayExists) { 
+        if (!arrayExists) {
             _lock->setLockMode(SystemCatalog::LockDesc::CRT);
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
             assert(rc);
@@ -123,7 +122,7 @@ private:
         } else {
             lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
         }
- 
+
         for (size_t i = 0; i < nDims; i++) {
             DimensionDesc const& dim = dims[i];
             newVersionDims[i] = dim;
@@ -264,9 +263,9 @@ private:
                             << baseArrayName;
                     }
                 }
-                if (srcArray->getArrayDesc().getAttributes().size() != _schema.getAttributes().size()) { 
+                if (srcArray->getArrayDesc().getAttributes().size() != _schema.getAttributes().size()) {
                     srcArray = boost::shared_ptr<Array>(new NonEmptyableArray(srcArray));
-                } 
+                }
             }
             boost::shared_ptr<Array> res = redistribute(srcArray, query, ps, arrayName, instanceID, distMapper);
             if (storeResult) {

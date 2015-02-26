@@ -8,8 +8,8 @@ create empty array D <b:string> [a(string)=3,1,0]
 create empty array E <b:string> [a(string)=3,1,0,x=0:2,3,0]
 store(build(A,x+10),A)
 store(join(build(<a:string> [x=0:2,3,0],string(x+1)),build(<a:string> [x=0:2,3,0],string(x+10))),C)
-redimension_store(C,D)
-redimension_store(C,E)
+store(redimension(C,D),D)
+store(redimension(C,E),E)
 
 --test
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_REPART_ERROR4 "store(repart(A,<b:int64> [x=0:1,3,0]),B1)"

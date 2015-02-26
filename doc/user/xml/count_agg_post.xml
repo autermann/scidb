@@ -55,8 +55,11 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
       <procedure>
         <step>
           <para>Create an array with values 1 along the diagonal of m3x3, and
-          the remaining cells empty.<para><programlisting>AFL% store(build_sparse(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],1,i=j),m3x3);
-       </programlisting><screen>[
+          the remaining cells empty.<para><programlisting>AFL% store(redimension
+        (apply
+            (build(&lt;v:double&gt;[i1=1:3,3,0,j1=1:3,3,0],1),i,iif(i1=j1,i1,null),
+         j,iif(i1=j1,j1,null)),
+      &lt;v:double&gt;[i=1:3,3,0,j=1:3,3,0]), m3x3);    </programlisting><screen>[
 [(1),(),()],
 [(),(1),()],
 [(),(),(1)]
@@ -64,7 +67,7 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
         </step>
 
         <step>
-          <para>Find the number of nonempty cells in the array:<para><programlisting>AFL% aggregate(m3x3,count(val));  </programlisting><screen>[(3)]
+          <para>Find the number of nonempty cells in the array:<para><programlisting>AFL% aggregate(m3x3,count(v));  </programlisting><screen>[(3)]
 </screen></para></para>
         </step>
       </procedure>

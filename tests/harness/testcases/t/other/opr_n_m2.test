@@ -7,7 +7,7 @@ store(build_sparse(A,x+10-y,x<>2 and x<>5),A)
 --aql update A set a=null where x=1 or x=3
 apply(A,z,a+10)
 between(A,0,1,1,2)
-cross(A,A)
+cross_join(A,A)
 cross_join(A as a1,A as a2,a1.x,a2.x)
 concat(A,A)
 filter(A,x%2=1)

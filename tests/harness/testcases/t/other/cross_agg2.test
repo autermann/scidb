@@ -12,16 +12,16 @@ store(build(a4,20*x+1),a4)
 
 
 --test
-cross(a1,a4)
+cross_join(a1,a4)
 scan(a1)
 scan(a4)
 scan(a5)
-cross(a1,regrid(a5,2,count(r)))
+cross_join(a1,regrid(a5,2,count(r)))
 # sum for the string type attribute is the concatenation of string ie "2" +(sum) "3" ="23"
-cross(a1,regrid(a5,2,sum(r)))
-cross(a1,subarray(a4,10,12))
-cross(a1,subarray(a5,10,12))
-cross(cross(a1,subarray(a5,10,12)),a1)
+cross_join(a1,regrid(a5,2,sum(r)))
+cross_join(a1,subarray(a4,10,12))
+cross_join(a1,subarray(a5,10,12))
+cross_join(cross_join(a1,subarray(a5,10,12)),a1)
 
 --cleanup
 remove(a1)

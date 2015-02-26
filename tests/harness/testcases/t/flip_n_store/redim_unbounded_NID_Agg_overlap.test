@@ -9,7 +9,7 @@ load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data1_str.txt')
 CREATE ARRAY Data < AV : double NULL DEFAULT 9.999 > [ I=0:*,4,2, J=0:*,6,2, W(string)=*,5,1 ]
 
 --set-format csv+
-redimension_store(Raw_Test_Data, Data, avg ( V ) as AV)
+store(redimension(Raw_Test_Data, Data, avg ( V ) as AV), Data)
 
 scan (Raw_Test_Data)
 scan (Data)

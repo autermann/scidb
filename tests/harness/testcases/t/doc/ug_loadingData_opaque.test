@@ -7,7 +7,7 @@
 --shell --command " csv2scidb -s 1 -p SNN < $DOC_DATA/intensity.csv > $DOC_DATA/intensity.scidb " --store
 --aql load intensityFlat from '../tests/harness/testcases/data/doc/intensity.scidb'
 --aql create array intensity <measuredIntensity:int64 null> [category(string)=3,3,0,elapsedTime=0:40000,10000,0]
-redimension_store(intensityFlat,intensity)
+store(redimension(intensityFlat,intensity),intensity)
 
 --test
 --aql SAVE intensity INTO CURRENT INSTANCE 'intensity_data.opaque' AS 'OPAQUE'

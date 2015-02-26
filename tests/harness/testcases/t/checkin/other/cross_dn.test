@@ -12,8 +12,8 @@ create array C <v:double> [I=0:99,10,0, J=0:99,10,0]
 store(build(C, I), C)
 
 --test
-cross(dense, vec)
-aggregate( apply( cross ( A, B ), vv, A.v * B.v), sum ( vv ), A.I, B.J)
+cross_join(dense, vec)
+aggregate( apply( cross_join ( A, B ), vv, A.v * B.v), sum ( vv ), A.I, B.J)
 
 aggregate(apply(cross_join(C as A, aggregate(C, avg(v) as v, I) as B, A.I, B.I), dv, B.v - A.v), sum(dv), avg(dv), count(*))
 aggregate(apply(cross_join(C as A, aggregate(C, avg(v) as v, I) as B, A.J, B.I), dv, B.v - A.v), sum(dv), avg(dv), count(*))

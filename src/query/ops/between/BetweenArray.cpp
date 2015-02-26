@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -638,7 +638,7 @@ namespace scidb
     //
     // Between array methods
     //
-    BetweenArray::BetweenArray(ArrayDesc& array, Coordinates const& from, Coordinates const& till, boost::shared_ptr<Array> input, bool tile)
+    BetweenArray::BetweenArray(ArrayDesc const& array, Coordinates const& from, Coordinates const& till, boost::shared_ptr<Array> const& input, bool const& tile)
     : DelegateArray(array, input), 
       lowPos(from), 
       highPos(till),

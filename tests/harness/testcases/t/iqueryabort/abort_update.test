@@ -37,7 +37,7 @@ subarray(ABRTEST, 0, 10)
 --igdata "insert(attribute_rename(project(apply(filter(ABRTEST, I/2 <> 0), v1, v*v), v1), v1, v), ABRTEST)"
 --igdata --aql "update ABRTEST set v=3"
 
-count(versions(ABRTEST))
+aggregate(versions(ABRTEST),count(*))
 
 --cleanup
 --stop-query-logging

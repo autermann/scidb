@@ -27,12 +27,12 @@ save(foo_null, 'foo_null.txt', -1)
 --igdata "load(foo3, 'foo_null.out', -2, '(int64 null,float null,string null)', 20)"
 --igdata "load(foo4, 'foo_null.out', -2, '(int64 null,float null,string null)', 10, foo_shadow)"
 --igdata "scan(foo_shadow)"
-count(versions(foo_shadow))
+aggregate(versions(foo_shadow),count(*))
 
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(foo6, 'foo_null.txt', -1, 'text', 1)"
 --igdata "load(foo6, 'foo_null.txt', -1, 'text', 10, foo6_shadow)"
 --igdata "scan(foo6_shadow)"
-count(versions(foo6_shadow))
+aggregate(versions(foo6_shadow),count(*))
 
 load(foo5, 'foo.out', -2, '(int32,dummy(4),string)')
 save(foo5, 'foo.out', -2, '(float,string(10))')
@@ -45,13 +45,13 @@ store(build_sparse(<a:double>[x=1:1000,100,10, y=1:1000,100,10], x, x = y and x 
 save(spa, 'spa.out', -1, 'opaque')
 load(spa2, 'spa.out', -1, 'opaque')
 store(join(build(<ra:float>[i=1:1000,100,0], i), build(<decl:float>[i=1:1000,100,0], i)), stars)
-redimension_store(stars, sky)
+store(redimension(stars, sky), sky)
 save(sky, 'sky.out', -2, 'opaque')
 load(sky2, 'sky.out', -2, 'opaque')
 --stop-igdata
 
-count(filter(sky, ra=decl))
-count(filter(sky2, ra=decl))
+aggregate(filter(sky, ra=decl),count(*))
+aggregate(filter(sky2, ra=decl),count(*))
 
 --reset-format
 save(build(<x:int64>[i=1:10,2,0], 1), 'table.dmp', -1, '(int32)')

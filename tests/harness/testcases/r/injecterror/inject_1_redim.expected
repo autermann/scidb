@@ -19,18 +19,18 @@ SCIDB QUERY : <subarray(apply (NODE_ID, foo, injectError (0, 1)),0,0)>
 {I} v,foo
 {0} 0,1
 
-SCIDB QUERY : <redimension_store(NODE_ID, NODE_ID_REDIM)>
-[An error expected at this place for the query "redimension_store(NODE_ID, NODE_ID_REDIM)". And it failed.]
+SCIDB QUERY : <store(redimension(NODE_ID, NODE_ID_REDIM), NODE_ID_REDIM)>
+[An error expected at this place for the query "store(redimension(NODE_ID, NODE_ID_REDIM), NODE_ID_REDIM)". And it failed.]
 
 SCIDB QUERY : <subarray(apply (NODE_ID, foo, injectError (1, 1)),0,1)>
 {I} v,foo
 {0} 0,-1
 {1} 1,1
 
-SCIDB QUERY : <redimension_store(NODE_ID, NODE_ID_REDIM)>
-[An error expected at this place for the query "redimension_store(NODE_ID, NODE_ID_REDIM)". And it failed.]
+SCIDB QUERY : <store(redimension(NODE_ID, NODE_ID_REDIM), NODE_ID_REDIM)>
+[An error expected at this place for the query "store(redimension(NODE_ID, NODE_ID_REDIM), NODE_ID_REDIM)". And it failed.]
 
-SCIDB QUERY : <count(NODE_ID_REDIM)>
+SCIDB QUERY : <aggregate(NODE_ID_REDIM,count(*))>
 {i} count
 {0} 0
 

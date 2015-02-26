@@ -20,12 +20,12 @@ create array NODE_ID_REDIM <v : int64> [I=0:7,2,0]
 
 # coordinator
 subarray(apply (NODE_ID, foo, injectError (0, 1)),0,0)
---error "redimension_store(NODE_ID, NODE_ID_REDIM)"
+--error "store(redimension(NODE_ID, NODE_ID_REDIM), NODE_ID_REDIM)"
 # node1
 subarray(apply (NODE_ID, foo, injectError (1, 1)),0,1)
---error "redimension_store(NODE_ID, NODE_ID_REDIM)"
+--error "store(redimension(NODE_ID, NODE_ID_REDIM), NODE_ID_REDIM)"
 
-count(NODE_ID_REDIM)
+aggregate(NODE_ID_REDIM,count(*))
 
 --cleanup
 remove(NODE_ID)

@@ -38,7 +38,7 @@ SCIDB QUERY : <between(B,1000,0,5001,5001)>
 SCIDB QUERY : <join(subarray(A,0,0,2500,2500),subarray(A,0,1,2500,2500))>
 [[]]
 
-SCIDB QUERY : <count(join(subarray(A,0,0,2500,2500),subarray(A,0,1,2500,2500)))>
+SCIDB QUERY : <aggregate(join(subarray(A,0,0,2500,2500),subarray(A,0,1,2500,2500)),count(*))>
 {0}[{0}(0)]
 
 SCIDB QUERY : <store(join(subarray(A,0,0,2500,2500),subarray(A,0,1,2500,2500)),AAA)>
@@ -62,7 +62,7 @@ SCIDB QUERY : <store(between(B,0,0,5,5),Bbetw)>
 SCIDB QUERY : <concat(between(A,0,0,5,5),Bbetw)>
 [An error expected at this place for the query "concat(between(A,0,0,5,5),Bbetw)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT.]
 
-SCIDB QUERY : <count(join(C,C))>
+SCIDB QUERY : <aggregate(join(C,C),count(*))>
 {0}[{0}(3)]
 
 SCIDB QUERY : <subarray(C,1,1,1,10000,10000,10000)>

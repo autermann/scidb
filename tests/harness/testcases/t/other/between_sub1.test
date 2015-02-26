@@ -13,10 +13,10 @@ store(build_sparse(B, x+100*y, (x=-10 and y=0) or (x=100 and y=100)),B)
 
 
 --test
-count(A)
+aggregate(A,count(*))
 between(A,171,261,191,281)
 between(A,0,0,10,100)
-count(B)
+aggregate(B,count(*))
 between(B,-10,0,100,100)
 between(B,-10,0,100,0)
 between(B,-10,50,0,99)
@@ -45,13 +45,13 @@ slice(B,y,99)
 
 store(between(A,171,261,191,281),XXX)
 store(subarray(A,171,261,191,281),ZZZ)
-count(store(between(A,171,261,191,281),XXX))
-count(store(subarray(A,171,261,191,281),ZZZ))
+aggregate(store(between(A,171,261,191,281),XXX),count(*))
+aggregate(store(subarray(A,171,261,191,281),ZZZ),count(*))
 show(XXX)
 show(ZZZ)
-count(XXX)
-count(ZZZ)
-count(subarray(A,171,261,191,281))
+aggregate(XXX,count(*))
+aggregate(ZZZ,count(*))
+aggregate(subarray(A,171,261,191,281),count(*))
 
 
 --cleanup

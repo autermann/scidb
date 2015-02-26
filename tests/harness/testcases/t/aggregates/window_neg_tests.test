@@ -4,7 +4,7 @@ create array A1 < v : double null > [ x=0:9,5,0, y=0:9,5,0 ]
 create array A2 < v : double null > [ x=0:9,5,2, y=0:9,5,2 ]
 
 store(build_sparse( A1, x+10*y, x <> y ), A1 )
-redimension_store  ( A1, A2 )
+store(redimension( A1, A2 ), A2 )
 
 --test
 --error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST "window ( Array_Does_Not_Exist, 1, 1, sum ( v ) )"

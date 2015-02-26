@@ -9,7 +9,8 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>load(<replaceable>output_array</replaceable>,<replaceable>input_file, instance_id, format</replaceable><optional>,<optional><replaceable>max_errors, shadow_array</replaceable></optional></optional>)</synopsis>
+    <synopsis>load(<replaceable> output_array</replaceable>, <replaceable>input_file</replaceable>
+             <optional>, <replaceable>instance_id</replaceable>,<replaceable> format</replaceable>, <replaceable>max_errors</replaceable>, <replaceable>shadow_array</replaceable></optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -33,24 +34,25 @@
 
     <itemizedlist>
       <listitem>
-        <para><emphasis role="bold">output_array</emphasis>: the name of a
-        SciDB array to hold the data.</para>
+        <para><emphasis>output_array</emphasis>: the name of a SciDB array to
+        hold the data.</para>
       </listitem>
 
       <listitem>
-        <para>i<emphasis role="bold">nput_file</emphasis>: the complete path
-        to the file that contains the source data for the array.</para>
+        <para><emphasis>input_file</emphasis>: the complete path to the file
+        that contains the source data for the array.</para>
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">instance_id</emphasis>: specifies the
-        instance or instances for performing the load. The value must be one
-        of the following:</para>
+        <para><emphasis>instance_id</emphasis>: <emphasis
+        role="bold">Optional.</emphasis> Specifies the instance or instances
+        for performing the load. The default is to load all data from the
+        coordinator instance. The value must be one of the following:</para>
 
         <itemizedlist>
           <listitem>
             <para><emphasis role="bold">-2</emphasis>: Load all data using the
-            coordinator instance of the query.</para>
+            coordinator instance of the query. This is the default.</para>
           </listitem>
 
           <listitem>
@@ -68,8 +70,10 @@
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">format</emphasis>: the format string
-        depends on the type of file that you are loading.<itemizedlist>
+        <para><emphasis>format</emphasis>: <emphasis
+        role="bold">Optional.</emphasis> The default is to load data from a
+        SciDB-formatted text file. The format string depends on the type of
+        file that you are loading.<itemizedlist>
             <listitem>
               <para><emphasis role="bold">Binary load:</emphasis> If you are
               loading binary data, the load <literal>operator</literal> uses
@@ -85,28 +89,29 @@
             </listitem>
 
             <listitem>
-              <para><emphasis role="bold">SciDB-Formatted text
+              <para><emphasis role="bold">SciDB-formatted text
               load:</emphasis> If your text file is in SciDB format, use the
-              string <command>text</command> or
-              <command>TEXT</command>.</para>
+              string <command>text</command> or <command>TEXT</command>. This
+              is the default.</para>
             </listitem>
           </itemizedlist></para>
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">max_errors</emphasis>: an optional
-        parameter to specify the limit of errors before the operator will
-        fail. The default value is 0, meaning that if any errors are
-        encountered, the operation will fail.</para>
+        <para><emphasis>max_errors</emphasis>: <emphasis
+        role="bold">Optional.</emphasis> Specifies the limit of errors before
+        the operator will fail. The default value is 0, meaning that if any
+        errors are encountered, the operation will fail.</para>
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">shadow_array</emphasis>: an optional
-        parameter for specifying a "shadow array." This is a mechanism by
-        which you can keep track of errors while still loading the error-free
-        values. The schema of shadow array is the same as output array, except
-        that each attribute becomes a string data type. The shadow array also
-        contains an additional attribute: <emphasis
+        <para><emphasis>shadow_array</emphasis>: <emphasis
+        role="bold">Optional.</emphasis> Specifies a "shadow array"—SciDB
+        writes this array into the array name that you provide. This is a
+        mechanism by which you can keep track of errors while still loading
+        the error-free values. The schema of the shadow array is the same as
+        output array, except that each attribute becomes a string data type.
+        The shadow array also contains an additional attribute: <emphasis
         role="bold">row_offset</emphasis>. The row_offset attribute contains a
         position in the file where an error was detected.</para>
       </listitem>

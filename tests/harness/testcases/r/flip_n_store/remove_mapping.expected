@@ -17,7 +17,7 @@ SCIDB QUERY : <store(build(Foo, i + 10), Foo)>
 SCIDB QUERY : <create empty array Foo_Flipped<i:int64>[x(double)=*,10,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(Foo, Foo_Flipped)>
+SCIDB QUERY : <store(redimension(Foo, Foo_Flipped), Foo_Flipped)>
 {x} i
 {11} 1
 {12} 2

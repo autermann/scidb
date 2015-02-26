@@ -117,7 +117,7 @@
  --show-query=no
  --show-output=no
 
---afl redimension_store(aFlat,A)
+--afl store(redimension(aFlat,A),A)
  --show-query=no
  --show-output=no
 
@@ -143,7 +143,7 @@
  --show-query=no
  --show-output=no
 
---afl redimension_store(bFlat,B)
+--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 
@@ -153,7 +153,7 @@
  --show-query=yes
  --show-output=no
 
---afl redimension_store(bFlat,B)
+--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 </programlisting></para>
@@ -212,7 +212,7 @@
     <para>Continuing with the preceding example, here are the contents of A
     and B before the insert operation:</para>
 
-    <para><programlisting lang="test" language="test">--afl redimension_store(aFlat,A)
+    <para><programlisting lang="test" language="test">--afl store(redimension(aFlat,A),A)
  --show-query=no
  --show-output=no
 
@@ -222,7 +222,7 @@
  --show-output=yes
  --show-query=yes
 
---afl redimension_store(bFlat,B)
+--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 
@@ -291,7 +291,7 @@
  --show-query=no
  --show-output=no
 
---afl redimension_store(cFlat,C)
+--afl store(redimension(cFlat,C),C)
  --show-query=no
  --show-output=no
 
@@ -310,7 +310,7 @@
     one of C's attributes from the source of the insert statement, as
     follows:</para>
 
-    <para><programlisting lang="test" language="test">--afl redimension_store(bFlat,B)
+    <para><programlisting lang="test" language="test">--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 
@@ -332,7 +332,7 @@
     data from an attribute named value2 into array B, whose sole attribute is
     named value:</para>
 
-    <para><programlisting lang="test" language="test">--afl redimension_store(bFlat,B)
+    <para><programlisting lang="test" language="test">--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 
@@ -359,7 +359,7 @@
     you are not limited to a select statement. Alternative syntax lets you use
     an array literal, as in the following command:</para>
 
-    <para><programlisting lang="test" language="test">--afl redimension_store(bFlat,B)
+    <para><programlisting lang="test" language="test">--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 
@@ -399,7 +399,7 @@
     language="test">--aql UPDATE m4x4 SET val=-pow(val,-1) WHERE abs(val) &gt; 5; --output-format=dense --chunkify=yes</programlisting></para>
   </section>
 
-  <section>
+  <section id="arrayVersions">
     <title>Array Versions</title>
 
     <para><indexterm>
@@ -414,9 +414,10 @@
         <secondary>arrays</secondary>
       </indexterm>When an array is updated, a new array version is created.
     SciDB stores the array versions. For example, in the previous section,
-    SciDB stored every version of m4x4 created by the <code>
-    <command>UPDATE</command> </code> command. You can see these versions with
-    <code>versions</code>:<programlisting language="test">--afl versions(m4x4); --show-output-in-test-file=no</programlisting>You
+    SciDB stored every version of m4x4 created by the
+    <code><command>UPDATE</command></code> command. Use the
+    <code>version()</code> operator to see a list of the existing versions for
+    an array:<programlisting language="test">--afl versions(m4x4); --show-output-in-test-file=no</programlisting>You
     can see the contents of any previous version of the array by using the
     version number:<programlisting language="test">--afl scan(m4x4@1); --show-output-in-test-file=no --output-format=dense --chunkify=yes</programlisting>Or
     the array timestamp:<programlisting>AQL% <command>SELECT</command> * <command>FROM</command> scan(m4x4@datetime('2012-11-19 1:20:50'));</programlisting><screen>[
@@ -429,5 +430,42 @@
     <para>You can use the array version name in any query. The unqualified
     name of the array always refers to the most recent version as of the start
     of the query.</para>
+  </section>
+
+  <section>
+    <title>Deleting Array Versions</title>
+
+    <para><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>deleting versions</secondary>
+      </indexterm>You can remove array versions, and keep only one version of
+    an array. This can be useful if need to recover disk space.</para>
+
+    <para>Let's say you have 5 versions of array <emphasis
+    role="bold">stocks</emphasis>:<programlisting language="test">--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],1),stocks); --show-query=no --show-output=no
+--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],2),stocks); --show-query=no --show-output=no
+--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],3),stocks); --show-query=no --show-output=no
+--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],4),stocks); --show-query=no --show-output=no
+--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],5),stocks); --show-query=no --show-output=no
+--afl project(versions(stocks), version_id); --output-format=dcsv</programlisting></para>
+
+    <para>If you want to keep only the latest version of the array, you can
+    perform the following steps to remove all other versions:<programlisting
+    language="test">--afl store(stocks,stocks_tmp); --show-output=no
+--afl remove(stocks); --show-output=no
+--afl rename(stocks_tmp,stocks); --show-output=no</programlisting></para>
+
+    <para>To verify, use the <code>versions()</code> operator
+    again:<programlisting language="test">--afl project(versions(stocks), version_id); --output-format=dcsv</programlisting></para>
+
+    <para>To keep one of the intermediate versions of <emphasis
+    role="bold">stocks</emphasis>, rather than the latest, use the version
+    syntax when specifying the array in the <code>store()</code> query. For
+    example, to save the second version of <emphasis
+    role="bold">stocks</emphasis>, you would run the following
+    query:<programlisting language="test">--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],2),stocks); --show-query=no --show-output=no
+--afl store(build(&lt;price:double&gt;[index=0:99,20,0, day_offset=0:30,31,0],3),stocks); --show-query=no --show-output=no
+--afl store(stocks@2,stocks_tmp); --show-output=no</programlisting></para>
   </section>
 </chapter>

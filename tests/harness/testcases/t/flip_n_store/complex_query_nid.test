@@ -10,37 +10,37 @@ store(apply(store(build(normal,13.5*6/x),normal),a2,a1*0.233),normal1)
 
 --test
 scan(normal1)
-redimension_store(normal1,NID)
+store(redimension(normal1,NID),NID)
 scan(NID)
-redimension_store(reverse(normal1),NID)
+store(redimension(reverse(normal1),NID),NID)
 scan(NID)
 show(NID)
 apply(apply(NID,y,a1),z,a2)
 regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z))
 xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)
-cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1))
-store(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),AAA)
+cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1))
+store(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),AAA)
 show(AAA)
-project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum)
-between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2)
+project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum)
+between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2)
 
-subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2)
-store(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),TTT)
+subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2)
+store(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),TTT)
 show(TTT)
-count(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i))
+aggregate(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i),count(*))
 
-unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i)
+unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i)
 
-store(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i),VVV)
+store(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i),VVV)
 show(VVV)
 
-filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i>4)
+filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i>4)
 
-filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3)
+filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3)
 
 ##### Here is what i find doubtful: Please see for it.
 
-store(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),MMM)
+store(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),MMM)
 show(MMM)
 scan(MMM)
 project(MMM,a1)
@@ -50,16 +50,16 @@ project(MMM,a2_2)
 project(MMM,x)
 project(MMM,z_sum)
 
-project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),z_sum)
+project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),z_sum)
 
-project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),x)
+project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),x)
 
 ### Why does it throw ambiguous error for a1,a2 when i have attributes as a1,a2,a1_2,a2_2,x,z_sum?
 ### same complex query when stored in MMM is giving the correct result.
 
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE "project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)"
 
---error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)"
+--error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)"
 
 
 

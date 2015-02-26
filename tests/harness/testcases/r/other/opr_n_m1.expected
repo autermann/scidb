@@ -35,7 +35,7 @@ SCIDB QUERY : <between(A,0,1,1,2)>
 {1,1} null
 {1,2} null
 
-SCIDB QUERY : <cross(A,A)>
+SCIDB QUERY : <cross_join(A,A)>
 {x,y,x,y} a,a
 {0,0,0,0} 10,10
 {0,0,0,1} 10,11

@@ -4,7 +4,7 @@ SCIDB QUERY : <CREATE ARRAY m3x3 <val:double>[i=0:2,3,0,j=0:2,3,0]>
 SCIDB QUERY : <store(build(m3x3,random()%10),m3x3)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <var(m3x3,val,i)>
+SCIDB QUERY : <aggregate(m3x3,var(val),i)>
 [Query was executed successfully, ignoring data output by this query.]
 
 Query was executed successfully

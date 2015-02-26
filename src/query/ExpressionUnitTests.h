@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,12 +38,10 @@
 #include <boost/assign.hpp>
 #include <boost/make_shared.hpp>
 
-#include "query/parser/QueryParser.h"
 #include "query/LogicalExpression.h"
-#include "query/parser/ALTranslator.h"
-#include "query/parser/AST.h"
 #include "query/Expression.h"
 #include "query/TypeSystem.h"
+#include "query/Parser.h"
 
 using namespace std;
 using namespace scidb;
@@ -86,15 +84,6 @@ CPPUNIT_TEST(evlMissingReason);
 CPPUNIT_TEST(evlStrPlusNull);
 CPPUNIT_TEST_SUITE_END();
 
-private:
-    boost::shared_ptr<LogicalExpression> parse(const std::string& expr)
-    {
-        QueryParser p;
-        boost::shared_ptr<AstNode> astTree = p.parse("EXPRESSION(" + expr + ")", false);
-        AstNode* ast = astTree->getChild(1);
-        return AstToLogicalExpression( ast->getChild(0) );
-    }
-
 public:
     void setUp()
     {
@@ -133,7 +122,7 @@ public:
 
     void evlVectorAPlusB()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("a+b");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("a+b");
         Expression e;
         e.addVariableInfo("a", TID_INT64);
         e.addVariableInfo("b", TID_INT64);
@@ -407,7 +396,7 @@ public:
 
     void evlPerfExp()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -450,7 +439,7 @@ public:
 
     void evlInt32PlusInt32()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("1+1");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("1+1");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -460,7 +449,7 @@ public:
 
     void evlInt64PlusInt64()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("5000000000+5000000000");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("5000000000+5000000000");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -470,7 +459,7 @@ public:
 
     void evlInt32PlusInt64()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("5+5000000000");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("5+5000000000");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -480,7 +469,7 @@ public:
 
     void evlInt32PlusInt32PlusInt64()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("5+5+5000000000");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("5+5+5000000000");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -490,7 +479,7 @@ public:
 
     void evlInt32PlusNull()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("5+NULL");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("5+NULL");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -500,7 +489,7 @@ public:
 
     void evlUnaryMinusInt32()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("-5");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("-5");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -510,7 +499,7 @@ public:
 
     void evlPowDouble()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("pow(0.5, 2.0)");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("pow(0.5, 2.0)");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -520,7 +509,7 @@ public:
 
     void evlSinDouble()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("sin(0.0)");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("sin(0.0)");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -530,7 +519,7 @@ public:
 
     void evlExplicitConvDouble()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("double(0)");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("double(0)");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -540,7 +529,7 @@ public:
 
     void evlExplicitConvInt32()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("int32(0.0)");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("int32(0.0)");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -550,7 +539,7 @@ public:
 
     void evliif0()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("iif(1 < 0, 0/0 , 1)");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("iif(1 < 0, 0/0 , 1)");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -560,7 +549,7 @@ public:
 
     void evliif1()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("iif(1 > 0, 5000000000, 0/0)");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("iif(1 > 0, 5000000000, 0/0)");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -570,7 +559,7 @@ public:
 
     void evlor_lazy()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("(1 > 0) or 0/0");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("(1 > 0) or 0/0");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -580,7 +569,7 @@ public:
 
     void evland_lazy()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("(1 < 0) and 0/0");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("(1 < 0) and 0/0");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -590,7 +579,7 @@ public:
 
     void evland_lazy2()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("3 > 2 and not (2 = 1)");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("3 > 2 and not (2 = 1)");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -636,7 +625,7 @@ public:
 
     void evlInstanceId()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("instanceid()");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("instanceid()");
          Expression e;
 
         boost::shared_ptr<scidb::Query> emptyQuery;
@@ -649,7 +638,7 @@ public:
 
     void evlInt8PlusInt16()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("int8(8)+int16(-8)");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("int8(8)+int16(-8)");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -682,7 +671,7 @@ public:
 
     void evlIsNull()
     {
-        boost::shared_ptr< LogicalExpression> le = parse("is_null(NULL)");
+        boost::shared_ptr< LogicalExpression> le = parseExpression("is_null(NULL)");
          Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -692,7 +681,7 @@ public:
 
     void evlMissingReason()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("missing_reason(NULL)");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("missing_reason(NULL)");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
@@ -702,7 +691,7 @@ public:
 
     void evlStrPlusNull()
     {
-        boost::shared_ptr<LogicalExpression> le = parse("NULL + 'xyz'");
+        boost::shared_ptr<LogicalExpression> le = parseExpression("NULL + 'xyz'");
         Expression e;
         boost::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);

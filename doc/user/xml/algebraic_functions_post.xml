@@ -150,10 +150,11 @@
 
           <row>
             <entry><indexterm>
-                <primary>random function</primary>
+                <primary>random number generator</primary>
               </indexterm>random</entry>
 
-            <entry>Generate random positive integer</entry>
+            <entry>Generate random positive integer. The maximum value is the
+            maximum, unsigned, 32-bit integer: 2147483647.</entry>
 
             <entry>random()</entry>
 
@@ -186,11 +187,11 @@
         <step>
           <para>Construct an array that contains a random set of values
           between 0 and 1. <para><programlisting>AFL% create array C &lt;val:double&gt; [i=0:4,5,0];  </programlisting><para><programlisting>AFL% store(build(C,random() /  2147483647.0),C);  </programlisting><screen>{i} val
-{0} 0.619441
-{1} 0.217831
-{2} 0.349238
-{3} 0.467368
-{4} 0.553006
+{0} 0.547088
+{1} 0.554735
+{2} 0.751838
+{3} 0.935875
+{4} 0.481854
 </screen>The
           largest value that random() can produce is 2,147,483,647. So we
           divide the output by a double that is equivalent; this returns a

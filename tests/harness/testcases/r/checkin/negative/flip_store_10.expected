@@ -16,7 +16,7 @@ SCIDB QUERY : <store(join(build_sparse(T,x,1),build_sparse(TS,string(x+10),1)),A
 {1} 1,'11'
 {2} 2,'12'
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {a} b,x
 {0} '10',0
 {1} '11',1
@@ -42,7 +42,7 @@ SCIDB QUERY : <select name,schema from list()>
 {2} 'T','T<a:int32> [x=0:2,3,0]'
 {3} 'TS','TS<a:string> [x=0:2,3,0]'
 
-SCIDB QUERY : <redimension_store(B,A)>
+SCIDB QUERY : <store(redimension(B,A),A)>
 {x} a,b
 {0} 0,'10'
 {1} 1,'11_new'

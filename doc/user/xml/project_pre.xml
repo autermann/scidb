@@ -42,8 +42,19 @@
 
       <procedure>
         <step>
-          <para>Show the source_array:<programlisting language="test">--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' --show-query=no --show-output=no
+          <para>Show the source_array:<programlisting language="test">--afl store(build(&lt;event:string&gt;[i=0:*,12,0],'["dash","dash","steeplechase","marathon","marathon",
+      "marathon"]',true),event); --show-query=no --show-output=no
+--afl store(build(&lt;year:int64&gt;[i=0:*,12,0],'[1996,2000,2000,1996,2000,2008]',true),year);
+      --show-query=no --show-output=no
+--afl store(build(&lt;person:string&gt;[i=0:*,12,0],'["Bailey","Greene","Kosgei","Thugwane","Abera",
+      "Wanjiru"]',true),person); --show-query=no --show-output=no
+--afl store(build(&lt;country:string&gt;[i=0:*,12,0],'["Canada","USA","Kenya","USA","Ethiopia",
+      "Kenya"]',true),country); --show-query=no --show-output=no
+--afl store(build(&lt;time:double&gt;[i=0:*,12,0],'[9.84,9.87,503.17,7956,7811,7596]',true),time);
+      --show-query=no --show-output=no
+--afl store(join(event,join(year,(join(person,join(country,time))))),winnersFlat);
+      --show-query=no --show-output=no
+
 --afl store(sort(winnersFlat,year),champions) --show-query=no --show-output=no
 --afl scan(champions) --output-format=csv</programlisting></para>
         </step>

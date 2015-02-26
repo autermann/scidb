@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,7 +25,10 @@
 
 /****************************************************************************/
 
-#include <boost/utility.hpp>
+#include <new>                                           // For operator new
+#include <assert.h>                                      // For assert()
+#include <sstream>
+#include <system/Exceptions.h>
 
 /****************************************************************************/
 namespace scidb {
@@ -44,7 +47,7 @@ namespace scidb {
  *              that the lifetime of an object is tied to the lexical scope in
  *              which it is instantiated:
  *  @code
- *              class Lock : stackonly, boost::nocopyable
+ *              class Lock : stackonly, boost::noncopyable
  *              {
  *                 Lock(...) ...
  *                ~Lock(...) ...
@@ -104,6 +107,57 @@ struct null_deleter
 {
             void              operator()(const void*) const {}
 };
+
+/**
+ *  Cast the pointer 'pb' from type 'base*' to type 'derived'. Equivalent to a
+ *  static cast in a release build, but has the advantage that the downcast is
+ *  checked with an assertion in a debug build.
+ */
+template<class derived,class base>
+inline derived downcast(base* pb)
+{
+    assert(dynamic_cast<derived>(pb) == pb);             // Is the cast safe?
+
+    return static_cast<derived>(pb);                     // So cast it already
+}
+
+
+/**
+ *  Cast the pointer 'pb' from type 'base*' to type 'derived'. Equivalent to a
+ *  static cast in a release build, but has the advantage that the downcast is
+ *  checked with an assertion in a debug build.
+ */
+template<class derived_t, class base_t>
+inline derived_t safe_dynamic_cast(base_t pb)
+{
+    derived_t ptr = dynamic_cast<derived_t>(pb);
+    if (ptr != pb) {
+        assert(false);
+        std::stringstream ss;
+        ss << " invalid cast from " << typeid(pb).name() << " to " << typeid(ptr).name();
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << ss.str();
+    }
+    return ptr;
+}
+
+/**
+ *  Return true if the truth of 'a' logically implies the truth of 'b'; that
+ *  is, 'b' is true whenever 'a' is true.
+ */
+inline bool implies(bool a,bool b)
+{
+    return !a || b;                                      // 'a' => 'b
+}
+
+/**
+ *  Return true if the truth of 'a' logically implies the truth of 'b' and so
+ *  also vice versa; in other words, both 'a' and 'b' have precisely the same
+ *  truth value.
+ */
+inline bool iff(bool a,bool b)
+{
+    return a == b;                                       // 'a' <=> 'b'
+}
 
 /****************************************************************************/
 }

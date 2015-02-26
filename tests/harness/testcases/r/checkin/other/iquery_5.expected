@@ -10,10 +10,10 @@ Query was executed successfully
 SCIDB QUERY : <load(A,'../tests/basic/data/iquery_5.txt')>
 [[(10,'b_04','c_04')],[(11,'b_14','c_14')],[(12,'b_24','c_24')]];[[(10,'b_05','c_05')],[(11,'b_15','c_15')],[(12,'b_25','c_25')]]
 
-SCIDB QUERY : <redimension_store(A,A2)>
+SCIDB QUERY : <store(redimension(A,A2),A2)>
 [(10,'b_04'),(10,'b_05'),(11,'b_14'),(11,'b_15'),(12,'b_24'),(12,'b_25')]
 
-SCIDB QUERY : <redimension_store(A,A3)>
+SCIDB QUERY : <store(redimension(A,A3),A3)>
 [[('c_04',10),(),()],[('c_05',10),(),()],[(),('c_14',11),()],[(),('c_15',11),()],[(),(),('c_24',12)],[(),(),('c_25',12)]]
 
 SCIDB QUERY : <echo ('iquery -p 8888 -o lcsv+ -aq \'scan ( A )\'')>

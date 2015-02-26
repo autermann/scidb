@@ -26,7 +26,7 @@ SCIDB QUERY : <subarray(R, 0, 10)>
 {0} 100
 {1} 200
 
-SCIDB QUERY : <avg(R)>
+SCIDB QUERY : <aggregate(R,avg(a))>
 {i} a_avg
 {0} 1575
 
@@ -65,7 +65,7 @@ SCIDB QUERY : <subarray(L, 0, 10)>
 {0} 100
 {1} 200
 
-SCIDB QUERY : <avg(filter(L, a > 300))>
+SCIDB QUERY : <aggregate(filter(L, a > 300),avg(a))>
 {i} a_avg
 {0} 3000
 

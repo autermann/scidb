@@ -8,7 +8,7 @@ create array A <a:uint64> [x=1:1024,1024,0,y=1:100,10,0]
 create array T <a:uint64> [x=1:1024,1024,0,y=1:100,10,0,a_2=1:(1024*1024),1024,0]
 
 --test
---igdata "redimension_store(C,T)"
+--igdata "store(redimension(C,T),T)"
 
 
 --cleanup

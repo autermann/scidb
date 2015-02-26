@@ -7,7 +7,7 @@ Query was executed successfully
 SCIDB QUERY : <load(quantile3dtmp, '../tests/harness/testcases/data/quantile_3d.txt')>
 [(0,0,0,8),(0,0,1,6),(0,0,2,4),(0,1,0,1),(0,1,1,3),(0,2,2,5),(0,3,2,2),(1,0,0,10),(1,0,3,1),(1,1,1,6),(1,2,2,9),(1,2,3,7)]
 
-SCIDB QUERY : <redimension_store(quantile3dtmp, quantile3d)>
+SCIDB QUERY : <store(redimension(quantile3dtmp, quantile3d), quantile3d)>
 [[[(8),(6)],[(1),(3)]]];[[[(4),()],[(),()]]];{0,2,2}[[[(5),()],[(2),()]]];[[[(10),()],[(),(6)]]];[[[(),(1)],[(),()]]];{1,2,2}[[[(9),(7)],[(),()]]]
 
 SCIDB QUERY : <quantile(quantile3d, 2, a, y, z)>

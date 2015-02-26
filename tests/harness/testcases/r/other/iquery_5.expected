@@ -16,7 +16,7 @@ SCIDB QUERY : <load(A,'../tests/harness/testcases/data/iquery_5.txt')>
 {1,5} 11,'b_15','c_15'
 {2,5} 12,'b_25','c_25'
 
-SCIDB QUERY : <redimension_store(A,A2)>
+SCIDB QUERY : <store(redimension(A,A2),A2)>
 {c} a,b
 {'c_04'} 10,'b_04'
 {'c_05'} 10,'b_05'
@@ -25,7 +25,7 @@ SCIDB QUERY : <redimension_store(A,A2)>
 {'c_24'} 12,'b_24'
 {'c_25'} 12,'b_25'
 
-SCIDB QUERY : <redimension_store(A,A3)>
+SCIDB QUERY : <store(redimension(A,A3),A3)>
 {b,x} c,a
 {'b_04',0} 'c_04',10
 {'b_05',0} 'c_05',10

@@ -34,7 +34,7 @@ SCIDB QUERY : <select * from AA>
 {13} 6.23077,35.64,17.82
 {14} 5.78571,33.0943,16.5471
 
-SCIDB QUERY : <redimension_store(AA,NID)>
+SCIDB QUERY : <store(redimension(AA,NID),NID)>
 {a1,a2,a3} x
 {5.78571,33.0943,16.5471} 14
 {6.23077,35.64,17.82} 13

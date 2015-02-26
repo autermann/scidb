@@ -50,7 +50,7 @@ SCIDB QUERY : <between(A,0,3)>
 {2} 12
 {3} 13
 
-SCIDB QUERY : <cross(A,A)>
+SCIDB QUERY : <cross_join(A,A)>
 {x,x} a,a
 {-2,-2} 8,8
 {-2,-1} 8,9

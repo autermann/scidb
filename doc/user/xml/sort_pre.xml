@@ -143,16 +143,15 @@
         <step>
           <para>Show the source_array: <programlisting language="test">--afl create array numbers &lt;number:int64 null&gt;[i=0:4,5,0] --show-query=no --show-output=no
 --shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p N &lt; $DOC_DATA/mostNumbers.csv &gt; $DOC_DATA/mostNumbers.scidb
---aql load numbers from '${DOC_DATA}/mostNumbers.scidb'; --show-query=no --show-output=no
---afl scan(numbers);</programlisting></para>
+--afl load(numbers,'../tests/harness/testcases/data/doc/mostNumbers.scidb'); --show-query=no --output-format=dense</programlisting></para>
         </step>
 
         <step>
-          <para>Sort by number (ascending): <programlisting language="test">--afl sort(numbers, number asc);</programlisting></para>
+          <para>Sort by number (ascending): <programlisting language="test">--afl sort(numbers, number asc); --output-format=dense</programlisting></para>
         </step>
 
         <step>
-          <para>Sort by number (descending): <programlisting language="test">--afl sort(numbers, number desc);</programlisting></para>
+          <para>Sort by number (descending): <programlisting language="test">--afl sort(numbers, number desc); --output-format=dense</programlisting></para>
         </step>
       </procedure>
     </informalexample>

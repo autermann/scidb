@@ -9,7 +9,7 @@
 
  --test
  --start-igdata
- --shell --command " cat ./testcases/data/csv2scidb_1.csv |csv2scidb -c 100 -s 1 -n 1 > /tmp/csv2scidb_test_1.txt  " 
+ --shell --command " cat ${TEST_DATA_DIR}/csv2scidb_1.csv |csv2scidb -c 100 -s 1 -n 1 > /tmp/csv2scidb_test_1.txt  " 
   load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.txt' )
  --stop-igdata
  sort( Raw_CSVLoad_1,symbl )
@@ -19,3 +19,4 @@ remove ( Raw_CSVLoad_1 )
  --shell --command "rm -rf /tmp/csv2scidb_test_1.txt" --store
 
  --stop-query-logging
+

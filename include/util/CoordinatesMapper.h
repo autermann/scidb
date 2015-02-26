@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,6 +33,7 @@
 #include <array/Array.h>
 #include <assert.h>
 #include <boost/shared_ptr.hpp>
+#include <boost/scoped_array.hpp>
 
 
 
@@ -101,9 +102,20 @@ public:
         init(computeFirstChunkPosition(chunkPos, dims), computeLastChunkPosition(chunkPos, dims));
     }
 
+    /**
+     * Default copy Constructor
+     */
+    /**
+     * Deafult assignment operator
+     */
+
+    /// convert logical chunk position (in row-major order)  to array coordinates
     void pos2coord(position_t pos, Coordinates& coord) const
     {
+        assert(pos>=0);
         assert(_origin.size()>0);
+        assert(_nDims>0);
+        coord.resize(_nDims);
 
         if (_nDims == 1) {
             coord[0] = _origin[0] + pos;
@@ -114,7 +126,7 @@ public:
             coord[0] = _origin[0] + pos;
             assert(pos < _chunkIntervals[0]);
         } else {
-            for (int i = (int)_nDims; --i >= 0;) {
+            for (ssize_t i = static_cast<ssize_t>(_nDims); --i >= 0;) {
                 coord[i] = _origin[i] + (pos % _chunkIntervals[i]);
                 pos /= _chunkIntervals[i];
             }
@@ -122,20 +134,26 @@ public:
         }
     }
 
+    /// convert array coordinates to the logical chunk position (in row-major order)
     position_t coord2pos(Coordinates const& coord) const
     {
+        assert(coord.size() == _nDims);
+        position_t pos(-1);
+
         if (_nDims == 1) {
-            return coord[0] - _origin[0];
+            pos = coord[0] - _origin[0];
+            assert(pos < _chunkIntervals[0]);
         } else if (_nDims == 2) {
-            return (coord[0] - _origin[0])*_chunkIntervals[1] + (coord[1] - _origin[1]);
+            pos = (coord[0] - _origin[0])*_chunkIntervals[1] + (coord[1] - _origin[1]);
         } else {
-            position_t pos = 0;
+            pos = 0;
             for (size_t i = 0, n = _nDims; i < n; i++) {
                 pos *= _chunkIntervals[i];
                 pos += coord[i] - _origin[i];
             }
-            return pos;
         }
+        assert(pos >= 0 && static_cast<uint64_t>(pos)<_logicalChunkSize);
+        return pos;
     }
 
     /**
@@ -156,7 +174,6 @@ public:
         return _chunkIntervals[dim];
     }
 };
-
 
 /**
  * Map coordinates to offset within chunk and vice versa, while the chunk is given at run time.
@@ -216,6 +233,7 @@ public:
      */
     void pos2coord(Coordinates const& chunkPos, position_t pos, Coordinates& coord) const
     {
+        assert(pos>=0);
         Coordinates lows(chunkPos.size());
         Coordinates intervals(chunkPos.size());
         chunkPos2LowsAndIntervals(chunkPos, lows, intervals);
@@ -232,6 +250,7 @@ public:
      */
     void pos2coordWithLowsAndIntervals(Coordinates const& lows, Coordinates const& intervals, position_t pos, Coordinates& coord) const
     {
+        assert(pos>=0);
         assert(lows.size() == _dims.size());
         assert(intervals.size() == _dims.size());
         assert(coord.size() == _dims.size());

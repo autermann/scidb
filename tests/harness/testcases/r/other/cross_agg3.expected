@@ -20,7 +20,7 @@ SCIDB QUERY : <store(build(m4x4_overlap, (3*x*x-4*y)/(3.5)),m4x4_overlap)>
 {4,3} 10.2857
 {4,4} 9.14286
 
-SCIDB QUERY : <cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap)>
+SCIDB QUERY : <cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap)>
 {x,y,x,y} val,z,val
 {0,0,1,1} -0.285714,0,-0.285714
 {0,0,1,2} -0.285714,0,-1.42857
@@ -919,11 +919,11 @@ SCIDB QUERY : <cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_o
 {7,6,4,3} 9.14286,7,10.2857
 {7,6,4,4} 9.14286,7,9.14286
 
-SCIDB QUERY : <count(cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap))>
+SCIDB QUERY : <aggregate(cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),count(*))>
 {i} count
 {0} 896
 
-SCIDB QUERY : <cross(m4x4_overlap,count(cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap)))>
+SCIDB QUERY : <cross_join(m4x4_overlap,aggregate(cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),count(*)))>
 {x,y,i} val,count
 {1,1,0} -0.285714,896
 {1,2,0} -1.42857,896
@@ -942,7 +942,7 @@ SCIDB QUERY : <cross(m4x4_overlap,count(cross(apply(subarray(xgrid(m4x4_overlap,
 {4,3,0} 10.2857,896
 {4,4,0} 9.14286,896
 
-SCIDB QUERY : <store(cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),AAA)>
+SCIDB QUERY : <store(cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),AAA)>
 {x,y,x_2,y_2} val,z,val_2
 {0,0,1,1} -0.285714,0,-0.285714
 {0,0,1,2} -0.285714,0,-1.42857

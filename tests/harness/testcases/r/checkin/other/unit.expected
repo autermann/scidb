@@ -23,8 +23,8 @@ End Testing TypeLibrary and Type Class handling
 .Start Testing TypeLibrary and Type Class handling
 End Testing TypeLibrary and Type Class handling
 ......................
-Options{name="A",limit=unlimited,pagesize=1KB,parent="root",finalizing=0,recycling=0,resetting=0,debugging=0,locking=0}
-Options{name="B",limit=unlimited,pagesize=4KB,parent="root",finalizing=0,recycling=0,resetting=1,debugging=0,locking=1}
+Options{name="A",limit=unlimited,pagesize=1KB,parent="root",finalizing=1,recycling=0,resetting=0,debugging=0,locking=0}
+Options{name="B",limit=unlimited,pagesize=4KB,parent="root",finalizing=1,recycling=0,resetting=1,debugging=0,locking=1}
 .
 .
 .
@@ -41,17 +41,17 @@ Options{name="B",limit=unlimited,pagesize=4KB,parent="root",finalizing=0,recycli
 .
 78: extensive testing shows that allocate_shared() is AOK.
 .
-SystemException in file: src/util/arena/Arena.cpp function: exhausted line: 474
+SystemException in file: src/util/arena/Arena.cpp function: exhausted line: 508
 Error id: scidb::SCIDB_SE_NO_MEMORY::SCIDB_LE_ARENA_EXHAUSTED
 Error description: Not enough memory. An attempt was made to allocate more memory than is available.
    arena  : {name="root/100",available=100B,allocated=0B,peakUsage=96B,allocations=0}
    request: 112B.
 .
 An Example ==================================================
-SystemException in file: src/util/arena/Arena.cpp function: exhausted line: 474
+SystemException in file: src/util/arena/Arena.cpp function: exhausted line: 508
 Error id: scidb::SCIDB_SE_NO_MEMORY::SCIDB_LE_ARENA_EXHAUSTED
 Error description: Not enough memory. An attempt was made to allocate more memory than is available.
-   arena  : {name="root/B",available=1e+03KB,allocated=8B,peakUsage=88B,allocations=1}
+   arena  : {name="root/B",available=1e+03KB,allocated=8B,peakUsage=136B,allocations=1}
    request: 7.6MB.
 
 update("PhysicalFoo.cpp checkpoint",{name="root/Foo",available=1GB,allocated=0B,peakUsage=0B,allocations=0})

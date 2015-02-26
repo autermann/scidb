@@ -81,7 +81,11 @@
       <procedure>
         <step>
           <para>Create an array containing values along the diagonal, and
-          empty cells everywhere else.<programlisting language="test">--afl store(build_sparse(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],i,i=j), A); --output-format=dense --chunkify=yes</programlisting></para>
+          empty cells everywhere else.<programlisting language="test">--afl store(redimension (
+         apply (
+             build(&lt;val:double&gt;[i1=0:3,4,0, j1=0:3,4,0], i1),
+         i, iif(i1=j1, i1,null), j, iif(i1=j1,i1,null)),
+      &lt;val:double&gt;[i=0:3,4,0, j=0:3,4,0]),A); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>

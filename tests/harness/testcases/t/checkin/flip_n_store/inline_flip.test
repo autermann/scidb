@@ -9,11 +9,11 @@ store(join(build(<a:int64>[x=0:2,3,0,y=13:16,1,0],(x+1)*y),build(<a:int64>[x=0:2
 
 --test
 redimension(A,empty <x:int64>[a=0:9,5,0])
-count(redimension(B, <a:int64> [x=0:2,3,0]))
+aggregate(redimension(B, <a:int64> [x=0:2,3,0]),count(*))
 redimension(B,<a:int64 null, count:uint64 null> [x=0:2,3,0], sum(a) as a, count(a) as count)
-count(redimension(B, <b:int64> [x=0:2,3,0]))
+aggregate(redimension(B, <b:int64> [x=0:2,3,0]),count(*))
 redimension(B,empty <b:int64 null, count:uint64 null> [x=0:2,3,0], sum(b) as b, count(b) as count)
-count(redimension(B, <b:int64> [y=13:16,1,0]))
+aggregate(redimension(B, <b:int64> [y=13:16,1,0]),count(*))
 redimension(B,<b:int64 null, count:uint64 null> [y=13:16,1,0], sum(b) as b, count(*) as count)
 redimension(B,empty <b:int64,a:int64> [y=13:16,1,0,x=0:2,3,0])
 redimension(B,<a:int64,b:int64> [x=0:2,3,0,y=13:16,1,0])

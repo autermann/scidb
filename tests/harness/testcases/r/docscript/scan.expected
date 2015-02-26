@@ -5,16 +5,7 @@ SCIDB QUERY : <store(build(m3x3,i*3+j),m3x3)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <scan(m3x3)>
-{i,j} val
-{0,0} 0
-{0,1} 1
-{0,2} 2
-{1,0} 3
-{1,1} 4
-{1,2} 5
-{2,0} 6
-{2,1} 7
-{2,2} 8
+[[(0),(1),(2)],[(3),(4),(5)],[(6),(7),(8)]]
 
 Query was executed successfully
 

@@ -13,7 +13,7 @@ SCIDB QUERY : <store(join(build(T,x+1+0.05),build(T,x+5+0.08)),A)>
 {1} 2.05,6.08
 {2} 3.05,7.08
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {a} b
 {1.05} 5.08
 {2.05} 6.08

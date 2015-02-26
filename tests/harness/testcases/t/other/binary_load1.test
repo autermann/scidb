@@ -28,7 +28,7 @@ load(ABC2_null, 'abc_null.txt')
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(AB1, 'abc_null.out', 0, '(int32 null,string null ,double null)')"
 --igdata "load(AB1, 'abc_null.out', 0, '(int32 null,string null ,double null)',10)"
 --igdata "load(AB1, 'abc_null.out', 0, '(int32 null,string null ,double null)',14,AB1_shadow)"
-count(versions(AB1_shadow))
+aggregate(versions(AB1_shadow),count(*))
 load(AB2, 'abc_null.txt', 0, 'text',16)
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(AB2, 'abc_null.txt', 0, 'text')"
 --igdata "load(AB2, 'abc_null.txt', 0, 'text',12)"

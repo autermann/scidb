@@ -68,19 +68,19 @@ Query was executed successfully
 {attribute_number} attribute_name,min,max,distinct_count,non_null_count
 {0} 'a','0','99999.8',601599,1000000
 
-{i} a_adc
+{i} a_ApproxDC
 {0} 9968
 
-{i} a_adc
+{i} a_ApproxDC
 {0} 997
 
-{i} a_adc
+{i} a_ApproxDC
 {0} 20021
 
-{i} a_adc
+{i} a_ApproxDC
 {0} 1004684
 
-{i} a_adc
+{i} a_ApproxDC
 {0} 1236713
 
 {i} a_ApproxDC

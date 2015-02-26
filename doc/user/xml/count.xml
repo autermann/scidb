@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry id="countOperator">
+  <refnamediv>
+    <refname>count</refname>
+
+    <refpurpose><indexterm>
+        <primary>count</primary>
+      </indexterm>Returns a count of non-empty cells.</refpurpose>
+
+    <para><indexterm>
+        <primary>deprecated</primary>
+
+        <secondary>count</secondary>
+      </indexterm><emphasis role="bold">Deprecated.</emphasis> The
+    <code>count</code> operator may be removed in the future. Use the <link
+    linkend="countAggregate">count aggregate</link> instead.</para>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>count(<replaceable>array</replaceable><optional> ,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The <code>count</code> operator counts nonempty cells of the input array. When
+    dimensions are provided they are used to do a group-by, and a count per
+    resulting group is returned.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example finds the element count value along the first and
+      second dimension of a 4<symbol role="symbolfont">×</symbol>4 array where
+      some cells are empty.</para>
+
+      <procedure>
+        <step>
+          <para>Create an array named source_array:<programlisting
+          language="test">--afl CREATE ARRAY source_array&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no</programlisting></para>
+        </step>
+
+        <step>
+          <para>Store values of 0–15 in source_array:<programlisting
+          language="test">--afl store(build(source_array,i*4+j),source_array); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Use between to create some empty cells in source_array and
+          store the result in count_array:<programlisting language="test">--afl store(between(source_array,1,1,1,2),count_array); --show-output=no
+--afl scan(count_array) --show-query=no --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+
+        <step>
+          <para>Find the count of nonempty elements in
+          count_array:<programlisting language="test">--afl aggregate(count_array,count(*)); --output-format=dense</programlisting></para>
+        </step>
+
+        <step>
+          <para>Count the nonempty elements along the dimensions of
+          count_array:<programlisting language="test">--afl aggregate(count_array,count(*),i); --output-format=dense</programlisting><programlisting
+          language="test">--afl aggregate(count_array,count(*),j); --output-format=dense</programlisting></para>
+        </step>
+
+        <step>
+          <para>If we specify both dimensions, the operator returns an array
+          of the original size, with a single value that represents whether or
+          not each cell is empty:<programlisting language="test">--afl aggregate(count_array,count(*),i,j); --output-format=dense --chunkify=yes</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
+  </refsect1>
+</refentry>

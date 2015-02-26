@@ -29,26 +29,42 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example concatenates a 4<symbol role="symbolfont">×</symbol>3
-      array and a 2<symbol role="symbolfont">×</symbol>3 array.</para>
+      <para>This example concatenates a 3<symbol role="symbolfont">×</symbol>2
+      matrix and a 2<symbol role="symbolfont">×</symbol>2 matrix.</para>
 
       <procedure>
         <step>
-          <para>Create a 4<symbol role="symbolfont">×</symbol>3 array
-          left_array containing value 1 in all cells:<para><programlisting>AFL% create array left_array &lt;val:double&gt;[i=0:3,6,0,j=0:2,3,0];  </programlisting><programlisting>AFL% store(build(left_array,1),left_array);   </programlisting></para></para>
+          <para>Create a 3<symbol role="symbolfont">×</symbol>2
+          matrix.<para><programlisting>AFL% store(build(&lt;val:double&gt;[row=0:2,6,0, col=0:1,2,0],row*2+col),left_array);
+       </programlisting><screen>[
+[(0),(1)],
+[(2),(3)],
+[(4),(5)]
+]</screen></para></para>
         </step>
 
         <step>
-          <para>Create a 2<symbol role="symbolfont">×</symbol>3 array
-          right_array containing value 0 in all cells:<para><programlisting>AFL% create array right_array &lt;val:double&gt;[i=0:1,6,0,j=0:2,3,0];  </programlisting><programlisting>AFL% store(build(right_array,0),right_array);  </programlisting></para></para>
+          <para>Create a 2<symbol role="symbolfont">×</symbol>2array.<para><programlisting>AFL% store(build(&lt;val:double&gt;[row=0:1,6,0, col=0:1,2,0],pow( double(row*2+col+1),2.0)),right_array);
+       </programlisting><screen>[
+[(1),(4)],
+[(9),(16)]
+]</screen></para></para>
         </step>
 
         <step>
-          <para>Concatenate left_array and right_array:<para><programlisting>AFL% create array concat_array &lt;val:double&gt;[i=0:5,6,0,j=0:2,3,0];  </programlisting><programlisting>AFL% store(concat(left_array,right_array),concat_array);  </programlisting>This
-          produces an array concat_array with contents and schema as
-          follows:<para><screen>[('concat_array&lt;val:double&gt; [i=0:5,6,0,j=0:2,3,0]')]
-</screen><screen>[[(1),(1),(1)],[(1),(1),(1)],[(1),(1),(1)],[(1),(1),(1)],[(0),(0),(0)],[(0),(0),(0)]]
-</screen></para></para></para>
+          <para>Concatenate left_array and right_array.<para><programlisting>AFL% concat(left_array,right_array);  </programlisting><screen>[
+[(0),(1)],
+[(2),(3)],
+[(4),(5)],
+[(1),(4)],
+[(9),(16)]
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para>The schema of the result looks like this:<para><screen>{i} schema
+{0} 'left_array@1right_array@1&lt;val:double&gt; [row=0:4,6,0,col=0:1,2,0]'
+</screen></para></para>
         </step>
       </procedure>
     </informalexample>

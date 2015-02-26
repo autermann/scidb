@@ -5,15 +5,15 @@ create empty array B <b:string>[a(string)=2,1,0]
 
 --test
 store(join(build_sparse(T,'a_'+string(x+1),x=1),build_sparse(T,'b_'+string(x+1),x=1)),A)
-redimension_store(A,B)
+store(redimension(A,B),B)
 unpack(B,row)
 
 store(join(build_sparse(T,'a_'+string(x+1),x<>1),build_sparse(T,'b_'+string(x+1),x<>1)),A)
-redimension_store(A,B)
+store(redimension(A,B),B)
 unpack(B,row)
 
 store(join(build_sparse(T,'a_'+string(x+1),x=1),build_sparse(T,'b_'+string(x+1),x=1)),A)
-redimension_store(A,B)
+store(redimension(A,B),B)
 unpack(B,row)
 
 --cleanup

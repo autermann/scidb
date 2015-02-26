@@ -81,11 +81,11 @@ project(between(Test1,3,7),b,a)
 project(filter(Test1, x<>3),b,a)
 project(substitute(Test1,build(<a:double> [x=0:1,2,0], iif( x = 0, 20, 30))),b,a)
 
---error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED "project(redimension_store(build(Test2,x*3.9),Test3),y)"
+--error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED "project(store(redimension(build(Test2,x*3.9),Test3),Test3),y)"
 ## redimension_store has to be the outer operator
-redimension_store(build(Test2,x*3.9),Test3)
+store(redimension(build(Test2,x*3.9),Test3),Test3)
 project(Test3,y)
-redimension_store(Test2,Test3)
+store(redimension(Test2,Test3),Test3)
 project(Test3,y)
 
 --cleanup

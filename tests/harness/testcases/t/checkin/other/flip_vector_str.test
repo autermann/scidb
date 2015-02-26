@@ -4,7 +4,7 @@ CREATE ARRAY vector_str<x:string, y:double>[i=1:8,4,0]
 load(vector_str, '../tests/harness/testcases/data/vector_str.txt')
 
 --test
-redimension_store(vector_str, matrix_str)
+store(redimension(vector_str, matrix_str), matrix_str)
 
 --cleanup
 remove(matrix_str)

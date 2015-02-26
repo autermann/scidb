@@ -8,8 +8,8 @@ create empty array matrix2_R2<i:int64>[x=0:8,2,0, y=0:8,2,0]
 load(vector2_R2, '../tests/harness/testcases/data/vector2_R2.txt')
 
 --test
-redimension_store(vectorR2, matrixR2)
-redimension_store(vector2_R2, matrix2_R2)
+store(redimension(vectorR2, matrixR2), matrixR2)
+store(redimension(vector2_R2, matrix2_R2), matrix2_R2)
 join(matrixR2, matrix2_R2)
 
 --cleanup

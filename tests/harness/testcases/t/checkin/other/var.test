@@ -3,9 +3,9 @@ CREATE ARRAY dense <a: double > [x=0:5,3,0, y=0:5,3,0]
 load(dense, '../tests/harness/testcases/data/dense.txt')
 
 --test
-var(dense)
-var(dense,a,y)
-var(dense,a,x)
+aggregate(dense,var(a))
+aggregate(dense,var(a),y)
+aggregate(dense,var(a),x)
 
 --cleanup
 remove(dense)

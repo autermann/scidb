@@ -16,7 +16,7 @@ Query was executed successfully
 SCIDB QUERY : <create array Dsp3<val:double>[s(string)=*,5,0, p(string)=*,5,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create not empty array Dsp_mult_d<val: double>[s(string)=*,5,0, p(string)=*,5,0]>
+SCIDB QUERY : <create array Dsp_mult_d<val: double>[s(string)=*,5,0, p(string)=*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create array Dsp_mult<val: double>[s(string)=*,5,0, p(string)=*,5,0]>
@@ -252,7 +252,7 @@ SCIDB QUERY : <select count(val), min(val), max(val), avg(val), stdev(val) from 
 {i} count,min_1,max_2,avg_3,stdev_4
 {0} 25,0.01,606.25,210.21,191.962
 
-SCIDB QUERY : <redimension_store(expo, Ds, avg(val) as av)>
+SCIDB QUERY : <store(redimension(expo, Ds, avg(val) as av), Ds)>
 {s} av
 {'sample-0'} 161.71
 {'sample-1'} 183.94
@@ -260,7 +260,7 @@ SCIDB QUERY : <redimension_store(expo, Ds, avg(val) as av)>
 {'sample-3'} 234.46
 {'sample-4'} 262.75
 
-SCIDB QUERY : <redimension_store(expo, Dp, avg(val) as av)>
+SCIDB QUERY : <store(redimension(expo, Dp, avg(val) as av), Dp)>
 {p} av
 {'probe-0'} 8.11
 {'probe-1'} 58.66
@@ -268,7 +268,7 @@ SCIDB QUERY : <redimension_store(expo, Dp, avg(val) as av)>
 {'probe-3'} 311.26
 {'probe-4'} 513.31
 
-SCIDB QUERY : <redimension_store(expo, Dsp)>
+SCIDB QUERY : <store(redimension(expo, Dsp), Dsp)>
 {s,p} val
 {'sample-0','probe-0'} 0.01
 {'sample-0','probe-1'} 30.36
@@ -296,10 +296,10 @@ SCIDB QUERY : <redimension_store(expo, Dsp)>
 {'sample-4','probe-3'} 384
 {'sample-4','probe-4'} 606.25
 
-SCIDB QUERY : <redimension_store(expo2, Dsp)>
-[An error expected at this place for the query "redimension_store(expo2, Dsp)". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES.]
+SCIDB QUERY : <store(redimension(expo2, Dsp), Dsp)>
+[An error expected at this place for the query "store(redimension(expo2, Dsp), Dsp)". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES.]
 
-SCIDB QUERY : <redimension_store(expo, Dsp3)>
+SCIDB QUERY : <store(redimension(expo, Dsp3), Dsp3)>
 {s,p} val
 {'sample-0','probe-0'} 0.01
 {'sample-0','probe-1'} 30.36
@@ -327,7 +327,7 @@ SCIDB QUERY : <redimension_store(expo, Dsp3)>
 {'sample-4','probe-3'} 384
 {'sample-4','probe-4'} 606.25
 
-SCIDB QUERY : <redimension_store(expo2, Dsp3)>
+SCIDB QUERY : <store(redimension(expo2, Dsp3), Dsp3)>
 s,p,val
 0,0,0.01
 0,1,42.49
@@ -1913,7 +1913,7 @@ offset,i,s,p,val
 24,24,'sample-3','probe-4',557.76
 25,25,'sample-4','probe-4',606.25
 
-SCIDB QUERY : <redimension_store(expo_1d, Dsp2)>
+SCIDB QUERY : <store(redimension(expo_1d, Dsp2), Dsp2)>
 s,p,val
 0,0,0.01
 0,1,30.36

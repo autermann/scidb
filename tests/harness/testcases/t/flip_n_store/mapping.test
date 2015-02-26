@@ -31,7 +31,7 @@ CREATE EMPTY ARRAY Dorfs < detail : string, qty : double > [ name(string)=7,7,0,
 # 5. redimension_store() the 1D array into the target. 
 #
 
-redimension_store ( RawDataForDorfs, Dorfs )
+store(redimension( RawDataForDorfs, Dorfs ), Dorfs )
 
 #
 # 6. Create a copy of the array with the non-integer dimensions. This new 

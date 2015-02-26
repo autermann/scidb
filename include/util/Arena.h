@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -68,14 +68,15 @@ const finalizer_t             allocated = finalizer_t(1);// Special finalizer
 /****************************************************************************/
 
 ArenaPtr                      getArena();                // The current arena
-ArenaPtr                      newArena(const Options&);  // Adds a new branch
+ArenaPtr                      newArena(Options);         // Adds a new branch
 
 /****************************************************************************/
 
-template<class t> finalizer_t finalizer();
-template<class t> void        finalize(void*);
-template<class t> t*          newArray(Arena&,count_t);
-template<class t> void        destroy (Arena&,const t*,count_t = unlimited);
+template<class t> finalizer_t finalizer();               // Gives &finalize<t>
+template<class t> void        finalize (void*);          // Calls t::~t()
+template<class t> t*          newScalar(Arena&/*...*/);  // Creates a scalar
+template<class t> t*          newVector(Arena&,count_t); // Creates a vector
+template<class t> void        destroy  (Arena&,const t*,count_t = unlimited);
 
 /****************************************************************************/
 
@@ -203,7 +204,9 @@ class Arena : noncopyable
             void*             calloc(size_t);
             void*             malloc(size_t,count_t);
             void*             calloc(size_t,count_t);
-            void              free  (void*, size_t);
+            char*             strdup(const char*);
+            char*             strdup(const std::string&);
+            void              free  (void*,size_t);
 
  public:                   // Implementation
     virtual void*             doMalloc(size_t)           = 0;
@@ -334,9 +337,9 @@ struct Allocator<void>
  *              Notice also that there is no comparable overload for 'operator
  *              new []': again, there's just no portable way to implement this
  *              operator (see article below for the gory details). Instead, we
- *              have the function newArray() for this purpose:
+ *              have the function newVector() for this purpose:
  *  @code
- *                  Foo* p = newArray(arena,78);    // allocate off arena
+ *                  Foo* p = newVector(arena,78);   // allocate off arena
  *                      ...
  *                  destroy(arena,p);               // return to the arena
  *  @endcode
@@ -394,7 +397,7 @@ class Allocated
  *              inheritance graph.
  *
  *  @see        http://www.parashift.com/c++-faq/named-parameter-idiom.html for
- *              a descrption of the 'named parameter idiom'.
+ *              a description of the 'named parameter idiom'.
  *
  *  @author     jbell@paradigm4.com.
  */
@@ -544,13 +547,43 @@ inline finalizer_t finalizer()
 }
 
 /**
+ *  Allocate an object of the given type from off the Arena 'a'.
+ *
+ *  The function is available at all arities - well, 8, at any rate - with any
+ *  additional arguments being passed on to the constructor for class 'type'.
+ *
+ *  @param x1,...,xn    Optional arguments to the constructor for class 'type'
+ *  (not shown in the synopsis above).
+ */
+template<class type>
+inline type* newScalar(Arena& a)
+{
+    return new(a,finalizer<type>()) type();              // Allocate off arena
+}
+
+/** @cond ********************************************************************
+ * In the absence of proper compiler support for variadic templates, we create
+ * the additional overloads with the help of the preprocessor...*/
+#define SCIDB_NEW_SCALAR(_,i,__)                                               \
+                                                                               \
+template<class type,BOOST_PP_ENUM_PARAMS(i,class X)>                           \
+inline type* newScalar(Arena& a,BOOST_PP_ENUM_BINARY_PARAMS(i,X,const& x))     \
+{                                                                              \
+    return new(a,finalizer<type>()) type(BOOST_PP_ENUM_PARAMS(i,x));           \
+}
+
+BOOST_PP_REPEAT_FROM_TO(1,8,SCIDB_NEW_SCALAR,"")         // Emit the overloads
+#undef SCIDB_NEW_SCALAR                                  // And clean up after
+/** @endcond ****************************************************************/
+
+/**
  *  Allocate an array of 'c' elements of the given type from the Arena 'a' and
  *  default construct each element, guarding against a possible exception that
  *  the constructor might throw. The array should be returned to the Arena 'a'
  *  - and *only* the Arena 'a'- for destruction by calling 'destroy(a,p)'. For
  *  example:
  *  @code
- *      double* p = newArray<string>(arena,13);          // Allocate an array
+ *      double* p = newVector<string>(arena,13);         // Allocate a vector
  *          ...
  *      destroy(arena,p);                                // Destroy the array
  *  @endcode
@@ -558,7 +591,7 @@ inline finalizer_t finalizer()
  *  array to the Arena to be destroyed and the underlying memory recycled.
  */
 template<class type>
-type* newArray(Arena& a,count_t c)
+type* newVector(Arena& a,count_t c)
 {
     finalizer_t f = finalizer<type>();                   // Find the finalizer
     void* const v = a.allocate(sizeof(type),f,c);        // Allocate the array
@@ -651,7 +684,7 @@ inline std::ostream& operator<<(std::ostream& o,const Exhausted& e)
 
 /**
  *  Construct an object of the given type within memory that is allocated from
- *  off the given Arena, and wrap it in a shared_ptr.
+ *  the Arena 'a', and wrap this new object with a shared_ptr.
  *
  *  This function overloads the boost function of the same name so as to allow
  *  it to be called directly with a reference to an Arena,  without the caller
@@ -667,9 +700,9 @@ inline std::ostream& operator<<(std::ostream& o,const Exhausted& e)
  *  @see http://www.boost.org/doc/libs/1_54_0/libs/smart_ptr/make_shared.html
  */
 template<class type>
-inline shared_ptr<type> allocate_shared(Arena& arena)
+inline shared_ptr<type> allocate_shared(Arena& a)
 {
-    return boost::allocate_shared<type>(Allocator<type>(&arena));
+    return boost::allocate_shared<type>(Allocator<type>(&a));
 }
 
 /** @cond ********************************************************************
@@ -679,24 +712,60 @@ inline shared_ptr<type> allocate_shared(Arena& arena)
                                                                                \
 template<class type,BOOST_PP_ENUM_PARAMS(i,class X)>                           \
 inline shared_ptr<type>                                                        \
-allocate_shared(Arena& arena,BOOST_PP_ENUM_BINARY_PARAMS(i,X,const& x))        \
+allocate_shared(Arena& a,BOOST_PP_ENUM_BINARY_PARAMS(i,X,const& x))            \
 {                                                                              \
-    Allocator<type> a(&arena);                                                 \
-                                                                               \
-    return boost::allocate_shared<type>(Allocator<type>(&arena),               \
+    return boost::allocate_shared<type>(Allocator<type>(&a),                   \
                                         BOOST_PP_ENUM_PARAMS(i,x));            \
 }
 
 BOOST_PP_REPEAT_FROM_TO(1,8,SCIDB_ALLOCATE_SHARED,"")    // Emit the overloads
 #undef SCIDB_ALLOCATE_SHARED                             // And clean up after
 /** @endcond ****************************************************************/
+
+
+/****************************************************************************/
+namespace detail {                                       // For implementation
+/****************************************************************************/
+
+class arena_deleter : private ArenaPtr
+{
+ public:                   // Construction
+                              arena_deleter(const ArenaPtr& a)
+                               : ArenaPtr(a)             {}
+
+ public:                   // Operations
+    template<class type>void  operator()(type* p)  const {destroy(*get(),p);}
+};
+
+/****************************************************************************/
+}
+/****************************************************************************/
+
+/**
+ *  Attach a shared_ptr wrapper to the native pointer 'p',  which points at an
+ *  object - or graph of objects - that were originally allocated from off the
+ *  Arena 'a'.  The resulting shared_ptr drags a strong reference to 'a' along
+ *  with it and will return 'p' to this Arena when the reference count finally
+ *  falls to zero.
+ *
+ *  Useful for adding sharing semantics to a graph of objects after the fact.
+ *
+ *  Notice the third argument to the shared_ptr constructor, which serves only
+ *  to ensure that the header block used to store the reference counting stuff
+ *  is also allocated within the Arena 'a'.
+ */
+template<class type>
+shared_ptr<type> attach_shared(type* p,const ArenaPtr& a)
+{
+    return shared_ptr<type>(p,detail::arena_deleter(a),Allocator<int>(a));
+}
+
+/****************************************************************************/
 }}
 /****************************************************************************/
 
-inline void* operator new   (size_t n,scidb::arena::Arena& a)                             {return a.allocate(n);}
-inline void* operator new   (size_t n,scidb::arena::Arena& a,scidb::arena::finalizer_t f) {return a.allocate(n,f);}
-inline void  operator delete(void*  p,scidb::arena::Arena& a)                             {a.recycle(p);}
-inline void  operator delete(void*  p,scidb::arena::Arena& a,scidb::arena::finalizer_t f) {f?a.destroy(p,0):a.recycle(p);}
+inline void* operator new   (size_t n,scidb::arena::Arena& a,scidb::arena::finalizer_t f=0) {return f ? a.allocate(n,f) : a.allocate(n);}
+inline void  operator delete(void*  p,scidb::arena::Arena& a,scidb::arena::finalizer_t f=0) {       f ? a.destroy (p,0) : a.recycle (p);}
 
 /****************************************************************************/
 #endif

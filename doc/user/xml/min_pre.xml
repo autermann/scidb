@@ -73,7 +73,7 @@
 
         <step>
           <para>Select the minimum value of each row of m3x3:<programlisting
-          language="test">--afl min(m3x3,val,i); --output-format=dense --show-output-in-test-file=no</programlisting></para>
+          language="test">--afl aggregate(m3x3,min(val),i); --output-format=dense --show-output-in-test-file=no</programlisting></para>
         </step>
       </procedure>
 

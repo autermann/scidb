@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -71,11 +71,6 @@ class PhysicalNormalize: public  PhysicalOperator
             std::vector< boost::shared_ptr<Array> >& inputArrays,
             boost::shared_ptr<Query> query)
 	{
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
         boost::shared_ptr<Array> inputArray = inputArrays[0];
         if (query->getInstancesCount() > 1) { 
             uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getInstanceID() : query->getCoordinatorID();
@@ -84,6 +79,7 @@ class PhysicalNormalize: public  PhysicalOperator
                 return boost::shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
+        inputArray = ensureRandomAccess(inputArray, query);
         double len = 0.0;
         for (boost::shared_ptr<ConstArrayIterator> arrayIterator = inputArray->getConstIterator(0);
              !arrayIterator->end();

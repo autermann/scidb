@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,11 +40,11 @@
 #include "query/QueryPlanUtilites.h"
 #include "query/optimizer/Optimizer.h"
 #include "query/optimizer/HabilisOptimizer.h"
+#include "query/ParsingContext.h"
 #include "system/SystemCatalog.h"
 #include "network/NetworkManager.h"
 #include "array/Metadata.h"
 #include "array/DelegateArray.h"
-#include "query/parser/ParsingContext.h"
 
 #include <iostream>
 
@@ -252,7 +252,7 @@ boost::shared_ptr<OperatorParam> HabilisOptimizer::n_createPhysicalParameter(con
                physicalExpression->compile(logicalExpression->getExpression(), _query, tile, logicalExpression->getExpectedType().typeId(), logicalInputSchemas,
                                             logicalOutputSchema);
             }
-            if (tile && !physicalExpression->supportsTileMode()) { 
+            if (tile && !physicalExpression->supportsTileMode()) {
                 return boost::shared_ptr<OperatorParam>();
             }
             return boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(logicalParameter->getParsingContext(), physicalExpression,
@@ -300,13 +300,13 @@ PhysNodePtr HabilisOptimizer::n_createPhysicalNode(boost::shared_ptr<LogicalQuer
     const LogicalOperator::Parameters& logicalParams = logicalOp->getParameters();
     size_t nParams = logicalParams.size();
     PhysicalOperator::Parameters physicalParams(nParams);
-        
+
   Retry:
     for (size_t i = 0; i < nParams; i++)
     {
         bool paramTileMode = tileMode && logicalOp->compileParamInTileMode(i);
         boost::shared_ptr<OperatorParam> param = n_createPhysicalParameter(logicalParams[i], inputSchemas, outputSchema, paramTileMode);
-                                                                           
+
         if (!param) {
             assert(paramTileMode);
             tileMode = false;
@@ -332,7 +332,7 @@ PhysNodePtr HabilisOptimizer::n_buildSgNode(const ArrayDesc & outputSchema,
     ps.setInt32(partSchema);
 
     psConst->compile(false, TID_INT32, ps);
-    sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), psConst, true)));
+    sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), psConst, true)));
 
     if (storeArray)
     {
@@ -340,11 +340,11 @@ PhysNodePtr HabilisOptimizer::n_buildSgNode(const ArrayDesc & outputSchema,
         Value instance(TypeLibrary::getType(TID_INT64));
         instance.setInt64(-1);
         instanceConst->compile(false, TID_INT64, instance);
-        sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""),
+        sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(),
                                                                                           instanceConst,
                                                                                           true)));
 
-        sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamArrayReference(boost::make_shared<ParsingContext> (""),
+        sgParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamArrayReference(boost::make_shared<ParsingContext>(),
                                                                                       "",
                                                                                       outputSchema.getName(),
                                                                                       true)));
@@ -365,7 +365,7 @@ PhysNodePtr HabilisOptimizer::n_buildReducerNode(PhysNodePtr const& child, Parti
     Value ps(TypeLibrary::getType(TID_INT32));
     ps.setInt32(partSchema);
     psConst->compile(false, TID_INT32, ps);
-    reducerParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), psConst, true)));
+    reducerParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), psConst, true)));
     PhysOpPtr reducerOp = OperatorLibrary::getInstance()->createPhysicalOperator("reduce_distro",
                                                                                  "physicalReduceDistro",
                                                                                  reducerParams,
@@ -438,7 +438,7 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
     Value ps(TypeLibrary::getType(TID_INT32));
     ps.setInt32(dist.getPartitioningSchema());
     psConst->compile(false, TID_INT32, ps);
-    newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), psConst, true)));
+    newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), psConst, true)));
 
     size_t nParams = 1;
     if( dist.getPartitioningSchema() == psLocalInstance)
@@ -449,7 +449,7 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
 
         boost::shared_ptr<Expression> instanceIdExpr = boost::make_shared<Expression> ();
         instanceIdExpr->compile(false, TID_INT64, instanceId);
-        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), instanceIdExpr, true)));
+        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), instanceIdExpr, true)));
 
         nParams = 2;
     }
@@ -467,12 +467,12 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
         Value instance(TypeLibrary::getType(TID_INT64));
         instance.setInt64(-1);
         instanceConst->compile(false, TID_INT64, instance);
-        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), instanceConst, true)));
+        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), instanceConst, true)));
     }
 
     if (newParameters.size() < 3)
     {   //if not already there - add fake schema name and fake store flag set to "false"
-        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamArrayReference(boost::make_shared<ParsingContext> (""),
+        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamArrayReference(boost::make_shared<ParsingContext>(),
                                                                                       "",
                                                                                       sgSchema.getName(),
                                                                                       true)));
@@ -481,7 +481,7 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
         Value storeFlag(TypeLibrary::getType(TID_BOOL));
         storeFlag.setBool(false);
         storeFlagExpr->compile(false, TID_BOOL, storeFlag);
-        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), storeFlagExpr, true)));
+        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), storeFlagExpr, true)));
     }
 
     DimensionVector offset;
@@ -496,7 +496,7 @@ static void s_setSgDistribution(PhysNodePtr sgNode,
         Value vectorValue(TypeLibrary::getType(TID_INT64));
         vectorValue.setInt64(offset[i]);
         vectorValueExpr->compile(false, TID_INT64, vectorValue);
-        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), vectorValueExpr, true)));
+        newParameters.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), vectorValueExpr, true)));
     }
 
     sgNode->getPhysicalOperator()->setParameters(newParameters);
@@ -1258,7 +1258,7 @@ void HabilisOptimizer::tw_insertRepartNodes(PhysNodePtr root)
             ArrayDesc repartSchema = root->getPhysicalOperator()->getRepartSchema(inputSchema);
 
             PhysicalOperator::Parameters repartParams;
-            repartParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamSchema(boost::make_shared<ParsingContext> (""), repartSchema)));
+            repartParams.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamSchema(boost::make_shared<ParsingContext>(), repartSchema)));
 
             PhysOpPtr repartOp = OperatorLibrary::getInstance()->createPhysicalOperator("repart", "physicalRepart", repartParams, repartSchema);
             repartOp->setQuery(_query);
@@ -1292,7 +1292,7 @@ void HabilisOptimizer::tw_insertChunkMaterializers(PhysNodePtr root)
             boost::shared_ptr<Expression> formatParameterExpr = boost::make_shared<Expression> ();
             formatParameterExpr->compile(false, TID_INT64, formatParameterValue);
             PhysicalOperator::Parameters params;
-            params.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext> (""), formatParameterExpr, true)));
+            params.push_back(boost::shared_ptr<OperatorParam> (new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), formatParameterExpr, true)));
 
             PhysOpPtr materializeOp = OperatorLibrary::getInstance()->createPhysicalOperator("materialize", "impl_materialize", params, schema);
             materializeOp->setQuery(_query);

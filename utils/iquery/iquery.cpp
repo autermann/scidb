@@ -4,7 +4,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -590,6 +590,12 @@ int main(int argc, char* argv[])
         iqueryState.connection = sciDB.connect(connectionString, port);
     	string query = ""; // separated query from overall set of queries    
 
+        // Whenever '{' is encountered, the count is increased by 1.
+        // Whenever '}' is encountered, the count is reduced by 1.
+        // The usage: do NOT terminate a query at ';' if the count is greater than 0.
+        // TO-DO: negative count should be reported as an exception but omit this error checking for now.
+        int nLevelsInsideCurlyBrackets = 0;
+
     	do
     	{
     		// We analyzing begin of queries or next query, so reset position 
@@ -620,6 +626,7 @@ int main(int argc, char* argv[])
     		char currC = 0;     // Character in current position
     		char prevC = 0; // Character in previous position
     		bool eoq = false;
+
     		for (size_t pos = 0; pos < queries.size(); ++pos)
     		{
     			prevC = currC;
@@ -650,12 +657,19 @@ int main(int argc, char* argv[])
     				    query += currC;
     			}
     			// Checking query separator, if not in string and comment, execute this query
-    			else if (currC == ';' && !iqueryState.insideComment && !iqueryState.insideString)
+    			else if (currC == ';' && !iqueryState.insideComment && !iqueryState.insideString
+    			        && nLevelsInsideCurlyBrackets==0)
     			{
     				executeCommandOrQuery(query);
     				query = "";
     				eoq = true;
     				++iqueryState.col;
+    			}
+    			// Maintain nLevelsInsideCurlyBrackets
+    			else if ((currC == '{' || currC == '}') && !iqueryState.insideComment && !iqueryState.insideString)
+    			{
+    			    nLevelsInsideCurlyBrackets += (currC == '{' ? 1 : -1);
+    			    query += currC;
     			}
     			// All other just added to query
     			else

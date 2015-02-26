@@ -76,7 +76,7 @@
 
         <step>
           <para>Select the standard deviation of each row of m3x3:
-          <programlisting language="test">--afl stdev(m3x3,val,i); --output-format=dense --show-output-in-test-file=no</programlisting></para>
+          <programlisting language="test">--afl aggregate(m3x3,stdev(val),i); --output-format=dense --show-output-in-test-file=no</programlisting></para>
         </step>
       </procedure>
     </informalexample>

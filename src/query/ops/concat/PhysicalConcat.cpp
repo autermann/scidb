@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -116,6 +116,7 @@ public:
                 case psByCol:
                 case psUndefined:
                 case psGroupby:
+                case psScaLAPACK:
                     return ArrayDistribution(psUndefined);
 
                 default:
@@ -135,13 +136,10 @@ public:
     {
 		assert(inputArrays.size() == 2);
 
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM ||
-            inputArrays[1]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
+		shared_ptr<Array> input0 = ensureRandomAccess(inputArrays[0], query);
+		shared_ptr<Array> input1 = ensureRandomAccess(inputArrays[1], query);
 
-		boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new ConcatArray(_schema, inputArrays[0], inputArrays[1]));
+		boost::shared_ptr<Array> result = boost::shared_ptr<Array>(make_shared<ConcatArray>(_schema, input0, input1));
 		return result;
 	 }
 };

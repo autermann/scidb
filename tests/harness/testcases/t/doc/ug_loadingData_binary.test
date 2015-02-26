@@ -13,7 +13,7 @@
 --aql LOAD intensityFlat FROM '../tests/harness/testcases/data/doc/intensity_data.bin' AS '(string, int64, int64 null)'
 --aql SELECT * FROM analyze(intensityFlat)
 --aql CREATE ARRAY intensity <measuredIntensity:int64 null> [exposure(string)=3,1000,0,elapsedTime=0:10,1000,0]
---aql SELECT * FROM redimension_store(intensityFlat,intensity)
+--aql SELECT * FROM store(redimension(intensityFlat,intensity),intensity)
 
 --aql drop array intensityFlat
 

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -73,7 +73,7 @@ class AllVersionsChunk : public DelegateChunk
 class AllVersionsArrayIterator : public DelegateArrayIterator
 {
   public:
-   AllVersionsArrayIterator(AllVersionsArray const& array, AttributeID attrID,
+        AllVersionsArrayIterator(AllVersionsArray const& array, AttributeID attrID,
                             boost::shared_ptr<ConstArrayIterator> inputIterator);
 
         virtual ConstChunk const& getChunk();
@@ -86,11 +86,20 @@ class AllVersionsArrayIterator : public DelegateArrayIterator
         virtual boost::shared_ptr<Query> getQuery();
 
   protected:
-    AllVersionsArray const& array;
-    shared_ptr<Array> inputVersion;
-    VersionID currVersion;
-    bool hasCurrent;
-    Coordinates outPos;
+        AllVersionsArray const& array;
+        VersionID currVersion;
+        bool hasCurrent;
+        Coordinates outPos;
+
+        /*
+         * It is not legal to destroy an iterator while there are outstanding chunks. This iterator runs over
+         * chunks from several input iterators. We cannot destroy them until this iterator is destroyed. So, we
+         * create a map of all the iterators we need. It starts out empty and gets populated lazily.
+         * Note we also inherit a single "inputIterator" from the superclass. That variable shall always be
+         * set to one of the pointers on this map.
+         */
+        map <VersionID, shared_ptr<ConstArrayIterator> > inputIterators;
+
 };
 
 class AllVersionsArray : public DelegateArray

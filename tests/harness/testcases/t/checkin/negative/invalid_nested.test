@@ -2,11 +2,11 @@
 create array A <a:int32>[x=0:2,3,0]
 
 --test
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "sum(zz.A)"
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "avg(zz.A)"
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "max(zz.A)"
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "min(zz.A)"
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "count(zz.A)"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "aggregate(zz.A,sum(a))"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "aggregate(zz.A,avg(a))"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "aggregate(zz.A,max(a))"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "aggregate(zz.A,min(a))"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "aggregate(zz.A,count(*))"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "save(zz.A,'1.txt')"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "between(zz.A,1,1)"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "filter(zz.A,1)"
@@ -24,8 +24,8 @@ create array A <a:int32>[x=0:2,3,0]
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "reverse(zz.A)"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "project(zz.A,a)"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "aggregate(zz.A)"
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "join(A,zz.A)"
---error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "join(zz.A,A)"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "cross_join(A,zz.A)"
+--error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "cross_join(zz.A,A)"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "concat(zz.A,A)"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "concat(A,zz.A)"
 --error --code=scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED "merge(zz.A,A)"

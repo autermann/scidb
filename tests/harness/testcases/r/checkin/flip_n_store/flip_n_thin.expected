@@ -107,7 +107,7 @@ SCIDB QUERY : <store(build(Orig,i*10.1), Orig)>
 {99} 999.9
 {100} 1010
 
-SCIDB QUERY : <redimension_store(Orig, Flipped)>
+SCIDB QUERY : <store(redimension(Orig, Flipped), Flipped)>
 {x} i
 {10.1} 1
 {20.2} 2

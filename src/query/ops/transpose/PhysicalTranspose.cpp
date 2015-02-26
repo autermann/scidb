@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -114,13 +114,9 @@ class PhysicalTranspose: public PhysicalOperator
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
-        shared_ptr<CoordinateSet> inputChunkPositions = inputArrays[0]->findChunkPositions();
-        return boost::shared_ptr<Array>(new TransposeArray(_schema, inputArrays[0], inputChunkPositions, query));
+        shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+        shared_ptr<CoordinateSet> inputChunkPositions = inputArray->findChunkPositions();
+        return make_shared<TransposeArray>(_schema, inputArray, inputChunkPositions, query);
     }
 };
 

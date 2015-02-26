@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -426,7 +426,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
         addPerInstanceArgsOMPI(myId, desc, clusterUuid, queryId,
                            launchId, slaveArgs, args);
     }
-    int64_t shmSize(0);
+    uint64_t shmSize(0);
     vector<string>::iterator iter=args.begin();
     iter += ARGS_PER_LAUNCH;
 
@@ -439,7 +439,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments size = " << shmSize);
 
-    envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
+    envVars.push_back(mpi::getScidbMPIEnvVar(mpi::getShmIpcType(), clusterUuid, queryId, launchId));
 
     // Create shared memory to pass the arguments to the launcher
     string ipcName = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_args";
@@ -472,7 +472,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
     }
     *(ptr+off) = '\n';
     ++off;
-    assert(static_cast<int64_t>(off) <= shmSize);
+    assert(off <= shmSize);
     shmIpc->close();
     shmIpc->flush();
 
@@ -734,7 +734,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     const size_t DELIM_SIZE=sizeof('\n');
 
     // compute arguments/configfile size
-    int64_t shmSizeArgs(0);
+    uint64_t shmSizeArgs(0);
     vector<string>::iterator iter=args.begin();
     iter += ARGS_PER_LAUNCH;
     for (; iter!=args.end(); ++iter) {
@@ -799,7 +799,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
         arg.clear();
     }
 
-    assert(static_cast<int64_t>(off) <= shmSizeArgs);
+    assert(off <= shmSizeArgs);
     assert((*(ptrArgs+off-3)) == ' ');
     assert((*(ptrArgs+off-2)) == ':');
     assert((*(ptrArgs+off-1)) == '\n');
@@ -851,7 +851,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     args[ARGS_PER_LAUNCH+4] = "-configfile";
     args[ARGS_PER_LAUNCH+5] = mpi::getIpcFile(getInstallPath(),ipcNameArgs);
     validateLauncherArg(args[ARGS_PER_LAUNCH+5]);
-    envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
+    envVars.push_back(mpi::getScidbMPIEnvVar(mpi::getShmIpcType(), clusterUuid, queryId, launchId));
 }
 
 void MpiLauncher::resolveHostNames(boost::shared_ptr<vector<string> >& hosts)
@@ -986,7 +986,7 @@ MpiLauncherMPICH::getLauncherSSHExecContent(const string& clusterUuid, const str
     script << "#!/bin/sh\n"
            << "args=\"\"\n"
            << "bin=\""<< daemonBinPath <<"\"\n"
-           << "info=" << mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId)<<"\n"
+           << "info=" << mpi::getScidbMPIEnvVar(mpi::getShmIpcType(), clusterUuid, queryId, launchId)<<"\n"
            << "for a in $@ ; do\n"
            << "case $a in\n"
            << "\"$bin\") args=\"$args $info\" ;;\n"
@@ -999,7 +999,7 @@ MpiLauncherMPICH::getLauncherSSHExecContent(const string& clusterUuid, const str
     return script.str();
 }
 
-char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize)
+char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, uint64_t shmSize)
 {
     assert(shmIpc);
     char* ptr(NULL);
@@ -1062,8 +1062,8 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
 
     args.push_back(string("")); //place holder for the binary
 
-    string ipcNameHosts = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_hosts";
-    string ipcNameExec  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_exec";
+    string ipcNameHosts;
+    string ipcNameExec;
 
     args.push_back("-bootstrap-exec");
     args.push_back("");
@@ -1074,7 +1074,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
     args.push_back("-wdir");
     args.push_back("/tmp");
 
-    envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
+    envVars.push_back(mpi::getScidbMPIEnvVar(mpi::getShmIpcType(), clusterUuid, queryId, launchId));
 
     // loop over all the instances
     size_t count = 0;
@@ -1087,6 +1087,10 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
         if (currId == myId) {
             assert(args[0].empty());
             setInstallPath(desc->getPath());
+
+            ipcNameHosts = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_hosts";
+            ipcNameExec  = mpi::getIpcName(getInstallPath(), clusterUuid, queryId, myId, launchId) + ".launch_exec";
+
             args[0] = MpiManager::getInstance()->getLauncherBinFile(getInstallPath());
             validateLauncherArg(args[0]);
             args[EXEC_INDX] = mpi::getIpcFile(getInstallPath(),ipcNameExec);
@@ -1103,7 +1107,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
     resolveHostNames(hosts);
 
     // compute hostfile size
-    int64_t shmSizeHosts(0);
+    uint64_t shmSizeHosts(0);
     for (vector<string>::iterator iter=hosts->begin(); iter!=hosts->end(); ++iter) {
         string& host = (*iter);
         shmSizeHosts += (host.size()+DELIM_SIZE);

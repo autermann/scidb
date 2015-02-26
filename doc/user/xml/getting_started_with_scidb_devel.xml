@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd">
+"docbookV4.5/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "scidb_ug.ent">
+%myents;
+]>
 <chapter remap="h1" xml:id="iqueryClient">
   <title>Getting Started with SciDB Development</title>
 
@@ -13,8 +16,8 @@
   command line when a SciDB session is active:</para>
 
   <para>
-    <programlisting>scidb.py startall <replaceable>dbname</replaceable>
-iquery</programlisting>
+    <programlisting>$ scidb.py startall <replaceable>scidb_cluster_name</replaceable>
+$ iquery</programlisting>
   </para>
 
   <para><indexterm>
@@ -124,7 +127,8 @@ quit or exit   - End iquery session</programlisting></para>
             <entry>dcsv</entry>
 
             <entry>Format used in most doc examples. Visually distinguishes
-            dimensions from attributes.</entry>
+            dimensions from attributes. This is the default output
+            format.</entry>
           </row>
 
           <row>
@@ -447,8 +451,7 @@ quit or exit   - End iquery session</programlisting></para>
               <para>Set the format of query output. Options are csv, csv+,
               dcsv, lcsv+, sparse, and lsparse.</para>
 
-              <para>We <emphasis>strongly</emphasis> recommend that you set
-              your format to lcsv+ or dcsv.</para>
+              <para>The default format is dcsv.</para>
             </entry>
           </row>
 
@@ -478,6 +481,107 @@ quit or exit   - End iquery session</programlisting></para>
     <para>The opening and closing braces at the beginning and end of the file
     must be present and each entry (except the last one) should be followed by
     a comma.</para>
+  </section>
+
+  <section id="iqueryNonCoord">
+    <title>Running iquery from any computer</title>
+
+    <para><indexterm>
+        <primary>remote iquery</primary>
+      </indexterm><indexterm>
+        <primary>iquery</primary>
+
+        <secondary>running remotely</secondary>
+      </indexterm>You can run the iquery command from any computer, not just
+    the SciDB coordinator server. This section describes how to do so.</para>
+
+    <para>Note the following:<itemizedlist>
+        <listitem>
+          <para>Your version of iquery must match the version of SciDB. For
+          example, if your SciDB installation is at version 13.12, you must
+          download and install iquery version 13.12.</para>
+        </listitem>
+
+        <listitem>
+          <para>Your client OS does not need to match the OS of the SciDB
+          coordinator server. For example, you can install the iquery client
+          on computer running Ubuntu, and access a SciDB coordinator server
+          that is running CentOS.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>Perform the following steps from the computer on which you wish to
+    run iquery:</para>
+
+    <procedure>
+      <step>
+        <para>Add SciDB's GPG public key by running the following
+        command:</para>
+
+        <itemizedlist>
+          <listitem>
+            <para>On Ubuntu:<programlisting>wget -O- http://downloads.paradigm4.com/key | sudo apt-key add -</programlisting></para>
+          </listitem>
+
+          <listitem>
+            <para>On CentOS or RHEL:<programlisting>wget http://downloads.paradigm4.com/key
+sudo rpm --import key
+rm -f key</programlisting></para>
+          </listitem>
+        </itemizedlist>
+      </step>
+
+      <step>
+        <para>Add the SciDB repository to the repository folder, by creating
+        the configuration file:<itemizedlist>
+            <listitem>
+              <para>On Ubuntu, create the file
+              <code>/etc/apt/sources.list.d/scidb.list</code> and add the
+              following line:<programlisting>deb  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/</programlisting></para>
+            </listitem>
+
+            <listitem>
+              <para>On CentOS or RHEL, create the
+              <code>/etc/yum.repos.d/scidb.repo</code> file and add the
+              following lines:<programlisting>[scidb]
+name=SciDB
+baseurl=http://downloads.paradigm4.com/centos6.3/&scidb_version;/
+gpgcheck=1</programlisting></para>
+            </listitem>
+          </itemizedlist></para>
+      </step>
+
+      <step>
+        <para>Run the appropriate update and package install commands for your
+        OS:<itemizedlist>
+            <listitem>
+              <para>On Ubuntu:<programlisting>sudo apt-get update
+sudo apt-get install scidb-&scidb_version;-utils</programlisting></para>
+            </listitem>
+
+            <listitem>
+              <para>On CentOS or RHEL:<programlisting>sudo yum update
+sudo yum install scidb-&scidb_version;-utils</programlisting></para>
+            </listitem>
+          </itemizedlist></para>
+      </step>
+
+      <step>
+        <para>Set the SciDB environment variables in the user
+        environment.<programlisting>export SCIDB_VER=&scidb_version; 
+export PATH="$PATH:/opt/scidb/$SCIDB_VER/bin:/opt/scidb/$SCIDB_VER/share/scidb"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/scidb/$SCIDB_VER/lib"</programlisting></para>
+      </step>
+
+      <step>
+        <para>When you run iquery, make sure to specify the correct host (the
+        computer running the SciDB coordinator node). For example, if your
+        SciDB coordinator server is <emphasis
+        role="bold">shared-c6-c2-vm1</emphasis> (and is running on the default
+        <code>base-port</code> of 1239), you could start an iquery session by
+        running the following command: <programlisting>$ iquery --host shared-c6-c2-vm1</programlisting></para>
+      </step>
+    </procedure>
   </section>
 
   <section id="multipleSciDBs">
@@ -554,7 +658,6 @@ install_root=/opt/scidb/13.3
 pluginsdir=/opt/scidb/13.3/lib/scidb/plugins
 logconf=/opt/scidb/13.3/share/scidb/log4cxx.properties
 base-path=/home/scidb/one-13.3
-tmp-path=/tmp
 base-port=1259</programlisting></para>
         </listitem>
 
@@ -568,7 +671,6 @@ install_root=/opt/scidb/13.6
 pluginsdir=/opt/scidb/13.6/lib/scidb/plugins
 logconf=/opt/scidb/13.6/share/scidb/log4cxx.properties
 base-path=/home/scidb/two-13.6
-tmp-path=/tmp
 base-port=1279</programlisting></para>
         </listitem>
 
@@ -620,11 +722,8 @@ alias iquery13.6=/opt/scidb/13.6/bin/iquery -p 1279
     <para>The are more detailed examples on creating a SciDB array in <xref
     linkend="creatingArraysChapter"/>.</para>
 
-    <para><indexterm>
-        <primary>random function</primary>
-      </indexterm>The following example creates an array, generates random
-    numbers and stores them in the array, and saves the array data into a
-    csv-formatted file.</para>
+    <para>The following example creates an array, generates random numbers and
+    stores them in the array, and saves the array data into a file.</para>
 
     <orderedlist>
       <listitem>
@@ -647,8 +746,9 @@ alias iquery13.6=/opt/scidb/13.6/bin/iquery -p 1279
       </listitem>
 
       <listitem>
-        <para>Save the values in random_numbers in csv format to a file called
-        <code>/tmp/random_values.csv</code>: <programlisting>iquery -o csv -r /tmp/random_values.csv -aq "scan(random_numbers)"
+        <para>Save the values in random_numbers in the default format
+        (<emphasis role="bold">dcsv</emphasis>) to a file called
+        <code>/tmp/random_values.dcsv</code>: <programlisting>iquery -r /tmp/random_values.dcsv -aq "scan(random_numbers)"
 </programlisting></para>
       </listitem>
     </orderedlist>
@@ -688,7 +788,7 @@ Convertible, 26.8
 
       <step>
         <para>Use the load command to load the SciDB-formatted file that you
-        just created into <literal>target</literal>:<programlisting>iquery -o csv aq "load(target, '<replaceable>output_path</replaceable>/datafile.scidb')"</programlisting><screen>type,mpg
+        just created into <literal>target</literal>:<programlisting>iquery aq "load(target, '<replaceable>output_path</replaceable>/datafile.scidb')"</programlisting><screen>type,mpg
 'Truck',23.5
 'Sedan',48.7
 'SUV',19.6
@@ -710,12 +810,15 @@ Convertible, 26.8
       <step>
         <para>Now, suppose that you want to convert miles per gallon to
         kilometers per liter. Use the apply operator to perform a calculation
-        on the <literal>mpg</literal> attribute values:<programlisting>iquery -aq "apply(target,kpl,mpg*.4251)"</programlisting><screen> [('Truck',23.5,9.98985),('Sedan',48.7,20.7024),
- ('SUV',19.6,8.33196),('Convertible',26.8,11.3927)]
-</screen>Note that this does not update <literal>target</literal>. Instead,
-        SciDB creates an result array with the new calculated attribute
-        <literal>kpl</literal>. To create an array containing the kpl
-        attribute, use the <literal>store</literal> command:<programlisting>iquery -aq "store(apply(target,kpl,mpg*.4251),target_new)"</programlisting></para>
+        on the <literal>mpg</literal> attribute values:<programlisting>iquery -aq "apply(target,kpl,mpg*.4251)"</programlisting><screen>{x} type,mpg,kpl
+{0} 'Truck',23.5,9.98985
+{1} 'Sedan',48.7,20.7024
+{2} 'SUV',19.6,8.33196
+{3} 'Convertible',26.8,11.3927</screen>Note that this does not update
+        <literal>target</literal>. Instead, SciDB creates an result array with
+        the new calculated attribute <literal>kpl</literal>. To create an
+        array containing the kpl attribute, use the <literal>store</literal>
+        command:<programlisting>iquery -aq "store(apply(target,kpl,mpg*.4251),target_new)"</programlisting></para>
       </step>
 
       <step>
@@ -738,32 +841,34 @@ Maudi,Convertible,45000
         <para>Now, you want to combine the data in these two files so that
         each entry has a make and model, a price, an mpg, and a kpl. You can
         join the arrays with the <literal>join</literal>
-        operator:<programlisting>iquery -o csv -aq "join(storage,target_new)"</programlisting><screen>make,type,price,type,mpg,kpl
-'Handa','Truck',26700,'Truck',23.5,9.98985
-'Tolona','Sedan',31000,'Sedan',48.7,20.7024
-'Gerrd',' SUV',42000,'SUV',19.6,8.33196
-'Maudi','Convertible',45000,'Convertible',26.8,11.3927
-</screen>Note that attributes 2 and 4 are identical. Before you store the
-        combined data in an array, you want to get rid of duplicated
-        data.</para>
+        operator:<programlisting>iquery -aq "join(storage,target_new)"</programlisting><screen>{x} make,type,price,type,mpg,kpl
+{0} 'Handa','Truck',26700,'Truck',23.5,9.98985
+{1} 'Tolona','Sedan',31000,'Sedan',48.7,20.7024
+{2} 'Gerrd',' SUV',42000,'SUV',19.6,8.33196
+{3} 'Maudi','Convertible',45000,'Convertible',26.8,11.3927</screen>Note that
+        attributes 2 and 4 are identical. Before you store the combined data
+        in an array, you want to get rid of duplicated data.</para>
       </step>
 
       <step>
         <para>You can use the <literal>project</literal> operator to specify
-        attributes in a specific order:<programlisting>iquery -aq "project(target_new,mpg,kpl)"
-[(23.5,9.98985),(48.7,20.7024),(19.6,8.33196),(26.8,11.3927)]</programlisting>Attributes
-        that you do not specify are not included in the output.</para>
+        attributes in a specific order:<programlisting>iquery -aq "project(target_new,mpg,kpl)"</programlisting><screen>{x} mpg,kpl
+{0} 23.5,9.98985
+{1} 48.7,20.7024
+{2} 19.6,8.33196
+{3} 26.8,11.3927
+</screen>Attributes that you do not specify are not included in the
+        output.</para>
       </step>
 
       <step>
         <para>Use the <literal>join</literal> and <literal>project</literal>
         operators to put the car data together. Use csv as the query output
-        format:<programlisting>iquery -o csv -aq "join(storage,project(target_new,mpg,kpl))"</programlisting><screen>make,type,price,mpg,kpl
-'Handa','Truck',26700,23.5,9.98985
-'Tolona','Sedan',31000,48.7,20.7024
-'Gerrd',' SUV',42000,19.6,8.33196
-'Maudi','Convertible',45000,26.8,11.3927
-</screen></para>
+        format:<programlisting>iquery -aq "join(storage,project(target_new,mpg,kpl))"</programlisting><screen>{x} make,type,price,mpg,kpl
+{0} 'Handa','Truck',26700,23.5,9.98985
+{1} 'Tolona','Sedan',31000,48.7,20.7024
+{2} 'Gerrd',' SUV',42000,19.6,8.33196
+{3} 'Maudi','Convertible',45000,26.8,11.3927</screen></para>
       </step>
     </procedure>
   </section>

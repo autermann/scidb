@@ -8,7 +8,7 @@ load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data2.txt')
 
 CREATE ARRAY Data < V : double NULL > [ I=0:999,10,0, J=0:999,10,0 ]
 
-redimension_store(Raw_Test_Data, Data)
+store(redimension(Raw_Test_Data, Data), Data)
 
 scan (Raw_Test_Data)
 scan (Data)

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -98,16 +98,17 @@ public:
 
     shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        shared_ptr<Array> inputArray = inputArrays[0];
+        if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
+        {   //if input supports MULTI_PASS, don't bother converting it
+            inputArray = ensureRandomAccess(inputArray, query);
         }
 
         // timing
         LOG4CXX_DEBUG(logger, "[Rank] Begins.");
         ElapsedMilliSeconds timing;
 
-        const ArrayDesc& inputSchema = inputArrays[0]->getArrayDesc();
+        const ArrayDesc& inputSchema = inputArray->getArrayDesc();
         string attName = _parameters.size() > 0 ? ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName() :
                                                 inputSchema.getAttributes()[0].getName();
 
@@ -145,7 +146,7 @@ public:
         // For now, just use Alex's old implementation.
         if (groupBy.size() == 0) {
             LOG4CXX_DEBUG(logger, "[Rank] Building RankArray, because this is not a group-by rank.");
-            shared_ptr<Array> rankArray = buildRankArray(inputArrays[0], rankedAttributeID, groupBy, query);
+            shared_ptr<Array> rankArray = buildRankArray(inputArray, rankedAttributeID, groupBy, query);
 
             timing.logTiming(logger, "[Rank] buildRankArray", false); // false = no need to restart
             LOG4CXX_DEBUG(logger, "[Rank] finished!")
@@ -156,8 +157,7 @@ public:
         // if every cell is a separate group, return "all-ranked-one"
         if (groupBy.size() == dims.size()) {
             LOG4CXX_DEBUG(logger, "[Rank] Building AllRankedOneArray, because all the dimensions are involved.");
-            shared_ptr<Array> allRankedOne = shared_ptr<Array>(
-                    new AllRankedOneArray(getRankingSchema(inputSchema, rankedAttributeID), inputArrays[0], rankedAttributeID));
+            shared_ptr<Array> allRankedOne = make_shared<AllRankedOneArray>(getRankingSchema(inputSchema, rankedAttributeID), inputArray, rankedAttributeID);
 
             timing.logTiming(logger, "[Rank] Building AllRankedOneArray", false);
             LOG4CXX_DEBUG(logger, "[Rank] finished!")
@@ -213,8 +213,7 @@ public:
         vector<AttributeID> projection(1);
         projection[0] = rankedAttributeID;
 
-        shared_ptr<Array> projected = shared_ptr<Array>(
-                new SimpleProjectArray(projectSchema, inputArrays[0], projection));
+        shared_ptr<Array> projected = make_shared<SimpleProjectArray>(projectSchema, inputArray, projection);
 
         // Redistribute, s.t. all records in the same group go to the same instance.
         boost::shared_ptr<Array> redistributed = redistribute(
@@ -399,8 +398,8 @@ public:
         // timing
         timing.logTiming(logger, "[Rank] Second sort", false);
 
-        boost::shared_ptr<GroupbyRankArray> dest = boost::shared_ptr<GroupbyRankArray>(
-                new GroupbyRankArray(outputSchema, redistributed, pRowCollectionChunkSorted, 0, mapChunkPosToID));
+        boost::shared_ptr<GroupbyRankArray> dest =
+                make_shared<GroupbyRankArray>(outputSchema, redistributed, pRowCollectionChunkSorted, 0, mapChunkPosToID);
 
         LOG4CXX_DEBUG(logger, "[Rank] finished!")
 

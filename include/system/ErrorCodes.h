@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -87,7 +87,7 @@ ERRCODE(SCIDB_LE_NO_MEMORY_FOR_VALUE,               8); //No memory for new Valu
 ERRCODE(SCIDB_LE_THREAD_EVENT_ERROR,                9); //Error state '%1%' detected in event wait
 ERRCODE(SCIDB_LE_THREAD_SEMAPHORE_ERROR,            10); //Error state '%1%' detected in semaphore enter
 ERRCODE(SCIDB_LE_CANT_LOAD_MODULE,                  11); //Can not load module '%1%', dlopen returned '%2%'
-ERRCODE(SCIDB_LE_TOO_NEW_MODULE,                    12); //Too new plugin version. Version of %1% is %2%.%3%.%4%.%5% but but SciDB version is %6%
+ERRCODE(SCIDB_LE_WRONG_MODULE_VERSION,              12); //Plugin version does not match the version of SciDB. The plugin %1% has version %2%.%3%.%4%.%5% but SciDB version is %6%
 ERRCODE(SCIDB_LE_CANT_FIND_SYMBOL,                  13); //Can not find symbol '%1%', dlsym returned '%2%'
 ERRCODE(SCIDB_LE_INPUTS_MUST_BE_BEFORE_PARAMS,      14); //Error in operator '%1%'. All inputs must be before other parameters
 ERRCODE(SCIDB_LE_VAR_MUST_BE_AFTER_PARAMS,          15); //Error in operator '%1%'. Variadic parameters must appear last
@@ -187,6 +187,7 @@ ERRCODE(SCIDB_LE_UNKNOWN_MESSAGE_TYPE2,             117); //Invalid message type
 ERRCODE(SCIDB_LE_INVALID_SHEDULER_WORK_ITEM,        118); //Invalid work item for Scheduler
 ERRCODE(SCIDB_LE_INVALID_SHEDULER_PERIOD,           119); //Invalid period for Scheduler
 ERRCODE(SCIDB_LE_CONNECTION_ERROR2,                 120); //Connection error while sending
+ERRCODE(SCIDB_LE_CANT_OPEN_PATH,                    121); //Cannot open path '%1%'
 ERRCODE(SCIDB_LE_WRONG_ATTRIBUTE_TYPE,              124); //Attribute '%1%' has incorrect datatype (source: %2%, destination: %3%)
 ERRCODE(SCIDB_LE_WRONG_ATTRIBUTE_FLAGS,             125); //Attribute '%1%' has incorrect properties
 ERRCODE(SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE,       126); //Source attribute '%1%' must be of type '%2%'
@@ -275,9 +276,6 @@ ERRCODE(SCIDB_LE_OP_CAST_ERROR1,                    227); //Mismatched number of
 ERRCODE(SCIDB_LE_OP_CAST_ERROR3,                    229); //Attribute '%1%' flags doesn't match
 ERRCODE(SCIDB_LE_OP_CAST_ERROR4,                    230); //Mismatched number of dimensions
 ERRCODE(SCIDB_LE_OP_CAST_ERROR5,                    231); //Dimension '%1%' length doesn't match
-ERRCODE(SCIDB_LE_OP_CAST_ERROR6,                    232); //Dimension '%1%' start doesn't match
-ERRCODE(SCIDB_LE_OP_CAST_ERROR7,                    233); //Dimension '%1%' chunk interval doesn't match
-ERRCODE(SCIDB_LE_OP_CAST_ERROR8,                    234); //Dimension '%1%' chunk overlap doesn't match
 ERRCODE(SCIDB_LE_OP_CONCAT_ERROR1,                  235); //Arrays with open boundary can not be concatenated
 ERRCODE(SCIDB_LE_OP_CROSSJOIN_ERROR1,               236); //Dimension should be specified only once in JOIN ON list
 ERRCODE(SCIDB_LE_OP_DELDIM_ERROR1,                  237); //Can not delete last dimension of array
@@ -449,7 +447,20 @@ ERRCODE(SCIDB_LE_ATTRIBUTE_CANNOT_BE_NULLABLE,      434); //The index attribute 
 ERRCODE(SCIDB_LE_CANNOT_PARSE_BOOLEAN_PARAMETER,    435); //The parameter '%1%' could not be parsed into a boolean value
 ERRCODE(SCIDB_LE_CHUNK_SEGMENT_SIZE_INCOMPATIBLE,   436); //Configured chunk segment size: %1% bytes, doesn't match stored chunk segment size: %2% bytes
 ERRCODE(SCIDB_LE_CHUNK_SEGMENT_SIZE_ILLEGAL,        437); //Cannot initialize database with chunk segment size of %1% bytes
- 
+ERRCODE(SCIDB_LE_BAD_BLOCK_COMMENT,                 438); //The block '/*' comment is not terminated with a matching '*/'
+ERRCODE(SCIDB_LE_BAD_LITERAL_REAL,                  439); //'%1%' is too large to represent as a double
+ERRCODE(SCIDB_LE_BAD_LITERAL_INTEGER,               440); //'%1%' is too large to represent as an integer
+ERRCODE(SCIDB_LE_NAME_REDEFINED,                    441); //'%1%' has already been defined
+ERRCODE(SCIDB_LE_NAME_NOT_APPLICABLE,               442); //'%1%' is not an entity that can be applied (such as an operator or function)
+ERRCODE(SCIDB_LE_NAME_IS_RECURSIVE,                 443); //'%1%' is defined recursively (recursion not yet supported)
+ERRCODE(SCIDB_LE_NAME_ARITY_MISMATCH,               444); //'%1%' is applied to the wrong number of arguments
+ERRCODE(SCIDB_LE_DATASTORE_GUID_NOT_UNIQUE,         445); //Attempt to create a DataStore on file '%1%' with non-unique guid '%2%'
+ERRCODE(SCIDB_LE_STORAGE_FILE_INVALID_FORMAT,       446); //The storage file '%1% has an invalid format
+ERRCODE(SCIDB_LE_DATASTORE_NOT_FOUND,               447); //Attempt to access non-existent DataStore with guid '%1%'
+ERRCODE(SCIDB_LE_DATASTORE_CHUNK_CORRUPTED,         448); //Chunk header corrupted in DataStore with guid '%1%' offset '%2%'
+ERRCODE(SCIDB_LE_DATASTORE_CORRUPT_FREELIST,        449); //Stored freelist for data store corrupted: '%1%'
+
+
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%

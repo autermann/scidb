@@ -35,7 +35,7 @@ SCIDB QUERY : <load ( RawDataForDorfs, '../tests/harness/testcases/data/iquery_2
 SCIDB QUERY : <CREATE EMPTY ARRAY Dorfs < detail : string, qty : double > [ name(string)=7,7,0, item(string)=4,4,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store ( RawDataForDorfs, Dorfs )>
+SCIDB QUERY : <store(redimension( RawDataForDorfs, Dorfs ), Dorfs )>
 {name,item} detail,qty
 {'Bashful','Beard'} 'long',7
 {'Bashful','Body'} 'normal',5

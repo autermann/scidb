@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -182,8 +182,8 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 		{
 			if (ie.record)                 // PASS
 			{
-				bfs::remove (ie.expected_rfile);	
-				bfs::rename (ie.actual_rfile, ie.expected_rfile);	
+				bfs::copy_file (ie.actual_rfile, ie.expected_rfile, bfs::copy_option::overwrite_if_exists);
+				bfs::remove (ie.actual_rfile);
 				result = RESULT_RECORDED;
 				result_str = "RECORDED";
 				failureReason = "";
@@ -713,6 +713,7 @@ void MANAGER :: getInfoForExecutorFromharness (const HarnessCommandLineOptions &
     _ie.rootDir            = c.rootDir;
     _ie.sleepTime          = c.sleepTime;
     _ie.logDir             = c.logDir;
+    _ie.scratchDir         = c.scratchDir;
     _ie.logDestination     = c.logDestination;
     _ie.debugLevel         = c.debugLevel;
     _ie.record             = c.record;

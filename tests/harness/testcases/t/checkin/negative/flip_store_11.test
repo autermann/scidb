@@ -8,8 +8,8 @@ create empty array B <x:int64> [a=0:15,2,1]
 create empty array C <x:int64> [a=0:15,2,1]
 
 --test
-redimension_store(A,B)
-redimension_store(A,C)
+store(redimension(A,B),B)
+store(redimension(A,C),C)
 
 --cleanup
 remove(A)

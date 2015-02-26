@@ -41,6 +41,14 @@ BuildRequires: lapack-devel
 BuildRequires: blas-devel
 BuildRequires: openssh-clients
 BuildRequires: cppunit-devel
+BuildRequires: ant
+BuildRequires: ant-contrib
+BuildRequires: ant-nodeps
+BuildRequires: ant-jdepend
+BuildRequires: protobuf-compiler
+BuildRequires: protobuf-java
+BuildRequires: java-1.6.0-openjdk-devel
+BuildRequires: junit
 Requires: %{scidb_boost}-filesystem      = %{scidb_boost_version}
 Requires: %{scidb_boost}-serialization   = %{scidb_boost_version}
 Requires: %{scidb_boost}-system          = %{scidb_boost_version}
@@ -158,6 +166,14 @@ BuildArch: noarch
 %description -n %{scidb}-doc
 SciDB documentation
 
+%package -n %{scidb}-jdbc
+Summary: SciDB Java connector
+Group: Applications/Databases
+Requires: protobuf-java
+Requires: java-1.6.0-openjdk-devel
+%description -n %{scidb}-jdbc
+SciDB Java connector
+
 %package -n %{scidb}-all
 Summary: SciDB metapackage which install entire SciDB
 Group: Applications/Databases
@@ -197,7 +213,7 @@ cmake . -DSWIG_EXECUTABLE=/usr/bin/swig2 -DSCIDB_DOC_TYPE=API -DBUILD_USER_DOC=1
 make %{?_smp_mflags}
 
 %install
-for p in %{scidb} %{scidb}-dbg %{libscidbclient} %{libscidbclient}-dbg %{scidb}-utils %{scidb}-utils-dbg %{scidb}-dev-tools %{scidb}-dev-tools-dbg %{scidb}-plugins %{scidb}-plugins-dbg %{libscidbclient}-python %{libscidbclient}-python-dbg %{scidb}-dev %{scidb}-doc; do
+for p in %{scidb} %{scidb}-dbg %{libscidbclient} %{libscidbclient}-dbg %{scidb}-utils %{scidb}-utils-dbg %{scidb}-dev-tools %{scidb}-dev-tools-dbg %{scidb}-plugins %{scidb}-plugins-dbg %{libscidbclient}-python %{libscidbclient}-python-dbg %{scidb}-dev %{scidb}-doc %{scidb}-jdbc; do
     COMPONENT=$(echo $p | sed -e "s/%{scidb}/scidb/" | sed -e "s/%{libscidbclient}/libscidbclient/")
     scidb_install_prefix=${SCIDB_INSTALL_PREFIX:=$(grep CMAKE_INSTALL_PREFIX CMakeCache.txt|sed 's/.*=//')}
     cmake -DCMAKE_INSTALL_PREFIX=%{buildroot}/${scidb_install_prefix} -DCMAKE_INSTALL_COMPONENT=$COMPONENT -P cmake_install.cmake | tail -n+2 | awk '{print $3}'|sed "s|%{buildroot}/||"|sort|uniq > "/tmp/rpm-$p-files"
@@ -237,6 +253,9 @@ done
 %defattr(-,root,root,-)
 
 %files -n %{libscidbclient}-python-dbg -f /tmp/rpm-%{libscidbclient}-python-dbg-files
+%defattr(-,root,root,-)
+
+%files -n %{scidb}-jdbc -f /tmp/rpm-%{scidb}-jdbc-files
 %defattr(-,root,root,-)
 
 %files -n %{scidb}-dev -f /tmp/rpm-%{scidb}-dev-files

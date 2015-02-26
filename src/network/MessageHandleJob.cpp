@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -625,6 +625,8 @@ void MessageHandleJob::handleReplicaChunk()
         // when all eofs are received the work queue for this arrId can be removed
 
         _query->validate(); // to make sure no previous errors in replication
+
+        LOG4CXX_DEBUG(logger, "handleReplicaChunk: received eof");
 
         // ack the eof message back to sourceId
         boost::shared_ptr<MessageDesc> responseMsg = boost::make_shared<MessageDesc>(mtReplicaSyncResponse);

@@ -16,22 +16,22 @@ create array NN <x:int64> [a1(double)=2,2,0, a2(double)=2,2,0]
 
 
 --test
-redimension_store(source,dest)
-redimension_store(repart(source,< a : double NULL > [ b=0:10,11,0 ]),dest1)
+store(redimension(source,dest),dest)
+store(redimension(repart(source,< a : double NULL > [ b=0:10,11,0 ]),dest1),dest1)
 
 --aql update source set a=NULL
 --aql select * from source
 
-redimension_store(source,dest2)
+store(redimension(source,dest2),dest2)
 
 ## It eliminates the cell even if one of the two dimesions is null.( but not both the dimesnions are null: Here a1,a2)
-redimension_store(ZZ,NN)
+store(redimension(ZZ,NN),NN)
 
 --aql update ZZ  set a2=NULL
-redimension_store(ZZ,NN)
+store(redimension(ZZ,NN),NN)
 
 --aql update ZZ  set a1=NULL
-redimension_store(ZZ,NN)
+store(redimension(ZZ,NN),NN)
 
 
 --cleanup

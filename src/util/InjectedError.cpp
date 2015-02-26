@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -75,6 +75,9 @@ InjectedErrorLibrary::InjectedErrorLibrary()
     rc = registerError(ThreadStartInjectedError::ID,
                        boost::shared_ptr<InjectedError>(new ThreadStartInjectedError()));
     assert(rc);
+    rc = registerError(DataStoreInjectedError::ID,
+                       boost::shared_ptr<InjectedError>(new DataStoreInjectedError()));
+    assert(rc);
 #endif
 }
 
@@ -140,5 +143,16 @@ void  ThreadStartInjectedError::activate() const
     throw std::runtime_error("Injected Error");
 }
 
+void DataStoreInjectedError::inject() const
+{
+    boost::shared_ptr<const DataStoreInjectedError> err(shared_from_this());
+    Notification<DataStoreInjectedError> event(err);
+    event.publish();
+}
+
+void  DataStoreInjectedError::activate() const
+{
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INJECTED_ERROR, SCIDB_LE_INJECTED_ERROR);
+}
 
 }

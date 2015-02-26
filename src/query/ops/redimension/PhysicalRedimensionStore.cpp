@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -82,7 +82,7 @@ void storeToDBArray(shared_ptr<Array> srcArray, shared_ptr<Array>& dstArray, sha
     }
     //Insert tombstone entries
     StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
-    
+
     SystemCatalog::getInstance()->updateArrayBoundaries(dstArrayDesc, bounds);
 }
 
@@ -286,8 +286,8 @@ public:
 
             // If the parent did not have mapping arrays, don't add it.
             shared_ptr<ArrayDesc> fromCatalog = SystemCatalog::getInstance()->getArrayDesc(arrayId);
-            Dimensions const& dimsFromCatalog = fromCatalog->getDimensions();
-            assert(_updateableDims.size()==dimsFromCatalog.size());
+            Dimensions const *dimsFromCatalog = &fromCatalog->getDimensions();
+            assert(_updateableDims.size()==dimsFromCatalog->size()); dimsFromCatalog = dimsFromCatalog;
 
             SystemCatalog::getInstance()->updateArray(ArrayDesc(arrayId,
                                                                 _arrayUAID,

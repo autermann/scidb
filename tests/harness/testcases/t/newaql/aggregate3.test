@@ -15,8 +15,8 @@ create array T <a:char>[x=0:2,3,0]
 
 --test
 store(join(build_sparse(T,string(x+1),1),build_sparse(T,string(x+5),1)),A)
-redimension_store(A,B)
-redimension_store(A,C)
+store(redimension(A,B),B)
+store(redimension(A,C),C)
 --aql select count(*) from Str
 --aql select count(Str)
 --aql select min(Str)

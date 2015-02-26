@@ -1,5 +1,5 @@
 --setup
-create not empty array S <values : double> [x=0:1,1,0]
+create array S <values : double> [x=0:1,1,0]
 store(build(S, 2-(x*2)),S)
 
 --test

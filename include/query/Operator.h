@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -2149,8 +2149,17 @@ class PhysicalOperator
      * @param[in] input an array to output
      * @param[in] logger the logger object to use
      */
-    static void dumpArrayToLog(shared_ptr<Array> const& input,
-                               log4cxx::LoggerPtr& logger);
+    static void dumpArrayToLog(shared_ptr<Array> const& input, log4cxx::LoggerPtr& logger);
+
+    /**
+     * Helper: ensures that the given array object can satisfy the Array::RANDOM access pattern.
+     * If input already satisfies this, simply return it. Otherwise create and return a new array object.
+     * Note: the input may be reset as the result of calling this function, always use the returned pointer
+     * @param[in|out] input the array; invalidated by the function
+     * @param[out] query the query context
+     * @return an object with the same data and schema as input that supports Array::RANDOM access.
+     */
+    shared_ptr<Array> ensureRandomAccess(shared_ptr<Array>& input, shared_ptr<Query> const& query);
 
   protected:
     Parameters _parameters;

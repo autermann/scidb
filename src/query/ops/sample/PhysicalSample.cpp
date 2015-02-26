@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -124,12 +124,12 @@ public:
         if (probability <= 0 || probability > 1)
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_SAMPLE_ERROR2);
 
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        shared_ptr<Array> inputArray = inputArrays[0];
+        if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
+        {   //if input supports MULTI_PASS, don't bother converting it
+            inputArray = ensureRandomAccess(inputArray, query);
         }
-
-  		return boost::shared_ptr<Array>(new SampleArray(_schema, inputArrays[0], probability, seed));
+  		return make_shared<SampleArray>(_schema, inputArray, probability, seed);
     }
 };
     

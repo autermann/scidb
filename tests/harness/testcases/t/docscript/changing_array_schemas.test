@@ -2,30 +2,31 @@
 --test
 --start-query-logging
 
---shell  --command="cat $DOC_DATA/expo_example.txt " --store
 --set-format dcsv
 --start-igdata
-CREATE ARRAY device_probe <d:string, p:string, val:double> [i=1:25,5,0]  
-load(device_probe, '../tests/harness/testcases/data/doc/expo_example.scidb')  
-create array two_dim<val:double>[d(string)=5,5,0, p(string)=5,5,0]  
+store(build(<device_id:int64>[i=1:25,5,0],(i-1)%5),devices)  
+store(build(<probe_id:int64>[i=1:25,5,0],(i-1)/5),probes)  
+store(build(<val:double>[i=1:25,5,0],' [(0.01),(2.04),(6.09),(12.16),(20.25), (30.36),(42.49),(56.64),(72.81),(91), (111.21),(133.44),(157.69),(183.96),(212.25), (242.56),(274.89),(309.24),(345.61),(384), (424.41),(466.84),(511.29),(557.76),(606.25)]', true),values)  
+--stop-igdata
+store(join(devices,(join(probes,values))),device_probe)  
+--start-igdata
+create array two_dim<val:double>[device_id=0:4,5,0, probe_id=0:4,5,0]  
 --set-format dense
 --stop-igdata
-redimension_store(device_probe, two_dim)  
---aql SELECT val FROM two_dim WHERE d='device-2' and p='probe-3'  
+store(redimension(device_probe, two_dim),two_dim)  
+--aql SELECT val FROM two_dim WHERE device_id=2 and probe_id=3  
 --set-format dcsv
 --start-igdata
-CREATE ARRAY redim_missing< val1:string,val2:string NULL,val3:double >[i=0:9,10,0]  
+store(build(<val1:int64>[i=0:9,10,0],i/5),first)  
+store(build(<val2:int64 null>[i=0:9,10,0],iif(i!=5,i%5,null)),second)  
+store(build(<val3:double>[i=0:9,10,0], '[(1),(0.540302), (-0.416147),(-0.989992),(-0.653644),(0.7),(0.841471),(0.909297), (0.14112),(-0.756802)]',true),third)  
 --stop-igdata
-show(redim_missing)
+store(join(first,join(second,third)),redim_missing)  
 --start-igdata
-load(redim_missing, '../tests/harness/testcases/data/doc/redim_missing.scidb')  
---stop-igdata
-scan(redim_missing)  
---start-igdata
-CREATE ARRAY redim_target <val3:double> [val1(string)=2,2,0,val2(string)=5,5,0]  
+CREATE ARRAY redim_target <val3:double> [val1=0:2,2,0, val2=0:5,5,0]  
 --set-format dense
 --stop-igdata
-redimension_store(redim_missing,redim_target)  
+store(redimension(redim_missing,redim_target),redim_target)  
 --set-format dcsv
 --start-igdata
 CREATE ARRAY m4x4 <val:double>[i=0:3,4,0,j=0:3,4,0]  
@@ -104,16 +105,13 @@ show(chunks_part)
 --set-format dcsv
 --start-igdata
 --aql SELECT * INTO chunks_overlap FROM repart(chunks,<val1:double,val2:double> [i=0:999,100,10,j=0:999,100,10])  
-CREATE ARRAY Dsp_raw<d: string, t: string, val: double >[i=1:25,5,0]  
-CREATE ARRAY Dsp<val: double>[d(string)=5,5,0,t(string)=5,5,0]  
-load(Dsp_raw, '../tests/harness/testcases/data/doc/expo_example.scidb')  
-redimension_store(Dsp_raw, Dsp)  
+rename(two_dim, Dsp)  
 --stop-igdata
 scan(Dsp) 
 show(Dsp)
---aql SELECT * INTO Dsp_slice_0 FROM slice(Dsp, d, 'device-0')  
---aql SELECT * INTO Dsp_slice_1 FROM slice(Dsp, d, 'device-1')  
---aql SELECT * INTO Dsp_slice_2 FROM slice(Dsp, d, 'device-2')  
+--aql SELECT * INTO Dsp_slice_0 FROM slice(Dsp, device_id, 0)  
+--aql SELECT * INTO Dsp_slice_1 FROM slice(Dsp, device_id, 1)  
+--aql SELECT * INTO Dsp_slice_2 FROM slice(Dsp, device_id, 2)  
 show(Dsp_slice_2)
 --aql SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2)  
 show(Dsp_1d)
@@ -125,8 +123,14 @@ show(Dsp_new)
 
 --cleanup
 
+remove(devices)
+remove(probes)
+remove(values)
 remove(device_probe)
-remove(two_dim)
+remove(Dsp)
+remove(first)
+remove(second)
+remove(third)
 remove(redim_missing)
 remove(redim_target)
 remove(m4x4)
@@ -139,8 +143,6 @@ remove(m3x3_new_attr)
 remove(chunks)
 remove(chunks_part)
 remove(chunks_overlap)
-remove(Dsp_raw)
-remove(Dsp)
 remove(Dsp_slice_0)
 remove(Dsp_slice_1)
 remove(Dsp_slice_2)

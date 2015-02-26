@@ -1,0 +1,25 @@
+
+--test
+--start-query-logging
+
+--set-format dcsv
+--start-igdata
+create array left_array <val:double>[i=0:3,6,0,j=0:2,3,0]  
+store(build(left_array,1),left_array)  
+create array right_array <val:double>[i=0:1,6,0,j=0:2,3,0]  
+store(build(right_array,0),right_array)  
+create array concat_array <val:double>[i=0:5,6,0,j=0:2,3,0]  
+store(concat(left_array,right_array),concat_array)  
+--set-format dense
+--stop-igdata
+show(concat_array)  
+scan(concat_array)  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(left_array)
+remove(right_array)
+remove(concat_array)

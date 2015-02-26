@@ -182,7 +182,7 @@ SCIDB QUERY : <project(dimensions(AIL),low,high)>
 {No} low,high
 {0} 12,14
 
-SCIDB QUERY : <create not empty array BN<j:int8>[i=0:14,5,0]>
+SCIDB QUERY : <create array BN<j:int8>[i=0:14,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(BN, '[(),(1),(2),(3),(4),(5),(6)]', true), BN)>
@@ -202,7 +202,7 @@ SCIDB QUERY : <project(dimensions(BN),low,high)>
 {No} low,high
 {0} 0,9
 
-SCIDB QUERY : <create not empty array AN<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create array AN<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(BN, AN)>
@@ -328,7 +328,7 @@ SCIDB QUERY : <save(AN, '/tmp/scidb_array_a.out', 0)>
 {18} 0
 {19} 0
 
-SCIDB QUERY : <create not empty array ANL<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create array ANL<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(ANL, '/tmp/scidb_array_a.out',0)>
@@ -358,7 +358,7 @@ SCIDB QUERY : <project(dimensions(ANL), low, high)>
 {No} low,high
 {0} 0,19
 
-SCIDB QUERY : <create not empty array BNI<j:int8>[i=0:14,5,0]>
+SCIDB QUERY : <create array BNI<j:int8>[i=0:14,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(BNI, '[(),(1),(2),(3),(4),(5),(6)]', true), BNI)>
@@ -378,7 +378,7 @@ SCIDB QUERY : <project(dimensions(BNI),low,high)>
 {No} low,high
 {0} 0,9
 
-SCIDB QUERY : <create not empty array ANI<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create array ANI<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(BNI, ANI)>
@@ -430,7 +430,7 @@ SCIDB QUERY : <save(ANI, '/tmp/scidb_array_a.out', 0)>
 {13} 13
 {14} 14
 
-SCIDB QUERY : <create not empty array ANIL<j:int8>[i=0:*,5,0]>
+SCIDB QUERY : <create array ANIL<j:int8>[i=0:*,5,0]>
 Query was executed successfully
 
 SCIDB QUERY : <load(ANIL, '/tmp/scidb_array_a.out',0)>
@@ -448,7 +448,7 @@ SCIDB QUERY : <project(dimensions(ANIL), low, high)>
 SCIDB QUERY : <create array target <j:int8> [x=-10:*,2,0, y(string)=*,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(apply(join(A,variable_window(A,i, 3,0, count(*) as count)),x, int64(count*3), y, 'abc_'+string(count)), target)>
+SCIDB QUERY : <store(redimension(apply(join(A,variable_window(A,i, 3,0, count(*) as count)),x, int64(count*3), y, 'abc_'+string(count)), target), target)>
 {x,y} j
 {3,'abc_1'} 2
 {6,'abc_2'} 3
@@ -460,7 +460,7 @@ SCIDB QUERY : <project(dimensions(target), low,high)>
 {0} 3,12
 {1} 0,3
 
-SCIDB QUERY : <redimension_store(filter(apply(join(A,variable_window(A,i, 3,0, count(*) as count)),x, int64(count*3), y, 'abc_'+string(count)), count%2<>0), target)>
+SCIDB QUERY : <store(redimension(filter(apply(join(A,variable_window(A,i, 3,0, count(*) as count)),x, int64(count*3), y, 'abc_'+string(count)), count%2<>0), target), target)>
 {x,y} j
 {3,'abc_1'} 2
 {9,'abc_3'} 12

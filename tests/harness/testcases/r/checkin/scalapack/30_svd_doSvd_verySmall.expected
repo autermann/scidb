@@ -129,31 +129,31 @@ r,c,multiply
 ../../bin/doSvd.sh: ****** from 6 to 10 (if any)
 ../../bin/doSvd.sh: U-only test @ 6 x 6 csize 32 x 32
 Query was executed successfully
-count(gesvd(build(TEST_DOSVD_IN, 1+c+r*6), 'U'))
+aggregate(gesvd(build(TEST_DOSVD_IN, 1+c+r*6), 'U'),count(*))
 i,count
 0,36
 
 ../../bin/doSvd.sh: U-only test @ 7 x 7 csize 32 x 32
 Query was executed successfully
-count(gesvd(build(TEST_DOSVD_IN, 1+c+r*7), 'U'))
+aggregate(gesvd(build(TEST_DOSVD_IN, 1+c+r*7), 'U'),count(*))
 i,count
 0,49
 
 ../../bin/doSvd.sh: U-only test @ 8 x 8 csize 32 x 32
 Query was executed successfully
-count(gesvd(build(TEST_DOSVD_IN, 1+c+r*8), 'U'))
+aggregate(gesvd(build(TEST_DOSVD_IN, 1+c+r*8), 'U'),count(*))
 i,count
 0,64
 
 ../../bin/doSvd.sh: U-only test @ 9 x 9 csize 32 x 32
 Query was executed successfully
-count(gesvd(build(TEST_DOSVD_IN, 1+c+r*9), 'U'))
+aggregate(gesvd(build(TEST_DOSVD_IN, 1+c+r*9), 'U'),count(*))
 i,count
 0,81
 
 ../../bin/doSvd.sh: U-only test @ 10 x 10 csize 32 x 32
 Query was executed successfully
-count(gesvd(build(TEST_DOSVD_IN, 1+c+r*10), 'U'))
+aggregate(gesvd(build(TEST_DOSVD_IN, 1+c+r*10), 'U'),count(*))
 i,count
 0,100
 

@@ -16,7 +16,7 @@ sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays')
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'full'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
 
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'full_redimension_store'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
---igdata "redimension_store(full, full_redimension_store)"
+--igdata "store(redimension(full, full_redimension_store), full_redimension_store)"
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'full_redimension_store'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
 
 
@@ -25,7 +25,7 @@ sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays')
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
 
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half_redimension_store'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
---igdata "redimension_store(half, half_redimension_store)"
+--igdata "store(redimension(half, half_redimension_store), half_redimension_store)"
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half_redimension_store'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)
 
 sort(project(filter(cross_join(aggregate(filter(cross_join(filter(list('arrays'), name = 'half'), list('chunk map')), uaid = id), max(arrid) as array_last_version_id), list('chunk map')), array_last_version_id=arrid and inst=instn), nelem), nelem)

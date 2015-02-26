@@ -34,17 +34,17 @@ SCIDB QUERY : <store(build_sparse(B,x*y+10,x<>2),A)>
 {3,2} 16
 {3,3} 19
 
-SCIDB QUERY : <cross(A,B)>
+SCIDB QUERY : <cross_join(A,B)>
 {x,y,x,y} a,a
 
-SCIDB QUERY : <count(cross(A,B))>
+SCIDB QUERY : <aggregate(cross_join(A,B),count(*))>
 {i} count
 {0} 0
 
-SCIDB QUERY : <cross(B,A)>
+SCIDB QUERY : <cross_join(B,A)>
 {x,y,x,y} a,a
 
-SCIDB QUERY : <count(cross(B,A))>
+SCIDB QUERY : <aggregate(cross_join(B,A),count(*))>
 {i} count
 {0} 0
 
@@ -59,7 +59,7 @@ SCIDB QUERY : <show(C)>
 {i} schema
 {0} 'C<a:int32> [x=0:3,2,0,y=0:3,2,0]'
 
-SCIDB QUERY : <cross(A,C)>
+SCIDB QUERY : <cross_join(A,C)>
 {x,y,x,y} a,a
 {0,0,3,0} 10,10
 {0,0,3,1} 10,13
@@ -110,11 +110,11 @@ SCIDB QUERY : <cross(A,C)>
 {3,3,3,2} 19,16
 {3,3,3,3} 19,19
 
-SCIDB QUERY : <count(cross(A,C))>
+SCIDB QUERY : <aggregate(cross_join(A,C),count(*))>
 {i} count
 {0} 48
 
-SCIDB QUERY : <cross(C,A)>
+SCIDB QUERY : <cross_join(C,A)>
 {x,y,x,y} a,a
 {3,0,0,0} 10,10
 {3,0,0,1} 10,10
@@ -165,7 +165,7 @@ SCIDB QUERY : <cross(C,A)>
 {3,3,3,2} 19,16
 {3,3,3,3} 19,19
 
-SCIDB QUERY : <count(cross(C,A))>
+SCIDB QUERY : <aggregate(cross_join(C,A),count(*))>
 {i} count
 {0} 48
 

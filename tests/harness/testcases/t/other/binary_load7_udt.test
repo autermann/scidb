@@ -33,7 +33,7 @@ load(RAT2, 'rat11.txt')
 load(RAT3, 'rational.out', 0, '(string)', 100, rat_shad)
 load(RAT3, 'ration1.bin', 0, '(rational,dummy(16))')
 load(RAT3, 'ration1.bin', 0, '(dummy(16),rational)')
-count(versions(RAT3))
+aggregate(versions(RAT3),count(*))
 
 
 --cleanup

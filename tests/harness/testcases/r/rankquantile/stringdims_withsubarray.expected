@@ -69,7 +69,7 @@ SCIDB QUERY : <load(expo, '../tests/harness/testcases/data/stringdims_withsubarr
 {60} 'GSM203679','8540','209617_s_at',63.8592
 {61} 'GSM203679','8540','215517_at',28.1274
 
-SCIDB QUERY : <redimension_store(expo, md_expo)>
+SCIDB QUERY : <store(redimension(expo, md_expo), md_expo)>
 ID,AffyId,response
 0,0,8.2308
 0,2,61.8875

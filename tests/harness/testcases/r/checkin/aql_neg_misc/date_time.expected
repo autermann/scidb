@@ -37,8 +37,8 @@ SCIDB QUERY : <select a / a from A>
 SCIDB QUERY : <select a % a from A>
 [An error expected at this place for the query "select a % a from A". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND.]
 
-SCIDB QUERY : <sum(A)>
-[An error expected at this place for the query "sum(A)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND.]
+SCIDB QUERY : <aggregate(A,sum(a))>
+[An error expected at this place for the query "aggregate(A,sum(a))". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND.]
 
 SCIDB QUERY : <build(A,'2011-13-10')>
 [An error expected at this place for the query "build(A,'2011-13-10')". And it failed with error code = scidb::SCIDB_SE_TYPE_CONVERSION::SCIDB_LE_INVALID_SPECIFIED_DATE. Expected error code = scidb::SCIDB_SE_TYPE_CONVERSION::SCIDB_LE_INVALID_SPECIFIED_DATE.]

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -479,17 +479,28 @@ int collectSkippedTestCases (string root_dir, string under_directory, string ski
 	if (under_directory.find ('/') != 0 && under_directory.find ('~') != 0)
 		under_directory = root_dir + "/" + under_directory;
 
-	skiptestfname = under_directory + "/" + skiptestfname;
-
 	{
+	  // First, test if the file already exists (full absolute path passed in via --disable-tests switch)
 		bfs::path p (skiptestfname);
 
 		/* if exist, it should be a regular file */
 		if (!bfs :: is_regular (p))
 		{
+		  if (under_directory[under_directory.length()-1] != '/')
+		  {
+		      skiptestfname = under_directory + "/" + skiptestfname;
+		  }
+		  else
+		  {
+		      skiptestfname = under_directory +  skiptestfname;
+		  }
+		  p = skiptestfname;
+		  if (!bfs :: is_regular (p))
+		    {
 			LOG4CXX_ERROR (logger, "Skip Test file [" << skiptestfname << "] either does not exist or is not a regular file.");
 			LOGGER_POP_NDCTAG;
 			return -2;
+		    }
 		}
 	}
          
@@ -507,6 +518,7 @@ int collectSkippedTestCases (string root_dir, string under_directory, string ski
 	}
 
 	LOG4CXX_INFO (logger, "Reading skiplist from file " << skiptestfname);
+	
 	while (!f.eof ())
 	{
 		getline (f, line);
@@ -1048,6 +1060,12 @@ void prepare_filepaths (InfoForExecutor &ie, int internally_called)
 		ie.timerfile = tmp;
 		ie.diff_file = tmp;
 		ie.log_file = tmp;
+
+		/* create result directory for newly added tests */
+		boost::filesystem::path p(tmp);
+		boost::filesystem::path dir = p.parent_path();
+		if (!exists(dir))
+			boost::filesystem::create_directories(dir);
 	}
 	else
 	{
@@ -1072,6 +1090,18 @@ void prepare_filepaths (InfoForExecutor &ie, int internally_called)
 	ie.timerfile.replace (ie.timerfile.find (file_extension), file_extensionLength, ".timer");
 	ie.diff_file.replace (ie.diff_file.find (file_extension), file_extensionLength, ".diff");
 	ie.log_file.replace (ie.log_file.find (file_extension), file_extensionLength, ".log");
+	
+	//------------------------------------------------------------------------
+	// Change: during the desktop/development workflow the harness will be run
+	// directly against the tests located in the checked out SVN tree (rootDir
+	// switch value will point there).  The logs, outs, diffs, etc. will be 
+	// dumped into scratchDir in order not to pollute the SVN tree diffs.
+	ie.actual_rfile = ie.actual_rfile.replace (0,ie.rootDir.length(),ie.scratchDir,0,ie.scratchDir.length());
+	ie.timerfile = ie.timerfile.replace(0,ie.rootDir.length(),ie.scratchDir,0,ie.scratchDir.length());
+	ie.diff_file = ie.diff_file.replace(0,ie.rootDir.length(),ie.scratchDir,0,ie.scratchDir.length());
+	ie.log_file = ie.log_file.replace(0,ie.rootDir.length(),ie.scratchDir,0,ie.scratchDir.length());
+	// End change.
+	//------------------------------------------------------------------------
 }
 
 int Socket (int domain, int type, int protocol)

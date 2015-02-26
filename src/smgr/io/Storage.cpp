@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,50 +27,49 @@
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
  * @author poliocough@gmail.com
+ * @author sfridella@paradigm4.com
  */
 
-#include "util/FileIO.h"
 
+#include <sys/time.h>
 #include <inttypes.h>
 #include <map>
 #include <boost/unordered_set.hpp>
-
-#include "boost/make_shared.hpp"
-#include "log4cxx/logger.h"
-#include "system/Exceptions.h"
-#include "smgr/io/InternalStorage.h"
-#include "system/SystemCatalog.h"
-#include "network/NetworkManager.h"
-#include "network/BaseConnection.h"
-#include "network/MessageUtils.h"
-#include "array/Metadata.h"
-#include "system/Config.h"
-#include "system/SciDBConfigOptions.h"
-#include "query/Statistics.h"
-#include "query/Operator.h"
-#include "smgr/delta/Delta.h"
-#include "system/Cluster.h"
+#include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_comparison.hpp>
+#include <log4cxx/logger.h>
+#include <network/NetworkManager.h>
+#include <network/BaseConnection.h>
+#include <network/MessageUtils.h>
+#include <array/Metadata.h>
+#include <query/Statistics.h>
+#include <query/Operator.h>
+#include <boost/make_shared.hpp>
+#include <util/FileIO.h>
 #include <query/ops/list/ListArrayBuilder.h>
+#include <system/Cluster.h>
 #include <system/Utils.h>
+#include <system/Config.h>
+#include <system/SciDBConfigOptions.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
 #include <util/Platform.h>
+#include <array/TileIteratorAdaptors.h>
+#include <smgr/io/InternalStorage.h>
+#include <smgr/delta/Delta.h>
 
-#include <sys/time.h>
-
-#ifdef __APPLE__
-#define fdatasync(_fd) fsync(_fd)
-#endif
 
 namespace scidb
 {
 
-using namespace std;
 using namespace boost;
+using namespace std;
 
 ///////////////////////////////////////////////////////////////////
 /// Constants and #defines
 ///////////////////////////////////////////////////////////////////
 
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc"));
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.smgr"));
 
 #ifndef SCIDB_NO_DELTA_COMPRESSION
 DeltaVersionControl _deltaVersionControl;
@@ -95,11 +94,19 @@ const uint32_t SCIDB_STORAGE_HEADER_MAGIC = 0x5C1DB123;
  * If you are changing the format of the StorageHeader class (other than the first 3 fields), or any other structures that are saved to disk,
  * like ChunkHeader - you must increment this number.
  * When storage format versions are different, it is up to the scidb code to determine if an upgrade is possible. At the moment of this writing,
- * scidb with storage version X simply will refuse to read the file created by storage version Y. Future behavior may be a lot more sophisticated.
+ * scidb with storage version X simply will refuse to read the metadata file created by storage version Y. Future behavior may be a lot more 
+ * sophisticated.
  *
  * Revision history:
  *
-  * SCIDB_STORAGE_FORMAT_VERSION = 5:
+ * SCIDB_STORAGE_FORMAT_VERSION = 6:
+ *    Author: Steve F.
+ *    Date: TBD
+ *    Ticket: TBD
+ *    Note: Changed data file format to use power-of-two allocation size with buddy blocks.
+ *          Also, split data file into multiple files, one per array.
+ *
+ * SCIDB_STORAGE_FORMAT_VERSION = 5:
  *    Author: tigor
  *    Date: 10/31/2013
  *    Ticket: 3404
@@ -118,9 +125,8 @@ const uint32_t SCIDB_STORAGE_HEADER_MAGIC = 0x5C1DB123;
  *    Ticket: ??
  *    Note: Initial implementation dating back some time
  */
-const uint32_t SCIDB_STORAGE_FORMAT_VERSION = 5;
+const uint32_t SCIDB_STORAGE_FORMAT_VERSION = 6;
 
-const size_t DEFAULT_SEGMENT_SIZE = 1024 * 1024 * 1024; // default limit of database partition (in megabytes) used for generated storage descriptor file
 const size_t DEFAULT_TRANS_LOG_LIMIT = 1024; // default limit of transaction log file (in megabytes)
 const size_t MAX_CFG_LINE_LENGTH = 1024;
 const int MAX_REDUNDANCY = 8;
@@ -172,99 +178,6 @@ inline static double getTimeSecs()
     return (((double) tv.tv_sec) * 1000000 + ((double) tv.tv_usec)) / 1000000;
 }
 
-inline static uint32_t calculateCRC32(void const* content, size_t content_length, uint32_t crc = ~0)
-{
-    static const uint32_t table [] = {
-        0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
-        0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
-        0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988,
-        0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
-
-        0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE,
-        0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
-        0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC,
-        0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
-
-        0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172,
-        0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
-        0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940,
-        0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
-
-        0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116,
-        0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
-        0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924,
-        0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
-
-        0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A,
-        0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
-        0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818,
-        0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
-
-        0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E,
-        0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
-        0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C,
-        0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
-
-        0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2,
-        0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
-        0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0,
-        0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
-
-        0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086,
-        0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
-        0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4,
-        0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
-
-        0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A,
-        0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
-        0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8,
-        0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
-
-        0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE,
-        0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
-        0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC,
-        0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
-
-        0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252,
-        0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
-        0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60,
-        0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
-
-        0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236,
-        0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
-        0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04,
-        0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
-
-        0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A,
-        0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
-        0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38,
-        0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
-
-        0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E,
-        0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
-        0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C,
-        0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
-
-        0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2,
-        0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
-        0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0,
-        0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
-
-        0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6,
-        0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
-        0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94,
-        0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
-    };
-
-    unsigned char* buffer = (unsigned char*) content;
-
-    while (content_length-- != 0)
-    {
-        crc = (crc >> 8) ^ table[(crc & 0xFF) ^ *buffer++];
-    }
-    return crc;
-}
-
 static void collectArraysToRollback(boost::shared_ptr<std::map<ArrayID, VersionID> >& arrsToRollback, const VersionID& lastVersion,
                                     const ArrayID& baseArrayId, const ArrayID& newArrayId)
 {
@@ -290,6 +203,10 @@ void ChunkDescriptor::getAddress(StorageAddress& addr) const
     }
 }
 
+///////////////////////////////////////////////////////////////////
+/// ChunkInitializer
+///////////////////////////////////////////////////////////////////
+
 CachedStorage::ChunkInitializer::~ChunkInitializer()
 {
     ScopedMutexLock cs(storage._mutex);
@@ -300,19 +217,31 @@ CachedStorage::ChunkInitializer::~ChunkInitializer()
 /// CachedStorage class
 ///////////////////////////////////////////////////////////////////
 
+/* Constructor
+ */
 CachedStorage::CachedStorage() :
     _replicationManager(NULL)
-{
-    _hd = -1;
-    for (size_t i = 0; i < MAX_SEGMENTS; ++i)
-    {
-        _sd[i] = -1;
-    }
-    _log[0] = _log[1] = -1;
-}
+{}
 
-void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSizeBytes)
+/* Types needed to track overlapping chunks
+ */
+typedef tuple<DataStore::Guid, uint64_t> CloneOffset;
+struct CloneHash {
+    size_t operator() (const CloneOffset clof) const {
+        hash<uint64_t> myhash;
+        return myhash(clof.get<0>()) + myhash(clof.get<1>());
+    }
+};
+
+/* Read the storage description file to find path for chunk map file.
+   Iterate the chunk map file and build the chunk map in memory.
+ */
+void
+CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSizeBytes)
 {
+
+    /* read/create the storage description file
+     */
     StatisticsScope sScope;
     InjectedErrorListener<WriteChunkInjectedError>::start();
     char buf[MAX_CFG_LINE_LENGTH];
@@ -341,10 +270,8 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
         string databaseName = storageDescriptorFilePath.substr(fileNameBeg, fileNameEnd - fileNameBeg);
         databaseHeader = databasePath + databaseName + ".header";
         databaseLog = databasePath + databaseName + ".log";
-        _segments.push_back(Segment(databasePath + databaseName + ".data1", (uint64_t) DEFAULT_SEGMENT_SIZE * MB));
         fprintf(f, "%s.header\n", databaseName.c_str());
         fprintf(f, "%ld %s.log\n", (long) DEFAULT_TRANS_LOG_LIMIT, databaseName.c_str());
-        fprintf(f, "%ld %s.data1\n", (long) DEFAULT_SEGMENT_SIZE, databaseName.c_str());
         transLogLimit = (uint64_t) DEFAULT_TRANS_LOG_LIMIT * MB;
     }
     else
@@ -360,12 +287,6 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_DESCRIPTOR_INVALID_FORMAT);
         databaseLog = relativePath(databasePath, strtrim(buf + pos));
         transLogLimit = (uint64_t) sizeMb * MB;
-        while (fgets(buf, sizeof buf, f))
-        {
-            if (sscanf(buf, "%ld%n", &sizeMb, &pos) != 1)
-                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_DESCRIPTOR_INVALID_FORMAT);
-            _segments.push_back(Segment(relativePath(databasePath, strtrim(buf + pos)), (uint64_t) sizeMb * MB));
-        }
     }
     fclose(f);
 
@@ -377,9 +298,11 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
     _timestamp = 1;
     _lru.prune();
 
+    /* Open metadata (chunk map) file and transcation log file
+     */
     int flags = O_LARGEFILE | O_RDWR | O_CREAT;
-    _hd = ::open(databaseHeader.c_str(), flags, 0777);
-    if (_hd < 0)
+    _hd = FileManager::getInstance()->openFileObj(databaseHeader.c_str(), flags);
+    if (!_hd)
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_FILE) << databaseHeader << errno;
 
     struct flock flc;
@@ -388,87 +311,43 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
     flc.l_start = 0;
     flc.l_len = 1;
 
-    if (fcntl(_hd, F_SETLK, &flc))
+    if (_hd->fsetlock(&flc))
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_LOCK_DATABASE);
 
-    _log[0] = ::open((databaseLog + "_1").c_str(), O_LARGEFILE | O_SYNC | O_RDWR | O_CREAT, 0777);
-    if (_log[0] < 0)
+    _log[0] = FileManager::getInstance()->openFileObj((databaseLog + "_1").c_str(), O_LARGEFILE | O_SYNC | O_RDWR | O_CREAT);
+    if (!_log[0])
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_FILE) << (databaseLog + "_1") << errno;
 
-    _log[1] = ::open((databaseLog + "_2").c_str(), O_LARGEFILE | O_SYNC | O_RDWR | O_CREAT, 0777);
-    if (_log[1] < 0)
+    _log[1] = FileManager::getInstance()->openFileObj((databaseLog + "_2").c_str(), O_LARGEFILE | O_SYNC | O_RDWR | O_CREAT);
+    if (!_log[1])
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_FILE) << (databaseLog + "_2") << errno;
 
     _logSizeLimit = transLogLimit;
     _logSize = 0;
     _currLog = 0;
 
-    uint64_t configClusterSizeOld =  
-        static_cast<uint64_t>(Config::getInstance()->getOption<int> (CONFIG_CHUNK_CLUSTER_SIZE_BYTES));
-    uint64_t configClusterSize =
-        static_cast<uint64_t>(Config::getInstance()->getOption<int> (CONFIG_CHUNK_CLUSTER_SIZE_MB))
-        * 1024 * 1024;
+    /* Initialize the data stores
+     */
+    DataStores::getInstance()->initDataStores(databasePath.c_str());
 
-    LOG4CXX_DEBUG(logger, "configclustersizeold=" << configClusterSizeOld << " bytes");
-    LOG4CXX_DEBUG(logger, "configclustersize=" << configClusterSize << " bytes");
-    
-    if (configClusterSizeOld)
-    {
-        configClusterSize = configClusterSizeOld;
-    }
-
-    size_t rc = read(_hd, &_hdr, sizeof(_hdr));
+    /* Read/initialize metadata header
+     */
+    size_t rc = _hd->read(&_hdr, sizeof(_hdr), 0);
     if (rc != 0 && rc != sizeof(_hdr)) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED_WITH_ERRNO) << "read" << errno;
     }
-    else if (rc != 0)
-    {
-        LOG4CXX_DEBUG(logger, "Read storage header: cluster size=" << _hdr.clusterSize << " bytes");
-
-        if (configClusterSize && (configClusterSize != _hdr.clusterSize))
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_SEGMENT_SIZE_INCOMPATIBLE) <<
-                configClusterSize << _hdr.clusterSize;
-        }
-    }
-    size_t nSegments = _segments.size();
-
-    _clusters.clear();
-    _liveChunksInCluster.clear();
-    _freeClusters.resize(nSegments);
 
     _writeLogThreshold = Config::getInstance()->getOption<int> (CONFIG_IO_LOG_THRESHOLD);
     _enableDeltaEncoding = Config::getInstance()->getOption<bool> (CONFIG_ENABLE_DELTA_ENCODING);
-
-    // Open segments and calculate total amount of available space in the database
-    long available = 0;
-    for (size_t i = 0; i < nSegments; i++)
-    {
-        _sd[i] = ::open(_segments[i].path.c_str(), flags, 0777);
-        if (_sd[i] < 0)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_FILE) << _segments[i].path << errno;
-
-        if (_segments[i].size < _hdr.segment[i].used)
-        {
-            _segments[i].size = _hdr.segment[i].used;
-        }
-        available += (long) ((_segments[i].size - _hdr.segment[i].used) / GB);
-    }
-
-    _totalAvailable = available;
-
     _nInstances = SystemCatalog::getInstance()->getNumberOfInstances();
     _redundancy = 0; // disable replication during rollback: each instance is perfroming rollback locally
 
     if (rc == 0 || (_hdr.magic == SCIDB_STORAGE_HEADER_MAGIC && _hdr.currPos < HEADER_SIZE))
     {
-        if (!configClusterSize)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_SEGMENT_SIZE_ILLEGAL) <<
-                configClusterSize;
-        }
+        LOG4CXX_TRACE(logger, "smgr open:  initializing storage header");
 
-        // Database is not initialized
+        /* Database is not initialized
+         */
         memset(&_hdr, 0, sizeof(_hdr));
         _hdr.magic = SCIDB_STORAGE_HEADER_MAGIC;
         _hdr.versionLowerBound = SCIDB_STORAGE_FORMAT_VERSION;
@@ -476,17 +355,20 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
         _hdr.currPos = HEADER_SIZE;
         _hdr.instanceId = INVALID_INSTANCE;
         _hdr.nChunks = 0;
-        _hdr.clusterSize = configClusterSize;
-        LOG4CXX_DEBUG(logger, "Initialize storage header: cluster size=" << _hdr.clusterSize);
     }
     else
     {
+        LOG4CXX_TRACE(logger, "smgr open:  openinging storage header");
+
+        /* Check for corrupted metadata file
+         */
         if (_hdr.magic != SCIDB_STORAGE_HEADER_MAGIC)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_INVALID_STORAGE_HEADER);
         }
 
-        //At the moment, both upper and lower bound versions in the file must equal to the current version in the code.
+        /* At the moment, both upper and lower bound versions in the file must equal to the current version in the code.
+         */
         if (_hdr.versionLowerBound != SCIDB_STORAGE_FORMAT_VERSION || _hdr.versionUpperBound != SCIDB_STORAGE_FORMAT_VERSION)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION)
@@ -495,16 +377,21 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
                   << SCIDB_STORAGE_FORMAT_VERSION;
         }
 
+        /* Rollback uncommitted changes
+         */
         doTxnRecoveryOnStartup();
 
-        // Database is initialized: read information about all locally available chunks in map
+        /* Database is initialized: read information about all locally available chunks in map
+         */
+        LOG4CXX_TRACE(logger, "smgr open:  reading chunk map, nchunks " << _hdr.nChunks);
+
         _redundancy = Config::getInstance()->getOption<int> (CONFIG_REDUNDANCY);
         _syncReplication = !Config::getInstance()->getOption<bool> (CONFIG_ASYNC_REPLICATION);
 
         ChunkDescriptor desc;
         uint64_t chunkPos = HEADER_SIZE;
         StorageAddress addr;
-        unordered_set<uint64_t> clones;
+        unordered_set<CloneOffset, CloneHash> clones;
         set<ArrayID> removedArrays, orphanedArrays;
 
         typedef map<ArrayID, boost::shared_ptr<ArrayDesc> > ArrayDescCache;
@@ -512,7 +399,7 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
 
         for (size_t i = 0; i < _hdr.nChunks; i++, chunkPos += sizeof(ChunkDescriptor))
         {
-            size_t rc = pread(_hd, &desc, sizeof(ChunkDescriptor), chunkPos);
+            size_t rc = _hd->read(&desc, sizeof(ChunkDescriptor), chunkPos);
             if (rc != sizeof(ChunkDescriptor))
             {
                 LOG4CXX_ERROR(logger, "Inconsistency in storage header: rc="
@@ -536,6 +423,9 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
             else
             {
                 assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
+
+                LOG4CXX_TRACE(logger, "smgr open:  found chunk desc " << desc.toString());
+
                 if (desc.hdr.arrId != 0)
                 {
                     try
@@ -544,13 +434,13 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
                         {
                             desc.hdr.arrId = 0;
                             LOG4CXX_TRACE(logger, "ChunkDesc: Remove chunk descriptor for non-existent array at position " << chunkPos);
-                            File::writeAll(_hd, &desc.hdr, sizeof(ChunkHeader), chunkPos);
+                            _hd->writeAll(&desc.hdr, sizeof(ChunkHeader), chunkPos);
                             assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
                             _freeHeaders.insert(chunkPos);
                             continue;
                         }
 
-                        if (orphanedArrays.find(desc.hdr.arrId) != orphanedArrays.end())
+                        if (orphanedArrays.count(desc.hdr.arrId) != 0)
                         {
                             continue;
                         }
@@ -577,11 +467,8 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
                         {
                             chunk.reset(new PersistentChunk());
                             chunk->setAddress(adesc, desc);
-                            if (_hdr.clusterSize != 0)
-                            {
-                                _liveChunksInCluster[getClusterID(chunk->_hdr.pos)] += 1;
-                            }
-                            bool isUnique = clones.insert(chunk->_hdr.pos.offs * MAX_SEGMENTS + chunk->_hdr.pos.segmentNo).second;
+
+                            bool isUnique = clones.insert(make_tuple(chunk->_hdr.pos.dsGuid, chunk->_hdr.pos.offs)).second;
                             if (!isUnique) {
                                 assert(false);
                                 throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_DATABASE_HEADER_CORRUPTED);
@@ -595,7 +482,7 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
                             removedArrays.insert(desc.hdr.arrId);
                             desc.hdr.arrId = 0;
                             LOG4CXX_TRACE(logger, "ChunkDesc: Remove chunk descriptor for unexisted array at position " << chunkPos);
-                            File::writeAll(_hd, &desc.hdr, sizeof(ChunkHeader), chunkPos);
+                            _hd->writeAll(&desc.hdr, sizeof(ChunkHeader), chunkPos);
                             _freeHeaders.insert(chunkPos);
                         }
                         else if (x.getLongErrorCode() == SCIDB_LE_TYPE_NOT_REGISTERED)
@@ -615,6 +502,7 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
                 }
             }
         }
+
         if (chunkPos != _hdr.currPos)
         {
             LOG4CXX_ERROR(logger, "Storage header is not consistent: " << chunkPos << " vs. " << _hdr.currPos);
@@ -624,43 +512,22 @@ void CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSi
                 _hdr.currPos = chunkPos;
             }
         }
-
-        if (_hdr.clusterSize != 0)
-        {
-            for (size_t i = 0; i < nSegments; i++)
-            {
-                for (uint64_t offs = 0; offs < _hdr.segment[i].used; offs += _hdr.clusterSize)
-                {
-                    if (_liveChunksInCluster[getClusterID(i, offs)] == 0)
-                    {
-                        _freeClusters[i].insert(offs);
-                    }
-                }
-            }
-        }
     }
 
-    int syncMSeconds = Config::getInstance()->getOption<int> (CONFIG_SYNC_IO_INTERVAL);
-    if (syncMSeconds >= 0)
-    {
-        vector<int> fds(0);
-        for (size_t i = 0; i < _segments.size(); i++)
-        {
-            fds.push_back(_sd[i]);
-        }
-
-        BackgroundFileFlusher::getInstance()->start(syncMSeconds, _writeLogThreshold, fds);
-    }
-
+    /* Start replication manager
+     */
     _replicationManager = ReplicationManager::getInstance();
     assert(_replicationManager);
     assert(_replicationManager->isStarted());
 }
 
-void CachedStorage::close()
+
+/* Cleanup and close smgr
+ */
+void
+CachedStorage::close()
 {
     InjectedErrorListener<WriteChunkInjectedError>::stop();
-    BackgroundFileFlusher::getInstance()->stop();
 
     for (ChunkMap::iterator i = _chunkMap.begin(); i != _chunkMap.end(); ++i)
     {
@@ -673,32 +540,9 @@ void CachedStorage::close()
     }
     _chunkMap.clear();
 
-    std::ostringstream ss;
-
-    if (::close(_hd) != 0)
-    {
-        LOG4CXX_ERROR(logger, "Failed to close header file");
-    }
-    if (::close(_log[0]) != 0)
-    {
-        LOG4CXX_ERROR(logger, "Failed to close transaction log file");
-    }
-    if (::close(_log[1]) != 0)
-    {
-        LOG4CXX_ERROR(logger, "Failed to close transaction log file");
-    }
-    for (size_t i = 0, nSegments = _segments.size(); i < nSegments; i++)
-    {
-        if (::close(_sd[i]) != 0)
-        {
-            LOG4CXX_ERROR(logger, "Failed to close data file");
-        }
-    }
-    if (!ss.str().empty())
-    {
-        LOG4CXX_ERROR(logger, ss.str());
-        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_CLOSE_FAILED);
-    }
+    _hd.reset();
+    _log[0].reset();
+    _log[1].reset();
 }
 
 void CachedStorage::notifyChunkReady(PersistentChunk& chunk)
@@ -800,6 +644,7 @@ void CachedStorage::compressChunk(ArrayDesc const& desc, PersistentChunk const* 
 {
     assert(aChunk);
     PersistentChunk& chunk = *const_cast<PersistentChunk*>(aChunk);
+    shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(desc.getUAId());
     int compressionMethod = chunk.getCompressionMethod();
     if (compressionMethod < 0) {
         throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_COMPRESS_METHOD_NOT_DEFINED);
@@ -832,7 +677,7 @@ void CachedStorage::compressChunk(ArrayDesc const& desc, PersistentChunk const* 
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_ACCESS_TO_RAW_CHUNK) << aChunk->getHeader().arrId;
         }
         buf.allocate(aChunk->getCompressedSize());
-        readAll(aChunk->_hdr.pos, buf.getData(), aChunk->getCompressedSize());
+        readChunkFromDataStore(*ds, *aChunk, buf.getData());
     }
 }
 
@@ -972,6 +817,7 @@ void CachedStorage::remove(ArrayUAID uaId, ArrayID arrId)
 void CachedStorage::removeUnversionedArray(ArrayUAID uaId)
 {
     ScopedMutexLock cs(_mutex);
+    bool removeStore = false;
     shared_ptr<InnerChunkMap> innerMap;
     ChunkMap::const_iterator iter = _chunkMap.find(uaId);
     if (iter == _chunkMap.end())
@@ -1002,24 +848,13 @@ void CachedStorage::removeUnversionedArray(ArrayUAID uaId)
         {
             chunk->_hdr.arrId = 0;
             LOG4CXX_TRACE(logger, "ChunkDesc: Free chunk descriptor at position " << chunk->_hdr.pos.hdrPos);
-            File::writeAll(_hd, &chunk->_hdr, sizeof(ChunkHeader), chunk->_hdr.pos.hdrPos);
+            _hd->writeAll(&chunk->_hdr, sizeof(ChunkHeader), chunk->_hdr.pos.hdrPos);
             assert(chunk->_hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
             _freeHeaders.insert(chunk->_hdr.pos.hdrPos);
-            if (_hdr.clusterSize != 0)
-            {
-                ClusterID cluId = getClusterID(chunk->_hdr.pos);
-                size_t& nChunks = _liveChunksInCluster[cluId];
-                assert(nChunks > 0);
-                if (--nChunks == 0)
-                {
-                    freeCluster(cluId);
-                    _clusters.erase(uaId);
-                }
-            }
         }
         victims.insert(address);
     }
-    File::writeAll(_hd, &_hdr, HEADER_SIZE, 0);
+    _hd->writeAll(&_hdr, HEADER_SIZE, 0);
     for(set<StorageAddress>::iterator i = victims.begin(); i != victims.end(); ++i)
     {
         StorageAddress const& address = *i;
@@ -1028,6 +863,7 @@ void CachedStorage::removeUnversionedArray(ArrayUAID uaId)
     if (innerMap->size() == 0)
     {
         _chunkMap.erase(uaId);
+        removeStore = true;
     }
     // Removed all chunk headers with this UAID but also
     // need to remove some tombstone headers as they are not pointed to from the map.
@@ -1038,11 +874,19 @@ void CachedStorage::removeUnversionedArray(ArrayUAID uaId)
         ArrayID arrId = *i;
         deleteDescriptorsFor(uaId, arrId);
     }
+
+    /* If all chunks referencing a data store were removed, then delete the data store
+     */
+    if (removeStore)
+    {
+        DataStores::getInstance()->closeDataStore(uaId, true);
+    }
 }
 
 void CachedStorage::removeMutableArray(ArrayUAID uaId, ArrayID arrId)
 {
     ScopedMutexLock cs(_mutex);
+    bool removeStore = false;
     shared_ptr<InnerChunkMap> innerMap;
     ChunkMap::const_iterator iter = _chunkMap.find(uaId);
     if (iter == _chunkMap.end())
@@ -1071,8 +915,16 @@ void CachedStorage::removeMutableArray(ArrayUAID uaId, ArrayID arrId)
     if (innerMap->size() == 0)
     {
        _chunkMap.erase(uaId);
+       removeStore = true;
     }
     deleteDescriptorsFor(uaId, arrId);
+
+    /* If all chunks referencing a data store were removed, then delete the data store
+     */
+    if (removeStore)
+    {
+        DataStores::getInstance()->closeDataStore(uaId, true);
+    }
 }
 
 void CachedStorage::deleteDescriptorsFor(ArrayUAID uaId, ArrayID arrId)
@@ -1096,7 +948,7 @@ void CachedStorage::deleteDescriptorsFor(ArrayUAID uaId, ArrayID arrId)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
-        File::readAll(_hd, &chunkDescriptors[0], (endEntry - startEntry) * sizeof(ChunkDescriptor), HEADER_SIZE + (startEntry * sizeof(ChunkDescriptor)));
+        _hd->readAll(&chunkDescriptors[0], (endEntry - startEntry) * sizeof(ChunkDescriptor), HEADER_SIZE + (startEntry * sizeof(ChunkDescriptor)));
         for (size_t i = 0; i < (endEntry - startEntry); i++)
         {
             ChunkDescriptor& chunkDesc = chunkDescriptors[i];
@@ -1105,53 +957,13 @@ void CachedStorage::deleteDescriptorsFor(ArrayUAID uaId, ArrayID arrId)
                 chunkDesc.hdr.arrId = 0;
                 assert(chunkDesc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
                 _freeHeaders.insert(chunkDesc.hdr.pos.hdrPos);
-                if ( chunkDesc.hdr.is<ChunkHeader::TOMBSTONE>() == false && _hdr.clusterSize != 0)
-                {
-                    ClusterID cluId = getClusterID(chunkDesc.hdr.pos);
-                    size_t& nChunks = _liveChunksInCluster[cluId];
-                    assert(nChunks > 0);
-                    if (--nChunks == 0)
-                    {
-                        freeCluster(cluId);
-                        //Note: if this code ever executes on a version of an array that's not the last version (no one does this at the moment)
-                        //then we could be in a situation where _clusters[uaID] does not point to the same cluster as cluID. In that case,
-                        //we could unlink a different partially-filled cluster _clusers[uaID] from clusters. That won't stop the world from
-                        //turning but it will mean that the next time we go in to writeChunk, _clusters[uaID] will be empty and we will pick
-                        //a brand new cluster for the new chunk - leaving one cluster partially-filled. Meaning, we will use more space than we
-                        //need to. Once again, no one does this at the moment.
-                        _clusters.erase(uaId);
-                    }
-                }
             }
         }
-        File::writeAll(_hd, &chunkDescriptors[0], (endEntry - startEntry) * sizeof(ChunkDescriptor), HEADER_SIZE + (startEntry * sizeof(ChunkDescriptor)));
+        _hd->writeAll(&chunkDescriptors[0], (endEntry - startEntry) * sizeof(ChunkDescriptor), HEADER_SIZE + (startEntry * sizeof(ChunkDescriptor)));
         startEntry = endEntry;
         endEntry = std::max( std::min<size_t>(_hdr.nChunks, endEntry + (memLimit / sizeof(ChunkDescriptor))), startEntry + 1);
     }
-    File::writeAll(_hd, &_hdr, HEADER_SIZE, 0);
-}
-
-void CachedStorage::freeCluster(ClusterID id)
-{
-    _liveChunksInCluster.erase(id);
-    DiskPos clusterPos;
-    getClusterPos(clusterPos, id);
-    LOG4CXX_DEBUG(logger, "Free cluster " << id << " query " << Query::getCurrentQueryID());
-    _freeClusters[clusterPos.segmentNo].insert(clusterPos.offs);
-}
-
-int CachedStorage::getRandomSegment()
-{
-    int i = 0, n = _segments.size() - 1;
-    if (n != 0)
-    {
-        long val = (long) (rand() % _totalAvailable);
-        do
-        {
-            val -= (long) ((_segments[i].size - _hdr.segment[i].used) / GB);
-        } while (val > 0 && ++i < n);
-    }
-    return i;
+    _hd->writeAll(&_hdr, HEADER_SIZE, 0);
 }
 
 InstanceID CachedStorage::getPrimaryInstanceId(ArrayDesc const& desc, StorageAddress const& address) const
@@ -1280,15 +1092,32 @@ void CachedStorage::waitForReplicas(vector<boost::shared_ptr<ReplicationManager:
     }
 }
 
-void CachedStorage::writeAll(const DiskPos& pos, const void* data, size_t size)
+/* Write bytes to DataStore indicated by pos
+ * @param pos DataStore and offset to which to write
+ * @param data Bytes to write
+ * @param len Number of bytes to write
+ * @pre position in DataStore must be previously allocated
+ * @throws userException if an error occurs
+ */
+void
+CachedStorage::writeBytesToDataStore(DiskPos const& pos,
+                                     void const* data,
+                                     size_t len,
+                                     size_t allocated)
 {
     double t0 = 0, t1 = 0, writeTime = 0;
+    shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(pos.dsGuid);
+
+    if (!ds)
+    {
+        throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_DATASTORE_NOT_FOUND);
+    }
 
     if (_writeLogThreshold >= 0)
     {
         t0 = getTimeSecs();
     }
-    File::writeAll(_sd[pos.segmentNo], data, size, pos.offs);
+    ds->writeData(pos.offs, data, len, allocated);
     if (_writeLogThreshold >= 0)
     {
         t1 = getTimeSecs();
@@ -1297,18 +1126,50 @@ void CachedStorage::writeAll(const DiskPos& pos, const void* data, size_t size)
 
     if (_writeLogThreshold >= 0 && writeTime * 1000 > _writeLogThreshold)
     {
-        LOG4CXX_DEBUG(logger, "CWR: pwrite fd "<<_sd[pos.segmentNo]<<" size "<<size<<" time "<<writeTime);
+        LOG4CXX_DEBUG(logger, "CWR: pwrite ds " << ds << " time " << writeTime);
     }
 }
 
-void CachedStorage::readAll(const DiskPos& pos, void* data, size_t size)
+/* Force writing of chunk data to data store
+   Exception is thrown if write failed
+*/
+void
+CachedStorage::writeChunkToDataStore(DataStore& ds, PersistentChunk& chunk, void const* data)
+{
+    double t0 = 0, t1 = 0, writeTime = 0;
+
+    if (_writeLogThreshold >= 0)
+    {
+        t0 = getTimeSecs();
+    }
+    ds.writeData(chunk._hdr.pos.offs, 
+                 data, 
+                 chunk._hdr.compressedSize,
+                 chunk._hdr.allocatedSize);
+    if (_writeLogThreshold >= 0)
+    {
+        t1 = getTimeSecs();
+        writeTime = t1 - t0;
+    }
+
+    if (_writeLogThreshold >= 0 && writeTime * 1000 > _writeLogThreshold)
+    {
+        LOG4CXX_DEBUG(logger, "CWR: pwrite ds " << " chunk "<< chunk <<" time "<< writeTime);
+    }
+}
+
+/* Read chunk data from the disk
+   Exception is thrown if read failed
+*/
+void 
+CachedStorage::readChunkFromDataStore(DataStore& ds, PersistentChunk const& chunk, void* data)
 {
     double t0 = 0, t1 = 0, readTime = 0;
     if (_writeLogThreshold >= 0)
     {
         t0 = getTimeSecs();
     }
-    File::readAll(_sd[pos.segmentNo], data, size, pos.offs);
+    ds.readData(chunk._hdr.pos.offs, data, chunk._hdr.compressedSize);
     if (_writeLogThreshold >= 0)
     {
         t1 = getTimeSecs();
@@ -1316,7 +1177,7 @@ void CachedStorage::readAll(const DiskPos& pos, void* data, size_t size)
     }
     if (_writeLogThreshold >= 0 && readTime * 1000 > _writeLogThreshold)
     {
-        LOG4CXX_DEBUG(logger, "CWR: pwrite fd "<<_sd[pos.segmentNo]<<" size "<<size<<" time "<<readTime);
+        LOG4CXX_DEBUG(logger, "CWR: pwrite ds " << " chunk "<< chunk <<" time "<< readTime);
     }
 }
 
@@ -1427,17 +1288,24 @@ void CachedStorage::cleanChunk(PersistentChunk* chunk)
     notifyChunkReady(*chunk);
 }
 
-void CachedStorage::writeChunk(ArrayDesc const& desc, PersistentChunk* newChunk, boost::shared_ptr<Query>& query)
+/* Write new chunk into the smgr.
+ */
+void
+CachedStorage::writeChunk(ArrayDesc const& adesc, PersistentChunk* newChunk, boost::shared_ptr<Query>& query)
 {
-    //XXX TODO: consider locking mutex here to avoid writing replica chunks for a rolled-back query
+    /* XXX TODO: consider locking mutex here to avoid writing replica chunks for a rolled-back query
+     */
     PersistentChunk& chunk = *newChunk;
 
-    // To deal with exceptions: unpin and free
+    /* To deal with exceptions: unpin and free
+     */
     boost::function<void()> func = boost::bind(&CachedStorage::cleanChunk, this, &chunk);
     Destructor<boost::function<void()> > chunkCleaner(func);
 
     Query::validateQueryPtr(query);
 
+    /* Grab buffer to use for compressing chunk data and try to compress
+     */
     const size_t bufSize = chunk.getSize();
     boost::scoped_array<char> buf(new char[bufSize]);
     if (!buf) {
@@ -1446,77 +1314,43 @@ void CachedStorage::writeChunk(ArrayDesc const& desc, PersistentChunk* newChunk,
     currentStatistics->allocatedSize += bufSize;
     currentStatistics->allocatedChunks++;
 
-    VersionID dstVersion = desc.getVersionId();
+    VersionID dstVersion = adesc.getVersionId();
     void const* deflated = buf.get();
     int nCoordinates = chunk._addr.coords.size();
-    DBArrayChunkInternal intChunk(desc, &chunk);
-    size_t compressedSize = _compressors[chooseCompressionMethod(desc, chunk, buf.get())]->compress(buf.get(), intChunk);
+    DBArrayChunkInternal intChunk(adesc, &chunk);
+    size_t compressedSize = _compressors[chooseCompressionMethod(adesc, chunk, buf.get())]->compress(buf.get(), intChunk);
     assert(compressedSize <= chunk.getSize());
     if (compressedSize == chunk.getSize())
     { // no compression
         deflated = chunk._data;
     }
+
+    /* Replicate chunk data to other instances
+     */
     vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
     func = boost::bind(&CachedStorage::abortReplicas, this, &replicasVec);
     Destructor<boost::function<void()> > replicasCleaner(func);
     func.clear();
-    replicate(desc, chunk._addr, &chunk, deflated, compressedSize, chunk.getSize(), query, replicasVec);
+    replicate(adesc, chunk._addr, &chunk, deflated, compressedSize, chunk.getSize(), query, replicasVec);
 
+    /* Write chunk locally into storage
+     */
     {
         ScopedMutexLock cs(_mutex);
         assert(chunk.isRaw()); // new chunk is raw
         Query::validateQueryPtr(query);
+        const AttributeDesc& attrDesc = adesc.getAttributes()[chunk.getAddress().attId];
+        shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(adesc.getUAId());
 
-        const AttributeDesc& attrDesc = desc.getAttributes()[chunk.getAddress().attId];
-
+        /* Fill in the chunk descriptor
+         */
         chunk._hdr.compressedSize = compressedSize;
-        size_t reserve = attrDesc.getReserve();
-        chunk._hdr.allocatedSize = (reserve != 0 && dstVersion > 1) ? compressedSize + compressedSize * reserve / 100 : compressedSize;
+        chunk._hdr.pos.dsGuid = adesc.getUAId();
+        chunk._hdr.pos.offs = ds->allocateSpace(compressedSize, 
+                                                chunk._hdr.allocatedSize);
 
-        if (_hdr.clusterSize == 0)
-        { // old no-cluster mode
-            chunk._hdr.pos.segmentNo = getRandomSegment();
-            if (_hdr.segment[chunk._hdr.pos.segmentNo].used + chunk._hdr.allocatedSize > _segments[chunk._hdr.pos.segmentNo].size)
-            {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_FREE_SPACE);
-            }
-            chunk._hdr.pos.offs = _hdr.segment[chunk._hdr.pos.segmentNo].used;
-            _hdr.segment[chunk._hdr.pos.segmentNo].used += chunk._hdr.allocatedSize;
-        }
-        else
-        {
-            if (chunk._hdr.allocatedSize > _hdr.clusterSize)
-            {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_SIZE_TOO_LARGE) << chunk._hdr.allocatedSize << _hdr.clusterSize;
-            }
-            // Choose location of the chunk
-            Cluster& cluster = _clusters[desc.getUAId()];
-            if (cluster.used == 0 || cluster.used + chunk._hdr.allocatedSize > _hdr.clusterSize)
-            {
-                cluster.pos.segmentNo = getRandomSegment();
-                cluster.used = 0;
-                if (!_freeClusters[cluster.pos.segmentNo].empty())
-                {
-                    set<uint64_t>::iterator i = _freeClusters[cluster.pos.segmentNo].begin();
-                    cluster.pos.offs = *i;
-                    _freeClusters[cluster.pos.segmentNo].erase(i);
-                }
-                else
-                {
-                    if (_hdr.segment[cluster.pos.segmentNo].used + _hdr.clusterSize > _segments[cluster.pos.segmentNo].size)
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NO_FREE_SPACE);
-                    cluster.pos.offs = _hdr.segment[cluster.pos.segmentNo].used;
-                    _hdr.segment[cluster.pos.segmentNo].used += _hdr.clusterSize;
-                    LOG4CXX_DEBUG(logger, "Allocate new chunk segment " << cluster.pos.offs);
-                }
-                assert(cluster.pos.offs % _hdr.clusterSize == 0);
-            }
-            chunk._hdr.pos.segmentNo = cluster.pos.segmentNo;
-            chunk._hdr.pos.offs = cluster.pos.offs + cluster.used;
-            cluster.used += chunk._hdr.allocatedSize;
-            _liveChunksInCluster[getClusterID(chunk._hdr.pos)] += 1;
-        }
-
+        /* Locate spot for chunk descriptor
+         */
         if (_freeHeaders.empty())
         {
             chunk._hdr.pos.hdrPos = _hdr.currPos;
@@ -1531,11 +1365,12 @@ void CachedStorage::writeChunk(ArrayDesc const& desc, PersistentChunk* newChunk,
             _freeHeaders.erase(i);
         }
 
-        // Write ahead UNDO log
+        /* Write ahead UNDO log
+         */
         if (dstVersion != 0)
         {
             TransLogRecord transLogRecord[2];
-            transLogRecord->arrayUAID = desc.getUAId();
+            transLogRecord->arrayUAID = adesc.getUAId();
             transLogRecord->arrayId = chunk._addr.arrId;
             transLogRecord->version = dstVersion;
             transLogRecord->hdr = chunk._hdr;
@@ -1550,12 +1385,14 @@ void CachedStorage::writeChunk(ArrayDesc const& desc, PersistentChunk* newChunk,
             }
             LOG4CXX_TRACE(logger, "ChunkDesc: Write in log chunk header " << transLogRecord->hdr.pos.offs << " at position " << _logSize);
 
-            File::writeAll(_log[_currLog], transLogRecord, sizeof(TransLogRecord) * 2, _logSize);
+            /* Write the transaction... log is opened O_SYNC so no flush is necessary
+             */
+            _log[_currLog]->writeAll(transLogRecord, sizeof(TransLogRecord) * 2, _logSize);
             _logSize += sizeof(TransLogRecord);
-            //XXX do we need to flush/fsync the log now ?
         }
 
-        // Update value count in Chunk Header
+        /* Update value count in Chunk Header
+         */
         if(chunk.isRLE() &&
            chunk.getCompressionMethod() == CompressorFactory::NO_COMPRESSION) {
             if (attrDesc.isEmptyIndicator()) {
@@ -1565,33 +1402,37 @@ void CachedStorage::writeChunk(ArrayDesc const& desc, PersistentChunk* newChunk,
                 ConstRLEPayload payload(static_cast<const char*>(deflated));
                 chunk._hdr.nElems = payload.count();
             }
-            // Update sparse flag
+            /* Update sparse flag
+             */
             chunk.setSparse(chunk._hdr.nElems <
                             chunk.getNumberOfElements(true) *
                             Config::getInstance()->
                             getOption<double>(CONFIG_SPARSE_CHUNK_THRESHOLD));
         }
 
-        // Write chunk data
-        writeAll(chunk._hdr.pos, deflated, compressedSize);
+        /* Write chunk data
+         */
+        writeChunkToDataStore(*ds, chunk, deflated);
         buf.reset();
 
-        // Write chunk descriptor in storage header
-        ChunkDescriptor desc;
-        desc.hdr = chunk._hdr;
+        /* Write chunk descriptor in storage header
+         */
+        ChunkDescriptor cdesc;
+        cdesc.hdr = chunk._hdr;
         for (int i = 0; i < nCoordinates; i++)
         {
-            desc.coords[i] = chunk._addr.coords[i];
+            cdesc.coords[i] = chunk._addr.coords[i];
         }
         assert(chunk._hdr.pos.hdrPos != 0);
 
         LOG4CXX_TRACE(logger, "ChunkDesc: Write chunk descriptor at position " << chunk._hdr.pos.hdrPos);
-        LOG4CXX_TRACE(logger, "Chunk descriptor to write: " << desc.toString());
+        LOG4CXX_TRACE(logger, "Chunk descriptor to write: " << cdesc.toString());
 
-        File::writeAll(_hd, &desc, sizeof(ChunkDescriptor), chunk._hdr.pos.hdrPos);
+        _hd->writeAll(&cdesc, sizeof(ChunkDescriptor), chunk._hdr.pos.hdrPos);
 
-        // Update storage header
-        File::writeAll(_hd, &_hdr, HEADER_SIZE, 0);
+        /* Update storage header (for nchunks field)
+         */
+        _hd->writeAll(&_hdr, HEADER_SIZE, 0);
 
         InjectedErrorListener<WriteChunkInjectedError>::check();
 
@@ -1602,6 +1443,9 @@ void CachedStorage::writeChunk(ArrayDesc const& desc, PersistentChunk* newChunk,
             addChunkToCache(chunk);
         } // else chunkCleaner will dec accessCount and free
     }
+
+    /* Wait for replication to complete
+     */
     waitForReplicas(replicasVec);
     replicasCleaner.disarm();
 }
@@ -1667,7 +1511,7 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
     tombstoneDesc.hdr.size = 0;
     tombstoneDesc.hdr.nElems = 0;
     tombstoneDesc.hdr.compressionMethod = 0;
-    tombstoneDesc.hdr.pos.segmentNo = 0;
+    tombstoneDesc.hdr.pos.dsGuid = 0;
     tombstoneDesc.hdr.pos.offs = 0;
     for (int i = 0; i <  tombstoneDesc.hdr.nCoordinates; i++)
     {
@@ -1719,16 +1563,16 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
         LOG4CXX_TRACE(logger, "ChunkDesc: Write in log chunk tombstone header " << transLogRecord->hdr.pos.offs
                       << " at position " << _logSize);
 
-        File::writeAll(_log[_currLog], transLogRecord, sizeof(TransLogRecord) * 2, _logSize);
+        _log[_currLog]->writeAll(transLogRecord, sizeof(TransLogRecord) * 2, _logSize);
         _logSize += sizeof(TransLogRecord);
         //XXX do we need to flush/fsync the log now ?
 
         LOG4CXX_TRACE(logger, "ChunkDesc: Write chunk tombstone descriptor at position " <<  tombstoneDesc.hdr.pos.hdrPos);
         LOG4CXX_TRACE(logger, "Chunk tombstone descriptor to write: " << tombstoneDesc.toString());
 
-        File::writeAll(_hd, &tombstoneDesc, sizeof(ChunkDescriptor), tombstoneDesc.hdr.pos.hdrPos);
+        _hd->writeAll(&tombstoneDesc, sizeof(ChunkDescriptor), tombstoneDesc.hdr.pos.hdrPos);
     }
-    File::writeAll(_hd, &_hdr, HEADER_SIZE, 0);
+    _hd->writeAll(&_hdr, HEADER_SIZE, 0);
     InjectedErrorListener<WriteChunkInjectedError>::check();
 }
 ///
@@ -1753,7 +1597,7 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
         while (true)
         {
             // read txn log record
-            size_t rc = ::pread(_log[i], &transLogRecord, sizeof(TransLogRecord), pos);
+            size_t rc = _log[i]->read(&transLogRecord, sizeof(TransLogRecord), pos);
             if (rc != sizeof(TransLogRecord) || transLogRecord.arrayUAID == 0)
             {
                 LOG4CXX_DEBUG(logger, "End of log at position " << pos << " rc=" << rc);
@@ -1783,10 +1627,9 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
                         addr.arrId = transLogRecord.arrayId;
                         addr.attId = transLogRecord.hdr.attId;
                         addr.coords.resize(transLogRecord.hdr.nCoordinates);
-                        File::readAll(_hd,
-                                      &addr.coords[0],
-                                      transLogRecord.hdr.nCoordinates * sizeof(Coordinate),
-                                      transLogRecord.hdr.pos.hdrPos + sizeof(ChunkHeader));
+                        _hd->readAll(&addr.coords[0],
+                                     transLogRecord.hdr.nCoordinates * sizeof(Coordinate),
+                                     transLogRecord.hdr.pos.hdrPos + sizeof(ChunkHeader));
 
                         // find the chunk in the map
                         shared_ptr<InnerChunkMap> & innerMap = iter->second;
@@ -1814,9 +1657,9 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
                                   << " size " << transLogRecord.oldSize << " from position "
                                   << (pos-sizeof(TransLogRecord)));
 
-                    // read the previous version of the chunk from the txn log 
+                    // read the previous version of the chunk from the txn log
                     boost::scoped_array<char> buf(new char[transLogRecord.oldSize]);
-                    File::readAll(_log[i], buf.get(), transLogRecord.oldSize, pos);
+                    _log[i]->readAll(buf.get(), transLogRecord.oldSize, pos);
                     crc = calculateCRC32(buf.get(), transLogRecord.oldSize);
                     if (crc != transLogRecord.bodyCRC)
                     {
@@ -1824,14 +1667,17 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
                                       << ": " << crc << " vs. expected " << transLogRecord.bodyCRC);
                         break;
                     }
-                    writeAll(transLogRecord.hdr.pos, buf.get(), transLogRecord.oldSize);
+                    writeBytesToDataStore(transLogRecord.hdr.pos, 
+                                          buf.get(), 
+                                          transLogRecord.oldSize,
+                                          transLogRecord.hdr.allocatedSize);
                     buf.reset();
 
                     // restore first chunk in clones chain
                     assert(transLogRecord.hdr.pos.hdrPos != 0);
                     LOG4CXX_TRACE(logger, "ChunkDesc: Restore chunk descriptor at position "
                                   << transLogRecord.hdr.pos.hdrPos);
-                    File::writeAll(_hd, &transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
+                    _hd->writeAll(&transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
                     transLogRecord.hdr.pos.hdrPos = transLogRecord.newHdrPos;
                 }
 
@@ -1839,8 +1685,26 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
                 assert(transLogRecord.hdr.pos.hdrPos != 0);
                 LOG4CXX_TRACE(logger, "ChunkDesc: Undo chunk descriptor creation at position "
                               << transLogRecord.hdr.pos.hdrPos);
-                File::writeAll(_hd, &transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
+                _hd->writeAll(&transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
                 _freeHeaders.insert(transLogRecord.hdr.pos.hdrPos);
+
+                /* Update the free list for the data store --- catch exceptions so that we can
+                   at least start even if the data store is missing.
+                 */
+                try
+                {
+                    shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(transLogRecord.hdr.pos.dsGuid);
+
+                    ds->freeChunk(transLogRecord.hdr.pos.offs,
+                                  transLogRecord.hdr.allocatedSize);
+                }
+                catch (SystemException const& x)
+                {
+                    LOG4CXX_ERROR(logger, "Failed to open datastore with guid " <<
+                                  transLogRecord.hdr.pos.dsGuid << " during rollback " <<
+                                  "error message: " << x.getErrorMessage());
+                    throw x;
+                }
             }
             pos += transLogRecord.oldSize;
         }
@@ -1880,6 +1744,8 @@ void CachedStorage::doTxnRecoveryOnStartup()
                     lock->getLockMode() == SystemCatalog::LockDesc::RD);
         }
     }
+
+    // Deal with the worker locks next
     for (list<shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = workerLocks.begin(); iter != workerLocks.end(); ++iter)
     {
 
@@ -1895,32 +1761,50 @@ void CachedStorage::doTxnRecoveryOnStartup()
             assert(lock->getLockMode() == SystemCatalog::LockDesc::RNF);
         }
     }
+
+    // Do the rollback
     rollback(*arraysToRollback.get());
+
+    // Find arrays that were completely rolled back (version 0), and delete
+    // the data stores
+    map<ArrayID, VersionID>::iterator array_it = arraysToRollback->begin();
+    for ( ; array_it != arraysToRollback->end(); ++array_it)
+    {
+        if (array_it->second == 0)
+        {
+            DataStores::getInstance()->closeDataStore(array_it->first, true);
+        }
+    }
+
     SystemCatalog::getInstance()->deleteArrayLocks(getInstanceId());
 }
 
-void CachedStorage::flush()
+/* Flush all changes to the physical device(s) for the indicated array. 
+   (optionally flush data for all arrays, if uaId == INVALID_ARRAY_ID). 
+*/
+void 
+CachedStorage::flush(ArrayUAID uaId)
 {
     int rc;
-    do
-    {
-        rc = ::fsync(_hd);
-    } while (rc != 0 && errno == EINTR);
+
+    /* flush the chunk map file
+     */
+    rc = _hd->fsync();
     if (rc != 0)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED_WITH_ERRNO) << "fsync" << errno;
     }
 
-    for (size_t i = 0, nSegments = _segments.size(); i < nSegments; i++)
+    /* flush the data store for the indicated array (or flush all datastores)
+     */
+    if (uaId != INVALID_ARRAY_ID)
     {
-        do
-        {
-            rc = ::fsync(_sd[i]);
-        } while (rc != 0 && errno == EINTR);
-        if (rc != 0)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED_WITH_ERRNO) << "fsync" << errno;
-        }
+        shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(uaId);
+        ds->flush();
+    }
+    else
+    {
+        DataStores::getInstance()->flushAllDataStores();
     }
 }
 
@@ -1941,6 +1825,7 @@ boost::shared_ptr<ConstArrayIterator> CachedStorage::getConstArrayIterator(boost
 void CachedStorage::fetchChunk(ArrayDesc const& desc, PersistentChunk& chunk)
 {
     ChunkInitializer guard(this, chunk);
+    shared_ptr<DataStore> ds = DataStores::getInstance()->getDataStore(desc.getUAId());
     if (chunk._hdr.pos.hdrPos == 0)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_ACCESS_TO_RAW_CHUNK) << chunk.getHeader().arrId;
@@ -1956,18 +1841,16 @@ void CachedStorage::fetchChunk(ArrayDesc const& desc, PersistentChunk& chunk)
         if (!buf) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
-        readAll(chunk._hdr.pos, buf.get(), chunk.getCompressedSize());
-        chunk._loader = pthread_self();
+        readChunkFromDataStore(*ds, chunk, buf.get());
         DBArrayChunkInternal intChunk(desc, &chunk);
         size_t rc = _compressors[chunk.getCompressionMethod()]->decompress(buf.get(), chunk.getCompressedSize(), intChunk);
-        chunk._loader = 0;
         if (rc != chunk.getSize())
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_DECOMPRESS_CHUNK);
         buf.reset();
     }
     else
     {
-        readAll(chunk._hdr.pos, chunk._data, chunkSize);
+        readChunkFromDataStore(*ds, chunk, chunk._data);
     }
 }
 
@@ -2011,7 +1894,7 @@ void CachedStorage::loadChunk(ArrayDesc const& desc, PersistentChunk* aChunk)
         }
     }
 
-    if (chunk._raw && chunk._loader != pthread_self())
+    if (chunk._raw)
     {
         fetchChunk(desc, chunk);
     }
@@ -2043,20 +1926,12 @@ size_t CachedStorage::getNumberOfInstances() const
 void CachedStorage::setInstanceId(InstanceID id)
 {
     _hdr.instanceId = id;
-    File::writeAll(_hd, &_hdr, HEADER_SIZE, 0);
+    _hd->writeAll(&_hdr, HEADER_SIZE, 0);
 }
 
 void CachedStorage::getDiskInfo(DiskInfo& info)
 {
     memset(&info, 0, sizeof info);
-    info.clusterSize = _hdr.clusterSize;
-    info.nSegments = _segments.size();
-    for (size_t i = 0; i < _segments.size(); i++)
-    {
-        info.used += _hdr.segment[i].used;
-        info.available += _segments[i].size - _hdr.segment[i].used;
-        info.nFreeClusters += _freeClusters[i].size();
-    }
 }
 
 void CachedStorage::listChunkDescriptors(ListChunkDescriptorsArrayBuilder& builder)
@@ -2066,7 +1941,7 @@ void CachedStorage::listChunkDescriptors(ListChunkDescriptorsArrayBuilder& build
     uint64_t chunkPos = HEADER_SIZE;
     for (size_t i = 0; i < _hdr.nChunks; i++, chunkPos += sizeof(ChunkDescriptor))
     {
-        File::readAll(_hd, &element.first, sizeof(ChunkDescriptor), chunkPos);
+        _hd->readAll(&element.first, sizeof(ChunkDescriptor), chunkPos);
         element.second = _freeHeaders.count(chunkPos);
         builder.listElement(element);
     }
@@ -2658,18 +2533,38 @@ boost::shared_ptr<ConstChunkIterator> CachedStorage::DBArrayChunk::getConstItera
     UnPinner selfScope(dbChunk);
 
     _arrayIter._storage->loadChunk(getArrayDesc(), dbChunk);
+    if (isRLE()) {
+        if (getAttributeDesc().isEmptyIndicator()) {
+            return boost::make_shared<RLEBitmapChunkIterator>(getArrayDesc(),
+                                                              DBArrayChunkBase::getAttributeId(),
+                                                              (Chunk*) this, bitmap, iterationMode, query);
+        } else if ((iterationMode & ConstChunkIterator::INTENDED_TILE_MODE) ||
+                   (iterationMode & ConstChunkIterator::TILE_MODE)) { //old tile mode
 
-    boost::shared_ptr<ConstChunkIterator> iterator = boost::shared_ptr<ConstChunkIterator>(
-            isRLE() ?
-            ( getAttributeDesc().isEmptyIndicator() ?
-              (ConstChunkIterator*) new RLEBitmapChunkIterator(getArrayDesc(), DBArrayChunkBase::getAttributeId(), (Chunk*) this, bitmap, iterationMode, query) :
-              (ConstChunkIterator*) new RLEConstChunkIterator(getArrayDesc(),  DBArrayChunkBase::getAttributeId(), (Chunk*) this, bitmap, iterationMode, query) )
-                :
-            ( isSparse() ?
-                (ConstChunkIterator*) new SparseChunkIterator(getArrayDesc(), DBArrayChunkBase::getAttributeId(), (Chunk*) this, bitmap, false, iterationMode, query) :
-                (ConstChunkIterator*) new MemChunkIterator(getArrayDesc(),    DBArrayChunkBase::getAttributeId(), (Chunk*) this, bitmap, false, iterationMode, query) )
-    );
-    return iterator;
+            return boost::make_shared<RLEConstChunkIterator>(getArrayDesc(),
+                                                             DBArrayChunkBase::getAttributeId(),
+                                                             (Chunk*) this, bitmap, iterationMode, query);
+        }
+
+        // non-tile mode, but using the new tiles for read-ahead buffering
+        boost::shared_ptr<RLETileConstChunkIterator> tiledIter =
+               boost::make_shared<RLETileConstChunkIterator>(getArrayDesc(),
+                                                             DBArrayChunkBase::getAttributeId(),
+                                                             (Chunk*) this,
+                                                             bitmap,
+                                                             iterationMode,
+                                                             query);
+        return boost::make_shared< BufferedConstChunkIterator< boost::shared_ptr<RLETileConstChunkIterator> > >(tiledIter, query);
+    }
+    // deprecated formats
+    if (isSparse()) {
+        return boost::make_shared<SparseChunkIterator>(getArrayDesc(),
+                                                       DBArrayChunkBase::getAttributeId(),
+                                                       (Chunk*) this, bitmap, false, iterationMode, query);
+    }
+    return boost::make_shared<MemChunkIterator>(getArrayDesc(),
+                                                DBArrayChunkBase::getAttributeId(),
+                                                (Chunk*) this, bitmap, false, iterationMode, query);
 }
 
 boost::shared_ptr<ChunkIterator>
@@ -2909,7 +2804,6 @@ void PersistentChunk::init()
     _next = _prev = NULL;
     _storage = &StorageManager::getInstance();
     _timestamp = 1;
-    _loader = 0;
 }
 
 RWLock& PersistentChunk::getLatch()
@@ -3018,20 +2912,28 @@ void* CachedStorage::DBArrayChunkBase::getData() const
     return _inputChunk->getData(getArrayDesc());
 }
 
+void* CachedStorage::DBArrayChunkBase::getDataForLoad()
+{
+    return _inputChunk->getDataForLoad();
+}
+
 void* PersistentChunk::getData(const ArrayDesc& desc)
 {
-    if (_loader != pthread_self())
+    if (!_accessCount) {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_NOT_PINNED);
+    }
+    if (_hdr.pos.hdrPos != 0)
     {
-        if (!_accessCount) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_NOT_PINNED);
-        }
-        if (_hdr.pos.hdrPos != 0)
-        {
-            _storage->loadChunk(desc, this);
-        }
+        _storage->loadChunk(desc, this);
     }
     return _data;
 }
+
+void* PersistentChunk::getDataForLoad()
+{
+    return _data;
+}
+
 size_t  CachedStorage::DBArrayChunkBase::getSize() const
 {
     return _inputChunk->getSize();

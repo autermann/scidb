@@ -9,7 +9,7 @@ create array md_expo <response: double> [ID(string)=*,10,0, AffyId(string)=*,10,
 load(expo, '../tests/harness/testcases/data/stringdims_withsubarray.txt')
 
 --set-format csv+
-redimension_store(expo, md_expo)
+store(redimension(expo, md_expo), md_expo)
 
 avg_rank(md_expo)
 avg_rank(md_expo, response)

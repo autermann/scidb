@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -271,8 +271,8 @@ namespace scidb
     {
         PinBuffer scope(*this);
         closure.allocate(getSize() + emptyBitmap->packedSize());
-        memcpy(closure.getData(), getData(), getSize());
-        emptyBitmap->pack((char*)closure.getData() + getSize());
+        memcpy(closure.getDataForLoad(), getData(), getSize());
+        emptyBitmap->pack((char*)closure.getDataForLoad() + getSize());
     }
 
     ConstChunk* ConstChunk::materialize() const
@@ -347,7 +347,7 @@ namespace scidb
             throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CHUNK_ALREADY_EXISTS);
         }
         setCount(0); // unknown
-        char* dst = (char*)getData();
+        char* dst = (char*)getDataForLoad();
 
         // If it is in the middle of a redimension, and if there is a synthetic dimension, use the following algorithm:
         // (a) Build an auxiliary structure describing #elements in each cell, not including the synthetic dim.
@@ -485,7 +485,7 @@ namespace scidb
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_AGGREGATE_STATE_MUST_BE_NULLABLE);//enforce equivalency w above merge()
 
         setCount(0);
-        char* dst = (char*)getData();
+        char* dst = (char*)getDataForLoad();
         if (dst != NULL)
         {
             int sparseMode = isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
@@ -545,7 +545,7 @@ namespace scidb
 
         assert(isRLE() && with.isRLE());
 
-        char* dst = static_cast<char*>(getData());
+        char* dst = static_cast<char*>(getDataForLoad());
         PinBuffer scope(with);
         if (dst != NULL)
         {
@@ -1141,12 +1141,12 @@ namespace scidb
                 if (emptyBitmap && chunk.getBitmapSize() == 0) {
                     size_t size = chunk.getSize() + emptyBitmap->packedSize();
                     outChunk.allocate(size);
-                    memcpy(outChunk.getData(), chunk.getData(), chunk.getSize());
+                    memcpy(outChunk.getDataForLoad(), chunk.getData(), chunk.getSize());
                     emptyBitmap->pack((char*)outChunk.getData() + chunk.getSize());
                 } else {
                     size_t size = emptyBitmap ? chunk.getSize() : chunk.getSize() - chunk.getBitmapSize();
                     outChunk.allocate(size);
-                    memcpy(outChunk.getData(), chunk.getData(), size);
+                    memcpy(outChunk.getDataForLoad(), chunk.getData(), size);
                 }
                 outChunk.setCount(chunk.isCountKnown() ? chunk.count() : 0);
                 outChunk.write(query);

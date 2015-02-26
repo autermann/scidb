@@ -7,7 +7,7 @@ SCIDB QUERY : <store(apply((build(<a:char>[x=0:2,3,0],string(x-2))),b,(x+32/2.7)
 SCIDB QUERY : <create  array B <x:int64>[a(char)=3,3,0, b(double)=3,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {a,b} x
 {'-',11.8519} 0
 {'-',12.8519} 1

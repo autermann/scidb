@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -46,7 +46,7 @@ using namespace std;
 class TransposeArray: public Array
 {
 public:
-    TransposeArray(ArrayDesc const& arrayDesc, shared_ptr<Array>& input, shared_ptr<CoordinateSet>& inputChunkPositions, shared_ptr<Query>& query):
+    TransposeArray(ArrayDesc const& arrayDesc, shared_ptr<Array>const& input, shared_ptr<CoordinateSet>const& inputChunkPositions, shared_ptr<Query>const& query):
         _arrayDesc(arrayDesc),
         _inputArray(input),
         _nDimensions(input->getArrayDesc().getDimensions().size()),

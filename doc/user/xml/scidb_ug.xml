@@ -3,7 +3,8 @@
 [ <!ENTITY % myents SYSTEM "scidb_ug.ent" > %myents; ]
 >
 <book>
-  <title>SciDB User's Guide</title>
+        <title>SciDB User Guide</title>
+        <subtitle>Community Edition</subtitle>
 
   <bookinfo>
     <mediaobject>
@@ -13,7 +14,7 @@
     </mediaobject>
 
     <copyright>
-      <year>2008–2013</year>
+      <year>2008–2014</year>
 
       <holder>SciDB, Inc.</holder>
     </copyright>
@@ -34,57 +35,30 @@
     </legalnotice>
   </bookinfo>
 
-  <xi:include href="rn.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="intro_to_scidb.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="scidb_installation_and_administration.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="getting_started_with_scidb_devel.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="creating_and_removing_arrays_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="loading_data_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="basic_array_tasks_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="scidb_datatypes_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="analytics_chapter.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="updating_and_array_versions_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="changing_array_schemas_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="jdbc.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="plugin_UDFs.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="basic_linear_algebra_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="scidb_aggregates_ref.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
+  <xi:include href="rn.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="intro_to_scidb.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="scidb_installation_and_administration.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="getting_started_with_scidb_devel.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="scidb_datatypes_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="creating_and_removing_arrays_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="loading_data_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="basic_array_tasks_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="analytics_chapter.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="updating_and_array_versions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="changing_array_schemas_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="jdbc.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="macros.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="plugin_UDFs.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="basic_linear_algebra_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="scidb_aggregates_ref.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="scidb_function_reference.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="operator_categories.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="scidb_operator_ref.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="scidb_bestpractices.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="appendix_trouble.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="appendix_A.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="appendix_B.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="appendix_macros.xml" xmlns:xi="http://www.w3.org/2001/XInclude" />
 
   <index/>
 </book>

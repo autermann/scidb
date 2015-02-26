@@ -35,7 +35,7 @@ SCIDB QUERY : <store(apply(build(AA, iif(x%2=0, null, 10000)), a2,iif(x%2=1, nul
 SCIDB QUERY : <create array NN <x:int64> [a1(double)=2,2,0, a2(double)=2,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(source,dest)>
+SCIDB QUERY : <store(redimension(source,dest),dest)>
 {a} b
 {9971.2} 9
 {9977.6} 7
@@ -43,7 +43,7 @@ SCIDB QUERY : <redimension_store(source,dest)>
 {9990.4} 3
 {9996.8} 1
 
-SCIDB QUERY : <redimension_store(repart(source,< a : double NULL > [ b=0:10,11,0 ]),dest1)>
+SCIDB QUERY : <store(redimension(repart(source,< a : double NULL > [ b=0:10,11,0 ]),dest1),dest1)>
 {a} b
 {9971.2} 9
 {9977.6} 7
@@ -79,10 +79,10 @@ SCIDB QUERY : <select * from source>
 {9} null
 {10} null
 
-SCIDB QUERY : <redimension_store(source,dest2)>
+SCIDB QUERY : <store(redimension(source,dest2),dest2)>
 {a} b
 
-SCIDB QUERY : <redimension_store(ZZ,NN)>
+SCIDB QUERY : <store(redimension(ZZ,NN),NN)>
 {a1,a2} x
 
 SCIDB QUERY : <update ZZ  set a2=NULL>
@@ -90,7 +90,7 @@ SCIDB QUERY : <update ZZ  set a2=NULL>
 {0} null,null
 {1} 10000,null
 
-SCIDB QUERY : <redimension_store(ZZ,NN)>
+SCIDB QUERY : <store(redimension(ZZ,NN),NN)>
 {a1,a2} x
 
 SCIDB QUERY : <update ZZ  set a1=NULL>
@@ -98,7 +98,7 @@ SCIDB QUERY : <update ZZ  set a1=NULL>
 {0} null,null
 {1} null,null
 
-SCIDB QUERY : <redimension_store(ZZ,NN)>
+SCIDB QUERY : <store(redimension(ZZ,NN),NN)>
 {a1,a2} x
 
 SCIDB QUERY : <remove(source)>

@@ -35,7 +35,7 @@ load(A2a, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 9999)
 load(A2a, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 4, A2a_err)
 
 scan(A2a_err)
-count(A2a_err)
+aggregate(A2a_err,count(*))
 
 save(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,float,string_10)')
 

@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd" [
-<!ENTITY % myents SYSTEM "scidb_ug.ent">
-%myents;
-]>
+"docbookV4.5/docbookx.dtd">
 <chapter id="creatingArraysChapter">
   <title>Creating and Removing SciDB Arrays</title>
 
@@ -43,259 +40,280 @@
     </listitem>
   </itemizedlist>
 
-  <section id="CreateArray">
-    <title>Creating an Array</title>
+  <section id="createArrayStatement">
+    <title>SciDB Array Schema Syntax</title>
 
-    <para>This section discusses the following:<itemizedlist>
+    <para><indexterm>
+        <primary>syntax, schema</primary>
+      </indexterm><indexterm>
+        <primary>CREATE ARRAY syntax</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>creating</secondary>
+      </indexterm>The following items provide a precise syntax of a SciDB
+    array schema. A schema can be used in a variety of operators, such as
+    <code>cast()</code>, <code>build()</code>, <code>redimension()</code>, and
+    so on. Here, we discuss schemas within the context of creating
+    arrays.<programlisting><emphasis>create_array_statement</emphasis> ::= <emphasis
+          role="bold">CREATE ARRAY</emphasis> <emphasis>array_name schema</emphasis>
+<emphasis>schema </emphasis>                ::= <emphasis role="bold">&lt;</emphasis> <emphasis>attributes</emphasis> <emphasis
+          role="bold">&gt;</emphasis> <emphasis role="bold">[</emphasis> <emphasis>dimensions</emphasis> <emphasis
+          role="bold">]</emphasis></programlisting>To create an array, you
+    specify the key words <command>CREATE ARRAY</command>, followed by a name
+    and a schema. The schema comprises a list of attributes and a list of
+    dimensions.</para>
+
+    <note>
+      <para>The <command>CREATE ARRAY</command> keywords are allowed in both
+      AFL and AQL.</para>
+    </note>
+
+    <para>The array attributes describe the types of data contained in each
+    cell of the array. Each attribute is defined as follows:<programlisting><emphasis>attribute</emphasis> ::= <emphasis>attribute_name</emphasis> <emphasis
+          role="bold">:</emphasis> <emphasis>attribute_type nullable default</emphasis>
+<emphasis>nullable</emphasis>  ::=
+                <emphasis role="bold">NULL</emphasis>
+              | <emphasis role="bold">NOT NULL</emphasis>
+              | 
+<emphasis>default</emphasis>   ::=
+      <emphasis role="bold">          DEFAULT</emphasis> <emphasis>default_value</emphasis>
+              |</programlisting><indexterm>
+        <primary>attributes</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>attributes</secondary>
+      </indexterm>Each attribute consists of:<itemizedlist>
         <listitem>
-          <para>The <link linkend="createArrayStatement">CREATE ARRAY
-          statement</link></para>
+          <para><emphasis role="bold">A name: </emphasis>The array name
+          uniquely identifies the array in the database. The maximum length of
+          an array name is 1024 bytes. Array names may contain only the
+          alphanumeric characters and underscores (_).</para>
         </listitem>
 
         <listitem>
-          <para><link linkend="dimensionDefaults">Default values for
-          dimensions</link> when creating an array</para>
+          <para><emphasis role="bold">Its data type: </emphasis>One of the
+          data types supported by SciDB (can also be a user-defined type). Use
+          the <code>list('types')</code> command to see the list of available
+          data types.</para>
         </listitem>
 
         <listitem>
-          <para><link linkend="dimensionExpressions">Defining dimensions with
-          expressions</link></para>
+          <para><emphasis role="bold">Nulls allowed (Optional):
+          </emphasis>Users can specify 'NULL' to indicate attributes that are
+          allowed to contain null values. If this keyword is not used, all
+          values must be non null, that is, they cannot be assigned the
+          special null value. If the user does not specify a value for such an
+          attribute, SciDB will automatically substitute a default
+          value.</para>
         </listitem>
 
         <listitem>
-          <para><link linkend="dropArray">Removing an array</link> from
-          SciDB</para>
+          <para><emphasis role="bold">A default value (Optional):
+          </emphasis>Users can specify the value to be automatically
+          substituted when no value has been explicitly supplied for a non
+          NULL attribute. If unspecified, substitution uses system defaults
+          for various types (0 for numeric types and "" for string). Note that
+          if the attribute is declared as allowing nulls, this clause is
+          ignored.</para>
         </listitem>
       </itemizedlist></para>
 
-    <section id="createArrayStatement">
-      <title>CREATE ARRAY Statement</title>
+    <para><indexterm>
+        <primary>dimensions</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
 
-      <para><indexterm>
-          <primary>arrays</primary>
+        <secondary>dimensions</secondary>
+      </indexterm>Dimensions form the coordinate system for the array. The
+    number of dimensions in an array is the number of coordinates or
+    <emphasis>indices</emphasis> needed to specify an array cell. Each
+    dimension is defined as follows:<programlisting><emphasis>dimension</emphasis>    ::=   <emphasis>dimension_name</emphasis>
+                 | <emphasis>dimension_name</emphasis> <emphasis role="bold">=</emphasis> <emphasis>expression</emphasis> <emphasis
+          role="bold">:</emphasis> <emphasis>dimension_hi</emphasis> <emphasis
+          role="bold">,</emphasis> <emphasis>expression</emphasis> <emphasis
+          role="bold">,</emphasis> <emphasis>expression</emphasis>
+<emphasis>dimension_hi</emphasis> ::=   <emphasis>expression</emphasis>
+                 | <emphasis role="bold">*</emphasis></programlisting>Each
+    dimension consists of:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">A name. </emphasis>If you specify only
+          the name, SciDB uses defaults for the chunk size and overlap, and
+          makes the dimension unbounded. If not using defaults, you must
+          specify the remaining dimension characteristics.</para>
 
-          <secondary>creating</secondary>
-        </indexterm><indexterm>
-          <primary>create array</primary>
-        </indexterm>The <code><command>CREATE ARRAY </command></code>
-      statement creates a new array and specifies the array schema. The
-      <code><command>CREATE ARRAY </command></code> statement has the same
-      syntax in both AFL and AQL. The syntax of the<code> <command>CREATE
-      ARRAY</command> </code> statement for a bounded array is:
-      <programlisting><command>CREATE ARRAY</command> <replaceable>array_name</replaceable> &lt;<replaceable>attributes</replaceable>&gt; [<replaceable>dimensions</replaceable>]</programlisting></para>
+          <para>Just like attributes, each dimension must be named, and
+          dimension names cannot be repeated in the same array. The maximum
+          length of a dimension name is 1024 bytes. Dimension names may only
+          contain alphanumeric characters and underscores (_)</para>
+        </listitem>
 
-      <para>The arguments for the <command><code>CREATE ARRAY</code></command>
-      statement are as follows:</para>
+        <listitem>
+          <para><emphasis role="bold">A starting value: </emphasis>An
+          expression for the dimension start value.</para>
+        </listitem>
 
-      <variablelist>
-        <?dbfo term-width="1.0in"?>
+        <listitem>
+          <para><emphasis role="bold">An ending value: </emphasis>Either an
+          expression or an asterisk (*) can be supplied as the dimension end
+          value. An asterisk indicates the dimension has no set size (referred
+          to as an <emphasis>unbounded dimension</emphasis>). Together, the
+          starting and ending values define the range of possible values that
+          the dimension coordinate can take. This range includes both the
+          starting and ending values themselves. For example, [1,1000] defines
+          a dimension size of 1000.</para>
+        </listitem>
 
-        <varlistentry>
-          <term><code> <replaceable>array_name</replaceable> </code></term>
+        <listitem>
+          <para><emphasis role="bold">A chunk size: </emphasis>The number of
+          elements per chunk. An expression for the chunk size. Note that this
+          functions as a maximum value, as arrays can be sparse, and thus
+          contain many fewer values than the number specified here.</para>
+        </listitem>
 
-          <listitem>
-            <para>The array name that uniquely identifies the array in the
-            database. The maximum length of an array name is 1024 bytes. Array
-            names may only contain the alphanumeric characters and underscores
-            (_).</para>
-          </listitem>
-        </varlistentry>
+        <listitem>
+          <para><emphasis role="bold">A chunk overlap: </emphasis>The number
+          of overlapping dimension-index values for adjacent chunksAn
+          expression for the chunk overlap.</para>
+        </listitem>
+      </itemizedlist></para>
 
-        <varlistentry>
-          <term><code> <replaceable>attributes</replaceable> </code></term>
+    <para>Expressions must evaluate to a scalar value. For example, an
+    expression might be <emphasis role="bold">100</emphasis>, or <emphasis
+    role="bold">500 * 4</emphasis>, and so on. Additionally, expressions can
+    consist of environment variables—so long as they get evaluated in the
+    shell, and then passed into SciDB. For details, see <xref
+    linkend="dimensionExpressions"/>.</para>
 
-          <listitem>
-            <para><indexterm>
-                <primary>attributes</primary>
-              </indexterm><indexterm>
-                <primary>arrays</primary>
+    <para>As an example, this AQL statement creates an array: <programlisting
+    language="test">--aql CREATE ARRAY A &lt;x: double, err: double&gt; [i=0:99,10,0, j=0:99,10,0]; --show-output=no</programlisting></para>
 
-                <secondary>attributes</secondary>
-              </indexterm>The array attributes contain the actual data. You
-            specify an attribute with:<itemizedlist>
-                <listitem>
-                  <para><emphasis>Attribute name</emphasis>: Name of an
-                  attribute. The maximum length of an attribute name is
-                  1024 bytes. No two attributes in the same array can share a
-                  name. Attribute names may only contain alphanumeric
-                  characters and underscores (_).</para>
-                </listitem>
+    <para>The created array consists of the following:<itemizedlist>
+        <listitem>
+          <para>Array name, <code>A</code></para>
+        </listitem>
 
-                <listitem>
-                  <para><emphasis>Attribute type</emphasis>: Type identifier.
-                  One of the data types supported by SciDB. Use the
-                  <code>list('types')</code> command to see the list of
-                  available data types.</para>
-                </listitem>
+        <listitem>
+          <para>An array schema with the following characteristics:</para>
 
-                <listitem>
-                  <para>NULL (optional): Users can specify 'NULL' to indicate
-                  attributes that are allowed to contain null values. If this
-                  keyword is not used, all attributes must be non null, i.e.,
-                  they cannot be assigned the special null value. If the user
-                  does not specify a value for such an attribute, SciDB will
-                  automatically substitute a default value.</para>
-                </listitem>
+          <orderedlist>
+            <listitem>
+              <para>Two attributes: one with name <code>x</code> and type
+              <code>double</code> and one with name <code>err</code> and type
+              <code>double</code>.</para>
+            </listitem>
 
-                <listitem>
-                  <para>DEFAULT (optional): Allows the user to specify the
-                  value to be automatically substituted when a non NULL
-                  attribute lacks a value. If unspecified substitution uses
-                  system defaults for various types (0 for numeric types and
-                  "" for string). Note that if the attribute is declared as
-                  NULL, this clause is ignored.</para>
-                </listitem>
-              </itemizedlist></para>
-          </listitem>
-        </varlistentry>
+            <listitem>
+              <para>Two dimensions: one with name <code>i</code>, starting
+              coordinate 0, ending coordinate 99, chunk size 10, and chunk
+              overlap 0; one with name <code>j</code>, starting coordinate 0,
+              ending coordinate 99, chunk size 10, and chunk overlap 0.</para>
+            </listitem>
+          </orderedlist>
+        </listitem>
+      </itemizedlist></para>
+  </section>
 
-        <varlistentry>
-          <term><code> <replaceable>dimensions</replaceable> </code></term>
+  <section>
+    <title>Creating a sparse array</title>
 
-          <listitem>
-            <para><indexterm>
-                <primary>dimensions</primary>
-              </indexterm><indexterm>
-                <primary>arrays</primary>
+    <para><indexterm>
+        <primary>sparse arrays</primary>
+      </indexterm><indexterm>
+        <primary>create sparse array</primary>
+      </indexterm><indexterm>
+        <primary>build sparse array</primary>
+      </indexterm>Sparse arrays contain empty cells, as well as cells that
+    contain data. In SciDB, you can use a combination of the operators
+    redimension, apply, and build to create a sparse array. This section
+    contains a few examples.</para>
 
-                <secondary>dimensions</secondary>
-              </indexterm>Dimensions form the coordinate system for the array.
-            The number of dimensions in an array is the number of coordinates
-            or <emphasis>indices</emphasis> needed to specify an array cell.
-            You specify dimensions with:<itemizedlist>
-                <listitem>
-                  <para><emphasis>Dimension name</emphasis>: Each dimension
-                  has a name. Just like attributes, each dimension must be
-                  named, and dimension names cannot be repeated in the same
-                  array. The maximum length of a dimension name is 1024 bytes.
-                  Dimension names may only contain alphanumeric characters and
-                  underscores (_).</para>
-                </listitem>
-              </itemizedlist><itemizedlist>
-                <listitem>
-                  <para><emphasis>Dimension start</emphasis>: The starting
-                  coordinate of a dimension.</para>
-                </listitem>
-              </itemizedlist><itemizedlist>
-                <listitem>
-                  <para><emphasis>Dimension end</emphasis> or *: The ending
-                  coordinate of a dimension, or * if unbounded. The default
-                  data type is 64-bit integer for bounded dimensions.</para>
-                </listitem>
-              </itemizedlist><itemizedlist>
-                <listitem>
-                  <para><emphasis>Dimension chunk size</emphasis>: Number of
-                  elements per chunk.</para>
-                </listitem>
+    <informalexample>
+      <para>In this example, we create an array that has a random value every
+      50 cells (all other cells are empty).</para>
 
-                <listitem>
-                  <para><emphasis>Dimension chunk overlap</emphasis>: Number
-                  of overlapping dimension-index values for adjacent
-                  chunks.</para>
-                </listitem>
-              </itemizedlist></para>
-          </listitem>
-        </varlistentry>
-      </variablelist>
+      <procedure>
+        <step>
+          <para>Create an array to hold the eventual dimension
+          index.<programlisting language="test">--afl remove(A); --show-query=no --show-output=no
+--afl store(build(&lt;index:int64&gt;[i=0:9,10,0], i*50), A); --output-format=dense</programlisting></para>
+        </step>
 
-      <para><indexterm>
-          <primary>AQL</primary>
+        <step>
+          <para>Create an array to hold the values.<programlisting
+          language="test">--afl store(build(&lt;val:double&gt;[i=0:9,10,0], random()%2000/2000.0), B);
+      --output-format=dense --show-output-in-test-file=no</programlisting></para>
+        </step>
 
-          <secondary>create array</secondary>
-        </indexterm>The <code><command>CREATE ARRAY</command> </code>
-      statement creates an array with specified name and schema. This
-      statement creates an array: <programlisting language="test">--aql CREATE ARRAY A &lt;x: double, err: double&gt; [i=0:99,10,0, j=0:99,10,0]; --show-output=no</programlisting></para>
+        <step>
+          <para>Combine <literal>A</literal> and <literal>B</literal> into a
+          single array.<programlisting language="test">--afl store(join(A,B), test); --show-output-in-test-file=no</programlisting></para>
+        </step>
 
-      <para>The array this statement created has the following:<itemizedlist>
-          <listitem>
-            <para>Array name <code>A</code></para>
-          </listitem>
+        <step>
+          <para>Finally, redimension <literal>test</literal> into a sparse
+          array.<programlisting language="test">--afl redimension(test, &lt;val:double&gt;[index=0:*, 50,0]); --show-output-in-test-file=no</programlisting></para>
+        </step>
+      </procedure>
+    </informalexample>
 
-          <listitem>
-            <para>An array schema with:</para>
+    <informalexample>
+      <para>Suppose you want to create a 3<symbol>x</symbol>3, 2-dimensional
+      array, where you store the value 5.5 in all cells where the sum of the
+      two dimensions is greater than 4.<screen>If i+j &gt; 4, store 5.5; else empty</screen></para>
 
-            <orderedlist>
-              <listitem>
-                <para>Two attributes: one with name <code>x</code> and type
-                <code>double</code> and one with name <code>err</code> and
-                type <code>double</code></para>
-              </listitem>
+      <para>The array looks like this:<programlisting language="test">--afl redimension(apply(build(&lt;v:double&gt;[i1=1:3,3,0,j1=1:3,3,0],5.5),
+         i,iif(i1+j1&gt;4,i1,null), j,iif(i1+j1&gt;4,j1,null)),
+         &lt;v:double&gt;[i=1:3,3,0,j=1:3,3,0]);  --show-query=no --output-format=dense --chunkify=yes</programlisting></para>
 
-              <listitem>
-                <para>Two dimensions: one with name <code>i</code>, starting
-                coordinate 0, ending coordinate 99, chunk size 10, and chunk
-                overlap 0; one with name <code>j</code>, starting coordinate
-                0, ending coordinate 99, chunk size 10, and chunk overlap
-                0.</para>
-              </listitem>
-            </orderedlist>
-          </listitem>
-        </itemizedlist></para>
-    </section>
+      <para>This query creates the array:<programlisting language="test">--afl redimension(
+         apply
+            (build(&lt;v:double&gt;[i1=1:3,3,0,j1=1:3,3,0],5.5),
+         i, iif(i1+j1&gt;4,i1,null), j, iif(i1+j1&gt;4,j1,null)),
+       &lt;v:double&gt;[i=1:3,3,0,j=1:3,3,0]); --output-format=dcsv</programlisting></para>
 
-    <section id="dimensionDefaults">
-      <title>Dimension Defaults</title>
+      <para>We first build an array where all cells contain the value
+      <emphasis role="bold">5.5</emphasis>. Then we apply the condition that
+      we want—the sum of the two dimensions must be greater than 4. This has
+      the effect of nullifying all the dimension values that we don't want in
+      the final, sparse array. When we use the <code>redimension</code>
+      operator, the correct set of dimensions is created to hold the attribute
+      value.</para>
+    </informalexample>
 
-      <para>You can specify only the dimension name, and SciDB will create
-      defaults for the starting index, chunk size, and chunk overlap. The
-      dimension is created as an unbounded dimension (that is, there is no
-      ending index specified).</para>
+    <para>In general, assume you want to build a sparse array with the
+    following characteristics:<itemizedlist>
+        <listitem>
+          <para>a <emphasis role="bold">schema</emphasis>, consisting of a
+          single attribute (the <code>build</code> operator takes exactly one
+          attribute), and one or more dimensions,</para>
+        </listitem>
 
-      <para><indexterm>
-          <primary>default dimension characteristics</primary>
-        </indexterm><indexterm>
-          <primary>dimensions</primary>
+        <listitem>
+          <para>a <emphasis role="bold">value</emphasis>, to place into all
+          non-empty cells, and</para>
+        </listitem>
 
-          <secondary>defaults</secondary>
-        </indexterm>This statement uses default values for the dimensions
-      (default starting index, chunk size, and overlap):<programlisting
-      language="test">--aql CREATE ARRAY default_1 &lt;val:double&gt;[i]; --show-output=no
---schema default_1</programlisting>Array <literal>default_1</literal> has one
-      dimension named <code>i</code>, and was created with the defaults for
-      all of the dimension values. <indexterm>
-          <primary>chunks</primary>
+        <listitem>
+          <para>a <emphasis role="bold">condition</emphasis>, used to
+          determine which cells are empty and which are filled with <emphasis
+          role="bold">val</emphasis>.</para>
+        </listitem>
+      </itemizedlist></para>
 
-          <secondary>default size</secondary>
-        </indexterm>The default chunk size is set based on the number of
-      dimensions that do not have a specified chunk size. SciDB attempts to
-      set the total chunk size to approximately 500,000, which is the product
-      of all the dimensions.</para>
+    <para>To build such an array, construct the following query:</para>
 
-      <para>Here is an example where we create three dimensions, two using the
-      defaults:<programlisting language="test">--aql CREATE ARRAY default_2 &lt;val:double&gt;[i=1:1000,100,0, j,k]; --show-output=no
---schema default_2</programlisting>Array default_2 has three dimensions:
-      multiply the number of cells in each of the dimensions, and the product
-      is 490,000.</para>
-    </section>
-
-    <section id="dimensionExpressions">
-      <title>Using Expressions When Defining Dimensions</title>
-
-      <para><indexterm>
-          <primary>dimensions</primary>
-
-          <secondary>use expressions to define</secondary>
-        </indexterm><indexterm>
-          <primary>expressions</primary>
-
-          <secondary>when defining dimensions</secondary>
-        </indexterm>You may encounter cases where the characteristics of your
-      dimensions are based on environment variables. In these cases, you can
-      use expressions in the CREATE ARRAY statement for the dimension
-      characteristics.</para>
-
-      <para>The expressions must evaluate to constants outside of SciDB:
-      environment variables meet this requirement.</para>
-
-      <para>This example sets some environment variables, and then uses them
-      to calculate the characteristics for the dimension.<programlisting>$ export FIRST=10
-$ export MULTIPLE=50
-$ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &lt;v:double&gt; [row=$FIRST:$FIRST+$MULTIPLE*$CHNKSIZE,$CHNKSIZE,0]  </programlisting><programlisting>AFL% show(expr_1)</programlisting><screen><command>expr_1</command>
-
-&lt; v:double &gt;
-
-[row=10:5010,100,0]</screen></para>
-    </section>
+    <programlisting>redimension
+(
+   apply
+   (
+      build(schema_with_altered_dim_names, value),
+      dim1, iff(condition, dim1_altered, null),
+      ...
+   ),
+   schema
+)</programlisting>
   </section>
 
   <section id="dropArray">
@@ -314,8 +332,12 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
 
     <para>To delete an array with AFL, use the
     <code><literal>remove</literal></code> operator: <programlisting
-    language="test">--afl remove(default_1) --show-output=no
+    language="test">--afl create array default_1 &lt;v:int64&gt;[i]; --show-query=no --show-output=no
+--afl remove(default_1) --show-output=no
 </programlisting></para>
+
+    <para>If you want to remove some versions of your arrays to save space,
+    see <xref linkend="arrayVersions"/>.</para>
   </section>
 
   <section id="arrayAttributes">
@@ -358,129 +380,6 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
     language="test">--aql CREATE ARRAY product_dflt &lt;name:string, price:float default float(100.0), sold:datetime&gt; [i=0:*,10,0]; --show-output=no
 </programlisting></para>
 
-    <section id="specialValues">
-      <title>Special Values for Attributes</title>
-
-      <para><indexterm>
-          <primary>special values</primary>
-        </indexterm><indexterm>
-          <primary>empty cells</primary>
-        </indexterm><indexterm>
-          <primary>NaN values</primary>
-        </indexterm>SciDB attributes and cells support the following types of
-      values (not to be confused with SciDB's data types): <itemizedlist>
-          <listitem>
-            <para><emphasis role="bold">Ordinary values. </emphasis>These lie
-            within a defined range of representable values for the attribute
-            type. For example, "123" is an ordinary value for the data type
-            int64.</para>
-          </listitem>
-
-          <listitem>
-            <para><emphasis role="bold">Null (missing) values.
-            </emphasis>These match the semantics of NULL in a relational
-            database.</para>
-
-            <para>Null values can contain a missing reason code. This allows
-            applications to optionally specify multiple types of null values
-            and treat each type differently. If you are loading data, you can
-            specify a null value with a missing reason code by using
-            "?<replaceable>n</replaceable>", where
-            <replaceable>n</replaceable> is an integer from 0 to 127. There
-            are two SciDB functions that are associated with missing value
-            codes: <literal>missing()</literal> and
-            <literal>missing_reason()</literal>. For more details, see <xref
-            linkend="missingValues"/>.</para>
-
-            <para>For clarity, throughout the document the term "null" is
-            equivalent to "?0", that is, a missing value with missing reason
-            code 0. All other missing values will be specified with the
-            corresponding missing value code, e.g. "missing value code 100"
-            will be represented by "?100".</para>
-          </listitem>
-
-          <listitem>
-            <para><emphasis role="bold">Empty cells. </emphasis>This is purely
-            a SciDB concept. Typically, when you create an array that is very
-            sparse, most of its cells will be empty. In most cases, SciDB
-            treats empty cells like they simply do not exist.
-            Consider:<itemizedlist>
-                <listitem>
-                  <para>Empty cells are not considered when evaluating
-                  count(*).</para>
-                </listitem>
-
-                <listitem>
-                  <para>Empty cells are disregarded during join, sort, and
-                  unpack operations.</para>
-                </listitem>
-
-                <listitem>
-                  <para>Empty cells do not participate in aggregations.</para>
-                </listitem>
-
-                <listitem>
-                  <para>Some operators, such as the Linear Algebra operators,
-                  interpret empty cells as 0.</para>
-                </listitem>
-              </itemizedlist></para>
-
-            <para>Note that the SciDB concept of emptiness is only for entire
-            cells, not for individual attributes. For more details, see <xref
-            linkend="emptyCells"/>.</para>
-          </listitem>
-        </itemizedlist></para>
-
-      <para>Additionally, there are some floating-point values that behave
-      specially. The following values are applicable to the SciDB data types
-      double and float.<itemizedlist>
-          <listitem>
-            <para><emphasis role="bold">Infinity.</emphasis> During
-            calculations, it is possible to divide by 0 and store the result
-            into an attribute value. SciDB represents this as either <emphasis
-            role="bold">inf</emphasis> or <emphasis
-            role="bold">-inf</emphasis>, depending on the sign of the
-            dividend.</para>
-          </listitem>
-
-          <listitem>
-            <para><emphasis role="bold">NaN. </emphasis>"Not a Number." This
-            behaves the same as the IEEE floating point special value of the
-            same name. It is a floating-point value that does not actually
-            represent a floating-point number. When arithmetic is performed,
-            and one of the arguments is NaN, NaN is always the result. NaN
-            cannot take part in join operations. The following operations can
-            return NaN:<itemizedlist>
-                <listitem>
-                  <para>Operations with a NaN as at least one operand.</para>
-                </listitem>
-
-                <listitem>
-                  <para>Indeterminate forms (such as divisions 0/0 and
-                  inf/inf).</para>
-                </listitem>
-
-                <listitem>
-                  <para>Real operations with complex results:<itemizedlist>
-                      <listitem>
-                        <para>square root of a negative number</para>
-                      </listitem>
-
-                      <listitem>
-                        <para>logarithm of a negative number</para>
-                      </listitem>
-
-                      <listitem>
-                        <para>inverse sine or cosine of a number that is less
-                        than -1 or greater than +1.</para>
-                      </listitem>
-                    </itemizedlist></para>
-                </listitem>
-              </itemizedlist></para>
-          </listitem>
-        </itemizedlist></para>
-    </section>
-
     <section>
       <title>NULL and Default Attribute Values</title>
 
@@ -494,27 +393,26 @@ $ export CHNKSIZE=100</programlisting><programlisting>AFL% create array expr_1 &
       functionality includes special handling for empty cells, null values,
       and default values.</para>
 
-      <para>Consider the data set m4x4_missing.txt, shown here:<screen>[
+      <para>Consider the data set m4x4_missing.scidb, located in the /tmp
+      folder and shown here:<screen>[
 [(0,100),(1,99),(2,98),(3,97)],
 [(4),(5,95),(6,94),(7,93)],
 [(8,92),(9,91),(),(11,89)],
 [(12,88),(13),(14,86),(15,85)]
 ]</screen></para>
 
-      <para>The array m4x4_missing has two issues: the attribute val2 is
-      missing for the elements at coordinates <code>{x=1,y=0}</code> and
-      <code>{x=3,y=1}</code>, and the cell at <code>{2,2}</code> is empty. You
-      can tell SciDB how you want to handle the missing data with various
-      array options.</para>
+      <para>The array m4x4_missing has two issues: the attribute <emphasis
+      role="bold">val2</emphasis> is missing for the elements at coordinates
+      <code>{x=1,y=0}</code> and <code>{x=3,y=1}</code>, and the cell at
+      <code>{2,2}</code> is empty. You can tell SciDB how you want to handle
+      the missing data with various array options.</para>
 
-      <para>First, consider the case of the empty cell,
-      <code>{x=2,y=2}</code>. By default, SciDB will leave empty cells
-      unchanged and replace NULL attributes with 0: <programlisting
-      language="test">AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32&gt;[x=0:3,4,0,y=0:3,4,0];
-AFL% load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt');
-
---afl create_array(m4x4_first,&lt;val1:double&gt;[x=0:3,4,0, y=0:3,4,0]); --show-query=no --show-output=no
---afl store(build_sparse(m4x4_first,x*4+y,x*4+y&lt;&gt; 10),m4x4_first); --show-query=no --show-output=no
+      <para>By default, SciDB will leave empty cells unchanged and replace
+      NULL attributes with 0:<programlisting>AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32&gt;[x=0:3,4,0,y=0:3,4,0];
+AFL% load(m4x4_missing, '/tmp/m4x4_missing.scidb');</programlisting><programlisting
+      language="test">--afl create_array(m4x4_first,&lt;val1:double&gt;[x=0:3,4,0, y=0:3,4,0]); --show-query=no --show-output=no
+--afl store(build(m4x4_first, '[[0,1,2,3],[4,5,6,7],[8,9,(),11],[12,13,14,15]]',true),
+      m4x4_first); --show-query=no --show-output=no
 
 --afl create_array(m4x4_second,&lt;val2:int32&gt;[x=0:3,4,0, y=0:3,4,0]); --show-query=no --show-output=no
 --afl store(build(m4x4_second,'[[100,99,98,97],[0,95,94,93],[92,91,(),89],[88,0,86,85]]',true),m4x4_second);
@@ -530,10 +428,9 @@ AFL% load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt');
           <secondary>empty cells</secondary>
         </indexterm>To change the default value, that is, the value the SciDB
       substitutes for the missing data, set the default clause of the
-      attribute option: <programlisting language="test">AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32 default 5468&gt;[x=0:3,4,0,y=0:3,4,0];
-AF:% load(m4x4_missing, '../tests/harness/testcases/data/doc/m4x4_missing.txt'); --output-format=auto --chunkify=yes
-
---afl store(build(m4x4_second,'[[100,99,98,97],[5468,95,94,93],[92,91,(),89],[88,5468,86,85]]',true),m4x4_second);
+      attribute option:<programlisting>AFL% CREATE ARRAY m4x4_missing &lt;val1:double,val2:int32 default 5468&gt;[x=0:3,4,0,y=0:3,4,0];
+AFL% load(m4x4_missing, '/tmp/m4x4_missing.scidb');</programlisting><programlisting
+      language="test">--afl store(build(m4x4_second,'[[100,99,98,97],[5468,95,94,93],[92,91,(),89],[88,5468,86,85]]',true),m4x4_second);
     --show-query=no --show-output=no
 --afl store(join(m4x4_first, m4x4_second),m4x4_missing); --show-query=no --output-format=dense --chunkify=yes</programlisting></para>
     </section>
@@ -671,142 +568,6 @@ or
           </listitem>
         </itemizedlist></para>
     </section>
-
-    <section>
-      <title>Semantics of Special Values</title>
-
-      <para><indexterm>
-          <primary>special values</primary>
-
-          <secondary>behavior</secondary>
-        </indexterm>This section describes the behavior of the SciDB-specific
-      special values <emphasis role="bold">empty</emphasis> and <emphasis
-      role="bold">missing</emphasis>, and IEEE floating-point special value
-      <emphasis role="bold">NaN</emphasis>, as well as <emphasis
-      role="bold">inf</emphasis>/<emphasis role="bold">-inf</emphasis>,</para>
-
-      <para>Note the following representations:<itemizedlist>
-          <listitem>
-            <para><emphasis role="bold">?m</emphasis> denotes missing with a
-            non-negative integer <replaceable>m</replaceable> representing the
-            missing code.</para>
-          </listitem>
-
-          <listitem>
-            <para>Null is defined as <emphasis role="bold">?0</emphasis>, a
-            special case of <emphasis role="bold">missing</emphasis>.</para>
-          </listitem>
-
-          <listitem>
-            <para><command>op()</command> denotes a unary or binary expression
-            or function, such as <emphasis role="bold">x + y</emphasis>,
-            <emphasis role="bold">x &lt; y</emphasis>, or
-            <command>sin(x)</command>.</para>
-          </listitem>
-
-          <listitem>
-            <para>An <emphasis>aggregator</emphasis> is a function or operator
-            that computes aggregates, such as
-            <command>count()</command>.</para>
-          </listitem>
-
-          <listitem>
-            <para>A <emphasis>floating point value</emphasis> is a SciDB
-            attribute of type <code>float</code> or <code>double</code>. In
-            this section, it is restricted to "normal" floating-point values
-            (such 1.4, -3.75, and so on), plus <emphasis
-            role="bold">NaN</emphasis>, <emphasis role="bold">+inf</emphasis>,
-            and <emphasis role="bold">-inf</emphasis>, but does not include
-            <emphasis role="bold">empty </emphasis>nor <emphasis
-            role="bold">missing</emphasis>.</para>
-          </listitem>
-        </itemizedlist></para>
-
-      <para>When <command>op()</command> is not an aggregator:<itemizedlist>
-          <listitem>
-            <para>If at least one operand is <emphasis
-            role="bold">empty</emphasis>, the result is <emphasis
-            role="bold">empty</emphasis>.</para>
-          </listitem>
-
-          <listitem>
-            <para>If at least one of x or y is<emphasis role="bold">
-            missing</emphasis>, but neither is <emphasis
-            role="bold">empty</emphasis>: <command>op(x,y)</command> and
-            <command>op(?m)</command> both return <emphasis
-            role="bold">?0</emphasis>.</para>
-          </listitem>
-
-          <listitem>
-            <para>If at least one of the floating point values x or y is
-            <emphasis role="bold">NaN</emphasis>: <itemizedlist>
-                <listitem>
-                  <para>When <command>op(x,y)</command> is a comparison
-                  expression: x {==,&lt;,&gt;,&lt;=,&gt;=} y returns FALSE,
-                  and x &lt;&gt; y returns TRUE</para>
-                </listitem>
-
-                <listitem>
-                  <para>When <command>op(x,y)</command> is not a comparison
-                  expression: <command>op(x,y)</command> and
-                  <command>op(NaN)</command> both return <emphasis
-                  role="bold">NaN</emphasis>.</para>
-                </listitem>
-              </itemizedlist></para>
-          </listitem>
-        </itemizedlist></para>
-
-      <para>For aggregators:<itemizedlist>
-          <listitem>
-            <para><emphasis role="bold">Empty</emphasis> is ignored during
-            aggregation. That is, empty cells do not participate in
-            aggregation.</para>
-          </listitem>
-
-          <listitem>
-            <para>For details on how aggregates handle <emphasis
-            role="bold">missing</emphasis>, see the documentation for the
-            individual aggregate.</para>
-          </listitem>
-
-          <listitem>
-            <para><emphasis role="bold">NaN</emphasis> is included during
-            aggregation. For instance, the sum of a set of double numbers is
-            <emphasis role="bold">NaN</emphasis>, if at least one of the
-            numbers is <emphasis role="bold">NaN</emphasis>.</para>
-          </listitem>
-        </itemizedlist></para>
-
-      <para>Whenever possible, SciDB computations adhere to the IEEE Standard
-      for Floating-Point Arithmetic (IEEE 754). Exceptions are documented in
-      the appropriate place for the specific operator or function.</para>
-
-      <para><indexterm>
-          <primary>sort</primary>
-        </indexterm><indexterm>
-          <primary>special values</primary>
-
-          <secondary>sort order</secondary>
-        </indexterm>For the <command>sort()</command> operator, note the
-      following sort order regarding special values:<programlisting>?m &lt; NaN &lt; x</programlisting>where:<itemizedlist>
-          <listitem>
-            <para>'&lt;' indicates "comes before"</para>
-          </listitem>
-
-          <listitem>
-            <para>For <emphasis role="bold">missing</emphasis> values, the
-            sort order is based on the value of the missing code. Thus,
-            <emphasis role="bold">?0</emphasis> comes before <emphasis
-            role="bold">?10</emphasis> which comes before <emphasis
-            role="bold">?72</emphasis>.</para>
-          </listitem>
-
-          <listitem>
-            <para>x represents any floating point number, other than <emphasis
-            role="bold">NaN</emphasis>.</para>
-          </listitem>
-        </itemizedlist></para>
-    </section>
   </section>
 
   <section id="array_dimensions">
@@ -814,12 +575,14 @@ or
 
     <para>A SciDB array must have at least one dimension. Dimensions form the
     coordinate system for a SciDB array. There are several special types of
-    dimensions: dimensions with overlapping chunks and unbounded
-    dimensions.</para>
+    dimensions: dimensions with overlapping chunks and unbounded dimensions.
+    Additionally, you can use expressions to define dimension size, or let
+    SciDB assign default values.</para>
 
     <note>
       <para>The dimension size is determined by the range from the dimension
-      start to end, so 0:99 and 1:100 would create the same dimension
+      start to end, so ranges of <emphasis role="bold">0:99</emphasis> and
+      <emphasis role="bold">1:100</emphasis> would create the same dimension
       size.</para>
     </note>
 
@@ -887,6 +650,71 @@ or
         </itemizedlist><programlisting language="test">--aql CREATE ARRAY open &lt;val:double&gt;[I=0:9,10,0,J=0:*,10,0]; --show-output=no
 </programlisting></para>
     </section>
+
+    <section id="dimensionDefaults">
+      <title>Dimension Defaults</title>
+
+      <para>You can specify only the dimension name, and SciDB will create
+      defaults for the starting index, chunk size, and chunk overlap. The
+      dimension is created as an unbounded dimension (that is, there is no
+      ending index specified).</para>
+
+      <para><indexterm>
+          <primary>default dimension characteristics</primary>
+        </indexterm><indexterm>
+          <primary>dimensions</primary>
+
+          <secondary>defaults</secondary>
+        </indexterm>This statement uses default values for the dimensions
+      (default starting index, chunk size, and overlap):<programlisting
+      language="test">--aql CREATE ARRAY default_1 &lt;val:double&gt;[i]; --show-output=no
+--schema default_1</programlisting>Array <literal>default_1</literal> has one
+      dimension named <code>i</code>, and was created with the defaults for
+      all of the dimension values. <indexterm>
+          <primary>chunks</primary>
+
+          <secondary>default size</secondary>
+        </indexterm>The default chunk size is set based on the number of
+      dimensions that do not have a specified chunk size. SciDB attempts to
+      set the total chunk size to approximately 500,000, which is the product
+      of all the dimensions.</para>
+
+      <para>Here is an example where we create three dimensions, two using the
+      defaults:<programlisting language="test">--aql CREATE ARRAY default_2 &lt;val:double&gt;[i=0:999,200,0, j,k]; --show-output=no
+--schema default_2</programlisting>Array <literal>default_2</literal> has
+      three dimensions: multiply the chunk size for each of the dimensions,
+      and the product is 500,000:
+      50<symbol>x</symbol>50<symbol>x</symbol>200.</para>
+    </section>
+
+    <section id="dimensionExpressions">
+      <title>Environment Variables for Dimensions</title>
+
+      <para><indexterm>
+          <primary>dimensions</primary>
+
+          <secondary>use expressions to define</secondary>
+        </indexterm><indexterm>
+          <primary>expressions</primary>
+
+          <secondary>when defining dimensions</secondary>
+        </indexterm>You may encounter cases where the characteristics of your
+      dimensions are based on environment variables. In these cases, you can
+      use expressions for the dimension characteristics.</para>
+
+      <para>This works only when you are passing queries to SciDB through the
+      Linux shell—the shell parses the environment variables and supplies
+      SciDB with a scalar expression that it can evaluate. SciDB itself knows
+      nothing about the Linux environment variables.</para>
+
+      <para>The expressions must evaluate to constants outside of SciDB:
+      environment variables meet this requirement.</para>
+
+      <para>This example sets some environment variables, and then uses them
+      to calculate the characteristics for the dimension.<programlisting>$ export FIRST=10
+$ export MULTIPLE=50
+$ export CHNKSIZE=100</programlisting><programlisting>$ iquery -aq "create array expr_1 &lt;v:double&gt; [row=$FIRST:$FIRST+$MULTIPLE*$CHNKSIZE,$CHNKSIZE,0]"</programlisting><programlisting>$ iquery -aq "show(expr_1)"</programlisting><screen>expr_1 &lt; v:double &gt; [row=10:5010,100,0]</screen></para>
+    </section>
   </section>
 
   <section>
@@ -921,7 +749,7 @@ or
       --show-query=no --show-output=no
 --afl store(join(event,join(person,join(year,join(country,time)))),winnersFlat); --show-query=no --show-output=no
 
---afl redimension_store(winnersFlat,winners); --show-output=no --show-query=no
+--afl store(redimension(winnersFlat,winners),winners); --show-output=no --show-query=no
 --schema winners; --show-output=yes --show-query=yes
 </programlisting><programlisting language="test">SELECT * INTO OlympicWinners FROM winners;
 </programlisting> This means that both <code>winners</code> and

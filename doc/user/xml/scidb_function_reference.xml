@@ -47,6 +47,9 @@
       </listitem>
     </itemizedlist></para>
 
+  <para>You can get a list of all of the available functions by running the
+  following query:<screen>$ iquery -aq "list('functions')"</screen></para>
+
   <xi:include href="algebraic_functions_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 

@@ -1,13 +1,13 @@
 SCIDB QUERY : <create array A <val:double> [i=0:3,4,0, j=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(build(A,'[[(0),(),(),()],[(4),(),(6),(7)],[(8),(),(),()],[(),(13),(14),()]]',true),A)>
+SCIDB QUERY : <store(build(A,'[[(13),(),(),()],[(8),(),(6),(7)],[(4),(),(7),()],[(),(0),(14),()]]',true),A)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <create array C <label:string NULL default NULL>[i=0:3,4,0, j=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(build(C,NULL),C)>
+SCIDB QUERY : <store(build(C,'[[(sand),(),(first),()],[(peanut),(),(pastry),(doc)],[(four),(),(carl),()],[(),(livia),(Apostrophe),()]]',true),C)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <create array m4x4_empty<val:double, label:string NULL>[i=0:3,4,0, j=0:3,4,0]>
@@ -16,35 +16,41 @@ SCIDB QUERY : <create array m4x4_empty<val:double, label:string NULL>[i=0:3,4,0,
 SCIDB QUERY : <store(join(A,C),m4x4_empty)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : < SELECT * FROM sort(m4x4_empty, val)>
-{n} val,label
-{0} 0,null
-{1} 4,null
-{2} 6,null
-{3} 7,null
-{4} 8,null
-{5} 13,null
-{6} 14,null
+SCIDB QUERY : <scan(m4x4_empty)>
+[[(13,'sand'),(),(),()],[(8,'peanut'),(),(6,'pastry'),(7,'doc')],[(4,'four'),(),(7,'carl'),()],[(),(0,'livia'),(14,'Apostrophe'),()]]
 
-SCIDB QUERY : < SELECT * FROM sort(m4x4_empty, label)>
+SCIDB QUERY : <SELECT * FROM sort(m4x4_empty, val)>
 {n} val,label
-{0} 0,null
-{1} 4,null
-{2} 6,null
-{3} 7,null
-{4} 8,null
-{5} 13,null
-{6} 14,null
+{0} 0,'livia'
+{1} 4,'four'
+{2} 6,'pastry'
+{3} 7,'doc'
+{4} 7,'carl'
+{5} 8,'peanut'
+{6} 13,'sand'
+{7} 14,'Apostrophe'
+
+SCIDB QUERY : < SELECT * FROM sort(m4x4_empty, val, label)>
+{n} val,label
+{0} 0,'livia'
+{1} 4,'four'
+{2} 6,'pastry'
+{3} 7,'carl'
+{4} 7,'doc'
+{5} 8,'peanut'
+{6} 13,'sand'
+{7} 14,'Apostrophe'
 
 SCIDB QUERY : < SELECT * FROM sort(m4x4_empty, val desc)>
 {n} val,label
-{0} 14,null
-{1} 13,null
-{2} 8,null
-{3} 7,null
-{4} 6,null
-{5} 4,null
-{6} 0,null
+{0} 14,'Apostrophe'
+{1} 13,'sand'
+{2} 8,'peanut'
+{3} 7,'doc'
+{4} 7,'carl'
+{5} 6,'pastry'
+{6} 4,'four'
+{7} 0,'livia'
 
 SCIDB QUERY : <CREATE ARRAY m4x4_double < val:double >[i=0:3,4,0,j=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]

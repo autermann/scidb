@@ -155,34 +155,6 @@ SCIDB QUERY : <load(A7,'../tests/harness/testcases/data/adc2.txt')>
 {3,2} '(3/2)'
 {3,3} '(82/5)'
 
-SCIDB QUERY : <ApproxDC(A1)>
-{i} val1_adc
-{0} 7
-
-SCIDB QUERY : <ApproxDC(A2)>
-{i} val1_adc
-{0} 9
-
-SCIDB QUERY : <ApproxDC(A3)>
-{i} val1_adc
-{0} 7
-
-SCIDB QUERY : <ApproxDC(A4)>
-{i} val1_adc
-{0} 7
-
-SCIDB QUERY : <ApproxDC(A5)>
-{i} val1_adc
-{0} 16
-
-SCIDB QUERY : <ApproxDC(A6)>
-{i} val1_adc
-{0} 7
-
-SCIDB QUERY : <ApproxDC(A7)>
-{i} val1_adc
-{0} 15
-
 SCIDB QUERY : <aggregate(A1, ApproxDC(val1))>
 {i} val1_ApproxDC
 {0} 7

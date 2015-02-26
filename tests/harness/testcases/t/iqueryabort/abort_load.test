@@ -19,7 +19,7 @@ create empty array ABRLOAD <v : int64> [I=0:2000,20,0, J=0:1000,20,0]
 
 
 #--echo "array should be empty (0 rows)..."
-count(ABRLOAD)
+aggregate(ABRLOAD,count(*))
 
 --stop-query-logging
 

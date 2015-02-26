@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -124,14 +124,10 @@ public:
             std::vector< boost::shared_ptr< Array> >& inputArrays,
             boost::shared_ptr<Query> query)
     {
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
         assert(inputArrays.size() == 1);
         boost::shared_ptr<Array> inputArray = inputArrays[0];
         ArrayDesc const& desc = inputArray->getArrayDesc();
+        inputArray = ensureRandomAccess(inputArray, query);
         Dimensions const& dims = desc.getDimensions();
         size_t nDims = dims.size();
         size_t nParams = _parameters.size();

@@ -19,7 +19,7 @@ SCIDB QUERY : <project(apply(store(join(build(T,rational(x+1,x+2)),build(T,ratio
 {1} '(2/3) - (11/12)'
 {2} '(3/4) - (12/13)'
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 a,b
 0,'(10/11)'
 1,'(11/12)'
@@ -31,7 +31,7 @@ a,c
 1,'(11/12)'
 2,'(12/13)'
 
-SCIDB QUERY : <redimension_store(B,C)>
+SCIDB QUERY : <store(redimension(B,C),C)>
 b,a
 0,'(1/2)'
 1,'(2/3)'
@@ -114,7 +114,7 @@ a,c
 1,'(11/12) - (11/12)'
 2,'(12/13) - (12/13)'
 
-SCIDB QUERY : <project(apply(cross(B1 as B11,B1 as B12),c,str(B11.b)+' - '+str(B12.b)),c)>
+SCIDB QUERY : <project(apply(cross_join(B1 as B11,B1 as B12),c,str(B11.b)+' - '+str(B12.b)),c)>
 a,a,c
 0,0,'(10/11) - (10/11)'
 0,1,'(10/11) - (11/12)'
@@ -208,7 +208,7 @@ b,c
 1,'(2/3) - (2/3)'
 2,'(3/4) - (3/4)'
 
-SCIDB QUERY : <project(apply(cross(C1 as C11,C1 as C12),c,str(C11.a)+' - '+str(C12.a)),c)>
+SCIDB QUERY : <project(apply(cross_join(C1 as C11,C1 as C12),c,str(C11.a)+' - '+str(C12.a)),c)>
 b,b,c
 0,0,'(1/2) - (1/2)'
 0,1,'(1/2) - (2/3)'

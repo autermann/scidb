@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -69,14 +69,9 @@ public:
 		assert(inputArrays.size() == 2);
 		assert(_parameters.size() == 0);
 
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM ||
-            inputArrays[1]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
+
         if ( query->getInstancesCount() > 1) { 
             uint64_t coordinatorID = query->getCoordinatorID() == COORDINATOR_INSTANCE ?  query->getInstanceID() : query->getCoordinatorID();
             left = redistribute(left, query, psLocalInstance, "", coordinatorID);
@@ -85,6 +80,8 @@ public:
                 return boost::shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
+        left = ensureRandomAccess(left,query);
+        right = ensureRandomAccess(right,query);
 		return boost::shared_ptr<Array>(new LookupArray(_schema, left, right, query));
 	 }
 };

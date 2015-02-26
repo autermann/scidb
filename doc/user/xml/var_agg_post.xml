@@ -10,7 +10,7 @@
         <primary>aggregates</primary>
 
         <secondary>var</secondary>
-      </indexterm>Variance aggregate</refpurpose>
+      </indexterm>Aggregate that calculates the sample variance.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -22,11 +22,14 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The var aggregate returns the variance of a set of values.</para>
+    <para>The <code>var</code> aggregate returns the sample variance of a set
+    of values. You can optionally specify one or more dimensions to group
+    by.</para>
 
-    <para>The variance of an empty set is NULL. The variance of a set that
-    contains only NULL values is also NULL. If the set contains NULL and NOT
-    NULL values, the var aggregate considers only NOT NULL values.</para>
+    <para>The sample variance of an empty set is NULL. The sample variance of
+    a set that contains only NULL values is also NULL. If the set contains
+    NULL and NOT NULL values, the <code>var</code> aggregate considers only
+    NOT NULL values.</para>
   </refsect1>
 
   <refsect1>
@@ -43,14 +46,14 @@
         <step>
           <para>Put random values between 1 and 9 into m3x3:<para><programlisting>AFL% store(build(m3x3,random()%10/1.0),m3x3);
      </programlisting><screen>[
-[(4),(0),(3)],
-[(2),(8),(5)],
-[(8),(2),(6)]
+[(1),(2),(2)],
+[(2),(9),(0)],
+[(2),(0),(0)]
 ]</screen></para></para>
         </step>
 
         <step>
-          <para>Find the variance for each column of m3x3:<para><programlisting>AFL% aggregate(m3x3,var(val),j)  </programlisting><screen>[(9.33333),(17.3333),(2.33333)]
+          <para>Find the variance for each column of m3x3:<para><programlisting>AFL% aggregate(m3x3,var(val),j)  </programlisting><screen>[(0.333333),(22.3333),(1.33333)]
 </screen></para></para>
         </step>
       </procedure>

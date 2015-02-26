@@ -11,11 +11,11 @@ Query was executed successfully
 SCIDB QUERY : <store(join(build_sparse(ABR2, x+2 ,1),build_sparse(ABR2, x+1, 1)),ABR1)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <../utils/killquery.sh -afl 2 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 2 1 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 15 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 15 1 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9 1 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE>
 
 "should be empty..."
 SCIDB QUERY : <scan(ABR3)>
@@ -24,7 +24,7 @@ SCIDB QUERY : <scan(ABR3)>
 SCIDB QUERY : <scan(ABR3:a)>
 [An error expected at this place for the query "scan(ABR3:a)". And it failed.]
 
-SCIDB QUERY : <redimension_store(ABR1, ABR3)>
+SCIDB QUERY : <store(redimension(ABR1, ABR3), ABR3)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <count(ABR3:a)>

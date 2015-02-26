@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -162,7 +162,7 @@ public:
      * @param types a vector of variable types
      * @param expectedType an expected type of result
      */
-    void compile(const std::string& expression, std::vector<std::string> names, std::vector<TypeId> types, TypeId expectedType = TID_VOID);
+    void compile(const std::string& expression, const std::vector<std::string>& names, const std::vector<TypeId>& types, TypeId expectedType = TID_VOID);
 
     /**
      * @brief this method is useful for internal using in operators

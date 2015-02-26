@@ -285,19 +285,19 @@ SCIDB QUERY : <insert(subarray(insert(between(concat(ZZ,ZZ),1,1,2,2),AA),2,2,4,4
 {1,1} ''
 {2,0} '5amigos!2-insert '
 
-SCIDB QUERY : <count(versions(AA))>
+SCIDB QUERY : <aggregate(versions(AA),count(*))>
 {i} count
 {0} 6
 
-SCIDB QUERY : <count(versions(BB))>
+SCIDB QUERY : <aggregate(versions(BB),count(*))>
 {i} count
 {0} 2
 
-SCIDB QUERY : <count(versions(ZZ))>
+SCIDB QUERY : <aggregate(versions(ZZ),count(*))>
 {i} count
 {0} 2
 
-SCIDB QUERY : <count(versions(TT))>
+SCIDB QUERY : <aggregate(versions(TT),count(*))>
 {i} count
 {0} 1
 

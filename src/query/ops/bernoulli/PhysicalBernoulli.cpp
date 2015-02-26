@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -242,10 +242,7 @@ public:
     {
 		assert(inputArrays.size() == 1);
 
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
+		shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
 
         int seed = (_parameters.size() == 2)
             ? (int)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64()
@@ -255,7 +252,7 @@ public:
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_SAMPLE_ERROR1);
         if (probability <= 0 || probability > 1)
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_SAMPLE_ERROR2);
-        return boost::shared_ptr<Array>(new BernoulliArray(_schema, inputArrays[0], probability, seed));
+        return boost::shared_ptr<Array>(new BernoulliArray(_schema, inputArray, probability, seed));
     }
 };
     

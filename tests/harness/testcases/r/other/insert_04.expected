@@ -170,50 +170,29 @@ SCIDB QUERY : <insert(build(<a:int64 default 99> [x=-3:0,4,2, y=0:3,4,2], '[[(),
 {0,2} 10000
 {0,3} 10000
 
-SCIDB QUERY : <build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true)>
+SCIDB QUERY : <build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true)>
 {x,y} a
-{-3,0} null
-{-3,1} null
-{-3,2} null
 {-3,3} 0
 {-2,0} 1
-{-2,1} null
-{-2,2} null
-{-2,3} null
 {-1,0} 0
 {-1,1} 0
 {-1,2} 0
 {-1,3} -157
-{0,0} null
-{0,1} null
-{0,2} null
-{0,3} null
 
-SCIDB QUERY : <insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)>
-[An error expected at this place for the query "insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS.]
+SCIDB QUERY : <insert(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)>
+[An error expected at this place for the query "insert(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS.]
 
-SCIDB QUERY : <store(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),MIB)>
+SCIDB QUERY : <store(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),MIB)>
 {x,y} a
-{-3,0} null
-{-3,1} null
-{-3,2} null
 {-3,3} 0
 {-2,0} 1
-{-2,1} null
-{-2,2} null
-{-2,3} null
 {-1,0} 0
 {-1,1} 0
 {-1,2} 0
 {-1,3} -157
-{0,0} null
-{0,1} null
-{0,2} null
-{0,3} null
 
-SCIDB QUERY : <insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(0),(0),(0)],[(1),(0),(0),(0)],[(0),(0),(0),(0)],[(0),(1),(),()]]', true),MIB)>
+SCIDB QUERY : <insert(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(0),(0),(0)],[(1),(0),(0),(0)],[(0),(0),(0),(0)],[(0),(1),(),()]]', true),MIB)>
 {x,y} a
-{-3,0} null
 {-3,1} 0
 {-3,2} 0
 {-3,3} 0
@@ -227,16 +206,13 @@ SCIDB QUERY : <insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[
 {-1,3} 0
 {0,0} 0
 {0,1} 1
-{0,2} null
-{0,3} null
 
 SCIDB QUERY : <show(MIB)>
 {i} schema
-{0} 'not empty MIB<a:int64 NULL DEFAULT null> [x=-3:0,4,2,y=0:3,4,2]'
+{0} 'MIB<a:int64 NULL DEFAULT null> [x=-3:0,4,2,y=0:3,4,2]'
 
 SCIDB QUERY : <scan(MIB)>
 {x,y} a
-{-3,0} null
 {-3,1} 0
 {-3,2} 0
 {-3,3} 0
@@ -250,10 +226,8 @@ SCIDB QUERY : <scan(MIB)>
 {-1,3} 0
 {0,0} 0
 {0,1} 1
-{0,2} null
-{0,3} null
 
-SCIDB QUERY : <count(versions(MIB))>
+SCIDB QUERY : <aggregate(versions(MIB),count(*))>
 {i} count
 {0} 2
 
@@ -273,10 +247,8 @@ SCIDB QUERY : <insert(between(filter(build(MIB,null),a is null),-3,0,-1,2), MIB)
 {-1,3} 0
 {0,0} 0
 {0,1} 1
-{0,2} null
-{0,3} null
 
-SCIDB QUERY : <count(versions(MIB))>
+SCIDB QUERY : <aggregate(versions(MIB),count(*))>
 {i} count
 {0} 3
 

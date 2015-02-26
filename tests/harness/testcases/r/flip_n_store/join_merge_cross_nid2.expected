@@ -28,15 +28,15 @@ SCIDB QUERY : <store(subarray(NID),AAA)>
 {0,1} null,'b_0-1'
 {4,0} 'a_4-0',null
 
-SCIDB QUERY : <redimension_store(NID,A)>
+SCIDB QUERY : <store(redimension(NID,A),A)>
 {b} a
 {'b_0-1'} null
 
-SCIDB QUERY : <redimension_store(NID,B)>
+SCIDB QUERY : <store(redimension(NID,B),B)>
 {a} b
 {'a_4-0'} null
 
-SCIDB QUERY : <redimension_store(NID,A1)>
+SCIDB QUERY : <store(redimension(NID,A1),A1)>
 {b} a
 {'b_0-1'} null
 

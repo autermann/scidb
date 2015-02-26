@@ -14,16 +14,16 @@ store(build(M4x4, a*a+b/(3.0-a-4)), M4x4)
 
 
 --test
-ApproxDC(A)
-ApproxDC(subarray(A,0,3))
+aggregate(A,approxdc(a))
+aggregate(subarray(A,0,3),approxdc(a))
 aggregate(A,ApproxDC(a))
 aggregate(A,ApproxDC(a), sum(a),min(a),count(a),max(a))
 
 
-ApproxDC(M4x4)
+aggregate(M4x4,approxdc(val))
 aggregate(M4x4,ApproxDC(val))
 aggregate(M4x4,ApproxDC(val), sum(val),min(val),count(val),max(val))
-ApproxDC(xgrid(M4x4,2,2))
+aggregate(xgrid(M4x4,2,2),approxdc(val))
 
 --aql select ApproxDC(a) from A
 --aql select ApproxDC(a) from A regrid as (partition by x 5)

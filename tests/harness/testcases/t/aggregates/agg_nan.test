@@ -16,10 +16,6 @@ create array foo3<val:double null> [x=0:3,2,0 ,y=1:4,3,0]
 load (foo3, '../tests/harness/testcases/data/nanull2d.txt')
 
 --test
-min(foo)
-max(foo)
-min(foo1)
-max(foo1)
 aggregate(foo, min(val),max(val))
 aggregate(foo1,min(val),max(val))
 aggregate(foo2,min(val),max(val))
@@ -34,9 +30,9 @@ aggregate(foo2, min(val),max(val),avg(val))
 
 sort(foo3,10)
 aggregate(foo3, min(val),max(val),avg(val))
-max(subarray(foo3,0,1,1,2))
-min(subarray(foo3,0,1,1,2))
-avg(subarray(foo3,0,1,1,2))
+aggregate(subarray(foo3,0,1,1,2),max(val))
+aggregate(subarray(foo3,0,1,1,2),min(val))
+aggregate(subarray(foo3,0,1,1,2),avg(val))
 
 --cleanup
 remove(foo)

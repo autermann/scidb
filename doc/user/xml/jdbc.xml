@@ -61,8 +61,9 @@
               repository redistributes this package. Thus, if you want to
               install the package on a CentOS or RHEL client machine, you
               should create the <literal>etc/yum.repos.d/scidb.repo</literal>
-              file on your client. For details, see <xref
-              linkend="packageCentOS"/>.</para>
+              file on your client. For details, see the “Install SciDB on
+              CentOS / RHEL from binary package” section in the Installation
+              Chapter.</para>
             </listitem>
           </itemizedlist></para>
       </listitem>
@@ -89,9 +90,17 @@ wget http://downloads.paradigm4.com/client/&scidb_version;/jdbc/scidb4j.jar</pro
     drivers on your computer.</para>
 
     <para>Set your system CLASSPATH variable to include the following
-    entries:<programlisting>$JDBC/scidb4j.jar
-/usr/share/java/protobuf-java.jar /* or your path to the installed protobuf.jar file */
+    entries:<itemizedlist>
+        <listitem>
+          <para>On Ubuntu:<programlisting>$JDBC/scidb4j.jar:/usr/share/java/protobuf-java.jar
 </programlisting></para>
+        </listitem>
+
+        <listitem>
+          <para>On CentOS/RHEL:<programlisting>$JDBC/scidb4j.jar:/usr/share/java/protobuf.jar
+</programlisting></para>
+        </listitem>
+      </itemizedlist></para>
 
     <para>If the drivers are not listed in your CLASSPATH variable, you
     receive the following error message when you try to load the
@@ -120,7 +129,7 @@ wget http://downloads.paradigm4.com/client/&scidb_version;/jdbc/scidb4j.jar</pro
     <para>The URL is of the form <emphasis
     role="bold">jdbc:scidb://</emphasis><emphasis><emphasis
     role="bold">hostname</emphasis></emphasis><emphasis
-    role="bold">:[</emphasis><emphasis><emphasis
+    role="bold">[:</emphasis><emphasis><emphasis
     role="bold">port</emphasis></emphasis><emphasis role="bold">]</emphasis>.
     Substitute the host name and port for your SciDB database.</para>
 
@@ -174,9 +183,9 @@ class JDBCExample
       // create array A&lt;a:string&gt;[x=0:2,3,0, y=0:2,3,0];
       // select * into A from
       // array(A, '[["a","b","c"]["d","e","f"]["123","456","789"]]');
-      ResultSet res = st.executeQuery("select * from
-         array(&lt;a:string&gt;[x=0:2,3,0, y=0:2,3,0],
-         '[[\"a\",\"b\",\"c\"][\"d\",\"e\",\"f\"][\"123\",\"456\",\"789\"]]')");
+      ResultSet res = st.executeQuery("select * from " +
+         " array(&lt;a:string&gt;[x=0:2,3,0, y=0:2,3,0]," +
+         " '[[\"a\",\"b\",\"c\"][\"d\",\"e\",\"f\"][\"123\",\"456\",\"789\"]]')");
       ResultSetMetaData meta = res.getMetaData();
 
       System.out.println("Source array name: " + meta.getTableName(0));
@@ -211,12 +220,7 @@ class JDBCExample
     <para>To run this example, make sure SciDB is running, then run the
     following commands:<programlisting>cd $JDBC
 wget http://downloads.paradigm4.com/client/&scidb_version;/jdbc/example.jar
-java -classpath example.jar:scidb4j.jar:/usr/share/java/protobuf.jar org.scidb.JDBCExample</programlisting></para>
-
-    <note>
-      <para>On Ubuntu, the jar file is named <code>protobuf-java.jar</code>,
-      so you need to adjust the previous command line:<programlisting>java -classpath example.jar:scidb4j.jar:/usr/share/java/protobuf-java.jar org.scidb.JDBCExample</programlisting></para>
-    </note>
+java -classpath example.jar:$CLASSPATH org.scidb.JDBCExample</programlisting></para>
 
     <para>If the example runs without error, the output is similar to the
     following:<screen>Source array name: build

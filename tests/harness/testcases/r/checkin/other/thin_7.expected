@@ -15,7 +15,7 @@ SCIDB QUERY : <store(build_sparse(A,x+10,x<>5),A)>
 SCIDB QUERY : <create empty array B <x:int64 compression 'dictionary'> [a(string)=9,6,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {a} x
 {'10'} 0
 {'11'} 1

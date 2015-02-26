@@ -35,7 +35,7 @@ SCIDB QUERY : <load intensityFlat from '../tests/harness/testcases/data/doc/inte
 SCIDB QUERY : <create array intensity <measuredIntensity:int64 null> [category(string)=3,3,0,elapsedTime=0:40000,10000,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(intensityFlat,intensity)>
+SCIDB QUERY : <store(redimension(intensityFlat,intensity),intensity)>
 {category,elapsedTime} measuredIntensity
 {'High',0} 100
 {'High',1} 100

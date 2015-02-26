@@ -7,7 +7,7 @@ load ( RawDataForDorfs, '../tests/harness/testcases/data/iquery_2.txt')
 
 CREATE EMPTY ARRAY Dorfs < detail : string, qty : double > [ name(string)=7,7,0, item(string)=4,4,0 ]
 
-redimension_store ( RawDataForDorfs, Dorfs )
+store(redimension( RawDataForDorfs, Dorfs ), Dorfs )
 
 
 --test

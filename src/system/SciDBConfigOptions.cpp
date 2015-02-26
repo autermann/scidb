@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -105,6 +105,8 @@ void initConfig(int argc, char* argv[])
          "Size of chunks segment in bytes.", 0, false)
         (CONFIG_CHUNK_CLUSTER_SIZE_MB, 0, "chunk-segment-size-in-mb", "CHUNK_SEGMENT_SIZE_MB", "", Config::INTEGER,
          "Size of chunks segment in megabytes.", 85, false)
+        (CONFIG_STORAGE_MIN_ALLOC_SIZE_BYTES, 0, "storage-min-alloc-size-bytes", "STORAGE_MIN_ALLOC_SIZE_BYTES", "", Config::INTEGER,
+         "Size of minimum allocation chunk in storage file.", 512, false)
         (CONFIG_READ_AHEAD_SIZE, 0, "read-ahead-size", "READ_AHEAD_SIZE", "", Config::INTEGER,
             "Total size of read ahead chunks (bytes).", 64*1024*1024, false)
         (CONFIG_DAEMONIZE, 'd', "daemon", "", "", Config::BOOLEAN, "Run scidb in background.",
@@ -155,7 +157,7 @@ void initConfig(int argc, char* argv[])
                 true, false)
         (CONFIG_TILE_SIZE, 0, "tile-size", "TILE_SIZE", "", Config::INTEGER, "Size of tile", 10000, false)
         (CONFIG_TILES_PER_CHUNK, 0, "tiles-per-chunk", "TILES_PER_CHUNK", "", Config::INTEGER, "Number of tiles per chunk", 100, false)
-        (CONFIG_SYNC_IO_INTERVAL, 0, "sync-io-interval", "SYNC_IO_INTERVAL", "", Config::INTEGER, "Interval of time for io synchronization (milliseconds)", -1, false)
+        (CONFIG_SYNC_IO_INTERVAL, 0, "sync-io-interval", "SYNC_IO_INTERVAL", "", Config::INTEGER, "Interval of time for io synchronization (milliseconds)", 0, false)
         (CONFIG_IO_LOG_THRESHOLD, 0, "io-log-threshold", "IO_LOG_THRESHOLD", "", Config::INTEGER, "Duration above which ios are logged (milliseconds)", -1, false)
         (CONFIG_OUTPUT_PROC_STATS, 0, "output-proc-stats", "OUTPUT_PROC_STATS", "", Config::BOOLEAN, "Output SciDB process statistics such as virtual memory usage to stderr",
                 false, false)
@@ -194,12 +196,14 @@ void initConfig(int argc, char* argv[])
         (CONFIG_MPI_DIR, 0, "mpi-dir", "MPI_DIR", "", Config::STRING, "Location of MPI installation.", DEFAULT_MPI_DIR(), false)
         (CONFIG_MPI_IF, 0, "mpi-if", "MPI_IF", "", Config::STRING, "Network interface to use for MPI traffic", string(""), false)
         (CONFIG_MPI_TYPE, 0, "mpi-type", "MPI_TYPE", "", Config::STRING, "MPI installation type [mpich2-1.2 | mpich2-1.4].", DEFAULT_MPI_TYPE(), false)
+        (CONFIG_MPI_SHM_TYPE, 0, "mpi-shm-type", "MPI_SHM_TYPE", "", Config::STRING, "MPI shared memory type [SHM | FILE].", string("SHM"), false)
         (CONFIG_CATALOG_RECONNECT_TRIES, 0, "catalog-reconnect-tries", "CONFIG_CATALOG_RECONNECT_TRIES", "", Config::INTEGER, "Count of tries of catalog reconnection", 5, false)
         (CONFIG_QUERY_MAX_SIZE, 0, "query-max-size", "CONFIG_QUERY_MAX_SIZE", "", Config::INTEGER, "Max number of bytes in query string", 16 * 1024 * 1024, false)
         (CONFIG_MAX_REQUESTS, 0, "requests", "MAX_REQUESTS", "", Config::INTEGER,
          "Max. number of client query requests queued for execution. Any requests in excess of the limit are returned to the client with an error.", 1000, false)
         (CONFIG_ENABLE_CATALOG_UPGRADE, 0, "enable-catalog-upgrade", "ENABLE_CATALOG_UPGRADE", "", Config::BOOLEAN, "Set to true to enable the automatic upgrade of SciDB catalog", false, false)
         (CONFIG_REDIM_CHUNKSIZE, 0, "redimension-chunksize", "REDIMENSION_CHUNKSIZE", "", Config::INTEGER, "Chunksize for internal intermediate array used in operator redimension", 10240, false)
+        (CONFIG_MAX_OPEN_FDS, 0, "max-open-fds", "MAX_OPEN_FDS", "", Config::INTEGER, "Maximum number of fds that will be opened by the storage manager at once", 256, false)
         (CONFIG_PREALLOCATE_SHM, 0, "preallocate-shared-mem", "PREALLOCATE_SHM", "", Config::BOOLEAN, "Make sure shared memory backing (e.g. /dev/shm) is preallocated", true, false)
         ;
 

@@ -6,14 +6,14 @@
 --shell --command "touch  /tmp/$HPID.mu_setup.sh"
 --shell --command "touch  /tmp/$HPID.mu_cleanup.sh"
 
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_ARRAY, a<>100))\''  > /tmp/$HPID.mu_tests.sh"
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_M1024x1024, x=100))\''  > /tmp/$HPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_ARRAY, a<>100),count(*))\''  > /tmp/$HPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_M1024x1024, x=100),count(*))\''  > /tmp/$HPID.mu_tests.sh"
 
 --shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -naq $'\'store(project(apply(MU_TEST_ARRAY, b, a+1),b), MU_TEST_ARRAY)\''  >> /tmp/$HPID.mu_tests.sh"
 --shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -naq $'\'store(project(apply(MU_TEST_M1024x1024, b, x+1),b), MU_TEST_M1024x1024)\''  >> /tmp/$HPID.mu_tests.sh"
 
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_ARRAY, a=100))\''  >> /tmp/$HPID.mu_tests.sh"
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'count(filter(MU_TEST_M1024x1024, x<>100))\''  >> /tmp/$HPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_ARRAY, a=100),count(*))\''  >> /tmp/$HPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_M1024x1024, x<>100),count(*))\''  >> /tmp/$HPID.mu_tests.sh"
 
 --shell --command "echo [multi_query_test]                    > /tmp/$HPID.mu.cfg"
 --shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$HPID.mu.cfg"
@@ -32,11 +32,11 @@
 
 --shell --command "trap 'kill 0' SIGINT SIGTERM SIGHUP SIGQUIT ; python ../../bin/mu_driver.py /tmp/$HPID.mu.cfg 1> /tmp/$HPID.stdout 2> /tmp/$HPID.stderr"
 
-count(filter(MU_TEST_ARRAY, a<>100))
-count(filter(MU_TEST_ARRAY, a=100))
+aggregate(filter(MU_TEST_ARRAY, a<>100),count(*))
+aggregate(filter(MU_TEST_ARRAY, a=100),count(*))
 
-count(filter(MU_TEST_M1024x1024,x<>100))
-count(filter(MU_TEST_M1024x1024,x=100))
+aggregate(filter(MU_TEST_M1024x1024,x<>100),count(*))
+aggregate(filter(MU_TEST_M1024x1024,x=100),count(*))
 
 --cleanup
 

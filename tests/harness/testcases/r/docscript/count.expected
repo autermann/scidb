@@ -10,17 +10,17 @@ SCIDB QUERY : <store(between(source_array,1,1,1,2),count_array)>
 SCIDB QUERY : <scan(count_array)>
 [[(),(),(),()],[(),(5),(6),()],[(),(),(),()],[(),(),(),()]]
 
-SCIDB QUERY : <count(count_array)>
+SCIDB QUERY : <aggregate(count_array,count(val))>
 [(2)]
 
-SCIDB QUERY : <count(count_array,i)>
-[(0),(2),(0),(0)]
+SCIDB QUERY : <aggregate(count_array,count(val),i)>
+[(),(2),(),()]
 
-SCIDB QUERY : <count(count_array,j)>
-[(0),(1),(1),(0)]
+SCIDB QUERY : <aggregate(count_array,count(val),j)>
+[(),(1),(1),()]
 
-SCIDB QUERY : <count(count_array,i,j)>
-[[(0),(0),(0),(0)],[(0),(1),(1),(0)],[(0),(0),(0),(0)],[(0),(0),(0),(0)]]
+SCIDB QUERY : <aggregate(count_array,count(val),i,j)>
+[[(),(),(),()],[(),(1),(1),()],[(),(),(),()],[(),(),(),()]]
 
 Query was executed successfully
 

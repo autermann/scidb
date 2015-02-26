@@ -91,17 +91,22 @@ store(build(year,1996+(i%4 * 4)),year)
 store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,Kemboi,Kipruto,Thugwane,Abera,Baldini,Wanjiru]',true),person)  
 store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,Kenya,Kenya,USA,Ethiopia,Italy,Kenya]',true),country)  
 store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time)  
-store(join(event,join(person,join(year,join(country,time)))),winnersFlat)  
---aql CREATE ARRAY winners <person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]  
-redimension_store(winnersFlat, winners)  
+store(join(event,join(person,join(year,join(country,time)))),winners_temp)  
+store(uniq(sort(project(winners_temp,country)),'chunk_size=12'),country_index)  
+store(apply(country_index,country_id, i),countries)  
+store(project(filter(cross_join(winners_temp,countries),winners_temp.country=countries.country), event,person,year,time,winners_temp.country,country_id),winners)  
+store(project(unpack(winners,i),event,person,year,time,country,country_id),Farquar)  
+remove(winners)  
+rename(Farquar,winners)  
 --stop-igdata
 show(winners)
---aql SELECT * FROM winners  
+--set-format lcsv+
+scan(winners) 
+--set-format dcsv
 --start-igdata
---aql CREATE ARRAY perCountryMedalCount <medalCount: uint64 null> [country(string)=20,20,0]  
+CREATE ARRAY perCountryMedalCount <country:string, medalCount: uint64 null> [country_id=0:*,20,0]  
 --stop-igdata
-redimension_store (winners, perCountryMedalCount, count(*) as medalCount) 
---aql SELECT * FROM perCountryMedalCount  
+store(redimension(winners, perCountryMedalCount, count(*) as medalCount),perCountryMedalCount)  
 
 --stop-query-logging
 
@@ -124,6 +129,8 @@ remove(year)
 remove(person)
 remove(country)
 remove(time)
-remove(winnersFlat)
+remove(winners_temp)
+remove(country_index)
+remove(countries)
 remove(winners)
 remove(perCountryMedalCount)

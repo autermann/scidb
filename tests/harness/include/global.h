@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -158,6 +158,7 @@ struct InfoForExecutor
     std::string        rootDir;
     int                sleepTime;
     std::string        logDir;
+    std::string        scratchDir;
     std::string        logDestination;
     std::string        log_prop_file;
     int                debugLevel;
@@ -219,6 +220,7 @@ struct HarnessCommandLineOptions
     RegexType               regexFlag;
     int                     sleepTime;
     std::string             logDir;
+    std::string             scratchDir;
     std::string             logDestination;
     std::string             log_prop_file;
     std::string             reportFilename;

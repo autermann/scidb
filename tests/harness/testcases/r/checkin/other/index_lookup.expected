@@ -145,7 +145,7 @@ SCIDB QUERY : <index_lookup(filter(batch_1, i=0 or i=1 or i=10 or i=1000 or i=10
 {10} '10',-544.021,2
 {1000} '200',826.88,114
 
-SCIDB QUERY : <redimension_store(index_lookup(batch_1, target_index, batch_1.name, name_index, 'memory_limit=1', 'index_sorted= true'), target, sum(data) as data)>
+SCIDB QUERY : <store(redimension(index_lookup(batch_1, target_index, batch_1.name, name_index, 'memory_limit=1', 'index_sorted= true'), target, sum(data) as data), target)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <aggregate(target, count(*), sum(data), stdev(data), avg(data))>
@@ -174,7 +174,7 @@ SCIDB QUERY : <aggregate(index_lookup(batch_2_index, target_index, batch_2_index
 {i} idx_count,count
 {0} 200,400
 
-SCIDB QUERY : <insert(redimension(apply(cross(project(unpack(filter(index_lookup(batch_2_index, target_index, batch_2_index.name, idx, 'memory_limit=32'), idx is null), j), name), aggregate(target_index, count(*) as cnt)), i2, j+cnt), <name:string> [i2=0:*,100,0]), target_index)>
+SCIDB QUERY : <insert(redimension(apply(cross_join(project(unpack(filter(index_lookup(batch_2_index, target_index, batch_2_index.name, idx, 'memory_limit=32'), idx is null), j), name), aggregate(target_index, count(*) as cnt)), i2, j+cnt), <name:string> [i2=0:*,100,0]), target_index)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <insert(redimension(index_lookup( batch_2, target_index, batch_2.name, name_index, 'memory_limit=32'), target, sum(data) as data), target)>

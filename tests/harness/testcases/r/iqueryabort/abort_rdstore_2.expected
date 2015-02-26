@@ -3012,11 +3012,11 @@ SCIDB QUERY : <store(join(build_sparse(ABR2,'a_'+string(x+1),1),build_sparse(ABR
 {3000} 'a_3001','b_3001'
 
 "issuing redim"
-SCIDB QUERY : <../utils/killquery.sh -afl 2 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 2 2 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 15 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 15 2 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE>
 
-SCIDB QUERY : <../utils/killquery.sh -afl 9 2 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE>
+SCIDB QUERY : <../utils/killquery.sh -afl 9 2 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE>
 
 "should be empty..."
 SCIDB QUERY : <scan(ABR3)>

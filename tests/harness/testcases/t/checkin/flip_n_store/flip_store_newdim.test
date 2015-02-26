@@ -7,17 +7,17 @@ create empty array TS_3 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, res
 create empty array TS_4 <i:int64>[timestamp(datetime)=*,5,0, userID=1:*,5,0, resourceID=1:*,5,0]
 load(TS,'../tests/harness/testcases/data/redimension_ts.txt')
 
---igdata "redimension_store(TS, TS_1)"
---igdata "redimension_store(TS, TS_2, max(userID) as userID, max(resourceID) as resourceID)"
---igdata "redimension_store(TS, TS_3)"
---igdata "redimension_store(TS, TS_4)"
+--igdata "store(redimension(TS, TS_1), TS_1)"
+--igdata "store(redimension(TS, TS_2, max(userID) as userID, max(resourceID) as resourceID), TS_2)"
+--igdata "store(redimension(TS, TS_3), TS_3)"
+--igdata "store(redimension(TS, TS_4), TS_4)"
 
 --test
-count(TS)
-count(TS_1)
-count(TS_2)
-count(TS_3)
-count(TS_4)
+aggregate(TS,count(*))
+aggregate(TS_1,count(*))
+aggregate(TS_2,count(*))
+aggregate(TS_3,count(*))
+aggregate(TS_4,count(*))
 
 
 --cleanup

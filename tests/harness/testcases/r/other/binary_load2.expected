@@ -377,7 +377,7 @@ SCIDB QUERY : <load(UNB6,'unb5.txt',0,'text',15)>
 {14} 14
 {15} 15
 
-SCIDB QUERY : <count(unb6_shadow)>
+SCIDB QUERY : <aggregate(unb6_shadow,count(*))>
 {i} count
 {0} 1
 

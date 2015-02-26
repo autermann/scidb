@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -107,7 +107,7 @@ class MPIRankPhysical : public ScaLAPACKPhysical
 public:
     MPIRankPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
     :
-    	ScaLAPACKPhysical(logicalName, physicalName, parameters, schema)
+        ScaLAPACKPhysical(logicalName, physicalName, parameters, schema)
     {
     }
 
@@ -168,6 +168,8 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     size_t nRows = dims[0].getLength();
     size_t nCols = dims[1].getLength();
     if (!nRows || !nCols ) {
+        bool isParticipating = launchMPISlaves(query, 0);
+        SCIDB_ASSERT(!isParticipating);
         return shared_ptr<Array>(new MemArray(_schema,query));
     }
 
@@ -195,6 +197,8 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         //
         // We are an "extra" instance that must return an empty array
         // we will not start mpi slaves for such instances
+        bool isParticipating = launchMPISlaves(query, 0);
+        SCIDB_ASSERT(!isParticipating);
         return shared_ptr<Array>(new MemArray(_schema,query));
     } else {
         if(DBG) {
@@ -342,7 +346,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     //     NPE = MpiManager::getInstance()->getWorldSize();
     //     MYPE = MpiManager::getInstance()->getRank();
     // and here can be derived from the blacs_getinfo
-    // 
+    //
     // lets check them against the instanceCount and instanceID to make sure
     // everything is consistent
 
@@ -560,7 +564,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
 
     if(DBG) std::cerr << "extract data from SciDB Ain to ScaLAPACK double* IN" << std::endl ;
     LOG4CXX_DEBUG(logger, "extract data from SciDB Ain to ScaLAPACK double* IN");
-    extractDataToOp(Ain, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
+    extractDataToOp(Ain, /*attrID*/0, coordFirst, coordLast, pdelsetOp, query);
     LOG4CXX_DEBUG(logger, "extraction done");
     if(DBG) std::cerr << "extraction done" << std::endl ;
 
@@ -571,10 +575,10 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
         }
     }
 
-	// SPECIAL TO MPIRank, does not factor out
+        // SPECIAL TO MPIRank, does not factor out
     for(int ii=0; ii < SIZE_IN; ii++) {
         IN[ii] = MYPE ; // change it to what we think the rank will be when it really gets to MPI
-    }      
+    }
 
     //
     //.... Call the master wrapper

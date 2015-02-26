@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -71,6 +71,26 @@ void mpiErrorHandler(MPI::Comm& comm, int *a1, ...)
 {
     ::abort();
 }
+
+
+namespace scidb
+{
+namespace mpi
+{
+// not thread-safe !
+SharedMemoryIpc::SharedMemoryIpcType_t sShmType(SharedMemoryIpc::SHM_TYPE);
+void setShmIpcType(SharedMemoryIpc::SharedMemoryIpcType_t type)
+{
+    assert (type == SharedMemoryIpc::FILE_TYPE ||
+            type == SharedMemoryIpc::SHM_TYPE);
+    sShmType = type;
+}
+SharedMemoryIpc::SharedMemoryIpcType_t getShmIpcType()
+{
+    return sShmType;
+}
+} //namespace mpi
+} //namespace scidb
 
 /**
  * Implementation of scidb::MessageDesc which is aware of DLA specific messages
@@ -368,14 +388,19 @@ int main(int argc, char* argv[])
       cerr << "SLAVE: Unable to read /proc/self (pid="<< ::getpid() <<")" << std::endl;
       exit(903); // MPI is not initialized yet, so no MPI_Abort()
     }
+
     uint64_t queryId(0);
     uint64_t launchId(0);
     string clusterUuidStr;
-    if (!scidb::mpi::parseScidbMPIEnvVar(procEnvVar, queryId, launchId, clusterUuidStr)) {
-      cerr << "SLAVE: Unable to parse env variable: "
-	   << scidb::mpi::SCIDBMPI_ENV_VAR << "=" << procEnvVar << std::endl;
-      exit(904); // MPI is not initialized yet, so no MPI_Abort()
+    uint32_t shmType(0);
+
+    if (!scidb::mpi::parseScidbMPIEnvVar(procEnvVar, shmType, queryId, launchId, clusterUuidStr)) {
+        cerr << "SLAVE: Unable to parse env variable: "
+             << scidb::mpi::SCIDBMPI_ENV_VAR << "=" << procEnvVar << std::endl;
+        exit(904); // MPI is not initialized yet, so no MPI_Abort()
     }
+
+    scidb::mpi::setShmIpcType(shmType);
 
     // Get instance specific runtime values from the arguments
     const char* instanceIdStr = argv[1];
@@ -429,8 +454,8 @@ int main(int argc, char* argv[])
 
     try {
       runScidbCommands(port, clusterUuidStr, queryId,
-		       instanceId, static_cast<uint64_t>(rank),
-		       launchId, argc, argv);
+                       instanceId, static_cast<uint64_t>(rank),
+                       launchId, argc, argv);
     }
     catch (const scidb::SystemException &e)
     {
@@ -483,7 +508,7 @@ int setupMpi()
     //
     // Set up an error handler
     //
-    MPI::Errhandler eh = 
+    MPI::Errhandler eh =
        MPI::Comm::Create_errhandler((MPI::Comm::Errhandler_fn*)  &mpiErrorHandler);
 
     MPI::COMM_WORLD.Set_errhandler(eh);

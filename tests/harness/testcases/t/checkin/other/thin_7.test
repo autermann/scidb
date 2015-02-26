@@ -3,7 +3,7 @@
 create array A <a:string default 'test' compression 'rle'> [x=0:8,6,0]
 store(build_sparse(A,x+10,x<>5),A)
 create empty array B <x:int64 compression 'dictionary'> [a(string)=9,6,0]
-redimension_store(A,B)
+store(redimension(A,B),B)
 
 --test
 thin(A,0,1)

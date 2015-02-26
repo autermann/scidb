@@ -8,8 +8,8 @@ create array yec <person:string,time:double> [year=1996:2008,13,0, event(string)
 
 --test
 --aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2_2.scidb'
-redimension_store(winnersFlat, winnersCanonical)
-redimension_store(winnersCanonical,yec)
+store(redimension(winnersFlat, winnersCanonical), winnersCanonical)
+store(redimension(winnersCanonical,yec),yec)
 
 --cleanup
 --aql drop array winnersFlat

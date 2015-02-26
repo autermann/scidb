@@ -73,7 +73,7 @@ SCIDB QUERY : <scan(A2a_err)>
 {998} null,null,null,null,null,null,'Failed to parse string',240
 {1000} null,null,null,null,null,null,'Failed to parse string',279
 
-SCIDB QUERY : <count(A2a_err)>
+SCIDB QUERY : <aggregate(A2a_err,count(*))>
 {i} count
 {0} 3
 

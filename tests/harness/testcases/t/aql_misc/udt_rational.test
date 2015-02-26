@@ -51,11 +51,11 @@ project(apply(B,c,str(b/1)),c)
 
 project(apply(B,c,str(b/6)),c)
 
-project(apply(min(B),c,str(b_min)),c)
+project(apply(aggregate(B,min(b)),c,str(b_min)),c)
 
-project(apply(max(B),c,str(b_max)),c)
+project(apply(aggregate(B,max(b)),c,str(b_max)),c)
 
-project(apply(avg(B),c,str(b_avg)),c)
+project(apply(aggregate(B,avg(b)),c,str(b_avg)),c)
 
 --aql select str(b) from B
 

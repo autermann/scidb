@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,19 +42,12 @@ namespace scidb
 {
 namespace mpi
 {
-
-/// @return the type of shared memory in use
-SharedMemoryIpc::SharedMemoryIpcType_t getShmIpcType()
-{
-    return SharedMemoryIpc::SHM_TYPE;
-}
-
 SharedMemoryIpc* newSharedMemoryIpc(const std::string& name, bool preallocate)
 {
     if (getShmIpcType() == scidb::SharedMemoryIpc::SHM_TYPE) {
         return new SharedMemory(name, preallocate);
     } else if (getShmIpcType() == scidb::SharedMemoryIpc::FILE_TYPE) {
-        return new SharedFile(name);
+        return new SharedFile(name, preallocate);
     }
     return NULL;
 }
@@ -286,12 +279,17 @@ bool readProcName(const std::string& pid, std::string& procName)
 
 
 std::string
-getScidbMPIEnvVar(const string& clusterUuid,
-                  const string& queryId,
-                  const string& launchId)
+getScidbMPIEnvVar(const uint32_t shmType,
+                  const std::string& clusterUuid,
+                  const std::string& queryId,
+                  const std::string& launchId)
 {
-    stringstream var;
-    var << SCIDBMPI_ENV_VAR <<"="<< queryId <<"."<< launchId <<"." << clusterUuid;
+    std::stringstream var;
+    var << SCIDBMPI_ENV_VAR <<"="
+        << shmType << "."
+        << queryId <<"."
+        << launchId <<"."
+        << clusterUuid;
     return var.str();
 }
 
@@ -302,7 +300,9 @@ parseScidbMPIEnvVar(const string& envVarValue,
                     uint64_t& launchId)
 {
   string uuid;
+  uint32_t shmType(0);
   bool rc = parseScidbMPIEnvVar(envVarValue,
+                                shmType,
                                 queryId,
                                 launchId,
                                 uuid);
@@ -311,14 +311,15 @@ parseScidbMPIEnvVar(const string& envVarValue,
 
 bool
 parseScidbMPIEnvVar(const string& envVarValue,
+                    uint32_t& shmType,
                     uint64_t& queryId,
                     uint64_t& launchId,
                     string& clusterUuid)
 {
   std::vector<char> buf(envVarValue.size()+1);
-  string format("%"PRIu64".%"PRIu64".%s""%n");
+  string format("%"PRIu32".%"PRIu64".%"PRIu64".%s""%n");
   int n=0;
-  int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &queryId, &launchId, &buf[0], &n);
+  int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &shmType, &queryId, &launchId, &buf[0], &n);
   if (rc == EOF || rc < 3) {
     return false;
   }

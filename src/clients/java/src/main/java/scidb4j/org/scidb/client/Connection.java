@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,6 +39,7 @@ public class Connection
     private Network net;
     private boolean afl = false;
     private long _queryId = 0;
+    private String _queryStr = "";
     private WarningCallback warningCallback;
     private List<Long> _activeQueries = new ArrayList<Long>();
 
@@ -81,7 +82,7 @@ public class Connection
     {
         return net.isConnected();
     }
-    
+
     /**
      * Prepare query
      * @param queryString Query string
@@ -91,6 +92,7 @@ public class Connection
      */
     public Result prepare(String queryString) throws Error, IOException
     {
+        _queryStr = queryString;
         log.fine(String.format("Preparing query '%s'", queryString));
         Message msg = new Message.Query(0, queryString, afl, "", false);
         net.write(msg);
@@ -132,7 +134,7 @@ public class Connection
     {
         return afl;
     }
-    
+
     /**
      * Return AQL flag
      * @return true if AQL mode
@@ -141,7 +143,7 @@ public class Connection
     {
         return !afl;
     }
-    
+
     /**
      * Execute prepared query
      * @return Array result
@@ -154,9 +156,9 @@ public class Connection
         {
             throw new Error("Query not prepared");
         }
-        
+
         log.fine(String.format("Executing query %d", _queryId));
-        Message msg = new Message.Query(_queryId, "", afl, "", true);
+        Message msg = new Message.Query(_queryId, _queryStr, afl, "", true);
         net.write(msg);
         msg = net.read();
 
@@ -214,7 +216,7 @@ public class Connection
             }
         }
     }
-    
+
     /**
      * Rollback query
      */
@@ -247,7 +249,7 @@ public class Connection
             }
         }
     }
-    
+
     /**
      * Set warning callback for registering execution warnings
      * @param callback Callback object
@@ -256,7 +258,7 @@ public class Connection
     {
         warningCallback = callback;
     }
-    
+
     /**
      * Returns warning callback
      * @return Callback object

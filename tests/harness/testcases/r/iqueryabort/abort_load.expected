@@ -7,7 +7,7 @@ SCIDB QUERY : <../utils/killquery.sh -afl 15 2 $'load(ABRLOAD, \'../tests/harnes
 
 SCIDB QUERY : <../utils/killquery.sh -afl 9  2 $'load(ABRLOAD, \'../tests/harness/testcases/data/abrload.txt\' ) ' 1> /tmp/${HPID}_3.stdout || echo FAILURE>
 
-SCIDB QUERY : <count(ABRLOAD)>
+SCIDB QUERY : <aggregate(ABRLOAD,count(*))>
 {i} count
 {0} 0
 

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -152,17 +152,28 @@ private:
     }
 
     /**
-     * Get all the chunk iterators in a new chunk.
+     * Adjust chunkIterators to match _locInRow.
      *
-     * @pre the current location is a multiple of chunk size, and !end().
+     * @pre _locInRow was already set
+     * @pre end()==false
      */
-    void getChunkIterators()
+    void adjustChunkIterators()
     {
-        assert(_locInRow % _chunkSize == 0);
-        assert(!end());
+        ASSERT_EXCEPTION(!end(), "RowIterator::adjustChunkIterators() called but end() is true.");
 
-        Coordinates const& chunkPos = toTwoDim(_locInRow);
-        _rc.getConstChunkIterators(_chunkIterators, chunkPos);
+        // Acquire the chunkIterators, if needed.
+        if (!_chunkIterators[0] || _locInRow % _chunkSize != _chunkIterators[0]->getPosition()[1] % _chunkSize) {
+            Coordinates const& chunkPos = toTwoDim(_locInRow % _chunkSize);
+            _rc.getConstChunkIterators(_chunkIterators, chunkPos);
+        }
+
+        // Set local position for the chunk iterators.
+        if (_locInRow % _chunkSize != 0) {
+            Coordinates const& cellPos = toTwoDim(_locInRow);
+            for (size_t i=0; i<_numAttributes; ++i) {
+                _chunkIterators[i]->setPosition(cellPos);
+            }
+        }
     }
 
     /**
@@ -188,7 +199,7 @@ public:
         _tmpTwoDim[0] =_rowId;
         _tmpTwoDim[1] = 0;
         if (!end()) {
-            getChunkIterators();
+            adjustChunkIterators();
         }
     }
 
@@ -201,6 +212,7 @@ public:
     virtual void getItem(vector<Value>& item)
     {
         assert(! end());
+        assert( _chunkIterators[0]);
 
         for (size_t i=0; i<_numAttributes; ++i) {
             item[i] = _chunkIterators[i]->getItem();
@@ -227,7 +239,7 @@ public:
         if (end()) { // Have I reached the end of the row?
             resetChunkIterators();
         } else if (_locInRow % _chunkSize==0) { // Have I crossed chunk boundary?
-            getChunkIterators();
+            adjustChunkIterators();
         } else { // Otherwise, just increment.
             for (size_t i=0; i<_numAttributes; ++i) {
                 ++(*_chunkIterators[i]);
@@ -244,12 +256,20 @@ public:
     }
 
     /**
-     * Set the current postion. Could be made to work if needed.
+     * Set the current position.
      */
     virtual bool setPosition(Coordinates const& pos)
     {
-        assert(false);
-        return false;
+        assert(pos.size()==2);
+        assert(pos[0] == static_cast<Coordinate>(_rowId));
+
+        if (pos[1]<0 || pos[1]>=static_cast<Coordinate>(_totalInRow)) {
+            return false;
+        }
+
+        _locInRow = pos[1];
+        adjustChunkIterators();
+        return true;
     }
 
     /**
@@ -257,8 +277,10 @@ public:
      */
     virtual void reset()
     {
-        assert(false);
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "RowIterator::reset()";
+        _locInRow = 0;
+        if (!end()) {
+            adjustChunkIterators();
+        }
     }
 };
 

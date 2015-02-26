@@ -1,7 +1,7 @@
 SCIDB QUERY : <create empty array imtest <a:int64>[x=0:100,10,0, y=0:100,10,0]>
 Query was executed successfully
 
-SCIDB QUERY : <count(imtest)>
+SCIDB QUERY : <aggregate(imtest,count(*))>
 {i} count
 {0} 0
 

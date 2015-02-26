@@ -16,7 +16,7 @@ SCIDB QUERY : <load ( Raw_Dorf, '../tests/harness/testcases/data/iquery_1.txt')>
 SCIDB QUERY : <CREATE EMPTY ARRAY Dorfishness < dorfishness : int64 > [ name(string)=10,11,0, chin(string)=10,11,0, top(string)=10,11,0, head(string)=10,11,0, face(string)=10,11,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store ( Raw_Dorf, Dorfishness )>
+SCIDB QUERY : <store(redimension( Raw_Dorf, Dorfishness ), Dorfishness )>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <echo ('iquery -o lcsv+ -aq \'scan ( Dorfishness )\'')>

@@ -36,7 +36,7 @@ load(UNB6,'unb5.txt',0,'text',10)
 ## Undesired output
 load(UNB6,'unb5.txt',0,'(double)',15,unb6_shadow)
 load(UNB6,'unb5.txt',0,'text',15)
-count(unb6_shadow)
+aggregate(unb6_shadow,count(*))
 
 --cleanup
 remove(UNB)

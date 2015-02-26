@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -59,7 +59,7 @@
 #include "system/ErrorCodes.h"
 
 #include "query/Expression.h"
-#include "query/parser/Serialize.h"
+#include "query/Serialize.h"
 
 #include "system/catalog/data/CatalogMetadata.h"
 
@@ -111,8 +111,8 @@ namespace scidb
             << _arrayVersionId;
         return out.str();
     }
-            
- 
+
+
     const std::string& SystemCatalog::initializeCluster()
     {
         boost::function<void()> work = boost::bind(&SystemCatalog::_initializeCluster, this);
@@ -215,7 +215,7 @@ namespace scidb
 
         ScopedMutexLock mutexLock(_pgLock);
 
-        if (++totalNewArrays > maxTotalNewArrays) { 
+        if (++totalNewArrays > maxTotalNewArrays) {
             maxTotalNewArrays = totalNewArrays;
         }
 
@@ -465,7 +465,7 @@ namespace scidb
 
             tr.commit();
             *oldArrayDesc = array_desc;
-        } 
+        }
         catch (const broken_connection &e)
         {
             throw;
@@ -595,7 +595,7 @@ namespace scidb
     {
         return findArrayByName(array_name) != INVALID_ARRAY_ID;
     }
-    
+
 
     ArrayID SystemCatalog::findArrayByName(const std::string &array_name)
     {
@@ -620,7 +620,7 @@ namespace scidb
             string sql1 = "select id from \"array\" where name = $1";
             _connection->prepare(sql1, sql1)("varchar", treat_string);
             result query_res1 = tr.prepared(sql1)(array_name).exec();
-            if (query_res1.size() != 0) { 
+            if (query_res1.size() != 0) {
                 return query_res1[0].at("id").as(int64_t());
             }
         }
@@ -698,7 +698,7 @@ namespace scidb
         boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
         if (query) {
             boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(array_name);
-            if (tmpArray) { 
+            if (tmpArray) {
                 array_desc = tmpArray->getArrayDesc();
                 assert(array_desc.getUAId()!=0);
                 return;
@@ -2357,7 +2357,7 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
           if (lockDesc->getLockMode() == LockDesc::CRT) {
               assert(false);
               throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "lock mode";
-          }          
+          }
          lockInsertSql = "insert into array_version_lock"
          " ( array_name, array_id, query_id, instance_id, array_version_id, array_version, instance_role, lock_mode)"
          "  (select AVL.array_name, AVL.array_id, AVL.query_id, $3, AVL.array_version_id, AVL.array_version, $4, AVL.lock_mode"
@@ -3036,7 +3036,7 @@ void SystemCatalog::_renameArray(const string &old_array_name, const string &new
        throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << new_array_name;
    }
    catch (const sql_error &e)
-   {  
+   {
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
    }
    catch (const Exception &e)

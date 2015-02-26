@@ -55,12 +55,16 @@
   <para>Installation and Administration is broken down into the following
   topics:<itemizedlist>
       <listitem>
+        <para><link linkend="quickInstallation">Quick Install</link></para>
+      </listitem>
+
+      <listitem>
         <para><link linkend="upgradingSciDB">Upgrading SciDB</link></para>
       </listitem>
 
       <listitem>
-        <para><link linkend="PlatformPrep">Preparing the
-        Platform</link></para>
+        <para><link linkend="PlatformPrep">Preparing the Platform</link>—if
+        you are doing a new, manual installation, start here.</para>
       </listitem>
 
       <listitem>
@@ -82,7 +86,43 @@
       </listitem>
     </itemizedlist></para>
 
-  <xi:include href="scidb_upgrade.xml"
+  <section id="quickInstallation">
+    <title>Quick Install</title>
+
+    <para>Paradigm4 provides several tools that make it possible to perform a
+    fairly simple installation of SciDB. Additionally, if you have purchased
+    the Enterprise Edition, you can also install it using the following
+    scripts.</para>
+
+    <para>See the following for details:<itemizedlist>
+        <listitem>
+          <para>Cluster install script, located at <ulink
+          url="https://github.com/Paradigm4/deployment">https://github.com/Paradigm4/deployment</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para>Alternatively, you can install without root privileges—on
+          CentOS/RHEL only—by using the following script: <ulink
+          url="http://downloads.paradigm4.com/nri">http://downloads.paradigm4.com/nri</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para>Configurator (generates a config.ini file from your
+          interactive input): <ulink
+          url="https://github.com/Paradigm4/configurator">https://github.com/Paradigm4/configurator</ulink>.</para>
+        </listitem>
+
+        <listitem>
+          <para>A how-to video on installing SciDB is available here: <ulink
+          url="http://www.paradigm4.com/video">http://www.paradigm4.com/video</ulink>.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>See the remainder of the chapter for more details about the
+    installation process and files.</para>
+  </section>
+
+  <xi:include href="scidb_upgrade_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <section xml:id="PlatformPrep">
@@ -149,6 +189,10 @@
 
       <para><indexterm>
           <primary>configuration</primary>
+        </indexterm><indexterm>
+          <primary>storage</primary>
+
+          <secondary>configuring</secondary>
         </indexterm>On each server, select a location on the local file system
       to place the data directory for each instance. This must be accessible
       via the same path name on every server.</para>
@@ -161,7 +205,7 @@
       creating an optimal configuration.</para>
     </section>
 
-    <section xml:id="RemoteExecutionConfigurationssh">
+    <section id="ssh_passwordless">
       <title>Remote Execution Configuration (SSH)</title>
 
       <note>
@@ -179,9 +223,9 @@
           <primary>communication between instances</primary>
         </indexterm>SciDB uses <code>ssh</code> for execution of management
       commands such as start and stop within a cluster. This is why the
-      <emphasis role="bold">scidb</emphasis> user account should have
-      password-less <code>ssh</code> access from the coordinator to the
-      workers and from the coordinator to itself.</para>
+      <emphasis role="bold">scidb</emphasis> user account needs to have
+      <code>ssh</code> access from the coordinator to the workers and from the
+      coordinator to itself.</para>
 
       <para>There are several methods to configure password-less
       <code>SSH</code> between servers. We recommend the following simple
@@ -234,127 +278,32 @@ ssh scidb@<replaceable>worker</replaceable></programlisting><note>
       </orderedlist>
     </section>
 
-    <section>
-      <title>Additional Configuration on CentOS and RHEL</title>
+    <section id="extraCentOS">
+      <title>Disable iptables on CentOS and RHEL</title>
 
-      <para>This section describes two additional configuration steps that are
-      necessary if you are running SciDB on CentOS or RHEL:<itemizedlist>
-          <listitem>
-            <para>Configure iptables</para>
-          </listitem>
-
-          <listitem>
-            <para>Configure SELinux</para>
-          </listitem>
-        </itemizedlist></para>
+      <para><indexterm>
+          <primary>firewall</primary>
+        </indexterm><indexterm>
+          <primary>iptables</primary>
+        </indexterm>If you are running on CentOS or RHEL, you need to disable
+      iptables, in order for a multi-server configuration of SciDB to function
+      properly.</para>
 
       <para>
         <note>
-          <para>These configuration steps must be performed on all servers—the
-          coordinator server and all worker servers.</para>
+          <para>This configuration must be performed on all servers—the
+          coordinator and all workers.</para>
         </note>
       </para>
 
-      <section>
-        <title>Configure iptables</title>
+      <para>The iptables program controls a host-based firewall for Linux
+      operating systems. For SciDB, you must disable iptables. To disable
+      iptables, use either of the following commands:<programlisting>sudo chkconfig iptables off # do not start iptables during boot
+sudo service iptables stop # stop iptables</programlisting></para>
 
-        <para><indexterm>
-            <primary>firewall</primary>
-          </indexterm><indexterm>
-            <primary>iptables</primary>
-          </indexterm>If you are running on CentOS or RHEL, you need to set up
-        iptables, in order for a multi-server configuration of SciDB to
-        function properly.</para>
-
-        <para>The iptables program controls a host-based firewall for Linux
-        operating systems. For SciDB, you should perform one of the following
-        actions:<itemizedlist>
-            <listitem>
-              <para>Disable iptables. To disable iptables, use either of the
-              following commands:<programlisting>sudo chkconfig iptables off # do not start iptables during boot
-sudo service iptables stop # stop iptables</programlisting>Or,</para>
-            </listitem>
-
-            <listitem>
-              <para>Grant connections for the SciDB ports and for the Postgres
-              port.</para>
-            </listitem>
-          </itemizedlist></para>
-
-        <para><indexterm>
-            <primary>port numbers</primary>
-          </indexterm>To grant connections, perform the following
-        steps:<orderedlist>
-            <listitem>
-              <para>Use <command>sudo</command>, or login as root to edit the
-              <literal>/etc/sysconfig/iptables</literal> file.</para>
-            </listitem>
-
-            <listitem>
-              <para>On the coordinator instance, grant access for the Postgres
-              port, 5432. Insert the following line before the final line
-              (COMMIT) of the iptables file:<programlisting>-A INPUT -m state --state NEW -m tcp -p tcp --dport 5432 -j ACCEPT</programlisting></para>
-            </listitem>
-
-            <listitem>
-              <para>On all instances—the coordinator and all workers—you must
-              add a line for each instance port. For example, if you have four
-              instances, on ports 1239, 1240, 1241, and 1242, you would add
-              the following lines:<programlisting>-A INPUT -m state --state NEW -m tcp -p tcp --dport 1239 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1240 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1241 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1242 -j ACCEPT</programlisting></para>
-            </listitem>
-
-            <listitem>
-              <para>Restart the iptables service.<programlisting>sudo service iptables restart</programlisting></para>
-            </listitem>
-          </orderedlist></para>
-
-        <para>Here is an example of the updated iptables file on the
-        coordinator:</para>
-
-        <screen># Firewall configuration written by system-config-firewall
-# Manual customization of this file is not recommended.
-*filter
-:INPUT ACCEPT [0:0]
-:FORWARD ACCEPT [0:0]
-:OUTPUT ACCEPT [0:0]
--A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
--A INPUT -p icmp -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT
-# Grant connection for Postgres (coordinator only)
--A INPUT -m state --state NEW -m tcp -p tcp --dport 5432 -j ACCEPT
-# Grant SciDB instance connections
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1239 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1240 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1241 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 1242 -j ACCEPT
--A INPUT -i lo -j ACCEPT
--A INPUT -j REJECT --reject-with icmp-host-prohibited
--A FORWARD -j REJECT --reject-with icmp-host-prohibited
-COMMIT</screen>
-      </section>
-
-      <section>
-        <title>Configure SELinux</title>
-
-        <para>CentOS and RHEL have SELinux (Security-Enhanced Linux) enabled
-        by default. This can cause problems when you attempt to set up
-        password-less SSH. You can either disable SELinux or configure SELinux
-        to allow password-less SSH to function correctly. For details, see
-        your operating system documentation, or search the web for
-        instructions.</para>
-
-        <para>
-          <note>
-            <para>Disabling SELinux may introduce security risks.</para>
-          </note>
-        </para>
-
-        <para>For more information on SELinux, see <ulink
-        url="http://wiki.centos.org/HowTos/SELinux">http://wiki.centos.org/HowTos/SELinux</ulink>.</para>
-      </section>
+      <para><indexterm>
+          <primary>port numbers</primary>
+        </indexterm>To grant connections, perform the following steps:</para>
     </section>
   </section>
 
@@ -452,7 +401,8 @@ sudo apt-get source scidb # If you want the SciDB source</programlisting></para>
 
           <secondary>SciDB</secondary>
         </indexterm>This section describes how to download and install SciDB
-      on CentOS and RHEL, using pre-built binary packages.</para>
+      on CentOS and RHEL, using pre-built binary packages. The CentOS / RHEL
+      packages work with CentOS 6.3, 6.4, and 6.5.</para>
 
       <note>
         <para>This procedure must be performed by a user with sudo privileges.
@@ -495,7 +445,7 @@ gpgcheck=1</programlisting></para>
           <para>Install SciDB. If you want the default SciDB installation with
           all packages installed, you can install the
           scidb-&scidb_version;-all (or scidb-&scidb_version;-all-coord)
-          metapackage. This package includes all of the standard SciDB
+          meta-package. This package includes all of the standard SciDB
           packages.<programlisting>sudo yum search scidb
 sudo yum install scidb-&scidb_version;-all-coord # On the coordinator server only
 sudo yum install scidb-&scidb_version;-all # On all servers other than the coordinator server</programlisting></para>
@@ -512,128 +462,130 @@ sudo yum install scidb-&scidb_version;-all # On all servers other than the coord
         to use the scidb-&scidb_version;-all-coord package.</para>
       </note>
     </section>
+  </section>
 
-    <section xml:id="PostgresInstallationandConfiguration">
-      <title>Set Up Postgres as the SciDB System Catalog</title>
+  <section xml:id="PostgresInstallationandConfiguration">
+    <title>Set Up Postgres as the SciDB System Catalog</title>
 
-      <para>If you are upgrading from a previous version of SciDB, you can
-      skip this section, and continue with <xref linkend="ConfiguringSciDB"/>.
-      Also, this section only applies to the coordinator server: if you are
-      installing SciDB to a cluster, you can skip this section for all of your
-      worker servers.</para>
+    <para>If you are upgrading from a previous version of SciDB, you can skip
+    this section, and continue with <xref linkend="ConfiguringSciDB"/>. Also,
+    this section only applies to the coordinator server: if you are installing
+    SciDB to a cluster, you can skip this section for all of your worker
+    servers.</para>
 
-      <para><indexterm>
-          <primary>system catalog</primary>
-        </indexterm><indexterm>
-          <primary>Postgres</primary>
-        </indexterm><indexterm>
-          <primary>security, Postgres</primary>
-        </indexterm>SciDB relies on Postgres as the system catalog. In this
-      section, we describe how to set up and use Postgres <emphasis
-      role="bold">for SciDB</emphasis>.</para>
+    <para><indexterm>
+        <primary>system catalog</primary>
+      </indexterm><indexterm>
+        <primary>Postgres</primary>
+      </indexterm><indexterm>
+        <primary>security, Postgres</primary>
+      </indexterm>SciDB relies on Postgres as the system catalog. In this
+    section, we describe how to set up and use Postgres <emphasis
+    role="bold">for SciDB</emphasis>.</para>
 
-      <warning>
-        <para>We strongly recommend that you use a separate Postgres
-        installation exclusively for SciDB. The main reason for this is that
-        SciDB needs to store the password for the 'scidb' user in clear text
-        in a configuration file. Thus, if you use an existing Postgres
-        installation for SciDB, you introduce a security risk into the
-        existing Postgres installation.</para>
-      </warning>
+    <warning>
+      <para>We strongly recommend that you use a separate Postgres
+      installation exclusively for SciDB. The main reason for this is that
+      SciDB needs to store the password for the 'scidb' user in clear text in
+      a configuration file. Thus, if you use an existing Postgres installation
+      for SciDB, you introduce a security risk into the existing Postgres
+      installation.</para>
+    </warning>
 
-      <para>Note the following:<itemizedlist>
-          <listitem>
-            <para><indexterm>
-                <primary>port numbers</primary>
-              </indexterm>SciDB requires Postgres 8.4. This version is
-            typically available on most Linux platforms. If your platform
-            provides multiple versions of Postgres, make sure that version 8.4
-            is running and using port 5432.</para>
-          </listitem>
+    <para>Note the following:<itemizedlist>
+        <listitem>
+          <para><indexterm>
+              <primary>port numbers</primary>
+            </indexterm>SciDB requires Postgres 8.4. This version is typically
+          available on most Linux platforms. If your platform provides
+          multiple versions of Postgres, be aware that SciDB assumes that
+          version 8.4 is running and using port 5432. To change, set the
+          optional configuration parameter, <code>pg-port</code>.</para>
+        </listitem>
 
-          <listitem>
-            <para>The installation and configuration of Postgres must be
-            performed by root, or an account with equivalent administrative
-            privileges.</para>
-          </listitem>
+        <listitem>
+          <para>The installation and configuration of Postgres must be
+          performed by root, or an account with equivalent administrative
+          privileges.</para>
+        </listitem>
 
-          <listitem>
-            <para>You install and configure Postgres on the coordinator server
-            only.</para>
-          </listitem>
-        </itemizedlist></para>
+        <listitem>
+          <para>You install and configure Postgres on the coordinator server
+          only.</para>
+        </listitem>
+      </itemizedlist></para>
 
-      <para>By default, Postgres is configured to allow only local access via
-      Unix-domain sockets. In a cluster environment, the Postgres database
-      server needs to be configured to allow access from other instances in
-      the cluster. To do this, perform the following steps:</para>
+    <para>By default, Postgres is configured to allow only local access via
+    Unix-domain sockets. In a cluster environment, the Postgres database
+    server needs to be configured to allow access from other instances in the
+    cluster. To do this, perform the following steps:</para>
 
-      <procedure>
-        <step>
-          <para><emphasis role="bold">For CentOS/RHEL only:</emphasis> If you
-          have never previously run Postgres on your system, you must create
-          the Postgres configuration file, <literal>pg_hba.conf</literal>, by
-          running the following command:<programlisting>sudo service postgresql initdb</programlisting>Note
-          that for Ubuntu, the configuration file is created automatically
-          when you install the SciDB repository.</para>
-        </step>
+    <procedure>
+      <step>
+        <para><emphasis role="bold">For CentOS/RHEL only:</emphasis> If you
+        have never previously run Postgres on your system, you must create the
+        Postgres configuration file, <literal>pg_hba.conf</literal>, by
+        running the following command:<programlisting>sudo service postgresql initdb</programlisting>Note
+        that for Ubuntu, the configuration file is created automatically when
+        you install the SciDB repository.</para>
+      </step>
 
-        <step>
-          <para>Configure Postgres to use 'md5' authentication for local and
-          remote TCP/IP connections. To do this, modify the
-          <literal>pg_hba.conf</literal> file (usually at
-          <literal>/etc/postgresql/8.4/main/</literal> or
-          <literal>/var/lib/pgsql/data/</literal>) and include the following
-          settings.<programlisting>host    all     all     127.0.0.1/32      md5
+      <step>
+        <para>Configure Postgres to use 'md5' authentication for local and
+        remote TCP/IP connections. To do this, modify the
+        <literal>pg_hba.conf</literal> file (usually at
+        <literal>/etc/postgresql/8.4/main/</literal> or
+        <literal>/var/lib/pgsql/data/</literal>) and include the following
+        settings.<programlisting>host    all     all     127.0.0.1/32      md5
 host    all     all     ::1/128           md5
 host    all     all     W.X.Y.Z/N         md5</programlisting>This
-          configuration setting causes Postgres to use 'md5' authentication
-          for all local and remote connections from instances within the
-          <literal>W.X.Y.Z/N</literal> subnet in CIDR notation. Replace the
-          subnet/mask with the correct one for your cluster network (by using
-          the Linux <command>ifconfig</command> tool or consulting your system
-          administrator).<warning>
-              <para>Although the 'md5' authentication does provide some level
-              of security, this Postgres configuration might still pose
-              security issues. To make a more secure installation, you can
-              list specific host IP addresses, user names, and role
-              mappings.</para>
+        configuration setting causes Postgres to use 'md5' authentication for
+        all local and remote connections from instances within the
+        <literal>W.X.Y.Z/N</literal> subnet in CIDR notation. Replace the
+        subnet/mask with the correct one for your cluster network (by using
+        the Linux <command>ifconfig</command> tool or consulting your system
+        administrator).<warning>
+            <para>Although the 'md5' authentication does provide some level of
+            security, this Postgres configuration might still pose security
+            issues. To make a more secure installation, you can list specific
+            host IP addresses, user names, and role mappings.</para>
 
-              <para>You can read more on the security details of Postgres
-              client-authentication in the Postgres documentation at <ulink
-              url="http://www.postgresql.org/docs/8.4/static/client-authentication.html"/>.</para>
-            </warning></para>
-        </step>
+            <para>You can read more on the security details of Postgres
+            client-authentication in the Postgres documentation at <ulink
+            url="http://www.postgresql.org/docs/8.4/static/client-authentication.html"/>.</para>
+          </warning></para>
+      </step>
 
-        <step>
-          <para>You might need to set the <literal>postgresql.conf</literal>
-          file to have it listen on the relevant port. If you are running a
-          cluster with multiple servers, you will also need to modify the
-          <literal>postgresql.conf</literal> file to allow connections from
-          other instances in the cluster.<programlisting># - Connection Settings -
+      <step>
+        <para>You might need to set the <literal>postgresql.conf</literal>
+        file to have it listen on the relevant port. If you are running a
+        cluster with multiple servers, you will also need to modify the
+        <literal>postgresql.conf</literal> file to allow connections from
+        other instances in the cluster.<programlisting># - Connection Settings -
 listen_addresses = '*'
 port = 5432
 </programlisting></para>
-        </step>
+      </step>
 
-        <step>
-          <para>Restart Postgres.<programlisting>sudo /etc/init.d/postgresql restart
+      <step>
+        <para>Restart Postgres.<programlisting>sudo /etc/init.d/postgresql restart
 </programlisting></para>
-        </step>
+      </step>
 
-        <step>
-          <para>The final step, after you have configured Postgres, is to add
-          it to Linux system services. This means that Postgres will be
-          started automatically on system reboot.<programlisting>sudo /sbin/chkconfig --add postgresql</programlisting>To
-          run the previous command, you need to install the chkconfig package,
-          if it is not already installed on your system.</para>
-        </step>
-      </procedure>
+      <step>
+        <para>The final step, after you have configured Postgres, is to add it
+        to Linux system services. This means that Postgres will be started
+        automatically on system reboot.<programlisting>sudo /sbin/chkconfig --add postgresql
+sudo /sbin/chkconfig postgresql on
+</programlisting>To run the previous command, you need to install the
+        chkconfig package, if it is not already installed on your
+        system.</para>
+      </step>
+    </procedure>
 
-      <para>You can verify that a PostgreSQL instance is running on the
-      coordinator with the <literal>status</literal> command: <programlisting>sudo /etc/init.d/postgresql status
+    <para>You can verify that a PostgreSQL instance is running on the
+    coordinator with the <literal>status</literal> command: <programlisting>sudo /etc/init.d/postgresql status
 </programlisting></para>
-    </section>
   </section>
 
   <section xml:id="ConfiguringSciDB">
@@ -697,7 +649,10 @@ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/scidb/$SCIDB_VER/lib"</programlist
         </indexterm><indexterm>
           <primary>config.ini</primary>
         </indexterm>The standard location of the SciDB configuration file is
-      <literal>/opt/scidb/&scidb_version;/etc/config.ini</literal>.</para>
+      <literal>/opt/scidb/&scidb_version;/etc/config.ini</literal>. You can
+      also use the Configurator tool, which generates a config.ini file from
+      your interactive input. It is located here: <ulink
+      url="https://github.com/Paradigm4/configurator">https://github.com/Paradigm4/configurator</ulink>.</para>
 
       <para>The configuration 'test1' below is an example of the configuration
       for a single-node, four-instance system:<programlisting>[test1]
@@ -715,8 +670,7 @@ mem-array-threshold=1024
 smgr-cache-size=1024
 execution-threads=16
 result-prefetch-queue-size=4
-result-prefetch-threads=4
-chunk-segment-size-in-mb=100</programlisting></para>
+result-prefetch-threads=4</programlisting></para>
 
       <para>For an example of the configuration for a SciDB cluster, and for
       more details about the configuration parameters, see <xref
@@ -734,8 +688,8 @@ chunk-segment-size-in-mb=100</programlisting></para>
 
     <note>
       <simpara>For all of the following commands, replace
-      [<replaceable>db</replaceable>] with the name of your actual
-      cluster.</simpara>
+      <replaceable>scidb_cluster_name</replaceable> with the name of your
+      actual cluster.</simpara>
     </note>
 
     <procedure>
@@ -744,11 +698,11 @@ chunk-segment-size-in-mb=100</programlisting></para>
             <primary>Postgres</primary>
           </indexterm>Initialize the system catalog database in Postgres. This
         must be done as user Postgres, therefore, this command must be run as
-        user Postgres, or as superuser as follows. <programlisting>cd /tmp &amp;&amp; sudo -u postgres /opt/scidb/&scidb_version;/bin/scidb.py init_syscat [<replaceable>db</replaceable>]</programlisting></para>
+        user Postgres, or as superuser as follows. <programlisting>cd /tmp &amp;&amp; sudo -u postgres /opt/scidb/&scidb_version;/bin/scidb.py init_syscat <replaceable>scidb_cluster_name</replaceable></programlisting></para>
       </step>
 
       <step>
-        <para>Run the following command as the 'scidb' user.<programlisting>scidb.py initall [<replaceable>db</replaceable>]</programlisting><warning>
+        <para>Run the following command as the 'scidb' user.<programlisting>scidb.py initall <replaceable>scidb_cluster_name</replaceable></programlisting><warning>
             <para>This will reinitialize the SciDB database. Any arrays that
             you have created in previous SciDB sessions will be removed and
             corresponding storage files will be deleted.</para>
@@ -766,18 +720,24 @@ chunk-segment-size-in-mb=100</programlisting></para>
 
       <step>
         <para>Again, as the 'scidb' user, start the set of local SciDB
-        instances specified in your config.ini file.<programlisting>scidb.py startall [<replaceable>db</replaceable>]</programlisting></para>
+        instances specified in your config.ini file.<programlisting>scidb.py startall <replaceable>scidb_cluster_name</replaceable></programlisting></para>
       </step>
     </procedure>
+
+    <note>
+      <para>Initialization may fail if you are using the Lustre file system.
+      To correct the problem, use the <code>-o localflock</code> option when
+      mounting the file system.</para>
+    </note>
 
     <para>You can also execute the following commands (as the 'scidb'
     user).<itemizedlist>
         <listitem>
-          <para>To report the status of the various instances:<programlisting>scidb.py status [<replaceable>db</replaceable>]</programlisting></para>
+          <para>To report the status of the various instances:<programlisting>scidb.py status <replaceable>scidb_cluster_name</replaceable></programlisting></para>
         </listitem>
 
         <listitem>
-          <para>To stop all SciDB instances:<programlisting>scidb.py stopall [<replaceable>db</replaceable>]</programlisting></para>
+          <para>To stop all SciDB instances:<programlisting>scidb.py stopall <replaceable>scidb_cluster_name</replaceable></programlisting></para>
         </listitem>
       </itemizedlist></para>
 
@@ -785,10 +745,7 @@ chunk-segment-size-in-mb=100</programlisting></para>
     linkend="scidb.pyParameters"/>.</para>
   </section>
 
-  <xi:include href="scidb_bestpractices.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <?hard-pagebreak ?>
+  <!--  <?hard-pagebreak ?> -->
 
   <section id="installReference">
     <title>Installation Reference</title>
@@ -850,12 +807,6 @@ chunk-segment-size-in-mb=100</programlisting></para>
           <listitem>
             <para>The <code>scidb-&scidb_version;-utils</code> package
             contains SciDB server utilities.</para>
-          </listitem>
-
-          <listitem>
-            <para>The <code>scidb-&scidb_version;-dev</code> contains
-            development header files for developers creating SciDB extensions
-            (types, operators, and aggregates).</para>
           </listitem>
 
           <listitem>
@@ -1052,7 +1003,9 @@ chunk-segment-size-in-mb=100</programlisting></para>
               <entry><para><indexterm>
                   <primary>data-dir-prefix</primary>
                 </indexterm><indexterm>
-                  <primary>storage, assigning</primary>
+                  <primary>storage</primary>
+
+                  <secondary>assigning</secondary>
                 </indexterm>data-dir-prefix (optional)</para></entry>
 
               <entry><para>The SciDB administrator can provide file system
@@ -1224,31 +1177,6 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout></para><para>You
 
               <entry><para>Size of memory buffer used in merge sort, in MB.
               Default: 512 MB.</para></entry>
-            </row>
-
-            <row>
-              <entry><para>chunk-segment-size (optional)</para><para><emphasis
-              role="bold">Deprecated. </emphasis>This parameter may be removed
-              in the future. Use <code>chunk-segment-size-in-mb</code>
-              instead.</para></entry>
-
-              <entry><para>Size of a storage segment in bytes. Set to a
-              nonzero value to enable reuse of storage from removed arrays. If
-              this number is set to a nonzero value, it must be large enough
-              to contain the largest chunk of the array. If set to zero, no
-              space reuse or storage reclamation is done. Default value: 85MB.
-              Maximum size: 2,147,483,647 B (= 2GB).</para></entry>
-            </row>
-
-            <row>
-              <entry><para>chunk-segment-size-in-mb (optional)</para></entry>
-
-              <entry><para>Size of a storage segment in megabytes. Set to a
-              nonzero value to enable reuse of storage from removed arrays. If
-              this number is set to a nonzero value, it must be large enough
-              to contain the largest chunk of the array. If set to zero, no
-              space reuse or storage reclamation is done. Default value: 85MB.
-              Note that there is no upper limit.</para></entry>
             </row>
 
             <row>
@@ -1522,7 +1450,7 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
       <para><indexterm>
           <primary>scidb.py script</primary>
         </indexterm>The syntax for the <literal>scidb.py</literal> script is
-      as follows: <programlisting>scidb.py <replaceable>command</replaceable> <replaceable>db</replaceable> <replaceable>conffile</replaceable></programlisting></para>
+      as follows: <programlisting>scidb.py <replaceable>command</replaceable> <replaceable>scidb_cluster_name</replaceable> <replaceable>conffile</replaceable></programlisting></para>
 
       <para>The options for the <replaceable>command</replaceable> argument
       are:</para>
@@ -1619,8 +1547,9 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
         </tgroup>
       </informaltable>
 
-      <para>The <replaceable>db</replaceable> argument is the name of the
-      SciDB cluster you want to create or get information about.</para>
+      <para>The <replaceable>scidb_cluster_name</replaceable> argument is the
+      name of the SciDB cluster you want to create or get information
+      about.</para>
 
       <para>The configuration file is set by default to
       <code>/opt/scidb/&scidb_version;/etc/config.ini</code>. If you want to

@@ -5,8 +5,8 @@ create array A <a:int32, b:string, c:string> [x=0:2,3,0,y=4:5,1,0]
 create empty array A2 <a:int32, b:string> [c(string)=6,2,0]
 create empty array A3 <c:string, a:int32> [b(string)=6,2,0,x=0:2,3,0]
 load(A,'../tests/harness/testcases/data/iquery_5.txt')
-redimension_store(A,A2)
-redimension_store(A,A3)
+store(redimension(A,A2),A2)
+store(redimension(A,A3),A3)
 
 --test
 

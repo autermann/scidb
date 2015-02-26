@@ -27,17 +27,17 @@ show(ZZ)
 insert(sort(insert(filter( build(A,2000*x+10000),x=0 and y=2),A),a desc),ZZ)
 
 insert(build(<a:int64 default 99> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)
-build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true)
+build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true)
 
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "insert(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),A)"
 
-store(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),MIB)
-insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(0),(0),(0)],[(1),(0),(0),(0)],[(0),(0),(0),(0)],[(0),(1),(),()]]', true),MIB)
+store(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(),(),(0)],[(1),(),(),()],[(0),(0),(0),(-157)],[(),(),(),()]]', true),MIB)
+insert(build(<a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[[(),(0),(0),(0)],[(1),(0),(0),(0)],[(0),(0),(0),(0)],[(0),(1),(),()]]', true),MIB)
 show(MIB)
 scan(MIB)
-count(versions(MIB))
+aggregate(versions(MIB),count(*))
 insert(between(filter(build(MIB,null),a is null),-3,0,-1,2), MIB)
-count(versions(MIB))
+aggregate(versions(MIB),count(*))
 
 --error --code scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED "insert(filter(insert(build(MIB,null), MIB),a is null),MIB)"
 --error --code scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED "insert(insert(build(MIB,null), MIB),MIB)"

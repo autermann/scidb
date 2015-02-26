@@ -108,7 +108,7 @@ Query was executed successfully
 SCIDB QUERY : <CREATE  ARRAY B_repart2 < STR : string, I32 : int32, FLT : float, Line : int64> [ DBL(double)=*,4,0, STR2(string)=*,6,2 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (A_load, B)>
+SCIDB QUERY : <store(redimension(A_load, B), B)>
 DBL,STR2,STR,I32,FLT,Line
 0,0,'Foo',1,1.1,0
 1,2,'Foo',28,3.9,27
@@ -157,7 +157,7 @@ DBL,STR2,STR,I32,FLT,Line
 44,0,'Wump',38,5.1,37
 45,2,'Foo',29,4.1,28
 
-SCIDB QUERY : <redimension_store (A_load, B_repart1)>
+SCIDB QUERY : <store(redimension(A_load, B_repart1), B_repart1)>
 DBL,STR2,STR,I32,FLT,Line
 0,0,'Foo',1,1.1,0
 1,2,'Foo',28,3.9,27
@@ -258,7 +258,7 @@ DBL,STR2,STR,I32,FLT,Line
 SCIDB QUERY : <CREATE  ARRAY B_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:*,8,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (apply(B, recno, int32(Line)), B_flipped)>
+SCIDB QUERY : <store(redimension(apply(B, recno, int32(Line)), B_flipped), B_flipped)>
 recno,STR,DBL,I32,FLT,STR2
 0,'Foo',1.123,1,1.1,'Bar_T'
 1,'Foo',9.123,2,1.1,'Bar_T'
@@ -314,7 +314,7 @@ i,count
 SCIDB QUERY : <CREATE  ARRAY C < STR : string, DBL : double, Line : int64, STR2 : string> [ FLT(float)=*,4,2, I32(int32)=*,3,1 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (A_load, C)>
+SCIDB QUERY : <store(redimension(A_load, C), C)>
 FLT,I32,STR,DBL,Line,STR2
 0,0,'Foo',1.123,0,'Bar_T'
 0,1,'Foo',9.123,1,'Bar_T'
@@ -366,7 +366,7 @@ FLT,I32,STR,DBL,Line,STR2
 SCIDB QUERY : <CREATE  ARRAY C_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:*,8,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (apply(C, recno, int32(Line)), C_flipped)>
+SCIDB QUERY : <store(redimension(apply(C, recno, int32(Line)), C_flipped), C_flipped)>
 recno,STR,DBL,I32,FLT,STR2
 0,'Foo',1.123,1,1.1,'Bar_T'
 1,'Foo',9.123,2,1.1,'Bar_T'
@@ -422,7 +422,7 @@ i,count
 SCIDB QUERY : <CREATE  ARRAY D < STR : string, I32 : int32, Line : int64 > [ DBL(double)=*,10,0, STR2(string)=*,5,1, FLT(float)=100,10,2 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (A_load, D)>
+SCIDB QUERY : <store(redimension(A_load, D), D)>
 DBL,STR2,FLT,STR,I32,Line
 0,0,0,'Foo',1,0
 5,1,8,'Foo',10,9
@@ -474,7 +474,7 @@ DBL,STR2,FLT,STR,I32,Line
 SCIDB QUERY : <CREATE  ARRAY D_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string >[ recno=0:*,8,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (apply(D, recno, int32(Line)), D_flipped)>
+SCIDB QUERY : <store(redimension(apply(D, recno, int32(Line)), D_flipped), D_flipped)>
 recno,STR,DBL,I32,FLT,STR2
 0,'Foo',1.123,1,1.1,'Bar_T'
 1,'Foo',9.123,2,1.1,'Bar_T'
@@ -530,7 +530,7 @@ i,count
 SCIDB QUERY : <CREATE  ARRAY E < STR2 : string, FLT : float, Line : int64, total : double NULL default 999.998 > [ I32(int32)=*,4,0, STR(string)=*,6,2 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (A_load, E, sum(DBL) as total)>
+SCIDB QUERY : <store(redimension(A_load, E, sum(DBL) as total), E)>
 I32,STR,STR2,FLT,Line,total
 0,1,'Bar_T',1.1,0,1.123
 1,1,'Bar_T',1.1,1,9.123
@@ -582,7 +582,7 @@ I32,STR,STR2,FLT,Line,total
 SCIDB QUERY : <CREATE  ARRAY E_flipped < STR : string, total : double NULL default 999.998, I32 : int32, FLT : float, STR2 : string >[ recno=0:*,8,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (apply(E, recno, int32(Line)), E_flipped)>
+SCIDB QUERY : <store(redimension(apply(E, recno, int32(Line)), E_flipped), E_flipped)>
 recno,STR,total,I32,FLT,STR2
 0,'Foo',1.123,1,1.1,'Bar_T'
 1,'Foo',9.123,2,1.1,'Bar_T'
@@ -638,7 +638,7 @@ i,count
 SCIDB QUERY : <CREATE  ARRAY F < STR : string, I32 : int32, FLT : float, Line : int64> [ DBL(double)=100,4,0, STR2(string)=100,6,2 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (A_load, F)>
+SCIDB QUERY : <store(redimension(A_load, F), F)>
 DBL,STR2,STR,I32,FLT,Line
 0,0,'Foo',1,1.1,0
 1,2,'Foo',28,3.9,27
@@ -690,7 +690,7 @@ DBL,STR2,STR,I32,FLT,Line
 SCIDB QUERY : <CREATE  ARRAY F_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:100,8,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (apply(F, recno, int32(Line)), F_flipped)>
+SCIDB QUERY : <store(redimension(apply(F, recno, int32(Line)), F_flipped), F_flipped)>
 recno,STR,DBL,I32,FLT,STR2
 0,'Foo',1.123,1,1.1,'Bar_T'
 1,'Foo',9.123,2,1.1,'Bar_T'

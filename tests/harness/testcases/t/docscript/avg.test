@@ -9,7 +9,7 @@
 --stop-igdata
 store(build(avg_array,i*4+j),avg_array)  
 --set-format dcsv
-avg(avg_array,val,j) 
+aggregate(avg_array,avg(val),j) 
 
 --stop-query-logging
 

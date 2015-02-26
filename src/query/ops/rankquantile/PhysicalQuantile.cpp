@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -1171,16 +1171,17 @@ class PhysicalQuantile: public PhysicalOperator
      */
     boost::shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        shared_ptr<Array> inputArray = inputArrays[0];
+        if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
+        {   //if input supports MULTI_PASS, don't bother converting it
+            inputArray = ensureRandomAccess(inputArray, query);
         }
 
         // timing
         LOG4CXX_DEBUG(logger, "[Quantile] Begins.");
         ElapsedMilliSeconds timing;
 
-        const ArrayDesc& inputSchema = inputArrays[0]->getArrayDesc();
+        const ArrayDesc& inputSchema = inputArray->getArrayDesc();
         const Attributes& inputAttributes = inputSchema.getAttributes();
         const Dimensions& inputDims = inputSchema.getDimensions();
 
@@ -1244,9 +1245,9 @@ class PhysicalQuantile: public PhysicalOperator
             // timing
             LOG4CXX_DEBUG(logger, "[Quantile] Using the original algorithm, because this is not a group-by quantile.");
 
-            shared_ptr<DimensionGrouping> grouping ( new DimensionGrouping(inputArrays[0]->getArrayDesc().getDimensions(), groupBy));
+            shared_ptr<DimensionGrouping> grouping ( new DimensionGrouping(inputArray->getArrayDesc().getDimensions(), groupBy));
             shared_ptr<RankingStats> rStats (new RankingStats());
-            shared_ptr<Array> rankArray(buildRankArray(inputArrays[0], rankedAttributeID, groupBy, query, rStats));
+            shared_ptr<Array> rankArray(buildRankArray(inputArray, rankedAttributeID, groupBy, query, rStats));
 
             size_t nInstances = query->getInstancesCount();
             InstanceID myInstance = query->getInstanceID();
@@ -1362,8 +1363,7 @@ class PhysicalQuantile: public PhysicalOperator
         vector<AttributeID> projection(1);
         projection[0] = rankedAttributeID;
 
-        shared_ptr<Array> projected = shared_ptr<Array>(
-                new SimpleProjectArray(projectSchema, inputArrays[0], projection));
+        shared_ptr<Array> projected(make_shared<SimpleProjectArray>(projectSchema, inputArray, projection));
 
         // Redistribute, s.t. all records in the same group go to the same instance.
         boost::shared_ptr<Array> redistributed = redistribute(

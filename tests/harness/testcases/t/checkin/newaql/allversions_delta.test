@@ -9,6 +9,10 @@ store(input(deltaArray, '../tests/harness/testcases/data/dense.txt'), deltaArray
 
 --test
 --aql SELECT * FROM deltaArray@*
+consume(allversions(deltaArray))
+aggregate(sg(allversions(deltaArray),1,-1), count(*))
+slice(allversions(deltaArray), I, 4)
+between(allversions(deltaArray), 1, 4, 1, 2, 5, 3)
 
 --cleanup
 remove(deltaArray)

@@ -66,14 +66,14 @@
 
         <step>
           <para>Store random values in m3x3:<para><programlisting>AFL% store(build(m3x3,random()%20+1),m3x3);  </programlisting><screen>[
-[(15),(17),(12)],
-[(4),(5),(4)],
-[(6),(15),(16)]
+[(11),(7),(15)],
+[(15),(20),(16)],
+[(19),(16),(17)]
 ]</screen></para></para>
         </step>
 
         <step>
-          <para>Select the minimum value of each row of m3x3:<para><programlisting>AFL% min(m3x3,val,i);  </programlisting><screen>[(12),(4),(6)]
+          <para>Select the minimum value of each row of m3x3:<para><programlisting>AFL% aggregate(m3x3,min(val),i);  </programlisting><screen>[(7),(15),(16)]
 </screen></para></para>
         </step>
       </procedure>
@@ -90,45 +90,45 @@
               <primary>aliases</primary>
             </indexterm>alias it so that we can use it in a cross
           join:<para><programlisting>AFL% aggregate(m3x3,min(val) as m)  </programlisting><screen>{i} m
-{0} 4
+{0} 7
 </screen></para></para>
         </step>
 
         <step>
           <para>Cross join the minimum value with the original array, so that
           cell {i,j}x becomes {i,i,j}(m=min,x):<para><programlisting>AFL% cross_join(aggregate(m3x3,min(val) as m),m3x3)  </programlisting><screen>{i,i,j} m,val
-{0,0,0} 4,15
-{0,0,1} 4,17
-{0,0,2} 4,12
-{0,1,0} 4,4
-{0,1,1} 4,5
-{0,1,2} 4,4
-{0,2,0} 4,6
-{0,2,1} 4,15
-{0,2,2} 4,16
+{0,0,0} 7,11
+{0,0,1} 7,7
+{0,0,2} 7,15
+{0,1,0} 7,15
+{0,1,1} 7,20
+{0,1,2} 7,16
+{0,2,0} 7,19
+{0,2,1} 7,16
+{0,2,2} 7,17
 </screen></para></para>
         </step>
 
         <step>
           <para>Remove the extra dimension added in the previous
           step:<para><programlisting>AFL% deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3))  </programlisting><screen>{i,j} m,val
-{0,0} 4,15
-{0,1} 4,17
-{0,2} 4,12
-{1,0} 4,4
-{1,1} 4,5
-{1,2} 4,4
-{2,0} 4,6
-{2,1} 4,15
-{2,2} 4,16
+{0,0} 7,11
+{0,1} 7,7
+{0,2} 7,15
+{1,0} 7,15
+{1,1} 7,20
+{1,2} 7,16
+{2,0} 7,19
+{2,1} 7,16
+{2,2} 7,17
 </screen></para></para>
         </step>
 
         <step>
           <para>Filter (select) the cells that have the actual minimum
           value:<para><programlisting>AFL% filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)), val=m);  </programlisting><screen>[
+[(),(7,7),()],
 [(),(),()],
-[(4,4),(),(4,4)],
 [(),(),()]
 ]</screen></para></para>
         </step>
@@ -136,8 +136,8 @@
         <step>
           <para>Of the correct cells, show only <literal>val</literal>, not
           the alias, <literal>m</literal>:<para><programlisting>AFL% project(filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)), val=m),val);  </programlisting><screen>[
+[(),(7),()],
 [(),(),()],
-[(4),(),(4)],
 [(),(),()]
 ]</screen></para></para>
         </step>

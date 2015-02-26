@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -110,7 +110,7 @@ class MpiLauncher : public boost::enable_shared_from_this<MpiLauncher>
      * @return a pointer to the begining of the region
      * @throws scidb::SystemException if any errors are encountered
      */
-    static char* initIpcForWrite(SharedMemoryIpc* shmIpc, int64_t shmSize);
+    static char* initIpcForWrite(SharedMemoryIpc* shmIpc, uint64_t shmSize);
 
  protected:
 

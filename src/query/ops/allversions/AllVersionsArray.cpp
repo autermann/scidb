@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -128,9 +128,17 @@ void AllVersionsArrayIterator::operator ++()
             hasCurrent = false;
             return;
         }
-        inputIterator.reset();
-        inputVersion = shared_ptr<Array>(DBArray::newDBArray(array.getVersionName(++currVersion), query));
-        inputIterator = inputVersion->getConstIterator(attr);
+        ++currVersion;
+        if (!inputIterators[currVersion] )
+        {
+            shared_ptr<Array> inputVersion(DBArray::newDBArray(array.getVersionName(currVersion), query));
+            inputIterators[currVersion]=inputVersion->getConstIterator(attr);
+        }
+        else
+        {
+            inputIterators[currVersion]->reset();
+        }
+        inputIterator = inputIterators[currVersion];
     }
 }
 
@@ -149,9 +157,12 @@ bool AllVersionsArrayIterator::setPosition(Coordinates const& pos)
     if (currVersion < 1 || currVersion > array.versions.size()) {
         return hasCurrent = false;
     }
-    inputIterator.reset();
-    inputVersion = shared_ptr<Array>(DBArray::newDBArray(array.getVersionName(currVersion), query));
-    inputIterator = inputVersion->getConstIterator(attr);
+    if (!inputIterators[currVersion] )
+    {
+        shared_ptr<Array> inputVersion(DBArray::newDBArray(array.getVersionName(currVersion), query));
+        inputIterators[currVersion]=inputVersion->getConstIterator(attr);
+    }
+    inputIterator = inputIterators[currVersion];
     return hasCurrent = inputIterator->setPosition(Coordinates(pos.begin()+1, pos.end()));
 
 }
@@ -163,11 +174,24 @@ void AllVersionsArrayIterator::reset()
     chunkInitialized = false;
     for (currVersion = 1; currVersion <= array.versions.size(); currVersion++) {
         inputIterator.reset();
-        inputVersion = shared_ptr<Array>(DBArray::newDBArray(array.getVersionName(currVersion), query));
-        inputIterator = inputVersion->getConstIterator(attr);
-        if (!inputIterator->end()) {
-            hasCurrent = true;
-            return;
+        shared_ptr<Array> inputVersion(DBArray::newDBArray(array.getVersionName(currVersion), query));
+        if (inputIterators[currVersion])
+        {
+            inputIterators[currVersion]->reset();
+            if (!inputIterators[currVersion]->end()) {
+                inputIterator = inputIterators[currVersion];
+                hasCurrent = true;
+                return;
+            }
+        }
+        else
+        {
+            inputIterator = inputVersion->getConstIterator(attr);
+            if (!inputIterator->end()) {
+                inputIterators[currVersion] = inputIterator;
+                hasCurrent = true;
+                return;
+            }
         }
     }
 }

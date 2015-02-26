@@ -186,11 +186,11 @@
  --show-query=no
  --show-output=no
 
---afl redimension_store(aFlat,A)
+--afl store(redimension(aFlat,A),A)
  --show-query=no
  --show-output=no
 
---aql select * from A
+--afl scan(A);
  --output-format=dense
  --chunkify=yes
  --show-query=yes
@@ -223,11 +223,11 @@
  --show-query=no
  --show-output=no
 
---afl redimension_store(bFlat,B)
+--afl store(redimension(bFlat,B),B)
  --show-query=no
  --show-output=no
 
---aql select * from B
+--afl scan(B);
  --output-format=dense
  --chunkify=yes
  --show-query=yes

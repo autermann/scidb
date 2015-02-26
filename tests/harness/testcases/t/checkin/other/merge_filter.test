@@ -17,8 +17,8 @@ merge(filter(A,a>1),filter(build(A,x+10),1=1))
 merge(filter(A,a>1),filter(build(A,x+10),0))
 merge(filter(A,a>1),filter(build(A,x+10),-1))
 
-count(between(merge(foo, bar), 200, 800))
-count(merge(between(foo, 200,800), between(bar,200,800)))
+aggregate(between(merge(foo, bar), 200, 800),count(*))
+aggregate(merge(between(foo, 200,800), between(bar,200,800)),count(*))
 
 --cleanup
 remove(A)

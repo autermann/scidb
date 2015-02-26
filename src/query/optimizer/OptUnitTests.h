@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -1169,7 +1169,7 @@ public:
 
         pp = habilis_generatePPlanFor (" select * into opttest_dummy_flipped from opttest_dummy_array", false);
         root = pp->getRoot();
-        ASSERT_OPERATOR(root, "PhysicalRedimensionStore");
+        ASSERT_OPERATOR(root, "physicalStore");
 
         bool thrown = false;
         try
@@ -1180,7 +1180,8 @@ public:
         {
             thrown = true;
         }
-        CPPUNIT_ASSERT(!thrown);
+        //now an exception is thrown as AQL rewriter has been changed
+        CPPUNIT_ASSERT(thrown);
     }
 
     void testReplication()

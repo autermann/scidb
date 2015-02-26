@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -82,12 +82,11 @@ namespace scidb
         chunks.resize(arr.getAttributes().size());
         bitmapAttr = desc.getEmptyBitmapAttribute();
         emptyBitmapID = bitmapAttr != NULL ? bitmapAttr->getId() : (AttributeID)-1;
-        fd = File::createTemporary(arr.getName(), filePath);
+        file = FileManager::getInstance()->createTemporary(arr.getName(), filePath);
     }
 
     FileArray::~FileArray()
     {
-        ::close(fd);
     }
 
     void FileArray::writeChunk(FileChunk* chunk)
@@ -100,7 +99,7 @@ namespace scidb
         hdr.rle = chunk->isRLE();
         chunks[addr.attId][addr.coords] = hdr;
         if (emptyBitmapID != addr.attId) {
-            File::writeAll(fd, chunk->getData(), hdr.size, hdr.offset);
+            file->writeAll(chunk->getData(), hdr.size, hdr.offset);
             fileSize += hdr.size;
         }
     }
@@ -178,7 +177,7 @@ namespace scidb
                 dataChunk.allocate(hdr.size);
                 dataChunk.setSparse(hdr.sparse);
                 dataChunk.setRLE(hdr.rle);
-                File::readAll(array.fd, dataChunk.getData(), hdr.size, hdr.offset);
+                array.file->readAll(dataChunk.getData(), hdr.size, hdr.offset);
                 setBitmapChunk();
             }
         } else {

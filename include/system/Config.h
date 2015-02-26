@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -69,6 +69,7 @@ enum
     CONFIG_STRING_SIZE_ESTIMATION,
     CONFIG_CHUNK_CLUSTER_SIZE_BYTES,
     CONFIG_CHUNK_CLUSTER_SIZE_MB,
+    CONFIG_STORAGE_MIN_ALLOC_SIZE_BYTES,
     CONFIG_READ_AHEAD_SIZE,
     CONFIG_DAEMONIZE,
     CONFIG_SAVE_RAM,
@@ -118,11 +119,13 @@ enum
     CONFIG_MPI_DIR,
     CONFIG_MPI_IF,
     CONFIG_MPI_TYPE,
+    CONFIG_MPI_SHM_TYPE,
     CONFIG_CATALOG_RECONNECT_TRIES,
     CONFIG_QUERY_MAX_SIZE,
     CONFIG_MAX_REQUESTS,
     CONFIG_ENABLE_CATALOG_UPGRADE,
     CONFIG_REDIM_CHUNKSIZE,
+    CONFIG_MAX_OPEN_FDS,
     CONFIG_PREALLOCATE_SHM
 };
 

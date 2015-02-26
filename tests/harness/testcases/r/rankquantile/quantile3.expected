@@ -148,7 +148,7 @@ SCIDB QUERY : <quantile(A,10)>
 {9} 0.9,3.567
 {10} 1,inf
 
-SCIDB QUERY : <count(quantile(A,100))>
+SCIDB QUERY : <aggregate(quantile(A,100),count(*))>
 {i} count
 {0} 101
 

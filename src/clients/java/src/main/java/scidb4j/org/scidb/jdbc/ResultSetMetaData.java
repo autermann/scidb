@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,6 +33,8 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData
     private String[] columnsNames;
     private String[] columnsTypes;
     private int columnsCount;
+    /// dimension type: int64
+    private static final String TID_INT64 = new String("int64");
 
     public ResultSetMetaData(Schema schema)
     {
@@ -45,7 +47,7 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData
         for (Dimension dim: schema.getDimensions())
         {
             columnsNames[i] = dim.getName();
-            columnsTypes[i] = dim.getType();
+            columnsTypes[i] = TID_INT64;
             i++;
         }
 
@@ -58,7 +60,7 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData
             i++;
         }
     }
-    
+
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException
     {

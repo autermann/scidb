@@ -5,7 +5,7 @@ store(build_sparse(D,x+1,x<>1),D)
 
 --test
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE "redimension(D,C)"
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE "redimension_store(D,C)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE "store(redimension(D,C),C)"
 
 --cleanup
 remove(D)

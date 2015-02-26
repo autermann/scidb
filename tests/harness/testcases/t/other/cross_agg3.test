@@ -8,10 +8,10 @@ store(build(m4x4_overlap, (3*x*x-4*y)/(3.5)),m4x4_overlap)
 
 
 --test
-cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap)
-count(cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap))
-cross(m4x4_overlap,count(cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap)))
-store(cross(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),AAA)
+cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap)
+aggregate(cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),count(*))
+cross_join(m4x4_overlap,aggregate(cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),count(*)))
+store(cross_join(apply(subarray(xgrid(m4x4_overlap,2,2),0,1,8,7),z,x),m4x4_overlap),AAA)
 show(AAA)
 
 --cleanup

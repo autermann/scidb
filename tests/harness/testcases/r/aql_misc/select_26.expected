@@ -10,7 +10,7 @@ Query was executed successfully
 SCIDB QUERY : <select * from show(A)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <select * from count(A)>
+SCIDB QUERY : <select * from aggregate(A,count(*))>
 {i} count
 {0} 0
 
@@ -131,7 +131,7 @@ SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
 {0} 'a','int32',false
 {1} 'b','string',false
 
-SCIDB QUERY : <select * from count(versions(B))>
+SCIDB QUERY : <select * from aggregate(versions(B),count(*))>
 {i} count
 {0} 1
 
@@ -246,19 +246,19 @@ SCIDB QUERY : <select * from dimensions(A3)>
 {0} 'x',0,4,3,0,0,3,'int64'
 {1} 'y',0,3,3,0,0,2,'int64'
 
-SCIDB QUERY : <select * from sum(A)>
+SCIDB QUERY : <select * from aggregate(A,sum(a))>
 {i} a_sum
 {0} 42
 
-SCIDB QUERY : <select * from avg(A)>
+SCIDB QUERY : <select * from aggregate(A,avg(a))>
 {i} a_avg
 {0} 3.5
 
-SCIDB QUERY : <select * from max(A)>
+SCIDB QUERY : <select * from aggregate(A,max(a))>
 {i} a_max
 {0} 5
 
-SCIDB QUERY : <select * from min(A)>
+SCIDB QUERY : <select * from aggregate(A,min(a))>
 {i} a_min
 {0} 2
 

@@ -3,13 +3,13 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
-* SciDB is free software: you can redioutibute it and/or modify
+* SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
 * the Free Software Foundation.
 *
-* SciDB is dioutibuted "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
 * the AFFERO GNU General Public License for the complete license terms.
@@ -136,7 +136,7 @@ void PhysicalQueryPlanNode::toString(std::ostream &out, int indent, bool childre
         out << (outputFullChunks() ? "yes" : "no");
         out << "\n";
         out << prefix(' ');
-        out << "changes dioutibution: ";
+        out << "changes dstribution: ";
         out << (changesDistribution() ? "yes" : "no");
         out << "\n";
     }

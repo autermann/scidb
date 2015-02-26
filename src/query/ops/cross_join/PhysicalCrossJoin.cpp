@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -147,11 +147,10 @@ public:
     {
         assert(inputArrays.size() == 2);
 
-        if (query->getInstancesCount() == 1 && inputArrays[1]->getSupportedAccess() == Array::SINGLE_PASS)
+        shared_ptr<Array> input1 = inputArrays[1];
+        if (query->getInstancesCount() == 1 )
         {
-            //We normally redistribute the right array. We lazily iterate over the left array. But if the right array is
-            //single pass only and we're on one node - then there's a problem.
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+            input1 = ensureRandomAccess(input1, query);
         }
 
         size_t lDimsSize = inputArrays[0]->getArrayDesc().getDimensions().size();
@@ -178,7 +177,7 @@ public:
             }
         }
         
-        return boost::shared_ptr<Array>(new CrossJoinArray(_schema, inputArrays[0], redistribute(inputArrays[1], query, psReplication), ljd, rjd));
+        return boost::shared_ptr<Array>(new CrossJoinArray(_schema, inputArrays[0], redistribute(input1, query, psReplication), ljd, rjd));
     }
 };
     

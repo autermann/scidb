@@ -6,6 +6,9 @@ create empty array C <a:int32> [x=0:2,1,0]
 create empty array D <a:int32> [x=0:2,3,1]
 create empty array E <a:int32> [x=0:2,2,1]
 
+store(apply(build(<a:int32>[          x=0:2,3,0],x),b,true),Y)
+store(build(<b:bool> [y=0:2,3,0,x=0:2,3,0],true),Z)
+
 --test
 --aql select * into A from build(A,x+10)
 --aql select * into B from A
@@ -17,10 +20,14 @@ create empty array E <a:int32> [x=0:2,2,1]
 --aql select * into E from A
 --aql select * into E from A where x=1
 
+--aql select * into Z from Y
+
 --cleanup
 remove(A)
 remove(B)
 remove(C)
 remove(D)
 remove(E)
+remove(Y)
+remove(Z)
 --stop-query-logging

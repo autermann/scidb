@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -72,8 +72,8 @@ struct ArenaTests : public CppUnit::TestFixture
                     void      direct    (Arena&,size_t);
     template<class> void      opnew     ();
     template<class> void      opnew     (Arena&);
-    template<class> void      scalar    (Arena&);
-    template<class> void      array     (Arena&,count_t);
+    template<class> void      scalars   (Arena&);
+    template<class> void      vectors   (Arena&,count_t);
     template<class> void      nesting   (Arena&);
     template<class> void      container (Arena&);
     template<class> void      destroy0  (Arena&);
@@ -302,7 +302,7 @@ void ArenaTests::direct(Arena& a,size_t n)
  *  the resulting allocation.
  */
 template<class t>
-void ArenaTests::scalar(Arena& a)
+void ArenaTests::scalars(Arena& a)
 {
     a.reset(); CPPUNIT_ASSERT(a.allocated() == 0);
 
@@ -317,17 +317,17 @@ void ArenaTests::scalar(Arena& a)
 }
 
 /**
- *  Allocate an array of type 't', whose element constructors may throw, and
+ *  Allocate a vector of type 't', whose element constructors may throw, and
  *  destroy the resulting allocation.
  */
 template<class t>
-void ArenaTests::array(Arena& a,count_t n)
+void ArenaTests::vectors(Arena& a,count_t n)
 {
     a.reset(); CPPUNIT_ASSERT(a.allocated() == 0);
 
     try
     {
-        destroy(a,newArray<t>(a,n));
+        destroy(a,newVector<t>(a,n));
     }
     catch (int)
     {}
@@ -349,16 +349,16 @@ void ArenaTests::destroy0(Arena& a)
 }
 
 /**
- *  Check that various scalar and array allocations of 't's work as expected.
+ *  Check that various scalar and vector allocations of 't's work as expected.
  */
 template<class t>
 void ArenaTests::opnew(Arena& a)
 {
-    scalar  <t>(a);
-    array   <t>(a,0);
-    array   <t>(a,1);
-    array   <t>(a,2);
-    array   <t>(a,4);
+    scalars <t>(a);
+    vectors <t>(a,0);
+    vectors <t>(a,1);
+    vectors <t>(a,2);
+    vectors <t>(a,4);
     destroy0<t>(a);
 }
 
@@ -396,8 +396,8 @@ void ArenaTests::containers(Arena& a)
     nesting<deque               <string> >(a);
     nesting<vector              <string> >(a);
     nesting<multiset            <string> >(a);
-//  nesting<unordered_set       <string> >(a); // No scoped alloc support yet
-//  nesting<unordered_multiset  <string> >(a); // No scoped alloc support yet
+ // nesting<unordered_set       <string> >(a); // No scoped alloc support yet
+ // nesting<unordered_multiset  <string> >(a); // No scoped alloc support yet
 }
 
 /**
@@ -650,6 +650,11 @@ void ArenaTests::anExample()
             Allocated* pAll = new(*B)                     Allocated();
             string*    pStr = new(*B,finalizer<string>()) string(B,"string");
 
+        /* ...or, if you prefer, the overloaded template function newScalar(),
+           which automatically registers any non-trivial destructor for you..*/
+
+            string*    pStr2= newScalar<string>(*B,B,"another string");
+
          /* But deletion works differently: you must either *recycle* objects
             with trivial destructors...*/
 
@@ -665,16 +670,17 @@ void ArenaTests::anExample()
             some rather nifty template meta-programming...*/
 
             destroy(*B,pStr);                            // Do the right thing
+            destroy(*B,pStr2);                           // Do the right thing
 
-         /* You can also allocate arrays...*/
+         /* You can also allocate vectors...*/
 
-            pDbl = newArray<double>(*B,2);               // A 2 element array
+            pDbl = newVector<double>(*B,2);              // A 2 element vector
             pDbl[0] = 7;
             pDbl[1] = 8;
 
          /* ..and these, too, are cleaned up with a call destroy()...*/
 
-            destroy(*B,pDbl);                            // Destroy array
+            destroy(*B,pDbl);                            // Destroy vector
 
          /* Question: what happens if we try to allocate more than our arena
             is set up to allow? */
@@ -706,7 +712,7 @@ void ArenaTests::anExample()
         // ...
         C->calloc(387,2);
         // ...
-        double* p = newArray<double>(*C,8483);
+        double* p = newVector<double>(*C,8483);
         // ...
         destroy(*C,p);
 

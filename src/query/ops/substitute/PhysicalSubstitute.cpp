@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -130,12 +130,6 @@ public:
     {
 		assert(inputArrays.size() == 2);
 
-        if (inputArrays[1]->getSupportedAccess() != Array::RANDOM && query->getInstancesCount() == 1)
-        {
-            //We need to random access for the second array, but if we are on multiple nodes - we will redistribute and materialize it anyway
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
         //if no parameters are given, we assume we are substituting all nullable attributes
         vector<bool> substituteAttrs (inputArrays[0]->getArrayDesc().getAttributes().size(), _parameters.size() == 0 ? true : false);
         for (size_t i = 0, n = _parameters.size(); i < n; i++)
@@ -144,10 +138,10 @@ public:
             substituteAttrs[attId] = true;
         }
 
-        return shared_ptr<Array>(new SubstituteArray(_schema,
-                                                     inputArrays[0],
-                                                     redistribute(inputArrays[1], query, psReplication),
-                                                     substituteAttrs));
+        shared_ptr<Array> input1 = redistribute(inputArrays[1], query, psReplication);
+        input1 = ensureRandomAccess(input1, query);
+
+        return make_shared<SubstituteArray>(_schema, inputArrays[0], input1, substituteAttrs);
     }
 };
     

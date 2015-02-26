@@ -33,7 +33,7 @@ index_lookup(filter(batch_1, i=0 or i=1 or i=10 or i=1000 or i=10000 or i = 3276
 index_lookup(filter(batch_1, i=0 or i=1 or i=10 or i=1000 or i=10000 or i = 32768),  repart(filter(target_index, i>1 and i<5000), <name:string> [i=0:*,2,0] ), batch_1.name, 'memory_limit=1')
 index_lookup(filter(batch_1, i=0 or i=1 or i=10 or i=1000 or i=10000 or i = 32768),  repart(filter(target_index, i>1 and i<5000), <name:string> [i=0:*,1,0] ), batch_1.name, 'index_sorted=true', 'memory_limit=1')
 index_lookup(filter(batch_1, i=0 or i=1 or i=10 or i=1000 or i=10000 or i = 32768),  repart(filter(target_index, i>1 and i<5000), <name:string> [i=0:*,2,0] ), batch_1.name, 'memory_limit= 1', 'index_sorted= true')
---igdata "redimension_store(index_lookup(batch_1, target_index, batch_1.name, name_index, 'memory_limit=1', 'index_sorted= true'), target, sum(data) as data)"
+--igdata "store(redimension(index_lookup(batch_1, target_index, batch_1.name, name_index, 'memory_limit=1', 'index_sorted= true'), target, sum(data) as data), target)"
 aggregate(target, count(*), sum(data), stdev(data), avg(data))
 aggregate(apply(target_index, v, double(name)), count(*), sum(v), avg(v))
 --igdata "store(join(build (<name:string> [i=1:2000000,500000,0], string((i % 400000 - 200000))),  build(<data:double> [i=1:2000000,500000,0], sin(i) * 1000)), batch_2)"
@@ -41,7 +41,7 @@ aggregate(apply(target_index, v, double(name)), count(*), sum(v), avg(v))
 aggregate(apply(batch_2_index, b2, int64(name)), sum(b2), avg(b2), min(b2), max(b2), count(*))
 aggregate(index_lookup(batch_2_index, target_index, batch_2_index.name, idx, 'memory_limit=1'), count(idx), count(*))
 aggregate(index_lookup(batch_2_index, target_index, batch_2_index.name, idx, 'memory_limit=1', 'index_sorted=true'), count(idx), count(*))
---igdata "insert(redimension(apply(cross(project(unpack(filter(index_lookup(batch_2_index, target_index, batch_2_index.name, idx, 'memory_limit=32'), idx is null), j), name), aggregate(target_index, count(*) as cnt)), i2, j+cnt), <name:string> [i2=0:*,100000,0]), target_index)"
+--igdata "insert(redimension(apply(cross_join(project(unpack(filter(index_lookup(batch_2_index, target_index, batch_2_index.name, idx, 'memory_limit=32'), idx is null), j), name), aggregate(target_index, count(*) as cnt)), i2, j+cnt), <name:string> [i2=0:*,100000,0]), target_index)"
 --igdata "insert(redimension(index_lookup( batch_2, target_index, batch_2.name, name_index, 'memory_limit=32'), target, sum(data) as data), target)"
 aggregate(target, count(*), sum(data), stdev(data), avg(data))
 aggregate(apply(target_index, v, double(name)), count(*), sum(v), avg(v))

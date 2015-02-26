@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -87,16 +87,9 @@ public:
     }
 
   public:
+
     size_t getValueIndex(position_t pos) const {
-        size_t l = 0, r = _nSegs;
-        while (l < r) {
-            size_t m = (l + r) >> 1;
-            if (_seg[m]._lPosition + _seg[m]._length <= pos) {
-                l = m + 1;
-            } else {
-                r = m;
-            }
-        }
+        size_t r = findSegment(pos);
         return (r < _nSegs && _seg[r]._lPosition <= pos) ? _seg[r]._pPosition + pos - _seg[r]._lPosition : size_t(-1);
     }
 
@@ -104,15 +97,7 @@ public:
      * Check if element at specified position is empty
      */
     bool isEmpty(position_t pos) const {
-        size_t l = 0, r = _nSegs;
-        while (l < r) {
-            size_t m = (l + r) >> 1;
-            if (_seg[m]._lPosition + _seg[m]._length <= pos) {
-                l = m + 1;
-            } else {
-                r = m;
-            }
-        }
+        size_t r = findSegment(pos);
         return r == _nSegs || _seg[r]._lPosition > pos;
     }
 
@@ -175,12 +160,14 @@ public:
         position_t _currLPos;
 
       public:
-        iterator(ConstRLEEmptyBitmap const* bm): _bm(bm)
+        iterator(ConstRLEEmptyBitmap const* bm):
+        _bm(bm), _currSeg(0), _cs(NULL), _currLPos(-1)
         {
             reset();
         }
-
-        iterator() {}
+        iterator():
+        _bm(NULL), _currSeg(0), _cs(NULL), _currLPos(-1)
+        {}
 
         void reset()
         {
@@ -694,7 +681,7 @@ public:
      * Get next i-th segment
      */
     Segment const& getSegment(size_t i) const {
-        assert(i < _nSegs);
+        assert(i <= _nSegs); // allow _nSegs, used to cut new Tile's
         return _seg[i];
     }
 
@@ -704,8 +691,11 @@ public:
     size_t findSegment(position_t pos) const {
         size_t l = 0, r = _nSegs;
         while (l < r) {
-            size_t m = (l + r) >> 1;
-            if (_seg[m+1]._pPosition <= pos) {
+            size_t m = (l + r) / 2;
+            position_t mpos =_seg[m+1]._pPosition;
+            if (mpos == pos) {
+                return (m+1);
+            } else if (mpos < pos) {
                 l = m + 1;
             } else {
                 r = m;
@@ -757,7 +747,7 @@ public:
     public:
         //defined in .cpp because of value constructor
         iterator(ConstRLEPayload const* payload);
-        iterator() {}
+        iterator() : _payload(NULL), _currSeg(0), _cs(0), _currPpos(-1) {}
 
         size_t getCurrSeg()
         {

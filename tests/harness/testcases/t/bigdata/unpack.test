@@ -15,7 +15,7 @@ store(join(join(join(s, p), a), r), cube)
 --stop-igdata
 
 show(cube)
-count(cube)
+aggregate(cube,count(*))
 
 
 --test

@@ -8,12 +8,12 @@ create array Dsp<val:double>[s(string)=5,5,0, p(string)=5,5,0]
 create array Dsp2<val:double>[s(string)=5,5,0, p(string)=5,5,0]
 create array Dsp_d<val:double>[s(string)=5,5,0, p(string)=5,5,0]
 create array Dsp3<val:double>[s(string)=*,5,0, p(string)=*,5,0]
-create not empty array Dsp_mult_d<val: double>[s(string)=*,5,0, p(string)=*,5,0]
+create array Dsp_mult_d<val: double>[s(string)=*,5,0, p(string)=*,5,0]
 create array Dsp_mult<val: double>[s(string)=*,5,0, p(string)=*,5,0]
 
 create array expo_1d<i: int64, s: string, p: string, val: double>[offset=1:*,100,0]
 
-count(join(join(build(<s: string>[i=1:25,5,0], 'sample-'+string((i-1)%5)), build(<p: string>[i=1:25,5,0], 'probe-'+string(i/5))), build(<val: double>[i=1:25,5,0], 1.01*i*i-i)))
+aggregate(join(join(build(<s: string>[i=1:25,5,0], 'sample-'+string((i-1)%5)), build(<p: string>[i=1:25,5,0], 'probe-'+string(i/5))), build(<val: double>[i=1:25,5,0], 1.01*i*i-i)),count(*))
 store(join(join(build(<s: string>[i=1:25,5,0], 'sample-'+string((i-1)%5)), build(<p: string>[i=1:25,5,0], 'probe-'+string((i-1)/5))), build(<val: double>[i=1:25,5,0], 1.01*i*i-i)), expo)
 show(expo)
 
@@ -28,7 +28,7 @@ load(expo, 'expo.bin', -2, 'opaque')
 load(expo, 'expo.bin', -2, 'opaque')
 load(expo, 'expo.bin', -2, 'opaque')
 
-count(versions(expo))
+aggregate(versions(expo),count(*))
 scan(expo)
 
 --aql select count(val), min(val), max(val), avg(val), stdev(val) from expo
@@ -36,20 +36,20 @@ scan(expo)
 # Convert to 2-dim array and load it a few times to create a few versions.
 # First version is created using redimension_store. 
 
-redimension_store(expo, Ds, avg(val) as av)
-redimension_store(expo, Dp, avg(val) as av)
-redimension_store(expo, Dsp)
+store(redimension(expo, Ds, avg(val) as av), Ds)
+store(redimension(expo, Dp, avg(val) as av), Dp)
+store(redimension(expo, Dsp), Dsp)
 
 # This will fail because the sizes are not matched exactly and the destination is defined as bounded.
---error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES "redimension_store(expo2, Dsp)"
+--error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES "store(redimension(expo2, Dsp), Dsp)"
 
 # Use unbounded arrays for destination.
-redimension_store(expo, Dsp3)
+store(redimension(expo, Dsp3), Dsp3)
 
 --set-format csv+
-redimension_store(expo2, Dsp3)
+store(redimension(expo2, Dsp3), Dsp3)
 
-count(versions(Dsp3))
+aggregate(versions(Dsp3),count(*))
 dimensions(Dsp3)
 
 scan(Dsp3)
@@ -65,7 +65,7 @@ scan(Dsp3@2:p)
 
 scan(Dsp3)
 
-count(versions(Dsp))
+aggregate(versions(Dsp),count(*))
 scan(Dsp:s)
 scan(Dsp:p)
 
@@ -101,7 +101,7 @@ repart(Dsp_mult, <val: double>[s(string)=*,2,0, p(string)=*,2,0])
 show(Dsp_mult)
 
 scan(Dsp)
-count(versions(Dsp))
+aggregate(versions(Dsp),count(*))
 scan(Dsp:s)
 scan(Dsp:p)
 
@@ -115,7 +115,7 @@ scan(expo_1d_a)
 save(unpack(expo, offset), 'expo.bin', -2, '(int64,string,string,double null)')
 
 load(expo_1d, 'expo.bin', -2, '(int64,string,string,double null)')
-redimension_store(expo_1d, Dsp2)
+store(redimension(expo_1d, Dsp2), Dsp2)
 apply(join(Dsp, Dsp2), diff, Dsp.val - Dsp2.val)
 
 scan(Dsp)
@@ -123,7 +123,7 @@ scan(Dsp2)
 scan(Dsp3)
 --reset-format
 
-count(versions(expo))
+aggregate(versions(expo),count(*))
 
 # Load, failure case.
 #--error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(A2, '../tests/harness/testcases/data/A2_err.txt', -2, 'text', 2)"

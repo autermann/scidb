@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,7 +38,7 @@ namespace scidb {
  * @brief The operator: sort().
  *
  * @par Synopsis:
- *   sort( srcArray {, attr}* {, chunkSize}? )
+ *   sort( srcArray {, attr [asc | desc]}* {, chunkSize}? )
  *
  * @par Summary:
  *   Produces a 1D array by sorting the non-empty cells of a source array.
@@ -46,6 +46,7 @@ namespace scidb {
  * @par Input:
  *   - srcArray: the source array with srcAttrs and srcDim.
  *   - attr: the list of attributes to sort by. If no attribute is provided, the first attribute will be used.
+ *   - asc | desc: whether ascending or descending order of the attribute should be used. The default is asc.
  *   - chunkSize: the size of a chunk in the result array. If not provided, 1M will be used.
  *
  * @par Output array:

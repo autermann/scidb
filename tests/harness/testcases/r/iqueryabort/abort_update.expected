@@ -31,7 +31,7 @@ SCIDB QUERY : <insert(attribute_rename(project(apply(filter(ABRTEST, I/2 <> 0), 
 SCIDB QUERY : <update ABRTEST set v=3>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <count(versions(ABRTEST))>
+SCIDB QUERY : <aggregate(versions(ABRTEST),count(*))>
 {i} count
 {0} 3
 

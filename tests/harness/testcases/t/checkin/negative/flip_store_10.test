@@ -9,11 +9,11 @@ create empty array TS <a:string> [x=0:2,3,0]
 store(join(build_sparse(T,x,1),build_sparse(TS,string(x+10),1)),A)
 
 --test
-redimension_store(A,B)
+store(redimension(A,B),B)
 --aql select name,schema from list()
 --aql update B set b = b + '_new' where x=1
 --aql select name,schema from list()
-redimension_store(B,A)
+store(redimension(B,A),A)
 scan(A)
 
 --cleanup

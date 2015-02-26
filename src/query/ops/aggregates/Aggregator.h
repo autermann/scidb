@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -918,11 +918,9 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         {
             stateArrayIterators[i] = stateArray->getIterator(mapping.outputAttributeIds[i]);
         }
-
         vector <shared_ptr<ChunkIterator> > stateChunkIterators(nAggs, shared_ptr<ChunkIterator>());
         vector <AggregateMap> aggValues(nAggs);
         Coordinates outPos(_schema.getDimensions().size());
-
         while (!inArrayIterator->end())
         {
             {
@@ -931,17 +929,16 @@ class AggregatePartitioningOperator: public  PhysicalOperator
                 {
                     transformCoordinates(inChunkIterator->getPosition(), outPos);
                     Value &v = inChunkIterator->getItem();
-                    if (noNulls && v.isNull())
-                    {
-                        ++(*inChunkIterator);
-                        continue;
-                    }
+                    //XXX: Yes this whole thing is over-engineered and needs to be simplified and adapted to new tile mode
+                    //next release we hope...
                     for (size_t i =0; i<nAggs; i++)
                     {
-                        if ( !(aggFlags.nullBarrier[i] && v.isNull()) )
+                        vector<Value>& bucket = aggValues[i][outPos]; //XXX: Make sure we create an empty bucket for an aggregate result, see #3874
+                        if (v.isNull() && (noNulls || aggFlags.nullBarrier[i]))
                         {
-                            aggValues[i][outPos].push_back(v);
+                            continue;
                         }
+                        bucket.push_back(v);
                     }
                     ++(*inChunkIterator);
                 }
@@ -984,34 +981,28 @@ class AggregatePartitioningOperator: public  PhysicalOperator
 
         ArrayDesc stateDesc = createStateDesc();
         shared_ptr<MemArray> stateArray (new MemArray(stateDesc,query));
-
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS && _ioMappings.size() > 1)
-        {
-            //Input only allows single pass and we are aggregating over more than one attribute. Can't do it now.
-            //TODO: write a loop that supports this in the future!
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
+        shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
 
         if (_schema.getSize()==1)
         {
             for (size_t i=0; i<_ioMappings.size(); i++)
             {
-                AggregationFlags aggFlags = composeFlags(inputArrays[0], _ioMappings[i]);
+                AggregationFlags aggFlags = composeFlags(inputArray, _ioMappings[i]);
                 logMapping(_ioMappings[i],aggFlags);
 
                 if (_tileMode)
                 {
-                    grandTileAggregate(stateArray.get(),inputArrays[0], _ioMappings[i], aggFlags);
+                    grandTileAggregate(stateArray.get(),inputArray, _ioMappings[i], aggFlags);
                 }
                 else
                 {
                     if(aggFlags.countOnly)
                     {
-                        grandCount(stateArray.get(), inputArrays[0], _ioMappings[i], aggFlags);
+                        grandCount(stateArray.get(), inputArray, _ioMappings[i], aggFlags);
                     }
                     else
                     {
-                        grandAggregate(stateArray.get(),inputArrays[0], _ioMappings[i], aggFlags);
+                        grandAggregate(stateArray.get(),inputArray, _ioMappings[i], aggFlags);
                     }
                 }
             }
@@ -1020,17 +1011,17 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         {
             for (size_t i=0, n=_ioMappings.size(); i<n; i++)
             {
-                AggregationFlags aggFlags = composeGroupedFlags( inputArrays[0], _ioMappings[i]);
+                AggregationFlags aggFlags = composeGroupedFlags( inputArray, _ioMappings[i]);
                 logMapping(_ioMappings[i], aggFlags);
 
                 size_t attributeSize = inArrayDesc.getAttributes()[_ioMappings[i].inputAttributeId].getSize();
                 if (inArrayDesc.getAttributes()[_ioMappings[i].inputAttributeId].getType() != TID_BOOL && attributeSize>0)
                 {
-                    groupedTileFixedSizeAggregate(stateArray.get(), inputArrays[0], _ioMappings[i], aggFlags, attributeSize);
+                    groupedTileFixedSizeAggregate(stateArray.get(), inputArray, _ioMappings[i], aggFlags, attributeSize);
                 }
                 else
                 {
-                    groupedAggregate(stateArray.get(), inputArrays[0], _ioMappings[i], aggFlags);
+                    groupedAggregate(stateArray.get(), inputArray, _ioMappings[i], aggFlags);
                 }
             }
         }

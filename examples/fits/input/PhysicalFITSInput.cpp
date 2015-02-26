@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -80,7 +80,7 @@ public:
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
                                      boost::shared_ptr<Query> query)
     {
-        const string& filePath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
+        const string filePath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
         uint32_t hdu = getHDU();
         InstanceID fileInstanceID = getFileInstanceID(query);
         InstanceID myInstanceID = query->getInstanceID();
@@ -88,7 +88,7 @@ public:
         boost::shared_ptr<Array> result;
         if (fileInstanceID == myInstanceID) {   // This is the instance containing the file
             result = boost::shared_ptr<Array>(new FITSInputArray(_schema, filePath, hdu, query));
-            if (_schema.getEmptyBitmapAttribute() != NULL) { 
+            if (_schema.getEmptyBitmapAttribute() != NULL) {
                 result = boost::shared_ptr<Array>(new NonEmptyableArray(result));
             }
         } else {                        // Otherwise, return empty array
@@ -96,7 +96,7 @@ public:
         }
 
         return result;
-    }   
+    }
 };
 
 REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalFITSInput, "fits_input", "impl_fits_input");

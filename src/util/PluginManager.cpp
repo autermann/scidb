@@ -4,7 +4,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -126,8 +126,8 @@ PluginDesc& PluginManager::findModule(const std::string& moduleName, bool* was)
     GetPluginVersion getPluginVersion = reinterpret_cast<GetPluginVersion>(reinterpret_cast<size_t>(openSymbol(plugin, "GetPluginVersion")));
     if (getPluginVersion) {
         getPluginVersion(pluginDesc.major, pluginDesc.minor, pluginDesc.patch, pluginDesc.build);
-        if (pluginDesc.major != SCIDB_VERSION_MAJOR() || pluginDesc.minor > SCIDB_VERSION_MINOR()) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR, SCIDB_LE_TOO_NEW_MODULE) << moduleName
+        if (pluginDesc.major != SCIDB_VERSION_MAJOR() || pluginDesc.minor != SCIDB_VERSION_MINOR()) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR, SCIDB_LE_WRONG_MODULE_VERSION) << moduleName
                 << pluginDesc.major << pluginDesc.minor << pluginDesc.patch << pluginDesc.build
                 << SCIDB_VERSION();
         }

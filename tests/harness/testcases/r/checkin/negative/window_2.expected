@@ -28,11 +28,11 @@ SCIDB QUERY : <window(A,sum(a))>
 SCIDB QUERY : <window(A,2,2,1,stdev(b))>
 [An error expected at this place for the query "window(A,2,2,1,stdev(b))". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
-SCIDB QUERY : <window(count(A))>
-[An error expected at this place for the query "window(count(A))". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2.]
+SCIDB QUERY : <window(aggregate(A,count(*)))>
+[An error expected at this place for the query "window(aggregate(A,count(*)))". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_WRONG_OPERATOR_ARGUMENTS_COUNT2.]
 
 SCIDB QUERY : <window(count(b))>
-[An error expected at this place for the query "window(count(b))". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST.]
+[An error expected at this place for the query "window(count(b))". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_LOGICAL_OP_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_LOGICAL_OP_DOESNT_EXIST.]
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

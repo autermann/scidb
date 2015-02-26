@@ -30,7 +30,7 @@ Query was executed successfully
 SCIDB QUERY : <CREATE ARRAY Data < AV : double NULL > [ I=0:249,10,0, J=0:249,10,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(Raw_Test_Data, Data, avg ( V ) as AV)>
+SCIDB QUERY : <store(redimension(Raw_Test_Data, Data, avg ( V ) as AV), Data)>
 {I,J} AV
 {1,1} 1.55
 {1,2} 2.2

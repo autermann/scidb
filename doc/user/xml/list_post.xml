@@ -147,38 +147,32 @@
 
       <procedure>
         <step>
-          <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>{No} name,id,schema,availability
-{0} 'vector0',17,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
-{1} 'vector1',19,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+          <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>name,id,schema,availability
+'vector0',210,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+'vector1',212,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
         <step>
-          <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>{No} name,id,schema,availability
-{0} 'vector0',17,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
-{1} 'vector0@1',18,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
-{2} 'vector1',19,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
-{3} 'vector1@1',20,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
+          <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>name,id,schema,availability
+'vector0',210,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+'vector0@1',211,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
+'vector1',212,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+'vector1@1',213,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
         <step>
-          <para>List all SciDB aggregates:<para><programlisting>AFL% list('aggregates');</programlisting><screen>{No} name
-{0} 'ApproxDC'
-{1} 'avg'
-{2} 'count'
-{3} 'first_value'
-{4} 'la_first'
-{5} 'la_last'
-{6} 'last_value'
-{7} 'mad'
-{8} 'max'
-{9} 'median'
-{10} 'min'
-{11} 'stdev'
-{12} 'sum'
-{13} 'top_five'
-{14} 'var'
+          <para>List all SciDB aggregates:<para><programlisting>AFL% list('aggregates');  </programlisting><screen>name
+'ApproxDC'
+'avg'
+'count'
+'max'
+'min'
+'prod'
+'stdev'
+'sum'
+'var'
 </screen></para></para>
         </step>
       </procedure>

@@ -3,7 +3,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -190,8 +190,8 @@ while [ "$ORD" -le "$ORD_MAX" ] ; do
     fi
 
     # only elapsed/real time E makes sense from iquery
-    echo "count(gesvd(${BUILD}, 'U'))"    | tee /dev/stderr
-    /usr/bin/time -f'%E s' iquery -ocsv+ -aq "count(gesvd(${BUILD}, 'U'))"    | tee /dev/stderr
+    echo "aggregate(gesvd(${BUILD}, 'U'),count(*))"    | tee /dev/stderr
+    /usr/bin/time -f'%E s' iquery -ocsv+ -aq "aggregate(gesvd(${BUILD}, 'U'),count(*))"    | tee /dev/stderr
     echo                                                      #| tee /dev/stderr
 
     if [ "${ORD_STEP_TYPE}" = "+" ] ; then

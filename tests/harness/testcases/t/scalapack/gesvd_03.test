@@ -20,12 +20,12 @@ store(apply(M10x10, y, x), M2_10x10)
 --test
 --echo test to check the output when all elements are null or zero
 
-gesvd(build(M10x10, null), 'values')
 gesvd(build(M10x10, 0), 'values')
-gesvd(build(M10x10, null), 'right')
+--error --code=scidb::scidb::SCIDB_SE_EXECUTION::scidb::SCIDB_LE_CANT_CONVERT_NULL "gesvd(build(M10x10, null), 'values')"
 gesvd(build(M10x10, 0), 'right')
-gesvd(build(M10x10, null), 'left')
+--error --code=scidb::scidb::SCIDB_SE_EXECUTION::scidb::SCIDB_LE_CANT_CONVERT_NULL "gesvd(build(M10x10, null), 'right')"
 gesvd(build(M10x10, 0), 'left')
+--error --code=scidb::scidb::SCIDB_SE_EXECUTION::scidb::SCIDB_LE_CANT_CONVERT_NULL "gesvd(build(M10x10, null), 'left')"
 
 --echo test for gesvd on the subarrays
 subarray(M10x10,0,0, 4,4)

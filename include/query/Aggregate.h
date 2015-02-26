@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -173,24 +173,6 @@ public:
     virtual void merge(Value& dstState, Value const& srcState)  = 0;
     virtual void finalResult(Value& result, Value const& state) = 0;
 };
-
-template<typename T> inline
-bool isNanValue(T value)
-{
-    return false;
-}
-
-template<> inline
-bool isNanValue<double>(double value)
-{
-    return isnan(value);
-}
-
-template<> inline
-bool isNanValue<float>(float value)
-{
-    return isnan(value);
-}
 
 template<template <typename TS, typename TSR> class A, typename T, typename TR, bool asterisk = false>
 class BaseAggregate: public Aggregate

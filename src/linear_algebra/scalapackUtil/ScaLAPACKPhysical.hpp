@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -106,7 +106,7 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
 ///
 void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
                              slpp::int_t nPRow, slpp::int_t nPCol,
-                             slpp::int_t myPRow, slpp::int_t myPCol);
+                             slpp::int_t myPRow, slpp::int_t myPCol, const shared_ptr<Query>& query);
 
 class ScaLAPACKPhysical : public MPIPhysical
 {

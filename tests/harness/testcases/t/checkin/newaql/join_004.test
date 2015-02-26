@@ -5,7 +5,7 @@ load(vector3, '../tests/harness/testcases/data/vector3.txt')
 
 --test
 
---aql select * from vector3 A join vector3 B on A.a = B.b
+--aql select * from vector3 as A cross join vector3 as B where A.a = B.b
 
 
 --cleanup

@@ -74,7 +74,7 @@
         </step>
 
         <step>
-          <para>Select the maximum value of each row of m3x3:<para><programlisting>AFL% max(m3x3,val,i);  </programlisting><screen>[(2),(5),(8)]
+          <para>Select the maximum value of each row of m3x3:<para><programlisting>AFL% aggregate(m3x3,max(val),i);  </programlisting><screen>[(2),(5),(8)]
 </screen></para></para>
         </step>
       </procedure>

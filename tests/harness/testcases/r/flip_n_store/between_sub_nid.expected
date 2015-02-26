@@ -22,7 +22,7 @@ SCIDB QUERY : <scan(A_derivative)>
 {4} 20.25,115.83,57.915
 {5} 16.2,92.664,46.332
 
-SCIDB QUERY : <redimension_store(A_derivative,NID)>
+SCIDB QUERY : <store(redimension(A_derivative,NID),NID)>
 {a1,a2,a3} x
 {16.2,92.664,46.332} 5
 {20.25,115.83,57.915} 4
@@ -173,7 +173,7 @@ SCIDB QUERY : <join(NID,AAA)>
 {40.5,231.66,115.83} 2,2
 {81,463.32,231.66} 1,1
 
-SCIDB QUERY : <cross(NID,AAA)>
+SCIDB QUERY : <cross_join(NID,AAA)>
 {a1,a2,a3,a1,a2,a3} x,x
 {16.2,92.664,46.332,20.25,115.83,57.915} 5,4
 {16.2,92.664,46.332,27,154.44,77.22} 5,3

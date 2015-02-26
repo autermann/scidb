@@ -1,6 +1,6 @@
 --setup
 
---shell --command "test -e testcases/data/large_single_chunk.txt || gen_matrix -r 1 1 1000 1000 1.0 0.9 N > testcases/data/large_single_chunk.txt"
+--shell --command "test -e ${TEST_DATA_DIR}/large_single_chunk.txt || gen_matrix -r 1 1 1000 1000 1.0 0.9 N > ${TEST_DATA_DIR}/large_single_chunk.txt"
 
 --aql CREATE ARRAY delta_timing<x:double  COMPRESSION 'rle'>[i=1:1000,1000,0, j=1:1000,1000,0]
 --aql CREATE ARRAY dense_delta_timing<x:double COMPRESSION 'bitmap encoding' reserve 100>[i=1:1000,1000,0, j=1:1000,1000,0]

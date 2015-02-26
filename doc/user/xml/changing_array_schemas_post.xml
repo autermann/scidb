@@ -222,11 +222,11 @@
           <primary>collisions</primary>
         </indexterm><indexterm>
           <primary>cell collisions</primary>
-        </indexterm>The redimension and redimension_store operators can yield
-      result arrays with fewer cells than the source array. This can occur
-      when there are "cell collisions." A cell collision occurs when a single
-      cell location of the result array has more than one corresponding cell
-      in the source array.</para>
+        </indexterm>The redimension operator can yield result arrays with
+      fewer cells than the source array. This can occur when there are "cell
+      collisions." A cell collision occurs when a single cell location of the
+      result array has more than one corresponding cell in the source
+      array.</para>
 
       <para>There are three techniques for handling cell
       collisions:<itemizedlist>
@@ -253,8 +253,8 @@
           </listitem>
         </itemizedlist></para>
 
-      <para>For details on these techniques, see the <link linkend="redimension">redimension</link> and <link linkend="redimensionStore">redimension_store</link> operator reference
-      sections.</para>
+      <para>For details on these techniques, see the <link linkend="redimension">redimension</link> operator reference
+      section.</para>
     </section>
 
     <section>
@@ -269,10 +269,9 @@
 
           <secondary>redimensioning</secondary>
         </indexterm>Nullable attributes are handled in a special manner by
-      redimension_store. If the source array contains null values for the
-      attribute being transformed, these cells will be dropped during the
-      redimension_store. For example, consider the 1-dimensional array
-      <emphasis role="bold">redim_missing</emphasis>: <para><screen>{i} val1,val2,val3
+      redimension. If the source array contains null values for the attribute
+      being transformed, these cells will be dropped during the redimension.
+      For example, consider the 1-dimensional array <emphasis role="bold">redim_missing</emphasis>: <para><screen>{i} val1,val2,val3
 {0} 0,0,1
 {1} 0,1,0.540302
 {2} 0,2,-0.416147

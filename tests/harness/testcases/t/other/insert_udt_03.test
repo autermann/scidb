@@ -26,13 +26,13 @@ insert(build_sparse(P, point('(23,25)'), x=0),P)
 
 store(join(join(join(S,P),S),P),ZZZ)
 insert(ZZZ,SPSP)
-count(versions(SPSP))
-count(versions(ZZZ))
+aggregate(versions(SPSP),count(*))
+aggregate(versions(ZZZ),count(*))
 
 insert(ZZZ,SPSP)
 insert(SPSP,ZZZ)
-count(versions(SPSP))
-count(versions(ZZZ))
+aggregate(versions(SPSP),count(*))
+aggregate(versions(ZZZ),count(*))
 
 
 

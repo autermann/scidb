@@ -59,6 +59,7 @@ SCIDB QUERY : <regrid(A,1,sum(a))>
 {x} a_sum
 {-2} '8'
 {-1} '9'
+{0} ''
 {1} '11'
 {3} '13'
 {4} '14'
@@ -70,6 +71,7 @@ SCIDB QUERY : <regrid(A,1,max(a))>
 {x} a_max
 {-2} '8'
 {-1} '9'
+{0} null
 {1} '11'
 {3} '13'
 {4} '14'
@@ -81,6 +83,7 @@ SCIDB QUERY : <regrid(A,1,min(a))>
 {x} a_min
 {-2} '8'
 {-1} '9'
+{0} null
 {1} '11'
 {3} '13'
 {4} '14'
@@ -92,6 +95,7 @@ SCIDB QUERY : <regrid(A,1,count(a))>
 {x} a_count
 {-2} 1
 {-1} 1
+{0} 0
 {1} 1
 {3} 1
 {4} 1

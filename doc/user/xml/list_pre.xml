@@ -151,16 +151,19 @@
 
       <procedure>
         <step>
-          <para>List all arrays:<programlisting language="test">--afl list('arrays'); --show-output-in-test-file=no</programlisting></para>
+          <para>List all arrays:<programlisting language="test">--afl list('arrays'); --output-format=csv --show-output-in-test-file=no</programlisting></para>
         </step>
 
         <step>
           <para>List all versions of all arrays:<programlisting
-          language="test">--afl list('arrays',true); --show-output-in-test-file=no</programlisting></para>
+          language="test">--afl list('arrays',true); --output-format=csv --show-output-in-test-file=no</programlisting></para>
         </step>
 
         <step>
-          <para>List all SciDB aggregates:<programlisting language="test">--afl list('aggregates');</programlisting></para>
+          <para>List all SciDB aggregates:<programlisting language="test">--afl list('aggregates'); --show-output=no
+--afl filter(list('aggregates'),name != 'mad' and name != 'median'
+      and name != 'top_five' and name !='first_value'
+      and name!='last_value'); --show-query=no --output-format=csv</programlisting></para>
         </step>
       </procedure>
     </informalexample>

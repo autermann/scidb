@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,11 +39,9 @@
 #include "query/TypeSystem.h"
 #include "system/SystemCatalog.h"
 #include "array/DBArray.h"
-#include "query/parser/ParsingContext.h"
 #include "network/NetworkManager.h"
-#include "query/parser/QueryParser.h"
-#include "query/parser/AST.h"
-#include "query/parser/ALTranslator.h"
+#include "query/ParsingContext.h"
+#include "query/Parser.h"
 
 using namespace std;
 using namespace boost;
@@ -267,13 +265,11 @@ void Expression::compile(std::string functionName,
     _compiled = true;
 }
 
-void Expression::compile(const string& expression, vector<string> names, vector<TypeId> types, TypeId expectedType)
+void Expression::compile(const string& expression, const vector<string>& names, const vector<TypeId>& types, TypeId expectedType)
 {
     assert(names.size() == types.size());
-    QueryParser p;
-    shared_ptr<AstNode> astTree = p.parse("EXPRESSION(" + expression + ")", false);
-    AstNode* ast = astTree->getChild(1);
-    shared_ptr<LogicalExpression> logicalExpression = AstToLogicalExpression( ast->getChild(0) );
+
+    shared_ptr<LogicalExpression> logicalExpression(parseExpression(expression));
 
     for (size_t i = 0; i < names.size(); i++) {
         addVariableInfo(names[i], types[i]);

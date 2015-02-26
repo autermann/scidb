@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -172,12 +172,19 @@ int SciDBTestHarness :: execute (int mode)
 			bfs::path p (skiptestfname);
 
 			string under_dir = DEFAULT_TEST_CASE_DIR;
+			if (!bfs :: is_regular (p))
+			{
 			under_dir = under_dir + p.parent_path ().string ();
 #if (BOOST_FS_VER==2)
 			skiptestfname = p.filename();
 #else
 			skiptestfname = p.filename().string();
 #endif
+            }
+            else // Full path to disable tests file was specified.
+            {
+                under_dir = _c.rootDir + "/" + DEFAULT_TEST_CASE_DIR;
+            }
 
 			/* collect skipped testcases */
 			rv_skip = collectSkippedTestCases (_c.rootDir, under_dir, skiptestfname, skip_tclist); 
@@ -191,6 +198,7 @@ int SciDBTestHarness :: execute (int mode)
 				_rptr->writeFinalInfo (_harnessES);
 				return FAILURE;
 			}
+
 			LOG4CXX_INFO (_logger, "Picked up below " << skip_tclist.size() << " test cases/suites to be skipped from the file [" << skiptestfname << "]");
 			print_vector (skip_tclist);
 		}
@@ -419,8 +427,15 @@ int SciDBTestHarness :: validateParameters (void)
 		throw ConfigError (FILE_LINE_FUNCTION, ERR_CONFIG_SCIDBPORT_INVALID);
 
 	_c.rootDir = getAbsolutePath (_c.rootDir, false);
+	_c.scratchDir = getAbsolutePath (_c.scratchDir, false);
+	
 	if (_c.rootDir.empty ())
 		throw ConfigError (FILE_LINE_FUNCTION, ERR_CONFIG_SCIDBROOTDIR_EMPTY);
+		
+	if (_c.scratchDir.empty ())
+	{
+	  _c.scratchDir = _c.rootDir;
+	}
 
 	for (unsigned int i=0; i<_c.testName.size (); i++)
 	{
@@ -503,7 +518,7 @@ int SciDBTestHarness :: validateParameters (void)
 		throw SystemError (FILE_LINE_FUNCTION, ss.str());
 	}
 
-	_c.reportFilename = _c.rootDir + "/" + _c.reportFilename;
+	_c.reportFilename = _c.scratchDir + "/" + _c.reportFilename;
 	if (creat (_c.reportFilename.c_str (), S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) == -1)
 	{
 		stringstream ss;
@@ -535,7 +550,7 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			"[--test-id <value>] [--test-list <value>] [--test-name <value>] [--suite-id <value>] [--skip-tests <yes/no/value>] "
 			"[--include-regex-id <regex_expression>] [--exclude-regex-id <regex_expression>] "
 			"[--include-regex-name <regex_expression>] [--exclude-regex-name <regex_expression>] "
-			"[--sleep <value>] [--log-queries] [--log-dir <value>] [--log-destination <value>] [--log-properties-file <value>] [--report-file <value>] [--parallel <value>] "
+			"[--sleep <value>] [--log-queries] [--log-dir <value>] [--log-destination <value>] [--log-properties-file <value>] [--report-file <value>] [--parallel <value>] [--scratch-dir <value>]"
 			"[--debug <value>] [--record] [--keep-previous-run] [--save-failures] [--terminate-on-failure] [--cleanup] [--version]\n"
 			);
 
@@ -555,6 +570,7 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 		("sleep",                po::value<int>(),    "Execution is paused after each statement in the test case.")
 		("log-queries",                               "Log queries in the test case output.")
 		("log-dir",              po::value<string>(), "Path to the directory where log files are kept.")
+		("scratch-dir",          po::value<string>(), "Path to the scratch directory where .out, .diff, .log, and other temporaries will be stored.")
 		("log-destination",      po::value<string>(), "Indicates where to log the messages. Valid values are \"console\" or \"file\". Default is \"file\".")
 		("log-properties-file",	 po::value<string>(), "Path of log4j.properties file.")
 		("report-file",          po::value<string>(), "Name of the file in which output report will be stored in an XML format under the root-dir. Default is \"Report.xml\".")
@@ -620,6 +636,11 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 
 		if (vm.count ("root-dir"))
 			_c.rootDir = vm["root-dir"].as<string>();
+			
+		if (vm.count ("scratch-dir"))
+		{
+		  _c.scratchDir = vm["scratch-dir"].as<string>();
+		}
 
         if (vm.count("plugins")) {
             scidb::PluginManager::getInstance()->setPluginsDirectory(vm["plugins"].as<string>());

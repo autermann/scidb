@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -75,7 +75,7 @@ namespace scidb
     
     size_t NoCompression::decompress(void const* src, size_t size, Chunk& chunk) 
     {
-        memcpy(chunk.getData(), src, size);
+        memcpy(chunk.getDataForLoad(), src, size);
         return size;
     }
     
@@ -91,7 +91,7 @@ namespace scidb
     size_t ZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk) 
     {
         uLongf dstLen = chunk.getSize();
-        int rc = uncompress((Bytef*)chunk.getData(), &dstLen, (Bytef*)src, size);
+        int rc = uncompress((Bytef*)chunk.getDataForLoad(), &dstLen, (Bytef*)src, size);
         return rc == Z_OK ? dstLen : 0;
     }
 
@@ -108,7 +108,7 @@ namespace scidb
     size_t BZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk) 
     {
         unsigned int dstLen = chunk.getSize();
-        int rc = BZ2_bzBuffToBuffDecompress((char*)chunk.getData(), &dstLen, (char*)src, size, 0, 0);
+        int rc = BZ2_bzBuffToBuffDecompress((char*)chunk.getDataForLoad(), &dstLen, (char*)src, size, 0, 0);
         return rc == BZ_OK ? dstLen : 0;
     }
 

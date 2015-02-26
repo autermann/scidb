@@ -11,7 +11,7 @@ create array A2a <a: int32, b: int32, c: string, d: string, e: string, f: string
 --aql load A2 from current instance '../tests/harness/testcases/data/A2.txt'
 
 --aql select * from SP
---aql select * from count(versions(SP))
+--aql select * from aggregate(versions(SP),count(*))
 --aql select * from show(SP)
 --aql select * from dimensions(SP)
 
@@ -29,7 +29,7 @@ create array A2a <a: int32, b: int32, c: string, d: string, e: string, f: string
 --aql load SP from current instance 'sp_int32.bin' as '(int32,string,double,int64,bool,float,string_10)' errors 1 shadow array SP_err
 
 --aql select * from SP
---aql select * from count(versions(SP))
+--aql select * from aggregate(versions(SP),count(*))
 --aql select * from show(SP)
 --aql select * from dimensions(SP)
 
@@ -37,7 +37,7 @@ create array A2a <a: int32, b: int32, c: string, d: string, e: string, f: string
 --aql load SP from current instance 'sp_int32_int64.bin' as '(int64,string,double,int64,bool,float,string_10)'
 
 --aql select * from SP
---aql select * from count(versions(SP))
+--aql select * from aggregate(versions(SP),count(*))
 --aql select * from show(SP)
 --aql select * from dimensions(SP)
 
@@ -45,7 +45,7 @@ create array A2a <a: int32, b: int32, c: string, d: string, e: string, f: string
 --aql load SP from 'sp_aql.bin' as 'opaque'
 
 --aql select * from SP
---aql select * from count(versions(SP))
+--aql select * from aggregate(versions(SP),count(*))
 --aql select * from show(SP)
 --aql select * from dimensions(SP)
 

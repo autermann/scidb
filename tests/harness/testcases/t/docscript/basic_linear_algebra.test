@@ -55,8 +55,8 @@ load_library('dense_linear_algebra')
 
 --cleanup
 
-remove(m3x3)
 remove(A)
 remove(m2x3)
 remove(Zeros)
+remove(m3x3)
 remove(m3x2)

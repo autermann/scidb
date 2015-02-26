@@ -5,7 +5,7 @@ create empty array Flipped <i:int64> [x(double)=100,10,0]
 store(build(Orig,i*10.1), Orig)
 
 --test
-redimension_store(Orig, Flipped)
+store(redimension(Orig, Flipped), Flipped)
 subarray(thin(Flipped, 1, 2), 30.3, 50.1)                         
 between(thin(Flipped, 1, 2), 20.2, 40.4)                         
 store(subarray(thin(Flipped, 1, 2), 30.3, 50.1), A)                         

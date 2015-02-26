@@ -5,7 +5,7 @@ load(join1,'../tests/harness/testcases/data/join1.txt')
 
 --test
 
---aql select * from join1 as J1 join join1 as J2 ON J1.a = J2.a AND J1.b = J2.b
+--aql select * from join1 as J1 cross join join1 as J2 where J1.a = J2.a AND J1.b = J2.b
 
 --cleanup
 remove(join1)

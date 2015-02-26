@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter id="scidbOperatorReference">
@@ -44,6 +43,9 @@
   <para>To see a categorized listing of the AFL operators, see <xref
   linkend="scidbAFLCategories"/>.</para>
 
+  <para>You can get a list of all of the available operators by running the
+  following query:<screen>$ iquery -aq "list('operators')"</screen></para>
+
   <xi:include href="adddim_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
@@ -58,8 +60,10 @@
 
   <xi:include href="apply_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="approxdc_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="attribute_rename_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -67,7 +71,9 @@
   <xi:include href="attributes_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="avg_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="avg_rank_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -79,12 +85,14 @@
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="build_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="build_sparse_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="build_sparse_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+          xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <!--
-     This is an internal operator: I want to remove it from the user guide. SJM
+  
+  This is an internal operator: I want to remove it from the user guide. SJM
   <xi:include href="cancel.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
 
@@ -93,12 +101,15 @@
   <xi:include href="concat_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="consume.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="consume.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="count_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
+  <!-- Deprecated in 13.12
   <xi:include href="cross_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="cross_join_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -128,17 +139,20 @@
 
   <xi:include href="help_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="index_lookup_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="index_lookup_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="input_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="insert_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="insert_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="join_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="list_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="load_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="load_module.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="load_library.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -146,11 +160,15 @@
   <xi:include href="lookup_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="max_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="merge_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="min_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="mpi_init.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
@@ -168,12 +186,11 @@
   <xi:include href="redimension_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="redimension_store_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <!--
-     This is an internal operator: I want to remove it from the user guide. SJM
-
+  This is an internal operator: I want to remove it from the user guide. SJM
   <xi:include href="reduce_distro.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
 
@@ -208,9 +225,15 @@
 -->
 
   <xi:include href="show_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="slice_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="sort_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <!-- Deprecated in 13.12
   <xi:include href="stdev_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
+
   <xi:include href="store_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="subarray_post.xml"
@@ -219,15 +242,16 @@
   <xi:include href="substitute_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="sum_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="thin_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="transpose_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="uniq_post.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="uniq_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="unload_library.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -235,7 +259,9 @@
   <xi:include href="unpack_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <!-- Deprecated in 13.12
   <xi:include href="var_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
 
   <xi:include href="variable_window_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>

@@ -92,7 +92,7 @@ SCIDB QUERY : <insert(subarray(A,2,3),B)>
 {2} 4
 {3} 6
 
-SCIDB QUERY : <count(versions(A))>
+SCIDB QUERY : <aggregate(versions(A),count(*))>
 {i} count
 {0} 4
 
@@ -103,7 +103,7 @@ SCIDB QUERY : <insert(filter(A,true),B)>
 {2} 4
 {3} 6
 
-SCIDB QUERY : <count(versions(B))>
+SCIDB QUERY : <aggregate(versions(B),count(*))>
 {i} count
 {0} 5
 

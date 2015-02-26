@@ -41,16 +41,16 @@ SCIDB QUERY : <load(TS,'../tests/harness/testcases/data/redimension_ts.txt')>
 {24} '2010-10-10 10:00:14',1,16
 {25} '2010-10-10 10:00:14',15,3
 
-SCIDB QUERY : <redimension_store(TS, TS_1)>
+SCIDB QUERY : <store(redimension(TS, TS_1), TS_1)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <redimension_store(TS, TS_2, max(userID) as userID, max(resourceID) as resourceID)>
+SCIDB QUERY : <store(redimension(TS, TS_2, max(userID) as userID, max(resourceID) as resourceID), TS_2)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <redimension_store(TS, TS_3)>
+SCIDB QUERY : <store(redimension(TS, TS_3), TS_3)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <redimension_store(TS, TS_4)>
+SCIDB QUERY : <store(redimension(TS, TS_4), TS_4)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <count(TS)>

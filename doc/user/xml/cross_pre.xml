@@ -62,17 +62,13 @@
 
       <procedure>
         <step>
-          <para>Show the first array:<programlisting language="test">
---afl create array letters &lt;letter:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p S &lt; $DOC_DATA/letters.csv &gt; $DOC_DATA/letters.scidb --show-query=no --show-output=no
---aql load letters from '../tests/harness/testcases/data/doc/letters.scidb' --show-query=no --show-output=no 
---afl scan(letters);</programlisting></para>
+          <para>Show the first array:<programlisting language="test">--afl store(build(&lt;letter:string&gt; [i=0:2,3,0],'["A","B","C"]',true),letters);
+      --show-query=no</programlisting></para>
         </step>
 
         <step>
-          <para>Show the second array:<programlisting language="test">
---afl store(build(&lt;number:int64 null&gt;[i=0:4,5,0],i),numbers) --show-query=no --show-output=no
---afl scan(numbers);</programlisting></para>
+          <para>Show the second array:<programlisting language="test">--afl store(build(&lt;number:int64 null&gt;[i=0:4,5,0],i),numbers) --show-query=no
+</programlisting></para>
         </step>
 
         <step>
@@ -87,11 +83,9 @@
 
       <procedure>
         <step>
-          <para>Show the first array:<programlisting language="test">
---afl create array lettersPlus &lt;letter:string, type:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p S &lt; $DOC_DATA/lettersPlus.csv &gt; $DOC_DATA/lettersPlus.scidb --show-query=no --show-output=no
---aql load lettersPlus from '../tests/harness/testcases/data/doc/lettersPlus.scidb' --show-query=no --show-output=no
---afl scan(lettersPlus);</programlisting></para>
+          <para>Show the first array:<programlisting language="test">--afl store(build(&lt;type:string&gt;[i=0:2,3,0],'["vowel","consonant","consonant"]',true),letter_cat);
+       --show-query=no --show-output=no
+--afl store(join(letters,letter_cat),lettersPlus);  --show-query=no</programlisting></para>
         </step>
 
         <step>
@@ -108,11 +102,8 @@
       <procedure>
         <step>
           <para>Show the array containing some null values (where the even
-          numbers would be):<programlisting language="test">
---afl create array oddNumbers &lt;number:int64 null&gt; [i=0:4,5,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p N &lt; $DOC_DATA/oddNumbers.csv &gt; $DOC_DATA/oddNumbers.scidb --show-query=no --show-output=no
---aql load oddNumbers from '../tests/harness/testcases/data/doc/oddNumbers.scidb' --show-query=no --show-output=no
---afl scan(oddNumbers);</programlisting></para>
+          numbers would be):<programlisting language="test">--afl store(build(&lt;number:int64 null&gt; [i=0:4,5,0],'[null,1,null,3,null]',true),oddNumbers);
+      --show-query=no</programlisting></para>
         </step>
 
         <step>
@@ -129,8 +120,7 @@
       <procedure>
         <step>
           <para>Show the array containing some empty cells (where the odd
-          numbers would be):<programlisting language="test">
---afl store(build_sparse(&lt;number:int64&gt;[i=0:4,5,0],i,((i%2)=0)),evenNumbers) --show-query=no --show-output=no
+          numbers would be):<programlisting language="test">--afl store(build_sparse(&lt;number:int64&gt;[i=0:4,5,0],i,((i%2)=0)),evenNumbers) --show-query=no --show-output=no
 --afl scan(evenNumbers);</programlisting></para>
         </step>
 

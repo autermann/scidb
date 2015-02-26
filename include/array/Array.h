@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,18 +35,20 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/noncopyable.hpp>
-#include "array/Metadata.h"
-#include "query/Aggregate.h"
-#include "query/TypeSystem.h"
-#include "query/Statistics.h"
+#include <array/Metadata.h>
+#include <query/TypeSystem.h>
+#include <query/Statistics.h>
+#include <array/TileInterface.h>
 
 namespace scidb
 {
 class Array;
+class Aggregate;
 class Query;
 class Chunk;
 class ConstArrayIterator;
 class ConstRLEEmptyBitmap;
+class CoordinatesMapper;
 
 /** \brief SharedBuffer is an abstract class for binary data holding
  *
@@ -358,6 +360,135 @@ class ConstChunkIterator : public ConstIterator
      * Get last position in the iterated chunk according to the iteration mode
      */
     virtual Coordinates const& getLastPosition();
+
+    /**
+     * Return a tile of at most maxValues starting at the logicalStart coordinates.
+     * The logical position is advanced by the size of the returned tile.
+     * @parm offset - [IN] array coordinates of the first data element
+     *                      [OUT] Coordinates object to which the return value refers
+     * @param maxValues   - max number of values in a tile
+     * @param tileData    - output data tile
+     * @param tileCoords  - output tile of array coordinates, one for each element in the data tile
+     * @return scidb::Coordinates() if no data are found at the logicalStart coordinates
+     *         (either at the end of chunk or at a logical "whole" in the serialized data);
+     *         otherwise, the next set of array coordinates where data exist in row-major order.
+     *         If the next position is at the end of the chunk, scidb::Coordinates() is returned and
+     *         the output variables may contain data/coordinates.
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    virtual const Coordinates&
+    getData(scidb::Coordinates& offset,
+            size_t maxValues,
+            boost::shared_ptr<BaseTile>& tileData,
+            boost::shared_ptr<BaseTile>& tileCoords)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::getData(const Coordinates)";
+    }
+
+    /**
+     * Return a tile of at most maxValues starting at logicalStart.
+     * The logical position is advanced by the size of the returned tile.
+     * @parm logicalOffset - logical position (in row-major order) within a chunk of the first data element
+     * @param maxValues   - max number of values in a tile
+     * @param tileData    - output data tile
+     * @param tileCoords  - output tile of logical position_t's, one for each element in the data tile
+     * @return positon_t(-1) if no data is found at the logicalStart position
+     *         (either at the end of chunk or at a logical "whole" in the serialized data);
+     *         otherwise, the next position where data exist in row-major order.
+     *         If the next position is at the end of the chunk, positon_t(-1) is returned and
+     *         the output variables may contain data/coordinates.
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    virtual position_t
+    getData(position_t logicalOffset,
+            size_t maxValues,
+            boost::shared_ptr<BaseTile>& tileData,
+            boost::shared_ptr<BaseTile>& tileCoords)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::getData(positon_t)";
+    }
+
+    /**
+     * Return a tile of at most maxValues starting at the logicalStart coordinates.
+     * The logical position is advanced by the size of the returned tile.
+     * @parm offset - [IN] array coordinates of the first data element
+     *                [OUT] Coordinates object to which the return value refers
+     * @param maxValues   - max number of values in a tile
+     * @param tileData    - output data tile
+     * @return scidb::Coordinates() if no data are found at the logicalStart coordinates
+     *         (either at the end of chunk or at a logical "whole" in the serialized data);
+     *         otherwise, the next set of array coordinates where data exist in row-major order.
+     *         If the next position is at the end of the chunk, scidb::Coordinates() is returned and
+     *         the output variables may contain data/coordinates.
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    virtual const Coordinates&
+    getData(scidb::Coordinates& offset,
+            size_t maxValues,
+            boost::shared_ptr<BaseTile>& tileData)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::getData(const Coordinates, data)";
+    }
+
+    /**
+     * Return a tile of at most maxValues starting at logicalStart.
+     * The logical position is advanced by the size of the returned tile.
+     * @parm logicalOffset - logical position (in row-major order) within a chunk of the first data element
+     * @param maxValues   - max number of values in a tile
+     * @param tileData    - output data tile
+     * @return positon_t(-1) if no data is found at the logicalStart position
+     *         (either at the end of chunk or at a logical "whole" in the serialized data);
+     *         otherwise, the next position where data exist in row-major order.
+     *         If the next position is at the end of the chunk, positon_t(-1) is returned and
+     *         the output variables may contain data/coordinates.
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    virtual position_t
+    getData(position_t logicalOffset,
+            size_t maxValues,
+            boost::shared_ptr<BaseTile>& tileData)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::getData(positon_t,data)";
+    }
+
+    /**
+     * @return a mapper capable of converting logical positions to/from array coordinates
+     *         assuming row-major serialization order
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    virtual operator const CoordinatesMapper* () const
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::operator()(CoordinatesMapper*)";
+    }
+
+    /**
+     * @return the iterator current logical position within a chunk
+     *         assuming row-major serialization order
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    virtual position_t getLogicalPosition()
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::getLogicalPosition";
+    }
+
+    /**
+     * Set the current iterator position corresponding to the logical position within a chunk
+     *         assuming row-major serialization order
+     * @return true if a cell with such position exist and its position is successfully recorded
+     * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     */
+    using ConstIterator::setPosition;
+    virtual bool setPosition(position_t pos)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "ConstChunkIterator::setPosition";
+    }
 };
 
 
@@ -368,13 +499,13 @@ class ChunkIterator : public ConstChunkIterator
 {
 protected:
     /**
-     * Exception-safety control flag. This is checked by the 
+     * Exception-safety control flag. This is checked by the
      * RLEChunkIterator, MemChunkIterator and SparseChunkIterator during destruction.
      * It is used to make sure unPin() is called upon destruction, unless flush() already executed.
-     * 
+     *
      * It would be ideal to place the whole machinery into the superclass. However it's not
      * possible because it's unsafe call subclass methods from the superclass destructor
-     * 
+     *
      * Ergo, if you override the flush method, you need to pay careful attention to this flag.
      *
      * However the situation will improve because soon we WILL get rid of MemChunkIterator and
@@ -542,7 +673,7 @@ class ConstChunk : public SharedBuffer
     virtual void unPin() const;
 
     virtual Array const& getArray() const = 0;
-    
+
     void makeClosure(Chunk& closure, boost::shared_ptr<ConstRLEEmptyBitmap> const& emptyBitmap) const;
 
     virtual boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
@@ -555,11 +686,11 @@ class ConstChunk : public SharedBuffer
     virtual ConstChunk* materialize() const;
 
     virtual void overrideTileMode(bool) {}
-    
+
  protected:
     ConstChunk();
     virtual ~ConstChunk();
-    
+
     /**
      * A pointer to a materialized copy of this chunk. Deallocated on destruction. Used as part of materialize() and other routines like count().
      * Note that not all subclasses use this field. Note also that PersistentChunk objects can exist indefinitely without being destroyed.
@@ -593,7 +724,7 @@ public:
        setSparse(isSparse);
        setRLE(isRle);
        setCount(count);
-       memcpy(getData(), input, byteSize);
+       memcpy(getDataForLoad(), input, byteSize);
 
        write(query);
    }
@@ -607,7 +738,7 @@ public:
        if (byteSize != getSize()) {
            throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CANT_MERGE_CHUNKS_WITH_VARYING_SIZE);
        }
-       char* dst = static_cast<char*>(getData());
+       char* dst = static_cast<char*>(getDataForLoad());
        assert(dst!=NULL);
        assert(input!=NULL);
 
@@ -683,25 +814,33 @@ public:
     * @param[in] query the query context
     */
    virtual void aggregateMerge(ConstChunk const& with,
-                               AggregatePtr const& aggregate,
+                               boost::shared_ptr<Aggregate> const& aggregate,
                                boost::shared_ptr<Query>& query);
 
-   /** 
+   /**
     * Perform an aggregate-merge of this with another chunk.
-    * This function is optimized for current group-by aggregates, which 
+    * This function is optimized for current group-by aggregates, which
     * are liable to produce sparse chunks with many nulls. This method does NOT work
     * if the intermediate aggregating array is emptyable (which is what redimension uses).
     * @param[in] with chunk to merge with. Must be filled out by an aggregating op.
     * @param[in] aggregate the aggregate to use
     * @param[in] query the query context
-    */ 
+    */
    virtual void nonEmptyableAggregateMerge(ConstChunk const& with,
-                                   AggregatePtr const& aggregate,
-                                   boost::shared_ptr<Query>& query);
+                                           boost::shared_ptr<Aggregate> const& aggregate,
+                                           boost::shared_ptr<Query>& query);
 
    virtual void write(boost::shared_ptr<Query>& query) = 0;
    virtual void truncate(Coordinate lastCoord);
    virtual void setCount(size_t count);
+
+    /* Get a reference to the data buffer of the chunk for the purposes of loading
+       data directly to it.  getData() should be used for reading data only.  This
+       interface can be overridden by classes that need to use getData() as a hook
+       for loading data from some other source.
+     */ 
+   virtual void* getDataForLoad()
+        { return getData(); }
 };
 
 /**
@@ -979,8 +1118,8 @@ class PinBuffer {
     PinBuffer(SharedBuffer const& buf) : buffer(buf) {
         pinned = buffer.pin();
     }
-    
-    bool isPinned() const { 
+
+    bool isPinned() const {
         return pinned;
     }
 
@@ -991,6 +1130,7 @@ class PinBuffer {
     }
 };
 
+typedef PinBuffer Pinner;
 
 /**
  * Constructed around a chunk pointer to automatically unpin the chunk on destruction.
@@ -1025,6 +1165,11 @@ public:
     void set(Chunk* buf)
     {
         _buffer = buf;
+    }
+
+    Chunk* get()
+    {
+        return _buffer;
     }
 };
 

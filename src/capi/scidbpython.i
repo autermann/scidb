@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@ section of that chapter."
 %module(docstring=MODULE_DOCSTRING) libscidbpython
 #pragma SWIG nowarn=362,389,319,325,309,401,520,403,503
 
-%{ 
+%{
 #define SWIG_FILE_WITH_INIT
 #define SCIDB_CLIENT
 #include <stdint.h>
@@ -50,7 +50,7 @@ using namespace boost;
 #include "array/Metadata.h"
 #include "network/BaseConnection.h"
 #include "system/Exceptions.h"
-#include "array/Array.h" 
+#include "array/Array.h"
 #include "array/MemArray.h"
 #include "array/StreamArray.h"
 #include "array/ParallelAccumulatorArray.h"
@@ -62,7 +62,7 @@ using namespace boost;
 #ifndef PyInt_FromSize_t
 #define PyInt_FromSize_t(x) PyInt_FromLong((long)x)
 #endif
-#endif 
+#endif
 
 using namespace scidb;
 %}
@@ -116,7 +116,7 @@ namespace scidb {
 
 }
 
-%shared_ptr(scidb::ConstIterator); 
+%shared_ptr(scidb::ConstIterator);
 %shared_ptr(scidb::ConstChunkIterator);
 %shared_ptr(scidb::ChunkIterator);
 %shared_ptr(scidb::MemChunkIterator);
@@ -135,11 +135,13 @@ namespace scidb {
 %shared_ptr(scidb::MergeStreamArray);
 %shared_ptr(scidb::ClientArray);
 %shared_ptr(scidb::BaseChunkIterator);
+%shared_ptr(scidb::BaseTileChunkIterator);
 %shared_ptr(scidb::RLEConstChunkIterator);
+%shared_ptr(scidb::RLETileConstChunkIterator);
 %shared_ptr(scidb::RLEBitmapChunkIterator);
 %shared_ptr(scidb::RLEChunkIterator);
 
-using namespace std; 
+using namespace std;
 using namespace boost;
 %include "query/TypeSystem.h"
 %include "array/Metadata.h"

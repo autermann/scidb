@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -58,8 +58,12 @@ public class Result
         i = 0;
         for (ScidbMsg.QueryResult.DimensionDesc dim : rec.getDimensionsList())
         {
-            dimensions[i] = new Schema.Dimension(dim.getName(), dim.getTypeId(), dim.getFlags(), dim.getStartMin(),
-                    dim.getCurrStart(), dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval());
+            dimensions[i] = new Schema.Dimension(dim.getName(),
+                                                 dim.getStartMin(),
+                                                 dim.getCurrStart(),
+                                                 dim.getCurrEnd(),
+                                                 dim.getEndMax(),
+                                                 dim.getChunkInterval());
             i++;
         }
 
@@ -68,7 +72,7 @@ public class Result
         this.selective = rec.getSelective();
         this.explainLogical = rec.getExplainLogical();
         this.explainPhysical = rec.getExplainPhysical();
-        
+
         if (rec.getWarningsCount() > 0 && conn.getWarningCallback() != null)
         {
             for (ScidbMsg.QueryResult.Warning warn : rec.getWarningsList())
@@ -95,7 +99,7 @@ public class Result
     {
         return queryId;
     }
-    
+
     /**
      * Returns selective flag
      * @return true - if selective
@@ -104,7 +108,7 @@ public class Result
     {
         return selective;
     }
-    
+
     /**
      * Returns explained logical plan
      * @return Logical plan
@@ -113,7 +117,7 @@ public class Result
     {
         return explainLogical;
     }
-    
+
     /**
      * Returns explained physical plan
      * @return Physical plan

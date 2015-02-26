@@ -11,66 +11,66 @@ CREATE  ARRAY B < STR : string, I32 : int32, FLT : float, Line : int64> [ DBL(do
 CREATE  ARRAY B_repart1 < STR : string, I32 : int32, FLT : float, Line : int64> [ DBL(double)=*,4,0, STR2(string)=*,6,0 ]
 CREATE  ARRAY B_repart2 < STR : string, I32 : int32, FLT : float, Line : int64> [ DBL(double)=*,4,0, STR2(string)=*,6,2 ]
 
-redimension_store (A_load, B)
-redimension_store (A_load, B_repart1)
+store(redimension(A_load, B), B)
+store(redimension(A_load, B_repart1), B_repart1)
 
 store ( repart (B_repart1, B_repart2), B_repart2)
 
 CREATE  ARRAY B_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:*,8,0 ]
 
-redimension_store (apply(B, recno, int32(Line)), B_flipped)
+store(redimension(apply(B, recno, int32(Line)), B_flipped), B_flipped)
 
-count ( filter ( join ( cast(B_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR))
+aggregate ( filter ( join ( cast(B_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR), count(*))
 
 # B END
 
 # C START
 CREATE  ARRAY C < STR : string, DBL : double, Line : int64, STR2 : string> [ FLT(float)=*,4,2, I32(int32)=*,3,1 ]
 
-redimension_store (A_load, C)
+store(redimension(A_load, C), C)
 
 CREATE  ARRAY C_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:*,8,0 ]
 
-redimension_store (apply(C, recno, int32(Line)), C_flipped)
+store(redimension(apply(C, recno, int32(Line)), C_flipped), C_flipped)
 
-count ( filter ( join ( cast(C_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR))
+aggregate ( filter ( join ( cast(C_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR), count(*))
 # C END
 
 # D START
 CREATE  ARRAY D < STR : string, I32 : int32, Line : int64 > [ DBL(double)=*,10,0, STR2(string)=*,5,1, FLT(float)=100,10,2 ]
 
-redimension_store (A_load, D)
+store(redimension(A_load, D), D)
 
 CREATE  ARRAY D_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string >[ recno=0:*,8,0 ]
 
-redimension_store (apply(D, recno, int32(Line)), D_flipped)
+store(redimension(apply(D, recno, int32(Line)), D_flipped), D_flipped)
 
-count ( filter ( join ( cast(D_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR))
+aggregate ( filter ( join ( cast(D_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR), count(*))
 # D END
 
 # E START
 
 CREATE  ARRAY E < STR2 : string, FLT : float, Line : int64, total : double NULL default 999.998 > [ I32(int32)=*,4,0, STR(string)=*,6,2 ]
 
-redimension_store (A_load, E, sum(DBL) as total)
+store(redimension(A_load, E, sum(DBL) as total), E)
 
 CREATE  ARRAY E_flipped < STR : string, total : double NULL default 999.998, I32 : int32, FLT : float, STR2 : string >[ recno=0:*,8,0 ]
-redimension_store (apply(E, recno, int32(Line)), E_flipped)
+store(redimension(apply(E, recno, int32(Line)), E_flipped), E_flipped)
 
-count ( filter ( join ( cast(E_flipped, empty<STR : string, total : double NULL default 999.998, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR))
+aggregate ( filter ( join ( cast(E_flipped, empty<STR : string, total : double NULL default 999.998, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR), count(*))
 
 # E END
 
 # F START
 CREATE  ARRAY F < STR : string, I32 : int32, FLT : float, Line : int64> [ DBL(double)=100,4,0, STR2(string)=100,6,2 ]
 
-redimension_store (A_load, F)
+store(redimension(A_load, F), F)
 
 CREATE  ARRAY F_flipped < STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[ recno=0:100,8,0 ]
 
-redimension_store (apply(F, recno, int32(Line)), F_flipped)
+store(redimension(apply(F, recno, int32(Line)), F_flipped), F_flipped)
 
-count ( filter ( join ( cast(F_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR))
+aggregate ( filter ( join ( cast(F_flipped, empty<STR : string, DBL : double, I32 : int32, FLT : float, STR2 : string>[recno=0:*,8,0]) as A1, A_load as A2), A1.STR <> A2.STR), count(*))
 # F END
 
 --reset-format

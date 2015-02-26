@@ -16,13 +16,13 @@ SCIDB QUERY : <store(build_sparse(D,x+5,x<>1),D)>
 SCIDB QUERY : <store(B,C)>
 []
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {9}[(),(0),(1),(2),(),()]
 
-SCIDB QUERY : <redimension_store(D,C)>
+SCIDB QUERY : <store(redimension(D,C),C)>
 {3}[(),(),(0),(),(2),()]
 
-SCIDB QUERY : <redimension_store(B,D)>
+SCIDB QUERY : <store(redimension(B,D),D)>
 [(10),(11),(12)]
 
 SCIDB QUERY : <unpack(B,row)>
@@ -64,7 +64,7 @@ SCIDB QUERY : <project(B,x)>
 SCIDB QUERY : <join(B,B)>
 {9}[(),(0,0),(1,1),(2,2),(),()]
 
-SCIDB QUERY : <cross(B,B)>
+SCIDB QUERY : <cross_join(B,B)>
 {9,9}[[(),(),()],[(),(0,true,0),(0,true,1)],[(),(1,true,0),(1,true,1)]];[[(),(),()],[(0,true,2),(),()],[(1,true,2),(),()]];{12,9}[[(),(2,true,0),(2,true,1)],[(),(),()],[(),(),()]];[[(2,true,2),(),()],[(),(),()],[(),(),()]]
 
 SCIDB QUERY : <apply(B,z,x-a)>
@@ -112,7 +112,7 @@ SCIDB QUERY : <project(C,x)>
 SCIDB QUERY : <join(C,C)>
 {3}[(),(),(0,0),(),(2,2),()]
 
-SCIDB QUERY : <cross(C,C)>
+SCIDB QUERY : <cross_join(C,C)>
 {3,3}[[(),(),()],[(),(),()],[(),(),(0,true,0)]];[[(),(),()],[(),(),()],[(),(0,true,2),()]];{6,3}[[(),(),()],[(),(),(2,true,0)],[(),(),()]];[[(),(),()],[(),(2,true,2),()],[(),(),()]]
 
 SCIDB QUERY : <apply(C,z,x-a)>
@@ -160,7 +160,7 @@ SCIDB QUERY : <project(D,a)>
 SCIDB QUERY : <join(D,D)>
 [(10,10),(11,11),(12,12)]
 
-SCIDB QUERY : <cross(D,D)>
+SCIDB QUERY : <cross_join(D,D)>
 [[(10,true,10),(10,true,11),(10,true,12)],[(11,true,10),(11,true,11),(11,true,12)],[(12,true,10),(12,true,11),(12,true,12)]]
 
 SCIDB QUERY : <apply(D,z,x-a)>

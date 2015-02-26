@@ -199,11 +199,11 @@
           <primary>collisions</primary>
         </indexterm><indexterm>
           <primary>cell collisions</primary>
-        </indexterm>The redimension and redimension_store operators can yield
-      result arrays with fewer cells than the source array. This can occur
-      when there are "cell collisions." A cell collision occurs when a single
-      cell location of the result array has more than one corresponding cell
-      in the source array.</para>
+        </indexterm>The redimension operator can yield result arrays with
+      fewer cells than the source array. This can occur when there are "cell
+      collisions." A cell collision occurs when a single cell location of the
+      result array has more than one corresponding cell in the source
+      array.</para>
 
       <para>There are three techniques for handling cell
       collisions:<itemizedlist>
@@ -231,9 +231,8 @@
         </itemizedlist></para>
 
       <para>For details on these techniques, see the <link
-      linkend="redimension">redimension</link> and <link
-      linkend="redimensionStore">redimension_store</link> operator reference
-      sections.</para>
+      linkend="redimension">redimension</link> operator reference
+      section.</para>
     </section>
 
     <section>
@@ -248,11 +247,10 @@
 
           <secondary>redimensioning</secondary>
         </indexterm>Nullable attributes are handled in a special manner by
-      redimension_store. If the source array contains null values for the
-      attribute being transformed, these cells will be dropped during the
-      redimension_store. For example, consider the 1-dimensional array
-      <emphasis role="bold">redim_missing</emphasis>: <programlisting
-      language="test">--afl store(build(&lt;val1:int64&gt;[i=0:9,10,0],i/5),first); --show-query=no --show-output=no
+      redimension. If the source array contains null values for the attribute
+      being transformed, these cells will be dropped during the redimension.
+      For example, consider the 1-dimensional array <emphasis
+      role="bold">redim_missing</emphasis>: <programlisting language="test">--afl store(build(&lt;val1:int64&gt;[i=0:9,10,0],i/5),first); --show-query=no --show-output=no
 --afl store(build(&lt;val2:int64 null&gt;[i=0:9,10,0],iif(i!=5,i%5,null)),second);
        --show-query=no --show-output=no
 --afl store(build(&lt;val3:double&gt;[i=0:9,10,0], '[(1),(0.540302),
@@ -432,8 +430,7 @@
       the <code>subarray </code>operator. For example, you can select a 2-by-2
       array of the last two values from each dimension of the array <code>m4x4
       </code>with the following <code>subarray </code>query: <programlisting
-      language="test">
---schema m4x4 --show-output=yes --show-query=yes
+      language="test">--schema m4x4 --show-output=yes --show-query=yes
 --afl scan(m4x4); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes	</programlisting>
       <programlisting language="test">
 --aql SELECT * FROM subarray(m4x4, 2, 2, 3, 4); --show-query=yes --show-output=yes --output-format=dense --chunkify=yes</programlisting></para>
@@ -615,7 +612,7 @@
       your array. This example demonstrates how you can take slices from an
       existing array and then reassemble them into a array with a different
       schema. Consider the following 2-dimensional array: <programlisting
-      language="test">--afl rename(two_dim, Dsp); --show-query=no --show-output=no
+      language="test">--afl store(two_dim, Dsp); --show-query=no --show-output=no
 --afl scan(Dsp) --show-output=yes --show-query=yes
 --schema Dsp --show-output=yes --show-query=yes
 </programlisting></para>

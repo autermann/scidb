@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -58,7 +58,7 @@ public:
         //We will produce this array only on coordinator
         if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
         {
-            std::string const& text = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+            std::string const text = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
             vector<boost::shared_ptr<Tuple> > tuples(1);
             Tuple& tuple = *new Tuple(1);
             tuples[0] = shared_ptr<Tuple>(&tuple);

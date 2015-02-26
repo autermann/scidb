@@ -10,21 +10,21 @@ store(join(build_sparse(ABR2, x+2 ,1),build_sparse(ABR2, x+1, 1)),ABR1)
 --echo "issuing redim"
 #redimension_store(ABR1,ABR3)
 
---shell --command "../utils/killquery.sh -afl 2 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 2 1 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_1.stdout || echo FAILURE" --store
 # log the output
 --shell --command "cat /tmp/${HPID}_1.stdout"
 
---shell --command "../utils/killquery.sh -afl 15 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 15 1 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_2.stdout || echo FAILURE" --store
 # log the output
 --shell --command "cat /tmp/${HPID}_2.stdout"
 
---shell --command "../utils/killquery.sh -afl 9 1 'redimension_store(ABR1, ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
+--shell --command "../utils/killquery.sh -afl 9 1 'store(redimension(ABR1, ABR3), ABR3)' 1> /tmp/${HPID}_3.stdout || echo FAILURE" --store
 # log the output
 --shell --command "cat /tmp/${HPID}_3.stdout"
 
 
 --echo "should be empty..."
-count(ABR3)
+aggregate(ABR3,count(*))
 versions(ABR3)
 --error "scan(ABR3:a)"
 

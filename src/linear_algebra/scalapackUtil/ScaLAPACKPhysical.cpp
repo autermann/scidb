@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -178,7 +178,7 @@ void ScaLAPACKPhysical::checkInputArray(boost::shared_ptr<Array>& Ain) const
 
 void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
                              slpp::int_t nPRow, slpp::int_t nPCol,
-                             slpp::int_t myPRow, slpp::int_t myPCol)
+                             slpp::int_t myPRow, slpp::int_t myPCol, const shared_ptr<Query>& query)
 {
     // use extractDataToOp() and the reformatToScalapack() operator
     // to reformat the data according to ScaLAPACK requirements.
@@ -187,7 +187,7 @@ void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp:
     scidb::ReformatToScalapack pdelsetOp(dst, desc, coordFirst[0], coordFirst[1], nPRow, nPCol, myPRow, myPCol);
 
     Timing reformatTimer;
-    extractDataToOp(array, /*attrID*/0, coordFirst, coordLast, pdelsetOp);
+    extractDataToOp(array, /*attrID*/0, coordFirst, coordLast, pdelsetOp, query);
     LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK took " << reformatTimer.stop());
 }
 

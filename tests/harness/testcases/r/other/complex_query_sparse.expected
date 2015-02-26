@@ -36,11 +36,11 @@ SCIDB QUERY : <apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x)>
 {1,6} -3.42857,1
 {1,7} -4.57143,1
 
-SCIDB QUERY : <count(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8))>
+SCIDB QUERY : <aggregate(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),count(*))>
 {i} count
 {0} 16
 
-SCIDB QUERY : <count(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x))>
+SCIDB QUERY : <aggregate(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),count(*))>
 {i} count
 {0} 16
 
@@ -55,7 +55,7 @@ SCIDB QUERY : <join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m
 {0,3} -2.28571,0,-3.42857
 {0,4} -2.28571,0,-4.57143
 
-SCIDB QUERY : <count(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])))>
+SCIDB QUERY : <aggregate(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),count(*))>
 {i} count
 {0} 5
 
@@ -71,7 +71,7 @@ SCIDB QUERY : <regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8
 {0,0} 0
 {0,1} 0
 
-SCIDB QUERY : <cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse)>
+SCIDB QUERY : <cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse)>
 {x,y,x,y} z_sum,val
 {0,0,0,0} 0,0
 {0,0,0,1} 0,-1.14286
@@ -84,24 +84,24 @@ SCIDB QUERY : <cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0
 {0,1,0,3} 0,-3.42857
 {0,1,0,4} 0,-4.57143
 
-SCIDB QUERY : <count(cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse))>
+SCIDB QUERY : <aggregate(cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),count(*))>
 {i} count
 {0} 10
 
-SCIDB QUERY : <unpack(project(subarray(cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i)>
+SCIDB QUERY : <unpack(project(subarray(cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i)>
 {i} x,y,x,y,val
 {0} 0,0,0,0,0
 {1} 0,0,0,1,-1.14286
 {2} 0,1,0,0,0
 {3} 0,1,0,1,-1.14286
 
-SCIDB QUERY : <explain_physical('store(unpack(project(subarray(cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i),ZZZ)', 'afl')>
+SCIDB QUERY : <explain_physical('store(unpack(project(subarray(cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i),ZZZ)', 'afl')>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <explain_logical('store(unpack(project(subarray(cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i),ZZZ)', 'afl')>
+SCIDB QUERY : <explain_logical('store(unpack(project(subarray(cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i),ZZZ)', 'afl')>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(unpack(project(subarray(cross(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i),ZZZ)>
+SCIDB QUERY : <store(unpack(project(subarray(cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_sparse,2,2),0,1,9,8),z,x),repart(m5x5_sparse,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_sparse),0,0,0,0,1,1,1,1),val),i),ZZZ)>
 {i} x,y,x_2,y_2,val
 {0} 0,0,0,0,0
 {1} 0,0,0,1,-1.14286

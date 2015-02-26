@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -46,6 +46,7 @@ configure_file(config.ini.planet "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/con
 configure_file(config.ini.ec2 "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/config.ini.ec2")
 configure_file(scidb_cores "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/scidb_cores")
 configure_file(loadcsv.py.in "${GENERAL_OUTPUT_DIRECTORY}/loadcsv.py")
+configure_file(scidb_backup.py "${GENERAL_OUTPUT_DIRECTORY}/scidb_backup.py")
 
 add_executable(benchGen benchGen.cc) 
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "benchGen" benchGen)

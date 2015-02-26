@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,20 +32,17 @@
 #define STORAGE_H_
 
 #include <stdlib.h>
-#include <string>
 #include <exception>
 #include <limits>
-
+#include <string>
+#include <map>
 #include <system/Cluster.h>
-#include "array/MemArray.h"
-#include "array/Compressor.h"
+#include <array/MemArray.h>
+#include <array/Compressor.h>
 #include <query/Query.h>
 
 namespace scidb
 {
-    using namespace std;
-    using namespace boost;
-
     /**
      * An extension of Address that specifies the chunk of a persistent array.
      *
@@ -165,38 +162,8 @@ namespace scidb
 
     class ListChunkDescriptorsArrayBuilder;
     class ListChunkMapArrayBuilder;
-
-    /**
-     * Descriptor of database segment.
-     * It is used to describe partition or file used to store data
-     */
-    struct Segment
-    {
-        /**
-         * Path to the file or raw partition
-         */
-        string path;
-        /**
-         * Size of raw partition or maximal size of the file
-         */
-        uint64_t size;
-
-        /**
-         * Segment constructor
-         */
-        Segment(string path, uint64_t size)
-        {
-            this->path = path;
-            this->size = size;
-        }
-
-        /**
-         * Default constructor
-         */
-        Segment() {}
-    };
-
     class PersistentChunk;
+
     /**
      * Storage manager interface
      */
@@ -206,13 +173,12 @@ namespace scidb
         virtual ~Storage() {}
         /**
          * Open storage manager at specified URL.
-         * Format and sematic of storage URL depends in particular implementation of storage manager.
+         * Format and semantic of storage URL depends in particular implementation of storage manager.
          * For local storage URL specifies path to the description file.
          * Description file has the following format:
          * ----------------------
          * <storage-header-path>
-         * <segment1-size-Mb> <segment1-path>
-         * <segment2-size-Mb> <segment2-path>
+         * <log size limit> <storage-log-path>
          * ...
          * ----------------------
          * @param url implementation dependent database url
@@ -248,11 +214,11 @@ namespace scidb
                                                                             boost::shared_ptr<Query>& query) = 0;
 
         /**
-         * Flush all changes to the physical device(s).
-         * If power fault or system failure happens when there is some unflushed data, then these changes
-         * can be lost
+         * Flush all changes to the physical device(s) for the indicated array.  (optionally flush data
+         * for all arrays if uaId == INVALID_ARRAY_ID). If power fault or system failure happens when there
+         * is some unflushed data, then these changes can be lost
          */
-        virtual void flush() = 0;
+        virtual void flush(ArrayUAID uaId = INVALID_ARRAY_ID) = 0;
 
         /**
          * Close storage manager
@@ -295,10 +261,10 @@ namespace scidb
             uint64_t nSegments;
         };
 
-        virtual uint64_t getCurrentTimestamp() const = 0;
-        
         virtual void getDiskInfo(DiskInfo& info) = 0;
 
+        virtual uint64_t getCurrentTimestamp() const = 0;
+        
         /**
          * Method for creating a list of chunk descriptors. Implemented by LocalStorage.
          * @param builder a class that creates a list array
@@ -486,7 +452,7 @@ namespace scidb
     {
       public:
         /**
-         * Set custom miplementaiton of storage manager
+         * Set custom implementaiton of storage manager
          */
         static void setInstance(Storage& storage) {
             instance = &storage;

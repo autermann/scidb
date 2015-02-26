@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,9 +41,7 @@
 #include <log4cxx/logger.h>
 
 #include "query/QueryProcessor.h"
-#include "query/parser/QueryParser.h"
-#include "query/parser/AST.h"
-#include "query/parser/ALTranslator.h"
+#include "query/Parser.h"
 #include "smgr/io/Storage.h"
 #include "network/NetworkManager.h"
 #include "system/SciDBConfigOptions.h"
@@ -107,11 +105,7 @@ boost::shared_ptr<Query> QueryProcessorImpl::createQuery(string queryString, Que
 
 void QueryProcessorImpl::parseLogical(boost::shared_ptr<Query> query, bool afl)
 {
-    QueryParser queryParser(false);
-    boost::shared_ptr<AstNode> root = queryParser.parse(query->queryString, !afl);
-    // Infer AQL Types
-    //if (!afl) root->inferAQLTypes();
-    query->logicalPlan = boost::make_shared<LogicalPlan>(AstToLogicalPlan(root.get(), query, true));
+    query->logicalPlan = boost::make_shared<LogicalPlan>(parseStatement(query,afl));
 }
 
 
@@ -243,7 +237,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
         }
         query->setCurrentResultArray(currentResultArray);
 
-        notify(query); 
+        notify(query);
 
         if (query->getCoordinatorID() == COORDINATOR_INSTANCE)
         {
@@ -290,7 +284,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
         return boost::shared_ptr<Array>();
     }
     else
-    {        
+    {
         for (size_t i = 0; i < childs.size(); i++)
         {
             boost::shared_ptr<Array> arg = execute(childs[i], query, depth+1);

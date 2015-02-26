@@ -25,13 +25,13 @@ SCIDB QUERY : <build( <a:char,b:char>[x=0:2,3,0],'[(1,5),(2,6),(3,7)]',1)>
 {1} '2','6'
 {2} '3','7'
 
-SCIDB QUERY : <redimension_store(build( <a:char,b:char>[x=0:2,3,0],'[(1,5),(2,6),(3,7)]',1),B)>
+SCIDB QUERY : <store(redimension(build( <a:char,b:char>[x=0:2,3,0],'[(1,5),(2,6),(3,7)]',1),B),B)>
 {a} b
 {'1'} '5'
 {'2'} '6'
 {'3'} '7'
 
-SCIDB QUERY : <redimension_store(build( <a:char,b:char>[x=0:2,3,0],'[(1,5),(2,6),(3,7)]',1),C)>
+SCIDB QUERY : <store(redimension(build( <a:char,b:char>[x=0:2,3,0],'[(1,5),(2,6),(3,7)]',1),C),C)>
 {b} a
 {'5'} '1'
 {'6'} '2'

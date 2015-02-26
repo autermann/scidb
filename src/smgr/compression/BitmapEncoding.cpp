@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -230,7 +230,7 @@ namespace scidb {
 
         if(!_bitmapElements) { return chunkSize; }
 
-        uint8_t* dst = (uint8_t*)chunk.getData();
+        uint8_t* dst = (uint8_t*)chunk.getDataForLoad();
         ByteInputItr in((uint8_t *)src, size);
         uint32_t bmLength = ceil(_bitmapElements / 8.0);
         uint32_t individualBMLength = bmLength + _elementSize; // value + bm

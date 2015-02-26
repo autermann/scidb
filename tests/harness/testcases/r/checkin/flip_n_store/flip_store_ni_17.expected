@@ -13,10 +13,10 @@ Query was executed successfully
 SCIDB QUERY : <store(join(build_sparse(T,string(x+1),1),build_sparse(T,string(x+5),1)),A)>
 [{0}('1','5'),{1}('2','6'),{2}('3','7')]
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 [('5'),('6'),('7')]
 
-SCIDB QUERY : <redimension_store(B,C)>
+SCIDB QUERY : <store(redimension(B,C),C)>
 [('1'),('2'),('3')]
 
 SCIDB QUERY : <unpack(B,row)>
@@ -70,7 +70,7 @@ SCIDB QUERY : <project(B1,b)>
 SCIDB QUERY : <join(B1,B1)>
 [('5','5'),('6','6'),('7','7')]
 
-SCIDB QUERY : <cross(B1,B1)>
+SCIDB QUERY : <cross_join(B1,B1)>
 [[('5',true,'5'),('5',true,'6'),('5',true,'7')],[('6',true,'5'),('6',true,'6'),('6',true,'7')],[('7',true,'5'),('7',true,'6'),('7',true,'7')]]
 
 SCIDB QUERY : <apply(B1,z,a+'_z')>
@@ -136,7 +136,7 @@ SCIDB QUERY : <project(C1,a)>
 SCIDB QUERY : <join(C1,C1)>
 [('1','1'),('2','2'),('3','3')]
 
-SCIDB QUERY : <cross(C1,C1)>
+SCIDB QUERY : <cross_join(C1,C1)>
 [[('1',true,'1'),('1',true,'2'),('1',true,'3')],[('2',true,'1'),('2',true,'2'),('2',true,'3')],[('3',true,'1'),('3',true,'2'),('3',true,'3')]]
 
 SCIDB QUERY : <apply(C1,z,a+'_z')>

@@ -26,8 +26,7 @@
 
     <para>The new array must have the same number of attributes as the source
     array. The reshape operator cannot convert attributes to dimensions or
-    vice versa. For that, use <link linkend="redimension">redimension</link>
-    or <link linkend="redimensionStore">redimension_store</link>.</para>
+    vice versa. For that, use <link linkend="redimension">redimension</link>.</para>
 
     <para>The new array must have the same number of cells as the source
     array, but the resulting array can have more or fewer dimensions than the

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,14 +51,22 @@ public class JIQuery
                     System.out.println("Warning: " + whatStr);
                 }
             });
+
             conn.connect("localhost", 1239);
             Result res = conn.prepare(queryString);
             Array arr = conn.execute();
+
+            if (arr == null)
+            {
+                return;
+            }
+
             out.println(arr.getSchema().toString());
+
             arr.fetch();
             while (!arr.getEmptyBitmap().endOfArray())
             {
-            	while (!arr.endOfChunk())
+                while (!arr.endOfChunk())
                 {
                     if (arr.getEmptyBitmap() != null)
                     {

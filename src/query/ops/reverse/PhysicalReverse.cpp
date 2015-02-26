@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -96,12 +96,9 @@ public:
     {
 		assert(inputArrays.size() == 1);
 		assert(_parameters.size() == 0);
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
+		shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
 
-		return boost::shared_ptr<Array>(new ReverseArray(_schema, inputArrays[0]));
+		return make_shared<ReverseArray>(_schema, inputArray);
 	 }
 };
     

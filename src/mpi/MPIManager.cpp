@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,6 +42,17 @@ using namespace std;
 
 namespace scidb
 {
+namespace mpi
+{
+SharedMemoryIpc::SharedMemoryIpcType_t getShmIpcType()
+{
+    if (scidb::Config::getInstance()->getOption<string>(CONFIG_MPI_SHM_TYPE) == "FILE") {
+        return SharedMemoryIpc::FILE_TYPE;
+    }
+    return SharedMemoryIpc::SHM_TYPE;
+}
+}
+
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.mpi"));
 
 bool startsWith(const std::string& left, const std::string& right)
@@ -79,7 +90,7 @@ MpiManager::MpiManager()
       _mpiLauncherBin = mpi::OMPI_LAUNCHER_BIN;
     } else {
       throw (SYSTEM_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
-	     << string("Unrecognized MPI type value: ")+mpiTypeStr);
+             << string("Unrecognized MPI type value: ")+mpiTypeStr);
    }
 }
 
@@ -846,7 +857,7 @@ bool MpiManager::canRecognizeProc(const std::string& installPath,
     std::string procEnvVar;
     if (!mpi::readProcEnvVar(pidFileName,
                         mpi::SCIDBMPI_ENV_VAR,
-			     procEnvVar)) {
+                             procEnvVar)) {
       LOG4CXX_TRACE(logger, myFuncName << ": cannot extract " << mpi::SCIDBMPI_ENV_VAR << " from " << pidFileName);
       return false;
     }
@@ -897,7 +908,7 @@ MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_p
     return new MpiLauncherOMPI(launchId, q);
   }
   throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
-	 << "MpiManager::newMPILauncher");
+         << "MpiManager::newMPILauncher");
   return NULL;
 }
 
@@ -911,7 +922,7 @@ MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_p
     return new MpiLauncherOMPI(launchId, q, timeout);
   }
   throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
-	 << "MpiManager::newMPILauncher");
+         << "MpiManager::newMPILauncher");
   return NULL;
 }
 

@@ -1,4 +1,4 @@
-SCIDB QUERY : <count(barrier)>
+SCIDB QUERY : <aggregate(barrier,count(*))>
 {i} count
 {0} 250001
 

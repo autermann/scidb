@@ -26,9 +26,9 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The <code>approxdc</code> operator takes a set of values from
-    an array attribute and returns an approximate count of the number of
-    distinct values present.</para>
+    <para>The <code>approxdc</code> operator takes a set of values from an
+    array attribute and returns an approximate count of the number of distinct
+    values present.</para>
 
     <para>The result array contains the aggregation result as a new attribute.
     The name of this attribute is
@@ -66,10 +66,10 @@
   </refsect1>
 
   <refsect1>
-    <title>Examples</title>
+    <title>Example</title>
 
     <informalexample>
-      <para>These examples find the approximate number of distinct integers in
+      <para>This example finds the approximate number of distinct integers in
       an array.</para>
 
       <procedure>
@@ -85,7 +85,7 @@
 
         <step>
           <para>Retrieve an approximate count of the number of distinct values
-          in the array.<programlisting language="test">--afl approxdc(counting);</programlisting>As
+          in the array.<programlisting language="test">--afl aggregate(counting,approxdc(val));</programlisting>As
           you can see, the result, 997498, is within a few percent of the
           actual number of distinct values in the array.</para>
         </step>
@@ -102,7 +102,7 @@
 
         <step>
           <para>Retrieve an approximate count of the number of distinct values
-          in the array.<programlisting language="test">--afl approxdc(counting,val);</programlisting>In
+          in the array.<programlisting language="test">--afl aggregate(counting,approxdc(val));</programlisting>In
           this case, notice that the result is exact.</para>
         </step>
       </procedure>

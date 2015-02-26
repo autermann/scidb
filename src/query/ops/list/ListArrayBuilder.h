@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -129,7 +129,7 @@ private:
     {
         STORAGE_VERSION     =0,
         INSTANCE_ID         =1,
-        DISK_SEGMENT_NO     =2,
+        DATASTORE_GUID      =2,
         DISK_HEADER_POS     =3,
         DISK_OFFSET         =4,
         V_ARRAY_ID          =5,
@@ -192,7 +192,7 @@ private:
     {
         STORAGE_VERSION     =0,
         INSTANCE_ID         =1,
-        DISK_SEGMENT_NO     =2,
+        DATASTORE_GUID      =2,
         DISK_HEADER_POS     =3,
         DISK_OFFSET         =4,
         U_ARRAY_ID          =5,
@@ -220,9 +220,8 @@ private:
         FIRST_POS_OVERLAP   =27,
         LAST_POS_OVERLAP    =28,
         STORAGE             =29,
-        LOADER              =30,
-        EMPTY_INDICATOR     =31,
-        NUM_ATTRIBUTES      =32
+        EMPTY_INDICATOR     =30,
+        NUM_ATTRIBUTES      =31
     };
 
     /**

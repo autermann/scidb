@@ -36,7 +36,7 @@ gesvd(A_1c32, 'SIGMA')
 
 # also demonstrate result has a fully-defined schema (by storing into un-created array),
 # that it does not have the "not emptyable" attribute, and that it can be scanned.
---justrun "remove tmp"
+--justrun "remove(tmp)"
 store(gesvd(A_1c32, 'U'),  tmp)
 show(tmp)
 scan(tmp)

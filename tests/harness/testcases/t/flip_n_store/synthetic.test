@@ -7,8 +7,8 @@ create array Bad<i:int64>[x=0:3,2,0, s=0:1,1,0]
 store(build(Input, i/2), Input)
 
 --test
-redimension_store(Input, Good)
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_REDIMENSION_STORE_ERROR7 "redimension_store(Input, Bad)"
+store(redimension(Input, Good), Good)
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_REDIMENSION_STORE_ERROR7 "store(redimension(Input, Bad), Bad)"
 
 --cleanup
 remove(Input)

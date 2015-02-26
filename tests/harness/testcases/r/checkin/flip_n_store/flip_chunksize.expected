@@ -10,7 +10,7 @@ SCIDB QUERY : <store(join(A,A), C)>
 SCIDB QUERY : <create array T <a:uint64> [x=1:1024,1024,0,y=1:100,10,0,a_2=1:(1024*1024),1024,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(C,T)>
+SCIDB QUERY : <store(redimension(C,T),T)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <remove(A)>

@@ -5,7 +5,7 @@
 --test
 
 --igdata --aql="select * from show(A)"
---aql select * from count(A)
+--aql select * from aggregate(A,count(*))
 --aql select name,schema from list('arrays')
 --aql rename array A to B
 --aql select name,schema from list()
@@ -26,7 +26,7 @@
 --aql select name, high('B'), low('B'), dim.high, dim.low from dimensions(B) as dim
 --aql select name, start, length, chunk_interval, chunk_overlap, low, high, type from dimensions(B)
 --aql select name, type_id, nullable from attributes(B)
---aql select * from count(versions(B))
+--aql select * from aggregate(versions(B),count(*))
 --aql select version_id from versions(B)
 --aql select * into B from build_sparse(B,x+2,1)
 --aql select * from allversions(B)
@@ -38,10 +38,10 @@
 --aql select * from dimensions(A2)
 --aql select * into A3 from deldim(A2)
 --aql select * from dimensions(A3)
---aql select * from sum(A)
---aql select * from avg(A)
---aql select * from max(A)
---aql select * from min(A)
+--aql select * from aggregate(A,sum(a))
+--aql select * from aggregate(A,avg(a))
+--aql select * from aggregate(A,max(a))
+--aql select * from aggregate(A,min(a))
 --igdata --aql="select * from sample(A,1)"
 --igdata --aql="select * from bernoulli(A,1)"
 --aql select * from A where x between 0 and 1

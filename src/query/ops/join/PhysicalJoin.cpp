@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -142,16 +142,11 @@ public:
     boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
-
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM ||
-            inputArrays[1]->getSupportedAccess() != Array::RANDOM)
-        {
-            //We use setPosition to align data, so input arrays must support it
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
         boost::shared_ptr<Array> left = inputArrays[0];
         boost::shared_ptr<Array> right = inputArrays[1];
+        left = ensureRandomAccess(left, query);
+        right = ensureRandomAccess(right, query);
+
         return boost::shared_ptr<Array>(_schema.getEmptyBitmapAttribute() == NULL
                                         ? (Array*)new JoinArray(_schema, left, right)
                                         : (Array*)new JoinEmptyableArray(_schema, left, right));

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -154,6 +154,11 @@ public:
     void finalResult(Value& result, Value const& state)
     {
         result = state;
+        if(state.getMissingReason() == 1)
+        {
+            //we didn't see any values, return null
+            result.setNull();
+        }
     }
 };
 

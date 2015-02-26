@@ -98,7 +98,7 @@
  --show-query=no
  --show-output=no
 
---afl redimension_store(aFlat,A)
+--afl store(redimension(aFlat,A),A)
  --show-query=no
  --show-output=no
 

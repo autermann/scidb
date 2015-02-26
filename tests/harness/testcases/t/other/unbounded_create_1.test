@@ -4,7 +4,7 @@
 
 create empty array imtest <a:int64>[x=0:*,10,0, y=0:*,10,0]
 
-count(imtest)
+aggregate(imtest,count(*))
 
 dimensions(imtest)
 

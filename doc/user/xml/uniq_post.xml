@@ -83,7 +83,7 @@
         <step>
           <para>Remove nulls and duplicate values using
           <command>uniq()</command>, and set the chunk size of the result
-          array to 16.<para><programlisting>AFL% uniq(A_sorted,'chunk_size=16');  </programlisting><screen>[(0.61),(1.15),(1.54),(1.83),(3.14),(3.56),(3.99),(4.14),(4.54),(4.99),(),(),(),(),(),()]
+          array to 10.<para><programlisting>AFL% uniq(A_sorted,'chunk_size=10');  </programlisting><screen>[(0.61),(1.15),(1.54),(1.83),(3.14),(3.56),(3.99),(4.14),(4.54),(4.99)]
 </screen></para></para>
         </step>
       </procedure>

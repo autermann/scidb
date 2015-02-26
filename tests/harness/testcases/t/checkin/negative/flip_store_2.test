@@ -7,10 +7,10 @@ store(build_sparse(A,10,x=0),A)
 
 
 --test
-redimension_store(A,B)
+store(redimension(A,B),B)
 store(build_sparse(A,30,x=2),A)
 scan(B)
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION "redimension_store(A,B)"
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION "store(redimension(A,B),B)"
 scan(B)
 
 

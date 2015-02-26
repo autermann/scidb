@@ -13,10 +13,10 @@ SCIDB QUERY : <store(build_sparse(A,10,x=0),A)>
 SCIDB QUERY : <store(build_sparse(C,7,x=9),C)>
 [{9}(7)]
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {9}[(),(0),()]
 
-SCIDB QUERY : <redimension_store(C,B)>
+SCIDB QUERY : <store(redimension(C,B),B)>
 {6}[(),(9),(),(),(0),()]
 
 SCIDB QUERY : <max(B)>
@@ -49,7 +49,7 @@ SCIDB QUERY : <project(B,x)>
 SCIDB QUERY : <join(B,B)>
 {6}[(),(9,9),(),(),(0,0),()]
 
-SCIDB QUERY : <cross(B,B)>
+SCIDB QUERY : <cross_join(B,B)>
 {6,6}[[(),(),()],[(),(9,true,9),()],[(),(),()]];[[(),(),()],[(),(9,true,0),()],[(),(),()]];{9,6}[[(),(),()],[(),(0,true,9),()],[(),(),()]];[[(),(),()],[(),(0,true,0),()],[(),(),()]]
 
 SCIDB QUERY : <apply(B,z,x-a)>

@@ -5,7 +5,7 @@ store(build(Foo, i + 10), Foo)
 create empty array Foo_Flipped<i:int64>[x(double)=*,10,0]
 
 --test
-redimension_store(Foo, Foo_Flipped)
+store(redimension(Foo, Foo_Flipped), Foo_Flipped)
 subarray(Foo_Flipped, 11, 12)
 store(Foo_Flipped, Foo_Copy)
 subarray(Foo_Copy, 11, 12)

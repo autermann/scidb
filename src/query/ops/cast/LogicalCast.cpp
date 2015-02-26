@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -147,18 +147,12 @@ public:
         for (size_t i = 0, n = srcDimensions.size(); i < n; i++) {
             DimensionDesc const& srcDim = srcDimensions[i];
             DimensionDesc const& dstDim = dstDimensions[i];
-            if (!(srcDim.getEndMax() == dstDim.getEndMax() 
-                  || (srcDim.getEndMax() < dstDim.getEndMax() 
+            if (!(srcDim.getEndMax() == dstDim.getEndMax()
+                  || (srcDim.getEndMax() < dstDim.getEndMax()
                       && ((srcDim.getLength() % srcDim.getChunkInterval()) == 0
                           || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR5, pc) << dstDim.getBaseName();
-            if (srcDim.getStart() != dstDim.getStart())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6, pc) << dstDim.getBaseName();
-            if (srcDim.getChunkInterval() != dstDim.getChunkInterval())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR7, pc) << dstDim.getBaseName();
-            if (srcDim.getChunkOverlap() != dstDim.getChunkOverlap())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR8, pc) << dstDim.getBaseName();
-            
+
             if (!srcDim.getEndMax() != dstDim.getEndMax()) {
                 _properties.tile = false;
             }
@@ -168,12 +162,12 @@ public:
             //If you want to change the bounds, properly, use subarray.
             dstDimensions[i] = DimensionDesc(dstDim.getBaseName(),
                                              dstDim.getNamesAndAliases(),
-                                             dstDim.getStartMin() == MIN_COORDINATE && srcDim.getCurrStart() != MAX_COORDINATE ? srcDim.getStartMin() : dstDim.getStartMin(),
-                                             srcDim.getCurrStart(), 
-                                             srcDim.getCurrEnd(), 
+                                             srcDim.getStartMin(),
+                                             srcDim.getCurrStart(),
+                                             srcDim.getCurrEnd(),
                                              dstDim.getEndMax() == MAX_COORDINATE && srcDim.getCurrEnd() != MIN_COORDINATE ? srcDim.getEndMax() : dstDim.getEndMax(),
-                                             dstDim.getChunkInterval(), 
-                                             dstDim.getChunkOverlap());
+                                             srcDim.getChunkInterval(),
+                                             srcDim.getChunkOverlap());
         }
         return ArrayDesc(schemaParam.getName(), dstAttributes, dstDimensions, schemaParam.getFlags());
     }

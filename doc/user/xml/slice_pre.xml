@@ -19,6 +19,7 @@
         <secondary>slice</secondary>
       </indexterm>Produces a result array that is a subset of the source array
     derived by holding one or more dimension values constant.</refpurpose>
+
   </refnamediv>
 
   <refsynopsisdiv>
@@ -47,19 +48,18 @@
 
       <procedure>
         <step>
-          <para>Create a 3<symbol role="symbolfont">×</symbol>3 array m3x3:
-          <programlisting language="test">--afl CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-query=yes --show-output=yes
-</programlisting></para>
-        </step>
-
-        <step>
-          <para>Put values of 0–8 into m3x3: <programlisting language="test">--afl store(build(m3x3,i*3+j),m3x3); --show-query=yes --show-output=no
+          <para>Create a 3<symbol role="symbolfont">×</symbol>3 array and fill
+          it with values of 0–8: <programlisting language="test">--afl store(build(&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0],i*3+j),m3x3); --output-format=dense --chunkify=yes
 </programlisting></para>
         </step>
 
         <step>
           <para>Select the middle column of m3x3: <programlisting
           language="test">--afl slice(m3x3,j,1); --show-query=yes --show-output=yes
+</programlisting></para>
+
+          <para>You can accomplish the same task using the between operator, as shown in the
+          following query:<programlisting language="test">--afl redimension(between(m3x3,0,1,2,1),&lt;val:double&gt;[i=0:2,3,0]); --show-query=yes --show-output=yes
 </programlisting></para>
         </step>
       </procedure>

@@ -12,15 +12,15 @@ load(B, '../tests/harness/testcases/data/adc_sparse1.txt')
 
 --test
 --set-format lcsv+
-ApproxDC(A)
-ApproxDC(concat(A,A))
-ApproxDC(join(A,A))
+aggregate(A,approxdc(num))
+aggregate(concat(A,A),approxdc(num))
+aggregate(join(A as A1,A),approxdc(A1.num))
 aggregate(A,ApproxDC(num))
 aggregate(A,ApproxDC(num),sum(num))
 aggregate(A,ApproxDC(num),sum(num),min(num),max(num),count(num))
 
-ApproxDC(B)
-ApproxDC(join(B,B))
+aggregate(B,approxdc(val))
+aggregate(join(B as B1,B),approxdc(B1.val))
 aggregate(B,ApproxDC(val))
 aggregate(B,ApproxDC(val),sum(val),min(val),max(val),count(val))
 

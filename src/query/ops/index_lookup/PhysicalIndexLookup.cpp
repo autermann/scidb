@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -591,7 +591,7 @@ private:
         //note: if indexPreSorted is true, this is just an iterator over the empty tag; harmless
         shared_ptr<ConstArrayIterator> positionArrayIter = indexArray->getConstIterator(1);
         Value indexValueToAdd;
-        Coordinate positionInSortedArray, positionInOriginalArray;
+        Coordinate positionInSortedArray(-1), positionInOriginalArray(-1);
         bool currentValIsAdded = true, newChunk = true;
         while (!valueArrayIter->end())
         {

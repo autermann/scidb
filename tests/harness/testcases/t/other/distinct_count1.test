@@ -27,14 +27,6 @@ load(A7,'../tests/harness/testcases/data/adc2.txt')
 
 
 --test
-ApproxDC(A1)
-ApproxDC(A2)
-ApproxDC(A3)
-ApproxDC(A4)
-ApproxDC(A5)
-ApproxDC(A6)
-ApproxDC(A7)
-
 aggregate(A1, ApproxDC(val1))
 aggregate(A2, ApproxDC(val1))
 aggregate(A3, ApproxDC(val1))

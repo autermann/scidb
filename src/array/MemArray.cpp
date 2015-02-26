@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,18 +30,20 @@
  * @author others
  */
 
-#include "log4cxx/logger.h"
+#include <log4cxx/logger.h>
 #include <util/Platform.h>
 #include <util/FileIO.h>
-#include "array/MemArray.h"
-#include "system/Exceptions.h"
+#include <array/MemArray.h>
+#include <system/Exceptions.h>
 #ifndef SCIDB_CLIENT
-#include "system/Config.h"
+#include <system/Config.h>
 #endif
-#include "array/Compressor.h"
-#include "system/SciDBConfigOptions.h"
-#include "query/Statistics.h"
+#include <array/Compressor.h>
+#include <system/SciDBConfigOptions.h>
+#include <query/Statistics.h>
 #include <system/Utils.h>
+#include <array/Tile.h>
+#include <array/TileIteratorAdaptors.h>
 
 namespace scidb
 {
@@ -49,6 +51,8 @@ namespace scidb
     using namespace std;
 
     const size_t MAX_SPARSE_CHUNK_INIT_SIZE = 1024*1024;
+
+    const bool _sDebug = false;
 
     // Logger for operator. static to prevent visibility of variable outside of file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.memarray"));
@@ -75,25 +79,31 @@ namespace scidb
     MemArray::~MemArray()
     {
         SharedMemCache::getInstance().cleanupArray(*this);
-        if (_swapFile >= 0) {
-            ::close(_swapFile);
-        }
     }
 
     void MemArray::initLRU()
     {
-        _swapFile = -1;
         _usedFileSize = 0;
     }
 
     inline void MemArray::pinChunk(LruMemChunk& chunk)
     {
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "PIN: chunk="<<(void*)&chunk
+                          << ",  accessCount is " << chunk._accessCount
+                          << "Array="<<(void*)this << ",  name '" << chunk.arrayDesc->getName());
+        }
         Query::getValidQueryPtr(_query);
         SharedMemCache::getInstance().pinChunk(chunk);
     }
 
     inline void MemArray::unpinChunk(LruMemChunk& chunk)
     {
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "UNPIN: chunk="<<(void*)&chunk
+                          << ",  accessCount is " << chunk._accessCount
+                          << "Array="<<(void*)this << ",  name '" << chunk.arrayDesc->getName());
+        }
         // unpin should always succeed because it is called during exception handling
         SharedMemCache::getInstance().unpinChunk(chunk);
     }
@@ -418,13 +428,37 @@ namespace scidb
     boost::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(boost::shared_ptr<Query> const& query, int iterationMode) const
     {
         PinBuffer scope(*this);
-        return boost::shared_ptr<ConstChunkIterator>
-            (isRLE() ? getAttributeDesc().isEmptyIndicator() || getData() == NULL
-                 ? (ConstChunkIterator*)new RLEBitmapChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode, query)
-                 : (ConstChunkIterator*)new RLEConstChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode, query)
-             : isSparse()
-                 ? (ConstChunkIterator*)new SparseChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, false, iterationMode, query)
-                 : (ConstChunkIterator*)new MemChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, false, iterationMode, query));
+        if (isRLE()) {
+            if (getAttributeDesc().isEmptyIndicator() || getData() == NULL) {
+                return boost::make_shared<RLEBitmapChunkIterator>(*arrayDesc, addr.attId,
+                                                                  (Chunk*)this, bitmapChunk,
+                                                                  iterationMode, query);
+            } else if ((iterationMode & ConstChunkIterator::INTENDED_TILE_MODE) ||
+                       (iterationMode & ConstChunkIterator::TILE_MODE)) { //old tile mode
+
+                return boost::make_shared<RLEConstChunkIterator>(*arrayDesc, addr.attId,
+                                                                 (Chunk*)this, bitmapChunk,
+                                                                 iterationMode, query);
+            }
+            // non-tile mode, but using the new tiles for read ahead buffering
+            boost::shared_ptr<RLETileConstChunkIterator> tiledIter =
+               boost::make_shared<RLETileConstChunkIterator>(*arrayDesc,
+                                                             addr.attId,
+                                                             (Chunk*)this,
+                                                             bitmapChunk,
+                                                             iterationMode,
+                                                             query);
+            return boost::make_shared< BufferedConstChunkIterator< boost::shared_ptr<RLETileConstChunkIterator> > >(tiledIter, query);
+        }
+        // deprecated formats
+        if (isSparse()) {
+            return boost::make_shared<SparseChunkIterator>(*arrayDesc, addr.attId,
+                                                           (Chunk*)this, bitmapChunk,
+                                                           false, iterationMode, query);
+        }
+        return boost::make_shared<MemChunkIterator>(*arrayDesc, addr.attId,
+                                                    (Chunk*)this, bitmapChunk,
+                                                    false, iterationMode, query);
     }
     bool MemChunk::pin() const
     {
@@ -580,7 +614,7 @@ namespace scidb
                     if (!chunk.getData())
                         throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
                     const MemArray* array = (const MemArray*)chunk.array;
-                    File::readAll(array->_swapFile, chunk.getData(), chunk.size, chunk._swapFileOffset);
+                    array->_swapFile->readAll(chunk.getData(), chunk.size, chunk._swapFileOffset);
                     ++_loadsNum;
                     _usedMemSize += chunk.size;
                 }
@@ -639,10 +673,10 @@ namespace scidb
                 array->_usedFileSize += victim->size;
                 victim->_swapFileSize = victim->size;
             }
-            if (array->_swapFile < 0) {
-                array->_swapFile = File::createTemporary(array->getName());
+            if (!array->_swapFile) {
+                array->_swapFile = FileManager::getInstance()->createTemporary(array->getName());
             }
-            File::writeAll(array->_swapFile, victim->getData(), victim->size, offset);
+            array->_swapFile->writeAll(victim->getData(), victim->size, offset);
             ++_swapNum;
             victim->free();
         }
@@ -694,7 +728,7 @@ namespace scidb
     {
         ScopedMutexLock cs(_mutex);
         size_t lruSize = computeSizeOfLRU();
-        LOG4CXX_DEBUG(logger, "SharedMemCache::sizeCoherent computed "<<lruSize<<" used "<<_usedMemSize);
+        LOG4CXX_TRACE(logger, "SharedMemCache::sizeCoherent computed "<<lruSize<<" used "<<_usedMemSize);
         //computedSize does not include chunks that are pinned and not on the LRU. So we can't always check for strict equality.
         return lruSize <= _usedMemSize;
     }
@@ -1828,7 +1862,7 @@ namespace scidb
       defaultValue(attrDesc.getDefaultValue()),
       firstPos(dataChunk->getFirstPosition(!(iterationMode & IGNORE_OVERLAPS))),
       lastPos(dataChunk->getLastPosition(!(iterationMode & IGNORE_OVERLAPS))),
-      currPos(_origin.size()),
+      currPos(_nDims),
       isEmptyIndicator(attrDesc.isEmptyIndicator()),
       isNullDefault(defaultValue.isNull()),
       isNullable(attrDesc.isNullable()),
@@ -2003,9 +2037,6 @@ namespace scidb
 
     ConstChunk const& BaseChunkIterator::getChunk()
     {
-        LOG4CXX_TRACE(logger, "BCI::getChunk this=" << this
-                      << ", chunk=" << dataChunk
-                      << ", pinned=" << dataChunkPinned);
         return *dataChunk;
     }
 
@@ -2056,9 +2087,11 @@ namespace scidb
 
     BaseChunkIterator::~BaseChunkIterator()
     {
-        LOG4CXX_TRACE(logger, "~BCI this=" << this
-                      << ", chunk=" << dataChunk
-                      << ", pinned=" << dataChunkPinned);
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "~BCI this=" << this
+                          << ", chunk=" << dataChunk
+                          << ", pinned=" << dataChunkPinned);
+        }
         if (dataChunkPinned) {
             dataChunk->unPin();
         }
@@ -2096,32 +2129,35 @@ namespace scidb
         size_t nDims = dim.size();
         dataChunkPinned = dataChunk->pin();
 
-        LOG4CXX_TRACE(logger, "BCI::BCI this=" << this
-                      << ", chunk=" << dataChunk
-                      << ", pinned=" << dataChunkPinned);
-
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "BCI::BCI this=" << this
+                          << ", chunk=" << dataChunk
+                          << ", pinned=" << dataChunkPinned);
+        }
         position_t nElems = 1;
         hasOverlap = false;
         Coordinates const& firstPos(data->getFirstPosition(true));
         Coordinates const& lastPos(data->getLastPosition(true));
 
-        if ((iterationMode & INTENDED_TILE_MODE) && !attr.isNullable() && type.bitSize() >= 8) {
-            mode |= TILE_MODE;
-        }
-
         for (size_t i = 0; i < nDims; i++) {
             nElems *= lastPos[i] - firstPos[i] + 1;
             hasOverlap |= dim[i].getChunkOverlap() != 0;
         }
-#ifndef SCIDB_CLIENT
-        tileSize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
-        size_t tilesPerChunk = Config::getInstance()->getOption<int>(CONFIG_TILES_PER_CHUNK);
-        if (tilesPerChunk != 0) {
-            tileSize = max(tileSize, _logicalChunkSize/tilesPerChunk);
-        }
-#else
+
         tileSize = 1;
+#ifndef SCIDB_CLIENT
+        if (Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE) > 0) {
+            if ((iterationMode & INTENDED_TILE_MODE) && !attr.isNullable() && type.bitSize() >= 8) {
+                mode |= TILE_MODE;
+            }
+            tileSize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
+            if (Config::getInstance()->getOption<int>(CONFIG_TILES_PER_CHUNK) > 0) {
+                size_t tilesPerChunk = Config::getInstance()->getOption<int>(CONFIG_TILES_PER_CHUNK);
+                tileSize = max(tileSize, _logicalChunkSize/tilesPerChunk);
+            }
+        }
 #endif
+
         isEmptyable = array.getEmptyBitmapAttribute() != NULL;
         tilePos = 0;
     }
@@ -2138,13 +2174,15 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
       payloadIterator(&payload),
       value(type)
     {
-        LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
-                      <<" data="<<data
-                      <<" bitmap "<<bitmap
-                      <<" attr "<<attr
-                      <<" payload data="
-                      << data->getData()
-                      << " #segments=" << payload.nSegments());
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
+                          <<" data="<<data
+                          <<" bitmap "<<bitmap
+                          <<" attr "<<attr
+                          <<" payload data="
+                          << data->getData()
+                          << " #segments=" << payload.nSegments());
+        }
 
         if (((iterationMode & APPEND_CHUNK) || bitmap == NULL) && payload.packedSize() < data->getSize()) {
             emptyBitmap = boost::shared_ptr<ConstRLEEmptyBitmap>(new ConstRLEEmptyBitmap((char*)data->getData() + payload.packedSize()));
@@ -2160,23 +2198,25 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                                            data->getFirstPosition(false),
                                            data->getLastPosition(false));
         }
-
-        LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
-                      <<" ebmCount="<< emptyBitmap->count()
-                      <<" pCount="<<payload.count());
-
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
+                          <<" ebmCount="<< emptyBitmap->count()
+                          <<" pCount="<<payload.count());
+        }
         assert(emptyBitmap->count() <= payload.count());
 
         emptyBitmapIterator = emptyBitmap->getIterator();
         reset();
-        LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
-                      <<" data="<<data
-                      <<" bitmap "<<bitmap
-                      <<" attr "<<attr
-                      <<" payload data="
-                      << data->getData()
-                      << " #segments=" << payload.nSegments()
-                      <<" pCount="<<payload.count());
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
+                          <<" data="<<data
+                          <<" bitmap "<<bitmap
+                          <<" attr "<<attr
+                          <<" payload data="
+                          << data->getData()
+                          << " #segments=" << payload.nSegments()
+                          <<" pCount="<<payload.count());
+        }
     }
 
     void RLEConstChunkIterator::reset()
@@ -2253,6 +2293,9 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
     : BaseChunkIterator(desc, attr, data, iterationMode, query),
       value(type)
     {
+        UnPinner dataUP(dataChunk);
+        dataChunkPinned=false; // bitmap is copied out
+
         if (data->getData() == NULL) {
             emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
         } else {
@@ -2293,7 +2336,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                                        boost::shared_ptr<Query> const& query)
     : BaseChunkIterator(desc, attrID, data, iterationMode, query),
       _arena (arena::newArena(arena::Options("RLEValueMap").pagesize(64*KB).resetting(true))),
-      values(*new(*_arena) ValueMap(_arena)),
+      _values(_arena),
       tileValue(type, true),
       payload(type),
       bitmapChunk(bitmap),
@@ -2311,7 +2354,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
             if (isEmptyable) {
                 shared_ptr<ConstChunkIterator> it = data->getConstIterator(ConstChunkIterator::APPEND_CHUNK|ConstChunkIterator::IGNORE_EMPTY_CELLS);
                 while (!it->end()) {
-                    values[coord2pos(it->getPosition())] = it->getItem();
+                    _values[coord2pos(it->getPosition())] = it->getItem();
                     ++(*it);
                 }
             } else {
@@ -2321,7 +2364,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                     if (it.isDefaultValue(defaultValue)) {
                         it.toNextSegment();
                     } else {
-                        it.getItem(values[it.getPPos()]);
+                        it.getItem(_values[it.getPPos()]);
                         ++it;
                     }
                 }
@@ -2361,9 +2404,8 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
 
     bool RLEChunkIterator::isEmpty()
     {
-        return values.find(getPos()) == values.end();
+        return _values.find(getPos()) == _values.end();
     }
-
 
     Value& RLEChunkIterator::getItem()
     {
@@ -2378,7 +2420,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                 tmpValue = defaultValue;
                 return tmpValue;
             }
-            return values[getPos()];
+            return _values[getPos()];
         }
     }
 
@@ -2396,6 +2438,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         } else {
             if (item.isNull() && !attr.isNullable())
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
+
             if (mode & SEQUENTIAL_WRITE) {
                 if (isEmptyIndicator) {
                     position_t pos = emptyBitmapIterator.getLPos();
@@ -2417,7 +2460,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                 if (!type.variableSize() && item.size() > type.byteSize()) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_TRUNCATION) << item.size() << type.byteSize();
                 }
-                values[getPos()] = item;
+                _values[getPos()] = item;
             }
             if (emptyChunkIterator) {
                 if (!emptyChunkIterator->setPosition(getPosition()))
@@ -2432,13 +2475,13 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         _needsFlush = false;
         if (!(mode & (SEQUENTIAL_WRITE|TILE_MODE))) {
             if (isEmptyIndicator) {
-                RLEEmptyBitmap bitmap(values);
+                RLEEmptyBitmap bitmap(_values);
                 dataChunk->allocate(bitmap.packedSize());
                 bitmap.pack((char*)dataChunk->getData());
             } else {
-                RLEPayload payload(values, emptyBitmap->count(), type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, isEmptyable);
+                RLEPayload payload(_values, emptyBitmap->count(), type.byteSize(), attr.getDefaultValue(), type.bitSize()==1, isEmptyable);
                 if (isEmptyable && (mode & APPEND_CHUNK)) {
-                    RLEEmptyBitmap bitmap(values, true);
+                    RLEEmptyBitmap bitmap(_values, true);
                     dataChunk->allocate(payload.packedSize() + bitmap.packedSize());
                     payload.pack((char*)dataChunk->getData());
                     bitmap.pack((char*)dataChunk->getData() + payload.packedSize());
@@ -2509,4 +2552,595 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         }
     }
 
+
+    // New Tile based iterators
+
+    boost::shared_ptr<ConstRLEEmptyBitmap> BaseTileChunkIterator::getEmptyBitmap()
+    {
+        return _emptyBitmap;
+    }
+
+    int BaseTileChunkIterator::getMode()
+    {
+        return _mode;
+    }
+
+    bool BaseTileChunkIterator::isEmpty()
+    {
+        return false;
+    }
+
+    bool BaseTileChunkIterator::end()
+    {
+        return !_hasCurrent;
+    }
+
+    ConstChunk const& BaseTileChunkIterator::getChunk()
+    {
+        return *_dataChunk;
+    }
+
+    void BaseTileChunkIterator::reset()
+    {
+        _emptyBitmapIterator.reset();
+        _hasCurrent = !_emptyBitmapIterator.end();
+    }
+
+    Coordinates const& BaseTileChunkIterator::getPosition()
+    {
+        assert(!(_mode & TILE_MODE));
+        if (!_hasCurrent) {
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        pos2coord(_emptyBitmapIterator.getLPos(), _currPos);
+        return _currPos;
+    }
+
+    position_t BaseTileChunkIterator::getLogicalPosition()
+    {
+        assert(!(_mode & TILE_MODE));
+        if (!_hasCurrent) {
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        return _emptyBitmapIterator.getLPos();
+    }
+
+    void BaseTileChunkIterator::operator ++()
+    {
+        assert(!(_mode & TILE_MODE));
+
+        if (!_hasCurrent) {
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        ++_emptyBitmapIterator;
+        _hasCurrent = !_emptyBitmapIterator.end();
+    }
+
+    bool BaseTileChunkIterator::setPosition(Coordinates const& coord)
+    {
+        assert(!(_mode & TILE_MODE));
+        assert(!coord.empty());
+
+        if (!_dataChunk->contains(coord, !(_mode & IGNORE_OVERLAPS))) { //XXX necessary ?
+            return _hasCurrent = false;
+        }
+        position_t pos = coord2pos(coord);
+        return _hasCurrent = _emptyBitmapIterator.setPosition(pos);
+    }
+
+    bool BaseTileChunkIterator::setPosition(position_t lPos)
+    {
+        assert(!(_mode & TILE_MODE));
+        if (lPos < 0) {
+            return _hasCurrent = false;
+        }
+        Coordinates coord;
+        pos2coord(lPos, coord);
+        if (!_dataChunk->contains(coord, !(_mode & IGNORE_OVERLAPS))) { //XXX necessary ?
+            return _hasCurrent = false;
+        }
+        return _hasCurrent = _emptyBitmapIterator.setPosition(lPos);
+    }
+
+    BaseTileChunkIterator::~BaseTileChunkIterator()
+    {
+        assert(!(_mode & TILE_MODE));
+        if (_sDebug) {
+            LOG4CXX_TRACE(logger, "~BTileCI this=" << this
+                          << ", chunk=" << _dataChunk);
+        }
+    }
+
+BaseTileChunkIterator::BaseTileChunkIterator(ArrayDesc const& desc,
+                                             AttributeID aid,
+                                             Chunk* data,
+                                             int iterationMode,
+                                             boost::shared_ptr<Query> const& query)
+: CoordinatesMapper(*data),
+  _array(desc),
+  _attrID(aid),
+  _attr(_array.getAttributes()[aid]),
+  _dataChunk(data),
+  _hasCurrent(false),
+  _mode(iterationMode),
+  _currPos(_array.getDimensions().size()),
+  _query(query)
+{
+    if (_sDebug) {
+        LOG4CXX_TRACE(logger, "BTileCI this=" << this
+                      << ", chunk=" << _dataChunk);
+    }
+    const Dimensions& dim = _array.getDimensions();
+    size_t nDims = dim.size();
+
+    _hasOverlap = false;
+
+    if (iterationMode & INTENDED_TILE_MODE ||
+        iterationMode & TILE_MODE)
+    {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+        << "unsupported TILE_MODE";
+    }
+
+    for (size_t i = 0; i < nDims; i++) {
+        _hasOverlap |= dim[i].getChunkOverlap() != 0;
+    }
 }
+
+/**
+ * Constant RLE chunk iterator providing the getData() interface
+ */
+RLETileConstChunkIterator::RLETileConstChunkIterator(ArrayDesc const& desc,
+                                                     AttributeID attr,
+                                                     Chunk* data,
+                                                     Chunk* bitmap,
+                                                     int iterationMode,
+                                                     shared_ptr<Query> const& query)
+  : BaseTileChunkIterator(desc, attr, data, iterationMode, query),
+    _lPosition(-1),
+    _tileFactory(TileFactory::getInstance()),
+    _fastTileInitialize(false),
+    _value(TypeLibrary::getType(_attr.getType()))
+{
+    const char * func = "RLETileConstChunkIterator";
+    assert(! (_mode & TILE_MODE));
+
+    if (_sDebug) {
+        LOG4CXX_TRACE(logger, func << " this="<<this
+                      <<" data="<<data
+                      <<" bitmap "<<bitmap
+                      <<" attr "<<attr
+                      <<" payload data="
+                      << data->getData());
+    }
+    assert(_tileFactory);
+
+    prepare();
+    UnPinner dataUP(_dataChunk);
+
+    if (((_mode & APPEND_CHUNK) || bitmap == NULL) && _payload->packedSize() < data->getSize()) {
+        _emptyBitmap = make_shared<ConstRLEEmptyBitmap>(static_cast<char*>(data->getData())
+                                                        + _payload->packedSize());
+    } else if (bitmap != NULL) {
+        _emptyBitmap = bitmap->getEmptyBitmap();
+    }
+    if (!_emptyBitmap) {
+        _emptyBitmap = make_shared<RLEEmptyBitmap>(_logicalChunkSize);
+    }
+    if (_hasOverlap && (_mode & IGNORE_OVERLAPS)) {
+        _emptyBitmap = _emptyBitmap->cut(data->getFirstPosition(true),
+                                         data->getLastPosition(true),
+                                         data->getFirstPosition(false),
+                                         data->getLastPosition(false));
+    }
+    _emptyBitmapIterator = _emptyBitmap->getIterator();
+    _hasCurrent = !_emptyBitmapIterator.end();
+
+    if (_sDebug) {
+        LOG4CXX_TRACE(logger, func << " this="<<this
+                      <<" ebmCount="<< _emptyBitmap->count()
+                      <<" pCount="<<   _payload->count());
+    }
+
+    assert(_emptyBitmap->count() <= _payload->count());
+
+    _fastTileInitialize = (_emptyBitmap->count() == _payload->count()) &&
+                          (!_payload->isBool()) &&
+                          (_payload->elementSize() > 0) ;
+    if (_sDebug) {
+        LOG4CXX_TRACE(logger, func << " this="<<this
+                      <<" data="<<data
+                      <<" bitmap "<<bitmap
+                      <<" attr "<<_attr
+                      <<" payload data="
+                      << data->getData()
+                      << " #segments=" << _payload->nSegments()
+                      <<" pCount="     << _payload->count());
+    }
+
+    if (_hasCurrent) {
+        _lPosition = _emptyBitmapIterator.getLPos();
+    }
+    _payload.reset();
+}
+
+RLETileConstChunkIterator::RLEPayloadDesc::RLEPayloadDesc(ConstRLEPayload* rlePayload,
+                                                          position_t offset,
+                                                          size_t numElem)
+: _rlePayload(rlePayload),
+  _offset(offset),
+  _numElem(numElem)
+{
+    assert(rlePayload);
+    assert(offset>=0);
+    assert(numElem>0);
+}
+
+RLETileConstChunkIterator::~RLETileConstChunkIterator()
+{
+}
+
+void RLETileConstChunkIterator::prepare()
+{
+    assert(_dataChunk);
+    _dataChunk->pin();
+
+    UnPinner dataUP(_dataChunk);
+
+    _payload = make_shared<ConstRLEPayload>(static_cast<char*>(_dataChunk->getData()));
+    _payloadIterator = _payload->getIterator();
+
+    dataUP.set(NULL); // keep it pinned
+}
+
+void RLETileConstChunkIterator::reset()
+{
+    assert(! (_mode & TILE_MODE));
+    assert(_emptyBitmap);
+    assert(!_payload);
+
+    BaseTileChunkIterator::reset();
+
+    if (_hasCurrent) {
+        _lPosition = _emptyBitmapIterator.getLPos();
+    } else {
+        _lPosition = -1;
+    }
+}
+
+Value& RLETileConstChunkIterator::getItem()
+{
+    assert(! (_mode & TILE_MODE));
+    if (!_hasCurrent) {
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+    }
+    assert(!_payload);
+    assert(_emptyBitmap);
+
+    prepare();
+    UnPinner dataUP(_dataChunk);
+    assert(_payload);
+    assert(_lPosition >= 0);
+
+    assert(_emptyBitmapIterator.getLPos() == _lPosition);
+    alignIterators();
+
+    _payloadIterator.getItem(_value);
+    _payload.reset();
+    return _value;
+}
+
+const Coordinates&
+RLETileConstChunkIterator::getData(scidb::Coordinates& offset,
+                                   size_t maxValues,
+                                   boost::shared_ptr<BaseTile>& tileData,
+                                   boost::shared_ptr<BaseTile>& tileCoords)
+{
+    const scidb::TypeId& coordinatesType = "scidb::Coordinates";
+    const CoordinatesMapperWrapper coordMapper(this);
+
+    if (offset.empty()) {
+        return offset;
+    }
+    position_t logicalStartPos = coord2pos(offset);
+    logicalStartPos = getDataInternal(logicalStartPos, maxValues,
+                                      tileData, tileCoords,
+                                      coordinatesType, &coordMapper);
+    if (logicalStartPos < 0) {
+        offset.clear();
+    } else {
+        pos2coord(logicalStartPos, offset);
+    }
+    return offset;
+}
+
+position_t
+RLETileConstChunkIterator::getData(position_t logicalOffset,
+                                   size_t maxValues,
+                                   boost::shared_ptr<BaseTile>& tileData,
+                                   boost::shared_ptr<BaseTile>& tileCoords)
+{
+    const scidb::TypeId& coordinatesType = "scidb::Coordinates";
+    const CoordinatesMapperWrapper coordMapper(this);
+    return getDataInternal(logicalOffset, maxValues, tileData, tileCoords,
+                           coordinatesType, &coordMapper);
+}
+
+const Coordinates&
+RLETileConstChunkIterator::getData(scidb::Coordinates& offset,
+                                   size_t maxValues,
+                                   boost::shared_ptr<BaseTile>& tileData)
+{
+    if (offset.empty()) {
+        return offset;
+    }
+    position_t logicalStartPos = coord2pos(offset);
+    logicalStartPos = getDataInternal(logicalStartPos, maxValues, tileData);
+    if (logicalStartPos < 0) {
+        offset.clear();
+    } else {
+        pos2coord(logicalStartPos, offset);
+    }
+    return offset;
+}
+
+position_t
+RLETileConstChunkIterator::getData(position_t logicalOffset,
+                                   size_t maxValues,
+                                   boost::shared_ptr<BaseTile>& tileData)
+{
+    return getDataInternal(logicalOffset, maxValues, tileData);
+}
+
+
+/// @todo XXX re-factor
+position_t
+RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
+                                           size_t maxValues,
+                                           boost::shared_ptr<BaseTile>& tileData)
+{
+    const char * func = "RLETileConstChunkIterator::getDataInternal(data)";
+    assert(! (_mode & TILE_MODE));
+    assert(!_payload);
+    assert(_emptyBitmap);
+
+    prepare();
+    UnPinner dataUP(_dataChunk);
+    assert(_payload);
+    bool needSetPosition = (_emptyBitmapIterator.end() ||
+                            (logicalOffset != _emptyBitmapIterator.getLPos()));
+
+    if ( needSetPosition &&
+        !BaseTileChunkIterator::setPosition(logicalOffset)) {
+        assert(!_hasCurrent);
+        _lPosition = -1;
+        _payload.reset();
+        assert(!_hasCurrent);
+        return _lPosition;
+    }
+
+    shared_ptr<BaseTile> dataTile  = _tileFactory->construct(_attr.getType(), BaseEncoding::RLE);
+
+    if (_fastTileInitialize) {
+        position_t pPosition = _emptyBitmapIterator.getPPos();
+        assert(pPosition>=0);
+
+        RLEPayloadDesc rlePDesc(_payload.get(), pPosition, maxValues);
+        dataTile->getEncoding()->initialize(&rlePDesc);
+
+        assert(dataTile->size()>0);
+        bool ret = _emptyBitmapIterator.skip(dataTile->size()-1);
+        assert(ret); ret=ret;
+        assert(!_emptyBitmapIterator.end());
+        ++_emptyBitmapIterator;
+
+    } else {
+
+        LOG4CXX_TRACE(logger, func << " SLOW tile init: "
+                      << " isBool="<<_payload->isBool()
+                      << " elemSize="<<_payload->elementSize()
+                      << " attrType="<<_attr.getType());
+
+        dataTile->initialize();
+        dataTile->reserve(maxValues);
+
+        for (size_t n=0; !_payloadIterator.end() &&
+             !_emptyBitmapIterator.end() &&
+             n < maxValues; ++_payloadIterator, ++_emptyBitmapIterator, ++n) {
+
+            alignIterators();
+
+            _payloadIterator.getItem(_value);
+            dataTile->push_back(_value);
+        }
+        dataTile->finalize();
+    }
+
+    _payload.reset(); // dont need payload any more
+
+    if (!_emptyBitmapIterator.end()) {
+        _lPosition = _emptyBitmapIterator.getLPos();
+        assert(_lPosition >=0 &&
+               _lPosition > logicalOffset);
+        _hasCurrent = true;
+    } else {
+        // end of chuk data
+        _hasCurrent = false;
+        _lPosition = -1;
+    }
+    tileData.swap(dataTile);
+    return _lPosition;
+}
+
+position_t
+RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
+                                           size_t maxValues,
+                                           boost::shared_ptr<BaseTile>& tileData,
+                                           boost::shared_ptr<BaseTile>& tileCoords,
+                                           const scidb::TypeId& coordTileType,
+                                           const BaseTile::Context* coordCtx)
+{
+    assert(! (_mode & TILE_MODE));
+    assert(!_payload);
+    assert(_emptyBitmap);
+
+    prepare();
+    UnPinner dataUP(_dataChunk);
+    assert(_payload);
+    bool needSetPosition = (_emptyBitmapIterator.end() ||
+                            (logicalOffset != _emptyBitmapIterator.getLPos()));
+
+    if ( needSetPosition &&
+        !BaseTileChunkIterator::setPosition(logicalOffset)) {
+        assert(!_hasCurrent);
+        _lPosition = -1;
+        _payload.reset();
+        assert(!_hasCurrent);
+        return _lPosition;
+    }
+
+    shared_ptr<BaseTile> dataTile = _tileFactory->construct(_attr.getType(), BaseEncoding::RLE);
+
+    if (_fastTileInitialize) {
+
+        position_t pPosition = _emptyBitmapIterator.getPPos();
+        assert(pPosition>=0);
+
+        RLEPayloadDesc rlePDesc(_payload.get(), pPosition, maxValues);
+        dataTile->getEncoding()->initialize(&rlePDesc);
+
+        assert(dataTile->size()>0);
+    } else {
+        dataTile->initialize();
+        dataTile->reserve(maxValues);
+    }
+
+    shared_ptr<BaseTile> coordTile = _tileFactory->construct(coordTileType, BaseEncoding::ARRAY, coordCtx);
+    coordTile->initialize();
+    coordTile->reserve(maxValues);
+
+    ArrayEncoding<position_t>* coordEncoding = safe_dynamic_cast<ArrayEncoding<position_t>* >( coordTile->getEncoding() );
+
+    for (size_t n=0; !_payloadIterator.end() &&
+         !_emptyBitmapIterator.end() &&
+         n < maxValues; ++_payloadIterator,
+         ++_emptyBitmapIterator, ++n) {
+
+        if (!_fastTileInitialize) {
+            alignIterators();
+            _payloadIterator.getItem(_value);
+            dataTile->push_back(_value);
+        }
+        coordEncoding->push_back(_emptyBitmapIterator.getLPos());
+    }
+    _payload.reset(); // dont need payload any more
+
+    if (!_fastTileInitialize) {
+        dataTile->finalize();
+    }
+    coordTile->finalize();
+
+    assert(dataTile->size() == coordTile->size());
+
+    if (!_emptyBitmapIterator.end()) {
+        _lPosition = _emptyBitmapIterator.getLPos();
+        assert(_lPosition >=0 &&
+               _lPosition > logicalOffset);
+        _hasCurrent = true;
+    } else {
+        // end of chunk data
+        _hasCurrent = false;
+        _lPosition = -1;
+    }
+
+    tileData.swap(dataTile);
+    tileCoords.swap(coordTile);
+
+    return _lPosition;
+}
+
+void RLETileConstChunkIterator::alignIterators()
+{
+    // emptybitmap can (apparently) have fewer elements than the payload
+    // (as a result of filtering *just* the emptybitmap?)
+    // here we make sure to skip the elements not in the emptybitmap
+    position_t pPosition = _emptyBitmapIterator.getPPos();
+    if (_payloadIterator.getPPos() != pPosition)
+    {
+        if (!_payloadIterator.setPosition(pPosition)) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
+        }
+    }
+}
+
+void RLETileConstChunkIterator::operator ++()
+{
+    assert(! (_mode & TILE_MODE));
+    if (!_hasCurrent) {
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+    }
+    assert(!_payload);
+    assert(_emptyBitmap);
+
+    assert(_emptyBitmapIterator.getLPos() == _lPosition);
+
+    ++_emptyBitmapIterator;
+    if (_emptyBitmapIterator.end()) {
+        _hasCurrent = false;
+        _payload.reset();
+        return;
+    }
+
+    _lPosition = _emptyBitmapIterator.getLPos();
+    _payload.reset();
+}
+
+Coordinates const& RLETileConstChunkIterator::getPosition()
+{
+    assert(! (_mode & TILE_MODE));
+    assert(!_payload);
+    assert(_emptyBitmap);
+
+    assert(_emptyBitmapIterator.getLPos() == _lPosition);
+
+    Coordinates const& coords = BaseTileChunkIterator::getPosition();
+    assert((&coords) == (&_currPos));
+    return coords;
+}
+
+bool RLETileConstChunkIterator::setPosition(Coordinates const& coord)
+{
+    assert(! (_mode & TILE_MODE));
+    assert(!_payload);
+    assert(_emptyBitmap);
+
+    if (!BaseTileChunkIterator::setPosition(coord)) {
+        assert(!_hasCurrent);
+        _payload.reset();
+        return false;
+    }
+
+    _lPosition = _emptyBitmapIterator.getLPos();
+    return true;
+}
+
+bool RLETileConstChunkIterator::setPosition(position_t lPos)
+{
+    assert(! (_mode & TILE_MODE));
+    assert(!_payload);
+    assert(_emptyBitmap);
+    assert(lPos>=0);
+
+    if (!BaseTileChunkIterator::setPosition(lPos)) {
+        assert(!_hasCurrent);
+        _payload.reset();
+        return false;
+    }
+
+    _lPosition = _emptyBitmapIterator.getLPos();
+    assert(lPos == _lPosition);
+    return true;
+}
+
+} // scidb namespace

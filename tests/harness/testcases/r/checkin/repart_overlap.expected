@@ -12,11 +12,11 @@ Query was executed successfully
 SCIDB QUERY : <store(repart(test_array,test_array_overlap),test_array_overlap)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <count(test_array)>
+SCIDB QUERY : <aggregate(test_array,count(*))>
 {i} count
 {0} 9638
 
-SCIDB QUERY : <count(test_array_overlap)>
+SCIDB QUERY : <aggregate(test_array_overlap,count(*))>
 {i} count
 {0} 9638
 

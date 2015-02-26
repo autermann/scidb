@@ -53,11 +53,11 @@ SCIDB QUERY : <store(join(join(join(S,P),S),P),ZZZ)>
 SCIDB QUERY : <insert(ZZZ,SPSP)>
 {x} a,b,c,d
 
-SCIDB QUERY : <count(versions(SPSP))>
+SCIDB QUERY : <aggregate(versions(SPSP),count(*))>
 {i} count
 {0} 1
 
-SCIDB QUERY : <count(versions(ZZZ))>
+SCIDB QUERY : <aggregate(versions(ZZZ),count(*))>
 {i} count
 {0} 1
 
@@ -67,11 +67,11 @@ SCIDB QUERY : <insert(ZZZ,SPSP)>
 SCIDB QUERY : <insert(SPSP,ZZZ)>
 {x} s,p,s_2,p_2
 
-SCIDB QUERY : <count(versions(SPSP))>
+SCIDB QUERY : <aggregate(versions(SPSP),count(*))>
 {i} count
 {0} 2
 
-SCIDB QUERY : <count(versions(ZZZ))>
+SCIDB QUERY : <aggregate(versions(ZZZ),count(*))>
 {i} count
 {0} 2
 

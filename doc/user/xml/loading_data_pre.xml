@@ -75,7 +75,7 @@
         You also must determine for each array what variables it will include
         and which of those variables will be dimensions and which will be
         attributes. For more information about creating arrays, see <xref
-        linkend="CreateArray"/>.</para>
+        linkend="createArrayStatement"/>.</para>
 
         <para>Depending on the data-loading technique you choose, this
         preliminary assessment might or might not include determining chunk
@@ -1625,12 +1625,14 @@
         <para>You want to avoid the responsibility for ensuring that your load
         file is in the correct format.</para>
       </listitem>
-
-      <listitem>
-        <para>The array you are transferring includes a dimension whose
-        datatype is not int64.</para>
-      </listitem>
     </itemizedlist>
+
+    <para><indexterm>
+        <primary>opaque data loading</primary>
+      </indexterm>Note that the opaque format is <emphasis>not generally
+    compatible between versions of SciDB</emphasis>. Data saved using the
+    opaque format should only be re-loaded into the same SciDB database
+    version with identical database configuration parameters.</para>
 
     <section>
       <title>Visualize the Desired Array</title>
@@ -1726,9 +1728,6 @@
       <para>Assuming <replaceable>base-path</replaceable> is the same as in
       the previous save query, then this query would save the data to the
       following location:<programlisting> /home/scidb/scidb-data/000/2/intensity_data.opaque</programlisting></para>
-
-      <para>For details on SciDB paths, see <xref
-      linkend="sciDBLogs"/>.</para>
 
       <para>If you want the resulting opaque-formatted file to describe
       something other than the original array—say, a subset of it or an array

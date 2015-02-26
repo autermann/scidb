@@ -51,7 +51,7 @@ SCIDB QUERY : <load(us_presidents_1, '../tests/harness/testcases/data/us_preside
 SCIDB QUERY : <create empty array president_stats_1 <count:uint64 null, total_years_in_office: uint64 null, any_assassinated:bool null> [first_name(string)=*,10,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(us_presidents_1, president_stats_1, count(last_name) as count, sum(years_in_office) as total_years_in_office, max(assassinated) as any_assassinated)>
+SCIDB QUERY : <store(redimension(us_presidents_1, president_stats_1, count(last_name) as count, sum(years_in_office) as total_years_in_office, max(assassinated) as any_assassinated), president_stats_1)>
 {first_name} count,total_years_in_office,any_assassinated
 {'abraham'} 1,4,true
 {'andrew'} 2,12,false
@@ -113,7 +113,7 @@ SCIDB QUERY : <store(president_stats_1, tA)>
 {'woodrow'} 1,8,false
 {'zachary'} 1,1,false
 
-SCIDB QUERY : <redimension_store(us_presidents_1, president_stats_1, count(last_name) as count, sum(years_in_office) as total_years_in_office, max(assassinated) as any_assassinated)>
+SCIDB QUERY : <store(redimension(us_presidents_1, president_stats_1, count(last_name) as count, sum(years_in_office) as total_years_in_office, max(assassinated) as any_assassinated), president_stats_1)>
 {first_name} count,total_years_in_office,any_assassinated
 {'abraham'} 1,4,true
 {'andrew'} 2,12,false
@@ -181,7 +181,7 @@ Query was executed successfully
 SCIDB QUERY : <create empty array president_stats_1 <count:uint64 null, total_years_in_office: uint64 null, any_assassinated:bool null> [first_name(string)=*,10,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(us_presidents_1, president_stats_1, count(last_name) as count, sum(years_in_office) as total_years_in_office, max(assassinated) as any_assassinated)>
+SCIDB QUERY : <store(redimension(us_presidents_1, president_stats_1, count(last_name) as count, sum(years_in_office) as total_years_in_office, max(assassinated) as any_assassinated), president_stats_1)>
 {first_name} count,total_years_in_office,any_assassinated
 {'abraham'} 1,4,true
 {'andrew'} 2,12,false

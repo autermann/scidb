@@ -15,16 +15,16 @@ SCIDB QUERY : <load(B, '../tests/harness/testcases/data/adc_sparse1.txt')>
 {0,0} 10
 {5000,5000} 55010
 
-SCIDB QUERY : <ApproxDC(A)>
-i,num_adc
+SCIDB QUERY : <aggregate(A,approxdc(num))>
+i,num_ApproxDC
 0,3
 
-SCIDB QUERY : <ApproxDC(concat(A,A))>
-i,num_adc
+SCIDB QUERY : <aggregate(concat(A,A),approxdc(num))>
+i,num_ApproxDC
 0,3
 
-SCIDB QUERY : <ApproxDC(join(A,A))>
-i,num_adc
+SCIDB QUERY : <aggregate(join(A as A1,A),approxdc(A1.num))>
+i,num_ApproxDC
 0,3
 
 SCIDB QUERY : <aggregate(A,ApproxDC(num))>
@@ -39,12 +39,12 @@ SCIDB QUERY : <aggregate(A,ApproxDC(num),sum(num),min(num),max(num),count(num))>
 i,num_ApproxDC,num_sum,num_min,num_max,num_count
 0,3,nan,nan,nan,3
 
-SCIDB QUERY : <ApproxDC(B)>
-i,val_adc
+SCIDB QUERY : <aggregate(B,approxdc(val))>
+i,val_ApproxDC
 0,2
 
-SCIDB QUERY : <ApproxDC(join(B,B))>
-i,val_adc
+SCIDB QUERY : <aggregate(join(B as B1,B),approxdc(B1.val))>
+i,val_ApproxDC
 0,2
 
 SCIDB QUERY : <aggregate(B,ApproxDC(val))>

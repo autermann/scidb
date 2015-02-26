@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -236,7 +236,7 @@ void WorkQueue::enqueueReserved(WorkItem& work,
     {
         ScopedMutexLock lock(_mutex);
 
-        LOG4CXX_DEBUG(logger, funcName << "to queue="
+        LOG4CXX_TRACE(logger, funcName << "to queue="
                       << this
                       << ", sCtx="<<sCtx.get()
                       << ", size="<<_size());
@@ -309,7 +309,7 @@ void WorkQueue::scheduleReserved(boost::shared_ptr<Job>& job,
     assert(job);
     assert(toQueue);
 
-    LOG4CXX_DEBUG(logger, funcName << "to queue="
+    LOG4CXX_TRACE(logger, funcName << "to queue="
                   << toQueue.get()<< " of size="
                   << toQueue->size());
     try {

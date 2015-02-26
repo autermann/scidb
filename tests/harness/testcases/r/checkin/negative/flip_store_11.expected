@@ -13,13 +13,13 @@ Query was executed successfully
 SCIDB QUERY : <create empty array C <x:int64> [a=0:15,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {a} x
 {10} 0
 {11} 1
 {12} 2
 
-SCIDB QUERY : <redimension_store(A,C)>
+SCIDB QUERY : <store(redimension(A,C),C)>
 {a} x
 {10} 0
 {11} 1

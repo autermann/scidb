@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -129,12 +129,8 @@ public:
     {
         SCIDB_ASSERT(inputArrays.size() == 1);
 
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
-
-        ArrayDesc const& inDesc = inputArrays[0]->getArrayDesc();
+        shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+        ArrayDesc const& inDesc = inputArray->getArrayDesc();
         verifyInputSchema(inDesc);
 
         vector<AttributeID> inputAttrIDs;
@@ -174,7 +170,7 @@ public:
             }
         }
  
-        return boost::shared_ptr<Array>(new WindowArray(_schema, inputArrays[0], _window, inputAttrIDs, aggregates, method));
+        return boost::shared_ptr<Array>(new WindowArray(_schema, inputArray, _window, inputAttrIDs, aggregates, method));
     }
 };
     

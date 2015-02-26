@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -163,7 +163,6 @@ private:
             ++sptr;
             if(numUniqueElements>=1)
             {
-                EXCEPTION_ASSERT(startingValue.size() > 0 && endingValue.size() > 0);
                 EXCEPTION_ASSERT(startingValue.isNull() == false && endingValue.isNull() == false);
                 *sptr = startingValue.size();
                 ++sptr;
@@ -194,13 +193,11 @@ private:
             if(numUniqueElements>=1)
             {
                 size_t startingValueSize = *sptr;
-                EXCEPTION_ASSERT(startingValueSize>0);
                 uint8_t* bptr = reinterpret_cast <uint8_t*>(sptr+1);
                 startingValue.setData(bptr, startingValueSize);
                 bptr += startingValueSize;
                 sptr = reinterpret_cast<size_t*> (bptr);
                 size_t endingValueSize = *sptr;
-                EXCEPTION_ASSERT(endingValueSize>0);
                 bptr = reinterpret_cast <uint8_t*>(sptr+1);
                 endingValue.setData(bptr, endingValueSize);
                 bptr += endingValueSize;
@@ -289,7 +286,7 @@ private:
         virtual void addElement(Coordinate const position, Element const& input)
         {
             _marshalledSize += (input.getMarshalledSize() + sizeof(Coordinate));
-            insert( pair<Coordinate,Element>(position, input) );
+            this->insert( pair<Coordinate,Element>(position, input) );
         }
 
         /**

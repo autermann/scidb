@@ -14,7 +14,7 @@ store(build(A1,x/1.7),A1)
 
 --aql select * from A
 --aql select * from AA
-redimension_store(AA,NID)
+store(redimension(AA,NID),NID)
 --aql select * from NID
 
 --aql select count(a1),avg(a1) from A

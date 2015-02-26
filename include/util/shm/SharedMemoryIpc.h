@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -132,7 +132,10 @@ class SharedMemoryIpc
         virtual void raise() const { throw *this; }
         virtual const char* what() const throw()
         {
-            return "SharedMemoryIpc::NoShmMemoryException: unable to allocate shared memory";
+            return "SharedMemoryIpc::NoShmMemoryException: unable to allocate shared memory."
+            " Try increasing the size of the partition backing the shared memory to accomodate your data,"
+            " e.g. 'mount -oremount,size=<#GB_per_host>G /dev/shm'."
+            " If /dev/shm overcommits memory, make sure to add swap space as well (see 'man swapon' on Linux)";
         }
     };
 
@@ -324,8 +327,9 @@ private:
 class SharedFile : public SharedMemoryIpc
 {
 public:
-    explicit SharedFile(const std::string& name)
-    : SharedMemoryIpc(name)
+
+    explicit SharedFile(const std::string& name, bool prealloc=false)
+    : SharedMemoryIpc(name), _isPreallocate(prealloc)
     { }
     virtual ~SharedFile();
     virtual void create(AccessMode amode);
@@ -356,8 +360,15 @@ public:
     SharedFile(const SharedFile&);
     SharedFile& operator=(const SharedFile&);
 
+    /**
+     * Pre-allocate the space in the /dev/shm partition
+     *  to avoid running out of space later and being killed by SIGBUS
+     */
+    void preallocateShmMemory();
+
     boost::scoped_ptr<boost::interprocess::file_mapping> _file;
     boost::scoped_ptr<boost::interprocess::mapped_region> _region;
+    bool _isPreallocate;
 };
 
 }

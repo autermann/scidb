@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,10 +36,10 @@
 
 #include "query/optimizer/Optimizer.h"
 #include "query/OperatorLibrary.h"
+#include "query/ParsingContext.h"
 #include "system/SystemCatalog.h"
 #include "network/NetworkManager.h"
 #include "array/Metadata.h"
-#include "query/parser/ParsingContext.h"
 
 using namespace boost;
 using namespace std;
@@ -179,7 +179,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
             ps.setInt32(psHashPartitioned);
             psConst->compile(false, TID_INT32, ps);
             sgParams.push_back(boost::shared_ptr<OperatorParam>(
-                                   new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(""), psConst, true)));
+                                   new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(), psConst, true)));
 
             boost::shared_ptr<PhysicalOperator> sgOp =
                 OperatorLibrary::getInstance()->createPhysicalOperator("sg", "impl_sg", sgParams, sgSchema);
@@ -213,7 +213,7 @@ boost::shared_ptr<PhysicalQueryPlanNode> L2POptimizer::traverse(const boost::sha
         Value distributeType(TypeLibrary::getType(TID_INT32));
         distributeType.setInt32(psHashPartitioned);
         distributeExpression->compile(false, TID_INT32, distributeType);
-        sgParams.push_back(boost::shared_ptr<OperatorParam>( new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(""),
+        sgParams.push_back(boost::shared_ptr<OperatorParam>( new OperatorParamPhysicalExpression(boost::make_shared<ParsingContext>(),
                                                                                                  distributeExpression,
                                                                                                  true)));
 

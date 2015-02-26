@@ -7,14 +7,14 @@ SCIDB QUERY : <store(join(join(join(build(<x:int64>[dummy=0:250,3,0], dummy/130)
 SCIDB QUERY : <create array B<att1:int64, att2:int64>[x=0:*,1,0, y=0:*,1,0, synth=0:*,100,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <count(filter(B, att1<>att2))>
+SCIDB QUERY : <aggregate(filter(B, att1<>att2),count(*))>
 {i} count
 {0} 0
 
-SCIDB QUERY : <count(filter(redimension(A,B), att1<>att2))>
+SCIDB QUERY : <aggregate(filter(redimension(A,B), att1<>att2),count(*))>
 {i} count
 {0} 0
 
@@ -22,7 +22,7 @@ SCIDB QUERY : <aggregate(apply(redimension(join(join(build(<a:int64> [x=1:100,10
 {i} b_sum,c_sum,d_avg,count
 {0} 5050,5050,0,100
 
-SCIDB QUERY : <count(B)>
+SCIDB QUERY : <aggregate(B,count(*))>
 {i} count
 {0} 251
 

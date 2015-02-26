@@ -1,8 +1,8 @@
 --test
-store(count(build_sparse(<a:string>[i=0:10,1,0], '1', i%2=1)), anonymous_schema_001)
+store(aggregate(build_sparse(<a:string>[i=0:10,1,0], '1', i%2=1),count(*)), anonymous_schema_001)
 
 show(anonymous_schema_001)
-store(count(build_sparse(empty <a:string>[i=0:10,1,0], '1', i%2=1)), anonymous_schema_002)
+store(aggregate(build_sparse(empty <a:string>[i=0:10,1,0], '1', i%2=1),count(*)), anonymous_schema_002)
 
 show(anonymous_schema_002)
 store(build(<a:int64>[x=0:8,3,0], x*2), anonymous_schema_003)

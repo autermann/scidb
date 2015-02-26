@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -396,6 +396,40 @@ void* Arena::calloc(size_t size,count_t count)
 }
 
 /**
+ *  Copy the string 's', including its terminating null, into memory allocated
+ *  from within this arena.
+ *
+ *  When returning the allocation to a recycling arena, use a call such as:
+ *  @code
+ *      arena.free(s,strlen(s) + 1);                     // Don't forget null
+ *  @endcode
+ */
+char* Arena::strdup(const char* s)
+{
+    assert(s != 0);                                      // Validate arguments
+
+    size_t n = strlen(s) + 1;                            // Size of duplicate
+
+    return (char*)memcpy(this->malloc(n),s,n);           // Allocate and copy
+}
+
+/**
+ *  Copy the string 's', including its terminating null, into memory allocated
+ *  from within this arena.
+ *
+ *  When returning the allocation to a recycling arena, use a call such as:
+ *  @code
+ *      arena.free(s,strlen(s) + 1);                     // Don't forget null
+ *  @endcode
+ */
+char* Arena::strdup(const std::string& s)
+{
+    size_t n = s.size() + 1;                             // Size of duplicate
+
+    return (char*)memcpy(this->malloc(n),s.c_str(),n);   // Allocate and copy
+}
+
+/**
  *  Free the memory that was allocated earlier from this same Arena by calling
  *  malloc() and attempt to recycle it for future reuse to reclaim up to 'size'
  *  bytes of raw storage.  No promise is made however as to *when* this memory
@@ -485,16 +519,14 @@ void Arena::exhausted(size_t size) const
 
 /**
  *  Construct and return a concrete Arena that supports the features specified
- *  in the given options structure.
+ *  in the options structure 'o'.
  *
  *  This is the preferred way to construct an Arena, as opposed to including a
  *  header file and invoking the constructor directly, because it isolates the
  *  caller from needing to know the exact type of the Arena that they receive.
  */
-ArenaPtr newArena(const Options& options)
+ArenaPtr newArena(Options o)
 {
-    Options o(options);                                  // Copy the options
-
     if (o.debugging()&& !o.parent()->supports(debugging))// Debugging support?
     {
         o.parent(newDebugArena(o));                      // ...add debug arena

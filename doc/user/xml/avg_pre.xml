@@ -73,7 +73,7 @@
 
         <step>
           <para>Find the average value along the dimension j:<programlisting
-          language="test">--afl avg(avg_array,val,j);</programlisting></para>
+          language="test">--afl aggregate(avg_array,avg(val),j);</programlisting></para>
         </step>
       </procedure>
     </informalexample>

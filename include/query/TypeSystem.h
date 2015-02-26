@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -226,6 +226,27 @@ inline TypeId typeEnum2TypeId(TypeEnum te)
     return TID_VOID;
 }
 
+template<typename Type_tt>
+TypeId type2TypeId()
+{
+    assert(false);
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
+    << typeid(Type_tt).name();
+    return TID_VOID;
+}
+
+template<>  TypeId type2TypeId<char>();
+template<>  TypeId type2TypeId<int8_t>();
+template<>  TypeId type2TypeId<int16_t>();
+template<>  TypeId type2TypeId<int32_t>();
+template<>  TypeId type2TypeId<int64_t>();
+template<>  TypeId type2TypeId<uint8_t>();
+template<>  TypeId type2TypeId<uint16_t>();
+template<>  TypeId type2TypeId<uint32_t>();
+template<>  TypeId type2TypeId<uint64_t>();
+template<>  TypeId type2TypeId<float>();
+template<>  TypeId type2TypeId<double>();
+
 #define IS_VARLEN(type) (type==TID_STRING || type==TID_BINARY ? true : false)
 
 #define BUILTIN_TYPE_CNT 17
@@ -377,18 +398,18 @@ private:
 
     /**
      *  _missingReason is an overloaded element. It contains information
-         *  related to the 'missing' code for data, but also details about
+     *  related to the 'missing' code for data, but also details about
      *  cases where the data is stored in a buffer allocated outside the
      *  class instance, and merely linked to it here.
-         *
+     *
      * _missingReason >= 0 means value is NULL and _missingReason has a code
-         *  of reason.
+     *  of reason.
      * _missingReason = -1 means value is not NULL and data() returns relevant
-         *  buffer with value.
+     *  buffer with value.
      * _missingReason = -2 means _data contains linked vector data that should
      *  not be freed. Methods changing *data() are disallowed.
      */
-    int _missingReason;
+    int32_t _missingReason;
         /*
         ** For variable length data, the size of this data in bytes.
         */
@@ -421,6 +442,14 @@ private:
             }
             memset(_data, 0, _size);
         }
+    }
+
+    void destroy()
+    {
+        if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
+            free(_data);
+        }
+        delete _tile;
     }
 
 public:
@@ -459,7 +488,7 @@ public:
      * @param size a size of linked data buffer
      */
     inline explicit Value(void* data, size_t size, bool isVector = true)
-        : _size(size), _builtinBuf(0), _tile(NULL)
+    : _size(size), _builtinBuf(0), _tile(NULL)
     {
         if (isVector) {
             _missingReason = -2;
@@ -479,22 +508,28 @@ public:
         }
     }
 
-        /**
-         * Copy constructor.
-         * @param Value object to be copied.
-         */
+    /**
+     * Copy constructor.
+     * @param Value object to be copied.
+     */
     inline Value(const Value& val):
-        _missingReason(-1), _size(0), _builtinBuf(0), _tile(NULL)
-        {
+    _missingReason(-1), _size(0), _builtinBuf(0), _tile(NULL)
+    {
         *this = val;
+    }
+
+    void clear()
+    {
+        destroy();
+        _missingReason = 0;
+        _size = 0;
+        _builtinBuf = 0;
+        _tile = NULL;
     }
 
     inline ~Value()
     {
-        if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
-            free(_data);
-        }
-        delete _tile;
+        destroy();
     }
 
     /**
@@ -536,27 +571,26 @@ public:
         _data = data;
     }
 
-        /**
+    /**
      * Get (void *) to data contents of Value object.
      * @return (void *) to data
-         */
+     */
     inline void* data() const
     {
         return _missingReason != -2 && _size <= sizeof(_builtinBuf) ? (void*)&_builtinBuf : _data;
     }
 
-        /**
-         * Get size of data contents in bytes.
-         * @return size_t length of data in bytes
-         */
+    /**
+     * Get size of data contents in bytes.
+     * @return size_t length of data in bytes
+     */
     inline size_t size() const {
         return _size;
     }
-
-        /**
-         * Equality operator
-         * Very basic, byte-wise equality.
-         */
+    /**
+     * Equality operator
+     * Very basic, byte-wise equality.
+     */
     inline bool operator == (Value const& other) const
     {
         return _missingReason == other. _missingReason
@@ -612,10 +646,10 @@ public:
         }
     }
 
-        /**
-         * Set up memory to hold a vector of data values in this Value.
-         * @param size of the memory to hold the vector in bytes.
-        */
+    /**
+     * Set up memory to hold a vector of data values in this Value.
+     * @param size of the memory to hold the vector in bytes.
+     */
     inline void setVector(const size_t size)
     {
         if (_missingReason == -2)
@@ -667,9 +701,9 @@ public:
     {
         void* ptr;
 
-        if (_missingReason == -2)
+        if (_missingReason == -2) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_MODIFY_VALUE_WITH_LINKED_DATA);
-
+        }
         if (size > sizeof(_builtinBuf)) {
             ptr = (_size <= sizeof(_builtinBuf)) ? malloc(size) : realloc(_data, size);
             if (ptr == NULL) {
@@ -705,7 +739,7 @@ public:
     /**
      * Get reason of missing value (if it is previously set by setNull method)
      */
-    inline int getMissingReason() const {
+    inline int32_t getMissingReason() const {
         return _missingReason;
     }
 
@@ -713,9 +747,9 @@ public:
         return _missingReason <= -2;
     }
 
-        /**
-         * Assignment operator.
-         */
+    /**
+     * Assignment operator.
+     */
     inline Value& operator=(const Value& val)
     {
         if (this == &val)
@@ -768,6 +802,17 @@ public:
             _missingReason = -2;
         }
         return *this;
+    }
+
+    inline void swap(Value& val)
+    {
+        std::swap(_missingReason,val._missingReason);
+        std::swap(_size,val._size);
+        std::swap(_data,val._data);
+        std::swap(_tile,val._tile);
+
+        assert(_missingReason > -3);
+        assert((_size <= sizeof(_builtinBuf)) || _data != NULL);
     }
 
     void makeTileConstant(const TypeId& typeId);
@@ -825,6 +870,32 @@ public:
     BUILTIN_METHODS(float, Float)
     BUILTIN_METHODS(double, Double)
     BUILTIN_METHODS(bool, Bool)
+
+    /// @return this value as a given type
+    template<typename Type>
+    const Type& get() const
+    {
+        assert(sizeof(Type) == _size);
+        return *reinterpret_cast<const Type*>(&_builtinBuf);
+    }
+
+    /// set this value as a given type
+    template<typename Type>
+    void set(const Type& val)
+    {
+        if (_size > sizeof(_builtinBuf) && _missingReason != -2) {
+            assert(false);
+            free(_data);
+            _data=0;
+        }
+        _missingReason = -1;
+        _size = sizeof(Type);
+        if (_size > sizeof(_builtinBuf)) {
+            assert(false);
+            throw std::runtime_error("size of type too big");
+        }
+        (*reinterpret_cast<Type*>(&_builtinBuf)) = val;
+    }
 
     /**
      * Setter of a scidb::Value, given its built-in value.
@@ -937,7 +1008,8 @@ public:
     inline RLEPayload* getTile(TypeId const& type);
 
     inline RLEPayload* getTile() const {
-        assert(_tile != NULL);
+        //XXX disable assert(_tile != NULL);
+        //XXX for the hack to enable vectorized execution
 //TODO:        assert(_missingReason == -3);
         return _tile;
     }
@@ -950,6 +1022,8 @@ public:
         _missingReason = -3;
     }
 };
+
+std::ostream& operator<<(std::ostream& stream, const Value& ob );
 
 /**
  * TypeLibrary is a container to registered types in the engine.

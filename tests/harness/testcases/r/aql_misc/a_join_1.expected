@@ -16,7 +16,7 @@ SCIDB QUERY : <select * into B from build(B,x+6)>
 {1} 7
 {2} 8
 
-SCIDB QUERY : <select * from A a1 join A a2 on a1.a = a2.a>
+SCIDB QUERY : <select * from A as a1 join A as a2 on a1.a = a2.a>
 {x,x} a,a
 {0,0} 5,5
 {1,1} 6,6

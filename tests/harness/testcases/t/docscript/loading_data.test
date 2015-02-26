@@ -12,8 +12,13 @@
 --stop-igdata
 --aql SELECT * FROM analyze(winnersFlat)  
 --start-igdata
---aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event(string)=3,1000,0] 
-redimension_store(winnersFlat,winners)  
+--aql CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event_id=0:3,1000,0]  
+create array event_index <event:string>[event_id=0:*,10,0]  
+--stop-igdata
+store(uniq(sort(project(winnersFlat,event)),'chunk_size=10'),event_index)  
+store(redimension (project (index_lookup(winnersFlat,event_index,winnersFlat.event, event_id), year,person,time,event_id),winners), winners)  
+--start-igdata
+--aql SELECT * INTO winners FROM winnersFlat  
 --stop-igdata
 scan(winners)  
 --start-igdata
@@ -24,8 +29,13 @@ scan(winners)
 --aql SELECT exposure, strlen(exposure) FROM intensityFlat  
 --aql SELECT * FROM analyze(intensityFlat) 
 --start-igdata
---aql CREATE ARRAY intensity <measuredIntensity:int64 null> [exposure(string)=3,3,0, elapsedTime=0:40000,10000,0]  
-redimension_store(intensityFlat,intensity)  
+create array exposure_index <exposure:string>[exposure_id=0:*,10,0]  
+--stop-igdata
+store(uniq(sort(project(intensityFlat,exposure)),'chunk_size=10'),exposure_index)  
+--start-igdata
+CREATE ARRAY intensity <measuredIntensity:int64 null> [elapsedTime=0:40000,10000,0, exposure_id=0:2,3,0]  
+store(redimension (project (index_lookup (intensityFlat,exposure_index,intensityFlat.exposure, exposure_id), elapsedTime,measuredIntensity,exposure_id), intensity),intensity)  
+--aql SELECT * INTO intensity FROM intensityFlat  
 remove(intensityFlat)  
 --aql CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,1000000,0]  
 --aql LOAD intensityFlat FROM '../tests/harness/testcases/data/doc/intensity_data.bin' AS '(string, int64, int64 null)'  
@@ -36,8 +46,7 @@ remove(intensityFlat)
 --stop-igdata
 show(intensity)
 --start-igdata
---aql CREATE ARRAY intensityCopy < measuredIntensity:int64 NULL > [ exposure(string)=3,3,0, duration=0:40000,10000,0] 
---aql LOAD intensityCopy FROM CURRENT INSTANCE '../tests/harness/testcases/data/doc/intensity_data.opaque' AS 'OPAQUE'  
+--aql CREATE ARRAY intensityCopy < measuredIntensity:int64 NULL > [duration=0:40000,10000,0, exposure_id=0:3,3,0] 
 --shell  --command="cat $DOC_DATA/v4.scidb" --store
 --aql CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0] 
 --set-format dense
@@ -81,6 +90,8 @@ show(intensityFlatShadow)
 
 remove(winnersFlat)
 remove(winners)
+remove(event_index)
+remove(exposure_index)
 remove(intensity)
 remove(intensityFlat_NoExposure)
 remove(intensityFlat_NoTime_NoMeasurement)

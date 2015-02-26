@@ -31,7 +31,7 @@ SCIDB QUERY : <load zFlat from '../tests/harness/testcases/data/doc/bug1709.scid
 SCIDB QUERY : <store(redimension(zFlat,z1),z1)>
 [An error expected at this place for the query "store(redimension(zFlat,z1),z1)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE.]
 
-SCIDB QUERY : <redimension_store(zFlat,z1)>
+SCIDB QUERY : <store(redimension(zFlat,z1),z1)>
 {device,height} trial,ppb
 {'d0',60} 't1',1441
 {'d0',61} 't1',3443
@@ -51,7 +51,7 @@ SCIDB QUERY : <show(z3)>
 SCIDB QUERY : <store(redimension(z1,z3),z3)>
 [An error expected at this place for the query "store(redimension(z1,z3),z3)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE.]
 
-SCIDB QUERY : <redimension_store(z1,z3)>
+SCIDB QUERY : <store(redimension(z1,z3),z3)>
 {ppb} device,height,trial
 {1441} 'd0',60,'t1'
 {3443} 'd0',61,'t1'

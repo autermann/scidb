@@ -74,7 +74,7 @@ SCIDB QUERY : <save(expo, 'expo.bin', -2, 'opaque')>
 {24} 'sample-3','probe-4',557.76
 {25} 'sample-4','probe-4',606.25
 
-SCIDB QUERY : <redimension_store(expo, Ds, avg(val) as av)>
+SCIDB QUERY : <store(redimension(expo, Ds, avg(val) as av), Ds)>
 {s} av
 {'sample-0'} 161.71
 {'sample-1'} 183.94
@@ -82,7 +82,7 @@ SCIDB QUERY : <redimension_store(expo, Ds, avg(val) as av)>
 {'sample-3'} 234.46
 {'sample-4'} 262.75
 
-SCIDB QUERY : <redimension_store(expo, Dp, avg(val) as av)>
+SCIDB QUERY : <store(redimension(expo, Dp, avg(val) as av), Dp)>
 {p} av
 {'probe-0'} 8.11
 {'probe-1'} 58.66
@@ -90,7 +90,7 @@ SCIDB QUERY : <redimension_store(expo, Dp, avg(val) as av)>
 {'probe-3'} 311.26
 {'probe-4'} 513.31
 
-SCIDB QUERY : <redimension_store(expo, Dsp)>
+SCIDB QUERY : <store(redimension(expo, Dsp), Dsp)>
 {s,p} val
 {'sample-0','probe-0'} 0.01
 {'sample-0','probe-1'} 30.36
@@ -118,7 +118,7 @@ SCIDB QUERY : <redimension_store(expo, Dsp)>
 {'sample-4','probe-3'} 384
 {'sample-4','probe-4'} 606.25
 
-SCIDB QUERY : <redimension_store(expo, Dsp)>
+SCIDB QUERY : <store(redimension(expo, Dsp), Dsp)>
 {s,p} val
 {'sample-0','probe-0'} 0.01
 {'sample-0','probe-1'} 30.36

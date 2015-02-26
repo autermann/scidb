@@ -13,6 +13,9 @@
     </indexterm>This chapter lists SciDB aggregates. Aggregates take as input
   a set of 1 or more values and return a SciDB array.</para>
 
+  <para>You can get a list of all of the available aggregates by running the
+  following query:<screen>$ iquery -aq "list('aggregates')"</screen></para>
+
   <section>
     <title>Aggregate Syntax</title>
 
@@ -115,7 +118,7 @@ AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<
 </screen></para>
   </section>
 
-  <xi:include href="approxdc_agg.xml"
+  <xi:include href="approxdc_agg_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="avg_agg_post.xml"
@@ -124,15 +127,20 @@ AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<
   <xi:include href="count_agg_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="max_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="max_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="min_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="min_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="prod_agg_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="prod_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="stdev_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="stdev_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="sum_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="sum_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="var_agg_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>

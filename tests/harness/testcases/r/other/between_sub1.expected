@@ -312,7 +312,7 @@ SCIDB QUERY : <store(build_sparse(B, x+100*y, (x=-10 and y=0) or (x=100 and y=10
 {-10,0} -10
 {100,100} 10100
 
-SCIDB QUERY : <count(A)>
+SCIDB QUERY : <aggregate(A,count(*))>
 {i} count
 {0} 300
 
@@ -354,7 +354,7 @@ SCIDB QUERY : <between(A,0,0,10,100)>
 {9,99} 9909
 {10,100} 10010
 
-SCIDB QUERY : <count(B)>
+SCIDB QUERY : <aggregate(B,count(*))>
 {i} count
 {0} 2
 
@@ -826,11 +826,11 @@ SCIDB QUERY : <store(subarray(A,171,261,191,281),ZZZ)>
 {19,19} 28190
 {20,20} 28291
 
-SCIDB QUERY : <count(store(between(A,171,261,191,281),XXX))>
+SCIDB QUERY : <aggregate(store(between(A,171,261,191,281),XXX),count(*))>
 {i} count
 {0} 21
 
-SCIDB QUERY : <count(store(subarray(A,171,261,191,281),ZZZ))>
+SCIDB QUERY : <aggregate(store(subarray(A,171,261,191,281),ZZZ),count(*))>
 {i} count
 {0} 21
 
@@ -842,15 +842,15 @@ SCIDB QUERY : <show(ZZZ)>
 {i} schema
 {0} 'ZZZ<val:int64> [x=0:20,10,2,y=0:20,20,3]'
 
-SCIDB QUERY : <count(XXX)>
+SCIDB QUERY : <aggregate(XXX,count(*))>
 {i} count
 {0} 21
 
-SCIDB QUERY : <count(ZZZ)>
+SCIDB QUERY : <aggregate(ZZZ,count(*))>
 {i} count
 {0} 21
 
-SCIDB QUERY : <count(subarray(A,171,261,191,281))>
+SCIDB QUERY : <aggregate(subarray(A,171,261,191,281),count(*))>
 {i} count
 {0} 21
 

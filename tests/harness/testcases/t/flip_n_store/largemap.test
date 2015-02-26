@@ -10,7 +10,7 @@ store(build(<a:string>[i=0:799999,800000,0],format(i+0.0,'Gregor awoke one morni
 
 --test
 --start-igdata
-redimension_store(G,H)
+store(redimension(G,H),H)
 --stop-igdata
 
 --stop-query-logging 

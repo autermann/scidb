@@ -5,7 +5,7 @@ create array Flipped <i:int64> [x(string)=100,10,0]
 store(build(Orig,'str'+string(i)), Orig)
 
 --test
-redimension_store(Orig, Flipped)
+store(redimension(Orig, Flipped), Flipped)
 subarray(Flipped, 'str3', 'str5')                         
 subarray(thin(Flipped, 1, 2), 'str3', 'str5')                         
 between(thin(Flipped, 1, 2), 'str2', 'str4')                         

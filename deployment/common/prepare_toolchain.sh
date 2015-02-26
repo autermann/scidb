@@ -3,7 +3,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -30,9 +30,7 @@ echo "Prepare Ubuntu 12.04 for build SciDB"
 apt-get update
 
 # Build dependencies:
-apt-get install -y build-essential cmake scidb-${SCIDB_VER}-libboost1.54-all-dev libpqxx-3.1 libpqxx3-dev libprotobuf7 libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-1.12-1 libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 expect debhelper sudo
-
-apt-get install -y git git-svn
+apt-get install -y build-essential cmake scidb-${SCIDB_VER}-libboost1.54-all-dev libpqxx-3.1 libpqxx3-dev libprotobuf7 libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-1.12-1 libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 expect debhelper sudo ant ant-contrib ant-optional libprotobuf-java openjdk-6-jdk junit
 
 # Reduce rebuild time:
 apt-get install -y ccache
@@ -55,9 +53,7 @@ echo "Prepare CentOS 6 for build SciDB"
 
 INSTALL="yum install --enablerepo=scidb3rdparty -y"
 # Build dependencies:
-${INSTALL} gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make scidb-${SCIDB_VER}-libboost-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel sudo
-
-${INSTALL} git git-svn
+${INSTALL} gcc gcc-c++ gcc-gfortran subversion doxygen flex bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make scidb-${SCIDB_VER}-libboost-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect mpich2-devel lapack-devel blas-devel sudo java-1.6.0-openjdk-devel ant ant-contrib ant-nodeps ant-jdepend protobuf-compiler protobuf-java junit
 
 # Reduce build time
 ${INSTALL} ccache

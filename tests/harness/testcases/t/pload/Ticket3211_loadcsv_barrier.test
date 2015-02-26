@@ -5,10 +5,10 @@
 --test
 --start-igdata
 
---shell --command  "timeout -s SIGINT 30 loadcsv.py -i './testcases/data/barrier.dat' -a 'barrier' -s '<val:uint32>[i=0:*,1000000,0]' -x -d 'localhost' -p ${IQUERY_PORT}"
+--shell --command  "timeout -s SIGINT 30 loadcsv.py -i ${TEST_DATA_DIR}/barrier.dat -a 'barrier' -s '<val:uint32>[i=0:*,1000000,0]' -x -d 'localhost' -p ${IQUERY_PORT}"
 
 --stop-igdata
-count(barrier)
+aggregate(barrier,count(*))
 --cleanup
 remove(barrier)
 --stop-query-logging

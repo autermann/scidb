@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
@@ -14,7 +13,7 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>load_library(library_name);</synopsis>
+    <synopsis>load_library('<replaceable>library_name</replaceable>');</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -25,7 +24,7 @@
     shared library to store its contents with SciDB's internal extension
     management subsystem.</para>
 
-    <para>Shared library modules which are registered with the SciDB instance
+    <para>Shared libraries which are registered with the SciDB instance
     will be loaded at system start time.</para>
 
     <para>To unload a library, see the <link
@@ -36,9 +35,10 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example loads the example plugin, librational.so</para>
+      <para>This example loads the example plugin, <emphasis
+      role="bold">librational.so</emphasis>.</para>
 
-      <programlisting>load_library('rational')</programlisting>
+      <programlisting>load_library('rational');</programlisting>
     </informalexample>
   </refsect1>
 </refentry>

@@ -40,7 +40,7 @@ Query was executed successfully
 SCIDB QUERY : <create empty array unbounded3 <a:int64>[x=1:*,128,0]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store(unbounded,unbounded2)>
+SCIDB QUERY : <store(redimension(unbounded,unbounded2),unbounded2)>
 {a} x
 {1} 1
 {2} 2
@@ -77,19 +77,19 @@ SCIDB QUERY : <show(unbounded2)>
 {i} schema
 {0} 'unbounded2<x:int64> [a=1:*,128,0]'
 
-SCIDB QUERY : <avg(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,avg(x))>
 {i} x_avg
 {0} 15.5
 
-SCIDB QUERY : <count(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,count(*))>
 {i} count
 {0} 30
 
-SCIDB QUERY : <sum(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,sum(x))>
 {i} x_sum
 {0} 465
 
-SCIDB QUERY : <min(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,min(x))>
 {i} x_min
 {0} 1
 
@@ -126,7 +126,7 @@ SCIDB QUERY : <project(unbounded2,x)>
 {29} 29
 {30} 30
 
-SCIDB QUERY : <stdev(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,stdev(x))>
 {i} x_stdev
 {0} 8.80341
 
@@ -154,7 +154,7 @@ SCIDB QUERY : <filter(unbounded2,x<15)>
 {13} 13
 {14} 14
 
-SCIDB QUERY : <max(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,max(x))>
 {i} x_max
 {0} 30
 
@@ -1193,7 +1193,7 @@ SCIDB QUERY : <cross_join(unbounded2,unbounded2)>
 {30,29} 30,29
 {30,30} 30,30
 
-SCIDB QUERY : <cross(unbounded2,unbounded2)>
+SCIDB QUERY : <cross_join(unbounded2,unbounded2)>
 {a,a} x,x
 {1,1} 1,1
 {1,2} 1,2
@@ -2540,7 +2540,7 @@ SCIDB QUERY : <substitute(unbounded2,build(<a:bool>[x=0:30,2,0],true))>
 {29} 29
 {30} 30
 
-SCIDB QUERY : <var(unbounded2)>
+SCIDB QUERY : <aggregate(unbounded2,var(x))>
 {i} x_var
 {0} 77.5
 

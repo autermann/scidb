@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@
 
 #include "system/ErrorCodes.h"
 #include "system/Exceptions.h"
-#include "query/parser/ParsingContext.h"
+#include "query/ParsingContext.h"
 
 class ExceptionTests: public CppUnit::TestFixture
 {
@@ -59,15 +59,15 @@ CPPUNIT_TEST(system_check);
 CPPUNIT_TEST_SUITE_END();
 
 private:
-	void throwSystemException(int ErrorNum) { 
+	void throwSystemException(int ErrorNum) {
 		throw SYSTEM_EXCEPTION(ErrorNum, boost::str(boost::format("Throwing Error Number %d") % ErrorNum));
 	}
 
-	void throwUserException(int ErrorNum) { 
+	void throwUserException(int ErrorNum) {
 		throw USER_EXCEPTION(ErrorNum, boost::str(boost::format("Throwing Error Number %d") % ErrorNum));
 	}
 
-	void throwUserQueryException(int ErrorNum) { 
+	void throwUserQueryException(int ErrorNum) {
         boost::shared_ptr< ParsingContext> foo(new  ParsingContext("Foo Bar", 1, 0));
 		throw USER_QUERY_EXCEPTION( ErrorNum, boost::str(boost::format("Throwing Error Number %d") % ErrorNum), foo );
 	}
@@ -85,15 +85,15 @@ public:
 		std::cout << "End Testing Exceptions and Exception handling\n";
     }
 
-	void system_exception() 
+	void system_exception()
 	{
 		//
-		// 
+		//
 		//
 		char strBuf[32];
 
-		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) { 
-			try { 
+		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) {
+			try {
 				throwSystemException(i);
             } catch ( SystemException &e ) {
 
@@ -101,92 +101,92 @@ public:
 
 				CPPUNIT_ASSERT(i == e.getErrorCode());
 				//
-				// This is the line on which the Exception is thrown in the 
-				// function throwSystemException... 
-				// 
+				// This is the line on which the Exception is thrown in the
+				// function throwSystemException...
+				//
 				CPPUNIT_ASSERT(64 == e.getLine());
 
 				CPPUNIT_ASSERT(0 == strcmp("src/system/ExceptionUnitTests.h", e.getFile().c_str()));
 				CPPUNIT_ASSERT(0 == strcmp("throwSystemException", e.getFunction().c_str()));
 				CPPUNIT_ASSERT(0 == strcmp(strBuf, e.getWhatStr().c_str()));
 
-				if (i <= SCIDB_ERROR_MESG_COUNT) { 
+				if (i <= SCIDB_ERROR_MESG_COUNT) {
 					CPPUNIT_ASSERT(0 == strcmp(SCIDB_ERROR_MESSAGES[i],SCIDB_ERROR_GET_SHORT_MESSAGE(e.getErrorCode())));
-				} else { 
+				} else {
 					CPPUNIT_ASSERT(0 == strcmp(SCIDB_ERROR_MESSAGES[1],SCIDB_ERROR_GET_SHORT_MESSAGE(e.getErrorCode())));
 				}
 			}
 		}
 	}
 
-	void user_exception() 
+	void user_exception()
 	{
 		//
 		//
 		char strBuf[32];
 
-		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) { 
-			try { 
+		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) {
+			try {
 				throwUserException(i);
             } catch ( UserException &e ) {
 
 				sprintf(strBuf, "Throwing Error Number %d", i);
 				CPPUNIT_ASSERT(i == e.getErrorCode());
 				//
-				// This is the line on which the UserException is thrown 
-				// in the throwUserException() function. 
-				// 
+				// This is the line on which the UserException is thrown
+				// in the throwUserException() function.
+				//
 				CPPUNIT_ASSERT(68 == e.getLine());
 				CPPUNIT_ASSERT(0 == strcmp("src/system/ExceptionUnitTests.h", e.getFile().c_str()));
 				CPPUNIT_ASSERT(0 == strcmp("throwUserException", e.getFunction().c_str()));
 				CPPUNIT_ASSERT(0 == strcmp(strBuf, e.getWhatStr().c_str()));
 
-				if (i <= SCIDB_ERROR_MESG_COUNT) { 
+				if (i <= SCIDB_ERROR_MESG_COUNT) {
 					CPPUNIT_ASSERT(0 == strcmp(SCIDB_ERROR_MESSAGES[i],SCIDB_ERROR_GET_SHORT_MESSAGE(e.getErrorCode())));
-				} else { 
+				} else {
 					CPPUNIT_ASSERT(0 == strcmp(SCIDB_ERROR_MESSAGES[1],SCIDB_ERROR_GET_SHORT_MESSAGE(e.getErrorCode())));
 				}
 			}
 		}
 	}
 
-	void user_query_exception() 
+	void user_query_exception()
 	{
 		//
 		//
 		//
 		char strBuf[32];
 
-		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) { 
-			try { 
+		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) {
+			try {
 				throwUserQueryException(i);
             } catch ( UserQueryException &e ) {
 
 				sprintf(strBuf, "Throwing Error Number %d", i);
 				CPPUNIT_ASSERT(i == e.getErrorCode());
 				//
-				// This is the line on which the UserQueryException is thrown 
+				// This is the line on which the UserQueryException is thrown
 				// in the throwUserQueryException() function.
-				// 
+				//
 				CPPUNIT_ASSERT(73 == e.getLine());
 				CPPUNIT_ASSERT(0 == strcmp("src/system/ExceptionUnitTests.h", e.getFile().c_str()));
 				CPPUNIT_ASSERT(0 == strcmp("throwUserQueryException", e.getFunction().c_str()));
 				CPPUNIT_ASSERT(0 == strcmp(strBuf, e.getWhatStr().c_str()));
 
-				if (i <= SCIDB_ERROR_MESG_COUNT) { 
+				if (i <= SCIDB_ERROR_MESG_COUNT) {
 					CPPUNIT_ASSERT(0 == strcmp(SCIDB_ERROR_MESSAGES[i],SCIDB_ERROR_GET_SHORT_MESSAGE(e.getErrorCode())));
-				} else { 
+				} else {
 					CPPUNIT_ASSERT(0 == strcmp(SCIDB_ERROR_MESSAGES[1],SCIDB_ERROR_GET_SHORT_MESSAGE(e.getErrorCode())));
 				}
 			}
 		}
 	}
 
-	void user_check() { 
+	void user_check() {
 
-		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) { 
+		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) {
 
-			try { 
+			try {
 				USER_CHECK(i, (i == i), "Will not happen");
 				USER_CHECK(i, (i == (i+1)), "Will happen");
 
@@ -195,9 +195,9 @@ public:
                 CPPUNIT_ASSERT(i == e.getErrorCode());
 				//
 				// This is the line for the second of the two USER_CHECK()
-				// tests above. Note that the first will not cause an 
-				// Exception to be generated. 
-				// 
+				// tests above. Note that the first will not cause an
+				// Exception to be generated.
+				//
                 CPPUNIT_ASSERT(192 == e.getLine());
                 CPPUNIT_ASSERT(0 == strcmp("src/system/ExceptionUnitTests.h", e.getFile().c_str()));
                 CPPUNIT_ASSERT(0 == strcmp("user_check", e.getFunction().c_str()));
@@ -212,11 +212,11 @@ public:
 		}
 	}
 
-	void system_check() { 
+	void system_check() {
 
-		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) { 
+		for(int i = 0; i < SCIDB_ERROR_MESG_COUNT + 10; i++) {
 
-			try { 
+			try {
 				SYSTEM_CHECK(i, (i == i), "Will not happen");
 				SYSTEM_CHECK(i, (i == (i+1)), "Will happen");
 
@@ -225,9 +225,9 @@ public:
                 CPPUNIT_ASSERT(i == e.getErrorCode());
 				//
 				// This is the line for the second of the two USER_CHECK()
-				// tests above. Note that the first will not cause an 
-				// Exception to be generated. 
-				// 
+				// tests above. Note that the first will not cause an
+				// Exception to be generated.
+				//
                 CPPUNIT_ASSERT(222 == e.getLine());
                 CPPUNIT_ASSERT(0 == strcmp("src/system/ExceptionUnitTests.h", e.getFile().c_str()));
                 CPPUNIT_ASSERT(0 == strcmp("system_check", e.getFunction().c_str()));

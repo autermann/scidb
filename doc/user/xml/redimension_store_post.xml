@@ -171,7 +171,7 @@
 
         <step>
           <para>Use redimension_store to populate the target array with data
-          from the source array.<para><programlisting>AFL% redimension_store(ddFlat,doseData) 
+          from the source array.<para><programlisting>AFL% store(redimension(ddFlat,doseData),doseData) 
   </programlisting><screen>{patientID,elapsedTime} pulse,ppm
 {1,0} 72,10
 {1,10} 75,434
@@ -224,7 +224,7 @@
 
         <step>
           <para>Use redimension_store to populate the target array with data
-          from the source array.<para><programlisting>AFL% redimension_store(doseData,ppmFunction) 
+          from the source array.<para><programlisting>AFL% store(redimension(doseData,ppmFunction),ppmFunction) 
   </programlisting><screen>{patientID,elapsedTime,pulse} ppm
 {1,0,72} 10
 {1,10,75} 434
@@ -278,7 +278,7 @@
 
         <step>
           <para>Use redimension_store to populate the target array with data
-          from the source array.<para><programlisting>AFL% redimension_store(doseData,pulseFunction) 
+          from the source array.<para><programlisting>AFL% store(redimension(doseData,pulseFunction),pulseFunction) 
   </programlisting><screen>{patientID,elapsedTime,ppm} pulse
 {1,0,10} 72
 {1,10,434} 75

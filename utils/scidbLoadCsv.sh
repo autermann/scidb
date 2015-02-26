@@ -4,7 +4,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -687,12 +687,12 @@ debug 3 "LOAD_FIFO was $LOAD_FIFO ------------------- listing it----------------
 if (( OPTION_CHECK )) ; then
     debug -1 "Checks of the size and contents of the linear load array."
     aflQueryChecked "" 1 "scan ( ${TMP_LOAD} )"   # NOCHECKIN - can only do this for a test array
-    aflQueryChecked "" 1 "count ( ${TMP_LOAD} )"
-    # aflQueryChecked "" 1 "avg ( ${TMP_LOAD} )"
+    aflQueryChecked "" 1 "aggregate ( ${TMP_LOAD} ), count(*) )"
+    # aflQueryChecked "" 1 "aggregate ( ${TMP_LOAD} ), avg ( ${ATTR_NAME} ) )"
     for (( I=0 ; I < NAME_LEN ; I++ )) ; do
         ATTR_NAME="${NAME_ARRAY[${I}]}"
-        aflQueryChecked "" 1 "min ( ${TMP_LOAD}, ${ATTR_NAME} )"
-        aflQueryChecked "" 1 "max ( ${TMP_LOAD}, ${ATTR_NAME} )"
+        aflQueryChecked "" 1 "aggregate ( ${TMP_LOAD}, min ( ${ATTR_NAME} ) )"
+        aflQueryChecked "" 1 "aggregate ( ${TMP_LOAD}, max ( ${ATTR_NAME} ) )"
     done
 fi
 
@@ -708,7 +708,7 @@ debug 1              "CREATE EMPTY ARRAY ${TMP_REDIM_STORE_ARRAY} ${POST_REDIM_A
 aflQueryChecked "" 0 "CREATE EMPTY ARRAY ${TMP_REDIM_STORE_ARRAY} ${POST_REDIM_ATTRIBUTES} ${POST_REDIM_DIMENSIONS}"
 #aflQueryChecked "" 0 "show($TMP_LOAD)"
 #aflQueryChecked "" 0 "show($TMP_REDIM_STORE_ARRAY)"
-aflQueryChecked "-n" 1 "redimension_store ( ${TMP_LOAD}, ${TMP_REDIM_STORE_ARRAY} )"
+aflQueryChecked "-n" 1 "store ( redimension ( ${TMP_LOAD}, ${TMP_REDIM_STORE_ARRAY} ), ${TMP_REDIM_STORE_ARRAY} )"
 
 aflQuery   "" 1 "remove(${TARGET_NAME})" > /dev/null 2>&1
 # getting the "duplicate key" error here, so have to wait more sometimes
@@ -717,7 +717,7 @@ aflQuery   "" 1 "remove(${TARGET_NAME})" > /dev/null 2>&1
 aflQueryChecked "" 1 "rename(${TMP_REDIM_STORE_ARRAY}, ${TARGET_NAME})"
 if (( OPTION_CHECK )) ; then
     debug -1 "Checks of the size and contents of the linear load array."
-    aflQueryChecked "" 0 "count ( ${TARGET_NAME} )"
+    aflQueryChecked "" 0 "aggregate ( ${TARGET_NAME} ), count(*) )"
 fi
 
 #

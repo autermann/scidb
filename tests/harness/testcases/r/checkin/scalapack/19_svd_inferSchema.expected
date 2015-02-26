@@ -55,7 +55,7 @@ i,sigma
 SCIDB QUERY : <gesvd(A_1c32, 'foo')>
 [An error expected at this place for the query "gesvd(A_1c32, 'foo')". And it failed with error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33. Expected error code = DLA::SCIDB_SE_INFER_SCHEMA::DLA_ERROR33.]
 
-SCIDB QUERY : <remove tmp>
+SCIDB QUERY : <remove(tmp)>
 [SciDB query execution failed. But continuing, as it was intended to just run.]
 
 SCIDB QUERY : <store(gesvd(A_1c32, 'U'),  tmp)>

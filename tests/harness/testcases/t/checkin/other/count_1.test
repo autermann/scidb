@@ -8,7 +8,7 @@ store(join(build(T,x-y-1),build(T,x+y+1)),A)
 
 --test
 redimension(A,B)
-count(redimension(A,B))
+aggregate(redimension(A,B),count(*))
 
 --cleanup
 remove(A)

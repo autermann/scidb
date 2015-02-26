@@ -502,12 +502,12 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
       </indexterm>The preceding sections of this chapter describe those
     features of SciDB that were designed exclusively to calculate aggregates.
     You can also calculate aggregates "in-line" as part of other data
-    management or rearrangement steps: the redimension 
-    operator supports this type of usage. The redimension operator is used to
-    transform a source array into a result array with different schema or
-    dimensions. In those cases, aggregates can be useful in summarizing
-    multiple elements from the source array that are mapped to a single
-    element in the destination array.</para>
+    management or rearrangement steps: the redimension operator supports this
+    type of usage. The redimension operator is used to transform a source
+    array into a result array with different schema or dimensions. In those
+    cases, aggregates can be useful in summarizing multiple elements from the
+    source array that are mapped to a single element in the destination
+    array.</para>
 
     <para>For example, suppose you have an array describing some recent
     Olympic champions, and you want to produce an array that shows the
@@ -540,8 +540,8 @@ i 1 PRECEDING AND 1 FOLLOWING); --show-output=yes --show-query=yes
 --schema winners</programlisting>
 
     <para>To examine the data in the <emphasis role="bold">winners
-    </emphasis>array, use the following AFL statement with the -o lcsv+
-    format: <programlisting language="test">--afl scan(winners) --output-format=lcsv+</programlisting></para>
+    </emphasis>array, use the following AFL statement: <programlisting
+    language="test">--afl scan(winners);</programlisting></para>
 
     <para>To create the schema for the desired array, execute the following
     statement:<programlisting language="test">--afl CREATE ARRAY perCountryMedalCount &lt;country:string, medalCount: uint64 null&gt; [country_id=0:*,20,0];

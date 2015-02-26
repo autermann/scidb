@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@
 #include "system/Exceptions.h"
 #include "system/ErrorsLibrary.h"
 #include "query/Query.h"
-#include "query/parser/ParsingContext.h"
+#include "query/ParsingContext.h"
 
 using namespace std;
 using namespace boost;
@@ -231,7 +231,7 @@ void carrots(string &str, size_t line, size_t start, size_t end)
 {
     const string tmp = str;
     str = "";
-    const size_t len = end - start > 0 ? end - start : 1;
+    const size_t len = ( end > start ) ? end - start : 1;
     const string carrots = string(start - 1, ' ') + string(len, '^');
 
     bool done = false;

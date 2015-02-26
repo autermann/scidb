@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -66,11 +66,11 @@ static const bool DBG = false;
 class MPICopyPhysical : public ScaLAPACKPhysical
 {
 public:
-	MPICopyPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
-	:
-	    ScaLAPACKPhysical(logicalName, physicalName, parameters, schema)
-	{
-	}
+        MPICopyPhysical(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+        :
+            ScaLAPACKPhysical(logicalName, physicalName, parameters, schema)
+        {
+        }
 
     virtual bool changesDistribution(const std::vector<ArrayDesc> & inputSchemas) const
     {
@@ -174,8 +174,8 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
 
     // these formulas for LLD (loacal leading dimension) and LTD (local trailing dimension)
     // are found in the headers of the scalapack functions such as pdgesvd_()
-	const slpp::int_t MB= chunkRow(Ain);  // chunk sizes
-	const slpp::int_t NB= chunkCol(Ain);
+        const slpp::int_t MB= chunkRow(Ain);  // chunk sizes
+        const slpp::int_t NB= chunkCol(Ain);
     const slpp::int_t one = 1 ;
 
     // LLD(IN)
@@ -245,9 +245,9 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
 
 
     //-------------------- Create IPC
-	std::vector<MPIPhysical::SMIptr_t> shmIpc = allocateMPISharedMemory(NUM_BUFS, elemBytes, nElem, dbgNames);
+        std::vector<MPIPhysical::SMIptr_t> shmIpc = allocateMPISharedMemory(NUM_BUFS, elemBytes, nElem, dbgNames);
     typedef scidb::SharedMemoryPtr<double> shmSharedPtr_t ;
-    
+
     void *argsBuf = shmIpc[0]->get();
     double* IN = reinterpret_cast<double*>(shmIpc[1]->get());
     double* OUT= reinterpret_cast<double*>(shmIpc[2]->get());
@@ -255,7 +255,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     shmSharedPtr_t OUTx(shmIpc[resultShmIpcIndx]);
 
     setInputMatrixToAlgebraDefault(IN, nElem[1]);
-    extractArrayToScaLAPACK(Ain, IN, DESC_IN, NPROW, NPCOL, MYPROW, MYPCOL);
+    extractArrayToScaLAPACK(Ain, IN, DESC_IN, NPROW, NPCOL, MYPROW, MYPCOL, query);
 
     setOutputMatrixToAlgebraDefault(OUT, nElem[2], logger);
 
@@ -321,7 +321,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
     resetMPI();
- 
+
     return result;
 }
 
@@ -333,7 +333,7 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     // + calls invokeMPI()
     // + returns the output OpArray.
     // NOTE: only one input is allowed.
-    // 
+    //
     const bool DBG = false ;
 
     if(DBG) std::cerr << "MPICopyPhysical::execute() begin ---------------------------------------" << std::endl;
@@ -360,6 +360,8 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     size_t nRows = dims[0].getLength();
     size_t nCols = dims[1].getLength();
     if (!nRows || !nCols ) {
+        bool isParticipating = launchMPISlaves(query, 0);
+        SCIDB_ASSERT(!isParticipating);
         return shared_ptr<Array>(new MemArray(_schema,query));
     }
 
@@ -387,6 +389,8 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         //
         // We are an "extra" instance that must return an empty array
         // we will not start mpi slaves for such instances
+        bool isParticipating = launchMPISlaves(query, 0);
+        SCIDB_ASSERT(!isParticipating);
         return shared_ptr<Array>(new MemArray(_schema,query));
     } else {
         if(DBG) {
@@ -432,7 +436,6 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
 
         std::cerr << "MPICopy: preparing to extractData, nRows=" << nRows << ", nCols = " << nCols << std::endl ;
     }
-
 
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::execute(): preparing to extractData, nRows=" << nRows << ", nCols = " << nCols);
 

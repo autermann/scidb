@@ -18,18 +18,18 @@ SCIDB QUERY : <store(build_sparse(D,x+5,x<>1),D)>
 {0} 5
 {2} 7
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 {a} x
 {10} 0
 {11} 1
 {12} 2
 
-SCIDB QUERY : <redimension_store(D,B)>
+SCIDB QUERY : <store(redimension(D,B),B)>
 {a} x
 {5} 0
 {7} 2
 
-SCIDB QUERY : <redimension_store(B,D)>
+SCIDB QUERY : <store(redimension(B,D),D)>
 {x} a
 {0} 5
 {2} 7
@@ -44,15 +44,15 @@ SCIDB QUERY : <unpack(D,row)>
 {0} 0,5
 {1} 2,7
 
-SCIDB QUERY : <max(B)>
+SCIDB QUERY : <aggregate(B,max(x))>
 {i} x_max
 {0} 2
 
-SCIDB QUERY : <min(B)>
+SCIDB QUERY : <aggregate(B,min(x))>
 {i} x_min
 {0} 0
 
-SCIDB QUERY : <avg(B)>
+SCIDB QUERY : <aggregate(B,avg(x))>
 {i} x_avg
 {0} 1
 
@@ -84,7 +84,7 @@ SCIDB QUERY : <join(B,B)>
 {5} 0,0
 {7} 2,2
 
-SCIDB QUERY : <cross(B,B)>
+SCIDB QUERY : <cross_join(B,B)>
 {a,a} x,x
 {5,5} 0,0
 {5,7} 0,2
@@ -96,11 +96,11 @@ SCIDB QUERY : <apply(B,z,x-a)>
 {5} 0,-5
 {7} 2,-5
 
-SCIDB QUERY : <count(B)>
+SCIDB QUERY : <aggregate(B,count(*))>
 {i} count
 {0} 2
 
-SCIDB QUERY : <sum(B)>
+SCIDB QUERY : <aggregate(B,sum(x))>
 {i} x_sum
 {0} 2
 
@@ -114,15 +114,15 @@ SCIDB QUERY : <sort(B,x desc)>
 {0} 2
 {1} 0
 
-SCIDB QUERY : <max(D)>
+SCIDB QUERY : <aggregate(D,max(a))>
 {i} a_max
 {0} 7
 
-SCIDB QUERY : <min(D)>
+SCIDB QUERY : <aggregate(D,min(a))>
 {i} a_min
 {0} 5
 
-SCIDB QUERY : <avg(D)>
+SCIDB QUERY : <aggregate(D,avg(a))>
 {i} a_avg
 {0} 6
 
@@ -154,7 +154,7 @@ SCIDB QUERY : <join(D,D)>
 {0} 5,5
 {2} 7,7
 
-SCIDB QUERY : <cross(D,D)>
+SCIDB QUERY : <cross_join(D,D)>
 {x,x} a,a
 {0,0} 5,5
 {0,2} 5,7
@@ -166,11 +166,11 @@ SCIDB QUERY : <apply(D,z,x-a)>
 {0} 5,-5
 {2} 7,-5
 
-SCIDB QUERY : <count(D)>
+SCIDB QUERY : <aggregate(D,count(*))>
 {i} count
 {0} 2
 
-SCIDB QUERY : <sum(D)>
+SCIDB QUERY : <aggregate(D,sum(a))>
 {i} a_sum
 {0} 12
 

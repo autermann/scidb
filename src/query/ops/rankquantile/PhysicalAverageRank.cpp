@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -82,12 +82,13 @@ class PhysicalAverageRank: public PhysicalOperator
 
     shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-        if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
+        shared_ptr<Array> inputArray = inputArrays[0];
+        if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
+        {   //if input supports MULTI_PASS, don't bother converting it
+            inputArray = ensureRandomAccess(inputArray, query);
         }
 
-        const ArrayDesc& input = inputArrays[0]->getArrayDesc();
+        const ArrayDesc& input = inputArray->getArrayDesc();
         string attName = _parameters.size() > 0 ? ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName() :
                                                 input.getAttributes()[0].getName();
 
@@ -101,7 +102,7 @@ class PhysicalAverageRank: public PhysicalOperator
             }
         }
 
-        Dimensions const& dims = inputArrays[0]->getArrayDesc().getDimensions();
+        Dimensions const& dims = inputArray->getArrayDesc().getDimensions();
         Dimensions groupBy;
         if (_parameters.size() > 1)
         {
@@ -119,7 +120,7 @@ class PhysicalAverageRank: public PhysicalOperator
             }
         }
 
-        return buildDualRankArray(inputArrays[0], rankedAttributeID, groupBy, query);
+        return buildDualRankArray(inputArray, rankedAttributeID, groupBy, query);
     }
 };
 

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -180,9 +180,8 @@ std::vector<MPIPhysical::SMIptr_t> MPIPhysical::allocateMPISharedMemory(size_t n
         shmIpc[ii] = SMIptr_t(mpi::newSharedMemoryIpc(ipcNameFull, preallocate)); // can I get 'em off ctx instead?
         _ctx->addSharedMemoryIpc(_launchId, shmIpc[ii]);
 
-        assert (elemSizes[ii] * numElems[ii] <= std::numeric_limits<int64_t>::max());
-        char* ptr = MpiLauncher::initIpcForWrite(shmIpc[ii].get(), static_cast<int64_t>(elemSizes[ii] * numElems[ii]));
-        assert(ptr);
+        char* ptr = MpiLauncher::initIpcForWrite(shmIpc[ii].get(), (elemSizes[ii] * numElems[ii]));
+        assert(ptr); ptr=ptr;
     }
     return shmIpc;
 }

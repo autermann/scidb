@@ -7,8 +7,8 @@ store(join(A,B),C)
 store(join(B,A),D)
 
 --test
-cross(C,D)
-store(cross(D,C),E)
+cross_join(C,D)
+store(cross_join(D,C),E)
 
 --cleanup
 remove(A)

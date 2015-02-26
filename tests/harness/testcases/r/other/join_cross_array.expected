@@ -385,7 +385,7 @@ SCIDB QUERY : <cross_join(data_array,UB)>
 {9,28} 10,14
 {9,29} 10,15
 
-SCIDB QUERY : <count(cross_join(data_array,UB))>
+SCIDB QUERY : <aggregate(cross_join(data_array,UB),count(*))>
 {i} count
 {0} 160
 

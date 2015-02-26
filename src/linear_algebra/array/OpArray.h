@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -122,6 +122,11 @@ public:
                                 Coordinates const& delta,
                                 const boost::shared_ptr<scidb::Query>& query);
     virtual             ~OpArray();
+
+    virtual Access getSupportedAccess() const
+    {
+        return Array::MULTI_PASS;
+    }
 
     ArrayIterator*      createArrayIterator(AttributeID id) const;
 private:
@@ -287,7 +292,7 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
             int64_t chunkRows =  int64_t(dims[0].getChunkInterval());
             int64_t rowCount = std::max(0L, std::min(rowsTillEnd, chunkRows));
             if(DBG >= DBG_DETAIL) {
-                std::cerr << dbgPrefix << " first:" << first[-1] << "," << first[1] << std::endl;
+                std::cerr << dbgPrefix << " first:" << first[0] << "," << first[1] << std::endl;
                 std::cerr << dbgPrefix << " rowCount:" << rowCount
                                        << "= max(0,min(rowsTillEnd:"<< rowsTillEnd
                                                     << ", chunkRows:"<< chunkRows

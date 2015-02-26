@@ -7,7 +7,7 @@ store(build(A,x+10),A)
 
 --test
 --aql select name,schema from list()
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION "redimension_store(A,C)"
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION "store(redimension(A,C),C)"
 scan(C)
 
 

@@ -3,7 +3,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -28,15 +28,17 @@
 #   - license.txt
 #   - license.py.txt
 #   - *~
-#   - this script itself
+#   - FindProtobuf.cmake (See #3215)
+#
 # @note The following directories are omitted:
 #   - .svn
 #   - 3rdparty
 #   - extern
 #
-# @note The files in which missing copyright blocks are added are:
-#   - py, h, c, cpp, hpp, sh, java
+# @note The files in which missing copyright blocks are added are 
+#   - py, h, c, cpp, hpp, sh, java, yy, ll
 #   - their "in" version, e.g. py.in.
+#   To expand the script to handle more file types, follow the example of 'java' (search all occurences of 'java' in this file).
 #
 # @def A "copyright block" is a block of lines starting with a line that includes BEGIN_COPYRIGHT and ends with a line that includes END_COPYRIGHT.
 #
@@ -111,7 +113,7 @@ sub returnFirstCharIfMatch
 sub getSuffix
 {
 	my($file) = @_;
-	if ($file =~ /(.*)\.((py|h|c|cpp|hpp|sh|java)\.in)$/) {
+	if ($file =~ /(.*)\.((py|h|c|cpp|hpp|sh|java|yy|ll)\.in)$/) {
 		return $2;
 	}
 	elsif ($file =~ /(.*)\.(.+)/) {
@@ -248,7 +250,7 @@ sub loopDir
 			loopDir($f, $isReplaceMode);
 		}
 		elsif (-f $f) {
-			next if ($f eq __FILE__ || $f eq $newCopyrightFileStar || $f eq $newCopyrightFileSharp || $f =~ /\~$/);
+			next if ($f eq $newCopyrightFileStar || $f eq $newCopyrightFileSharp || $f =~ /\~$/ || $f eq "FindProtobuf.cmake");
 			my $firstChar = &returnFirstCharIfMatch($f);
 			my $suffix = &getSuffix($f);
 			if ($firstChar) {
@@ -265,14 +267,15 @@ sub loopDir
 			else {
 				my $missing = 0;
 
-				# py, h, c, cpp, hpp, sh
-				if ($suffix eq "h"    or $suffix eq "c"    or $suffix eq "cpp"    or $suffix eq "hpp"    or $suffix eq "java" or
-				    $suffix eq "h.in" or $suffix eq "c.in" or $suffix eq "cpp.in" or $suffix eq "hpp.in" or $suffix eq "java.in") {
+				# h, c, cpp, hpp, java, yy, ll
+				if ($suffix eq "h"    or $suffix eq "c"    or $suffix eq "cpp"    or $suffix eq "hpp"    or $suffix eq "java"    or $suffix eq "yy"    or $suffix eq "ll" or
+				    $suffix eq "h.in" or $suffix eq "c.in" or $suffix eq "cpp.in" or $suffix eq "hpp.in" or $suffix eq "java.in" or $suffix eq "yy.in" or $suffix eq "ll.in") {
 					if ($isReplaceMode) {
 						&add($f, 1);  # isStar
 					}
 					$missing = 1;
 				}
+				# py, sh
 				elsif ($suffix eq "py"    or $suffix eq "sh" or
 				       $suffix eq "py.in" or $suffix eq "sh.in") {
 					if ($isReplaceMode) {

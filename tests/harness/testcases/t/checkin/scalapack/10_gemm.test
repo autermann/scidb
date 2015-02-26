@@ -67,6 +67,11 @@ load(fileDense66c33,'../tests/harness/testcases/data/dense.txt')
 # and to make it output list in order
 create array output66c66 <a: double > [r=0:5,6,0, c=0:5,6,0]
 
+# subarray and gemm testing
+create array sub_test <val:double> [x=0:63,32,0,y=0:63,32,0]
+--igdata "store(build(sub_test, x+y), sub_test)"
+--igdata "store(gemm(sub_test, sub_test, sub_test), sub_expected)"
+
 load_library('dense_linear_algebra')
 
 --test
@@ -76,7 +81,7 @@ gemm(ident11c32,   ident11c32, build(ident11c32,0))
 
 # also demonstrate result has a fully-defined schema (by storing into un-created array),
 # that it does not have the "not emptyable" attribute, and that it can be scanned.
---justrun "remove tmp"
+--justrun "remove(tmp)"
 store(gemm(ident11c32,   ident11c32, build(ident11c32,0)), tmp)
 show(tmp)
 scan(tmp)
@@ -193,6 +198,12 @@ transpose(gemm(intRows22c32, intRows22c32, build(ident22c32,0)))
 # make sure we can cascade gemm operators
 join(join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))), join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c32, intRows22c32, build(ident22c32,0))))
 
+# combine gemm with joins and subarray
+filter(join(project(join(sub_test as A, subarray(gemm(sub_test,sub_test,sub_test), null, null, null, null) as B), gemm) as C, sub_expected as D), C.gemm<>D.gemm)
+filter(join(project(join(subarray(gemm(sub_test,sub_test,sub_test), 1, 2, null, null) as B, sub_test as A), gemm) as C, subarray(sub_expected, 1,2,null,null) as D), C.gemm<>D.gemm)
+subarray(gemm(sub_test, sub_test, sub_test), 1, 2, 50, 60)
+sg(subarray(gemm(sub_test, sub_test, sub_test), 1, 2, 50, 60), 1, -1)
+
 --cleanup
 
 # identity-squares
@@ -222,3 +233,8 @@ remove(intRows21nzc32)
 # one oddball test
 remove(fileDense66c33)
 remove(output66c66)
+
+# subarray
+remove(sub_test)
+remove(sub_expected)
+

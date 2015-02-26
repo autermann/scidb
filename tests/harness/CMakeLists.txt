@@ -78,8 +78,6 @@ configure_file(runN.py "${GENERAL_HARNESSTEST_DIRECTORY}/runN.py" COPYONLY)
 configure_file(scidbtestprep.py "${GENERAL_OUTPUT_DIRECTORY}/scidbtestprep.py" COPYONLY)
 configure_file(mu_admin.py "${GENERAL_OUTPUT_DIRECTORY}/mu_admin.py")
 configure_file(log4j.properties "${GENERAL_OUTPUT_DIRECTORY}/log4j.properties" COPYONLY)
-configure_file("testcases/t/client/basic.py.in" "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/client/basic.py")
-configure_file("testcases/t/client/querylist.csv"  "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/client/querylist.csv")
 
 #_____________________________________________________________________________________________________________
 # CDASH report #
@@ -117,11 +115,11 @@ add_executable(arg_separator ${arg_separator_sources})
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "arg_separator" arg_separator)
 set_target_properties(arg_separator PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
 
-set(DISABLE_TESTS "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/disable.tests")
-set(DISABLE_TESTS_IN "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable.tests.in")
+set(DISABLE_TESTS "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/disable.tests")
+set(DISABLE_TESTS_IN "${CMAKE_CURRENT_SOURCE_DIR}/testcases/disable.tests.in")
 
-set(DISABLE_TESTS_1I "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/t/disable1i.tests")
-set(DISABLE_TESTS_1I_IN "${CMAKE_CURRENT_SOURCE_DIR}/testcases/t/disable1i.tests.in")
+set(DISABLE_TESTS_1I "${GENERAL_HARNESSTEST_DIRECTORY}/testcases/disable1i.tests")
+set(DISABLE_TESTS_1I_IN "${CMAKE_CURRENT_SOURCE_DIR}/testcases/disable1i.tests.in")
 
 # list_1 and run_016 disabled until we get scalapack building
 # on all platforms
@@ -146,3 +144,4 @@ endif(CMAKE_BUILD_TYPE STREQUAL "Valgrind")
 
 configure_file(${DISABLE_TESTS_IN} ${DISABLE_TESTS})
 configure_file(${DISABLE_TESTS_1I_IN} ${DISABLE_TESTS_1I})
+

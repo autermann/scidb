@@ -1,4 +1,24 @@
 #!/usr/bin/python
+#
+# BEGIN_COPYRIGHT
+#
+# This file is part of SciDB.
+# Copyright (C) 2008-2014 SciDB, Inc.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 from scidbTestCase import testCase
 from pushPopCleaners import ArrayCleaner
 from pushPopCleaners import DataDirCleaner
@@ -107,9 +127,9 @@ def getOpTestQueries(dbq):
          'attributes(array_for_redimension_test)',
          'analyze('                + defBuild + ')',
          'apply('                  + defBuild + ',val2,0.5*attr1)',
-         'approxdc('               + dbq.build(t=['int64'],r=[(0,9)],i='random()%16') + ',attr1)',
+         'aggregate('              + dbq.build(t=['int64'],r=[(0,9)],i='random()%16') + ',approxdc(attr1))',
          'attribute_rename('       + defBuild + ',attr1,new_val)',
-         'avg('                    + defBuild + ',attr1)',
+         'aggregate('              + defBuild + ',avg(attr1))',
          'avg_rank('               + defBuild + ')',
          'bernoulli('              + defBuild + ',0.31459,12345)',
          'between('                + defBuild + ',1,1,88,88)',
@@ -117,8 +137,8 @@ def getOpTestQueries(dbq):
          'build_sparse('           + dbq.schema(r=[(0,199)])+ ',1,i=j)',
          'cast('                   + dbq.build(t=['int64'],r=[(0,199)]) + ',' + dbq.schema(a=['attr2'],t=['int64'],d=['i','jj'],r=[(0,199)])+ ')',
          'concat('                 + dbq.build(r=[(0,199)]) + ',' + dbq.build(r=[(0,199)])+ ')',
-         'count('                  + dbq.build(r=[(0,199)])+ ')',
-         'cross('                  + dbq.build(r=[(0,19)])+ ',' + dbq.build(a=['attr2'],d=['x','y'],r=[(0,19)]) + ')',
+         'aggregate('              + dbq.build(r=[(0,199)])+ ',count(*))',
+         'cross_join('             + dbq.build(r=[(0,19)])+ ',' + dbq.build(a=['attr2'],d=['x','y'],r=[(0,19)]) + ')',
          'cross_join('             + dbq.build(r=[(0,19)]) + ',' + dbq.build(a=['attr2'],d=['x','y'],r=[(0,19)]) + ',j,y)',
          'cumulate('               + dbq.build(r=[(0,49)]) + ',sum(attr1),j)',
          'deldim('                 + dbq.build(r=[(0,0),(0,199)]) + ')',
@@ -136,9 +156,9 @@ def getOpTestQueries(dbq):
          'load(array_for_input_test,\'../tests/harness/testcases/data/M4x4_1.txt\',-2,\'(int32, int32)\',99,shadow_array)',
          'lookup(join('            + dbq.build(a=['v1'],d=['i'],r=[(0,3)],i=1) + ',' + dbq.build(a=['v2'],d=['i'],r=[(0,3)],i='i') + '),' + defBuild + ')',
          'materialize('            + defBuild + ',1)',
-         'max('                    + defBuild + ')',
+         'aggregate('              + defBuild + ',max(attr1))',
          'merge(build_sparse('     + defSchema + ',1,i=j),build_sparse(' + dbq.schema(a=['attr2'])+ ',1,i=0))',
-         'min('                    + defBuild + ')',
+         'aggregate('              + defBuild + ',min(attr1))',
          'mstat()',
          'normalize('              + dbq.build(d=['i']) + ')',
          'old_unpack('             + defBuild + ',x)',
@@ -160,15 +180,15 @@ def getOpTestQueries(dbq):
          'slice('                  + defBuild + ',j,22)',
          'sort('                   + dbq.build(t=['int64'],i='random()%10') + ',attr1)',
          'splitarraytest('         + dbq.build(i='random()%10') + ')',
-         'stdev('                  + dbq.build(i='random()%10') + ',attr1,j)',
+         'aggregate('              + dbq.build(i='random()%10') + ',stdev(attr1),j)',
          'store('                  + dbq.build(i='random()%10') + ',array_for_store_test)',
          'subarray('               + dbq.build(i='random()%10') + ',10,10,2,32)',
          'substitute('             + dbq.build(r=[(0,9)],i='iif(i=j,null,1)',n=True) + ',' + dbq.build(d=['i'],r=[(0,0)],c=[1],i=0) + ')',
-         'sum('                    + dbq.build(t=['int64'],r=[(0,9)],i='random()%5') + ')',
+         'aggregate('              + dbq.build(t=['int64'],r=[(0,9)],i='random()%5') + ',sum(attr1))',
          'thin('                   + dbq.build(i='random()%10')+ ',0,2,0,2)',
          'transpose('              + dbq.build(r=[(0,19),(0,29)],i='random()%10') + ')',
          'unpack('                 + dbq.build(r=[(0,9)],i=1)+ ',j)',
-         'var('                    + defBuild + ',attr1)',
+         'aggregate('              + defBuild + ',var(attr1))',
          'variable_window('        + defBuild + ',i,2,6,sum(attr1))',
          'versions(array_for_store_test)',
          'window('                 + defBuild + ',2,11,4,13,min(attr1))',

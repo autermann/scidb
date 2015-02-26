@@ -8,25 +8,25 @@
 --shell  --command="csv2scidb -s 1 -p NNs < $DOC_DATA/aInsert.csv > $DOC_DATA/aInsert.scidb "
 --aql load aFlat from '../tests/harness/testcases/data/doc/aInsert.scidb' 
 --aql create array A <value:string null> [row=1:3,3,0, col=1:3,3,0] 
-redimension_store(aFlat,A) 
+store(redimension(aFlat,A),A) 
 --aql create array bFlat <row:int64, col:int64, value:string null> [csvRow=0:5,6,0] 
 --shell  --command="csv2scidb -s 1 -p NNs < $DOC_DATA/bInsert.csv > $DOC_DATA/bInsert.scidb "
 --aql load bFlat from '../tests/harness/testcases/data/doc/bInsert.scidb' 
 --aql create array B <value:string null> [row=1:3,3,0, col=1:3,3,0] 
-redimension_store(bFlat,B) 
+store(redimension(bFlat,B),B) 
 --aql insert into B select * from A 
-redimension_store(bFlat,B) 
+store(redimension(bFlat,B),B) 
 --stop-igdata
 show(A)
 show(B)
 --start-igdata
-redimension_store(aFlat,A) 
+store(redimension(aFlat,A),A) 
 --set-format dense
 --stop-igdata
 --aql select * from A 
 --set-format dcsv
 --start-igdata
-redimension_store(bFlat,B) 
+store(redimension(bFlat,B),B) 
 --set-format dense
 --stop-igdata
 --aql select * from B 
@@ -37,26 +37,26 @@ redimension_store(bFlat,B)
 --shell  --command="csv2scidb -s 1 -p NNsS < $DOC_DATA/cInsert.csv > $DOC_DATA/cInsert.scidb "
 --aql load cFlat from '../tests/harness/testcases/data/doc/cInsert.scidb' 
 --aql create array C <value:string null, value2:string null> [row=1:3,3,0, col=1:3,3,0] 
-redimension_store(cFlat,C) 
+store(redimension(cFlat,C),C) 
 --stop-igdata
 show(C)
 --set-format dense
 --aql select * from C 
 --set-format dcsv
 --start-igdata
-redimension_store(bFlat,B) 
+store(redimension(bFlat,B),B) 
 --set-format dense
 --stop-igdata
 --aql insert into B select value from C 
 --set-format dcsv
 --start-igdata
-redimension_store(bFlat,B) 
+store(redimension(bFlat,B),B) 
 --set-format dense
 --stop-igdata
 --aql insert into B select value2 from C 
 --set-format dcsv
 --start-igdata
-redimension_store(bFlat,B) 
+store(redimension(bFlat,B),B) 
 --set-format dense
 --stop-igdata
 --aql insert into B '[ [()()(333333333)] [()(555555555)()] [(777777777)()()] ]' 
@@ -70,6 +70,24 @@ versions(m4x4)
 --stop-igdata
 --start-igdata
 scan(m4x4@1)  
+--set-format dcsv
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],1),stocks)  
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],2),stocks)  
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],3),stocks)  
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],4),stocks)  
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],5),stocks)  
+--stop-igdata
+project(versions(stocks), version_id)  
+--start-igdata
+store(stocks,stocks_tmp)  
+remove(stocks)  
+rename(stocks_tmp,stocks)  
+--stop-igdata
+project(versions(stocks), version_id)  
+--start-igdata
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],2),stocks)  
+store(build(<price:double>[index=0:99,20,0, day_offset=0:30,31,0],3),stocks)  
+store(stocks@2,stocks_tmp)  
 --stop-igdata
 
 --stop-query-logging
@@ -84,3 +102,5 @@ remove(B)
 remove(cFlat)
 remove(C)
 remove(m4x4)
+remove(stocks)
+remove(stocks_tmp)

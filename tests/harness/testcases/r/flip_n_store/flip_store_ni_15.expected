@@ -16,13 +16,13 @@ SCIDB QUERY : <store(join(build(T,string(x+1)),build(T,string(x+5))),A)>
 {1} '2','6'
 {2} '3','7'
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 a,b
 0,'5'
 1,'6'
 2,'7'
 
-SCIDB QUERY : <redimension_store(B,C)>
+SCIDB QUERY : <store(redimension(B,C),C)>
 b,a
 0,'1'
 1,'2'
@@ -110,7 +110,7 @@ a,b,b
 1,'6','6'
 2,'7','7'
 
-SCIDB QUERY : <cross(B1,B1)>
+SCIDB QUERY : <cross_join(B1,B1)>
 a,a,b,b
 0,0,'5','5'
 0,1,'5','6'
@@ -223,7 +223,7 @@ b,a,a
 1,'2','2'
 2,'3','3'
 
-SCIDB QUERY : <cross(C1,C1)>
+SCIDB QUERY : <cross_join(C1,C1)>
 b,b,a,a
 0,0,'1','1'
 0,1,'1','2'

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -135,6 +135,21 @@ class ThreadStartInjectedError
 
 };
 typedef Notification<ThreadStartInjectedError> ThreadStartInjectedErrorNotification;
+
+/**
+ * @class DataStoreInjectedError - a specific error injected into the DataStore::invalidateFreelist
+ * code path.
+ */
+class DataStoreInjectedError
+: public InjectedError, public boost::enable_shared_from_this<DataStoreInjectedError>
+{
+ public:
+    const static long int ID = 6;
+    virtual void inject() const;
+    virtual void activate() const;
+
+};
+typedef Notification<DataStoreInjectedError> DataStoreInjectedErrorNotification;
  
 /**
  * @class InjectedErrorLibrary - a library of all injected error identified by their IDs

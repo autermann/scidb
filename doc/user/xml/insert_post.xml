@@ -160,7 +160,7 @@
       <procedure>
         <step>
           <para>Show array A. Note that row 1 has only empty cells, row 2 has
-          only null values, and row 3 has only non-null values.<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> A
+          only null values, and row 3 has only non-null values.<para><programlisting>AFL% scan(A);
   </programlisting><screen>[
 [(),(),()],
 [(null),(null),(null)],
@@ -171,7 +171,7 @@
         <step>
           <para>Show array B. Note that column 1 has only empty cells, column
           2 has only null values, and column 3 has only non-null
-          values.<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> B
+          values.<para><programlisting>AFL% scan(B);
   </programlisting><screen>[
 [(),(null),('b3')],
 [(),(null),('b6')],
@@ -195,8 +195,8 @@
           version of B. Version 2 is the version resulting from the insert
           operation of the previous step. <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> versions(B)
   </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,'2013-06-18 19:32:52'
-{2} 2,'2013-06-18 19:32:53'
+{1} 1,'2014-03-14 17:22:23'
+{2} 2,'2014-03-14 17:22:23'
 </screen></para></para>
         </step>
 

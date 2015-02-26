@@ -54,7 +54,8 @@
       <procedure>
         <step>
           <para>Show the schema for the original array.<programlisting
-          language="test">--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
+          language="test">--afl load_library('dense_linear_algebra'); --show-query=no --show-output=no
+--afl create array event &lt;event:string&gt; [i=0:11,12,0]; --show-query=no --show-output=no
 --afl create array year &lt;year:int64&gt;[i=0:11,12,0]; --show-query=no --show-output=no
 --afl create array person &lt;person:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no
 --afl create array country &lt;country:string&gt;[i=0:11,12,0]; --show-query=no --show-output=no

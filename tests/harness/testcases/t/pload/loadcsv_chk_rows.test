@@ -6,10 +6,9 @@
 --test
 --start-igdata
  
---shell --command " cat ./testcases/data/sm10.csv | loadcsv.py -a 'array_sm11' -s '<a:int64,b:int64,c:int64>[i=0:*,3,0]' -b -x -v -c 3 -l -L -d 'localhost' -p $IQUERY_PORT  " 
+--shell --command " cat ${TEST_DATA_DIR}/sm10.csv | loadcsv.py -a 'array_sm11' -s '<a:int64,b:int64,c:int64>[i=0:*,3,0]' -b -x -v -c 3 -l -L -d 'localhost' -p $IQUERY_PORT  "
 
 --stop-igdata
-
 
 #scan( array_sm11 )
 sort(array_sm11,a)

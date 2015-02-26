@@ -5,7 +5,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -238,7 +238,7 @@ def aflStderr(input, format="-odcsv", timeIt=False):
 #
 # check size of a matrix against its count
 def checkCount(MAT, nrow, ncol):
-   (ret,countRow) = aflResult("count(%s)" % (MAT,))
+   (ret,countRow) = aflResult("aggregate(%s,count(*))" % (MAT,))
    count = int(string.split(countRow)[1])
    if count != nrow * ncol:
        errStr = "count(MAT %s) = %s != (nrow %s * ncol %s == %s)" % (MAT, count, nrow, ncol, nrow*ncol)
@@ -626,7 +626,7 @@ def generateDiagonal(vector, result, autoCleanup=True):
 def norm(MAT_AFL, attr, attr_norm, MAT_NORM=None):
     printDebug("Computing norm(%s)"%MAT_AFL)
 
-    normAfl="project(apply(sum(project(apply(%s,square,%s*%s),square)), %s, sqrt(square_sum)), %s)" % \
+    normAfl="project(apply(aggregate(project(apply(%s,square,%s*%s),square), sum(square)), %s, sqrt(square_sum)), %s)" % \
         (MAT_AFL,attr,attr,attr_norm,attr_norm)
 
     if MAT_NORM:
@@ -717,7 +717,7 @@ def findMax(MAT, attr, attr_max_tmp="attr_max_tmp"):
     printDebug("attr is %s" % attr)
     printDebug("attr_max_tmp is %s" % attr_max_tmp)
 
-    findMaxAlf = ("filter(cross(%s,aggregate(%s, max(%s) as %s)),%s = %s)" %
+    findMaxAlf = ("filter(cross_join(%s,aggregate(%s, max(%s) as %s)),%s = %s)" %
                         (MAT, MAT, attr, attr_max_tmp, attr, attr_max_tmp))
 
     printDebug("findMax finish")
@@ -766,7 +766,7 @@ def doSvdSanityCount(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_
     # calculate array - apply(array, val * 1), since that appears to be messed up in some cases,
     # at least after the long apply chain in doSvdMetric1
     outOfRangeAfl = "filter(%s, %s > 1.0)"  % (MAT_WHICH, attr_which)
-    passTestAfl = "apply(count(%s),PASS,count = 0)" % (outOfRangeAfl)
+    passTestAfl = "apply(aggregate(%s,count(*)),PASS,count = 0)" % (outOfRangeAfl)
 
     # following copied/hacked form testForError
     (ret,result)=aflResult(passTestAfl)
@@ -819,7 +819,7 @@ def doSvdSanityApply(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_
     # calculate array - apply(array, val * 1), since that appears to be messed up in some cases,
     # at least after the long apply chain in doSvdMetric1
     badApplyAfl = "filter(apply(%s, times1, %s * 1), %s != %s)"  % (MAT_WHICH, attr_which, attr_which, "times1")
-    passTestAfl = "apply(count(%s),PASS,count = 0)" % (badApplyAfl)
+    passTestAfl = "apply(aggregate(%s,count(*)),PASS,count = 0)" % (badApplyAfl)
     # following copied/hacked form testForError
     (ret,result)=aflResult(passTestAfl)
     vals = string.split(result)[1]     # lines?
@@ -910,6 +910,10 @@ def doSvdMetric1(nrow, ncol, chunkSize, MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERR
     METRIC_TMP_DIAG_SS="METRIC_TMP_DIAG_SS"
     generateDiagonal(VEC_S, METRIC_TMP_DIAG_SS)
     if _DBG:
+        printDebugForce("%s:"%MAT_INPUT)
+        aflStderr("show(%s)"%MAT_INPUT)
+        printDebugForce("%s:"%VEC_S)
+        aflStderr("show(%s)"%VEC_S)
         printDebugForce("%s:"%MAT_U)
         aflStderr("show(%s)"%MAT_U)
         printDebugForce("%s:"%METRIC_TMP_DIAG_SS)
@@ -953,12 +957,12 @@ def doSvdMetric1(nrow, ncol, chunkSize, MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERR
             findMaxAfl = findMax(absResidualAfl, "abs_residual")
             aflStderr(findMaxAfl)
 
-            aflStderr("max(%s)" % MAT_INPUT, format="-odcsv")
-            aflStderr("min(%s)" % MAT_INPUT, format="-odcsv")
+            aflStderr("aggregate(%s, max(%s))" % (MAT_INPUT, 'v'), format="-odcsv")
+            aflStderr("aggregate(%s, min(%s))" % (MAT_INPUT, 'v'), format="-odcsv")
 
             printDebugForce("doSvdMetric1 result S %s" % VEC_S)
-            aflStderr("max(%s)" % VEC_S, format="-ocsv")
-            aflStderr("min(%s)" % VEC_S, format="-ocsv")
+            aflStderr("aggregate(%s, max(%s))" % (VEC_S, 'sigma'), format="-odcsv")
+            aflStderr("aggregate(%s, min(%s))" % (VEC_S, 'sigma'), format="-odcsv")
             # Kappa, the condtion number of the matrix,
             # when using the L sub_2 norm, is max / min
             # change this to aflResult, and grab the max and min
@@ -966,12 +970,12 @@ def doSvdMetric1(nrow, ncol, chunkSize, MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_ERR
             # then print that as the condition number
 
             printDebugForce("doSvdMetric1 result U %s" % MAT_U)
-            aflStderr("max(%s)" % MAT_U, format="-odcsv")
-            aflStderr("min(%s)" % MAT_U, format="-odcsv")
+            aflStderr("aggregate(%s, max(%s))" % (MAT_U, 'u'), format="-odcsv")
+            aflStderr("aggregate(%s, min(%s))" % (MAT_U, 'u'), format="-odcsv")
 
             printDebugForce("doSvdMetric1 result VT %s" % MAT_VT)
-            aflStderr("max(%s)" % MAT_VT, format="-odcsv")
-            aflStderr("min(%s)" % MAT_VT, format="-odcsv")
+            aflStderr("aggregate(%s, max(%s))" % (MAT_VT, 'v'), format="-odcsv")
+            aflStderr("aggregate(%s, min(%s))" % (MAT_VT, 'v'), format="-odcsv")
 
             MAX_ATTEMPTS=1 # increase this if you think it might be a spurious calculation error
             if (MAX_ATTEMPTS > 1):
@@ -1079,9 +1083,9 @@ def doSvdMetric4(nrow, ncol, VEC_S, MAT_ERROR, rms_ulp_error):
    # TODO: we should note why we do this with joining the shift, rather than sorting and comparing for equality
    #       since that would be the naive way.
    compareAfl = "project(apply( \
-                           sum(apply(join (subarray(%s, 0, (%d-2)) as L, \
+                           aggregate(apply(join (subarray(%s, 0, (%d-2)) as L, \
                                            subarray(%s, 1, (%d-1)) as R), \
-                               BLAH, iif(L.sigma<R.sigma, 1, 0) ), BLAH), \
+                               BLAH, iif(L.sigma<R.sigma, 1, 0) ), sum(BLAH)), \
                          %s, BLAH_sum), %s)" %  (VEC_S, ncol, VEC_S, ncol, rms_ulp_error, rms_ulp_error)
 
    if MAT_ERROR:
@@ -1492,7 +1496,7 @@ def testMPICopy(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
    error = "resid"
    metricAfl = computeResidualMeasures(INPUT, "v", mpicopyAfl, "copy", error)
 
-   maxAfl = "max(project(%s, %s))" % (metricAfl, error)
+   maxAfl = "aggregate(project(%s, %s), max(%s))" % (metricAfl, error, error)
    error = error+"_max"
 
    testForError("MPICOPY", maxAfl, error, errorLimit)

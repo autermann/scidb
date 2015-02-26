@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,6 +36,34 @@ using namespace boost::interprocess;
 
 namespace scidb
 {
+namespace {
+void preallocateFile(const std::string& path, uint64_t regionSize)
+{
+    assert(regionSize>0);
+
+    int fd = File::openFile(path,O_RDWR|O_LARGEFILE);
+    if (fd<0) {
+        int err=errno;
+        throw SharedMemoryIpc::SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
+    }
+
+    struct FdCleaner fdCleaner(fd);
+
+    int err = ::posix_fallocate(fd,0,regionSize);
+
+    if (err==EFBIG || err==ENOSPC) {
+        throw SharedMemoryIpc::NoShmMemoryException(err, REL_FILE, __FUNCTION__, __LINE__);
+    } else if (err != 0) {
+        throw SharedMemoryIpc::SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
+    }
+
+    if (File::closeFd(fd) != 0) {
+        int err=errno;
+        throw SharedMemoryIpc::SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
+    }
+    fdCleaner._fd = -1;
+}
+}
 
 SharedMemoryIpc::SharedMemoryIpc(const std::string& name)
 : _name(name)
@@ -182,27 +210,7 @@ void SharedMemory::preallocateShmMemory()
     assert(name == _shm->get_name());
     path += name;
 
-    int fd = File::openFile(path,O_RDWR|O_LARGEFILE);
-    if (fd<0) {
-        int err=errno;
-        throw SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
-    }
-
-    struct FdCleaner fdCleaner(fd);
-
-    int err = ::posix_fallocate(fd,0,regionSize);
-
-    if (err==EFBIG || err==ENOSPC) {
-        throw NoShmMemoryException(err, REL_FILE, __FUNCTION__, __LINE__);
-    } else if (err != 0) {
-        throw SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
-    }
-
-    if (File::closeFd(fd) != 0) {
-        int err=errno;
-        throw SystemErrorException(err, REL_FILE, __FUNCTION__, __LINE__);
-    }
-    fdCleaner._fd = -1;
+    preallocateFile(path, regionSize);
 }
 
 bool SharedMemory::flush()
@@ -353,9 +361,28 @@ void* SharedFile::get()
             }
             throw;
         }
+        preallocateShmMemory();
     }
     assert(_region);
     return _region->get_address();
+}
+
+void SharedFile::preallocateShmMemory()
+{
+    assert(_file);
+    assert(_region);
+    if (!_isPreallocate ||
+        _file->get_mode() == boost::interprocess::read_only) {
+        return;
+    }
+
+    uint64_t regionSize = getSize();
+    assert(regionSize>0);
+    const std::string& name = getName();
+    assert(!name.empty());
+    assert(name == _file->get_name());
+
+    preallocateFile(name, regionSize);
 }
 
 bool SharedFile::flush()

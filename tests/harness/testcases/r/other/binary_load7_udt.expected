@@ -108,7 +108,7 @@ SCIDB QUERY : <load(RAT3, 'ration1.bin', 0, '(dummy(16),rational)')>
 {1} '(1/2)'
 {2} '(4/7)'
 
-SCIDB QUERY : <count(versions(RAT3))>
+SCIDB QUERY : <aggregate(versions(RAT3),count(*))>
 {i} count
 {0} 5
 

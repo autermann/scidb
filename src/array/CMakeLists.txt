@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -22,6 +22,7 @@
 set (array_src
     Metadata.cpp
     Array.cpp
+    Tile.cpp
     MemArray.cpp
     StreamArray.cpp
     DelegateArray.cpp

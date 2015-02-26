@@ -13,8 +13,8 @@ create array test_array <vss_speed:double NOT NULL,ts:int64 NOT NULL> [device_id
 --test
 create array test_array_overlap <vss_speed:double NOT NULL,ts:int64 NOT NULL> [device_id=-1:*,2000,0,trip_id=-1:*,50000,0,entry_id=0:*,1000,2]
 --igdata "store(repart(test_array,test_array_overlap),test_array_overlap)"
-count(test_array)
-count(test_array_overlap)
+aggregate(test_array,count(*))
+aggregate(test_array_overlap,count(*))
 
 --cleanup
 remove (test_array)

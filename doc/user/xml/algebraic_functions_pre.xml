@@ -151,10 +151,11 @@
 
           <row>
             <entry><indexterm>
-                <primary>random function</primary>
+                <primary>random number generator</primary>
               </indexterm>random</entry>
 
-            <entry>Generate random positive integer</entry>
+            <entry>Generate random positive integer. The maximum value is the
+            maximum, unsigned, 32-bit integer: 2147483647.</entry>
 
             <entry>random()</entry>
 

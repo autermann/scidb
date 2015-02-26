@@ -164,32 +164,17 @@
 
       <procedure>
         <step>
-          <para>Show the source_array: <para><programlisting>AFL% scan(numbers);</programlisting><screen>{i} number
-{0} 0
-{1} 1
-{2} 2
-{3} null
-{4} 4
+          <para>Show the source_array: <para><screen>[(0),(1),(2),(null),(4)]
 </screen></para></para>
         </step>
 
         <step>
-          <para>Sort by number (ascending): <para><programlisting>AFL% sort(numbers, number asc);</programlisting><screen>{n} number
-{0} null
-{1} 0
-{2} 1
-{3} 2
-{4} 4
+          <para>Sort by number (ascending): <para><programlisting>AFL% sort(numbers, number asc);  </programlisting><screen>[(null),(0),(1),(2),(4)]
 </screen></para></para>
         </step>
 
         <step>
-          <para>Sort by number (descending): <para><programlisting>AFL% sort(numbers, number desc);</programlisting><screen>{n} number
-{0} 4
-{1} 2
-{2} 1
-{3} 0
-{4} null
+          <para>Sort by number (descending): <para><programlisting>AFL% sort(numbers, number desc);  </programlisting><screen>[(4),(2),(1),(0),(null)]
 </screen></para></para>
         </step>
       </procedure>

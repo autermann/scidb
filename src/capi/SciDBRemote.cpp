@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,7 +42,6 @@
 #include "array/StreamArray.h"
 #include "system/Exceptions.h"
 #include "util/PluginManager.h"
-#include "query/parser/ParsingContext.h"
 #include "util/Singleton.h"
 
 using namespace std;
@@ -110,7 +109,7 @@ public:
     StreamArray(arrayDesc), _connection(connection), _queryID(queryID), _queryResult(queryResult)
     {
     }
-    
+
 protected:
     // overloaded method
     ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
@@ -271,9 +270,9 @@ public:
             for (int i = 0; i < queryResultRecord->attributes_size(); i++)
             {
                 Value defaultValue;
-                if (queryResultRecord->attributes(i).default_missing_reason() >= 0) { 
+                if (queryResultRecord->attributes(i).default_missing_reason() >= 0) {
                     defaultValue.setNull(queryResultRecord->attributes(i).default_missing_reason());
-                } else { 
+                } else {
                     defaultValue.setData(queryResultRecord->attributes(i).default_value().data(),  queryResultRecord->attributes(i).default_value().size());
                 }
                 attributes.push_back(AttributeDesc(

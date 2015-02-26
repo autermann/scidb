@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * @brief Logical DDL operator which create new array
+ * @brief Logical DDL operator that creates a new persistent array.
  *
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  */
@@ -34,24 +34,94 @@ namespace scidb
 {
 
 /**
- * @brief The operator: create_array().
+ * @brief Implements create_array() operator.
  *
- * @par Synopsis:
- *   create_array( arrayName, arraySchema )
+ * @par Synopsis
  *
- * @par Summary:
- *   Creates an array with a given name and schema.
+ *  @code
+ *      create_array ( array_name, array_schema )
+ *  @endcode
+ *  or
+ *  @code
+ *      CREATE ARRAY   array_name  array_schema
+ *  @endcode
  *
- * @par Input:
- *   - arrayName: the array name
- *   - arraySchema: the array schema of attrs and dims
+ * @par Summary
+ *      Creates an array with the given name and schema and adds it to the database.
+ *
+ * @par Input
+ *      - array_name:      an identifier that names the new array.
+ *      - array_schema:    a multidimensional array schema that describes the rank
+ *                          and shape of the array to be created, as well as the types
+ *                          of each its attributes.
+ *
+ *  An array schema has the following form:
+ *
+ *  @code
+ *    array_schema := '<' attributes '>' '[' dimensions ']'
+ *
+ *    attributes   := attribute {',' attribute}*
+ *
+ *    dimensions   := dimension {',' dimension}*
+ *
+ *    attribute    := attribute_name ':' type [[NOT] NULL] [DEFAULT default_value] [COMPRESSION compression_algorithm] [RESERVE integer]
+ *
+ *    dimension    := dimension_name [= dim_low ':' {dim_high|'*'} ',' chunk_interval ',' chunk_overlap]
+ *  @endcode
+ *
+ *  Note:
+ *    - For a list of attribute types, use list('types'). Note that loading a plugin may introduce more types.
+ *
+ *    - The optional constraints of an attribute have the following meaning and default values:
+ *      <ul>
+ *
+ *      <li>[[NOT] NULL]:            indicates whether the attribute may contain null values.
+ *                                   Note that SciDB supports multiple null values, with different 'missing' reason codes.
+ *                                   You may specify a null value with the function missing(i), where 0<=i<=127.
+ *                                   Default is NOT NULL, meaning null values are not allowed.
+ *
+ *      <li>[DEFAULT default_value]: the value to be automatically substituted when a non-NULL attribute lacks a value.
+ *                                   If the attribute is declared as NULL, this clause is ignored, and 'null' (with missing reason 0)
+ *                                   will be used as the default value.
+ *                                   Otherwise, the default value is 0 for numeric types and "" for the string type.
+ *
+ *      <li>[COMPRESSION string]:    the compression algorithm that is used to compress chunk data before storing on disk.
+ *                                   Default is 'no compression'.
+ *
+ *                                   Paul describes COMPRESSION it thus:
+ *
+ *                                   " a place holder that will allow users or administrators to tell SciDB which general
+ *                                   compression method—for example, gzip—they want to apply to chunks for this attribute.
+ *                                   The range of legal values is open: the idea was to make the list of compression methods
+ *                                   extensible. The default is no compression. "
+ *
+ *                                   The syntax is currently recognized and is stored in the meta data, but does nothing
+ *                                   at the moment.
+ *
+ *                                   This should not be described in the user manual.
+ *
+ *      <li>[RESERVE integer]:       the value of the CONFIG_CHUNK_RESERVE config file setting
+ *
+ *                                   Paul describes RESERVE it thus:
+ *
+ *                                   " RESERVE is used to reserve space at the end of a chunk for delta compression. If we
+ *                                    anticipate that the update rate for this particular attribute is likely to be high,
+ *                                    we’ll reserve more space at the end of the chunk. Because the deltas are turned off,
+ *                                    this currently is inoperative."
+ *
+ *                                   This should not be described in the user manual.
+ *      </ul>
+ *
+ *    - array_name, attribute_name, dimension_name are all identifiers
+ *
+ *    - dim_low, dim_high, chunk_interval, and chunk_overlap are expressions that should evaluate to a 64-bit integer.
  *
  * @par Output array:
  *        <
- *   <br>   attrs
+ *   <br>   attributes
  *   <br> >
  *   <br> [
- *   <br>   dims
+ *   <br>   dimensions
  *   <br> ]
  *
  * @par Examples:

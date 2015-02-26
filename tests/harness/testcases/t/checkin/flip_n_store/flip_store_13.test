@@ -5,15 +5,15 @@ create empty array B <b:int64>[a=0:3,1,0]
 
 --test
 store(join(build_sparse(T,x+1,x=1),build_sparse(T,x+10,x=1)),A)
-redimension_store(A,B)
+store(redimension(A,B),B)
 unpack(B,row)
 
 store(join(build_sparse(T,x+1,x<>1),build_sparse(T,x+10,x<>1)),A)
-redimension_store(A,B)
+store(redimension(A,B),B)
 unpack(B,row)
 
 store(join(build_sparse(T,x+1,x<>2),build_sparse(T,x+10,x<>2)),A)
-redimension_store(A,B)
+store(redimension(A,B),B)
 unpack(B,row)
 
 --cleanup

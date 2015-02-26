@@ -7,7 +7,7 @@ SCIDB QUERY : <select * into A from build(A,x+1)>
 {1} 2
 {2} 3
 
-SCIDB QUERY : <select * into Tcount from count(A)>
+SCIDB QUERY : <select * into Tcount from aggregate(A,count(*))>
 {i} count
 {0} 3
 
@@ -31,7 +31,7 @@ SCIDB QUERY : <show(Tcount_a)>
 {i} schema
 {0} 'not empty Tcount_a<count:uint64 NULL DEFAULT null> [i=0:0,1,0]'
 
-SCIDB QUERY : <select * into Tsum from sum(A)>
+SCIDB QUERY : <select * into Tsum from aggregate(A,sum(a))>
 {i} a_sum
 {0} 6
 
@@ -47,7 +47,7 @@ SCIDB QUERY : <show(Tsum_a)>
 {i} schema
 {0} 'not empty Tsum_a<sum:int64 NULL DEFAULT null> [i=0:0,1,0]'
 
-SCIDB QUERY : <select * into Tmax from max(A)>
+SCIDB QUERY : <select * into Tmax from aggregate(A,max(a))>
 {i} a_max
 {0} 3
 
@@ -63,7 +63,7 @@ SCIDB QUERY : <show(Tmax_a)>
 {i} schema
 {0} 'not empty Tmax_a<max:int32 NULL DEFAULT null> [i=0:0,1,0]'
 
-SCIDB QUERY : <select * into Tmin from min(A)>
+SCIDB QUERY : <select * into Tmin from aggregate(A,min(a))>
 {i} a_min
 {0} 1
 
@@ -79,7 +79,7 @@ SCIDB QUERY : <show(Tmin_a)>
 {i} schema
 {0} 'not empty Tmin_a<min:int32 NULL DEFAULT null> [i=0:0,1,0]'
 
-SCIDB QUERY : <select * into Tavg from avg(A)>
+SCIDB QUERY : <select * into Tavg from aggregate(A,avg(a))>
 {i} a_avg
 {0} 2
 
@@ -95,7 +95,7 @@ SCIDB QUERY : <show(Tavg_a)>
 {i} schema
 {0} 'not empty Tavg_a<avg:double NULL DEFAULT null> [i=0:0,1,0]'
 
-SCIDB QUERY : <select * into Tvar from var(A)>
+SCIDB QUERY : <select * into Tvar from aggregate(A,var(a))>
 {i} a_var
 {0} 1
 
@@ -111,7 +111,7 @@ SCIDB QUERY : <show(Tvar_a)>
 {i} schema
 {0} 'not empty Tvar_a<var:double NULL DEFAULT null> [i=0:0,1,0]'
 
-SCIDB QUERY : <select * into Tstdev from stdev(A)>
+SCIDB QUERY : <select * into Tstdev from aggregate(A,stdev(a))>
 {i} a_stdev
 {0} 1
 

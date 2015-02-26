@@ -69,7 +69,7 @@
             </condition>
         </fail>
 
-        <fail message="Can not find proto file">
+        <fail message="Can not find proto file ${proto_dir}/scidb_msg.proto">
             <condition>
                 <not>
                     <available file="${proto_dir}/scidb_msg.proto" />

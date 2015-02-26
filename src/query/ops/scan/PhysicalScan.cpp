@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,6 @@
 #include "array/Metadata.h"
 #include <boost/make_shared.hpp>
 #include "system/SystemCatalog.h"
-#include "query/parser/ParsingContext.h"
 
 namespace scidb
 {
@@ -44,7 +43,7 @@ class PhysicalScan: public  PhysicalOperator
     {
         _arrayName = ((boost::shared_ptr<OperatorParamReference>&)parameters[0])->getObjectName();
     }
-   
+
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {

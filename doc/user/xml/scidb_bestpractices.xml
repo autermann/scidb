@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<section id="tuningSciDB">
+<appendix id="tuningSciDB">
   <title>Tuning your SciDB Installation</title>
 
   <para><indexterm>
@@ -12,13 +12,14 @@
       <primary>performance tuning</primary>
     </indexterm><indexterm>
       <primary>improving performance</primary>
-    </indexterm>This section provides general guidelines about maximizing the
+    </indexterm>This chapter provides general guidelines about maximizing the
   performance of SciDB on your system. Below are suggestions meant to guide
   you in choosing the right combination of settings for SciDB configuration
   parameters for your SciDB installation.</para>
 
-  <para>For the default values of the configuration parameters described in
-  this section, see <xref linkend="configParameters"/>.</para>
+  <para>The default values of the configuration parameters are described in
+  the "SciDB Configuration Parameters" section of the Installation
+  chapter.</para>
 
   <section id="configMemory">
     <title>Configuring Memory Usage</title>
@@ -153,38 +154,8 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
     determined empirically.</para>
   </section>
 
-  <section>
-    <title>Configuring Disk Usage</title>
-
-    <para>SciDB provides the <parameter
-    role="bold">chunk-segment-size-in-mb</parameter> (megabytes) parameter for
-    configuring the usage of your disks.</para>
-
-    <para>If this is 0, then chunks are stored contiguously and densely in the
-    storage file. In this mode, storage is not reclaimed. In this case, the
-    <literal>remove()</literal> operator does not have any effect on disk
-    usage.</para>
-
-    <para>If this is set to a non-zero value, the storage file is split evenly
-    into segments of the specified size. In this mode, when an array is
-    removed, all segments that belong to this array are marked available for
-    reuse—and can be reused by other arrays in the future. In this mode, a
-    segment may only contain data from exactly one array, which means that
-    each array will occupy at least one full segment on disk.</para>
-
-    <para>Currently, an array chunk size may not exceed the segment size. We
-    recommend a value of between 64 and 128 MB, subject to the above
-    restriction.</para>
-
-    <para>The general guideline: In a multi-disk host system, all SciDB
-    instances on the host should be equally spread across all available disks.
-    When selecting the number of SciDB instances per host, having several
-    instances per disk may be useful in increasing the disk
-    utilization.</para>
-  </section>
-
   <section id="configTrouble">
-    <title>Configuration Troubleshooting</title>
+    <title>Optimizing Configuration Parameters</title>
 
     <para>Beyond using the configuration parameters for optimizing your SciDB
     installation, this section provides a few useful guidelines.</para>
@@ -256,7 +227,7 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
       <para><indexterm>
           <primary>chunks</primary>
 
-          <secondary>selecting chunk size</secondary>
+          <secondary>analyzing chunk size</secondary>
         </indexterm><indexterm>
           <primary>chunk map</primary>
         </indexterm>The chunk size for your array can have a negative impact
@@ -378,89 +349,6 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
   </section>
 
   <section>
-    <title>MPI Troubleshooting</title>
-
-    <para><indexterm>
-        <primary>MPI</primary>
-      </indexterm><indexterm>
-        <primary>troubleshooting</primary>
-      </indexterm>MPICH is a high performance and widely portable
-    implementation of the Message Passing Interface (MPI) standard. SciDB
-    depends upon <emphasis role="bold">mpich2-1.2</emphasis> being installed
-    and configured. This section provides a checklist for ensuring that MPICH
-    is communicating with SciDB.<itemizedlist>
-        <listitem>
-          <para>Password-less SSH must be set up for the scidb user from the
-          coordinator to 0.0.0.0, 127.0.0.1, localhost, and all the workers.
-          For each worker:<itemizedlist>
-              <listitem>
-                <para>Make sure that you copy the authorization key, as
-                described in section <xref
-                linkend="RemoteExecutionConfigurationssh"/>, step 2.</para>
-              </listitem>
-
-              <listitem>
-                <para>Log in once: ssh
-                scidb@&lt;<replaceable>worker</replaceable>&gt;. At the
-                following prompt, answer <emphasis
-                role="bold">yes</emphasis>.<screen>Are you sure you want to continue connecting (yes/no)?</screen></para>
-              </listitem>
-
-              <listitem>
-                <para>Confirm it works by running:
-                scidb@&lt;<replaceable>worker</replaceable>&gt; again. This
-                must take you directly to a shell prompt on the worker.
-                Otherwise, password-less SSH is not yet set up on this
-                worker.</para>
-              </listitem>
-            </itemizedlist></para>
-        </listitem>
-
-        <listitem>
-          <para>DNS must be configured on all SciDB servers. In particular,
-          verify that the worker instances are able to resolve the coordinator
-          host name to the correct IP.</para>
-        </listitem>
-
-        <listitem>
-          <para>Configuration with multiple Network Interface Cards (NICs),
-          such as eth0, eth1, and so on, has not been tested. We recommend
-          that you disable all but one of your NICs. If you cannot disable all
-          but one of your NICs, make sure that the DNS names resolve to the
-          correct IPs.</para>
-        </listitem>
-
-        <listitem>
-          <para><indexterm>
-              <primary>memory, shared</primary>
-            </indexterm><indexterm>
-              <primary>shared memory</primary>
-            </indexterm>Make sure there is enough shared memory available. On
-          each SciDB server, run the following command to see your shared
-          memory usage:<programlisting>$ df -h /dev/shm</programlisting> Your
-          output should look similar to the following:<screen>Filesystem      Size  Used Avail Use% Mounted on
-none            3.8G  320K  3.8G   1% /run/shm</screen>Your available shared
-          memory needs to be at least 512 MB * #instances_per_host. You can
-          change the size of shared memory by adding a line to the
-          <literal>/etc/fstab</literal> file:<programlisting># shared memory device
-none    /dev/shm     tmpfs   defaults,size=48G     0 0</programlisting>Running
-          out of the shared memory from <literal>/dev/shm</literal> usually
-          manifests itself by the SciDB process being killed with the
-          <emphasis role="bold">SIGBUS</emphasis> signal as reported in the
-          SciDB error log (<emphasis
-          role="bold">scidb-stderr.log</emphasis>):</para>
-
-          <programlisting>2013-5-13 23:17:10 (ppid=23581): Started.
-2013-5-14 0:2:0 (ppid=23581): SciDB child (pid=23604) terminated by signal = 7, core dumped</programlisting>
-        </listitem>
-      </itemizedlist></para>
-
-    <para>If you have run out of shared memory, you can increase the value for
-    the <code>max-memory-limit</code> parameter in your SciDB config.ini
-    file.</para>
-  </section>
-
-  <section>
     <title>Configuration Example</title>
 
     <para>This section suggests configuration settings for a small, multi-disk
@@ -468,8 +356,8 @@ none    /dev/shm     tmpfs   defaults,size=48G     0 0</programlisting>Running
 
     <note>
       <para>Some of the parameters mentioned in this example are not discussed
-      in the preceding sections. For details, see <xref
-      linkend="configParameters"/>.</para>
+      in the preceding sections. For details, see the "SciDB Configuration
+      Parameters" section in the Installation chapter.</para>
     </note>
 
     <para>Suppose that we have a cluster with homogeneous motherboards, each
@@ -561,4 +449,4 @@ none    /dev/shm     tmpfs   defaults,size=48G     0 0</programlisting>Running
     operator-threads </parameter>should always equal the value of <parameter
     role="bold">result-prefetch-queue-size</parameter>.</para>
   </section>
-</section>
+</appendix>

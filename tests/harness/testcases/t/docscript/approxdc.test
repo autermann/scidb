@@ -6,15 +6,12 @@
 --start-igdata
 create array counting <val:int32> [i=0:999,1000,0, j=0:999,1000,0]  
 store(build(counting, (i * 1000) + j),counting)  
---set-format dense
 --stop-igdata
-approxdc(counting)  
---set-format dcsv
+aggregate(counting,approxdc(val)) 
 --start-igdata
 store(build(counting, ((i * 1000) + j) % 2000),counting)  
---set-format dense
 --stop-igdata
-approxdc(counting,val)  
+aggregate(counting,approxdc(val)) 
 
 --stop-query-logging
 

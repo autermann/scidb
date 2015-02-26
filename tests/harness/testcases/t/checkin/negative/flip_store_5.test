@@ -6,10 +6,10 @@ load(A,'../tests/harness/testcases/data/redimension_2.txt')
 
 --test
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension(A,B)"
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension_store(A,B)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "store(redimension(A,B),B)"
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension(A,C)"
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "redimension_store(A,C)"
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAY_DOESNT_EXIST "redimension_store(A,D)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_FLAGS "store(redimension(A,C),C)"
+--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAY_DOESNT_EXIST "store(redimension(A,D),D)"
 
 --cleanup
 remove(A)

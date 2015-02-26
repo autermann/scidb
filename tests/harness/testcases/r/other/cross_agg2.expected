@@ -51,7 +51,7 @@ SCIDB QUERY : <select * into a5 from  a4 where x<13 or x>15>
 {19} '381'
 {20} '401'
 
-SCIDB QUERY : <cross(a1,a4)>
+SCIDB QUERY : <cross_join(a1,a4)>
 {x,x} p,r
 {0,10} 1,'201'
 {0,11} 1,'221'
@@ -178,7 +178,7 @@ SCIDB QUERY : <scan(a5)>
 {19} '381'
 {20} '401'
 
-SCIDB QUERY : <cross(a1,regrid(a5,2,count(r)))>
+SCIDB QUERY : <cross_join(a1,regrid(a5,2,count(r)))>
 {x,x} p,r_count
 {0,10} 1,2
 {0,11} 1,1
@@ -221,7 +221,7 @@ SCIDB QUERY : <cross(a1,regrid(a5,2,count(r)))>
 {7,14} null,2
 {7,15} null,1
 
-SCIDB QUERY : <cross(a1,regrid(a5,2,sum(r)))>
+SCIDB QUERY : <cross_join(a1,regrid(a5,2,sum(r)))>
 {x,x} p,r_sum
 {0,10} 1,'201221'
 {0,11} 1,'241'
@@ -264,7 +264,7 @@ SCIDB QUERY : <cross(a1,regrid(a5,2,sum(r)))>
 {7,14} null,'361381'
 {7,15} null,'401'
 
-SCIDB QUERY : <cross(a1,subarray(a4,10,12))>
+SCIDB QUERY : <cross_join(a1,subarray(a4,10,12))>
 {x,x} p,r
 {0,0} 1,'201'
 {0,1} 1,'221'
@@ -291,7 +291,7 @@ SCIDB QUERY : <cross(a1,subarray(a4,10,12))>
 {6,2} null,'241'
 {7,2} null,'241'
 
-SCIDB QUERY : <cross(a1,subarray(a5,10,12))>
+SCIDB QUERY : <cross_join(a1,subarray(a5,10,12))>
 {x,x} p,r
 {0,0} 1,'201'
 {0,1} 1,'221'
@@ -318,7 +318,7 @@ SCIDB QUERY : <cross(a1,subarray(a5,10,12))>
 {6,2} null,'241'
 {7,2} null,'241'
 
-SCIDB QUERY : <cross(cross(a1,subarray(a5,10,12)),a1)>
+SCIDB QUERY : <cross_join(cross_join(a1,subarray(a5,10,12)),a1)>
 {x,x,x} p,r,p
 {0,0,0} 1,'201',1
 {0,0,1} 1,'201',4

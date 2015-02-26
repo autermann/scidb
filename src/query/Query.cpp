@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,8 +39,6 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include "query/QueryProcessor.h"
-#include "query/parser/QueryParser.h"
-#include "query/parser/AST.h"
 #include "query/RemoteArray.h"
 #include "array/DBArray.h"
 #include "smgr/io/Storage.h"
@@ -1416,12 +1414,16 @@ boost::shared_ptr<scidb::Array> ReplicationContext::getPersistentArray(ArrayID a
 void ReplicationContext::removeInboundQueue(ArrayID aId)
 {
     // tigor:
-    // Currently, we dont remove the queue until the query is destroyed
-    // To implement removal we would need a sync point (in addition to replicationSync)
-    // because each instance is not waiting for the INCOMING replication to finish
-    // (only the coordinator does by waiting for everyone to complete).
-    // The scheme could be similar to SG with two additional barriers,
-    // or waiting for all remote instances to send in their eof replicas.
+    // Currently, we dont remove the queue until the query is destroyed.
+    // The reason for this was that we did not have a sync point, and
+    // each instance was not waiting for the INCOMING replication to finish.
+    // But we now have a sync point here, to coordinate the storage manager
+    // fluhes.  So we may be able to implement queue removal in the future.
+
+    boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+    syncBarrier(0, query);
+    syncBarrier(1, query);
+
     return;
 }
 

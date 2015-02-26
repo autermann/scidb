@@ -9,18 +9,18 @@ create empty array unbounded3 <a:int64>[x(double)=*,128,0]
 
 --test
 
-redimension_store(unbounded,unbounded2)
+store(redimension(unbounded,unbounded2),unbounded2)
 
 show(unbounded2)
-avg(unbounded2)
-count(unbounded2)
-sum(unbounded2)
-min(unbounded2)
+aggregate(unbounded2,avg(x))
+aggregate(unbounded2,count(*))
+aggregate(unbounded2,sum(x))
+aggregate(unbounded2,min(x))
 project(unbounded2,x)
-stdev(unbounded2)
+aggregate(unbounded2,stdev(x))
 subarray(unbounded2,1,4)
 filter(unbounded2,x<15)
-max(unbounded2)
+aggregate(unbounded2,max(x))
 subarray(window(unbounded2,1,0,sum(x),count(x)),1,100)
 
 --error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_NOT_IMPLEMENTED "merge(unbounded2,unbounded3)"
@@ -31,7 +31,7 @@ apply(subarray(unbounded2,1,40), z,a+5)
 --set-format sparse
 join(unbounded2,unbounded2)
 cross_join(unbounded2,unbounded2)
-cross(unbounded2,unbounded2)
+cross_join(unbounded2,unbounded2)
 --reset-format
 transpose(unbounded2)
 #redimension(unbounded,unbounded2)
@@ -54,7 +54,7 @@ dimensions(unbounded2)
 normalize(unbounded)
 store(unbounded2,unbounded2_new)
 substitute(unbounded2,build(<a:bool>[x=0:30,2,0],true))
-var(unbounded2)
+aggregate(unbounded2,var(x))
 project(versions(unbounded2), version_id)
 
 #not supported for 1-D

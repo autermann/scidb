@@ -2,7 +2,7 @@
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
-  <refnamediv>
+  <refnamediv id="prodAggregate">
     <refname>prod</refname>
 
     <refpurpose><indexterm>

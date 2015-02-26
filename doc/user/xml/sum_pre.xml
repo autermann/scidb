@@ -73,12 +73,12 @@
 
         <step>
           <para>Sum the values of m3x3 along dimension j. This sums the
-          columns of m3x3: <programlisting language="test">--afl sum(m3x3,val,j); --output-format=dense</programlisting></para>
+          columns of m3x3: <programlisting language="test">--afl aggregate(m3x3,sum(val),j); --output-format=dense</programlisting></para>
         </step>
 
         <step>
           <para>Sum the values of m3x3 along dimension i. This sums the rows
-          of m3x3: <programlisting language="test">--afl sum(m3x3,val,i); --output-format=dense</programlisting></para>
+          of m3x3: <programlisting language="test">--afl aggregate(m3x3,sum(val),i); --output-format=dense</programlisting></para>
         </step>
       </procedure>
     </informalexample>

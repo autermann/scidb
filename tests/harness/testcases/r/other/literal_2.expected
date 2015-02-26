@@ -29,15 +29,15 @@ SCIDB QUERY : <build(<a:double, b:float, c:string> [x=110:112,1,0], '[(nan,inf,B
 {111} -inf,inf,'Phy'
 {112} inf,nan,'Math'
 
-SCIDB QUERY : <min(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1))>
+SCIDB QUERY : <aggregate(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1),min(a))>
 {i} a_min
 {0} nan
 
-SCIDB QUERY : <max(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1))>
+SCIDB QUERY : <aggregate(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1),max(a))>
 {i} a_max
 {0} nan
 
-SCIDB QUERY : <avg(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1))>
+SCIDB QUERY : <aggregate(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1),avg(a))>
 {i} a_avg
 {0} nan
 

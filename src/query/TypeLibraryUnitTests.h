@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@
 
 #include "system/ErrorCodes.h"
 #include "query/TypeSystem.h"
-#include "query/parser/ParsingContext.h"
+#include "query/ParsingContext.h"
 
 class TypeLibraryTests: public CppUnit::TestFixture
 {
@@ -69,7 +69,7 @@ public:
 		std::cout << "End Testing TypeLibrary and Type Class handling\n";
     }
 
-	void checkBuiltInTypes() 
+	void checkBuiltInTypes()
 	{
         std::vector< TypeId> typeNames =  TypeLibrary::typeIds();
 		std::cout << "List of Types\n";
@@ -94,7 +94,7 @@ public:
 			CPPUNIT_ASSERT (t1 == t2);
 
              Type t4 =  TypeLibrary::getType(names[0]);
-			for ( size_t j = 1; j < i; j++) { 
+			for ( size_t j = 1; j < i; j++) {
                  Type t5 =  TypeLibrary::getType(names[j]);
 				CPPUNIT_ASSERT (!(t4 == t5));
 			}

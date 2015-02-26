@@ -18,7 +18,7 @@ SCIDB QUERY : <store(build(Input, i/2), Input)>
 {6} 3
 {7} 3
 
-SCIDB QUERY : <redimension_store(Input, Good)>
+SCIDB QUERY : <store(redimension(Input, Good), Good)>
 {x,s} i
 {0,0} 0
 {0,1} 1
@@ -29,8 +29,8 @@ SCIDB QUERY : <redimension_store(Input, Good)>
 {3,0} 6
 {3,1} 7
 
-SCIDB QUERY : <redimension_store(Input, Bad)>
-[An error expected at this place for the query "redimension_store(Input, Bad)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_REDIMENSION_STORE_ERROR7. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_REDIMENSION_STORE_ERROR7.]
+SCIDB QUERY : <store(redimension(Input, Bad), Bad)>
+[An error expected at this place for the query "store(redimension(Input, Bad), Bad)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_REDIMENSION_STORE_ERROR7. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_OP_REDIMENSION_STORE_ERROR7.]
 
 SCIDB QUERY : <remove(Input)>
 Query was executed successfully

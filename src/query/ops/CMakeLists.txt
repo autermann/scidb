@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -48,15 +48,15 @@ set(ops_lib_src
     sg/LogicalSG.cpp
     sg/PhysicalSG.cpp
     load/LogicalLoad.cpp
-    count/LogicalCount.cpp
-    average/LogicalAverage.cpp
-    sum/LogicalSum.cpp
+#    count/LogicalCount.cpp
+#    average/LogicalAverage.cpp
+#    sum/LogicalSum.cpp
     store/LogicalStore.cpp
     store/PhysicalStore.cpp
     redimension/LogicalRedimension.cpp
     redimension/PhysicalRedimension.cpp
-    redimension/LogicalRedimensionStore.cpp
-    redimension/PhysicalRedimensionStore.cpp
+#    redimension/LogicalRedimensionStore.cpp
+#    redimension/PhysicalRedimensionStore.cpp
     redimension/RedimensionCommon.cpp
     reshape/LogicalReshape.cpp
     reshape/PhysicalReshape.cpp
@@ -72,6 +72,8 @@ set(ops_lib_src
     repart/PhysicalRepart.cpp
     load_library/LogicalLoadLibrary.cpp
     load_library/PhysicalLoadLibrary.cpp
+    load_module/LogicalLoadModule.cpp
+    load_module/PhysicalLoadModule.cpp
     aggregates/LogicalAggregate.cpp
     aggregates/PhysicalAggregate.cpp
     aggregates/LogicalRegrid.cpp
@@ -130,8 +132,8 @@ set(ops_lib_src
     merge/LogicalMerge.cpp
     merge/PhysicalMerge.cpp
     merge/MergeArray.cpp
-    max/LogicalMax.cpp
-    min/LogicalMin.cpp
+#    max/LogicalMax.cpp
+#    min/LogicalMin.cpp
     normalize/LogicalNormalize.cpp
     normalize/PhysicalNormalize.cpp
     normalize/NormalizeArray.cpp
@@ -143,9 +145,9 @@ set(ops_lib_src
     thin/LogicalThin.cpp
     thin/PhysicalThin.cpp
     thin/ThinArray.cpp
-    cross/LogicalCross.cpp
-    cross/PhysicalCross.cpp
-    cross/CrossArray.cpp
+#    cross/LogicalCross.cpp
+#    cross/PhysicalCross.cpp
+#    cross/CrossArray.cpp
     help/LogicalHelp.cpp
     help/PhysicalHelp.cpp
     lookup/LogicalLookup.cpp
@@ -176,8 +178,8 @@ set(ops_lib_src
     show/PhysicalShow.cpp
     echo/LogicalEcho.cpp
     echo/PhysicalEcho.cpp
-    var/LogicalVar.cpp
-    var/LogicalStdev.cpp
+#    var/LogicalVar.cpp
+#    var/LogicalStdev.cpp
     reduce_distro/LogicalReduceDistro.cpp
     reduce_distro/PhysicalReduceDistro.cpp
     setopt/LogicalSetopt.cpp
@@ -189,7 +191,7 @@ set(ops_lib_src
     analyze/LogicalAnalyze.cpp
     analyze/PhysicalAnalyze.cpp
     analyze/AnalyzeAggregate.cpp
-    analyze/LogicalApproxDC.cpp
+#    analyze/LogicalApproxDC.cpp
     mstat/LogicalMStat.cpp
     mstat/PhysicalMStat.cpp
     rankquantile/LogicalRank.cpp

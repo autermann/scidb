@@ -52,7 +52,7 @@ SCIDB QUERY : <store(build_sparse(d1, 1.0*x+100.0*y, x<>y),d1)>
 {4,0} 4
 {4,1} 104
 
-SCIDB QUERY : <cross(teeth,A)>
+SCIDB QUERY : <cross_join(teeth,A)>
 {x,y,x} val,a
 {0,1,-2} null,-1.56522
 {0,1,-1} null,-0.565217
@@ -120,7 +120,7 @@ SCIDB QUERY : <cross(teeth,A)>
 {5,3,1} 24,1.43478
 {5,3,2} 24,2.43478
 
-SCIDB QUERY : <cross(A,teeth)>
+SCIDB QUERY : <cross_join(A,teeth)>
 {x,x,y} a,val
 {-2,0,1} -1.56522,null
 {-2,1,0} -1.56522,0
@@ -188,15 +188,15 @@ SCIDB QUERY : <cross(A,teeth)>
 {1,5,3} 1.43478,24
 {2,5,3} 2.43478,24
 
-SCIDB QUERY : <count(cross(A,teeth))>
+SCIDB QUERY : <aggregate(cross_join(A,teeth),count(*))>
 {i} count
 {0} 65
 
-SCIDB QUERY : <count(cross(teeth,A))>
+SCIDB QUERY : <aggregate(cross_join(teeth,A),count(*))>
 {i} count
 {0} 65
 
-SCIDB QUERY : <store(cross(teeth,A),BBB)>
+SCIDB QUERY : <store(cross_join(teeth,A),BBB)>
 {x,y,x_2} val,a
 {0,1,-2} null,-1.56522
 {0,1,-1} null,-0.565217
@@ -268,7 +268,7 @@ SCIDB QUERY : <show(BBB)>
 {i} schema
 {0} 'BBB<val:int64 NULL DEFAULT null,a:float> [x=0:5,2,0,y=0:3,2,0,x_2=-2:2,3,0]'
 
-SCIDB QUERY : <cross(A,d1)>
+SCIDB QUERY : <cross_join(A,d1)>
 {x,x,y} a,a1
 {-2,0,-2} -1.56522,-200
 {-2,0,-1} -1.56522,-100
@@ -361,19 +361,19 @@ SCIDB QUERY : <cross(A,d1)>
 {2,4,0} 2.43478,4
 {2,4,1} 2.43478,104
 
-SCIDB QUERY : <avg(cross(A,d1))>
+SCIDB QUERY : <aggregate(cross_join(A,d1),avg(a))>
 {i} a_avg
 {0} 0.434783
 
-SCIDB QUERY : <avg(cross(d1,A))>
-{i} a1_avg
-{0} -58.9444
+SCIDB QUERY : <aggregate(cross_join(d1,A),avg(a))>
+{i} a_avg
+{0} 0.434783
 
-SCIDB QUERY : <count(cross(A,d1))>
+SCIDB QUERY : <aggregate(cross_join(A,d1),count(*))>
 {i} count
 {0} 90
 
-SCIDB QUERY : <cross(d1,concat(A,A))>
+SCIDB QUERY : <cross_join(d1,concat(A,A))>
 {x,y,x} a1,a
 {0,-2,-2} -200,-1.56522
 {0,-2,-1} -200,-0.565217
@@ -564,7 +564,7 @@ SCIDB QUERY : <subarray(d1,0,-2,1,0)>
 {1,1} -99
 {1,2} 1
 
-SCIDB QUERY : <cross(subarray(A,-2,-1),subarray(d1,0,-2,1,0))>
+SCIDB QUERY : <cross_join(subarray(A,-2,-1),subarray(d1,0,-2,1,0))>
 {x,x,y} a,a1
 {0,0,0} -1.56522,-200
 {0,0,1} -1.56522,-100
@@ -577,7 +577,7 @@ SCIDB QUERY : <cross(subarray(A,-2,-1),subarray(d1,0,-2,1,0))>
 {0,1,2} -1.56522,1
 {1,1,2} -0.565217,1
 
-SCIDB QUERY : <cross(filter(A, a>0),d1)>
+SCIDB QUERY : <cross_join(filter(A, a>0),d1)>
 {x,x,y} a,a1
 {0,0,-2} 0.434783,-200
 {0,0,-1} 0.434783,-100
@@ -634,7 +634,7 @@ SCIDB QUERY : <cross(filter(A, a>0),d1)>
 {2,4,0} 2.43478,4
 {2,4,1} 2.43478,104
 
-SCIDB QUERY : <cross(cross(filter(A, a>0),d1),cross(A,A))>
+SCIDB QUERY : <cross_join(cross_join(filter(A, a>0),d1),cross_join(A,A))>
 {x,x,y,x,x} a,a1,a,a
 {0,0,-2,-2,-2} 0.434783,-200,-1.56522,-1.56522
 {0,0,-2,-2,-1} 0.434783,-200,-1.56522,-0.565217
@@ -1987,11 +1987,11 @@ SCIDB QUERY : <cross(cross(filter(A, a>0),d1),cross(A,A))>
 {2,4,1,2,1} 2.43478,104,2.43478,1.43478
 {2,4,1,2,2} 2.43478,104,2.43478,2.43478
 
-SCIDB QUERY : <count(cross(cross(filter(A, a>0),d1),cross(A,A)))>
+SCIDB QUERY : <aggregate(cross_join(cross_join(filter(A, a>0),d1),cross_join(A,A)),count(*))>
 {i} count
 {0} 1350
 
-SCIDB QUERY : <cross(A,xgrid(teeth,2,2))>
+SCIDB QUERY : <cross_join(A,xgrid(teeth,2,2))>
 {x,x,y} a,val
 {-2,0,2} -1.56522,null
 {-2,0,3} -1.56522,null
@@ -2254,15 +2254,15 @@ SCIDB QUERY : <cross(A,xgrid(teeth,2,2))>
 {2,11,6} 2.43478,24
 {2,11,7} 2.43478,24
 
-SCIDB QUERY : <count(cross(A,xgrid(teeth,2,2)))>
+SCIDB QUERY : <aggregate(cross_join(A,xgrid(teeth,2,2)),count(*))>
 {i} count
 {0} 260
 
-SCIDB QUERY : <count(cross(A,teeth))>
+SCIDB QUERY : <aggregate(cross_join(A,teeth),count(*))>
 {i} count
 {0} 65
 
-SCIDB QUERY : <cross(d1,teeth)>
+SCIDB QUERY : <cross_join(d1,teeth)>
 {x,y,x,y} a1,val
 {0,-2,0,1} -200,null
 {0,-2,1,0} -200,0
@@ -2499,7 +2499,7 @@ SCIDB QUERY : <cross(d1,teeth)>
 {4,0,5,3} 4,24
 {4,1,5,3} 104,24
 
-SCIDB QUERY : <cross(teeth,d1)>
+SCIDB QUERY : <cross_join(teeth,d1)>
 {x,y,x,y} val,a1
 {0,1,0,-2} null,-200
 {0,1,0,-1} null,-100
@@ -2736,15 +2736,15 @@ SCIDB QUERY : <cross(teeth,d1)>
 {5,3,4,0} 24,4
 {5,3,4,1} 24,104
 
-SCIDB QUERY : <count(cross(teeth,d1))>
+SCIDB QUERY : <aggregate(cross_join(teeth,d1),count(*))>
 {i} count
 {0} 234
 
-SCIDB QUERY : <count(cross(d1,teeth))>
+SCIDB QUERY : <aggregate(cross_join(d1,teeth),count(*))>
 {i} count
 {0} 234
 
-SCIDB QUERY : <store(cross(teeth,d1),CCC)>
+SCIDB QUERY : <store(cross_join(teeth,d1),CCC)>
 {x,y,x_2,y_2} val,a1
 {0,1,0,-2} null,-200
 {0,1,0,-1} null,-100
@@ -3021,7 +3021,7 @@ SCIDB QUERY : <show(ZZZ)>
 {i} schema
 {0} 'ZZZ<x:int64,y:int64,val:int64 NULL DEFAULT null> [j=0:*,24,0]'
 
-SCIDB QUERY : <cross(unpack(teeth,j),A)>
+SCIDB QUERY : <cross_join(unpack(teeth,j),A)>
 {j,x} x,y,val,a
 {0,-2} 0,1,null,-1.56522
 {0,-1} 0,1,null,-0.565217
@@ -3089,7 +3089,7 @@ SCIDB QUERY : <cross(unpack(teeth,j),A)>
 {12,1} 5,3,24,1.43478
 {12,2} 5,3,24,2.43478
 
-SCIDB QUERY : <cross(ZZZ,A)>
+SCIDB QUERY : <cross_join(ZZZ,A)>
 {j,x} x,y,val,a
 {0,-2} 0,1,null,-1.56522
 {0,-1} 0,1,null,-0.565217
@@ -3157,23 +3157,23 @@ SCIDB QUERY : <cross(ZZZ,A)>
 {12,1} 5,3,24,1.43478
 {12,2} 5,3,24,2.43478
 
-SCIDB QUERY : <sum(cross(ZZZ,A))>
+SCIDB QUERY : <aggregate(cross_join(ZZZ,A),sum(x))>
 {i} x_sum
 {0} 170
 
-SCIDB QUERY : <stdev(cross(ZZZ,A))>
+SCIDB QUERY : <aggregate(cross_join(ZZZ,A),stdev(x))>
 {i} x_stdev
 {0} 1.74725
 
-SCIDB QUERY : <var(cross(ZZZ,A))>
+SCIDB QUERY : <aggregate(cross_join(ZZZ,A),var(x))>
 {i} x_var
 {0} 3.05288
 
-SCIDB QUERY : <max(cross(ZZZ,A))>
+SCIDB QUERY : <aggregate(cross_join(ZZZ,A),max(x))>
 {i} x_max
 {0} 5
 
-SCIDB QUERY : <min(cross(ZZZ,A))>
+SCIDB QUERY : <aggregate(cross_join(ZZZ,A),min(x))>
 {i} x_min
 {0} 0
 

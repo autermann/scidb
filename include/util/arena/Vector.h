@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -61,6 +61,10 @@ class vector : public SCIDB_MANAGED_BASE(boost::container,vector,V)
     explicit            vector(const allocator_type& a                             ) : base_type(a)    {}
     explicit            vector(const allocator_type& a,size_type n,const V& v = V()) : base_type(n,v,a){}
     template<class it>  vector(const allocator_type& a,it i,it e                   ) : base_type(i,e,a){}
+
+ public:             // Operations
+    V const&            operator[](size_type i)    const {return isDebug() ? at(i) : base_type::operator[](i);}
+    V&                  operator[](size_type i)          {return isDebug() ? at(i) : base_type::operator[](i);}
 };
 
 /**

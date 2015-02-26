@@ -22,13 +22,13 @@ SCIDB QUERY : <store(join(build(<a:string> [x=0:2,3,0],string(x+1)),build(<a:str
 {1} '2','11'
 {2} '3','12'
 
-SCIDB QUERY : <redimension_store(C,D)>
+SCIDB QUERY : <store(redimension(C,D),D)>
 {a} b
 {'1'} '10'
 {'2'} '11'
 {'3'} '12'
 
-SCIDB QUERY : <redimension_store(C,E)>
+SCIDB QUERY : <store(redimension(C,E),E)>
 {a,x} b
 {'1',0} '10'
 {'2',1} '11'

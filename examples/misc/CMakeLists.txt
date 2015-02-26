@@ -2,7 +2,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -28,6 +28,10 @@ set (misc_src
     ../../src/array/UnitTestDeepChunkMergePhysical.cpp
     ../../src/array/UnitTestSortArrayLogical.cpp
     ../../src/array/UnitTestSortArrayPhysical.cpp
+    ../../src/util/UnitTestFileIOLogical.cpp
+    ../../src/util/UnitTestFileIOPhysical.cpp
+    ../../src/smgr/io/UnitTestDataStoreLogical.cpp
+    ../../src/smgr/io/UnitTestDataStorePhysical.cpp
 )
 
 file(GLOB misc_include "*.h")

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,7 +34,7 @@ ERRMSG(SCIDB_LE_NO_MEMORY_FOR_VALUE,                 "Not enough memory for new 
 ERRMSG(SCIDB_LE_THREAD_EVENT_ERROR,                  "Error state '%1%' detected in event wait");
 ERRMSG(SCIDB_LE_THREAD_SEMAPHORE_ERROR,              "Error state '%1%' detected in semaphore enter");
 ERRMSG(SCIDB_LE_CANT_LOAD_MODULE,                    "Cannot load module '%1%', dlopen returned '%2%");
-ERRMSG(SCIDB_LE_TOO_NEW_MODULE,                      "This plugin is not supported by this version of SciDB. The plugin is version %1% is %2%.%3%.%4%.%5% but SciDB version is %6%");
+ERRMSG(SCIDB_LE_WRONG_MODULE_VERSION,                "Plugin version does not match the version of SciDB. The plugin %1% has version %2%.%3%.%4%.%5% but SciDB version is %6%");
 ERRMSG(SCIDB_LE_CANT_FIND_SYMBOL,                    "Cannot find symbol '%1%', dlsym returned '%2%'");
 ERRMSG(SCIDB_LE_INPUTS_MUST_BE_BEFORE_PARAMS,        "Error in operator '%1%'. All inputs must appear before other parameters");
 ERRMSG(SCIDB_LE_VAR_MUST_BE_AFTER_PARAMS,            "Error in operator '%1%'. Optional parameters must appear last");
@@ -45,7 +45,7 @@ ERRMSG(SCIDB_LE_OPERATOR_NOT_FOUND,                  "Operator '%1%' not found")
 ERRMSG(SCIDB_LE_ARRAY_DOESNT_EXIST,                  "Array '%1%' does not exist");
 ERRMSG(SCIDB_LE_ARRAYID_DOESNT_EXIST,                "Array with id '%1%' does not exist");
 ERRMSG(SCIDB_LE_CANT_OPEN_FILE,                      "Cannot open file '%1%' errno %2%");
-ERRMSG(SCIDB_LE_INSTANCE_DOESNT_EXIST,                   "Instance with id %1% does not exist");
+ERRMSG(SCIDB_LE_INSTANCE_DOESNT_EXIST,               "Instance with id %1% does not exist");
 ERRMSG(SCIDB_LE_ATTRIBUTE_DOESNT_EXIST,              "Attribute with id %1% does not exist in array '%2%'");
 ERRMSG(SCIDB_LE_DUPLICATE_ATTRIBUTE_NAME,            "Cannot create attribute '%1%'; name collides with existing object");
 ERRMSG(SCIDB_LE_ILLEGAL_OPERATION,                   "Illegal operation: %1%");
@@ -134,6 +134,7 @@ ERRMSG(SCIDB_LE_UNKNOWN_MESSAGE_TYPE2,              "Invalid message type for ID
 ERRMSG(SCIDB_LE_INVALID_SHEDULER_WORK_ITEM,         "Invalid work item for Scheduler");
 ERRMSG(SCIDB_LE_INVALID_SHEDULER_PERIOD,            "Invalid period for Scheduler");
 ERRMSG(SCIDB_LE_CONNECTION_ERROR2,                  "Connection error while sending");
+ERRMSG(SCIDB_LE_CANT_OPEN_PATH,                     "Cannot open path '%1%'");
 ERRMSG(SCIDB_LE_WRONG_ATTRIBUTE_TYPE,               "Attribute '%1%' has incorrect datatype (source: %2%, destination: %3%)");
 ERRMSG(SCIDB_LE_WRONG_ATTRIBUTE_FLAGS,              "Attribute '%1%' has incorrect properties");
 ERRMSG(SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE,        "Source attribute '%1%' must be of type '%2%'");
@@ -222,9 +223,6 @@ ERRMSG(SCIDB_LE_OP_CAST_ERROR1,                     "Mismatched number of attrib
 ERRMSG(SCIDB_LE_OP_CAST_ERROR3,                     "Attribute '%1%' flags doesn't match");
 ERRMSG(SCIDB_LE_OP_CAST_ERROR4,                     "Mismatched number of dimensions");
 ERRMSG(SCIDB_LE_OP_CAST_ERROR5,                     "Dimension '%1%' length doesn't match");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR6,                     "Dimension '%1%' start doesn't match");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR7,                     "Dimension '%1%' chunk size doesn't match");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR8,                     "Dimension '%1%' chunk overlap doesn't match");
 ERRMSG(SCIDB_LE_OP_CONCAT_ERROR1,                   "Arrays with open boundary cannot be concatenated");
 ERRMSG(SCIDB_LE_OP_CROSSJOIN_ERROR1,                "Dimension should be specified only once in JOIN ON list");
 ERRMSG(SCIDB_LE_OP_DELDIM_ERROR1,                   "Cannot delete the only dimension of array");
@@ -396,6 +394,18 @@ ERRMSG(SCIDB_LE_ATTRIBUTE_CANNOT_BE_NULLABLE,       "The index attribute %1% can
 ERRMSG(SCIDB_LE_CANNOT_PARSE_BOOLEAN_PARAMETER,     "The parameter '%1%' could not be parsed into a boolean");
 ERRMSG(SCIDB_LE_CHUNK_SEGMENT_SIZE_INCOMPATIBLE,    "Configured chunk segment size: %1% bytes, doesn't match stored chunk segment size: %2% bytes");
 ERRMSG(SCIDB_LE_CHUNK_SEGMENT_SIZE_ILLEGAL,         "Cannot initialize database with chunk segment size of %1% bytes");
+ERRMSG(SCIDB_LE_BAD_BLOCK_COMMENT,                  "The block '/*' comment is not terminated with a matching '*/'");
+ERRMSG(SCIDB_LE_BAD_LITERAL_REAL,                   "'%1%' is too large to represent as a double");
+ERRMSG(SCIDB_LE_BAD_LITERAL_INTEGER,                "'%1%' is too large to represent as an integer");
+ERRMSG(SCIDB_LE_NAME_REDEFINED,                     "'%1%' has already been defined");
+ERRMSG(SCIDB_LE_NAME_NOT_APPLICABLE,                "'%1%' is not an entity that can be applied (such as an operator or function)");
+ERRMSG(SCIDB_LE_NAME_IS_RECURSIVE,                  "'%1%' is defined recursively (recursion not yet supported)");
+ERRMSG(SCIDB_LE_NAME_ARITY_MISMATCH,                "'%1%' is applied to the wrong number of arguments");
+ERRMSG(SCIDB_LE_DATASTORE_GUID_NOT_UNIQUE,          "Attempt to create a DataStore on file '%1%' with non-unique guid '%2%'");
+ERRMSG(SCIDB_LE_STORAGE_FILE_INVALID_FORMAT,        "The storage file '%1%' has an invalid format");
+ERRMSG(SCIDB_LE_DATASTORE_NOT_FOUND,                "Attempt to access non-existent DataStore with guid '%1%'");
+ERRMSG(SCIDB_LE_DATASTORE_CHUNK_CORRUPTED,          "Chunk header corrupted in DataStore with guid '%1%' offset '%2%'");
+ERRMSG(SCIDB_LE_DATASTORE_CORRUPT_FREELIST,         "Stored freelist for data store corrupted: '%1%'");
 
 //Next ERRMSG
 

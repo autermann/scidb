@@ -1,19 +1,10 @@
-SCIDB QUERY : <create array letters <letter:string> [i=0:2,3,0]>
-[Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <load letters from '../tests/harness/testcases/data/doc/letters.scidb'>
-[Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <scan(letters)>
+SCIDB QUERY : <store(build(<letter:string> [i=0:2,3,0],'["A","B","C"]',true),letters)>
 {i} letter
 {0} 'A'
 {1} 'B'
 {2} 'C'
 
 SCIDB QUERY : <store(build(<number:int64 null>[i=0:4,5,0],i),numbers)>
-[Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <scan(numbers)>
 {i} number
 {0} 0
 {1} 1
@@ -24,13 +15,10 @@ SCIDB QUERY : <scan(numbers)>
 SCIDB QUERY : <cross(numbers,letters)>
 [[(0,'A'),(0,'B'),(0,'C')],[(1,'A'),(1,'B'),(1,'C')],[(2,'A'),(2,'B'),(2,'C')],[(3,'A'),(3,'B'),(3,'C')],[(4,'A'),(4,'B'),(4,'C')]]
 
-SCIDB QUERY : <create array lettersPlus <letter:string, type:string> [i=0:2,3,0]>
+SCIDB QUERY : <store(build(<type:string>[i=0:2,3,0],'["vowel","consonant","consonant"]',true),letter_cat)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load lettersPlus from '../tests/harness/testcases/data/doc/lettersPlus.scidb'>
-[Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <scan(lettersPlus)>
+SCIDB QUERY : <store(join(letters,letter_cat),lettersPlus)>
 {i} letter,type
 {0} 'A','vowel'
 {1} 'B','consonant'
@@ -39,13 +27,7 @@ SCIDB QUERY : <scan(lettersPlus)>
 SCIDB QUERY : <cross(numbers,lettersPlus)>
 [[(0,'A','vowel'),(0,'B','consonant'),(0,'C','consonant')],[(1,'A','vowel'),(1,'B','consonant'),(1,'C','consonant')],[(2,'A','vowel'),(2,'B','consonant'),(2,'C','consonant')],[(3,'A','vowel'),(3,'B','consonant'),(3,'C','consonant')],[(4,'A','vowel'),(4,'B','consonant'),(4,'C','consonant')]]
 
-SCIDB QUERY : <create array oddNumbers <number:int64 null> [i=0:4,5,0]>
-[Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <load oddNumbers from '../tests/harness/testcases/data/doc/oddNumbers.scidb'>
-[Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <scan(oddNumbers)>
+SCIDB QUERY : <store(build(<number:int64 null> [i=0:4,5,0],'[null,1,null,3,null]',true),oddNumbers)>
 {i} number
 {0} null
 {1} 1
@@ -67,6 +49,8 @@ SCIDB QUERY : <scan(evenNumbers)>
 
 SCIDB QUERY : <cross(evenNumbers,letters)>
 [[(0,'A'),(0,'B'),(0,'C')],[(),(),()],[(2,'A'),(2,'B'),(2,'C')],[(),(),()],[(4,'A'),(4,'B'),(4,'C')]]
+
+Query was executed successfully
 
 Query was executed successfully
 

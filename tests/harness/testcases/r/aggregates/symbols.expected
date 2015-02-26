@@ -13,13 +13,13 @@ SCIDB QUERY : <load ( Raw_Data_Two, '../tests/harness/testcases/data/symbols_2.t
 SCIDB QUERY : <CREATE EMPTY ARRAY Symbols < ID:int32, Qty:int32 > [ Symbol(string)=*,30,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (Raw_Data_One,Symbols)>
+SCIDB QUERY : <store(redimension(Raw_Data_One,Symbols),Symbols)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <CREATE EMPTY ARRAY Timeseries < Price : double > [ Symbol(string)=*,100,0, Time(string)=*,100,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <redimension_store (Raw_Data_Two,Timeseries)>
+SCIDB QUERY : <store(redimension(Raw_Data_Two,Timeseries),Timeseries)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <count ( Symbols )>

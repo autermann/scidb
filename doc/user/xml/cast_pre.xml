@@ -59,12 +59,24 @@
       <procedure>
         <step>
           <para>Show the schema of an existing array:<programlisting
-          language="test">--afl create array winnersFewFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt; [i=0:*,12,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winnersFew.csv &gt; $DOC_DATA/winnersFew.scidb --show-query=no --show-output=no
---aql load winnersFewFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' --show-query=no --show-output=no
---afl create array champions &lt;person:string,country:string,time:double, event:string&gt; [year=1996:2008,1,0] --show-query=no --show-output=no
---afl redimension_store(winnersFewFlat,champions) --show-query=no --show-output=no
---afl store(project(champions,time),winningTime) --show-query=no --show-output=no
+          language="test">--afl store(build(&lt;event:string&gt;[i=0:*,12,0],'["dash","dash","steeplechase","marathon","marathon",
+      "marathon"]',true),event); --show-query=no --show-output=no
+--afl store(build(&lt;year:int64&gt;[i=0:*,12,0],'[1996,2000,2000,1996,2000,2008]',true),year);
+      --show-query=no --show-output=no
+--afl store(build(&lt;person:string&gt;[i=0:*,12,0],'["Bailey","Greene","Kosgei","Thugwane","Abera",
+      "Wanjiru"]',true),person); --show-query=no --show-output=no
+--afl store(build(&lt;country:string&gt;[i=0:*,12,0],'["Canada","USA","Kenya","USA","Ethiopia",
+      "Kenya"]',true),country); --show-query=no --show-output=no
+--afl store(build(&lt;time:double&gt;[i=0:*,12,0],'[9.84,9.87,503.17,7956,7811,7596]',true),time);
+      --show-query=no --show-output=no
+--afl store(join(event,join(year,(join(person,join(country,time))))),winnersFewFlat);
+      --show-query=no --show-output=no
+
+
+--afl create array champions &lt;person:string,country:string,time:double, event:string&gt;
+     [year=1996:2008,1,0]; --show-query=no --show-output=no
+--afl store(redimension(winnersFewFlat,champions),champions); --show-query=no --show-output=no
+--afl store(project(champions,time),winningTime); --show-query=no --show-output=no
 --schema winningTime</programlisting></para>
         </step>
 
@@ -94,7 +106,7 @@
          [year=1996:2008,1,0]
        ),
        winningTimeRecast
-   );</programlisting></para>
+   ); --output-format=dcsv</programlisting></para>
         </step>
 
         <step>

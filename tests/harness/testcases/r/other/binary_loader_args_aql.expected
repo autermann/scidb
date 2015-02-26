@@ -25,7 +25,7 @@ SCIDB QUERY : <select * from SP>
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
 {1000} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
-SCIDB QUERY : <select * from count(versions(SP))>
+SCIDB QUERY : <select * from aggregate(versions(SP),count(*))>
 {i} count
 {0} 1
 
@@ -90,7 +90,7 @@ SCIDB QUERY : <select * from SP>
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
 {2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
-SCIDB QUERY : <select * from count(versions(SP))>
+SCIDB QUERY : <select * from aggregate(versions(SP),count(*))>
 {i} count
 {0} 3
 
@@ -117,7 +117,7 @@ SCIDB QUERY : <select * from SP>
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
 {2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
-SCIDB QUERY : <select * from count(versions(SP))>
+SCIDB QUERY : <select * from aggregate(versions(SP),count(*))>
 {i} count
 {0} 4
 
@@ -144,7 +144,7 @@ SCIDB QUERY : <select * from SP>
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
 {2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
-SCIDB QUERY : <select * from count(versions(SP))>
+SCIDB QUERY : <select * from aggregate(versions(SP),count(*))>
 {i} count
 {0} 5
 

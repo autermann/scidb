@@ -331,7 +331,7 @@ SCIDB QUERY : <load(spa2, 'spa.out', -1, 'opaque')>
 SCIDB QUERY : <store(join(build(<ra:float>[i=1:1000,100,0], i), build(<decl:float>[i=1:1000,100,0], i)), stars)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <redimension_store(stars, sky)>
+SCIDB QUERY : <store(redimension(stars, sky), sky)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <save(sky, 'sky.out', -2, 'opaque')>

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,8 +37,10 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/shared_array.hpp>
 #include <query/Query.h>
+#include <util/FileIO.h>
 #include <util/Lru.h>
 #include <util/CoordinatesMapper.h>
+#include <array/Tile.h>
 
 using namespace std;
 using namespace boost;
@@ -374,6 +376,7 @@ namespace scidb
                                                      int iterationMode);
     };
 
+
     /**
      * Structure to share mem chunks.
      */
@@ -506,7 +509,7 @@ namespace scidb
 
         ArrayDesc desc;
         uint64_t _usedFileSize;
-        int _swapFile;
+        File::FilePtr _swapFile;
         map<Address, LruMemChunk> _chunks;
         Mutex _mutex;
     private:
@@ -853,7 +856,7 @@ namespace scidb
             return isEmptyable ? emptyBitmapIterator.getLPos() : emptyBitmapIterator.getPPos();
         }
         arena::ArenaPtr const _arena;
-        ValueMap& values;
+        ValueMap  _values;
         Value     trueValue;
         Value     falseValue;
         Value     tmpValue;
@@ -864,7 +867,183 @@ namespace scidb
         RLEPayload::append_iterator appender;
         position_t prevPos;
     };
-}
 
+    /**
+     * Abstract base chunk iterator providing functionality which keeps track of the iterator logical position within a chunk.
+     * @note It uses an RLE empty bitmap extracted from a different materialized chunk (aka the empty bitmap chunk)
+     */
+    class BaseTileChunkIterator: public ConstChunkIterator, protected CoordinatesMapper
+    {
+      protected:
+        ArrayDesc const& _array;
+        AttributeID      _attrID;
+        AttributeDesc const& _attr;
+        Chunk* _dataChunk;
+        bool   _hasCurrent;
+        bool   _hasOverlap;
+        int    _mode;
+        boost::shared_ptr<ConstRLEEmptyBitmap> _emptyBitmap;
+        ConstRLEEmptyBitmap::iterator _emptyBitmapIterator;
+        Coordinates _currPos;
+        boost::weak_ptr<Query> _query;
+
+        BaseTileChunkIterator(ArrayDesc const& desc,
+                              AttributeID attr,
+                              Chunk* data,
+                              int iterationMode,
+                              boost::shared_ptr<Query> const& query);
+
+        virtual ~BaseTileChunkIterator();
+
+      public:
+        int  getMode();
+        bool isEmpty();
+        bool end();
+        virtual bool setPosition(position_t pos);
+        virtual position_t getLogicalPosition();
+        bool setPosition(Coordinates const& pos);
+        void operator ++();
+        void reset();
+        ConstChunk const& getChunk();
+        Coordinates const& getPosition();
+        boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap();
+        boost::shared_ptr<Query> getQuery()
+        {
+            // See XXX note in MemChunkIterator
+            return _query.lock();
+        }
+    };
+
+    class BaseTile;
+
+    /**
+     * Concrete chunk iterator class providing a tile-at-a-time access to chunk's data via getData()
+     * as well as a value-at-a-time access via getItem().
+     */
+    class RLETileConstChunkIterator : public BaseTileChunkIterator
+    {
+    public:
+        RLETileConstChunkIterator(ArrayDesc const& desc,
+                                  AttributeID attr,
+                                  Chunk* data,
+                                  Chunk* bitmap,
+                                  int iterationMode,
+                                  boost::shared_ptr<Query> const& query);
+        ~RLETileConstChunkIterator();
+        Value& getItem();
+        Coordinates const& getPosition();
+        bool setPosition(Coordinates const& pos);
+        virtual bool setPosition(position_t pos);
+        void operator ++();
+        void reset();
+
+        /// @see ConstChunkIterator
+        virtual const Coordinates& getData(scidb::Coordinates& logicalStart /*IN/OUT*/,
+                                           size_t maxValues,
+                                           boost::shared_ptr<BaseTile>& tileData,
+                                           boost::shared_ptr<BaseTile>& tileCoords);
+
+        /// @see ConstChunkIterator
+        virtual position_t getData(position_t logicalStart,
+                           size_t maxValues,
+                           boost::shared_ptr<BaseTile>& tileData,
+                           boost::shared_ptr<BaseTile>& tileCoords);
+
+        /// @see ConstChunkIterator
+        virtual const Coordinates& getData(scidb::Coordinates& logicalStart /*IN/OUT*/,
+                                           size_t maxValues,
+                                           boost::shared_ptr<BaseTile>& tileData);
+
+        /// @see ConstChunkIterator
+        virtual position_t getData(position_t logicalStart,
+                                   size_t maxValues,
+                                   boost::shared_ptr<BaseTile>& tileData);
+
+        /// @see ConstChunkIterator
+        operator const CoordinatesMapper* () const { return this; }
+    private:
+        /// Helper to pin the chunk and construct a payload iterator
+        void prepare();
+        /// Helper to make sure that the payload iterator corresponds to the EBM iterator
+        void alignIterators();
+
+        /**
+         * Return a tile of at most maxValues starting at logicalStart.
+         * The logical position is advanced by the size of the returned tile.
+         * @parm logicalStart - logical position (in row-major order) within a chunk of the first data element
+         * @param maxValues   - max number of values in a tile
+         * @param tileData    - output data tile
+         * @param tileCoords  - output tile of logical position_t's, one for each element in the data tile
+         * @param coordTileType - "scidb::Coordinates"
+         * @param coordCtx      - any context necessary for constructing the tile of coordinates
+         * @return positon_t(-1) if no data is found at the logicalStart position
+         *         (either at the end of chunk or at a logical "whole" in the serialized data);
+         *         otherwise, the next position where data exist in row-major order.
+         *         If positon_t(-1) is returned, the output variables are not modified.
+         */
+        position_t
+        getDataInternal(position_t logicalStart,
+                        size_t maxValues,
+                        boost::shared_ptr<BaseTile>& tileData,
+                        boost::shared_ptr<BaseTile>& tileCoords,
+                        const scidb::TypeId& coordTileType,
+                        const BaseTile::Context* coordCtx);
+        /**
+         * Return a tile of at most maxValues starting at logicalStart.
+         * The logical position is advanced by the size of the returned tile.
+         * @parm logicalStart - logical position (in row-major order) within a chunk of the first data element
+         * @param maxValues   - max number of values in a tile
+         * @param tileData    - output data tile
+         * @return positon_t(-1) if no data is found at the logicalStart position
+         *         (either at the end of chunk or at a logical "whole" in the serialized data);
+         *         otherwise, the next position where data exist in row-major order.
+         *         If positon_t(-1) is returned, the output variables are not modified.
+         */
+        position_t
+        getDataInternal(position_t logicalOffset,
+                        size_t maxValues,
+                        boost::shared_ptr<BaseTile>& tileData);
+
+        class CoordinatesMapperWrapper : public CoordinatesMapperProvider
+        {
+        private:
+            CoordinatesMapper* _mapper;
+        public:
+            CoordinatesMapperWrapper(CoordinatesMapper* mapper) : _mapper(mapper)
+            { assert(_mapper); }
+            virtual ~CoordinatesMapperWrapper() {}
+            virtual operator const CoordinatesMapper* () const { return _mapper; }
+        };
+
+        class RLEPayloadDesc : public rle::RLEPayloadProvider
+        {
+        public:
+            RLEPayloadDesc(ConstRLEPayload* rlePayload, position_t offset, size_t numElem);
+            virtual const ConstRLEPayload* getPayload() const  { return _rlePayload; }
+            virtual position_t getOffset() const { return _offset; }
+            virtual size_t getNumElements() const { return _numElem; }
+        private:
+            const ConstRLEPayload* _rlePayload;
+            const position_t _offset;
+            const size_t _numElem;
+        };
+
+    private:
+        /// data chunk RLE payload
+        boost::shared_ptr<ConstRLEPayload> _payload;
+        ConstRLEPayload::iterator _payloadIterator;
+
+        /// Current logical positon within a chunk,
+        /// not needed as long as EBM is never unpinned/not in memory
+        position_t _lPosition;
+
+        /// cached singleton pointer
+        TileFactory* _tileFactory;
+        //// The data is non-bool, fixed size, and ebm is aligned with data
+        mutable bool _fastTileInitialize;
+    protected:
+        Value _value;
+    };
+
+} // scidb namespace
 #endif
-

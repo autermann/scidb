@@ -7,7 +7,7 @@ aggregate(store(between(build(A, x+y), 1234, 5678, 2345, 6789), A), count(*), su
 
 --test
 redimension(vector, matrix)
-redimension_store(vector, matrix)
+store(redimension(vector, matrix), matrix)
 
 aggregate(redimension(A, <val:int64> [x=1234:2345,500,25,y=5678:6789,650,50]), count(*), sum(val), avg(val))
 between(redimension(A, <val:int64> [x=1000:2500,1000,100,y=5000:7000,700,50]), 1284,5678,1294,5678)

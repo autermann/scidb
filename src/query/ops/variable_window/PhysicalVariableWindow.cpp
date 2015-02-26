@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -1104,12 +1104,7 @@ public:
         runVariableWindowUnitTests();
 #endif
         assert(inputArrays.size() == 1);
-        shared_ptr<Array> srcArray = inputArrays[0];
-
-        if (inputArrays[0]->getSupportedAccess() != Array::RANDOM)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << getLogicalName();
-        }
+        shared_ptr<Array> srcArray = ensureRandomAccess(inputArrays[0], query);
 
         _srcDesc = srcArray->getArrayDesc();
         const string& dimName  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();

@@ -183,7 +183,7 @@ SCIDB QUERY : <load(AB1, 'abc_null.out', 0, '(int32 null,string null ,double nul
 SCIDB QUERY : <load(AB1, 'abc_null.out', 0, '(int32 null,string null ,double null)',14,AB1_shadow)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <count(versions(AB1_shadow))>
+SCIDB QUERY : <aggregate(versions(AB1_shadow),count(*))>
 i,count
 0,1
 

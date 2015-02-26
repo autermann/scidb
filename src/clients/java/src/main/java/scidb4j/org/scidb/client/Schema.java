@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@ public class Schema
 
     /**
      * Constructor
-     * 
+     *
      * @param name Array name
      * @param attributes Attributes array
      * @param dimensions Dimensions array
@@ -112,7 +112,7 @@ public class Schema
 
         /**
          * Constructor
-         * 
+         *
          * @param id Attribute ID
          * @param name Attribute name
          * @param type Attribute type
@@ -153,7 +153,7 @@ public class Schema
         {
             return type;
         }
-        
+
         /**
          * Returns nullable flag
          * @return true if nullable
@@ -162,7 +162,7 @@ public class Schema
         {
             return nullable;
         }
-        
+
         /**
          * Returns empty indicator flag
          * @return true if attribute is empty indicator
@@ -171,40 +171,43 @@ public class Schema
         {
             return emptyIndicator;
         }
-        
+
         @Override
         public String toString()
         {
             return String.format("%s:%s", name, type);
         }
     }
-    
+
     /**
      * Array dimension
      */
     public static class Dimension
     {
         private String name;
-        private String type;
-        private int flags = 0;
         private long startMin = 0;
         private long currStart = 0;
         private long currEnd = 0;
         private long endMax = 0;
         private long chunkInterval = 0;
-        
+
         /**
          * Constructor
-         * @param name Dimension name
-         * @param type Dimension type
-         * @param flags Dimension flags
+         * @param name dimension name
+         * @param startMin dimension minimum start
+         * @param currStart dimension current start
+         * @param currEnd dimension current end
+         * @param endMax endMax dimension maximum end
+         * @param chunkInterval  chunk size in this dimension
          */
-        public Dimension(String name, String type, int flags, long startMin, long currStart, long currEnd, long endMax,
+        public Dimension(String name,
+                         long startMin,
+                         long currStart,
+                         long currEnd,
+                         long endMax,
                          long chunkInterval)
         {
             this.name = name;
-            this.type = type;
-            this.flags = flags;
             this.startMin = startMin;
             this.currStart = currStart;
             this.currEnd = currEnd;
@@ -219,24 +222,6 @@ public class Schema
         public String getName()
         {
             return name;
-        }
-        
-        /**
-         * Returns dimension type
-         * @return Dimension type
-         */
-        public String getType()
-        {
-            return type;
-        }
-        
-        /**
-         * Returns dimension flags
-         * @return Dimension flags
-         */
-        public int getFlags()
-        {
-            return flags;
         }
 
         public long getStartMin()
@@ -264,7 +249,7 @@ public class Schema
             return chunkInterval;
         }
     }
-    
+
     @Override
     public String toString()
     {

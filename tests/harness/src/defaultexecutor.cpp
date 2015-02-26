@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -2825,6 +2825,7 @@ void DefaultExecutor :: copyToLocal (const InfoForExecutor &ie)
 	_ie.log_queries        = ie.log_queries;
 	_ie.save_failures      = ie.save_failures;
 	_ie.logDir             = ie.logDir;
+	_ie.scratchDir         = ie.scratchDir;
 	_ie.logDestination     = ie.logDestination;
 	_ie.debugLevel         = ie.debugLevel;
 	_ie.record             = ie.record;

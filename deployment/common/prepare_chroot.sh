@@ -3,7 +3,7 @@
 # BEGIN_COPYRIGHT
 #
 # This file is part of SciDB.
-# Copyright (C) 2008-2013 SciDB, Inc.
+# Copyright (C) 2008-2014 SciDB, Inc.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -36,7 +36,7 @@ chmod a-wx,o-r,ug+r ${CHROOT_SUDOERS}
 
 function centos6 ()
 {
-yum install --enablerepo=scidb3rdparty -y gcc make rpm-build mock python-argparse git git-svn
+yum install --enablerepo=scidb3rdparty -y gcc make rpm-build mock python-argparse
 chroot_sudoers_mock
 }
 
@@ -52,7 +52,7 @@ chmod a-wx,o-r,ug+r ${CHROOT_SUDOERS}
 function ubuntu1204 ()
 {
 apt-get update
-apt-get install -y build-essential dpkg-dev pbuilder debhelper m4 git git-svn cdbs quilt
+apt-get install -y build-essential dpkg-dev pbuilder debhelper m4 cdbs quilt
 chroot_sudoers_pbuilder
 }
 

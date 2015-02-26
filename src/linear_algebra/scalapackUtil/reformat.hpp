@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -150,6 +150,7 @@ inline void ReformatToScalapack::operator()(double val, size_t scidbRow, size_t 
               << ", " << val
               << ");" << std::endl;
 #endif
+    if (val == 0.0) return ; // no re-zeroing of already zeroed memory (bandwidth conservation)
 
     // the minimum scidb{Row,Col} may not be (0,0). to change to
     // 0-based indices, we subtract (_minrow, _mincol)

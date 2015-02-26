@@ -3,7 +3,7 @@
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter>
-  <title>Performing Simple Analytics</title>
+  <title>SciDB Basic Analytic Capabilities</title>
 
   <para><indexterm>
       <primary>aggregates</primary>
@@ -20,6 +20,7 @@
   of sorted items.</para>
 
    <xi:include href="analytics_aggregates_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+   <xi:include href="aggregate_cumulate_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
    <xi:include href="order_stats_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
 

@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -86,6 +86,29 @@
 #define PLUGIN_USER_QUERY_EXCEPTION(error_namespace, short_error_code, long_error_code, parsing_context)\
     scidb::UserQueryException(REL_FILE, __FUNCTION__, __LINE__, error_namespace, short_error_code,\
         long_error_code, #short_error_code, #long_error_code, parsing_context)
+
+/**
+ * The macro is equivalent to an assertion in DEBUG build, and an exception in RELEASE build.
+ *
+ * Usage:
+ *
+ *   new code:
+ *     ASSERT_EXCEPTION( condition, exceptionMsg );
+ *
+ *   equivalent old code:
+ *     assert( condition );
+ *     if (!condition) {
+ *        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << exceptionMsg;
+ *     }
+ */
+
+#define ASSERT_EXCEPTION(_cond_, _msg_) \
+     do { \
+         assert(_cond_); \
+         if (!_cond_) { \
+             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << _msg_; \
+         } \
+     } while (0)
 
 namespace scidb
 {

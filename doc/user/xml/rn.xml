@@ -23,10 +23,10 @@
       </listitem>
     </itemizedlist></para>
 
-  <para>Note that we may deprecate some items but commit to providing advance
-  notice about operators that may be removed in the next release. The items
-  marked for deprecation below are present in R&scidb_version; but may be
-  removed in the next release.</para>
+  <para>New features and important bug fixes are described in Sections 2, 3,
+  and 4. Feature changes made in this release and advance notice of changes
+  planned for the next release (R14.6) are discussed in Section 5. Known
+  limitations are noted in Section 6.</para>
 
   <section>
     <title>Supported Operating Systems</title>
@@ -38,123 +38,53 @@
   <section id="SciDB_ReleaseNotes">
     <title>Community Edition Features and Changes</title>
 
-    <para>This version includes the following features and
-    changes:<itemizedlist>
+    <para>This version includes the following features and changes:
+    <itemizedlist>
         <listitem>
-          <para>The start-up process of SciDB is parallelized, so should be
-          much faster than previous releases, especially if your cluster
-          consists of many nodes.</para>
+          <para><emphasis role="bold">Backup/Restore utility:</emphasis> A new
+          utility is provided to backup and restore SciDB arrays. The
+          functionality is fairly rich. For example, it supports three formats
+          including the OPAQUE format. The utility is <emphasis
+          role="bold">scidb_backup.py</emphasis>, located in <emphasis
+          role="bold">/opt/scidb/14.3/bin</emphasis> folder.</para>
         </listitem>
 
         <listitem>
-          <para>The <command role="bold">index_lookup()</command> and <command
-          role="bold">uniq()</command> operators have been optimized, and have
-          officially become part of SciDB. They may be used as a workaround of
-          non-integer dimensions, which are no longer supported. Refer to
-          <ulink
-          url="http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1172">http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1172</ulink>
-          for details.</para>
+          <para><emphasis role="bold">Macro support:</emphasis> SciDB 14.3
+          introduces basic user-defined macros that can be used to extend both
+          the set of SciDB functions and the set of AFL operators. A new
+          operator, <command>load_module()</command>, is provided. See <xref
+          linkend="macros"/> for details.</para>
         </listitem>
 
         <listitem>
-          <para>A new aggregate, <command>prod()</command>, has been added. It
-          computes the product of a set of values.</para>
-        </listitem>
-
-        <listitem>
-          <para>In the <command role="bold">create array </command>statement,
-          the 'immutable' constraint is no longer valid. Also, the 'not empty'
-          constraint is deprecated.</para>
-        </listitem>
-
-        <listitem>
-          <para>The special value, <emphasis role="bold">NA</emphasis>, is no
-          longer supported. You can use <emphasis role="bold">NaN
-          </emphasis>or <emphasis role="bold">Null </emphasis>instead.</para>
-        </listitem>
-
-        <listitem>
-          <para>The semantics of aggregates involving <emphasis
-          role="bold">NaN </emphasis>have been changed to return <emphasis
-          role="bold">NaN</emphasis>, to maintain consistency with the IEEE
-          standard.</para>
-        </listitem>
-
-        <listitem>
-          <para>The <command>multiply()</command> operator is no longer
-          supported.<itemizedlist>
+          <para><emphasis role="bold">Improved storage management:
+          </emphasis>SciDB 14.3 features better management of disk space, in
+          particular:<itemizedlist>
               <listitem>
-                <para>To multiply dense matrices, use the
-                <command>gemm()</command> operator.</para>
+                <para>When SciDB arrays are deleted, their storage space is
+                returned to the file system.</para>
               </listitem>
 
               <listitem>
-                <para>To multiply sparse matrices, use the
-                <command>spgemm()</command> operator, which is available in
-                the Enterprise Edition.</para>
+                <para>When queries are cancelled, disk space used by those
+                queries is reused by subsequent queries.</para>
               </listitem>
             </itemizedlist></para>
         </listitem>
 
         <listitem>
-          <para>The <emphasis role="bold"><command>redimension_store</command>
-          </emphasis>operator is deprecated. Use
-          <command>store(redimension())</command> instead.</para>
+          <para><emphasis role="bold">Mixed use of AQL and AFL: </emphasis>An
+          AQL selection query may be used inside an AFL query wherever a SciDB
+          array is expected. This feature may be useful for people familiar
+          with AQL but want to tap additional functionality provided by AFL.
+          For example, the following query is supported:<programlisting>$ iquery -aq "rank( (select * from build(&lt;v:double&gt;[i=1:5,5,0],i)), v)"</programlisting></para>
         </listitem>
 
         <listitem>
-          <para>The <command>cross()</command> operator is deprecated. Use
-          <command>cross_join()</command> instead.</para>
-        </listitem>
-
-        <listitem>
-          <para>The <command>build_sparse()</command> operator is deprecated.
-          Use <command>store(redimension(build()))</command> instead.</para>
-        </listitem>
-
-        <listitem>
-          <para>The special-case aggregate operators are deprecated. Use the
-          more general <command>aggregate()</command> operator instead. These
-          include the following:<itemizedlist>
-              <listitem>
-                <para><command>approxdc()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>avg()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>count()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>max()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>min()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>stdev()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>sum()</command></para>
-              </listitem>
-
-              <listitem>
-                <para><command>var()</command></para>
-              </listitem>
-            </itemizedlist></para>
-        </listitem>
-
-        <listitem>
-          <para>The semantics of unary operators over a missing value will be
-          changed, to return null (a special case of missing value where the
-          missing code is 0), in order to be consistent with the semantics of
-          binary operators.</para>
+          <para><emphasis role="bold">Improved Memory Management:</emphasis>
+          Certain out-of-memory errors that could occur in the previous
+          release have been fixed.</para>
         </listitem>
       </itemizedlist></para>
   </section>
@@ -166,27 +96,55 @@
 
     <itemizedlist>
       <listitem>
-        <para>The functions <command role="bold">first() </command>and
-        <emphasis role="bold">last()</emphasis> have been renamed to <command
-        role="bold">first_index()</command> and <emphasis
-        role="bold">last_index()</emphasis>, respectively.</para>
+        <para><emphasis role="bold">SciDB as a service: </emphasis>SciDB EE
+        14.3 can now be configured to run as a service. One advantage is that
+        the SciDB service will restart after a system reboot. For details, see
+        Section 5.7 of the <emphasis>SciDB Enterprise Edition User
+        Guide</emphasis>.</para>
+
+        <para/>
       </listitem>
 
       <listitem>
-        <para>The operators <command role="bold">cumsum() </command>and
-        <command role="bold">cumprod()</command> have been removed. Use the
-        <command role="bold">cumulate()</command> operator instead.</para>
+        <para><emphasis role="bold">Sparse Matrix Multiply: </emphasis>The
+        <emphasis role="bold">spgemm()</emphasis> operator has new
+        functionality and improved performance:<itemizedlist mark="endash">
+            <listitem>
+              <para><command>spgemm()</command> supports optional <emphasis
+              role="bold">‘min.+’</emphasis> and <emphasis
+              role="bold">‘max.+’</emphasis> semiring arithmetic. Such
+              alternative arithmetic permits <emphasis
+              role="bold"><command>spgemm()</command></emphasis> to be used
+              for a wide variety of graph algorithms, such as shortest paths
+              and measures of centrality.</para>
+            </listitem>
+
+            <listitem>
+              <para>The performance of <command>spgemm()</command> has been
+              improved in the case of matrix-vector multiplication.</para>
+            </listitem>
+          </itemizedlist></para>
       </listitem>
 
       <listitem>
-        <para>The operators <command role="bold">linregr()</command> and
-        <command role="bold">logistregr()</command> have been removed. Use the
-        <command role="bold">glm()</command> operator instead.</para>
+        <para><emphasis role="bold">Shortest paths:</emphasis> An example
+        script for computing single-source shortest paths (SSSP), using
+        spgemm() and the Bellman-Ford algorithm is given in <emphasis
+        role="bold">/opt/scidb/14.3/bin/
+        bellman_ford_example.sh</emphasis>.</para>
       </listitem>
 
       <listitem>
-        <para>The operator <command>solve()</command> has been removed. Use
-        the <command>glm()</command> operator instead.</para>
+        <para><emphasis role="bold">PageRank:</emphasis> An example script for
+        computing Google PageRank is given in <emphasis
+        role="bold">/opt/scidb/14.3/bin/pagerank_example.sh</emphasis>.</para>
+      </listitem>
+
+      <listitem>
+        <para><emphasis role="bold">Random number generator: </emphasis>A new
+        operator, <command>rng_uniform()</command>, provides a faster, higher
+        quality, pseudo-random number generator than
+        <command>build(...,random())</command> and similar variants.</para>
       </listitem>
     </itemizedlist>
   </section>
@@ -198,18 +156,314 @@
     GitHub repositories at <ulink
     url="http://github.com/paradigm4">http://github.com/paradigm4</ulink>.</para>
 
-    <para>The following P4 Labs features have been added:<itemizedlist>
-        <listitem>
-          <para>Loading files in the HDF-5 format is supported. For details,
-          see <ulink
-          url="https://github.com/Paradigm4/SciDB-HDF5">https://github.com/Paradigm4/SciDB-HDF5</ulink>.</para>
-        </listitem>
+    <para>For SciDB 14.3, a non-root install procedure has been added. For
+    details, see <ulink
+    url="http://downloads.paradigm4.com/nri">http://downloads.paradigm4.com/nri</ulink>.</para>
+  </section>
 
-        <listitem>
-          <para>Embedded R is supported. For details, see <ulink
-          url="https://github.com/Paradigm4/r_exec">https://github.com/Paradigm4/r_exec</ulink>.</para>
-        </listitem>
-      </itemizedlist></para>
+  <section>
+    <title>Deprecation Notes</title>
+
+    <para>This section lists important feature changes made in this release
+    and changes forthcoming in future releases. For each change, we also
+    identify in which the release we provided deprecation notice.</para>
+
+    <informaltable>
+      <tgroup cols="4">
+        <colspec colname="_1" colwidth="61*"/>
+
+        <colspec colname="_2" colwidth="15*"/>
+
+        <colspec colname="_3" colwidth="15*"/>
+
+        <colspec colname="_4" colwidth="9*"/>
+
+        <thead>
+          <row>
+            <entry>Functionality Change</entry>
+
+            <entry>Deprecation Notice</entry>
+
+            <entry>Deprecation Effective</entry>
+
+            <entry>Edition</entry>
+          </row>
+
+          <row>
+            <entry align="center" nameend="_4" namest="_1"><emphasis>Changes
+            made in this release (R14.3)</emphasis></entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry>Removed individual aggregate operators:<itemizedlist>
+                <listitem>
+                  <para><command>approxdc()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>avg()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>count()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>max()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>min()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>stdev()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>sum()</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>var()</command></para>
+                </listitem>
+              </itemizedlist>Use <command>aggregate()</command>
+            instead.</entry>
+
+            <entry>13.12</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Removed operator
+            <command>redimension_store()</command>.<para>Use
+            <command>store(redimension())</command> instead.</para></entry>
+
+            <entry>13.12</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Removed operator <command>cross()</command>.<para>Use
+            <command>cross_join()</command> instead.</para></entry>
+
+            <entry>13.12</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>The behavior of the <command>show()</command> operator has
+            changed.<para>Let <emphasis role="bold">A</emphasis> be the name
+            of a stored SciDB array. This syntax is no longer
+            supported:<programlisting>AFL% show('A as array', 'afl');</programlisting>Instead,
+            use the following syntax:<programlisting>AFL% show(filter('A,true)', 'afl');</programlisting></para></entry>
+
+            <entry>14.3</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </informaltable>
+
+    <informaltable>
+      <tgroup cols="3">
+        <colspec colname="_1" colwidth="74*"/>
+
+        <colspec colname="_2" colwidth="15*"/>
+
+        <colspec colname="_4" colwidth="9*"/>
+
+        <thead>
+          <row>
+            <entry>Functionality Change</entry>
+
+            <entry>Deprecation Notice</entry>
+
+            <entry>Edition</entry>
+          </row>
+
+          <row>
+            <entry align="center" nameend="_4" namest="_1"><emphasis>Expected
+            changes in the next release (R14.6)</emphasis></entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry>Will remove the following operators:
+            <command>corr()</command>, <command>covar()</command> and
+            <command>covariance()</command>.<para>Use
+            <command>pearson()</command>, <command>spearman()</command>, or
+            <command>kendall()</command> instead.</para></entry>
+
+            <entry>14.3</entry>
+
+            <entry>EE</entry>
+          </row>
+
+          <row>
+            <entry>Will remove the following operators:
+            <command>euclidean()</command> and
+            <command>manhattan()</command>.<para>Use
+            <command>apply()</command> instead.</para></entry>
+
+            <entry>14.3</entry>
+
+            <entry>EE</entry>
+          </row>
+
+          <row>
+            <entry>Will remove attribute type <command>string_xxx</command>;
+            use the <command>string</command> type.</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Will remove the use of integer data types with the
+            <command>spgemm()</command> operator. </entry>
+
+            <entry>14.3</entry>
+
+            <entry>EE</entry>
+          </row>
+
+          <row>
+            <entry>Will remove the <command>sample()</command>
+            operator.<para>Use <command>bernoulli()</command>
+            instead.</para></entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Will remove the <command>build_sparse()</command>
+            operator.<para>Use a combination of
+            <command>redimension()</command> and <command>build()</command>
+            instead. See the AFL operator reference, <xref linkend="build"/>,
+            for details.</para></entry>
+
+            <entry>13.12</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Will remove the <command>NOT EMPTY</command> constraint in
+            array schemas. All SciDB arrays will be empty-able.</entry>
+
+            <entry>13.11</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Will disallow the use of "impure" operators inside other
+            operators. By impure, we mean operators that have side effects.
+            The following operators fall into this class, and thus should be
+            used only at the top-level of a query.<itemizedlist>
+                <listitem>
+                  <para><command>create_array()</command>,
+                  <command>store()</command>, <command>load()</command>,
+                  <command>input()</command>, <command>rename()</command>,
+                  <command>remove()</command>, and <command>save()</command>,
+                  which modify arrays.</para>
+                </listitem>
+
+                <listitem>
+                  <para><command>load_library()</command>,
+                  <command>unload_library()</command>,
+                  <command>load_module()</command>, and
+                  <command>setopt()</command>, which modify how queries
+                  execute.</para>
+                </listitem>
+              </itemizedlist></entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Will disallow the use of the following parameters in
+            <emphasis role="bold">config.ini</emphasis>:<itemizedlist>
+                <listitem>
+                  <para><command>chunk-segment-size</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>repart-seq-scan-threshold</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>repart-algorithm</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>repart-dense-open-once</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>repart-disable-tile-mode</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>rle-chunk-format</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>parallel-sort</command></para>
+                </listitem>
+
+                <listitem>
+                  <para><command>save-ram</command></para>
+                </listitem>
+              </itemizedlist></entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>Will enforce case sensitivity for all identifiers,
+            including operators, functions, types, attribute names,
+            dimensions, and array names.</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+
+          <row>
+            <entry>The default chunk size will be set to 1 million cells
+            (presently defaults to 500 thousand cells).</entry>
+
+            <entry>14.3</entry>
+
+            <entry>CE</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </informaltable>
   </section>
 
   <section>
@@ -226,7 +480,14 @@
 
         <listitem>
           <para>The difference between the largest and the smallest dimension
-          value in an array must not exceed (2^61 - 1).</para>
+          value in an array must not exceed
+          (2<superscript>61</superscript> - 1).</para>
+        </listitem>
+
+        <listitem>
+          <para>The <command>gemm()</command> and <command>gesvd()</command>
+          operators produce incorrect results when the input matrices are
+          sparse.</para>
         </listitem>
 
         <listitem>
@@ -237,27 +498,16 @@
         </listitem>
 
         <listitem>
-          <para>For operators <command role="bold">gemm()</command> and
-          <command role="bold">gesvd()</command>, the chunks of the input must
-          be square, and must have a chunk interval from 32 to 1024.</para>
-        </listitem>
-
-        <listitem>
-          <para>Whenever a query requires filtering on dimension values, the
-          <command role="bold">filter()</command> operator performs slower
-          than it needs to. In the vast majority of cases, <command
+          <para>Whenever a query requires filtering on dimension values,
+          <command role="bold">filter()</command> may not be the fastest
+          approach. In the vast majority of cases, <command
           role="bold">between()</command>, <command
           role="bold">subarray()</command>, <command
-          role="bold">cross_join()</command>, or a combination of them, will
-          substantially increase performance. For more information about using
-          <command role="bold">cross_join()</command> as a dimensions filter,
-          see the slides at <ulink
+          role="bold">cross_join()</command>, or a combination of them,
+          performs better. For more information about using <command
+          role="bold">cross_join()</command> as a dimensions filter, see
+          <ulink
           url="http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1204">http://www.scidb.org/forum/viewtopic.php?f=18&amp;t=1204</ulink>.</para>
-        </listitem>
-
-        <listitem>
-          <para>Using mixed-case names for databases is not recommended. Use
-          all lowercase names to avoid problems.</para>
         </listitem>
       </itemizedlist></para>
   </section>

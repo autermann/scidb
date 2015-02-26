@@ -68,86 +68,86 @@
     dimensions</emphasis> and<emphasis> attributes</emphasis> of the
     array.</para>
 
-    <para>
-      <emphasis role="bold">Dimensions</emphasis>
-    </para>
+    <section>
+      <title>Dimensions</title>
 
-    <para>An n-dimensional SciDB array has dimensions <emphasis>d1</emphasis>,
-    <emphasis>d2</emphasis>, ..., <emphasis>dn</emphasis>. The
-    <emphasis>size</emphasis> of the dimension is the number of ordered values
-    in that dimension. For example, a 2-dimensional array may have dimensions
-    <emphasis>i</emphasis> and <emphasis>j</emphasis>, each with values (1, 2,
-    3, ..., 10) and (1, 2, ..., 30) respectively.</para>
+      <para>An n-dimensional SciDB array has dimensions
+      <emphasis>d1</emphasis>, <emphasis>d2</emphasis>, ...,
+      <emphasis>dn</emphasis>. Array dimensions are 64-bit integers. The
+      <emphasis>size</emphasis> of the dimension is the number of ordered
+      values in that dimension. For example, a 2-dimensional array may have
+      dimensions <emphasis>i</emphasis> and <emphasis>j</emphasis>, each with
+      values (1, 2, 3, ..., 10) and (1, 2, ..., 30) respectively.</para>
 
-    <para>Basic array dimensions are 64-bit integers.</para>
+      <para>When the total number of values or cardinality of a dimension is
+      known in advance, the SciDB array can be declared with a<emphasis>
+      bounded</emphasis> dimension. However, in many cases, the cardinality of
+      the dimension may not be known at array creation time. In such cases,
+      the SciDB array can be declared with an<emphasis> unbounded</emphasis>
+      dimension.</para>
+    </section>
 
-    <para>When the total number of values or cardinality of a dimension is
-    known in advance, the SciDB array can be declared with a<emphasis>
-    bounded</emphasis> dimension. However, in many cases, the cardinality of
-    the dimension may not be known at array creation time. In such cases, the
-    SciDB array can be declared with an<emphasis> unbounded</emphasis>
-    dimension.</para>
+    <section>
+      <title>Attributes</title>
 
-    <para>
-      <emphasis role="bold">Attributes</emphasis>
-    </para>
+      <para>Each combination of dimension values identifies a cell or element
+      of the array, which can hold multiple data values called attributes
+      (<emphasis>a1</emphasis>, <emphasis>a2</emphasis>, ...,
+      <emphasis>am</emphasis>). Each data value is referred to as an
+      <emphasis>attribute</emphasis>, and belongs to one of the supported
+      datatypes in SciDB.</para>
 
-    <para>Each combination of dimension values identifies a cell or element of
-    the array, which can hold multiple data values called attributes
-    (<emphasis>a1</emphasis>, <emphasis>a2</emphasis>, ...,
-    <emphasis>am</emphasis>). Each data value is referred to as an
-    <emphasis>attribute</emphasis>, and belongs to one of the supported
-    datatypes in SciDB.</para>
+      <para>At array creation time, the user must specify:<itemizedlist>
+          <listitem>
+            <para>An array name.</para>
+          </listitem>
 
-    <para>At array creation time, the user must specify:</para>
+          <listitem>
+            <para>Array dimensions. Dimensions have names, upper and lower
+            bounds, sizes, and overlaps. You must specify the dimension
+            name—all other characteristics are optional, and have default
+            values.</para>
+          </listitem>
 
-    <itemizedlist>
-      <listitem>
-        <para>An array name.</para>
-      </listitem>
+          <listitem>
+            <para>Array attributes. The name and data type of the each
+            attribute must be declared.</para>
+          </listitem>
+        </itemizedlist></para>
 
-      <listitem>
-        <para>Array dimensions. The name and size of each dimension must be
-        declared.</para>
-      </listitem>
+      <para>Once you have created a SciDB database and defined the arrays, you
+      must prepare and load data into it. Loaded data is then available to be
+      accessed and queried using SciDB's built-in analytics
+      capabilities.</para>
+    </section>
 
-      <listitem>
-        <para>Array attributes of the array. The name and data type of the
-        each attribute must be declared.</para>
-      </listitem>
-    </itemizedlist>
+    <section>
+      <title>Array Indexing</title>
 
-    <para>Once you have created a SciDB database and defined the arrays, you
-    must prepare and load data into it. Loaded data is then available to be
-    accessed and queried using SciDB's built-in analytics capabilities.</para>
+      <para><indexterm>
+          <primary>array indexing</primary>
+        </indexterm><indexterm>
+          <primary>indexing</primary>
 
-    <para>
-      <emphasis role="bold">Array Indexing</emphasis>
-    </para>
+          <secondary>of arrays</secondary>
+        </indexterm><indexterm>
+          <primary>data clustering</primary>
+        </indexterm><indexterm>
+          <primary>clustering</primary>
 
-    <para><indexterm>
-        <primary>array indexing</primary>
-      </indexterm><indexterm>
-        <primary>indexing</primary>
+          <secondary>of data</secondary>
+        </indexterm>SciDB uses array indexing—your dimensions are essentially
+      indices. This splits the data into fixed-size chunks. When you need to
+      retrieve data, you specify the coordinates and SciDB can very quickly
+      determine the chunk that contains the requested data. In other
+      databases, this functionality comes at a cost: you need to create an
+      index and maintain it—and the maintenance over time can become very
+      costly, in terms of the need to re-index as the data set grows.</para>
 
-        <secondary>of arrays</secondary>
-      </indexterm><indexterm>
-        <primary>data clustering</primary>
-      </indexterm><indexterm>
-        <primary>clustering</primary>
-
-        <secondary>of data</secondary>
-      </indexterm>SciDB uses array indexing—your dimensions are essentially
-    indices. This splits the data into fixed-size chunks. When you need to
-    retrieve data, you specify the coordinates and SciDB can very quickly
-    determine the chunk that contains the requested data. In other databases,
-    this functionality comes at a cost: you need to create an index and
-    maintain it—and the maintenance over time can become very costly, in terms
-    of the need to re-index as the data set grows.</para>
-
-    <para>Another advantage of SciDB array indexing is that your data is
-    clustered: data that logically belongs together is stored close together
-    on disk.</para>
+      <para>Another advantage of SciDB array indexing is that your data is
+      clustered: data that logically belongs together is stored close together
+      on disk.</para>
+    </section>
   </section>
 
   <section xml:id="InstallingSciDB">
@@ -318,35 +318,92 @@
     is shown in the illustration below.</para>
 
     <figure>
-      <title>Basic SciDB architecture</title>
+      <title>SciDB Shared-Nothing Cluster Architecture</title>
 
       <mediaobject>
         <imageobject>
-          <imagedata align="center" contentdepth="500" depth="300"
-                     fileref="../graphics/scidb_arch.png" scale="80"
-                     valign="top" width="400"/>
+          <imagedata align="left" contentwidth="5.5in"
+                     fileref="../graphics/scidb_arch.png" valign="top"/>
         </imageobject>
       </mediaobject>
     </figure>
 
     <para>SciDB is deployed on a cluster of servers, each with processing,
     memory, and local storage, interconnected using a standard Ethernet and
-    TCP/IP network. Each physical server hosts a SciDB instance that is
-    responsible for local storage and processing.</para>
+    TCP/IP network. Each physical server hosts a SciDB instance (or instances)
+    that is responsible for local storage and processing.</para>
 
     <para>External applications, when they connect to a SciDB database,
     connect to one of the instances in the cluster. While all instances in the
-    SciDB cluster participate in query execution and data storage, one server
-    is the <emphasis>coordinator</emphasis> and orchestrates query execution
-    and result fetching. It is the responsibility of the coordinator instance
-    to mediate all communication between the SciDB external client and the
-    entire SciDB database. The rest of the system instances are referred to as
-    <emphasis>worker</emphasis> instances and work on behalf of the
-    coordinator for query processing.</para>
+    SciDB cluster participate in query execution and data storage, one
+    instance is the <emphasis>coordinator</emphasis> and orchestrates query
+    execution and result fetching. It is the responsibility of the coordinator
+    instance to mediate all communication between the SciDB external client
+    and the entire SciDB cluster. The rest of the system instances are
+    referred to as <emphasis>worker</emphasis> instances and work on behalf of
+    the coordinator for query processing.</para>
 
     <para>SciDB's scale-out architecture is ideally suited for hardware grids
     as well as clouds, where additional severs may be added to scale the total
     capacity.</para>
+
+    <para><indexterm>
+        <primary>architecture</primary>
+      </indexterm><indexterm>
+        <primary>SciDB</primary>
+
+        <secondary>architecture</secondary>
+      </indexterm>The following statements describe relationships between the
+    constituents of a SciDB installation.<itemizedlist>
+        <listitem>
+          <para>A SciDB <emphasis>cluster</emphasis> consists of one or more
+          servers, each of which can host one or more <emphasis>SciDB
+          instances</emphasis>.</para>
+        </listitem>
+
+        <listitem>
+          <para>Each instance has a port number. Each instance has a unique
+          combination of server and port number. (That is, two instances can
+          have the same port number, but only if they are hosted by different
+          servers.)</para>
+        </listitem>
+
+        <listitem>
+          <para>There are two types of instances: <emphasis>coordinator
+          instances</emphasis> and <emphasis>worker instances</emphasis>. A
+          cluster has exactly one coordinator instance, and zero or more
+          worker instances.</para>
+        </listitem>
+
+        <listitem>
+          <para>Note the difference between a server and an instance: the
+          server may contain several instances. The server is a computer (or
+          VM), while the instances areLinux processes.</para>
+        </listitem>
+
+        <listitem>
+          <para>When two or more instances are hosted by the same server, each
+          of those instances requires its own directory to store SciDB
+          database files. In such cases, the directories for different
+          instances may be mounted on different drives.</para>
+        </listitem>
+
+        <listitem>
+          <para>Postgres communicates with all of the instances, but only
+          resides on the coordinator.</para>
+        </listitem>
+
+        <listitem>
+          <para>SciDB supports the following clients: shim (to connect to web
+          browsers), SciDB-R and SciDB-Py (to connect to R and Python,
+          respectively), and iquery. Note that only iquery is described in
+          this guide.</para>
+        </listitem>
+      </itemizedlist></para>
+  </section>
+
+  <section>
+    <title>Chunking</title>
 
     <para><indexterm>
         <primary>chunks</primary>
@@ -356,35 +413,45 @@
     instance of the SciDB database. SciDB uses<emphasis> chunking</emphasis>,
     a partitioning technique for multidimensional arrays where each instance
     is responsible for storing and updating a subset of the array locally, and
-    for executing queries that use the locally stored data. By distributing
-    data uniformly across all instances, SciDB is able to deliver scalable
-    performance on computationally or I/O intensive analytic operations on
-    very large data sets.</para>
+    for executing queries that use the locally stored data.</para>
 
-    <para>The details of chunking are shown in this section. Remember that you
-    do not need to manage chunk distribution beyond specifying chunk
-    size.</para>
+    <para>By distributing data uniformly across all instances, SciDB is able
+    to deliver scalable performance on computationally or I/O intensive
+    analytic operations on very large data sets. SciDB distributes the data
+    automatically—you do not need to manage chunk distribution beyond
+    specifying chunk size.</para>
 
-    <para>Chunking is specified for each array as follows. Each dimension of
-    an array is divided into chunks. For example, an array with dimensions
-    <literal>i</literal> and <literal>j</literal>, where <literal>i</literal>
-    is of length 10 and chunk size 5 and <literal>j</literal> is of length 30
-    and chunk size 10 would be chunked as follows:<figure>
-        <title>Chunking diagram</title>
+    <para>Data is split into regular, rectilinear chunks, and distributed
+    between instances. In this diagram, we assume a 4-instance cluster, and
+    the numbers represent the instances, from 0 to 3.<mediaobject>
+        <imageobject>
+          <imagedata align="center" contentwidth="2.5in"
+                     fileref="../graphics/chunks.png" valign="top"/>
+        </imageobject>
+      </mediaobject></para>
 
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentwidth="304" depth="300"
-                       fileref="../graphics/chunked_dimensions.png"
-                       valign="top"/>
-          </imageobject>
-        </mediaobject>
-      </figure></para>
+    <para>Chunking data in this way has several advantages:<itemizedlist>
+        <listitem>
+          <para>Data that are close together are stored close together.</para>
+        </listitem>
 
-    <para>Chunks are stored allocated to instances of the SciDB cluster
-    according to a hash-based scheme. Additionally, you can specify a
-    <emphasis>chunk overlap</emphasis>. SciDB then stores some cells in
-    neighboring chunks. For details, see <xref
+        <listitem>
+          <para>Coordinates are implied, and thus do not need to be
+          stored.</para>
+        </listitem>
+
+        <listitem>
+          <para>You get a light-weight indexing method for free.</para>
+        </listitem>
+
+        <listitem>
+          <para>For linear algebra and multi-dimensional windowing operations,
+          this mechanism provides good performance.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>Additionally, you can specify a <emphasis>chunk overlap</emphasis>.
+    SciDB then stores some cells in neighboring chunks. For details, see <xref
     linkend="ChunkOverlap"/>.</para>
   </section>
 
@@ -429,6 +496,36 @@
 
         <varlistentry>
           <term>
+            <emphasis>Storage of arrays</emphasis>
+          </term>
+
+          <listitem>
+            <para><indexterm>
+                <primary>array files</primary>
+              </indexterm><indexterm>
+                <primary>arrays</primary>
+
+                <secondary>storage</secondary>
+              </indexterm><indexterm>
+                <primary>storage</primary>
+
+                <secondary>arrays</secondary>
+              </indexterm>SciDB stores arrays into individual files. Each
+            instance contains a <emphasis role="bold">datastore</emphasis>
+            folder. For each array, SciDB creates one file (per instance),
+            using the array ID as the file name. As chunks are added to the
+            array, the system file grows accordingly. Also, each time the
+            system writes to an array, new versions are created, and each
+            version consumes some amount of disk space. If the array is
+            deleted, the system file is removed, and all the space is
+            returned. Empty space can creep into the data files if a
+            transaction is canceled, but SciDB keeps metadata that allows for
+            reuse of this space.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <emphasis>Storage of array versions</emphasis>
           </term>
 
@@ -441,41 +538,7 @@
                 <secondary>versions</secondary>
               </indexterm>SciDB uses a "no overwrite" storage model. No
             overwrite means that data is never overwritten; each query that
-            stores or updates existing arrays writes a new full chunk or a new
-            <emphasis>delta chunk</emphasis>. Delta chunks are calculated by
-            differencing the new version with the prior version and only
-            storing the difference. The SciDB storage manager stores "reverse"
-            deltas—this means that the most recent version is maintained as a
-            full chunk, and prior versions are maintained as a list or chain
-            of reverse deltas. The delta chain is stored in the "reserve"
-            portion of each chunk, an additional area over and above the total
-            size of the chunk. If the reserve area for the chunk fills up, a
-            new chunk is allocated within the same segment or a new segment
-            and linked into the delta chain.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <emphasis>Storage segments</emphasis>
-          </term>
-
-          <listitem>
-            <para><indexterm>
-                <primary>storage segments</primary>
-              </indexterm>The local storage manager manages space allocation,
-            placement, and reclamation within the local storage manager using
-            <emphasis>segments</emphasis>. A storage segment is a contiguous
-            portion of the storage file reserved for successive chunks of the
-            same array. This is designed to optimize queries issued on a very
-            large array to use sequential disk I/O and hence maximize the rate
-            of data transfer during a query.</para>
-
-            <para>Segments also serve as the unit of storage reclaim, so that
-            as array chunks are created, written, and ultimately removed, a
-            segment is reclaimed and reallocated for new chunks or arrays once
-            all its member chunks have been removed. This allows for reuse of
-            storage space.</para>
+            stores or updates existing arrays writes a new full chunk.</para>
           </listitem>
         </varlistentry>
 
@@ -491,9 +554,9 @@
             during query execution. This is specified during initialization
             and start-up as the <literal>tmp-path</literal> configuration
             setting. Temporary files are managed using the operating system's
-            <emphasis>tempfile</emphasis> mechanism. Data written to tempfile
-            only last for the lifetime of a query. They are removed upon
-            successful completion or abort of the query.</para>
+            <emphasis>temp_file</emphasis> mechanism. Data written to the
+            temporary file lasts only for the lifetime of a query. It is
+            removed upon successful completion or abort of the query.</para>
           </listitem>
         </varlistentry>
       </variablelist>
@@ -719,280 +782,5 @@
     protocol. Once connected via the connector, the user may issue queries
     written in either AFL or AQL, and fetch the result of a query using an
     iterator interface.</para>
-  </section>
-
-  <section xml:id="DataModelInstall">
-    <title>Visualizing a Completed SciDB Installation</title>
-
-    <para><indexterm>
-        <primary>architecture</primary>
-      </indexterm><indexterm>
-        <primary>SciDB</primary>
-
-        <secondary>architecture</secondary>
-      </indexterm>This section describes the pieces of a completed SciDB
-    installation.</para>
-
-    <section xml:id="DM_IC">
-      <title>The SciDB Installation and Its Clusters</title>
-
-      <para>The chapter describes the process for creating one SciDB
-      Installation, which consists of one or more SciDB clusters. The
-      following conceptual data model diagram expresses this
-      graphically.</para>
-
-      <figure>
-        <title>SciDB Cluster</title>
-
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="100"
-                       fileref="../graphics/dm_InstallationHasClusters.png"
-                       scale="30" valign="top" width="400"/>
-          </imageobject>
-        </mediaobject>
-      </figure>
-
-      <para>The figure asserts the following: There are SciDB installations.
-      Each SciDB installation has an arbitrary ID and SciDB clusters. There
-      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
-      and belongs to one SciDB installation. Within any SciDB installation,
-      Each SciDB cluster name is unique.</para>
-
-      <note>
-        <para>The data models shown in this chapter are purely conceptual.
-        They do not describe any physical data characteristics or connote any
-        particular meta-model such as relational, object-oriented, etc. For a
-        complete description of this notation, see Mastering Data Modeling: A
-        User-Driver Approach by John Carlis et al. (Addison-Wesley,
-        2001)</para>
-      </note>
-    </section>
-
-    <section xml:id="DM_CSI">
-      <title>The SciDB Cluster, Servers, and Instances</title>
-
-      <para><indexterm>
-          <primary>cluster</primary>
-        </indexterm><indexterm>
-          <primary>SciDB</primary>
-
-          <secondary>cluster</secondary>
-        </indexterm>Each SciDB cluster consists of one or more servers, each
-      of which can host one or more server instances.</para>
-
-      <para>Like this:</para>
-
-      <figure>
-        <title>SciDB Servers and Instances</title>
-
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="350"
-                       fileref="../graphics/dm_clusterHasServerHasInstance.png"
-                       scale="30" valign="top" width="400"/>
-          </imageobject>
-        </mediaobject>
-      </figure>
-
-      <para>The figure asserts the following: There are SciDB installations.
-      Each SciDB installation has an arbitrary ID and SciDB clusters. There
-      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
-      and belongs to one SciDB Installation. Within any SciDB installation,
-      each SciDB cluster name is unique. There are servers. Each server has an
-      IP address, belongs to one SciDB cluster, and can host multiple
-      instances. There are instances. <indexterm class="startofrange"
-          id="portnumbers">
-          <primary>port numbers</primary>
-        </indexterm>Each instance is hosted by one server. Each instance has a
-      port number. Each instance has a unique combination of server and port
-      number. (That is, two instances can have the same port number, but only
-      if they are hosted by different servers.)</para>
-    </section>
-
-    <section xml:id="DM_CI_WI">
-      <title>The Coordinator Instance and Worker Instances</title>
-
-      <para>Every instance is either a coordinator instance, a worker
-      instance, or both. Each SciDB cluster will have exactly one coordinator
-      instance.</para>
-
-      <para>Like this:</para>
-
-      <figure>
-        <title>SciDB Instances: Coordinator and Workers</title>
-
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="400"
-                       fileref="../graphics/dm_instanceBeCoordinatorOrWorker.png"
-                       scale="30" valign="top" width="400"/>
-          </imageobject>
-        </mediaobject>
-      </figure>
-
-      <note>
-        <para>A worker instance can also serve as the coordinator instance.
-        Such an instance is typically referred to as the coordinator instance,
-        but it can share in the workload of SciDB queries like any other
-        worker instance.</para>
-      </note>
-
-      <para>The figure asserts the following: There are SciDB installations.
-      Each SciDB installation has an arbitrary ID and SciDB clusters. There
-      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
-      and belongs to one SciDB installation. Within any SciDB installation,
-      each SciDB cluster name is unique. There are servers. Each server has an
-      IP address, belongs to one SciDB cluster, and can host multiple
-      instances. There are instances. Each instance is hosted by one server.
-      Each instance has a port number. Each instance has a unique combination
-      of server and port number. (That is, two instances can have the same
-      port number, but only if they are hosted by different servers.) An
-      instance can be a coordinator instance, a worker instance, or both.
-      Every coordinator instance is an instance. Every worker instance is an
-      instance. Each coordinator instance coordinates the work of one SciDB
-      cluster, and each SciDB cluster can be coordinated by one coordinator
-      instance.</para>
-    </section>
-
-    <section xml:id="DM_CS_WS">
-      <title>The Coordinator Server and Worker Servers</title>
-
-      <para><indexterm>
-          <primary>coordinator server</primary>
-        </indexterm><indexterm>
-          <primary>instances</primary>
-
-          <secondary>worker</secondary>
-        </indexterm><indexterm>
-          <primary>worker server</primary>
-        </indexterm>Whichever server hosts the coordinator instance is known
-      as the coordinator server. The other servers as known as worker servers.
-      In most contexts, the distinction between the coordinator server and
-      worker servers is immaterial, and they are collectively known as
-      servers. The installation instructions in this chapter direct you to
-      install Postgres on the coordinator server. Although the coordinator
-      server must host the coordinator instance, it can also host other
-      (worker) instances.</para>
-
-      <para>Like this:</para>
-
-      <figure>
-        <title>SciDB Servers: Coordinator and Workers</title>
-
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="400"
-                       fileref="../graphics/dm_serverBeCoordinatorOrWorker.png"
-                       scale="30" valign="top" width="400"/>
-          </imageobject>
-        </mediaobject>
-      </figure>
-
-      <para>The figure asserts the following: There are SciDB installations.
-      Each SciDB installation has an arbitrary ID and SciDB clusters. There
-      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
-      and belongs to one SciDB installation. Within any SciDB installation,
-      each SciDB cluster name is unique. There are servers. Each server has an
-      IP address, belongs to one SciDB cluster, and can host multiple
-      instances. There are instances. Each instance is hosted by one server.
-      Each instance has a port number. Each instance has a unique combination
-      of server and port number. (That is, two instances can have the same
-      port number, but only if they are hosted by different servers.) An
-      instance can be a coordinator instance, a worker instance, or both. Each
-      coordinator instance coordinates the work of one SciDB cluster, and each
-      SciDB cluster can be coordinated by one coordinator instance. A server
-      can be a coordinator server or a worker server. The coordinator server
-      hosts the coordinator instance (and because every coordinator instance
-      is an instance, might also host other instances). The coordinator server
-      will ultimately host the Postgres installation.</para>
-    </section>
-
-    <section xml:id="DM_DP_D">
-      <title>Disk Partitions and Directories</title>
-
-      <para><indexterm>
-          <primary>partitions</primary>
-        </indexterm><indexterm>
-          <primary>disk partitions</primary>
-        </indexterm>When two or more instances are hosted by the same server,
-      each of those instances requires its own directory to store SciDB
-      database files. Those directories could be on the same disk
-      partition.</para>
-
-      <para>Like this:</para>
-
-      <figure>
-        <title>Disk Partitions and Directories</title>
-
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="350"
-                       fileref="../graphics/dm_disksAndPartitions.png"
-                       scale="30" valign="top" width="400"/>
-          </imageobject>
-        </mediaobject>
-      </figure>
-
-      <para>The figure asserts the following: There are SciDB installations.
-      Each SciDB installation has an arbitrary ID and SciDB clusters. There
-      are SciDB clusters. Each SciDB cluster has a cluster name, a base path,
-      and belongs to one SciDB installation. Within any SciDB installation,
-      each SciDB cluster name is unique. There are servers. Each server has an
-      IP address, belongs to one SciDB cluster, and can host multiple
-      instances. There are instances. Each instance is hosted by one server.
-      <indexterm class="endofrange" startref="portnumbers">
-          <primary>port numbers</primary>
-        </indexterm>Each instance has a port number. Each instance has a
-      unique combination of server and port number. (That is, two instances
-      can have the same port number, but only if they are hosted by different
-      servers.) There are disk partitions. Each disk partition belongs to one
-      server, and has a unique mount point and can have multiple directories.
-      Each directory in on one disk partition, has a directory name, and can
-      contain data for exactly one instance. Each instance stores its SciDB
-      data on one directory.</para>
-    </section>
-
-    <section xml:id="DM_Complete">
-      <title>Complete SciDB Installation</title>
-
-      <para>The complete data model described in the preceding sections is
-      shown below. The model can help you visualize important distinctions
-      that arise during the installation process. For example, some steps of
-      the installation apply to all servers, whereas others apply only to the
-      coordinator server. Likewise, some steps apply only to the coordinator
-      instance, whereas other steps apply to all instances.</para>
-
-      <para>The complete model is here:</para>
-
-      <figure>
-        <title>SciDB Installation</title>
-
-        <mediaobject>
-          <imageobject>
-            <imagedata align="center" contentdepth="500" contentwidth="400"
-                       depth="400" fileref="../graphics/dm_installFull.png"
-                       scale="30" valign="top" width="400"/>
-          </imageobject>
-        </mediaobject>
-      </figure>
-
-      <?dbfo-need height="1.5in" ?>
-
-      <note>
-        <para>Remember, this is merely a conceptual model to help you
-        understand the building blocks of the installation process. It is a
-        conceptual model—not intended to connote any physical data layout or
-        any particular meta-model such as relational or object-oriented. For
-        that matter, it presents a somewhat simplified view of a SciDB
-        configuration, which is all you need to begin the installation
-        process.</para>
-      </note>
-    </section>
   </section>
 </chapter>

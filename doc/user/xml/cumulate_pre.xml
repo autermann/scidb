@@ -96,9 +96,8 @@
         </step>
 
         <step>
-          <para>Calculate the last aggregate for the first attribute, along
-          the first dimension.<programlisting language="test">--afl load_library('linear_algebra'); --show-query=no --show-output=no
---afl cumulate(B,last_value(val1)); --output-format=dense --chunkify=yes</programlisting></para>
+          <para>Calculate the variance for the first attribute, along the
+          first dimension.<programlisting language="test">--afl cumulate(B,var(val1)); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
       </procedure>
     </informalexample>

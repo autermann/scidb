@@ -20,7 +20,7 @@ SCIDB QUERY : <scan(normal1)>
 {3} 27,6.291
 {4} 20.25,4.71825
 
-SCIDB QUERY : <redimension_store(normal1,NID)>
+SCIDB QUERY : <store(redimension(normal1,NID),NID)>
 {a1,a2} x
 {20.25,4.71825} 4
 {27,6.291} 3
@@ -36,7 +36,7 @@ SCIDB QUERY : <scan(NID)>
 {81,18.873} 1
 {inf,inf} 0
 
-SCIDB QUERY : <redimension_store(reverse(normal1),NID)>
+SCIDB QUERY : <store(redimension(reverse(normal1),NID),NID)>
 {a1,a2} x
 {20.25,4.71825} 0
 {27,6.291} 1
@@ -79,7 +79,7 @@ SCIDB QUERY : <xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)>
 {4,2} inf
 {5,2} inf
 
-SCIDB QUERY : <cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1))>
+SCIDB QUERY : <cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1))>
 {a1,a2,a1,a2} x,z_sum
 {20.25,4.71825,0,0} 0,11.0093
 {20.25,4.71825,1,0} 0,11.0093
@@ -112,7 +112,7 @@ SCIDB QUERY : <cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,
 {inf,inf,4,2} 4,inf
 {inf,inf,5,2} 4,inf
 
-SCIDB QUERY : <store(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),AAA)>
+SCIDB QUERY : <store(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),AAA)>
 {a1,a2,a1_2,a2_2} x,z_sum
 {20.25,4.71825,0,0} 0,11.0093
 {20.25,4.71825,1,0} 0,11.0093
@@ -149,7 +149,7 @@ SCIDB QUERY : <show(AAA)>
 {i} schema
 {0} 'AAA<x:int64,z_sum:double NULL DEFAULT null> [a1(double)=5,5,0,a2(double)=5,5,0,a1_2=0:5,10,0,a2_2=0:2,5,0]'
 
-SCIDB QUERY : <project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum)>
+SCIDB QUERY : <project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum)>
 {a1,a2,a1,a2} x,z_sum
 {20.25,4.71825,0,0} 0,11.0093
 {20.25,4.71825,1,0} 0,11.0093
@@ -182,7 +182,7 @@ SCIDB QUERY : <project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,su
 {inf,inf,4,2} 4,inf
 {inf,inf,5,2} 4,inf
 
-SCIDB QUERY : <between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2)>
+SCIDB QUERY : <between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2)>
 {a1,a2,a1,a2} x,z_sum
 {20.25,4.71825,0,0} 0,11.0093
 {20.25,4.71825,1,0} 0,11.0093
@@ -191,7 +191,7 @@ SCIDB QUERY : <between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2
 {27,6.291,1,0} 1,11.0093
 {27,6.291,2,1} 1,28.3095
 
-SCIDB QUERY : <subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2)>
+SCIDB QUERY : <subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2)>
 {a1,a2,a1,a2} x,z_sum
 {20.25,4.71825,0,0} 0,11.0093
 {20.25,4.71825,1,0} 0,11.0093
@@ -200,7 +200,7 @@ SCIDB QUERY : <subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y
 {27,6.291,1,0} 1,11.0093
 {27,6.291,2,1} 1,28.3095
 
-SCIDB QUERY : <store(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),TTT)>
+SCIDB QUERY : <store(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),TTT)>
 {a1,a2,a1_2,a2_2} x,z_sum
 {20.25,4.71825,0,0} 0,11.0093
 {20.25,4.71825,1,0} 0,11.0093
@@ -213,11 +213,11 @@ SCIDB QUERY : <show(TTT)>
 {i} schema
 {0} 'TTT<x:int64,z_sum:double NULL DEFAULT null> [a1(double)=2,5,0,a2(double)=2,5,0,a1_2=0:2,10,0,a2_2=0:2,5,0]'
 
-SCIDB QUERY : <count(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i))>
+SCIDB QUERY : <count(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i))>
 {i} count
 {0} 6
 
-SCIDB QUERY : <unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i)>
+SCIDB QUERY : <unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i)>
 {i} a1,a2,a1,a2,x,z_sum
 {0} 20.25,4.71825,0,0,0,11.0093
 {1} 20.25,4.71825,1,0,0,11.0093
@@ -226,7 +226,7 @@ SCIDB QUERY : <unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(appl
 {4} 27,6.291,1,0,1,11.0093
 {5} 27,6.291,2,1,1,28.3095
 
-SCIDB QUERY : <store(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i),VVV)>
+SCIDB QUERY : <store(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i),VVV)>
 {i} a1,a2,a1_2,a2_2,x,z_sum
 {0} 20.25,4.71825,0,0,0,11.0093
 {1} 20.25,4.71825,1,0,0,11.0093
@@ -239,15 +239,15 @@ SCIDB QUERY : <show(VVV)>
 {i} schema
 {0} 'VVV<a1:double,a2:double,a1_2:int64,a2_2:int64,x:int64,z_sum:double NULL DEFAULT null> [i=0:*,36,0]'
 
-SCIDB QUERY : <filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i>4)>
+SCIDB QUERY : <filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i>4)>
 {i} a1,a2,a1,a2,x,z_sum
 {5} 27,6.291,2,1,1,28.3095
 
-SCIDB QUERY : <filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3)>
+SCIDB QUERY : <filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3)>
 {i} a1,a2,a1,a2,x,z_sum
 {3} 27,6.291,0,0,1,11.0093
 
-SCIDB QUERY : <store(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),MMM)>
+SCIDB QUERY : <store(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),MMM)>
 {i} a1,a2,a1_2,a2_2,x,z_sum
 {3} 27,6.291,0,0,1,11.0093
 
@@ -283,19 +283,19 @@ SCIDB QUERY : <project(MMM,z_sum)>
 {i} z_sum
 {3} 11.0093
 
-SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),z_sum)>
+SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),z_sum)>
 {i} z_sum
 {3} 11.0093
 
-SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),x)>
+SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),x)>
 {i} x
 {3} 1
 
-SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)>
-[An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE.]
+SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)>
+[An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE.]
 
-SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)>
-[An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
+SCIDB QUERY : <project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)>
+[An error expected at this place for the query "project(filter(unpack(subarray(between(project(cross_join(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i=3),a1_2)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]
 
 SCIDB QUERY : <remove(normal)>
 Query was executed successfully

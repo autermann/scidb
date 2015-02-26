@@ -198,10 +198,10 @@ SCIDB QUERY : <project(filter(Test1, x<>3),b,a)>
 SCIDB QUERY : <project(substitute(Test1,build(<a:double> [x=0:1,2,0], iif( x = 0, 20, 30))),b,a)>
 {x} b,a
 
-SCIDB QUERY : <project(redimension_store(build(Test2,x*3.9),Test3),y)>
-[An error expected at this place for the query "project(redimension_store(build(Test2,x*3.9),Test3),y)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED.]
+SCIDB QUERY : <project(store(redimension(build(Test2,x*3.9),Test3),Test3),y)>
+[An error expected at this place for the query "project(store(redimension(build(Test2,x*3.9),Test3),Test3),y)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_NESTING_PROHIBITED.]
 
-SCIDB QUERY : <redimension_store(build(Test2,x*3.9),Test3)>
+SCIDB QUERY : <store(redimension(build(Test2,x*3.9),Test3),Test3)>
 {a} y
 {3.9} 1
 {7.8} 1
@@ -211,7 +211,7 @@ SCIDB QUERY : <project(Test3,y)>
 {3.9} 1
 {7.8} 1
 
-SCIDB QUERY : <redimension_store(Test2,Test3)>
+SCIDB QUERY : <store(redimension(Test2,Test3),Test3)>
 {a} y
 
 SCIDB QUERY : <project(Test3,y)>

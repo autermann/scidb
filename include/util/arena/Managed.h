@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -68,10 +68,10 @@ namespace scidb
     using            base_type::operator=;                                     \
                                                                                \
  public:                                                                       \
-    C(const C& c)                         : base_type(c,c.get_allocator()) {}  \
-    C(const C& c,const allocator_type& a) : base_type(c,a)                 {}  \
-    C(BOOST_RV_REF(C) c)                  : base_type(c)                   {}  \
-    C(BOOST_RV_REF(C) c,const allocator_type& a): base_type(c,a)           {}
+    C(const        C& c)                         : base_type(c,c.get_allocator()){}\
+    C(const        C& c,const allocator_type& a) : base_type(c,a)                {}\
+    C(BOOST_RV_REF(C) c)                         : base_type(c,c.get_allocator()){}\
+    C(BOOST_RV_REF(C) c,const allocator_type& a) : base_type(c,a)                {}
 
 /**
  *  Expands to the standard container boilerplate needed to implement an arena-

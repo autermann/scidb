@@ -128,6 +128,18 @@ Query was executed successfully
 SCIDB QUERY : <store(build(various, iif(x%10 = 0, null, (x%100)*1.0/20)), various)>
 [Query was executed successfully, ignoring data output by this query.]
 
+SCIDB QUERY : <create array strings <val:string null> [x=1:10000,1000,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(build(strings, iif(x%1234=0, '', iif(x%5678=0, string(null), string(x)))), strings)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array strings2 <val:string> [i=0:20999,1000,0]>
+Query was executed successfully
+
+SCIDB QUERY : <store(project(apply(build(strings2, '[(|VPS13A-AS1|),(|UBE2Q2P3|),(|UBE2Q2P2|),(|HMGB1P1|),(|TIMM23B|),(|MOXD2P|),(|LOC155060|),(|RNU12-2P|),(|SSX9|),(|SSX9|)]', true), correction, iif(i=9,'',val)),correction), strings2)>
+[Query was executed successfully, ignoring data output by this query.]
+
 SCIDB QUERY : <uniq(empty_2, 'foobar')>
 [An error expected at this place for the query "uniq(empty_2, 'foobar')". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_UNRECOGNIZED_PARAMETER. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_UNRECOGNIZED_PARAMETER.]
 
@@ -460,6 +472,42 @@ SCIDB QUERY : <uniq(sort(various), 'chunk_size=17')>
 {88} 4.9
 {89} 4.95
 
+SCIDB QUERY : <between(uniq(sort(strings)),0,19)>
+{i} val
+{0} ''
+{1} '1'
+{2} '10'
+{3} '100'
+{4} '1000'
+{5} '10000'
+{6} '1001'
+{7} '1002'
+{8} '1003'
+{9} '1004'
+{10} '1005'
+{11} '1006'
+{12} '1007'
+{13} '1008'
+{14} '1009'
+{15} '101'
+{16} '1010'
+{17} '1011'
+{18} '1012'
+{19} '1013'
+
+SCIDB QUERY : <uniq(sort(strings2))>
+{i} val
+{0} ''
+{1} '|HMGB1P1|'
+{2} '|LOC155060|'
+{3} '|MOXD2P|'
+{4} '|RNU12-2P|'
+{5} '|SSX9|'
+{6} '|TIMM23B|'
+{7} '|UBE2Q2P2|'
+{8} '|UBE2Q2P3|'
+{9} '|VPS13A-AS1|'
+
 SCIDB QUERY : <remove(empty_1)>
 Query was executed successfully
 
@@ -479,5 +527,11 @@ SCIDB QUERY : <remove(nulls)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(various)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(strings)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(strings2)>
 Query was executed successfully
 

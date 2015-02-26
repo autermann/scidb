@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -418,7 +418,7 @@ bool fastDenseBinary<BinaryOr, bool, bool, bool>(size_t length, const char* p1, 
  * This template is for binary function for types with fixed size.
  * This function cannot preserve RLE structure.
  * Arguments of this function should be extracted using the same empty bitmask.
- * In other words they should be alligned during unpack.
+ * In other words they should be aligned during unpack.
  */
 template<template <typename T1, typename T2, typename TR> class O, typename T1, typename T2, typename TR>
 void rle_binary_func(const Value** args, Value* result, void*)
@@ -429,7 +429,11 @@ void rle_binary_func(const Value** args, Value* result, void*)
     res.getTile()->clear();
     boost::shared_ptr<std::vector<char> > varPart(new std::vector<char>());
 
-    if (v1.getTile()->nSegments() == 0 ||  v2.getTile()->nSegments() == 0) {
+    if (v1.getTile()->count() == 0 ||
+        v1.getTile()->nSegments() == 0 ||
+        v2.getTile()->count() == 0 ||
+        v2.getTile()->nSegments() == 0) {
+
         res.getTile()->flush(0);
         return;
     }
@@ -443,18 +447,18 @@ void rle_binary_func(const Value** args, Value* result, void*)
     uint64_t chunkSize = 0;
 
     if (ps1_length == INFINITE_LENGTH) {
-        // v1 is constant with infinity length. Allign it pPosition to v2
+        // v1 is constant with infinity length. Align it pPosition to v2
         ps1._pPosition = ps2._pPosition;
     } else {
         if (ps2_length == INFINITE_LENGTH) {
-            // v2 is constant with infinity length. Allign it pPosition to v1
+            // v2 is constant with infinity length. Align it pPosition to v1
             ps2._pPosition = ps1._pPosition;
         }
     }
 
     while (true)
     {
-        // At this point ps1 and ps2 should alligned
+        // At this point ps1 and ps2 should aligned
         // Segment with less length will be iterated and with more length cut at the end of loop
         assert(ps1._pPosition == ps2._pPosition);
         const uint64_t length = std::min(ps1_length, ps2_length);
@@ -682,6 +686,24 @@ public:
     }
 };
 
+template<typename T> inline
+bool isNanValue(T value)
+{
+    return false;
+}
+
+template<> inline
+bool isNanValue<double>(double value)
+{
+    return isnan(value);
+}
+
+template<> inline
+bool isNanValue<float>(float value)
+{
+    return isnan(value);
+}
+
 template <typename TS, typename TSR>
 class AggMin
 {
@@ -901,84 +923,6 @@ public:
         return true;
     }
 };
-
-/**
- * Template for implementation of tile->scalar functions
- * @param A is aggregator class.
- * @param T is typename which is processed by function.
- * @param TR is a type of result aggregation.
- * @param result must be clear for the first call. Next calls will add new result to it.
- */
-template<template <typename TS, typename TSR> class A, typename T, typename TR>
-void rle_tile_to_scalar(const Value** args, Value* result, void* state)
-{
-    const RLEPayload* vTile = args[0]->getTile();
-    A<T, TR> accumulator;
-    bool isNull = true;
-    size_t i = 0;
-    RLEPayload* rTile =  result->getTile();
-    const bool firstCall = rTile->nSegments() == 0;
-    if (firstCall) {
-        // This first loop initialize the first value and process other values of segment except the first.
-        for (; i < vTile->nSegments(); i++)
-        {
-            const RLEPayload::Segment& v = vTile->getSegment(i);
-            if (!v._null) {
-                accumulator.init(getPayloadValue<T>(vTile, v._valueIndex));
-                if (v._same) {
-                    if (v.length() > 1) {
-                        accumulator.multAggregate(getPayloadValue<T>(vTile, v._valueIndex), v.length() - 1);
-                    }
-                } else {
-                    const size_t end = v._valueIndex + v.length();
-                    for (size_t j = v._valueIndex + 1; j < end; j++) {
-                        accumulator.aggregate(getPayloadValue<T>(vTile, j));
-                    }
-                }
-                isNull = false;
-                i++;
-                break;
-            }
-        }
-    } else {
-        accumulator.state = *static_cast< typename A<T, TR>::State* >(state);
-    }
-
-    // Process other segments
-    if (!isNull || !firstCall) {
-        for (; i < vTile->nSegments(); i++)
-        {
-            const RLEPayload::Segment& v = vTile->getSegment(i);
-            if (v._null)
-                continue;
-            isNull = false;
-            if (v._same) {
-                accumulator.multAggregate(getPayloadValue<T>(vTile, v._valueIndex), v.length());
-            } else {
-                const size_t end = v._valueIndex + v.length();
-                for (size_t j = v._valueIndex; j < end; j++) {
-                    accumulator.aggregate(getPayloadValue<T>(vTile, j));
-                }
-            }
-        }
-    }
-
-    if (firstCall) {
-        RLEPayload::Segment r;
-        r._null = isNull;
-        r._pPosition = 0;
-        r._same = true;
-        r._valueIndex = 0;
-        rTile->addSegment(r);
-        addPayloadValues<TR>(rTile, 1);
-        rTile->flush(1);
-    }
-    if (!isNull) {
-        const_cast<ConstRLEPayload::Segment&>(rTile->getSegment(0))._null = false;
-        setPayloadValue<TR>(rTile, 0, accumulator.final());
-    }
-    *static_cast< typename A<T, TR>::State* >(state) = accumulator.state;
-}
 
 }
 

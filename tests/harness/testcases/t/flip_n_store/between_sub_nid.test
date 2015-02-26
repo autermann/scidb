@@ -10,7 +10,7 @@ store(apply(apply(build(A,13.5*6/x),a2,a1*5.72),a3,a2*0.5),A_derivative)
 
 --test
 scan(A_derivative)
-redimension_store(A_derivative,NID)
+store(redimension(A_derivative,NID),NID)
 show(NID)
 scan(NID)
 unpack(NID,i)
@@ -43,7 +43,7 @@ show(AAA)
 
 join(AAA,AAA)
 join(NID,AAA)
-cross(NID,AAA)
+cross_join(NID,AAA)
 cross_join(NID,AAA)
 
 

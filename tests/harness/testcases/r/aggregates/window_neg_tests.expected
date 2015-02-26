@@ -97,7 +97,7 @@ SCIDB QUERY : <store(build_sparse( A1, x+10*y, x <> y ), A1 )>
 {9,7} 79
 {9,8} 89
 
-SCIDB QUERY : <redimension_store  ( A1, A2 )>
+SCIDB QUERY : <store(redimension( A1, A2 ), A2 )>
 {x,y} v
 {0,1} 10
 {0,2} 20

@@ -10,16 +10,16 @@ store(build_sparse(A,x*y+100,x<>1),A)
 store(build_sparse(B,x*y+10,x<>2),A)
 
 --test
-cross(A,B)
-count(cross(A,B))
-cross(B,A)
-count(cross(B,A))
+cross_join(A,B)
+aggregate(cross_join(A,B),count(*))
+cross_join(B,A)
+aggregate(cross_join(B,A),count(*))
 --aql select * into C from A where x=2 or x=3
 show(C)
-cross(A,C)
-count(cross(A,C))
-cross(C,A)
-count(cross(C,A))
+cross_join(A,C)
+aggregate(cross_join(A,C),count(*))
+cross_join(C,A)
+aggregate(cross_join(C,A),count(*))
 
 
 --cleanup

@@ -72,7 +72,7 @@
         </step>
 
         <step>
-          <para>Find the average value along the dimension j:<para><programlisting>AFL% avg(avg_array,val,j);</programlisting><screen>{i} val_avg
+          <para>Find the average value along the dimension j:<para><programlisting>AFL% aggregate(avg_array,avg(val),j);</programlisting><screen>{j} val_avg
 {0} 6
 {1} 7
 {2} 8

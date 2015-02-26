@@ -9,8 +9,8 @@ show(A2)
 
 
 --test
-ApproxDC(A1)
-ApproxDC(A2)
+aggregate(A1,approxdc(val1))
+aggregate(A2,approxdc(val1))
 
 aggregate(A2,ApproxDC(val1))
 aggregate(A2,ApproxDC(val2))

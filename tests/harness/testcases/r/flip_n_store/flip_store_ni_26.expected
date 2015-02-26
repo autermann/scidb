@@ -16,13 +16,13 @@ SCIDB QUERY : <store(join(build_sparse(T,x+1+0.05,1),build_sparse(T,x+5+0.08,1))
 {1} 2.05,6.08
 {2} 3.05,7.08
 
-SCIDB QUERY : <redimension_store(A,B)>
+SCIDB QUERY : <store(redimension(A,B),B)>
 a,b
 0,5.08
 1,6.08
 2,7.08
 
-SCIDB QUERY : <redimension_store(B,C)>
+SCIDB QUERY : <store(redimension(B,C),C)>
 b,a
 0,1.05
 1,2.05
@@ -136,7 +136,7 @@ a,b,b
 1,6.08,6.08
 2,7.08,7.08
 
-SCIDB QUERY : <cross(B1,B1)>
+SCIDB QUERY : <cross_join(B1,B1)>
 a,a,b,b
 0,0,5.08,5.08
 0,1,5.08,6.08
@@ -278,7 +278,7 @@ b,a,a
 1,2.05,2.05
 2,3.05,3.05
 
-SCIDB QUERY : <cross(C1,C1)>
+SCIDB QUERY : <cross_join(C1,C1)>
 b,b,a,a
 0,0,1.05,1.05
 0,1,1.05,2.05

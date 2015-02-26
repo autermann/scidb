@@ -6,7 +6,7 @@ load(vector3, '../tests/harness/testcases/data/vector3.txt')
 
 --test
 
---aql select * from vector3 A join vector3 B on true
+--aql select * from vector3 as A join vector3 as B on true
 
 --cleanup
 remove(vector3)

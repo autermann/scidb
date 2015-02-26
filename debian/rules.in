@@ -8,7 +8,7 @@ BUILD_DIR ?= build
 INSOURCE ?= 0
 
 PACKAGES := scidb-VERSION_MAJOR.VERSION_MINOR.deb scidb-VERSION_MAJOR.VERSION_MINOR-dbg.deb libscidbclient-VERSION_MAJOR.VERSION_MINOR.deb libscidbclient-VERSION_MAJOR.VERSION_MINOR-dbg.deb scidb-VERSION_MAJOR.VERSION_MINOR-utils.deb scidb-VERSION_MAJOR.VERSION_MINOR-utils-dbg.deb scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools.deb
-PACKAGES += scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools-dbg.deb scidb-VERSION_MAJOR.VERSION_MINOR-plugins.deb scidb-VERSION_MAJOR.VERSION_MINOR-plugins-dbg.deb libscidbclient-VERSION_MAJOR.VERSION_MINOR-python.deb libscidbclient-VERSION_MAJOR.VERSION_MINOR-python-dbg.deb scidb-VERSION_MAJOR.VERSION_MINOR-dev.deb scidb-VERSION_MAJOR.VERSION_MINOR-doc.deb
+PACKAGES += scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools-dbg.deb scidb-VERSION_MAJOR.VERSION_MINOR-plugins.deb scidb-VERSION_MAJOR.VERSION_MINOR-plugins-dbg.deb libscidbclient-VERSION_MAJOR.VERSION_MINOR-python.deb libscidbclient-VERSION_MAJOR.VERSION_MINOR-python-dbg.deb scidb-VERSION_MAJOR.VERSION_MINOR-dev.deb scidb-VERSION_MAJOR.VERSION_MINOR-doc.deb scidb-VERSION_MAJOR.VERSION_MINOR-jdbc.deb
 
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
   NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))

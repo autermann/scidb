@@ -22,7 +22,7 @@ SCIDB QUERY : <load winnersFlat from '../tests/harness/testcases/data/doc/winner
 {10} 'marathon',2004,'Baldini','Italy',7855
 {11} 'marathon',2008,'Wanjiru','Kenya',7596
 
-SCIDB QUERY : <redimension_store(winnersFlat, winnersCanonical)>
+SCIDB QUERY : <store(redimension(winnersFlat, winnersCanonical), winnersCanonical)>
 {year,event} person,country,time
 {1996,'dash'} 'Bailey','Canada',9.84
 {1996,'marathon'} 'Thugwant','RSA',7956
@@ -37,7 +37,7 @@ SCIDB QUERY : <redimension_store(winnersFlat, winnersCanonical)>
 {2008,'marathon'} 'Wanjiru','Kenya',7596
 {2008,'steeplechase'} 'Kipruto','Kenya',490.34
 
-SCIDB QUERY : <redimension_store(winnersCanonical,yec)>
+SCIDB QUERY : <store(redimension(winnersCanonical,yec),yec)>
 {year,event,country} person,time
 {1996,'dash','Canada'} 'Bailey',9.84
 {1996,'marathon','RSA'} 'Thugwant',7956

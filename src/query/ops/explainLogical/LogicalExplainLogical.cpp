@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,10 +34,10 @@
 
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
+#include "query/ParsingContext.h"
 #include "system/Exceptions.h"
 #include "array/Metadata.h"
 #include "system/SystemCatalog.h"
-#include "query/parser/ParsingContext.h"
 
 namespace scidb
 {
@@ -110,7 +110,7 @@ public:
         {
                 boost::shared_ptr< ParsingContext> pc;
                 if (_parameters.size()==0) //need a parsing context for exception!
-                {       pc = boost::make_shared< ParsingContext> (""); }
+                {       pc = boost::make_shared<ParsingContext>(); }
                 else
                 {       pc = _parameters[0]->getParsingContext(); }
 

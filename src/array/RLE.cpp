@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -1542,7 +1542,7 @@ namespace scidb
     {
         assert(_isBoolean == payload._isBoolean);
         assert(_elemSize == payload._elemSize);
-        if (payload._container.empty()) {
+        if (payload.count() < 1 || payload._container.empty()) {
             return;
         }
         position_t lastHeadPosition = 0;

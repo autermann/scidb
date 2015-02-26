@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -79,13 +79,13 @@ LOGICAL_BUILDIN_OPERATOR(LogicalFilter);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalFilter);
 
 // Count
-LOGICAL_BUILDIN_OPERATOR(LogicalCount);
+//LOGICAL_BUILDIN_OPERATOR(LogicalCount);
 
 // Average
-LOGICAL_BUILDIN_OPERATOR(LogicalAverage);
+//LOGICAL_BUILDIN_OPERATOR(LogicalAverage);
 
 // Sum
-LOGICAL_BUILDIN_OPERATOR(LogicalSum);
+//LOGICAL_BUILDIN_OPERATOR(LogicalSum);
 
 // Store
 LOGICAL_BUILDIN_OPERATOR(LogicalStore);
@@ -96,8 +96,8 @@ LOGICAL_BUILDIN_OPERATOR(LogicalRedimension);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalRedimension);
 
 // Redimension_Store
-LOGICAL_BUILDIN_OPERATOR(LogicalRedimensionStore);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalRedimensionStore);
+//LOGICAL_BUILDIN_OPERATOR(LogicalRedimensionStore);
+//PHYSICAL_BUILDIN_OPERATOR(PhysicalRedimensionStore);
 
 // Reshape
 LOGICAL_BUILDIN_OPERATOR(LogicalReshape);
@@ -110,6 +110,10 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalRepart);
 // DeclarePhysicalOperator
 LOGICAL_BUILDIN_OPERATOR(LogicalLoadLibrary);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalLoadLibrary);
+
+// LoadModule
+LOGICAL_BUILDIN_OPERATOR(LogicalLoadModule);
+PHYSICAL_BUILDIN_OPERATOR(PhysicalLoadModule);
 
 // Join
 LOGICAL_BUILDIN_OPERATOR(LogicalJoin);
@@ -201,10 +205,10 @@ LOGICAL_BUILDIN_OPERATOR(LogicalMerge);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalMerge);
 
 // Min
-LOGICAL_BUILDIN_OPERATOR(LogicalMin);
+//LOGICAL_BUILDIN_OPERATOR(LogicalMin);
 
 // Max
-LOGICAL_BUILDIN_OPERATOR(LogicalMax);
+//LOGICAL_BUILDIN_OPERATOR(LogicalMax);
 
 // Adddim
 LOGICAL_BUILDIN_OPERATOR(LogicalAdddim);
@@ -231,8 +235,8 @@ LOGICAL_BUILDIN_OPERATOR(LogicalThin);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalThin);
 
 // Cross
-LOGICAL_BUILDIN_OPERATOR(LogicalCross);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalCross);
+//LOGICAL_BUILDIN_OPERATOR(LogicalCross);
+//PHYSICAL_BUILDIN_OPERATOR(PhysicalCross);
 
 // Help
 LOGICAL_BUILDIN_OPERATOR(LogicalHelp);
@@ -291,10 +295,10 @@ LOGICAL_BUILDIN_OPERATOR(LogicalCancel);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalCancel);
 
 // Var
-LOGICAL_BUILDIN_OPERATOR(LogicalVar);
+//LOGICAL_BUILDIN_OPERATOR(LogicalVar);
 
 // Stdev
-LOGICAL_BUILDIN_OPERATOR(LogicalStdev);
+//LOGICAL_BUILDIN_OPERATOR(LogicalStdev);
 
 //Show
 LOGICAL_BUILDIN_OPERATOR(LogicalShow);
@@ -325,7 +329,7 @@ LOGICAL_BUILDIN_OPERATOR(LogicalAnalyze);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalAnalyze);
 
 //ApproxDC
-LOGICAL_BUILDIN_OPERATOR(LogicalApproxDC);
+//LOGICAL_BUILDIN_OPERATOR(LogicalApproxDC);
 
 // MStat
 LOGICAL_BUILDIN_OPERATOR(LogicalMStat);

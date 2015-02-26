@@ -66,14 +66,14 @@
         <step>
           <para>Store values of random values between 0 and 9 in
           m3x3:<para><programlisting>AFL% store(build(m3x3,random()%10),m3x3);  </programlisting><screen>[
-[(5),(2),(3)],
-[(1),(9),(1)],
-[(1),(9),(1)]
+[(1),(0),(4)],
+[(5),(2),(6)],
+[(7),(1),(8)]
 ]</screen></para></para>
         </step>
 
         <step>
-          <para>Select the variance of each row of m3x3:<para><programlisting>AFL% var(m3x3,val,i);  </programlisting><screen>[(2.33333),(21.3333),(21.3333)]
+          <para>Select the variance of each row of m3x3:<para><programlisting>AFL% aggregate(m3x3,var(val),i);  </programlisting><screen>[(4.33333),(4.33333),(14.3333)]
 </screen></para></para>
         </step>
       </procedure>

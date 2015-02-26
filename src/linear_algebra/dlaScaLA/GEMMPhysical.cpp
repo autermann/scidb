@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -229,8 +229,9 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     // but when automatic repart() is done, we will want to use the chunksize of the output of the repart().
     // so we will need to decide by this point what the MB,NB is going to be, even if we haven't reparted
     // to it yet.
-    // to make it clear we mean ScaLAPACK MB,NB (which may become different from the inputArray[i] chunkSize in the future, we will
-    // call the array of ScaLAPACK MB,NB pairs,  MB_NB[].
+    // to make it clear we mean ScaLAPACK MB,NB
+    // (which may become different from the inputArray[i] chunkSize in the future)
+    // we will call the array of ScaLAPACK MB,NB pairs,  MB_NB[].
     matSize_t MB_NB[NUM_MATRICES];  // this one should be moved after redistributeInputArrays() for when it really reparts
     for(size_t i=0; i < numArray; i++ ) {
         MB_NB[i] = getMatChunkSize(inputArrays[i]);
@@ -366,7 +367,7 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
         asDoubles[mat] = reinterpret_cast<double*>(shmIpc[buf]->get());
 
         setInputMatrixToAlgebraDefault(asDoubles[mat], bufNumElem[buf]);  // note asDoubles[CC] is input and output to/from ScaLAPACK
-        extractArrayToScaLAPACK(tmpRedistedInput, asDoubles[mat], DESC[mat],NPROW, NPCOL, MYPROW, MYPCOL);
+        extractArrayToScaLAPACK(tmpRedistedInput, asDoubles[mat], DESC[mat],NPROW, NPCOL, MYPROW, MYPCOL, query);
 
         tmpRedistedInput.reset(); // and drop this array before iterating on the loop to the next repart/redist
         if (!wasConverted) {
@@ -503,14 +504,19 @@ shared_ptr<Array> GEMMPhysical::execute(std::vector< shared_ptr<Array> >& inputA
     Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
     ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions());
 
-    // and now invokeMPI produces an array without empty bitmap
+    // and now invokeMPI produces an array without empty bitmap except when it is not participating
     shared_ptr<Array> arrayNoEmptyTag = invokeMPI(inputArrays, options, query, schemaNoEmptyTag);
 
 
     // now we place a wrapper array around arrayNoEmptyTag, that adds a fake emptyTag (true everywhere)
     // but otherwise passes through requests for iterators on the other attributes.
     // And yes, the class name is the complete opposite of what it shold be.
-    shared_ptr<Array> result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
+    shared_ptr<Array> result;
+    if (arrayNoEmptyTag->getArrayDesc().getEmptyBitmapAttribute() == NULL) {
+        result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
+    } else {
+        result = arrayNoEmptyTag;
+    }
 
     // return the scidb array
     LOG4CXX_DEBUG(logger, "GEMMPhysical::execute(): (successful) end");

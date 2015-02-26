@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -118,10 +118,10 @@ Attributes ListChunkDescriptorsArrayBuilder::getAttributes() const
     Attributes attrs(NUM_ATTRIBUTES);
     attrs[STORAGE_VERSION]    = AttributeDesc(STORAGE_VERSION,   "svrsn",           TID_UINT32, 0, 0);
     attrs[INSTANCE_ID]        = AttributeDesc(INSTANCE_ID,       "insn",            TID_UINT32, 0, 0);
-    attrs[DISK_SEGMENT_NO]    = AttributeDesc(DISK_SEGMENT_NO,   "dseg",            TID_UINT8,  0, 0);
+    attrs[DATASTORE_GUID]     = AttributeDesc(DATASTORE_GUID,    "dguid",           TID_UINT32, 0, 0);
     attrs[DISK_HEADER_POS]    = AttributeDesc(DISK_HEADER_POS,   "dhdrp",           TID_UINT64, 0, 0);
     attrs[DISK_OFFSET]        = AttributeDesc(DISK_OFFSET,       "doffs",           TID_UINT64, 0, 0);
-    attrs[V_ARRAY_ID]           = AttributeDesc(V_ARRAY_ID,      "arrid",           TID_UINT64, 0, 0);
+    attrs[V_ARRAY_ID]         = AttributeDesc(V_ARRAY_ID,        "arrid",           TID_UINT64, 0, 0);
     attrs[ATTRIBUTE_ID]       = AttributeDesc(ATTRIBUTE_ID,      "attid",           TID_UINT64, 0, 0);
     attrs[COORDINATES]        = AttributeDesc(COORDINATES,       "coord",           TID_STRING, 0, 0);
     attrs[COMPRESSION]        = AttributeDesc(COMPRESSION,       "comp",            TID_INT8,   0, 0);
@@ -143,8 +143,8 @@ void ListChunkDescriptorsArrayBuilder::addToArray(pair<ChunkDescriptor, bool> co
     _outCIters[STORAGE_VERSION]->writeItem(v);
     v.setUint32(desc.hdr.instanceId);
     _outCIters[INSTANCE_ID]->writeItem(v);
-    v.setUint8(desc.hdr.pos.segmentNo);
-    _outCIters[DISK_SEGMENT_NO]->writeItem(v);
+    v.setUint32(desc.hdr.pos.dsGuid);
+    _outCIters[DATASTORE_GUID]->writeItem(v);
     v.setUint64(desc.hdr.pos.hdrPos);
     _outCIters[DISK_HEADER_POS]->writeItem(v);
     v.setUint64(desc.hdr.pos.offs);
@@ -179,7 +179,7 @@ Attributes ListChunkMapArrayBuilder::getAttributes() const
     Attributes attrs(NUM_ATTRIBUTES);
     attrs[STORAGE_VERSION]     = AttributeDesc(STORAGE_VERSION,   "svrsn",           TID_UINT32, 0, 0);
     attrs[INSTANCE_ID]         = AttributeDesc(INSTANCE_ID,       "instn",           TID_UINT32, 0, 0);
-    attrs[DISK_SEGMENT_NO]     = AttributeDesc(DISK_SEGMENT_NO,   "dseg",            TID_UINT8,  0, 0);
+    attrs[DATASTORE_GUID]      = AttributeDesc(DATASTORE_GUID,    "dguid",           TID_UINT32, 0, 0);
     attrs[DISK_HEADER_POS]     = AttributeDesc(DISK_HEADER_POS,   "dhdrp",           TID_UINT64, 0, 0);
     attrs[DISK_OFFSET]         = AttributeDesc(DISK_OFFSET,       "doffs",           TID_UINT64, 0, 0);
     attrs[U_ARRAY_ID]          = AttributeDesc(U_ARRAY_ID,        "uaid",            TID_UINT64, 0, 0);
@@ -207,7 +207,6 @@ Attributes ListChunkMapArrayBuilder::getAttributes() const
     attrs[FIRST_POS_OVERLAP]   = AttributeDesc(FIRST_POS_OVERLAP, "fposo",           TID_STRING, 0, 0);
     attrs[LAST_POS_OVERLAP]    = AttributeDesc(LAST_POS_OVERLAP,  "lposo",           TID_STRING, 0, 0);
     attrs[STORAGE]             = AttributeDesc(STORAGE,           "strge",           TID_UINT64, 0, 0);
-    attrs[LOADER]              = AttributeDesc(LOADER,            "loadr",           TID_UINT64, 0, 0);
     attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
     return attrs;
 }
@@ -220,8 +219,8 @@ void ListChunkMapArrayBuilder::addToArray(ChunkMapEntry const& value)
     _outCIters[STORAGE_VERSION]->writeItem(v);
     v.setUint32(chunk == NULL ? -1 : chunk->_hdr.instanceId);
     _outCIters[INSTANCE_ID]->writeItem(v);
-    v.setUint8(chunk == NULL ? -1 : chunk->_hdr.pos.segmentNo);
-    _outCIters[DISK_SEGMENT_NO]->writeItem(v);
+    v.setUint32(chunk == NULL ? -1 : chunk->_hdr.pos.dsGuid);
+    _outCIters[DATASTORE_GUID]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : chunk->_hdr.pos.hdrPos);
     _outCIters[DISK_HEADER_POS]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : chunk->_hdr.pos.offs);
@@ -298,8 +297,6 @@ void ListChunkMapArrayBuilder::addToArray(ChunkMapEntry const& value)
     _outCIters[LAST_POS_OVERLAP]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_storage);
     _outCIters[STORAGE]->writeItem(v);
-    v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_loader);
-    _outCIters[LOADER]->writeItem(v);
 }
 
 Attributes ListLibrariesArrayBuilder::getAttributes() const

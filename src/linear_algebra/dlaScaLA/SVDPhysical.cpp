@@ -3,7 +3,7 @@
 * BEGIN_COPYRIGHT
 *
 * This file is part of SciDB.
-* Copyright (C) 2008-2013 SciDB, Inc.
+* Copyright (C) 2008-2014 SciDB, Inc.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -101,7 +101,7 @@ public:
         // may calculate different singular values in different processes.
         // By choosing this rule, we make sure the process grid is no taller than
         // square, and that seems to prevent the problem from occuring.
-        // 
+        //
         // If the problem does occur, scaLAPACK returns INFO equal to min(M,N)+1
         // and an exception about results that could not be guaranteed accurate were discarded.
         // There is no known work-around by the user.
@@ -325,7 +325,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
     typedef scidb::SharedMemoryPtr<double> shmSharedPtr_t ;
 
     const slpp::int_t ALLOC_A = upToMultiple(SIZE_A, MB*NB);
-    const slpp::int_t ALLOC_S = upToMultiple(MIN_MN, MB*NB);  // NOCHECKIN, different case needs examining
+    const slpp::int_t ALLOC_S = upToMultiple(MIN_MN, MB*NB);  // TODO:, different case needs examining
     const slpp::int_t ALLOC_U = upToMultiple(SIZE_U, MB*NB);
     const slpp::int_t ALLOC_VT = upToMultiple(SIZE_VT, MB*NB);
 
@@ -349,7 +349,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
 
     setInputMatrixToAlgebraDefault(A, nElem[BUF_MAT_A]);
 
-    extractArrayToScaLAPACK(arrayA, A, DESC_A, NPROW, NPCOL, MYPROW, MYPCOL);
+    extractArrayToScaLAPACK(arrayA, A, DESC_A, NPROW, NPCOL, MYPROW, MYPCOL, query);
 
     // only bother clearing the output matrices we are going to use
     // TODO: clear only the parts that might not be set by the svd computation,
@@ -625,13 +625,18 @@ shared_ptr<Array> SVDPhysical::execute(std::vector< shared_ptr<Array> >& inputAr
     Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
     ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions());
 
-    // and now invokeMPI produces an array without empty bitmap
+    // and now invokeMPI produces an array without empty bitmap except when it is not participating
     shared_ptr<Array> arrayNoEmptyTag = invokeMPI(redistributedInputs, query, whichMatrix, schemaNoEmptyTag);
 
     // now we place a wrapper array around arrayNoEmptyTag, that adds a fake emptyTag (true everywhere)
     // but otherwise passes through requests for iterators on the other attributes.
     // And yes, the class name is the complete opposite of what it shold be.
-    shared_ptr<Array> result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
+    shared_ptr<Array> result;
+    if (arrayNoEmptyTag->getArrayDesc().getEmptyBitmapAttribute() == NULL) {
+        result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
+    } else {
+        result = arrayNoEmptyTag;
+    }
 
     // return the scidb array
     Dimensions const& resultDims = result->getArrayDesc().getDimensions();
