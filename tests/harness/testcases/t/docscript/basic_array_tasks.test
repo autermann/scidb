@@ -6,8 +6,8 @@
 --start-igdata
 --aql CREATE ARRAY A <val_a:double>[i=0:9,10,0]  
 --aql CREATE ARRAY B <val_b:double>[j=0:9,10,0]  
-load(A, '../examples/A.scidb')  
-load(B, '../examples/B.scidb')  
+load(A, '../tests/harness/testcases/data/doc/A.scidb')  
+load(B, '../tests/harness/testcases/data/doc/B.scidb')  
 --set-format auto
 --stop-igdata
 --aql SELECT * FROM A  
@@ -30,9 +30,9 @@ show(C)
 --set-format dcsv
 --aql CREATE ARRAY m3x3<a:double> [i=1:3,3,0,j=1:3,3,0]  
 --start-igdata
-load(m3x3, '../examples/m3x3.txt')  
+load(m3x3, '../tests/harness/testcases/data/doc/m3x3.txt')  
 --aql CREATE ARRAY vector3<b:double> [k=1:3,3,0]  
-load(vector3, '../examples/vector3.scidb')  
+load(vector3, '../tests/harness/testcases/data/doc/vector3.scidb')  
 --stop-igdata
 show(vector3)
 --set-format dense

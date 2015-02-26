@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="scanOperator">
   <refnamediv>
     <refname>scan</refname>
 
@@ -11,11 +11,11 @@
 
         <secondary>display contents</secondary>
       </indexterm>Produces a result array that is equivalent to a stored
-    array. That is, the scan operator reads a stored array.</refpurpose>
+    array. That is, <literal>scan</literal> reads a stored array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>scan(<replaceable>stored_array</replaceable>);</synopsis>
+    <synopsis>scan(<replaceable>stored_array</replaceable><optional>:<replaceable>mapped_dimension</replaceable></optional>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -26,6 +26,10 @@
     <replaceable>stored_array</replaceable>. The argument
     <replaceable>stored_array</replaceable> must be an array that was
     previously created and stored in SciDB.</para>
+
+    <para>If an array contains any non-integer dimensions, you can use the
+    <literal>scan</literal> operator to view the mapping array for the
+    <replaceable>mapped_dimension</replaceable>.</para>
 
     <para>The scan operator is most useful for displaying a stored array on
     stdout from the AFL language.</para>

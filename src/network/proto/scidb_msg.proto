@@ -70,8 +70,8 @@ message Chunk
 	optional uint64 array_id = 3;
 	optional uint32 attribute_id = 4;
 	required bool eof = 5;
-    optional bool sparse = 6;
-    optional bool rle = 7;
+        optional bool sparse = 6;
+        optional bool rle = 7;
 	optional uint64 decompressed_size = 8;
 	optional bool has_next = 9;
 	repeated int64 next_coordinates = 10;
@@ -210,7 +210,7 @@ message Error
  */
  message DummyQuery
  {
-    optional int32  barrier_id = 2;
+    optional uint64  payload_id = 2;
  }
 
 

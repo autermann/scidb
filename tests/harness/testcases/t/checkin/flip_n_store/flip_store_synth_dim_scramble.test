@@ -1,0 +1,28 @@
+# see ticket 3173
+# when there are multiple attributes and synthetic dimension, sometimes the records along the synthetic dimension may be 'scrambled'
+# in the sense that a resulted record may be composed by picking different attributes' values from different instance.
+--setup
+--start-query-logging
+
+--start-igdata
+create array A <x:int64, y:int64, att1:int64, att2:int64>[dummy=0:250,3,0]
+
+# build array A where x and y are both from 0 to 1, and att1==att2 always.
+store(join(join(join(build(<x:int64>[dummy=0:250,3,0], dummy/130),build(<y:int64>[dummy=0:250,3,0], dummy%2)),build(<att1:int64>[dummy=0:250,3,0], dummy)),build(<att2:int64>[dummy=0:250,3,0], dummy)), A)
+
+create array B<att1:int64, att2:int64>[x=0:*,1,0, y=0:*,1,0, synth=0:*,100,0]
+
+redimension_store(A,B)
+--stop-igdata
+
+--test
+# the count should be 0, because att1 and att2 are expected to be equal
+count(filter(B, att1<>att2))
+
+# the count should be 251, i.e. including all the elements in the array
+count(B)
+
+--cleanup
+remove(A)
+remove(B)
+--stop-query-logging

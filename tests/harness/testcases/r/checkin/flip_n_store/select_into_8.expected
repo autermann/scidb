@@ -23,49 +23,49 @@ SCIDB QUERY : <store(build(A,x+10),A)>
 [(10),(11),(12)]
 
 SCIDB QUERY : <store(build(B,string(x+10)),B)>
-[("10"),("11"),("12")]
+[('10'),('11'),('12')]
 
 SCIDB QUERY : <select * into C from A,B>
-[("10",10),("11",11),("12",12)]
+[('10',10),('11',11),('12',12)]
 
 SCIDB QUERY : <select * into D from A,B>
-[("10"),("11"),("12")]
+[('10'),('11'),('12')]
 
 SCIDB QUERY : <select * into E from A,B>
 [(10),(11),(12)]
 
 SCIDB QUERY : <select * into F from A,B>
-[("10"),("11"),("12")]
+[('10'),('11'),('12')]
 
 SCIDB QUERY : <select * into G from A,B>
 [(10),(11),(12)]
 
 SCIDB QUERY : <select * into C from A,B where x=0>
-[("10",10),(),()]
+[('10',10),(),()]
 
 SCIDB QUERY : <select * into D from A,B where x<>0>
-[(),("11"),("12")]
+[(),('11'),('12')]
 
 SCIDB QUERY : <select * into E from A,B where x<=1>
 [(10),(11),()]
 
 SCIDB QUERY : <select * into F from A,B where x>=1>
-[("11"),("12"),()]
+[('11'),('12'),()]
 
 SCIDB QUERY : <select * into G from A,B where x<>3>
 [(10),(11),(12)]
 
 SCIDB QUERY : <select * into C from A,B where a=10>
-[("10",10),(),()]
+[('10',10),(),()]
 
 SCIDB QUERY : <select * into D from A,B where b<>'11'>
-[("10"),(),("12")]
+[('10'),(),('12')]
 
 SCIDB QUERY : <select * into E from A,B where a<11 or b>'11'>
 [(10),(),(12)]
 
 SCIDB QUERY : <select * into F from A,B where a<>10 and b<>'11'>
-[("12"),(),()]
+[('12'),(),()]
 
 SCIDB QUERY : <select * into G from A,B where a=10 or b='13' and a=12>
 [(10),(),()]

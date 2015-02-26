@@ -33,6 +33,7 @@
 #include <set>
 #include <map>
 #include <boost/shared_ptr.hpp>
+#include <boost/asio.hpp>
 #include <util/Singleton.h>
 #include <util/Thread.h>
 #include <util/Network.h>
@@ -40,7 +41,6 @@
 #include <query/Query.h>
 #include <util/Event.h>
 #include <util/Mutex.h>
-#include <../src/network/proto/scidb_msg.pb.h> //XXX TODO: move to public ?
 #include <util/shm/SharedMemoryIpc.h>
 #include <mpi/MPILauncher.h>
 #include <mpi/MPIUtils.h>
@@ -70,7 +70,7 @@ namespace scidb
             virtual InstanceID getSourceInstanceID() const  { return CLIENT_INSTANCE; }
             virtual MessagePtr getRecord()                  { return MessagePtr(); }
             virtual MessageID getMessageType() const        { return scidb::SYSTEM_NONE_MSG_ID; }
-            virtual boost::asio::const_buffer getBinary()   { return asio::const_buffer(NULL, 0); }
+            virtual boost::asio::const_buffer getBinary()   { return boost::asio::const_buffer(NULL, 0); }
             virtual ~EofMessageDescription()                {}
             virtual QueryID getQueryId() const              { return 0; }
             virtual ClientContext::Ptr getClientContext()   { return ClientContext::Ptr(); }
@@ -309,24 +309,15 @@ namespace scidb
         MpiMessageHandler() {}
         virtual ~MpiMessageHandler() {}
 
-        scidb::MessagePtr createMpiSlaveCommand(scidb::MessageID id)
-        {
-            return scidb::MessagePtr(new scidb_msg::MpiSlaveCommand());
-        }
-        scidb::MessagePtr createMpiSlaveHandshake(scidb::MessageID id)
-        {
-            return scidb::MessagePtr(new scidb_msg::MpiSlaveHandshake());
-        }
+        inline scidb::MessagePtr createMpiSlaveCommand(scidb::MessageID id);
+        inline scidb::MessagePtr createMpiSlaveHandshake(scidb::MessageID id);
         /**
          * Handler for the handshake message coming from a slave
          * @param messageDescription HB message pointer
          */
         void handleMpiSlaveHandshake(const boost::shared_ptr<scidb::MessageDescription>& messageDesc);
 
-        scidb::MessagePtr createMpiSlaveResult(scidb::MessageID id)
-        {
-            return scidb::MessagePtr(new scidb_msg::MpiSlaveResult());
-        }
+        inline scidb::MessagePtr createMpiSlaveResult(scidb::MessageID id);
 
         /**
          * Handler for the command result message coming from a slave

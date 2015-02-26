@@ -53,49 +53,49 @@ SCIDB QUERY : <store(build_sparse(A,x+10,x<>1),A)>
 [{0}(10),{2}(12)]
 
 SCIDB QUERY : <store(build_sparse(B,string(x+10),x<>1),B)>
-[{0}("10"),{2}("12")]
+[{0}('10'),{2}('12')]
 
 SCIDB QUERY : <select * into C from A,B>
-[("10",10),(),("12",12)]
+[('10',10),(),('12',12)]
 
 SCIDB QUERY : <select * into D from A,B>
-[("10"),(),("12")]
+[('10'),(),('12')]
 
 SCIDB QUERY : <select * into E from A,B>
 [(10),(),(12)]
 
 SCIDB QUERY : <select * into F from A,B>
-[("10"),("12"),()]
+[('10'),('12'),()]
 
 SCIDB QUERY : <select * into G from A,B>
 [(10),(12),()]
 
 SCIDB QUERY : <select * into C1 from A,B where x=0>
-[("10",10),(),()]
+[('10',10),(),()]
 
 SCIDB QUERY : <select * into D1 from A,B where x<>0>
-[(),(),("12")]
+[(),(),('12')]
 
 SCIDB QUERY : <select * into E1 from A,B where x<=1>
 [(10),(),()]
 
 SCIDB QUERY : <select * into F1 from A,B where x>=1>
-[("12"),(),()]
+[('12'),(),()]
 
 SCIDB QUERY : <select * into G1 from A,B where x<>3>
 [(10),(12),()]
 
 SCIDB QUERY : <select * into C2 from A,B where a=10>
-[("10",10),(),()]
+[('10',10),(),()]
 
 SCIDB QUERY : <select * into D2 from A,B where b<>'11'>
-[("10"),(),("12")]
+[('10'),(),('12')]
 
 SCIDB QUERY : <select * into E2 from A,B where a<11 or b>'11'>
 [(10),(),(12)]
 
 SCIDB QUERY : <select * into F2 from A,B where a<>10 and b<>'11'>
-[("12"),(),()]
+[('12'),(),()]
 
 SCIDB QUERY : <select * into G2 from A,B where a=10 or b='13' and a=12>
 [(10),(),()]

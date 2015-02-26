@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="sampleOperator">
   <refnamediv>
     <refname>sample</refname>
 
@@ -17,18 +16,19 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>sample(<replaceable>array</replaceable>,<replaceable>probability</replaceable>);</synopsis>
+    <synopsis>sample(<replaceable>array</replaceable>,<replaceable>probability</replaceable><optional>,<replaceable>seed</replaceable></optional>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
     <para>The sample operator selects chunks from an array at random, subject
-    to a probability you supply.</para>
+    to a probability you supply. Use the optional, integer
+    <replaceable>seed</replaceable> parameter to reproduce results; each run
+    using the same seed returns identical results.</para>
 
-    <para>You can use the sample operator in the FROM clause of an AQL SELECT
-    statement, as a stand-alone operator in a AFL statement, or as an operand
-    within other SciDB operators.</para>
+    <para>To select random cells, as opposed to random chunks, use the <link
+    linkend="bernoulliOperator">bernoulli</link> operator.</para>
   </refsect1>
 
   <refsect1>
@@ -40,14 +40,14 @@
 
       <procedure>
         <step>
-          <para>Create a 1-dimensional array with dimension size of 16 and
-          chunk size of 2: <programlisting language="test">--afl CREATE ARRAY vector1&lt;val:double&gt;[i=0:15,2,0]; --show-query=yes --show-output=no
+          <para>Create a 2-dimensional array with dimension sizes of 6, and
+          chunk sizes of 2 and 3: <programlisting language="test">--afl CREATE ARRAY vector1&lt;val:double&gt;[i=0:5,2,0, j=0:5,3,0]; --show-query=yes --show-output=no
 </programlisting></para>
         </step>
 
         <step>
-          <para>Put values of 0–15 into vector1: <programlisting
-          language="test">--afl store(build(vector1,i),vector1); --show-query=yes --output-format=dense</programlisting></para>
+          <para>Put values of 0–35 into vector1: <programlisting
+          language="test">--afl store(build(vector1,i*6+j),vector1); --show-query=yes --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>

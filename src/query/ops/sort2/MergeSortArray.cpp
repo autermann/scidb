@@ -103,9 +103,10 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
       isLocal(local),
       input(inputArrays),
       streams(inputArrays.size()),
-      attributes(array.getAttributes().size()),
-      _query(query)
+      attributes(array.getAttributes().size())
     {
+        assert(query);
+        _query=query;
         chunkPos[0] = array.getDimensions()[0].getStart();
         size_t nAttrs = attributes.size();
         for (size_t i = 0; i < nAttrs; i++) {
@@ -161,7 +162,7 @@ inline size_t getArrayLength(DimensionDesc const& dim, size_t instanceId, size_t
         }
         size_t nAttrs = attributes.size();
         vector< boost::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
-        boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
 
         while (permutation.size() != 0) {
             if (!chunkIterators[0]) {

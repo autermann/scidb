@@ -53,7 +53,7 @@ namespace scidb {
         ArrayDesc dstMappingArrayDesc(tmpMappingArrayName,
                                       srcMappingArrayDesc.getAttributes(), 
                                       indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
-        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc));
+        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc,query));
         if (last != -1) { 
             shared_ptr<ArrayIterator> dstArrayIterator = dstMappingArray->getIterator(0);
             Coordinates pos(1);

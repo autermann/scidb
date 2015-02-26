@@ -93,6 +93,7 @@ public:
         {
             if (sem_post(_sem) == -1)
             {
+                // XXX TODO: this must be an error
                 assert(false);
             }
         }

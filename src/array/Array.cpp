@@ -33,12 +33,12 @@
 #include <boost/assign.hpp>
 
 #include "array/MemArray.h"
-#include "array/EmbeddedArray.h"
 #include "array/RLE.h"
 #include "system/Exceptions.h"
 #include "query/FunctionDescription.h"
 #include "query/TypeSystem.h"
 #include "query/Statistics.h"
+#include <query/Query.h>
 #ifndef SCIDB_CLIENT
 #include "system/Config.h"
 #endif
@@ -53,44 +53,26 @@ using namespace boost::assign;
 
 namespace scidb
 {
-
     // Logger for operator. static to prevent visibility of variable outside of file
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.Array"));
 
-    void* SharedBuffer::getData() const
+    void SharedBuffer::free()
     {
-        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "SharedBuffer::getData";
-    }
-
-    size_t SharedBuffer::getSize() const
-    {
-        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "SharedBuffer::getSize";
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "SharedBuffer::free";
     }
 
     void SharedBuffer::allocate(size_t size)
     {
-        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "SharedBuffer::allocate";
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "SharedBuffer::allocate";
     }
 
     void SharedBuffer::reallocate(size_t size)
     {
-        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "SharedBuffer::reallocate";
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "SharedBuffer::reallocate";
     }
-
-    void SharedBuffer::free()
-    {
-        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "SharedBuffer::free";
-    }
-
-    bool SharedBuffer::pin() const
-    {
-        return false;
-    }
-
-    void SharedBuffer::unPin() const
-    {
-    }
-
 
     void* CompressedBuffer::getData() const
     {
@@ -115,10 +97,11 @@ namespace scidb
 
     void CompressedBuffer::reallocate(size_t size)
     {
-        data = ::realloc(data, size);
-        if (data == NULL) {
+        void *tmp = ::realloc(data, size);
+        if (tmp == NULL) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
+        data = tmp;
         compressedSize = size;
         currentStatistics->allocatedSize += size;
         currentStatistics->allocatedChunks++;
@@ -303,21 +286,21 @@ namespace scidb
     {
         return false;
     }
-
     void ConstChunk::unPin() const
     {
         assert(typeid(*this) != typeid(ConstChunk));
     }
-
     void Chunk::decompress(CompressedBuffer const& buf)
     {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Chunk::decompress";
     }
-
     void Chunk::merge(ConstChunk const& with, boost::shared_ptr<Query>& query)
     {
-        if (getDiskChunk() != NULL)
+        Query::validateQueryPtr(query);
+
+        if (getPersistentChunk() != NULL) {
             throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CHUNK_ALREADY_EXISTS);
+        }
         setCount(0); // unknown
         char* dst = (char*)getData();
 
@@ -338,7 +321,7 @@ namespace scidb
             // Build the auxiliary structure.
             SyntheticDimHelper syntheticDimHelper(redimInfo->_dimSynthetic, redimInfo->_dim.getStart());
             shared_ptr<MapCoordToCount> mapCoordToCount = make_shared<MapCoordToCount>();
-            syntheticDimHelper.updateMapCoordToCount(mapCoordToCount, reinterpret_cast<LruMemChunk*>(this));
+            syntheticDimHelper.updateMapCoordToCount(mapCoordToCount, this);
 
             // Iterate through the src, update each coord, and write to dest.
             // Note that default values can't be ignored. Otherwise the coordinate in the synthetic dimension would mess up.
@@ -401,12 +384,17 @@ namespace scidb
     {
         assert(isRLE() && with.isRLE());
         assert(isMemChunk() && with.isMemChunk());
+
+        Query::validateQueryPtr(query);
+
         DeepChunkMerger deepChunkMerger((MemChunk&)*this, (MemChunk const&)with, query);
         deepChunkMerger.merge();
     }
 
     void Chunk::shallowMerge(ConstChunk const& with, boost::shared_ptr<Query>& query)
     {
+        Query::validateQueryPtr(query);
+
         int sparseMode = isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
         boost::shared_ptr<ChunkIterator> dstIterator = getIterator(query, sparseMode|ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
         boost::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_DEFAULT_VALUES);
@@ -435,7 +423,9 @@ namespace scidb
 
     void Chunk::aggregateMerge(ConstChunk const& with, AggregatePtr const& aggregate, boost::shared_ptr<Query>& query)
     {
-        if (getDiskChunk() != NULL)
+        Query::validateQueryPtr(query);
+
+        if (getPersistentChunk() != NULL)
             throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CHUNK_ALREADY_EXISTS);
 
         if (isReadOnly())
@@ -484,7 +474,9 @@ namespace scidb
 
     void Chunk::nonEmptyableAggregateMerge(ConstChunk const& with, AggregatePtr const& aggregate, boost::shared_ptr<Query>& query)
     {
-        if (getDiskChunk() != NULL)
+        Query::validateQueryPtr(query);
+
+        if (getPersistentChunk() != NULL)
         {
             throw USER_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_CHUNK_ALREADY_EXISTS);
         }
@@ -556,10 +548,6 @@ namespace scidb
     }
 
     void Chunk::setRLE(bool)
-    {
-    }
-
-    void Chunk::write(boost::shared_ptr<Query>& query)
     {
     }
 
@@ -709,7 +697,7 @@ namespace scidb
         return false;
     }
 
-    DBChunk const* ConstChunk::getDiskChunk() const
+    ConstChunk const* ConstChunk::getPersistentChunk() const
     {
         return NULL;
     }

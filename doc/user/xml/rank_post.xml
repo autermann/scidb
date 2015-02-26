@@ -14,11 +14,7 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>rank(<replaceable>array</replaceable>, [<replaceable>attribute</replaceable> [, <replaceable>dimension1</replaceable> [, <replaceable>dimension2</replaceable>... ]]
-   [<replaceable>attribute2</replaceable> [, <replaceable>dimension</replaceable>...]]])</synopsis>
-
-    <synopsis>rank(<replaceable>array</replaceable><optional>,<replaceable>attribute1</replaceable>,<replaceable>attribute2,...</replaceable></optional>
-   <optional>,<replaceable>dimension1</replaceable>,<replaceable>dimension2</replaceable>,...</optional>);</synopsis>
+    <synopsis>rank(<replaceable>array</replaceable><optional>, <replaceable>attribute</replaceable></optional><optional>,<replaceable> dimension_1</replaceable>, <replaceable>dimension_2</replaceable>,...]</optional>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -35,6 +31,30 @@
   </refsect1>
 
   <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>rank</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute_</emphasis><replaceable>n</replaceable>: An
+          optional attribute on which to sort. If no attributes are specified,
+          the first one is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">dimension</emphasis>_<replaceable>n</replaceable>: An
+          optional list of dimensions to group by. If no dimensions are
+          specified, the ordering is global across the entire array.</para>
+        </listitem>
+      </itemizedlist></para>
+  </refsect1>
+
+  <refsect1>
     <title>Example</title>
 
     <informalexample>
@@ -43,8 +63,8 @@
 
       <procedure>
         <step>
-          <para>Assume that you have the following 4<symbol role="symbolfont">×</symbol>4 matrix called
-          rank_matrix:<para><screen>[
+          <para>Assume that you have the following 4<symbol role="symbolfont">×</symbol>4 array called
+          rank_array:<para><screen>[
 [(9),(1),(0),(6)],
 [(1),(3),(7),(7)],
 [(2),(3),(9),(8)],
@@ -53,8 +73,7 @@
         </step>
 
         <step>
-          <para>Rank the elements in rank_matrix by dimension
-          i:<para><programlisting>AFL% rank(rank_matrix,val,i);  </programlisting><screen>[
+          <para>Rank the elements in rank_array by dimension i:<para><programlisting>AFL% rank(rank_array,val,i);  </programlisting><screen>[
 [(9,4),(1,2),(0,1),(6,3)],
 [(1,1),(3,2),(7,<emphasis role="bold">3</emphasis>),(7,<emphasis role="bold">3</emphasis>)],
 [(2,1),(3,2),(9,4),(8,3)],
@@ -65,7 +84,7 @@
         </step>
 
         <step>
-          <para>Rank all the elements of the matrix:<para><programlisting>AFL% rank(rank_matrix,val);  </programlisting><screen>[
+          <para>Rank all the elements of the array:<para><programlisting>AFL% rank(rank_array,val);  </programlisting><screen>[
 [(9,<emphasis role="bold">13</emphasis>),(1,<emphasis role="bold">2</emphasis>),(0,1),(6,9)],
 [(1,<emphasis role="bold">2</emphasis>),(3,<emphasis role="bold">5</emphasis>),(7,<emphasis role="bold">10</emphasis>),(7,<emphasis role="bold">10</emphasis>)],
 [(2,4),(3,<emphasis role="bold">5</emphasis>),(9,<emphasis role="bold">13</emphasis>),(8,12)],

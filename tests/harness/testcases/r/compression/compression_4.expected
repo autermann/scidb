@@ -226,57 +226,57 @@ SCIDB QUERY : <load edTs_rle from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load edTs_d from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load edTs_ns from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load edTs_be from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load edTs_z from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load edTs_bz from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load edTs_nf from '../tests/harness/testcases/data/null_15.txt'>
 {x} a
 {-2} null
 {0} ?2
-{1} "default"
+{1} 'default'
 {2} null
-{3} "default"
+{3} 'default'
 
 SCIDB QUERY : <load Ts_rle from '../tests/harness/testcases/data/null_12.txt'>
 {x} a
@@ -427,65 +427,65 @@ SCIDB QUERY : <load eTs_nf from '../tests/harness/testcases/data/null_16.txt'>
 
 SCIDB QUERY : <load edTs_rle from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <load edTs_d from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <load edTs_ns from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <load edTs_be from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <load edTs_z from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <load edTs_bz from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <load edTs_nf from '../tests/harness/testcases/data/null_16.txt'>
 {x} a
-{-2} "default"
+{-2} 'default'
 {-1} ?2
 {0} null
-{1} "default"
-{2} "default"
+{1} 'default'
+{2} 'default'
 {3} null
 
 SCIDB QUERY : <remove(Ts_rle)>

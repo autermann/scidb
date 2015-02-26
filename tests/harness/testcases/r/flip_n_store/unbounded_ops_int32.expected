@@ -75,7 +75,7 @@ SCIDB QUERY : <redimension_store(unbounded,unbounded2)>
 
 SCIDB QUERY : <show(unbounded2)>
 {i} schema
-{0} "unbounded2<x:int64> [a(int32)=*,128,0]"
+{0} 'unbounded2<x:int64> [a(int32)=*,128,0]'
 
 SCIDB QUERY : <avg(unbounded2)>
 {i} x_avg
@@ -364,7 +364,7 @@ SCIDB QUERY : <regrid(unbounded2,4,sum(x))>
 
 SCIDB QUERY : <attributes(unbounded2)>
 {No} name,type_id,nullable
-{0} "x","int64",false
+{0} 'x','int64',false
 
 SCIDB QUERY : <rename(unbounded2, temp)>
 Query was executed successfully
@@ -473,7 +473,7 @@ SCIDB QUERY : <sample(unbounded2,1,1)>
 
 SCIDB QUERY : <dimensions(unbounded2)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "a",0,4611686018427387903,128,0,0,29,"int32"
+{0} 'a',0,4611686018427387903,128,0,0,29,'int32'
 
 SCIDB QUERY : <adddim(unbounded2,z)>
 {z,a} x
@@ -576,7 +576,7 @@ SCIDB QUERY : <cast(unbounded2,unbounded3)>
 
 SCIDB QUERY : <dimensions(unbounded2)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "a",0,4611686018427387903,128,0,0,29,"int32"
+{0} 'a',0,4611686018427387903,128,0,0,29,'int32'
 
 SCIDB QUERY : <normalize(unbounded)>
 [An error expected at this place for the query "normalize(unbounded)". And it failed.]
@@ -657,7 +657,7 @@ SCIDB QUERY : <project(versions(unbounded2), version_id)>
 
 SCIDB QUERY : <show(unbounded2)>
 {i} schema
-{0} "unbounded2<x:int64> [a(int32)=*,128,0]"
+{0} 'unbounded2<x:int64> [a(int32)=*,128,0]'
 
 SCIDB QUERY : <allversions(unbounded2)>
 {VersionNo,a} x

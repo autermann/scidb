@@ -146,23 +146,23 @@ ConstChunk const* RemoteArray::nextChunk(AttributeID attId, MemChunk& chunk)
 
 /** R E M O T E   M E R G E D   A R R A Y */
 
-RemoteMergedArray::RemoteMergedArray(const ArrayDesc& arrayDesc, QueryID queryId, Statistics& statistics):
-        MultiStreamArray(Query::getQueryByID(queryId)->getInstancesCount(), arrayDesc),
-        _queryId(queryId),
+RemoteMergedArray::RemoteMergedArray(const ArrayDesc& arrayDesc, const boost::shared_ptr<Query>& query, Statistics& statistics):
+        MultiStreamArray(query->getInstancesCount(), arrayDesc, query),
+        _queryId(query->getQueryID()),
         _received(arrayDesc.getAttributes().size(), vector<Semaphore>(getStreamsCount())),
         _messages(arrayDesc.getAttributes().size(), vector< boost::shared_ptr<MessageDesc> >(getStreamsCount())),
         _nextPositions(arrayDesc.getAttributes().size(), vector<Coordinates>(getStreamsCount())),
         _hasPositions(arrayDesc.getAttributes().size(), vector<bool>(getStreamsCount(), false))
 {
-    boost::shared_ptr<Query> query = Query::getQueryByID(queryId);
     _localArray = query->getCurrentResultArray();
 }
 
 boost::shared_ptr<RemoteMergedArray> RemoteMergedArray::create(const ArrayDesc& arrayDesc, QueryID queryId, Statistics& statistics)
 {
     boost::shared_ptr<Query> query = Query::getQueryByID(queryId);
+    assert(query);
     //assert(query->mergedArray == NULL);
-    boost::shared_ptr<RemoteMergedArray> array = boost::shared_ptr<RemoteMergedArray>(new RemoteMergedArray(arrayDesc, queryId, statistics));
+    boost::shared_ptr<RemoteMergedArray> array = boost::shared_ptr<RemoteMergedArray>(new RemoteMergedArray(arrayDesc, query, statistics));
     query->setMergedArray(array);
     return array;
 }

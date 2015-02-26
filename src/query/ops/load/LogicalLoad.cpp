@@ -49,19 +49,20 @@ namespace scidb
  * @brief The operator: load().
  *
  * @par Synopsis:
- *   load( outputArray, filename, instance=-2, format="", maxErrors=0, shadowArray="" )
+ *   load( outputArray, filename, instanceId=-2, format="", maxErrors=0, shadowArray="" )
  *
  * @par Summary:
  *   Loads data to an existing outputArray from a given file, and optionally stores to shadowArray.
  *
  * @par Input:
  *   - outputArray: the output array to store data into.
- *   - filename: where to load data from.
- *   - instance: which instance; default is -2. ??
- *   - format: ??
- *   - maxErrors: ??
- *   - shadowArray: if provided, the result array will be written to it.
- *
+ *   - filename: A path to file where to load data from.
+ *   - instanceId: positive number means an instance ID on which file will be saved. -1 means to save file on every instance. -2 - on coordinator.
+ *   - format: format in which file will be stored. Possible values are 'store', 'lcsv+', 'lsparse', 'dcsv', 'opaque', '(<custom plugin>)'
+ *   - maxErrors: a maximum number of errors which can take place due loading. After that exception is raised.
+ *   - shadowArray: if provided a name of array where error of reading will be specified. The schema of array is the same as output array
+ *     but all attribute has string data type + attribute [row_offset: int64]. It contains an error or reading every attribute with related name
+ *     and row_offset - a position in file where an error was detected.
  * @par Output array:
  *   n/a
  *

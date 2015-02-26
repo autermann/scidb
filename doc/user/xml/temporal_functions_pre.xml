@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry id="temporalFunctions">
@@ -193,7 +192,7 @@
           <para>Assume the following array, <emphasis
           role="bold">dates</emphasis>.<programlisting language="test">--afl create array dates &lt;dt:datetime&gt;[i=0:*,10,0]; --show-query=no --show-output=no
 --afl show(dates); --output-format=dense
---afl load(dates,'../examples/dates.scidb'); --show-query=no</programlisting></para>
+--afl load(dates,'../tests/harness/testcases/data/doc/dates.scidb'); --show-query=no</programlisting></para>
         </step>
 
         <step>
@@ -235,8 +234,10 @@
     </informalexample>
 
     <informalexample>
-      <para>This example illustrates offsets for time zones. It uses the same
-      array as the previous example, array, <emphasis
+      <para><indexterm>
+          <primary>time zone offset</primary>
+        </indexterm>This example illustrates offsets for time zones. It uses
+      the same array as the previous example, array, <emphasis
       role="bold">dates</emphasis>.</para>
 
       <procedure>
@@ -280,7 +281,11 @@
     </informalexample>
 
     <informalexample>
-      <para>This example illustrates the difference between
+      <para><indexterm>
+          <primary>append_offset</primary>
+        </indexterm><indexterm>
+          <primary>apply_offset</primary>
+        </indexterm>This example illustrates the difference between
       <literal>append_offset</literal> and
       <literal>apply_offset</literal>.</para>
 

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="lookupOperator">
   <refnamediv>
     <refname>lookup</refname>
 
@@ -12,7 +11,8 @@
         <primary>dimensions</primary>
 
         <secondary>selecting cells</secondary>
-      </indexterm>Select array cells by dimension index</refpurpose>
+      </indexterm>Produces a result array, selecting array cells by supplied
+    dimension index.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -58,9 +58,9 @@
         </step>
 
         <step>
-          <para>Use lookup to use the dimension coordinates array
-          pattern_array to return the second row of
-          source_array:<programlisting language="test">--afl lookup(pattern_array,source_array); --output-format=dense</programlisting></para>
+          <para>Run <literal>lookup</literal>, using the dimension coordinates
+          array <emphasis role="bold">pattern_array</emphasis> to return the
+          second row of source_array:<programlisting language="test">--afl lookup(pattern_array,source_array); --output-format=dense</programlisting></para>
         </step>
       </procedure>
     </informalexample>

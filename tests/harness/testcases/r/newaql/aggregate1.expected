@@ -311,7 +311,19 @@ SCIDB QUERY : <select x,sin(x),cos(2*a*a*x/2),tan(a) from B where (sqrt(x)+x)<3>
 {1} 1,0.841471,-0.653644,-2.18504
 
 SCIDB QUERY : <select * from A,B>
-[An error expected at this place for the query "select * from A,B". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_LOGICAL_JOIN_ERROR2. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_LOGICAL_JOIN_ERROR2.]
+{x} a,a
+{-3} -6,-6
+{-2} -4,-4
+{-1} -2,-2
+{0} 0,0
+{1} 2,2
+{2} 4,4
+{3} 6,6
+{4} 8,8
+{5} 10,10
+{6} 12,12
+{7} 14,14
+{8} 16,16
 
 SCIDB QUERY : <select * from A,repart(B,<a:double> [x=-3:8,4,0])>
 {x} a,a

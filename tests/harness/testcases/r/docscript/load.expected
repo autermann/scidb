@@ -1,7 +1,7 @@
 SCIDB QUERY : <CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 null > [i=0:*,5,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load(intensityFlat,'../examples/intensity_data.bin',-2, '(string, int64, int64 null)',99,shadowArray)>
+SCIDB QUERY : <load(intensityFlat,'../tests/harness/testcases/data/doc/intensity_data.bin',-2, '(string, int64, int64 null)',99,shadowArray)>
 {i} exposure,elapsedTime,measuredIntensity
 {0} "High",0,100
 {1} "High",1,100
@@ -34,14 +34,13 @@ SCIDB QUERY : <remove(intensityFlat)>
 SCIDB QUERY : <CREATE ARRAY intensityFlat < exposure:string, elapsedTime:int64, measuredIntensity:int64 > [i=0:*,5,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load(intensityFlat,'../examples/intensity_data.bin',-1, '(string, int64, int64)',99,shadowArray)>
+SCIDB QUERY : <load(intensityFlat,'../tests/harness/testcases/data/doc/intensity_data.bin',-2, '(string, int64, int64)',99,shadowArray)>
 {i} exposure,elapsedTime,measuredIntensity
 {0} "High",0,25855
 {1} "",0,0
 
 SCIDB QUERY : <scan(shadowArray)>
-{i} exposure,elapsedTime,measuredIntensity,row_offset
-{1} "Failed to read file: 0","Failed to read file: 0","Failed to read file: 0",25
+[Query was executed successfully, ignoring data output by this query.]
 
 Query was executed successfully
 

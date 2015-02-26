@@ -35,6 +35,7 @@
 #ifndef SCIDB_CLIENT
 #include "system/Config.h"
 #endif
+#include "util/PointerRange.h"
 #include "system/SciDBConfigOptions.h"
 #include "query/TypeSystem.h"
 #include "array/Metadata.h"
@@ -269,7 +270,7 @@ ArrayDesc& ArrayDesc::operator = (ArrayDesc const& other)
     return *this;
 }
 
-ArrayDesc::~ArrayDesc() 
+ArrayDesc::~ArrayDesc()
 {
     assert(_accessCount == 0);
 }
@@ -280,7 +281,7 @@ void ArrayDesc::initializeDimensions()
     for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
         _dimensions[i]._array = this;
         // check that logical size of chunk is less than 2^64: detect overflow during calculation of logical chunk size
-        if (_dimensions[i].getChunkInterval() != 0 && logicalChunkSize*_dimensions[i].getChunkInterval()/_dimensions[i].getChunkInterval() != logicalChunkSize) { 
+        if (_dimensions[i].getChunkInterval() != 0 && logicalChunkSize*_dimensions[i].getChunkInterval()/_dimensions[i].getChunkInterval() != logicalChunkSize) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_METADATA, SCIDB_LE_LOGICAL_CHUNK_SIZE_TOO_LARGE);
         }
         logicalChunkSize *= _dimensions[i].getChunkInterval();
@@ -294,7 +295,7 @@ void ArrayDesc::trim()
         if (dim._startMin == MIN_COORDINATE && dim._currStart != MAX_COORDINATE) {
             dim._startMin = dim._currStart;
         }
-        if (dim._endMax == MAX_COORDINATE && dim._currEnd != MIN_COORDINATE) { 
+        if (dim._endMax == MAX_COORDINATE && dim._currEnd != MIN_COORDINATE) {
             dim._endMax = (dim._startMin + (dim._currEnd - dim._startMin + dim._chunkInterval) / dim._chunkInterval * dim._chunkInterval + dim._chunkOverlap - 1);
         }
     }
@@ -303,7 +304,7 @@ void ArrayDesc::trim()
 std::string const& ArrayDesc::getMappingArrayName(size_t dimension) const
 {
     std::string const& mappingArrayName = _dimensions[dimension].getMappingArrayName();
-    if (mappingArrayName.empty()) { 
+    if (mappingArrayName.empty()) {
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_MAPPING_ARRAY) << _dimensions[dimension].getBaseName() << _name;
     }
     return mappingArrayName;
@@ -361,7 +362,7 @@ uint64_t ArrayDesc::getChunkNumber(Coordinates const& pos) const
     {
         // 1013 is prime number close to 1024. 1024*1024 is assumed to be optimal chunk size for 2-d array.
         // For 1-d arrays value of this constant is not important, because we are multiplying it on 0.
-        // 3-d arrays and arrays with more dimensions are less common and using prime number and XOR should provide 
+        // 3-d arrays and arrays with more dimensions are less common and using prime number and XOR should provide
         // well enough (uniform) mixing of bits.
         no = (no * 1013) ^ ((pos[i] - dims[i].getStart()) / dims[i].getChunkInterval());
     }
@@ -383,7 +384,7 @@ void ArrayDesc::getChunkPositionFor(Coordinates& pos) const
 {
     Dimensions const& dims = _dimensions;
     for (size_t i = 0, n = pos.size(); i < n; i++) {
-        if ( dims[i].getChunkInterval() != 0) { 
+        if ( dims[i].getChunkInterval() != 0) {
             pos[i] -= (pos[i] - dims[i].getStart()) % dims[i].getChunkInterval();
         }
     }
@@ -494,9 +495,9 @@ uint64_t ArrayDesc::getNumberOfChunks() const
     return nChunks*_attributes.size();
 }
 
-void ArrayDesc::cutOverlap() 
+void ArrayDesc::cutOverlap()
 {
-    for (size_t i = 0, n = _dimensions.size(); i < n; i++) { 
+    for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
         _dimensions[i]._chunkOverlap = 0;
     }
 }
@@ -504,7 +505,7 @@ void ArrayDesc::cutOverlap()
 bool ArrayDesc::hasOverlap() const
 {
     for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
-        if (_dimensions[i].getChunkOverlap() != 0) { 
+        if (_dimensions[i].getChunkOverlap() != 0) {
             return true;
         }
     }
@@ -528,7 +529,7 @@ Dimensions ArrayDesc::grabDimensions(VersionID version) const
                                     dim.getFuncMapScale()
                 );
 
-        } else { 
+        } else {
             dims[i] = dim;
         }
     }
@@ -639,7 +640,7 @@ void printSchema(std::ostream& stream,const ArrayDesc& ob)
         stream << "\n--- " << ob.getComment() << "\n";
     }
 #ifndef SCIDB_CLIENT
-    if (Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT)) { 
+    if (Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT)) {
         if (ob.getEmptyBitmapAttribute() == NULL) {
             stream << "not empty ";
         }
@@ -662,7 +663,7 @@ std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob)
         stream << "\n--- " << ob.getComment() << "\n";
     }
 #ifndef SCIDB_CLIENT
-    if (Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT)) { 
+    if (Config::getInstance()->getOption<bool>(CONFIG_ARRAY_EMPTYABLE_BY_DEFAULT)) {
         if (ob.getEmptyBitmapAttribute() == NULL) {
             stream << "not empty ";
         }
@@ -936,7 +937,7 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate start, Coordina
 
     _chunkInterval(chunkInterval),
     _chunkOverlap(chunkOverlap),
-        
+
     _funcMapOffset(0),
     _funcMapScale(1),
 
@@ -960,7 +961,7 @@ DimensionDesc::DimensionDesc(const std::string &baseName, const NamesType &names
 
     _chunkInterval(chunkInterval),
     _chunkOverlap(chunkOverlap),
-        
+
     _funcMapOffset(0),
     _funcMapScale(1),
 
@@ -984,7 +985,7 @@ DimensionDesc::DimensionDesc(const std::string &name, Coordinate startMin, Coord
     _currEnd(currEnd),
     _endMax(endMax),
     _chunkInterval(chunkInterval),
-    _chunkOverlap(chunkOverlap),        
+    _chunkOverlap(chunkOverlap),
     _funcMapOffset(funcMapOffset),
     _funcMapScale(funcMapScale),
     _type(type),

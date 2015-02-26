@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="transposeOperator">
   <refnamediv>
     <refname>transpose</refname>
 
@@ -9,12 +9,12 @@
       </indexterm><indexterm>
         <primary>arrays</primary>
 
-        <secondary>transposing</secondary>
+        <secondary>transpose</secondary>
       </indexterm><indexterm>
-        <primary>matrices</primary>
+        <primary>matrix</primary>
 
         <secondary>transpose</secondary>
-      </indexterm>Array transpose</refpurpose>
+      </indexterm>Array transpose.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -39,7 +39,7 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example transposes a 3<symbol>×</symbol>3 matrix.</para>
+      <para>This example transposes a 3<symbol>×</symbol>3 array.</para>
 
       <procedure>
         <step>
@@ -60,7 +60,12 @@
 [(0),(3),(6)],
 [(1),(4),(7)],
 [(2),(5),(8)]
-]</screen></para></para>
+]</screen>Compare
+          the <literal>reverse</literal> operator to transpose:<para><programlisting>AFL% reverse(m3x3);  </programlisting><screen>[
+[(8),(7),(6)],
+[(5),(4),(3)],
+[(2),(1),(0)]
+]</screen></para></para></para>
         </step>
       </procedure>
     </informalexample>

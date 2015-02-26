@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="reverseOperator">
   <refnamediv>
     <refname>reverse</refname>
 
     <refpurpose><indexterm>
         <primary>reverse</primary>
-      </indexterm>Reverse values in each array dimension</refpurpose>
+      </indexterm>Returns a result array, where the values in each array
+    dimension are reversed.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -36,11 +36,13 @@
         </step>
 
         <step>
-          <para>Put values of 0–11 into m3x4:<programlisting language="test">--afl store(build(m3x4,i*4+j),m3x4); --output-format=dense --chunkify=yes</programlisting></para>
+          <para>Put values of 1–12 into m3x4:<programlisting language="test">--afl store(build(m3x4,i*4+j+1),m3x4); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>
-          <para>Reverse the values in m3x4:<programlisting language="test">--afl reverse(m3x4); --output-format=dense --chunkify=yes</programlisting></para>
+          <para>Reverse the values in m3x4:<programlisting language="test">--afl reverse(m3x4); --output-format=dense --chunkify=yes</programlisting>Compare
+          the <literal>transpose</literal> operator to reverse:<programlisting
+          language="test">--afl transpose(m3x4); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>

@@ -157,7 +157,7 @@ immutable_modifier:
 empty_modifier:
     NOT EMPTY
     {
-        $$ = new AstNodeBool(emptyable, CONTEXT(@1), false);
+        $$ = new AstNodeBool(emptyable, CONTEXT(@$), false);
     }
     | EMPTY
     {
@@ -184,7 +184,7 @@ array_attribute_list:
 array_attribute:
     identifier_clause ':' typename nullable_modifier default compression reserve 
     {
-        $$ = new AstNode(attribute, CONTEXT(@1),
+        $$ = new AstNode(attribute, CONTEXT(@$),
             attributeArgCount, 
             $1,
             $3,
@@ -200,7 +200,7 @@ array_attribute:
 nullable_modifier:
     NOT NULL_VALUE
     {
-        $$ = new AstNodeBool(attributeIsNullable, CONTEXT(@1), false);
+        $$ = new AstNodeBool(attributeIsNullable, CONTEXT(@$), false);
     }
     | NULL_VALUE
     {
@@ -373,7 +373,7 @@ typename:
 schema:
     '<' array_attribute_list '>' '[' array_dimension_list ']'
     {
-        $$ = new AstNode(schema, CONTEXT(@1), schemaArgCount,
+        $$ = new AstNode(schema, CONTEXT(@$), schemaArgCount,
             $2,
             $5
         );
@@ -390,7 +390,7 @@ dummy:
 select_statement:
     SELECT select_list into_clause FROM from_list filter_clause grw_as_clause order_by_clause
     {
-        $$ = new AstNode(selectStatement, CONTEXT(@1), selectClauseArgCount,
+        $$ = new AstNode(selectStatement, CONTEXT(@$), selectClauseArgCount,
             $2,
             $3,
             $5,
@@ -400,7 +400,7 @@ select_statement:
     }
     | SELECT select_list into_clause
     {
-        $$ = new AstNode(selectStatement, CONTEXT(@1), selectClauseArgCount,
+        $$ = new AstNode(selectStatement, CONTEXT(@$), selectClauseArgCount,
             $2,
             $3,
             NULL,
@@ -474,21 +474,21 @@ grw_as_clause:
 group_by_clause:
     GROUP BY path_expression_list
     {
-        $$ = new AstNode(groupByClause, CONTEXT(@1), groupByClauseArgCount, $3);
+        $$ = new AstNode(groupByClause, CONTEXT(@$), groupByClauseArgCount, $3);
     }
     ;
 
 redimension_clause:
     REDIMENSION BY '[' array_dimension_list ']'
     {
-        $$ = new AstNode(redimensionClause, CONTEXT(@1), 1, $4);
+        $$ = new AstNode(redimensionClause, CONTEXT(@$), 1, $4);
     }
     ;
 
 regrid_clause:
     REGRID AS '(' PARTITION BY regrid_dimensions_list ')'
     {
-        $$ = new AstNode(regridClause, CONTEXT(@1), regridClauseArgCount, $6);
+        $$ = new AstNode(regridClause, CONTEXT(@$), regridClauseArgCount, $6);
     }
     ;
 
@@ -564,7 +564,7 @@ fixed_window_clause:
 variable_window_sole_clause:
     VARIABLE WINDOW AS '(' PARTITION BY window_dimension_range ')'
     {
-        $$ = new AstNode(windowClause, CONTEXT(@1), windowClauseArgCount,
+        $$ = new AstNode(windowClause, CONTEXT(@$), windowClauseArgCount,
             new AstNodeString(identifierClause, CONTEXT(@1), ""),
             new AstNode(windowRangesList, CONTEXT(@7), 1, $7),
             new AstNodeBool(boolNode, CONTEXT(@1), true));
@@ -600,11 +600,11 @@ window_dimensions_ranges_list:
 window_dimension_range:
     path_expression window_range_value PRECEDING AND window_range_value FOLLOWING
     {
-        $$ = new AstNode(windowDimensionRange, CONTEXT(@1), windowDimensionRangeArgCount, $1, $2, $5);
+        $$ = new AstNode(windowDimensionRange, CONTEXT(@$), windowDimensionRangeArgCount, $1, $2, $5);
     }
     | path_expression CURRENT
     {
-        $$ = new AstNode(windowDimensionRange, CONTEXT(@1), windowDimensionRangeArgCount, $1,
+        $$ = new AstNode(windowDimensionRange, CONTEXT(@$), windowDimensionRangeArgCount, $1,
             new AstNodeInt64(int64Node, CONTEXT(@1), 0),
             new AstNodeInt64(int64Node, CONTEXT(@1), 0));
     }
@@ -653,13 +653,13 @@ named_expr:
     }
     | expr AS identifier_clause
     {
-        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+        $$ = new AstNode(namedExpr, CONTEXT(@$), namedExprArgCount,
             $1,
             $3);
     }
     | expr identifier_clause
     {
-        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+        $$ = new AstNode(namedExpr, CONTEXT(@$), namedExprArgCount,
             $1,
             $2);
     }
@@ -668,7 +668,7 @@ named_expr:
 path_expression:
     identifier_clause timestamp_clause index_clause sort_quirk
     {
-        $$ = new AstNode(reference, CONTEXT(@1), referenceArgCount,
+        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
             NULL,
             $1,
             $2,
@@ -678,7 +678,7 @@ path_expression:
     }
     | identifier_clause '.' identifier_clause sort_quirk
     {
-        $$ = new AstNode(reference, CONTEXT(@1), referenceArgCount,
+        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
             $1,
             $3,
             NULL,
@@ -758,13 +758,13 @@ named_array_source:
     }
     | array_source AS identifier_clause
     {
-        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+        $$ = new AstNode(namedExpr, CONTEXT(@$), namedExprArgCount,
             $1,
             $3);
     }
     | array_source identifier_clause
     {
-        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+        $$ = new AstNode(namedExpr, CONTEXT(@$), namedExprArgCount,
             $1,
             $2);
     }
@@ -782,7 +782,7 @@ array_source:
 joined_input:
     reference_input JOIN reference_input ON expr
     {
-        $$ = new AstNode(joinClause, CONTEXT(@1),
+        $$ = new AstNode(joinClause, CONTEXT(@$),
             joinClauseArgCount,
             $1,
             $3,
@@ -790,7 +790,7 @@ joined_input:
     }
     | reference_input CROSS JOIN reference_input
     {
-        $$ = new AstNode(joinClause, CONTEXT(@1),
+        $$ = new AstNode(joinClause, CONTEXT(@$),
             joinClauseArgCount,
             $1,
             $4,
@@ -802,7 +802,7 @@ joined_input:
 array_literal:
     ARRAY '(' array_literal_schema ',' array_literal_input ')' array_literal_alias
     {
-        $$ = new AstNode(namedExpr, CONTEXT(@1), namedExprArgCount,
+        $$ = new AstNode(namedExpr, CONTEXT(@$), namedExprArgCount,
             new AstNode(function, CONTEXT(@1),
                 functionArgCount,
                 new AstNodeString(identifierClause, CONTEXT(@1), "build"),
@@ -841,7 +841,7 @@ array_literal_alias:
 thin_clause:
     THIN array_source BY '(' thin_dimensions_list ')'
     {
-        $$ = new AstNode(thinClause, CONTEXT(@1), thinClauseArgCount, $2, $5);
+        $$ = new AstNode(thinClause, CONTEXT(@$), thinClauseArgCount, $2, $5);
     }
     ;
     
@@ -860,7 +860,7 @@ thin_dimensions_list:
 thin_dimension:
     path_expression START constant_int64 STEP constant_int64
     {
-        $$ = new AstNode(thinDimension, CONTEXT(@1), thinDimensionClauseArgCount,
+        $$ = new AstNode(thinDimension, CONTEXT(@$), thinDimensionClauseArgCount,
             $1, $3, $5);
     }
     ;
@@ -953,11 +953,11 @@ expr:
 array_access:
     common_expr '[' expr_list ']'
     {
-        $$ = new AstNode(sequencionalArrayAccess, CONTEXT(@1), sequencionalArrayAccessArgCount, $1, $3);
+        $$ = new AstNode(sequencionalArrayAccess, CONTEXT(@$), sequencionalArrayAccessArgCount, $1, $3);
     }
     | common_expr '{' expr_list '}'
     {
-        $$ = new AstNode(numberedArrayAccess, CONTEXT(@1), numberedArrayAccessArgCount, $1, $3);
+        $$ = new AstNode(numberedArrayAccess, CONTEXT(@$), numberedArrayAccessArgCount, $1, $3);
     }
     ;
 
@@ -1111,7 +1111,7 @@ constant_bool:
 function:
     identifier_clause '(' ')'
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             $1,
             new AstNode(functionArguments, CONTEXT(@2), 0),
@@ -1120,7 +1120,7 @@ function:
     }
     | identifier_clause '(' function_argument_list ')'
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             $1,
             $3,
@@ -1129,7 +1129,7 @@ function:
     }
     | identifier_clause '(' asterisk ')'
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             $1,
             new AstNode(functionArguments, CONTEXT(@2), 1,
@@ -1142,7 +1142,7 @@ function:
 olap_aggregate:
     function OVER identifier_clause
     {
-        $$ = new AstNode(olapAggregate, CONTEXT(@1), olapAggregateArgCount,
+        $$ = new AstNode(olapAggregate, CONTEXT(@$), olapAggregateArgCount,
             $1,
             $3);
     }
@@ -1188,9 +1188,11 @@ case_expr:
         AstNode* currentIif = NULL;
         AstNode* lastIif = NULL;
         bool first = true;
-        for(size_t i = 0; i < $3->getChildsCount(); ++i)
+        for(size_t i = 0, n = $3->getChildsCount(); i < n; ++i)
         {
             currentIif = $3->getChild(i);
+            $3->setChild(i, NULL);
+
             if (!iifNode)
             {
                 iifNode = currentIif;
@@ -1212,6 +1214,7 @@ case_expr:
                     glue.error(
                         currentIif->getChild(functionArgParameters)->getChild(0)->getParsingContext(),
                         "Function or scalar operator expected");
+                    delete currentIif;
                     delete $2;
                     delete $3;
                     delete $4;
@@ -1228,12 +1231,11 @@ case_expr:
             first = false;
         }
 
-        if ($4)
-        {
-            //Filling third parameter of IIF for ELSE clause
-            lastIif->getChild(functionArgParameters)->setChild(2, $4);            
-        }
+        //Filling third parameter of IIF for ELSE clause
+        lastIif->getChild(functionArgParameters)->setChild(2,
+            $4 ? $4 : new AstNodeNull(null, CONTEXT(@4)));            
 
+        delete $3;
         $$ = iifNode;
     }
     ;
@@ -1260,14 +1262,13 @@ case_when_clause_list:
 case_when_clause:
     WHEN expr THEN expr
     {
-        //$$ = new AstNode(caseWhenClause, CONTEXT(@1), caseWhenClauseArgCount, $2, $4);
         $$ = new AstNode(function, CONTEXT(@$),
                 functionArgCount,
                 new AstNodeString(identifierClause, CONTEXT(@$), "iif"),
                 new AstNode(functionArguments, CONTEXT(@$), 3,
                     $2, //will be updated in case_expr
                     $4,
-                    new AstNodeNull(null, CONTEXT(@$)) //will be filled in case_expr
+                    NULL//will be filled in case_expr
                 ),
                 NULL,
                 new AstNodeBool(boolNode, CONTEXT(@$), false)
@@ -1290,9 +1291,9 @@ beetween_expr:
     expr BETWEEN reduced_expr AND reduced_expr %prec BETWEEN
     {
         $$ = makeBinaryScalarOp("and",
-                makeBinaryScalarOp(">=", $1, $3, CONTEXT(@1)),
-                makeBinaryScalarOp("<=", $1->clone(), $5, CONTEXT(@1)),
-                CONTEXT(@1)
+                makeBinaryScalarOp(">=", $1, $3, CONTEXT(@$)),
+                makeBinaryScalarOp("<=", $1->clone(), $5, CONTEXT(@$)),
+                CONTEXT(@$)
                 );
     }
     ;
@@ -1316,7 +1317,7 @@ load_statement:
             }
         }
 
-        $$ = new AstNode(loadStatement, CONTEXT(@1), loadStatementArgCount,
+        $$ = new AstNode(loadStatement, CONTEXT(@$), loadStatementArgCount,
             $2,
             $4,
             $5,
@@ -1342,7 +1343,7 @@ format_error_shadow:
 error_shadow:
     ERRORS constant_int64 shadow
     {
-        $$ = new AstNode(unknownNode, CONTEXT(@2), 2, $2, $3);
+        $$ = new AstNode(unknownNode, CONTEXT(@1), 2, $2, $3);
     }
     |
     {
@@ -1365,7 +1366,7 @@ shadow:
 save_statement:
     SAVE path_expression INTO load_save_instance_id constant_string save_format
     {
-        $$ = new AstNode(saveStatement, CONTEXT(@1), saveStatementArgCount,
+        $$ = new AstNode(saveStatement, CONTEXT(@$), saveStatementArgCount,
             $2,
             $4,
             $5,
@@ -1414,7 +1415,7 @@ load_save_instance_id:
 update_statement:
     UPDATE path_expression SET update_list where_clause  
     {
-        $$ = new AstNode(updateStatement, CONTEXT(@1), updateStatementArgCount,
+        $$ = new AstNode(updateStatement, CONTEXT(@$), updateStatementArgCount,
             $2,
             $4,
             $5);
@@ -1436,7 +1437,7 @@ update_list:
 update_list_item:
     identifier_clause '=' expr
     {
-        $$ = new AstNode(updateListItem, CONTEXT(@1), updateListItemArgCount,
+        $$ = new AstNode(updateListItem, CONTEXT(@$), updateListItemArgCount,
             $1,
             $3
             );
@@ -1446,7 +1447,7 @@ update_list_item:
 drop_array_statement:
     DROP ARRAY identifier_clause
     {
-        $$ = new AstNode(dropArrayStatement, CONTEXT(@1), dropArrayStatementArgCount,
+        $$ = new AstNode(dropArrayStatement, CONTEXT(@$), dropArrayStatementArgCount,
             $3
             );        
     }
@@ -1466,7 +1467,7 @@ where_clause:
 load_library_statement:
     LOAD LIBRARY constant_string
     {
-        $$ = new AstNode(loadLibraryStatement, CONTEXT(@1), loadLibraryStatementArgCount,
+        $$ = new AstNode(loadLibraryStatement, CONTEXT(@$), loadLibraryStatementArgCount,
             $3
             );
     }
@@ -1475,7 +1476,7 @@ load_library_statement:
 unload_library_statement:
     UNLOAD LIBRARY constant_string
     {
-        $$ = new AstNode(unloadLibraryStatement, CONTEXT(@1), unloadLibraryStatementArgCount,
+        $$ = new AstNode(unloadLibraryStatement, CONTEXT(@$), unloadLibraryStatementArgCount,
             $3
             );
     }

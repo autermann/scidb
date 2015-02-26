@@ -279,58 +279,88 @@ static shared_ptr<LogicalQueryPlanNode> fitInput(
     const ArrayDesc& requiredSchema,
     shared_ptr<Query>& query);
 
-shared_ptr<LogicalQueryPlanNode> AstToLogicalPlan(AstNode *ast, const shared_ptr<Query> &query)
+/**
+ * Convert all UDTs to strings
+ *
+ * @param input Input query
+ * @param query Query context
+ * @return Result logical plan
+ */
+static shared_ptr<LogicalQueryPlanNode> canonicalizeTypes(
+        const shared_ptr<LogicalQueryPlanNode> &input,
+        const shared_ptr<Query> &query);
+
+shared_ptr<LogicalQueryPlanNode> AstToLogicalPlan(AstNode *ast, const shared_ptr<Query> &query,
+        bool canonicalize)
 {
+    shared_ptr<LogicalQueryPlanNode> result = shared_ptr<LogicalQueryPlanNode>();
     switch(ast->getType())
     {
         //AFL/AQL
         case function:
-            return passAFLOperator(ast, query);
+            result = passAFLOperator(ast, query);
+            break;
 
         case selectStatement:
-            return passSelectStatement(ast, query);
+            result = passSelectStatement(ast, query);
+            break;
 
         case reference:
-            return passImplicitScan(ast, query);
+            result = passImplicitScan(ast, query);
+            break;
 
         //DDL/DML
         case createArray:
-        return passCreateArray(ast, query);
+            result = passCreateArray(ast, query);
+            break;
 
         case loadStatement:
-            return passLoadStatement(ast, query);
+            result = passLoadStatement(ast, query);
+            break;
 
         case saveStatement:
-            return passSaveStatement(ast, query);
+            result = passSaveStatement(ast, query);
+            break;
 
         case updateStatement:
-            return passUpdateStatement(ast, query);
+            result = passUpdateStatement(ast, query);
+            break;
 
         case dropArrayStatement:
-            return passDropArrayStatement(ast);
+            result = passDropArrayStatement(ast);
+            break;
 
         case renameArrayStatement:
-            return passRenameArrayStatement(ast);
+            result = passRenameArrayStatement(ast);
+            break;
 
         case cancelQueryStatement:
-            return passCancelQueryStatement(ast);
+            result = passCancelQueryStatement(ast);
+            break;
 
         case loadLibraryStatement:
-            return passLoadLibrary(ast);
+            result = passLoadLibrary(ast);
+            break;
 
         case unloadLibraryStatement:
-            return passUnloadLibrary(ast);
+            result = passUnloadLibrary(ast);
+            break;
 
         case insertIntoStatement:
-            return passInsertIntoStatement(ast, query);
+            result = passInsertIntoStatement(ast, query);
+            break;
 
         default:
-            assert(0);
+            assert(false);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "AstToLogicalPlan";
     }
 
-    assert(false);
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "AstToLogicalPlan";
-    return shared_ptr<LogicalQueryPlanNode>();
+    if (canonicalize && !result->isDdl())
+    {
+        result = canonicalizeTypes(result, query);
+    }
+
+    return result;
 }
 
 shared_ptr<LogicalExpression> AstToLogicalExpression(AstNode *ast)
@@ -3544,7 +3574,7 @@ static shared_ptr<LogicalQueryPlanNode> passSelectList(
                     }
 
                     // Otherwise prepare parameters for project
-                    BOOST_FOREACH(const AttributeDesc &att, inputSchema.getAttributes())
+                    BOOST_FOREACH(const AttributeDesc &att, inputSchema.getAttributes(true))
                     {
                         shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
                             selItem->getParsingContext(),
@@ -4362,6 +4392,68 @@ static shared_ptr<LogicalQueryPlanNode> fitInput(
     }
 
     return fittedInput;
+}
+
+static shared_ptr<LogicalQueryPlanNode> canonicalizeTypes(
+        const shared_ptr<LogicalQueryPlanNode> &input,
+        const shared_ptr<Query> &query)
+{
+    LOG4CXX_TRACE(logger, "Types canonicalization");
+    const ArrayDesc& inputSchema = input->inferTypes(query);
+    bool skip = true;
+    BOOST_FOREACH(const AttributeDesc& att, inputSchema.getAttributes())
+    {
+        if(!isBuiltinType(att.getType()))
+        {
+            skip = false;
+            break;
+        }
+    }
+
+    if (skip)
+    {
+        return input;
+    }
+
+    shared_ptr<ParsingContext> pc = input->getParsingContext();
+    vector<shared_ptr<OperatorParam> > castParams(1);
+
+    Attributes attrs;
+    BOOST_FOREACH(const AttributeDesc& att, inputSchema.getAttributes())
+    {
+        TypeId attType;
+        if(isBuiltinType(att.getType()))
+        {
+            attType = att.getType();
+        }
+        else
+        {
+            attType = TID_STRING;
+        }
+        AttributeDesc newAtt(
+                att.getId(),
+                att.getName(),
+                attType,
+                att.getFlags(),
+                att.getDefaultCompressionMethod(),
+                att.getAliases(),
+                att.getReserve());
+        attrs.push_back(newAtt);
+    }
+
+    ArrayDesc castSchema(
+            inputSchema.getId(),
+            inputSchema.getUAId(),
+            inputSchema.getVersionId(),
+            inputSchema.getName(),
+            attrs,
+            inputSchema.getDimensions(),
+            inputSchema.getFlags(),
+            inputSchema.getComment());
+
+    castParams[0] = make_shared<OperatorParamSchema>(pc, castSchema);
+
+    return appendOperator(input, "cast", castParams, pc);
 }
 
 } // namespace scidb

@@ -5,7 +5,7 @@
 --set-format dcsv
 --start-igdata
 create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
---aql load winnersFlat from '../examples/winnersFew.scidb' 
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' 
 store(sort(winnersFlat,year),champions) 
 --set-format csv
 --stop-igdata

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="stdevOperator">
   <refnamediv>
     <refname>stdev</refname>
 
-    <refpurpose>Standard deviation</refpurpose>
+    <refpurpose>Returns the standard deviation for the specified attribute of
+    the input array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>stdev(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
+    <synopsis>stdev(<replaceable>array</replaceable>[,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>])</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -18,14 +18,34 @@
 
     <para><indexterm>
         <primary>standard deviation</primary>
-      </indexterm>The stdev operator takes a set of scalar values from an
-    array attribute and returns the standard deviation of those values.</para>
+      </indexterm>The <literal>stdev</literal> operator takes a set of scalar
+    values from an array attribute and returns the standard deviation of those
+    values. For the corresponding aggregate, see the <link
+    linkend="stdevAggregate">stdev aggregate</link> reference.</para>
+  </refsect1>
 
-    <note>
-      <para>The stdev operator provides the same functionality as the stdev
-      aggregate. For details, see the <link
-      linkend="stdevAggregate">stdev</link> aggregate reference.</para>
-    </note>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>stdev</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: Optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

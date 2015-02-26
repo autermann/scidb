@@ -23,6 +23,7 @@ package org.scidb;
 
 import junit.framework.TestCase;
 import org.scidb.jdbc.IResultSetWrapper;
+import org.scidb.jdbc.IStatementWrapper;
 
 import java.sql.*;
 
@@ -315,5 +316,62 @@ public class JDBCBasicTestCase extends TestCase
             res.next();
         }
         assertEquals("0:false:false:true:1:false:true:false:2:false:false:false:3:false:false:true:", sbMain.toString());
+    }
+
+    public void testStatementWrapper() throws SQLException
+    {
+        Statement st = conn.createStatement();
+
+        IStatementWrapper stWrapper = st.unwrap(IStatementWrapper.class);
+        assertTrue(stWrapper.isAql());
+        stWrapper.setAfl(true);
+        assertTrue(stWrapper.isAfl());
+        assertFalse(stWrapper.isAql());
+
+        ResultSet res = st.executeQuery("build(<a:int32>[x=0:3,4,0], x)");
+        ResultSetMetaData meta = res.getMetaData();
+
+        assertEquals("build", meta.getTableName(0));
+        assertEquals(2, meta.getColumnCount());
+
+        IResultSetWrapper resWrapper = res.unwrap(IResultSetWrapper.class);
+        assertEquals("x", meta.getColumnName(1));
+        assertEquals("int64", meta.getColumnTypeName(1));
+        assertFalse(resWrapper.isColumnAttribute(1));
+
+        assertEquals("a", meta.getColumnName(2));
+        assertEquals("int32", meta.getColumnTypeName(2));
+        assertTrue(resWrapper.isColumnAttribute(2));
+
+        StringBuilder sbMain = new StringBuilder();
+        while(!res.isAfterLast())
+        {
+            sbMain.append(res.getLong("x") + ":" + res.wasNull() + ":" + res.getInt("a") + ":" + res.wasNull() + ":");
+            res.next();
+        }
+        assertEquals("0:false:0:false:1:false:1:false:2:false:2:false:3:false:3:false:", sbMain.toString());
+    }
+
+    public void testBatchExecutionMultipleResults() throws SQLException
+    {
+        Statement st = conn.createStatement();
+        st.addBatch("select * from array(empty<a:int32>[x=0:2,3,0], '[1,2,3]')");
+        st.addBatch("select * from array(empty<b:int32>[y=0:2,3,0], '[4,5,6]')");
+        st.executeBatch();
+
+        StringBuilder sbMain = new StringBuilder();
+        do
+        {
+            ResultSet res = st.getResultSet();
+            sbMain.append("{");
+            while(!res.isAfterLast())
+            {
+                sbMain.append(res.getLong(1) + ":" + res.getInt(2) + ":");
+                res.next();
+            }
+            sbMain.append("}");
+        } while (st.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+        conn.commit();
+        assertEquals("{0:1:1:2:2:3:}{0:4:1:5:2:6:}", sbMain.toString());
     }
 }

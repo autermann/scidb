@@ -1,31 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="minOperator">
   <refnamediv>
     <refname>min</refname>
 
     <refpurpose><indexterm>
         <primary>min</primary>
-      </indexterm>Select minimum value</refpurpose>
+      </indexterm>Selects the minimum value for the specified attribute,
+    optionally over one or more dimensions.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>min(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+    <synopsis>min(<replaceable>array</replaceable>[,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>])</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para>The min operator selects the minimum value from an array
-    attribute.</para>
+    <para>The min operator selects the minimum value from an array attribute.
+    For the corresponding aggregate, see the <link
+    linkend="minAggregate">min</link> aggregate reference.</para>
+  </refsect1>
 
-    <note>
-      <para>The min operator provides the same functionality as the min
-      aggregate. For details, see the <link linkend="minAggregate">min</link>
-      aggregate reference.</para>
-    </note>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>min</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: an optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

@@ -31,6 +31,7 @@
 #include <stdarg.h>
 #include <float.h>
 #include <vector>
+#include <boost/algorithm/string.hpp>
 
 #include "log4cxx/logger.h"
 #include "log4cxx/basicconfigurator.h"
@@ -237,6 +238,23 @@ const Value& TypeLibrary::_getDefaultValue(TypeId typeId)
 }
 
 /**
+ * Check if type is fixed string (type name is pattern string_*)
+ * @warning Fixed-sized strings are still not fully supported and have known problems
+ * @param type type name
+ * @return
+ */
+bool isFixedString(const TypeId type)
+{
+    if (TID_FIXED_STRING == type)
+    {
+        return true;
+    }
+
+    int size;
+    return sscanf(type.c_str(), "string_%d", &size) == 1;
+}
+
+/**
  * Helper Value functions implementation
  * 
  * NOTE: This will only work efficiently for the built in types. If you try 
@@ -270,21 +288,21 @@ string ValueToString(const TypeId type, const Value& value, int precision)
        	ss << value.getInt64();
 	} else if ( TID_INT32 == type ) { 
        	ss << value.getInt32();
-	} else if ( TID_STRING == type ) { 
+	} else if ( TID_STRING == type || isFixedString(type)) {
         char const* str = value.getString();
         if (str == NULL) { 
             ss << "null";
         } else { 
             const string s = str;
-            ss << '\"';
+            ss << '\'';
             for (size_t i = 0; i < s.length(); i++) {
                 const char ch = s[i];
-                if (ch == '\"' || ch == '\\') {
+                if (ch == '\'' || ch == '\\') {
                     ss << '\\';
                 }
                 ss << ch;
             }
-            ss << '\"';
+            ss << '\'';
         }
 	} else if ( TID_CHAR == type ) {
 
@@ -325,7 +343,7 @@ string ValueToString(const TypeId type, const Value& value, int precision)
 
        	gmtime_r(&dt, &tm);
        	strftime(buf, sizeof(buf), DEFAULT_STRFTIME_FORMAT, &tm);
-       	ss << '\"' << buf << '\"';
+       	ss << '\'' << buf << '\'';
 
 	} else if ( TID_DATETIMETZ == type) {
 
@@ -347,7 +365,7 @@ string ValueToString(const TypeId type, const Value& value, int precision)
 	            (int32_t) (aoffset%3600)/60);
 
 
-	    ss << '\"' << buf << '\"';
+	    ss << '\'' << buf << '\'';
 	} else if ( TID_INT8 == type ) { 
        	ss << (int)value.getInt8();
 	} else if ( TID_INT16 == type ) { 
@@ -370,36 +388,57 @@ string ValueToString(const TypeId type, const Value& value, int precision)
 
 inline void mStringToMonth(char* mString, int& month)
 {
-    if (mString[0]!=0)
+    if (boost::iequals(mString, "jan"))
     {
-        switch (mString[0])
-        {
-            case 'J':
-                if (mString[1]=='A')      { month=1; }
-                else if (mString[2]=='N') { month=6; }
-                else                      { month=7; }
-                break;
-            case 'F':                       month=2;
-                break;
-            case 'M':
-                if(mString[2]=='R')       { month=3; }
-                else                      { month=5; }
-                break;
-            case 'A':
-                if (mString[1]=='P')      { month=4; }
-                else                      { month=8; }
-                break;
-            case 'S':                       month=9;
-                break;
-            case 'O':                       month=10;
-                break;
-            case 'N':                       month=11;
-                break;
-            case 'D':                       month=12;
-                break;
-            default:
-                throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_INVALID_MONTH_REPRESENTATION) << string(mString);
-        }
+        month = 1;
+    }
+    else if (boost::iequals(mString, "feb"))
+    {
+        month = 2;
+    }
+    else if (boost::iequals(mString, "mar"))
+    {
+        month = 3;
+    }
+    else if (boost::iequals(mString, "apr"))
+    {
+        month = 4;
+    }
+    else if (boost::iequals(mString, "may"))
+    {
+        month = 5;
+    }
+    else if (boost::iequals(mString, "jun"))
+    {
+        month = 6;
+    }
+    else if (boost::iequals(mString, "jul"))
+    {
+        month = 7;
+    }
+    else if (boost::iequals(mString, "aug"))
+    {
+        month = 8;
+    }
+    else if (boost::iequals(mString, "sep"))
+    {
+        month = 9;
+    }
+    else if (boost::iequals(mString, "oct"))
+    {
+        month = 10;
+    }
+    else if (boost::iequals(mString, "nov"))
+    {
+        month = 11;
+    }
+    else if (boost::iequals(mString, "dec"))
+    {
+        month = 12;
+    }
+    else
+    {
+        throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_INVALID_MONTH_REPRESENTATION) << string(mString);
     }
 }
 
@@ -426,6 +465,8 @@ time_t parseDateTime(std::string const& str)
     char amPmString[3]="";
 
     if (( sscanf(s, "%d-%3s-%d %d.%d.%d %2s%n", &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &amPmString[0], &n) == 7 ||
+          sscanf(s, "%d-%3s-%d %d.%d.%d%n", &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) == 6 ||
+          sscanf(s, "%d-%3s-%d%n", &t.tm_mday, &mString[0], &t.tm_year, &n) == 3 ||
           sscanf(s, "%d%3s%d:%d:%d:%d%n", &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) == 6 ) && n == (int) str.size())
     {
         mStringToMonth(&mString[0], t.tm_mon);
@@ -556,9 +597,11 @@ bool isBuiltinType(const TypeId type)
         || TID_BOOL == type
         || TID_DATETIME == type
         || TID_VOID == type
-        || TID_DATETIMETZ == type;
+        || TID_DATETIMETZ == type
+        || TID_BINARY == type
+        || isFixedString(type);
 }
- 
+
 TypeId propagateType(const TypeId type)
 {
 	return TID_INT8 == type || TID_INT16 == type || TID_INT32 == type
@@ -597,6 +640,13 @@ void StringToValue(const TypeId type, const string& str, Value& value)
     } else if (  TID_CHAR == type )  { 
         value.setChar(str[0]);
 	} else if ( TID_STRING == type ) {
+        value.setString(str.c_str());
+	} else if (isFixedString(type)) {
+	    if (str.size() + 1 > TypeLibrary::getType(type).byteSize())
+	    {
+            throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TRUNCATION)
+                    << str.size() << type;
+	    }
         value.setString(str.c_str());
     } else if ( TID_FLOAT == type ) { 
         if (str == string("NA") ) {
@@ -668,7 +718,7 @@ double ValueToDouble(const TypeId type, const Value& value)
         return value.getInt32();
     } else if ( TID_CHAR == type ) { 
         return value.getChar();
-    } else if ( TID_STRING == type ) { 
+    } else if ( TID_STRING == type  || isFixedString(type)) {
         double d;
         int n;
         char const* str = value.getString();
@@ -726,6 +776,15 @@ void DoubleToValue(const TypeId type, double d, Value& value)
       } else if ( TID_STRING == type ) {
           std::stringstream ss;
           ss << d;
+          value.setString(ss.str().c_str());
+      } else if (isFixedString(type)) {
+          std::stringstream ss;
+          ss << d;
+          if (ss.str().size() + 1 > TypeLibrary::getType(type).byteSize())
+          {
+              throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TRUNCATION)
+                      << ss.str().size() << type;
+          }
           value.setString(ss.str().c_str());
       } else if (  TID_DATETIME == type ) {
         return value.setDateTime((time_t)d);

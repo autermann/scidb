@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter>
@@ -102,13 +101,13 @@
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNs 
-            &lt; ../examples/aInsert.csv &gt; 
-              ../examples/aInsert.scidb
+            &lt; $DOC_DATA/aInsert.csv &gt; 
+              $DOC_DATA/aInsert.scidb
  --show-query=no
  --show-output=no
 
 --aql load aFlat 
-      from '../examples/aInsert.scidb'
+      from '../tests/harness/testcases/data/doc/aInsert.scidb'
  --show-query=no
  --show-output=no
 
@@ -129,12 +128,12 @@
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNs 
-                   &lt; ../examples/bInsert.csv &gt; 
-                   ../examples/bInsert.scidb
+                   &lt; $DOC_DATA/bInsert.csv &gt; 
+                   $DOC_DATA/bInsert.scidb
  --show-query=no
  --show-output=no
 
---aql load bFlat from '../examples/bInsert.scidb'
+--aql load bFlat from '../tests/harness/testcases/data/doc/bInsert.scidb'
  --show-query=no
  --show-output=no
 
@@ -170,10 +169,10 @@
     null/not-null setting on each corresponding pair of attributes, and
     restrictions on dimension starting indexes, chunk sizes, and chunk
     overlaps. In addition, the current release of SciDB requires that every
-    dimension of either array must have datatype int64. The complete list of
-    compatibility rules for insertion operations appears in the chapter called
-    SciDB AFL Operator Reference, in the section on the insert
-    operator.</para>
+    dimension of either array must have datatype int64. For the complete list
+    of compatibility rules for insertion operations, see the <link
+    linkend="insertOperator">insert operator</link> AFL reference
+    topic.</para>
 
     <para>Here is the schema for array A:</para>
 
@@ -276,13 +275,13 @@
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNsS 
-            &lt; ../examples/cInsert.csv &gt; 
-              ../examples/cInsert.scidb
+            &lt; $DOC_DATA/cInsert.csv &gt; 
+              $DOC_DATA/cInsert.scidb
  --show-query=no
  --show-output=no
 
 --aql load cFlat 
-      from '../examples/cInsert.scidb'
+      from '../tests/harness/testcases/data/doc/cInsert.scidb'
  --show-query=no
  --show-output=no
 
@@ -350,6 +349,12 @@
         <primary>insert into</primary>
 
         <secondary>literals</secondary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>literals</secondary>
+      </indexterm><indexterm>
+        <primary>literals, inserting</primary>
       </indexterm>When supplying the array to be inserted in the source array,
     you are not limited to a select statement. Alternative syntax lets you use
     an array literal, as in the following command:</para>

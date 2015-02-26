@@ -29,7 +29,7 @@
 
 #include "query/Operator.h"
 #include "array/DelegateArray.h"
-
+#include "CastArray.h"
 
 using namespace std;
 using namespace boost;
@@ -64,14 +64,44 @@ public:
         { 
             inputArray = boost::shared_ptr<Array>(new NonEmptyableArray(inputArray));
         }
-		if (Config::getInstance()->getOption<bool>(CONFIG_RLE_CHUNK_FORMAT) )
-		{
-		    return boost::shared_ptr<Array>(new ShallowDelegateArray(_schema, inputArray));
-		}
-		else
-		{
-		    return boost::shared_ptr<Array>(new DelegateArray(_schema, inputArray, false));
-		}
+
+        CastArray::CastingMap castingMap;
+
+        for(AttributeID i = 0, n = _schema.getAttributes().size(); i < n; ++i)
+        {
+            TypeId from = inputArray->getArrayDesc().getAttributes()[i].getType();
+            TypeId to = _schema.getAttributes()[i].getType();
+            if (from != to)
+            {
+                castingMap[i] = FunctionLibrary::getInstance()->findConverter(
+                        from, to);
+            }
+        }
+
+        Dimensions dstDimensions(_schema.getDimensions().size());
+        for (size_t i = 0, n = _schema.getDimensions().size(); i < n; i++)
+        {
+            const DimensionDesc &srcDim = _schema.getDimensions()[i];
+            dstDimensions[i] = DimensionDesc(
+                    srcDim.getBaseName(),
+                    srcDim.getNamesAndAliases(),
+                    srcDim.getStartMin(),
+                    srcDim.getCurrStart(),
+                    srcDim.getCurrEnd(),
+                    srcDim.getEndMax(),
+                    srcDim.getChunkInterval(),
+                    srcDim.getChunkOverlap(),
+                    srcDim.getType(),
+                    srcDim.getFlags(),
+                    inputArray->getArrayDesc().getDimensions()[i].getMappingArrayName(),
+                    srcDim.getComment(),
+                    srcDim.getFuncMapOffset(),
+                    srcDim.getFuncMapScale());
+        }
+
+        ArrayDesc dstSchema("", _schema.getAttributes(), dstDimensions, _schema.getFlags());
+
+        return boost::shared_ptr<Array>(new CastArray(dstSchema, inputArray, castingMap));
 	 }
 };
     

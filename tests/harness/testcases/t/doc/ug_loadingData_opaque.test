@@ -1,4 +1,3 @@
-../tests/harness/testcases/doc_data
 
 --setup
 --start-query-logging
@@ -7,8 +6,8 @@
 --aql drop array intensity
 --aql drop array intensityCopy
 --aql create array intensityFlat <category:string,elapsedTime:int64,measuredIntensity:int64 null>[i=0:*,10000,0]
---shell --command " csv2scidb -s 1 -p SNN < ../tests/harness/testcases/doc_data/intensityBig.csv > ../tests/harness/testcases/doc_data/intensityBig.scidb " --store
---aql load intensityFlat from '../tests/harness/testcases/doc_data/intensity.scidb'
+--shell --command " csv2scidb -s 1 -p SNN < ../tests/harness/testcases/data/doc/intensityBig.csv > ../tests/harness/testcases/data/doc/intensityBig.scidb " --store
+--aql load intensityFlat from '../tests/harness/testcases/data/doc/intensity.scidb'
 --aql create array intensity <measuredIntensity:int64 null> [category(string)=3,3,0,elapsedTime=0:40000,10000,0]
 redimension_store(intensityFlat,intensity)
 

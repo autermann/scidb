@@ -140,7 +140,7 @@ public:
         if (parentArrayDesc.isImmutable()) {
             _lock->setArrayId(parentArrayDesc.getId());
             rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
-            assert(rc);            
+            assert(rc);
             return;
         }
 
@@ -249,7 +249,7 @@ public:
                     coordinateMultiIndices[i] = buildSortedMultiIndex(srcArray, attID, query, indexMapName, destDims[i].getStart(), destDims[i].getLength());
                 } else {
                     coordinateMultiIndices[i] = buildFunctionalMapping(destDims[i]); // first try to locate method performing functional mapping for this type
-                    if (!coordinateMultiIndices[i]) { // if there are no such functions, then buid mapping index
+                    if (!coordinateMultiIndices[i]) { // if there are no such functions, then build mapping index
                         if (srcArray->getSupportedAccess() == Array::SINGLE_PASS)  {
                             throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_UNSUPPORTED_INPUT_ARRAY) << "redimension_store";
                         }
@@ -314,9 +314,8 @@ public:
         shared_ptr<Array> srcArray = inputArrays[0];
 
         ArrayDesc  const& srcArrayDesc = srcArray->getArrayDesc();
-        ArrayDesc  const& destArrayDesc = _schema;
-        Attributes const& destAttrs = destArrayDesc.getAttributes(true); // true = exclude empty tag.
-        Dimensions const& destDims = destArrayDesc.getDimensions();
+        Attributes const& destAttrs = _schema.getAttributes(true); // true = exclude empty tag.
+        Dimensions const& destDims = _schema.getDimensions();
 
         vector<AggregatePtr> aggregates (destAttrs.size());
         vector<size_t> attrMapping(destAttrs.size());
@@ -339,18 +338,29 @@ public:
             	}
             }
 
-            SystemCatalog::getInstance()->updateArray(ArrayDesc(arrayId, _arrayUAID, vid, baseArrayName, _schema.getAttributes(), _updateableDims, _schema.getFlags()));
+            SystemCatalog::getInstance()->updateArray(ArrayDesc(arrayId,
+                                                                _arrayUAID,
+                                                                vid,
+                                                                baseArrayName,
+                                                                _schema.getAttributes(),
+                                                                _updateableDims,
+                                                                _schema.getFlags()));
         }
 
-        shared_ptr<Array> destArray = shared_ptr<Array>(new DBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
+        shared_ptr<Array> destArray(DBArray::newDBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
         arrayId = destArray->getHandle();
+
+        query->getReplicationContext()->enableInboundQueue(arrayId, destArray);
+
         _schema.setIds(arrayId, _schema.getUAId(), _schema.getVersionId());
-        SystemCatalog::getInstance()->updateArray(_schema);
+        SystemCatalog::getInstance()->updateArray(_schema); //XXX why this ?
 
         transformArray(destArray, srcArrayDesc, srcArray, attrMapping, dimMapping, aggregates, query);
 
+        query->getReplicationContext()->replicationSync(arrayId);
+        query->getReplicationContext()->removeInboundQueue(arrayId);
+
         StorageManager::getInstance().flush();
-        query->replicationBarrier();
         getInjectedErrorListener().check();
         return destArray;
     }

@@ -5,14 +5,20 @@
 --set-format dcsv
 --start-igdata
 create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
---shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winners2.csv > ../examples/winners2.scidb "
---aql load winnersFlat from '../examples/winners2.scidb'  
+--shell  --command="csv2scidb -s 1 -p SNSSN < $DOC_DATA/winners2.csv > $DOC_DATA/winners2.scidb "
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2.scidb'  
 CREATE ARRAY champions<person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]  
 redimension_store(winnersFlat,champions)  
 --stop-igdata
 --aql select * from show(champions)  
 --aql select * into championsAbridged from project(champions,person)  
 --aql select * from show(championsAbridged)  
+--set-format dense
+store(build(<val1:int64> [i=0:4,5,0, j=0:0,1,0], i),A)  
+store(build(<val2:int64> [i=0:0,1,0, j=0:4,5,0], 10-j),B)  
+show('multiply(A,B)','afl')  
+show('select sum(val1) from A')  
+show('select stdev(val1) from A')  
 
 --stop-query-logging
 
@@ -22,3 +28,5 @@ redimension_store(winnersFlat,champions)
 remove(winnersFlat)
 remove(champions)
 remove(championsAbridged)
+remove(A)
+remove(B)

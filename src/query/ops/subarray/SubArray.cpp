@@ -54,7 +54,7 @@ namespace scidb
         ArrayDesc dstMappingArrayDesc(tmpMappingArrayName,
                                       srcMappingArrayDesc.getAttributes(), 
                                       indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY); 
-        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc));
+        shared_ptr<Array> dstMappingArray = boost::shared_ptr<Array>(new MemArray(dstMappingArrayDesc, query));
         if (till >= from) { 
             shared_ptr<ArrayIterator> dstArrayIterator = dstMappingArray->getIterator(0);
             Coordinates pos(1);
@@ -335,8 +335,8 @@ namespace scidb
                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
                     sparseChunk.setBitmapChunk((Chunk*)&emptyIterator->getChunk());
                 }
-                boost::shared_ptr<Query> dummyQuery;
-                outIterator = sparseChunk.getIterator(dummyQuery, ChunkIterator::NO_EMPTY_CHECK);
+                outIterator = sparseChunk.getIterator(Query::getValidQueryPtr(array._query),
+                                                      ChunkIterator::NO_EMPTY_CHECK);
                 fillSparseChunk(0);
                 outIterator->flush();
                 return sparseChunk;
@@ -491,14 +491,16 @@ namespace scidb
 	//
     // SubArray methods
     //
-    SubArray::SubArray(ArrayDesc& array, Coordinates lowPos, Coordinates highPos, boost::shared_ptr<Array> input)
+    SubArray::SubArray(ArrayDesc& array, Coordinates lowPos, Coordinates highPos,
+                       boost::shared_ptr<Array>& input, const shared_ptr<Query>& query)
     : DelegateArray(array, input), 
       subarrayLowPos(lowPos), 
       subarrayHighPos(highPos),
       dims(desc.getDimensions()),
       inputDims(input->getArrayDesc().getDimensions()),
       _useChunkSet(false)
-	{
+    {
+        _query = query;
         aligned = true;
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
             if ((lowPos[i] - inputDims[i].getStart()) % dims[i].getChunkInterval() != 0) { 

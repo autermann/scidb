@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="thinOperator">
   <refnamediv>
     <refname>thin</refname>
 
@@ -12,8 +11,8 @@
         <secondary>thin</secondary>
       </indexterm><indexterm>
         <primary>thin</primary>
-      </indexterm>Select data from an array dimension at fixed
-    intervals</refpurpose>
+      </indexterm>Produces a result array by selecting data from an array
+    dimension at fixed intervals.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -25,9 +24,11 @@
 
     <para>The thin operator selects regularly spaced elements of the array in
     each dimension. The selection criteria are specified by the starting
-    dimension value <replaceable>start_1</replaceable> and the number of cells
-    to skip using <replaceable>step_1</replaceable> for each dimension of the
-    input array.</para>
+    dimension value <replaceable>start_<emphasis
+    role="bold">n</emphasis></replaceable> and the number of cells to skip
+    using <replaceable>step_<emphasis role="bold">n</emphasis></replaceable>
+    for each dimension of the input array. Note that a step of 1 means to
+    select everything.</para>
 
     <para>Note the following limitations:</para>
 

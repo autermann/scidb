@@ -31,6 +31,7 @@
  */
 #include <boost/foreach.hpp>
 
+#include "query/QueryPlanUtilites.h"
 #include "query/LogicalExpression.h"
 #include "system/Exceptions.h"
 #include "array/Metadata.h"
@@ -41,5 +42,39 @@ using namespace boost;
 namespace scidb
 {
 
+void LogicalExpression::toString(std::ostream &out, int indent) const
+{
+    Indent prefix(indent);
+    out << prefix(' ', false);
+    out << "[logicalExpression]\n";
+}
+
+void AttributeReference::toString(std::ostream &out, int indent) const
+{
+    Indent prefix(indent);
+    out << prefix(' ', false);
+    out << "[attributeReference] array " << _arrayName;
+    out << " attr " << _attributeName<<"\n";
+}
+
+void Constant::toString(std::ostream &out, int indent) const
+{
+    Indent prefix(indent);
+    out << prefix(' ', false);
+    out << "[constant] type " << _type;
+    out <<" value "<< ValueToString(_type,_value) << "\n";
+}
+
+void Function::toString(std::ostream &out, int indent) const
+{
+    Indent prefix(indent);
+    out << prefix(' ', false);
+    out << "[function] " << _function;
+    out << " args:\n";
+    for ( size_t i = 0; i < _args.size(); ++i)
+    {
+        _args[i]->toString(out, indent + 1);
+    }
+}
 
 } // namespace scidb

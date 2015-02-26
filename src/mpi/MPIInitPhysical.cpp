@@ -73,7 +73,7 @@ class MPIInitPhysical: public MPIPhysical
         slave->waitForExit(_ctx); // wait for the slave to disconnect
         unlaunchMPISlaves();
         resetMPI();
-        return shared_ptr<Array> (new MemArray(_schema));
+        return shared_ptr<Array> (new MemArray(_schema,query));
     }
 };
 REGISTER_PHYSICAL_OPERATOR_FACTORY(MPIInitPhysical, "mpi_init", "MPIInitPhysical");

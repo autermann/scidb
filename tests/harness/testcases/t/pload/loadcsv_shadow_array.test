@@ -21,9 +21,9 @@
 
 #scan( array_sm10 )
 #scan( array_shadow )
-sort( array_sm10,a )
-sort( array_shadow,a )
-sort(array_shadow2,a)
+project( array_sm10, a, b, c )
+project( array_shadow, a, b, c )
+project( array_shadow2, a, b, c)
 #scan( array_shadow2 )
 --cleanup
 

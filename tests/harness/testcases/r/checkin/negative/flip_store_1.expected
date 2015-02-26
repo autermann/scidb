@@ -8,8 +8,8 @@ Query was executed successfully
 {2} 12
 
 {No} name,schema
-{0} "A","A<a:int64> [x=0:2,3,0]"
-{1} "C","C<x:int64> [a=0:3,3,0]"
+{0} 'A','A<a:int64> [x=0:2,3,0]'
+{1} 'C','C<x:int64> [a=0:3,3,0]'
 
 [An error expected at this place for the query "redimension_store(A,C)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_INVALID_REDIMENSION_POSITION.]
 

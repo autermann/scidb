@@ -122,7 +122,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_USED_CPU_LIMIT, 'x', "used-cpu-limit", "USED_CPU_LIMIT", "", Config::INTEGER,
                 "Max. number of threads for concurrent processing of one chunk", 0, false)
         (CONFIG_MERGE_SORT_BUFFER, 0, "merge-sort-buffer", "MERGE_SORT_BUFFER", "", Config::INTEGER,
-                "Maximal size for in-memory sort buffer (Mb)", 512, false)
+                "Maximal size for in-memory sort buffer (Mb)", 128, false)
         (CONFIG_NETWORK_BUFFER, 'n', "network-buffer", "NETWORK_BUFFER", "", Config::INTEGER,
                 "Size of memory used for network buffers (Mb)", 512, false)
         (CONFIG_ASYNC_IO_BUFFER, 0, "async-io-buffer", "ASYNC_IO_BUFFER", "", Config::INTEGER,
@@ -155,9 +155,9 @@ void initConfig(int argc, char* argv[])
                 false, false)
         (CONFIG_MAX_MEMORY_LIMIT, 0, "max-memory-limit", "MAX_MEMORY_LIMIT", "", Config::INTEGER, "Maximum amount of memory the scidb process can take up (megabytes)", -1, false)
 
-        (CONFIG_SMALL_MEMALLOC_SIZE, 0, "small-memalloc-size", "SMALL-MEMALLOC-SIZE", "", Config::INTEGER, "Maximum size of a memory allocation request which is considered small (in bytes). Larger memory allocation requests may be allocated according to a different policy.", -1, false)
+        (CONFIG_SMALL_MEMALLOC_SIZE, 0, "small-memalloc-size", "SMALL-MEMALLOC-SIZE", "", Config::INTEGER, "Maximum size of a memory allocation request which is considered small (in bytes). Larger memory allocation requests may be allocated according to a different policy.", 64 * 1024, false)
 
-        (CONFIG_LARGE_MEMALLOC_LIMIT, 0, "large-memalloc-limit", "LARGE-MEMALLOC-LIMIT", "", Config::INTEGER, "Maximum number of large  (vs. small) memory allocations. The policy for doing large memory allocations may be different from the (default) policy used for small memory allocations. This parameter limits the number of outstanding allocations performed using the (non-default) large-size allocation policy.", -1, false)
+        (CONFIG_LARGE_MEMALLOC_LIMIT, 0, "large-memalloc-limit", "LARGE-MEMALLOC-LIMIT", "", Config::INTEGER, "Maximum number of large  (vs. small) memory allocations. The policy for doing large memory allocations may be different from the (default) policy used for small memory allocations. This parameter limits the number of outstanding allocations performed using the (non-default) large-size allocation policy.", std::numeric_limits<int>::max(), false)
     
         (CONFIG_STRICT_CACHE_LIMIT, 0, "strict-cache-limit", "STRICT_CACHE_LIMIT", "", Config::BOOLEAN, "Block thread if cache is overflown", false, false)
         (CONFIG_REPART_SEQ_SCAN_THRESHOLD, 0, "repart-seq-scan-threshold", "REPART_SEQ_SCAN_THRESHOLD", "", Config::INTEGER, "Number of chunks in array cause repart to use sequential scan through source array", 1000000, false)
@@ -188,6 +188,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_MPI_DIR, 0, "mpi-dir", "MPI_DIR", "", Config::STRING, "Location of MPI installation.", DEFAULT_MPI_DIR(), false)
         (CONFIG_MPI_IF, 0, "mpi-if", "MPI_IF", "", Config::STRING, "Network interface to use for MPI traffic", string(""), false)
         (CONFIG_MPI_TYPE, 0, "mpi-type", "MPI_TYPE", "", Config::STRING, "MPI installation type [mpich2-1.2 | mpich2-1.4].", DEFAULT_MPI_TYPE(), false)
+        (CONFIG_CATALOG_RECONNECT_TRIES, 0, "catalog-reconnect-tries", "CONFIG_CATALOG_RECONNECT_TRIES", "", Config::INTEGER, "Count of tries of catalog reconnection", 5, false)
         ;
 
     cfg->addHook(configHook);

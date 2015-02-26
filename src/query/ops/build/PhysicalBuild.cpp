@@ -76,12 +76,12 @@ public:
                 //InputArray is very access-restrictive, but we're building it from a string - so it's small!
                 //So why don't we just materialize the whole literal array:
                 shared_ptr<Array> input(new InputArray(_schema, expr->evaluate().getString(), "", query, AS_STRING));
-                shared_ptr<Array> materializedInput(new MemArray(input,false));
+                shared_ptr<Array> materializedInput(new MemArray(input,query,false));
                 return materializedInput;
             }
             else
             {
-                return boost::shared_ptr<Array>(new MemArray(_schema));
+                return boost::shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
         else

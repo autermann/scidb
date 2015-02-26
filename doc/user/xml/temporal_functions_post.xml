@@ -188,24 +188,24 @@
 
       <procedure>
         <step>
-          <para>Assume the following array, <emphasis role="bold">dates</emphasis>.<para><programlisting>AFL% show(dates);  </programlisting><screen>[("dates&lt;dt:datetime&gt; [i=0:*,10,0]")]
+          <para>Assume the following array, <emphasis role="bold">dates</emphasis>.<para><programlisting>AFL% show(dates);  </programlisting><screen>[('dates&lt;dt:datetime&gt; [i=0:*,10,0]')]
 </screen><screen>{i} dt
-{0} "2012-04-12 12:14:01"
-{1} "2013-03-11 19:24:58"
-{2} "2009-11-22 16:05:19"
-{3} "1975-01-08 00:00:01"
-{4} "1969-12-31 19:00:01"
+{0} '2012-04-12 12:14:01'
+{1} '2013-03-11 19:24:58'
+{2} '2009-11-22 16:05:19'
+{3} '1975-01-08 00:00:01'
+{4} '1969-12-31 19:00:01'
 </screen></para></para>
         </step>
 
         <step>
           <para>Calculate the day of the week for each date in the
           array.<para><programlisting>AFL% apply(dates, weekday, day_of_week(dt));  </programlisting><screen>i,dt,weekday
-0,"2012-04-12 12:14:01",4
-1,"2013-03-11 19:24:58",1
-2,"2009-11-22 16:05:19",0
-3,"1975-01-08 00:00:01",3
-4,"1969-12-31 19:00:01",3
+0,'2012-04-12 12:14:01',4
+1,'2013-03-11 19:24:58',1
+2,'2009-11-22 16:05:19',0
+3,'1975-01-08 00:00:01',3
+4,'1969-12-31 19:00:01',3
 </screen>So,
           you can see that the first date is a Thursday, the second is a
           Monday, and the third is a Sunday.</para></para>
@@ -214,11 +214,11 @@
         <step>
           <para>Extract the hour for each datetime value in the
           array.<para><programlisting>AFL% apply(dates, time_hour, hour_of_day(dt));  </programlisting><screen>i,dt,time_hour
-0,"2012-04-12 12:14:01",12
-1,"2013-03-11 19:24:58",19
-2,"2009-11-22 16:05:19",16
-3,"1975-01-08 00:00:01",0
-4,"1969-12-31 19:00:01",19
+0,'2012-04-12 12:14:01',12
+1,'2013-03-11 19:24:58',19
+2,'2009-11-22 16:05:19',16
+3,'1975-01-08 00:00:01',0
+4,'1969-12-31 19:00:01',19
 </screen></para></para>
         </step>
       </procedure>
@@ -232,56 +232,58 @@
         <listitem>
           <para>Get the date as <emphasis role="bold">Month, day,
           year</emphasis>.<para><programlisting>AFL% apply(dates,date,strftime(dt,'%B %d, %Y'));</programlisting><screen>{i} dt,date
-{0} "2012-04-12 12:14:01","April 12, 2012"
-{1} "2013-03-11 19:24:58","March 11, 2013"
-{2} "2009-11-22 16:05:19","November 22, 2009"
-{3} "1975-01-08 00:00:01","January 08, 1975"
-{4} "1969-12-31 19:00:01","December 31, 1969"
+{0} '2012-04-12 12:14:01','April 12, 2012'
+{1} '2013-03-11 19:24:58','March 11, 2013'
+{2} '2009-11-22 16:05:19','November 22, 2009'
+{3} '1975-01-08 00:00:01','January 08, 1975'
+{4} '1969-12-31 19:00:01','December 31, 1969'
 </screen></para></para>
         </listitem>
 
         <listitem>
           <para>Get the time as <emphasis role="bold">hour:minute:second
           AM/PM</emphasis>.<para><programlisting>AFL% apply(dates,date,strftime(dt,'%l:%M:%S %p'));</programlisting><screen>{i} dt,date
-{0} "2012-04-12 12:14:01","12:14:01 PM"
-{1} "2013-03-11 19:24:58"," 7:24:58 PM"
-{2} "2009-11-22 16:05:19"," 4:05:19 PM"
-{3} "1975-01-08 00:00:01","12:00:01 AM"
-{4} "1969-12-31 19:00:01"," 7:00:01 PM"
+{0} '2012-04-12 12:14:01','12:14:01 PM'
+{1} '2013-03-11 19:24:58',' 7:24:58 PM'
+{2} '2009-11-22 16:05:19',' 4:05:19 PM'
+{3} '1975-01-08 00:00:01','12:00:01 AM'
+{4} '1969-12-31 19:00:01',' 7:00:01 PM'
 </screen>There
           is a shorthand for this format, <emphasis role="bold">%r</emphasis>:<para><programlisting>AFL% apply(dates,date,strftime(dt,'%r'));</programlisting><screen>{i} dt,date
-{0} "2012-04-12 12:14:01","12:14:01 PM"
-{1} "2013-03-11 19:24:58","07:24:58 PM"
-{2} "2009-11-22 16:05:19","04:05:19 PM"
-{3} "1975-01-08 00:00:01","12:00:01 AM"
-{4} "1969-12-31 19:00:01","07:00:01 PM"
+{0} '2012-04-12 12:14:01','12:14:01 PM'
+{1} '2013-03-11 19:24:58','07:24:58 PM'
+{2} '2009-11-22 16:05:19','04:05:19 PM'
+{3} '1975-01-08 00:00:01','12:00:01 AM'
+{4} '1969-12-31 19:00:01','07:00:01 PM'
 </screen></para></para></para>
         </listitem>
 
         <listitem>
           <para>Get the date in the ISO 8601 date format.<para><programlisting>AFL% apply(dates,date,strftime(dt,'%F'));</programlisting><screen>{i} dt,date
-{0} "2012-04-12 12:14:01","2012-04-12"
-{1} "2013-03-11 19:24:58","2013-03-11"
-{2} "2009-11-22 16:05:19","2009-11-22"
-{3} "1975-01-08 00:00:01","1975-01-08"
-{4} "1969-12-31 19:00:01","1969-12-31"
+{0} '2012-04-12 12:14:01','2012-04-12'
+{1} '2013-03-11 19:24:58','2013-03-11'
+{2} '2009-11-22 16:05:19','2009-11-22'
+{3} '1975-01-08 00:00:01','1975-01-08'
+{4} '1969-12-31 19:00:01','1969-12-31'
 </screen></para></para>
         </listitem>
       </itemizedlist>
     </informalexample>
 
     <informalexample>
-      <para>This example illustrates offsets for time zones. It uses the same
-      array as the previous example, array, <emphasis role="bold">dates</emphasis>.</para>
+      <para><indexterm>
+          <primary>time zone offset</primary>
+        </indexterm>This example illustrates offsets for time zones. It uses
+      the same array as the previous example, array, <emphasis role="bold">dates</emphasis>.</para>
 
       <procedure>
         <step>
           <para>Apply an offset for each value in the array, <emphasis role="bold">dates</emphasis>. <para><programlisting>AFL% store(project(apply(dates,dt_plusI,append_offset(dt,3600*(i+1))),dt_plusI),datesTZ);</programlisting><screen>{i} dt_plusI
-{0} "2012-04-12 12:14:01 +01:00"
-{1} "2013-03-11 19:24:58 +02:00"
-{2} "2009-11-22 16:05:19 +03:00"
-{3} "1975-01-08 00:00:01 +04:00"
-{4} "1969-12-31 19:00:01 +05:00"
+{0} '2012-04-12 12:14:01 +01:00'
+{1} '2013-03-11 19:24:58 +02:00'
+{2} '2009-11-22 16:05:19 +03:00'
+{3} '1975-01-08 00:00:01 +04:00'
+{4} '1969-12-31 19:00:01 +05:00'
 </screen>We
           store the result array into <emphasis role="bold">datesTZ</emphasis>. The <emphasis role="bold">datesTZ
           </emphasis>array contains datetimetz values, where the offset added
@@ -297,22 +299,22 @@
             <step>
               <para>Use get_offset to return the offsets as
               integers.<para><programlisting>AFL% apply(datesTZ,offset_integer,get_offset(dt_plusI));</programlisting><screen>{i} dt_plusI,offset_integer
-{0} "2012-04-12 12:14:01 +01:00",3600
-{1} "2013-03-11 19:24:58 +02:00",7200
-{2} "2009-11-22 16:05:19 +03:00",10800
-{3} "1975-01-08 00:00:01 +04:00",14400
-{4} "1969-12-31 19:00:01 +05:00",18000
+{0} '2012-04-12 12:14:01 +01:00',3600
+{1} '2013-03-11 19:24:58 +02:00',7200
+{2} '2009-11-22 16:05:19 +03:00',10800
+{3} '1975-01-08 00:00:01 +04:00',14400
+{4} '1969-12-31 19:00:01 +05:00',18000
 </screen></para></para>
             </step>
 
             <step>
               <para>Use strip_offset to strip the offsets, and return the
               datetime value, without the timezone offset.<para><programlisting>AFL% apply(datesTZ,date_stripped,strip_offset(dt_plusI));</programlisting><screen>{i} dt_plusI,date_stripped
-{0} "2012-04-12 12:14:01 +01:00","2012-04-12 12:14:01"
-{1} "2013-03-11 19:24:58 +02:00","2013-03-11 19:24:58"
-{2} "2009-11-22 16:05:19 +03:00","2009-11-22 16:05:19"
-{3} "1975-01-08 00:00:01 +04:00","1975-01-08 00:00:01"
-{4} "1969-12-31 19:00:01 +05:00","1969-12-31 19:00:01"
+{0} '2012-04-12 12:14:01 +01:00','2012-04-12 12:14:01'
+{1} '2013-03-11 19:24:58 +02:00','2013-03-11 19:24:58'
+{2} '2009-11-22 16:05:19 +03:00','2009-11-22 16:05:19'
+{3} '1975-01-08 00:00:01 +04:00','1975-01-08 00:00:01'
+{4} '1969-12-31 19:00:01 +05:00','1969-12-31 19:00:01'
 </screen></para></para>
             </step>
           </substeps>
@@ -320,25 +322,29 @@
 
         <step>
           <para>Get the date and time, as a datetimetz value, and then convert
-          it to a datetime value that adds the GMT offset.<para><programlisting>AFL% store(build(&lt;current:datetimetz&gt;[i=0:0,1,0],tznow()),nowDate);  </programlisting><screen>[("2013-03-25 10:20:01 -04:00")]
+          it to a datetime value that adds the GMT offset.<para><programlisting>AFL% store(build(&lt;current:datetimetz&gt;[i=0:0,1,0],tznow()),nowDate);  </programlisting><screen>[('2013-05-31 10:41:11 -04:00')]
 </screen>The
           <emphasis role="bold">nowDate</emphasis> array has the current date
           and time. Now use the <literal>apply</literal> operator to return
-          the GMT date and time.<para><programlisting>AFL%  project(apply(nowDate,GMTdate,togmt(current)),GMTdate);  </programlisting><screen>[("2013-03-25 14:20:01")]
+          the GMT date and time.<para><programlisting>AFL%  project(apply(nowDate,GMTdate,togmt(current)),GMTdate);  </programlisting><screen>[('2013-05-31 14:41:11')]
 </screen></para></para></para>
         </step>
       </procedure>
     </informalexample>
 
     <informalexample>
-      <para>This example illustrates the difference between
+      <para><indexterm>
+          <primary>append_offset</primary>
+        </indexterm><indexterm>
+          <primary>apply_offset</primary>
+        </indexterm>This example illustrates the difference between
       <literal>append_offset</literal> and
       <literal>apply_offset</literal>.</para>
 
       <procedure>
         <step>
           <para>Get the time and date as a datetime value, and store it to an
-          array.<para><programlisting>AFL% store(build(&lt;current:datetime&gt;[i=0:0,1,0],now()),currentDate);  </programlisting><screen>[("2013-03-25 14:20:02")]
+          array.<para><programlisting>AFL% store(build(&lt;current:datetime&gt;[i=0:0,1,0],now()),currentDate);  </programlisting><screen>[('2013-05-31 14:41:12')]
 </screen></para></para>
         </step>
 
@@ -346,7 +352,7 @@
           <para>Assume that we know that our time is GMT -5 hours. We can use
           the <literal>append_offset</literal> function to convert our
           datetime value into the correct datetimetz value.<para><programlisting>AFL% apply(currentDate, currentGMT, append_offset(current, (-5*3600)));  </programlisting><screen>{i} current,currentGMT
-{0} "2013-03-25 14:20:02","2013-03-25 14:20:02 -05:00"
+{0} '2013-05-31 14:41:12','2013-05-31 14:41:12 -05:00'
 </screen></para></para>
         </step>
 
@@ -356,7 +362,7 @@
           our time zone, which happens to be GMT -5 hours. Here, we can use
           the <literal>apply_offset</literal> function to convert our datetime
           value into the correct datetimetz value.<para><programlisting>AFL% apply(currentDate, currentGMT, apply_offset(current, (-5*3600)));  </programlisting><screen>{i} current,currentGMT
-{0} "2013-03-25 14:20:02","2013-03-25 09:20:02 -05:00"
+{0} '2013-05-31 14:41:12','2013-05-31 09:41:12 -05:00'
 </screen></para></para>
         </step>
       </procedure>

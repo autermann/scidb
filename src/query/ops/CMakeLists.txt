@@ -92,8 +92,6 @@ set(ops_lib_src
     multiply/LogicalMultiply.cpp
     multiply/PhysicalMultiply.cpp
     multiply/MultiplyArray.cpp
-    inverse/LogicalInverse.cpp
-    inverse/PhysicalInverse.cpp
     slice/LogicalSlice.cpp
     slice/PhysicalSlice.cpp
     slice/SliceArray.cpp

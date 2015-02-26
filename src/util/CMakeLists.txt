@@ -39,6 +39,7 @@ set (util_src
     InjectedError.cpp
     BufferedFileInput.cpp
     shm/SharedMemoryIpc.cpp
+    MultiConstIterators.cpp
 )
 
 file(GLOB util_include "*.h")

@@ -22,11 +22,12 @@
 
 if(BUILD_USER_DOC)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/xml/custom.xsl.in ${CMAKE_CURRENT_BINARY_DIR}/xml/custom.xsl)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/xml/scidb_ug.ent.in ${CMAKE_CURRENT_BINARY_DIR}/xml/scidb_ug.ent)
     file(GLOB USER_DOC_SRC
         "xml/*.xml"
 	"p4examples/*")
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pdf/scidb-userguide-${SCIDB_SHORT_VERSION}.pdf
-        COMMAND ${XSLTPROC_EXECUTABLE} --xinclude -o ${CMAKE_CURRENT_BINARY_DIR}/scidb-userguide-${SCIDB_SHORT_VERSION}.fo ${CMAKE_CURRENT_BINARY_DIR}/xml/custom.xsl ${CMAKE_CURRENT_SOURCE_DIR}/xml/scidb_ug.xml
+        COMMAND ${XSLTPROC_EXECUTABLE} --xinclude --path ${CMAKE_CURRENT_BINARY_DIR}/xml -o ${CMAKE_CURRENT_BINARY_DIR}/scidb-userguide-${SCIDB_SHORT_VERSION}.fo ${CMAKE_CURRENT_BINARY_DIR}/xml/custom.xsl ${CMAKE_CURRENT_SOURCE_DIR}/xml/scidb_ug.xml
         COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/pdf
         COMMAND ${FOP_EXECUTABLE} -c fopconfig.xml -fo ${CMAKE_CURRENT_BINARY_DIR}/scidb-userguide-${SCIDB_SHORT_VERSION}.fo -pdf ${CMAKE_CURRENT_BINARY_DIR}/pdf/scidb-userguide-${SCIDB_SHORT_VERSION}.pdf
         DEPENDS ${USER_DOC_SRC}

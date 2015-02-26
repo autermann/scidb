@@ -5,9 +5,9 @@
 --set-format dcsv
 --start-igdata
 --aql create array ddFlat <patientID:int64,elapsedTime:int64,pulse:int64,ppm:int64> [csvRow=0:1000,1000,0]  
---shell  --command="csv2scidb -s 1 -p NNNN < ../examples/doseData.csv > ../examples/doseData.scidb "
+--shell  --command="csv2scidb -s 1 -p NNNN < $DOC_DATA/doseData.csv > $DOC_DATA/doseData.scidb "
 --stop-igdata
---aql load ddFlat from '../examples/doseData.scidb'  
+--aql load ddFlat from '../tests/harness/testcases/data/doc/doseData.scidb'  
 --start-igdata
 --aql create array doseData <pulse:int64,ppm:int64> [patientID=1:100,100,0,elapsedTime=0:999,1000,0] 
 --stop-igdata
@@ -22,8 +22,8 @@ redimension_store(doseData,ppmFunction)
 redimension_store(doseData,pulseFunction) 
 --start-igdata
 --aql create array nwFlat <event:string,year:int64,person:string,country:string,time:double> [csvRow=0:11,12,0] 
---shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/nationWinners.csv > ../examples/nationWinners.scidb "
---aql load nwFlat from '../examples/nationWinners.scidb'  
+--shell  --command="csv2scidb -s 1 -p SNSSN < $DOC_DATA/nationWinners.csv > $DOC_DATA/nationWinners.scidb "
+--aql load nwFlat from '../tests/harness/testcases/data/doc/nationWinners.scidb'  
 --aql create array nationWinners <person:string,country:string,time:double> [event(string)=3,3,0,year=1996:2008,13,0]  
 --stop-igdata
 redimension_store(nwFlat,nationWinners) 
@@ -50,8 +50,8 @@ redimension_store (nationWinners, victoryCountPerCountry, count(*) as victoryCou
 redimension_store(nationWinners,vPer_C_Synthetic) 
 --start-igdata
 --aql create array namesFlat < givenName:string, surname:string, a:int64, b:int64 null, c:int64, d:int64> [ csvRow=0:6,6,0 ] 
---shell  --command="csv2scidb -s 1 -p SSNNNN < ../examples/namesData.csv > ../examples/namesData.scidb "
---aql load namesFlat from '../examples/namesData.scidb'  
+--shell  --command="csv2scidb -s 1 -p SSNNNN < $DOC_DATA/namesData.csv > $DOC_DATA/namesData.scidb "
+--aql load namesFlat from '../tests/harness/testcases/data/doc/namesData.scidb'  
 --aql create array names <a:int64, b:int64 null, c:int64, d:int64> [givenName(string)=5,5,0,surname(string)=5,5,0] 
 --stop-igdata
 redimension_store(namesFlat,names) 

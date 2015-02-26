@@ -246,7 +246,7 @@ void FITSInputArray::calculateLength()
  */
 void FITSInputArray::readChunk()
 {
-    boost::shared_ptr<Query> queryLock(query.lock());
+    boost::shared_ptr<Query> queryLock(Query::getValidQueryPtr(query));
 
     initMemChunks(queryLock);
 

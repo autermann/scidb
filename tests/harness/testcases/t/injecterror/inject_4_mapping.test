@@ -29,8 +29,7 @@ subarray(apply (NODE_ID, foo, injectError (1, 4)),0,1)
 --error "redimension_store(NODE_ID, NODE_ID_REDIM)"
 
 --echo "Check for orphans..."
---shell --command "../utils/find_leaked_nids.sh $SCIDB_CLUSTER_NAME localhost" --store
-
+--shell --command "../utils/find_leaked_nids.sh ${DB_HOST:=localhost} ${DB_PORT:=5432} ${DB_NAME:=mydb} ${DB_USER:=mydb} ${DB_PASSWD:=mydb}" --store
 scan(NODE_ID)
 scan(NODE_ID_REDIM)
 

@@ -4,10 +4,10 @@ SCIDB QUERY : <CREATE ARRAY A <val_a:double>[i=0:9,10,0]>
 SCIDB QUERY : <CREATE ARRAY B <val_b:double>[j=0:9,10,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load(A, '../examples/A.scidb')>
+SCIDB QUERY : <load(A, '../tests/harness/testcases/data/doc/A.scidb')>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load(B, '../examples/B.scidb')>
+SCIDB QUERY : <load(B, '../tests/harness/testcases/data/doc/B.scidb')>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <SELECT * FROM A>
@@ -17,10 +17,10 @@ SCIDB QUERY : <SELECT * FROM B>
 [(101),(102),(103),(104),(105),(106),(107),(108),(109),(110)]
 
 SCIDB QUERY : <SELECT * FROM show(A)>
-[("A<val_a:double> [i=0:9,10,0]")]
+[('A<val_a:double> [i=0:9,10,0]')]
 
 SCIDB QUERY : <SELECT * FROM show(B)>
-[("B<val_b:double> [j=0:9,10,0]")]
+[('B<val_b:double> [j=0:9,10,0]')]
 
 SCIDB QUERY : <SELECT j from B>
 [(0),(1),(2),(3),(4),(5),(6),(7),(8),(9)]
@@ -42,13 +42,13 @@ SCIDB QUERY : <SELECT * INTO C FROM A, B>
 
 SCIDB QUERY : <show(C)>
 {i} schema
-{0} "C<val_a:double,val_b:double> [i=0:9,10,0]"
+{0} 'C<val_a:double,val_b:double> [i=0:9,10,0]'
 
 SCIDB QUERY : <SELECT * INTO D FROM C,B>
 [(1,101,101),(2,102,102),(3,103,103),(4,104,104),(5,105,105),(6,106,106),(7,107,107),(8,108,108),(9,109,109),(10,110,110)]
 
 SCIDB QUERY : <SELECT * FROM show(D)>
-[("D<val_a:double,val_b:double,val_b_2:double> [i=0:9,10,0]")]
+[('D<val_a:double,val_b:double,val_b_2:double> [i=0:9,10,0]')]
 
 SCIDB QUERY : <SELECT C.val_b + D.val_b FROM C,D>
 [(202),(204),(206),(208),(210),(212),(214),(216),(218),(220)]
@@ -59,18 +59,18 @@ SCIDB QUERY : <SELECT a1.val_a,a2.val_a+2 FROM A as a1,A as a2>
 SCIDB QUERY : <CREATE ARRAY m3x3<a:double> [i=1:3,3,0,j=1:3,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <load(m3x3, '../examples/m3x3.txt')>
+SCIDB QUERY : <load(m3x3, '../tests/harness/testcases/data/doc/m3x3.txt')>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <CREATE ARRAY vector3<b:double> [k=1:3,3,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load(vector3, '../examples/vector3.scidb')>
+SCIDB QUERY : <load(vector3, '../tests/harness/testcases/data/doc/vector3.scidb')>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <show(vector3)>
 {i} schema
-{0} "vector3<b:double> [k=1:3,3,0]"
+{0} 'vector3<b:double> [k=1:3,3,0]'
 
 SCIDB QUERY : <scan(vector3)>
 [(21),(20.5),(20.3333)]

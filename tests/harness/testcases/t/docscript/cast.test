@@ -5,8 +5,8 @@
 --set-format dcsv
 --start-igdata
 create array winnersFewFlat <event:string,year:int64,person:string,country:string,time:double> [i=0:*,12,0] 
---shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winnersFew.csv > ../examples/winnersFew.scidb "
---aql load winnersFewFlat from '../examples/winnersFew.scidb' 
+--shell  --command="csv2scidb -s 1 -p SNSSN < $DOC_DATA/winnersFew.csv > $DOC_DATA/winnersFew.scidb "
+--aql load winnersFewFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' 
 create array champions <person:string,country:string,time:double> [year=1996:2008,1,0, event(string)=3,1,0] 
 redimension_store(winnersFewFlat,champions) 
 store(project(champions,time),winningTime) 

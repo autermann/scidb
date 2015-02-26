@@ -180,7 +180,7 @@ public:
         ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions);
 
         // Define two one-chunk arrays, simulating fragments appearing in different instances.
-        MemArray arrayInstOne(schema), arrayInstTwo(schema);
+        MemArray arrayInstOne(schema,query), arrayInstTwo(schema,query);
 
         // Generate source data in the form of maps.
         CoordValueMap mapInstOne, mapInstTwo;
@@ -293,7 +293,7 @@ public:
             }
         }
 
-        return shared_ptr<Array> (new MemArray(_schema));
+        return shared_ptr<Array> (new MemArray(_schema,query));
     }
 
 };

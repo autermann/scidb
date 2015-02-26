@@ -6,362 +6,362 @@ Query was executed successfully
 
 SCIDB QUERY : <list('operators')>
 {No} name,library
-{0} "adddim","scidb"
-{1} "aggregate","scidb"
-{2} "allversions","scidb"
-{3} "analyze","scidb"
-{4} "apply","scidb"
-{5} "ApproxDC","scidb"
-{6} "attribute_rename","scidb"
-{7} "attributes","scidb"
-{8} "avg","scidb"
-{9} "avg_rank","scidb"
-{10} "bernoulli","scidb"
-{11} "between","scidb"
-{12} "build","scidb"
-{13} "build_sparse","scidb"
-{14} "cancel","scidb"
-{15} "cast","scidb"
-{16} "concat","scidb"
-{17} "count","scidb"
-{18} "create_array","scidb"
-{19} "cross","scidb"
-{20} "cross_join","scidb"
-{21} "deldim","scidb"
-{22} "dimensions","scidb"
-{23} "diskinfo","scidb"
-{24} "echo","scidb"
-{25} "explain_logical","scidb"
-{26} "explain_physical","scidb"
-{27} "filter","scidb"
-{28} "gemm","dense_linear_algebra"
-{29} "gesvd","dense_linear_algebra"
-{30} "help","scidb"
-{31} "input","scidb"
-{32} "insert","scidb"
-{33} "join","scidb"
-{34} "list","scidb"
-{35} "load","scidb"
-{36} "load_library","scidb"
-{37} "lookup","scidb"
-{38} "materialize","scidb"
-{39} "max","scidb"
-{40} "merge","scidb"
-{41} "min","scidb"
-{42} "mpi_init","dense_linear_algebra"
-{43} "mpi_test","dense_linear_algebra"
-{44} "mpicopy","dense_linear_algebra"
-{45} "mpirank","dense_linear_algebra"
-{46} "mstat","scidb"
-{47} "multiply","scidb"
-{48} "normalize","scidb"
-{49} "old_unpack","scidb"
-{50} "project","scidb"
-{51} "quantile","scidb"
-{52} "rank","scidb"
-{53} "redimension","scidb"
-{54} "redimension_store","scidb"
-{55} "reduce_distro","scidb"
-{56} "regrid","scidb"
-{57} "remove","scidb"
-{58} "rename","scidb"
-{59} "repart","scidb"
-{60} "reshape","scidb"
-{61} "reverse","scidb"
-{62} "sample","scidb"
-{63} "save","scidb"
-{64} "scan","scidb"
-{65} "setopt","scidb"
-{66} "sg","scidb"
-{67} "show","scidb"
-{68} "slice","scidb"
-{69} "sort","scidb"
-{70} "splitarraytest","scidb"
-{71} "stdev","scidb"
-{72} "store","scidb"
-{73} "subarray","scidb"
-{74} "substitute","scidb"
-{75} "sum","scidb"
-{76} "thin","scidb"
-{77} "transpose","scidb"
-{78} "unload_library","scidb"
-{79} "unpack","scidb"
-{80} "var","scidb"
-{81} "variable_window","scidb"
-{82} "versions","scidb"
-{83} "window","scidb"
-{84} "xgrid","scidb"
+{0} 'adddim','scidb'
+{1} 'aggregate','scidb'
+{2} 'allversions','scidb'
+{3} 'analyze','scidb'
+{4} 'apply','scidb'
+{5} 'ApproxDC','scidb'
+{6} 'attribute_rename','scidb'
+{7} 'attributes','scidb'
+{8} 'avg','scidb'
+{9} 'avg_rank','scidb'
+{10} 'bernoulli','scidb'
+{11} 'between','scidb'
+{12} 'build','scidb'
+{13} 'build_sparse','scidb'
+{14} 'cancel','scidb'
+{15} 'cast','scidb'
+{16} 'concat','scidb'
+{17} 'count','scidb'
+{18} 'create_array','scidb'
+{19} 'cross','scidb'
+{20} 'cross_join','scidb'
+{21} 'deldim','scidb'
+{22} 'dimensions','scidb'
+{23} 'diskinfo','scidb'
+{24} 'echo','scidb'
+{25} 'explain_logical','scidb'
+{26} 'explain_physical','scidb'
+{27} 'filter','scidb'
+{28} 'gemm','dense_linear_algebra'
+{29} 'gesvd','dense_linear_algebra'
+{30} 'help','scidb'
+{31} 'input','scidb'
+{32} 'insert','scidb'
+{33} 'join','scidb'
+{34} 'list','scidb'
+{35} 'load','scidb'
+{36} 'load_library','scidb'
+{37} 'lookup','scidb'
+{38} 'materialize','scidb'
+{39} 'max','scidb'
+{40} 'merge','scidb'
+{41} 'min','scidb'
+{42} 'mpi_init','dense_linear_algebra'
+{43} 'mpi_test','dense_linear_algebra'
+{44} 'mpicopy','dense_linear_algebra'
+{45} 'mpirank','dense_linear_algebra'
+{46} 'mstat','scidb'
+{47} 'multiply','scidb'
+{48} 'normalize','scidb'
+{49} 'old_unpack','scidb'
+{50} 'project','scidb'
+{51} 'quantile','scidb'
+{52} 'rank','scidb'
+{53} 'redimension','scidb'
+{54} 'redimension_store','scidb'
+{55} 'reduce_distro','scidb'
+{56} 'regrid','scidb'
+{57} 'remove','scidb'
+{58} 'rename','scidb'
+{59} 'repart','scidb'
+{60} 'reshape','scidb'
+{61} 'reverse','scidb'
+{62} 'sample','scidb'
+{63} 'save','scidb'
+{64} 'scan','scidb'
+{65} 'setopt','scidb'
+{66} 'sg','scidb'
+{67} 'show','scidb'
+{68} 'slice','scidb'
+{69} 'sort','scidb'
+{70} 'splitarraytest','scidb'
+{71} 'stdev','scidb'
+{72} 'store','scidb'
+{73} 'subarray','scidb'
+{74} 'substitute','scidb'
+{75} 'sum','scidb'
+{76} 'thin','scidb'
+{77} 'transpose','scidb'
+{78} 'unload_library','scidb'
+{79} 'unpack','scidb'
+{80} 'var','scidb'
+{81} 'variable_window','scidb'
+{82} 'versions','scidb'
+{83} 'window','scidb'
+{84} 'xgrid','scidb'
 
 SCIDB QUERY : <list('functions')>
 {No} name,profile,deterministic,library
-{0} "%","double %(double,double)",true,"scidb"
-{1} "%","int16 %(int16,int16)",true,"scidb"
-{2} "%","int32 %(int32,int32)",true,"scidb"
-{3} "%","int64 %(int64,int64)",true,"scidb"
-{4} "%","int8 %(int8,int8)",true,"scidb"
-{5} "%","uint16 %(uint16,uint16)",true,"scidb"
-{6} "%","uint32 %(uint32,uint32)",true,"scidb"
-{7} "%","uint64 %(uint64,uint64)",true,"scidb"
-{8} "%","uint8 %(uint8,uint8)",true,"scidb"
-{9} "*","double *(double,double)",true,"scidb"
-{10} "*","float *(float,float)",true,"scidb"
-{11} "*","int16 *(int16,int16)",true,"scidb"
-{12} "*","int32 *(int32,int32)",true,"scidb"
-{13} "*","int64 *(int64,int64)",true,"scidb"
-{14} "*","int8 *(int8,int8)",true,"scidb"
-{15} "*","rational *(rational,rational)",true,"rational"
-{16} "*","uint16 *(uint16,uint16)",true,"scidb"
-{17} "*","uint32 *(uint32,uint32)",true,"scidb"
-{18} "*","uint64 *(uint64,uint64)",true,"scidb"
-{19} "*","uint8 *(uint8,uint8)",true,"scidb"
-{20} "+","datetime +(datetime,int64)",true,"scidb"
-{21} "+","double +(double,double)",true,"scidb"
-{22} "+","float +(float,float)",true,"scidb"
-{23} "+","int16 +(int16,int16)",true,"scidb"
-{24} "+","int32 +(int32,int32)",true,"scidb"
-{25} "+","int64 +(int64,int64)",true,"scidb"
-{26} "+","int8 +(int8,int8)",true,"scidb"
-{27} "+","point +(point,point)",true,"point"
-{28} "+","rational +(rational,rational)",true,"rational"
-{29} "+","string +(string,string)",true,"scidb"
-{30} "+","uint16 +(uint16,uint16)",true,"scidb"
-{31} "+","uint32 +(uint32,uint32)",true,"scidb"
-{32} "+","uint64 +(uint64,uint64)",true,"scidb"
-{33} "+","uint8 +(uint8,uint8)",true,"scidb"
-{34} "-","datetime -(datetime)",true,"scidb"
-{35} "-","int64 -(datetime,datetime)",true,"scidb"
-{36} "-","datetime -(datetime,int64)",true,"scidb"
-{37} "-","double -(double)",true,"scidb"
-{38} "-","double -(double,double)",true,"scidb"
-{39} "-","float -(float)",true,"scidb"
-{40} "-","float -(float,float)",true,"scidb"
-{41} "-","int16 -(int16)",true,"scidb"
-{42} "-","int16 -(int16,int16)",true,"scidb"
-{43} "-","int32 -(int32)",true,"scidb"
-{44} "-","int32 -(int32,int32)",true,"scidb"
-{45} "-","int64 -(int64)",true,"scidb"
-{46} "-","int64 -(int64,int64)",true,"scidb"
-{47} "-","int8 -(int8)",true,"scidb"
-{48} "-","int8 -(int8,int8)",true,"scidb"
-{49} "-","rational -(rational,rational)",true,"rational"
-{50} "-","int16 -(uint16)",true,"scidb"
-{51} "-","int16 -(uint16,uint16)",true,"scidb"
-{52} "-","int32 -(uint32)",true,"scidb"
-{53} "-","int32 -(uint32,uint32)",true,"scidb"
-{54} "-","int64 -(uint64)",true,"scidb"
-{55} "-","int64 -(uint64,uint64)",true,"scidb"
-{56} "-","int8 -(uint8)",true,"scidb"
-{57} "-","int8 -(uint8,uint8)",true,"scidb"
-{58} "/","double /(double,double)",true,"scidb"
-{59} "/","float /(float,float)",true,"scidb"
-{60} "/","int16 /(int16,int16)",true,"scidb"
-{61} "/","int32 /(int32,int32)",true,"scidb"
-{62} "/","int64 /(int64,int64)",true,"scidb"
-{63} "/","int8 /(int8,int8)",true,"scidb"
-{64} "/","rational /(rational,int64)",true,"rational"
-{65} "/","rational /(rational,rational)",true,"rational"
-{66} "/","uint16 /(uint16,uint16)",true,"scidb"
-{67} "/","uint32 /(uint32,uint32)",true,"scidb"
-{68} "/","uint64 /(uint64,uint64)",true,"scidb"
-{69} "/","uint8 /(uint8,uint8)",true,"scidb"
-{70} "<","bool <(bool,bool)",true,"scidb"
-{71} "<","bool <(char,char)",true,"scidb"
-{72} "<","bool <(datetime,datetime)",true,"scidb"
-{73} "<","bool <(datetimetz,datetimetz)",true,"scidb"
-{74} "<","bool <(double,double)",true,"scidb"
-{75} "<","bool <(float,float)",true,"scidb"
-{76} "<","bool <(int16,int16)",true,"scidb"
-{77} "<","bool <(int32,int32)",true,"scidb"
-{78} "<","bool <(int64,int64)",true,"scidb"
-{79} "<","bool <(int8,int8)",true,"scidb"
-{80} "<","bool <(rational,rational)",true,"rational"
-{81} "<","bool <(string,string)",true,"scidb"
-{82} "<","bool <(uint16,uint16)",true,"scidb"
-{83} "<","bool <(uint32,uint32)",true,"scidb"
-{84} "<","bool <(uint64,uint64)",true,"scidb"
-{85} "<","bool <(uint8,uint8)",true,"scidb"
-{86} "<=","bool <=(bool,bool)",true,"scidb"
-{87} "<=","bool <=(char,char)",true,"scidb"
-{88} "<=","bool <=(datetime,datetime)",true,"scidb"
-{89} "<=","bool <=(datetimetz,datetimetz)",true,"scidb"
-{90} "<=","bool <=(double,double)",true,"scidb"
-{91} "<=","bool <=(float,float)",true,"scidb"
-{92} "<=","bool <=(int16,int16)",true,"scidb"
-{93} "<=","bool <=(int32,int32)",true,"scidb"
-{94} "<=","bool <=(int64,int64)",true,"scidb"
-{95} "<=","bool <=(int8,int8)",true,"scidb"
-{96} "<=","bool <=(rational,rational)",true,"rational"
-{97} "<=","bool <=(string,string)",true,"scidb"
-{98} "<=","bool <=(uint16,uint16)",true,"scidb"
-{99} "<=","bool <=(uint32,uint32)",true,"scidb"
-{100} "<=","bool <=(uint64,uint64)",true,"scidb"
-{101} "<=","bool <=(uint8,uint8)",true,"scidb"
-{102} "<>","bool <>(bool,bool)",true,"scidb"
-{103} "<>","bool <>(char,char)",true,"scidb"
-{104} "<>","bool <>(datetime,datetime)",true,"scidb"
-{105} "<>","bool <>(datetimetz,datetimetz)",true,"scidb"
-{106} "<>","bool <>(double,double)",true,"scidb"
-{107} "<>","bool <>(float,float)",true,"scidb"
-{108} "<>","bool <>(int16,int16)",true,"scidb"
-{109} "<>","bool <>(int32,int32)",true,"scidb"
-{110} "<>","bool <>(int64,int64)",true,"scidb"
-{111} "<>","bool <>(int8,int8)",true,"scidb"
-{112} "<>","bool <>(string,string)",true,"scidb"
-{113} "<>","bool <>(uint16,uint16)",true,"scidb"
-{114} "<>","bool <>(uint32,uint32)",true,"scidb"
-{115} "<>","bool <>(uint64,uint64)",true,"scidb"
-{116} "<>","bool <>(uint8,uint8)",true,"scidb"
-{117} "=","bool =(bool,bool)",true,"scidb"
-{118} "=","bool =(char,char)",true,"scidb"
-{119} "=","bool =(datetime,datetime)",true,"scidb"
-{120} "=","bool =(datetimetz,datetimetz)",true,"scidb"
-{121} "=","bool =(double,double)",true,"scidb"
-{122} "=","bool =(float,float)",true,"scidb"
-{123} "=","bool =(int16,int16)",true,"scidb"
-{124} "=","bool =(int32,int32)",true,"scidb"
-{125} "=","bool =(int64,int64)",true,"scidb"
-{126} "=","bool =(int8,int8)",true,"scidb"
-{127} "=","bool =(rational,rational)",true,"rational"
-{128} "=","bool =(string,string)",true,"scidb"
-{129} "=","bool =(uint16,uint16)",true,"scidb"
-{130} "=","bool =(uint32,uint32)",true,"scidb"
-{131} "=","bool =(uint64,uint64)",true,"scidb"
-{132} "=","bool =(uint8,uint8)",true,"scidb"
-{133} ">","bool >(bool,bool)",true,"scidb"
-{134} ">","bool >(char,char)",true,"scidb"
-{135} ">","bool >(datetime,datetime)",true,"scidb"
-{136} ">","bool >(datetimetz,datetimetz)",true,"scidb"
-{137} ">","bool >(double,double)",true,"scidb"
-{138} ">","bool >(float,float)",true,"scidb"
-{139} ">","bool >(int16,int16)",true,"scidb"
-{140} ">","bool >(int32,int32)",true,"scidb"
-{141} ">","bool >(int64,int64)",true,"scidb"
-{142} ">","bool >(int8,int8)",true,"scidb"
-{143} ">","bool >(rational,rational)",true,"rational"
-{144} ">","bool >(string,string)",true,"scidb"
-{145} ">","bool >(uint16,uint16)",true,"scidb"
-{146} ">","bool >(uint32,uint32)",true,"scidb"
-{147} ">","bool >(uint64,uint64)",true,"scidb"
-{148} ">","bool >(uint8,uint8)",true,"scidb"
-{149} ">=","bool >=(bool,bool)",true,"scidb"
-{150} ">=","bool >=(char,char)",true,"scidb"
-{151} ">=","bool >=(datetime,datetime)",true,"scidb"
-{152} ">=","bool >=(datetimetz,datetimetz)",true,"scidb"
-{153} ">=","bool >=(double,double)",true,"scidb"
-{154} ">=","bool >=(float,float)",true,"scidb"
-{155} ">=","bool >=(int16,int16)",true,"scidb"
-{156} ">=","bool >=(int32,int32)",true,"scidb"
-{157} ">=","bool >=(int64,int64)",true,"scidb"
-{158} ">=","bool >=(int8,int8)",true,"scidb"
-{159} ">=","bool >=(rational,rational)",true,"rational"
-{160} ">=","bool >=(string,string)",true,"scidb"
-{161} ">=","bool >=(uint16,uint16)",true,"scidb"
-{162} ">=","bool >=(uint32,uint32)",true,"scidb"
-{163} ">=","bool >=(uint64,uint64)",true,"scidb"
-{164} ">=","bool >=(uint8,uint8)",true,"scidb"
-{165} "abs","double abs(double)",true,"scidb"
-{166} "abs","int32 abs(int32)",true,"scidb"
-{167} "acos","double acos(double)",true,"scidb"
-{168} "acos","float acos(float)",true,"scidb"
-{169} "and","bool and(bool,bool)",true,"scidb"
-{170} "append_offset","datetimetz append_offset(datetime,int64)",true,"scidb"
-{171} "apply_offset","datetimetz apply_offset(datetime,int64)",true,"scidb"
-{172} "asin","double asin(double)",true,"scidb"
-{173} "asin","float asin(float)",true,"scidb"
-{174} "atan","double atan(double)",true,"scidb"
-{175} "atan","float atan(float)",true,"scidb"
-{176} "ceil","int64 ceil(double)",true,"scidb"
-{177} "cos","double cos(double)",true,"scidb"
-{178} "cos","float cos(float)",true,"scidb"
-{179} "day_of_week","uint8 day_of_week(datetime)",true,"scidb"
-{180} "day_of_week","uint8 day_of_week(datetimetz)",true,"scidb"
-{181} "exp","double exp(double)",true,"scidb"
-{182} "exp","float exp(float)",true,"scidb"
-{183} "fact","string fact(int64)",true,"more_math"
-{184} "first","int64 first(string)",true,"scidb"
-{185} "first","int64 first(string,string)",true,"scidb"
-{186} "floor","int64 floor(double)",true,"scidb"
-{187} "format","string format(double,string)",true,"scidb"
-{188} "get_offset","int64 get_offset(datetimetz)",true,"scidb"
-{189} "getdenom","int64 getdenom(rational)",true,"rational"
-{190} "getnumer","int64 getnumer(rational)",true,"rational"
-{191} "high","int64 high(string)",true,"scidb"
-{192} "high","int64 high(string,string)",true,"scidb"
-{193} "hour_of_day","uint8 hour_of_day(datetime)",true,"scidb"
-{194} "hour_of_day","uint8 hour_of_day(datetimetz)",true,"scidb"
-{195} "instanceid","int64 instanceid()",true,"scidb"
-{196} "is_nan","bool is_nan(double)",true,"scidb"
-{197} "is_null","void is_null(void)",true,"scidb"
-{198} "isprime","string isprime(int64)",true,"more_math"
-{199} "lasso","double lasso(double,double,double)",true,"more_math"
-{200} "last","int64 last(string)",true,"scidb"
-{201} "last","int64 last(string,string)",true,"scidb"
-{202} "length","int64 length(string)",true,"scidb"
-{203} "length","int64 length(string,string)",true,"scidb"
-{204} "log","double log(double)",true,"scidb"
-{205} "log","float log(float)",true,"scidb"
-{206} "log10","double log10(double)",true,"scidb"
-{207} "log10","float log10(float)",true,"scidb"
-{208} "low","int64 low(string)",true,"scidb"
-{209} "low","int64 low(string,string)",true,"scidb"
-{210} "max","bool max(bool,bool)",true,"scidb"
-{211} "max","string max(string,string)",true,"scidb"
-{212} "min","bool min(bool,bool)",true,"scidb"
-{213} "min","string min(string,string)",true,"scidb"
-{214} "missing","void missing(int32)",true,"scidb"
-{215} "mylog","double mylog(double,double)",true,"more_math"
-{216} "not","bool not(bool)",true,"scidb"
-{217} "now","datetime now()",true,"scidb"
-{218} "or","bool or(bool,bool)",true,"scidb"
-{219} "point","point point()",true,"point"
-{220} "point2str","string point2str(point)",true,"point"
-{221} "pow","double pow(double,double)",true,"scidb"
-{222} "random","uint32 random()",true,"scidb"
-{223} "rational","rational rational()",true,"rational"
-{224} "rational","rational rational(int64)",true,"rational"
-{225} "rational","rational rational(int64,int64)",true,"rational"
-{226} "rational","rational rational(string)",true,"rational"
-{227} "regex","bool regex(string,string)",true,"scidb"
-{228} "sin","double sin(double)",true,"scidb"
-{229} "sin","float sin(float)",true,"scidb"
-{230} "sqrt","double sqrt(double)",true,"scidb"
-{231} "sqrt","float sqrt(float)",true,"scidb"
-{232} "str","string str(rational)",true,"rational"
-{233} "str2point","point str2point(string)",true,"point"
-{234} "strchar","char strchar(string)",true,"scidb"
-{235} "strftime","string strftime(datetime,string)",true,"scidb"
-{236} "strip_offset","datetime strip_offset(datetimetz)",true,"scidb"
-{237} "strlen","int32 strlen(string)",true,"scidb"
-{238} "substr","string substr(string,int32,int32)",true,"scidb"
-{239} "tan","double tan(double)",true,"scidb"
-{240} "tan","float tan(float)",true,"scidb"
-{241} "togmt","datetime togmt(datetimetz)",true,"scidb"
-{242} "tznow","datetimetz tznow()",true,"scidb"
-{243} "iif","<any> iif(bool, <any>, <any>)",true,"scidb"
-{244} "missing_reason","int32 missing_reason(<any>)",true,"scidb"
+{0} '%','double %(double,double)',true,'scidb'
+{1} '%','int16 %(int16,int16)',true,'scidb'
+{2} '%','int32 %(int32,int32)',true,'scidb'
+{3} '%','int64 %(int64,int64)',true,'scidb'
+{4} '%','int8 %(int8,int8)',true,'scidb'
+{5} '%','uint16 %(uint16,uint16)',true,'scidb'
+{6} '%','uint32 %(uint32,uint32)',true,'scidb'
+{7} '%','uint64 %(uint64,uint64)',true,'scidb'
+{8} '%','uint8 %(uint8,uint8)',true,'scidb'
+{9} '*','double *(double,double)',true,'scidb'
+{10} '*','float *(float,float)',true,'scidb'
+{11} '*','int16 *(int16,int16)',true,'scidb'
+{12} '*','int32 *(int32,int32)',true,'scidb'
+{13} '*','int64 *(int64,int64)',true,'scidb'
+{14} '*','int8 *(int8,int8)',true,'scidb'
+{15} '*','rational *(rational,rational)',true,'rational'
+{16} '*','uint16 *(uint16,uint16)',true,'scidb'
+{17} '*','uint32 *(uint32,uint32)',true,'scidb'
+{18} '*','uint64 *(uint64,uint64)',true,'scidb'
+{19} '*','uint8 *(uint8,uint8)',true,'scidb'
+{20} '+','datetime +(datetime,int64)',true,'scidb'
+{21} '+','double +(double,double)',true,'scidb'
+{22} '+','float +(float,float)',true,'scidb'
+{23} '+','int16 +(int16,int16)',true,'scidb'
+{24} '+','int32 +(int32,int32)',true,'scidb'
+{25} '+','int64 +(int64,int64)',true,'scidb'
+{26} '+','int8 +(int8,int8)',true,'scidb'
+{27} '+','point +(point,point)',true,'point'
+{28} '+','rational +(rational,rational)',true,'rational'
+{29} '+','string +(string,string)',true,'scidb'
+{30} '+','uint16 +(uint16,uint16)',true,'scidb'
+{31} '+','uint32 +(uint32,uint32)',true,'scidb'
+{32} '+','uint64 +(uint64,uint64)',true,'scidb'
+{33} '+','uint8 +(uint8,uint8)',true,'scidb'
+{34} '-','datetime -(datetime)',true,'scidb'
+{35} '-','int64 -(datetime,datetime)',true,'scidb'
+{36} '-','datetime -(datetime,int64)',true,'scidb'
+{37} '-','double -(double)',true,'scidb'
+{38} '-','double -(double,double)',true,'scidb'
+{39} '-','float -(float)',true,'scidb'
+{40} '-','float -(float,float)',true,'scidb'
+{41} '-','int16 -(int16)',true,'scidb'
+{42} '-','int16 -(int16,int16)',true,'scidb'
+{43} '-','int32 -(int32)',true,'scidb'
+{44} '-','int32 -(int32,int32)',true,'scidb'
+{45} '-','int64 -(int64)',true,'scidb'
+{46} '-','int64 -(int64,int64)',true,'scidb'
+{47} '-','int8 -(int8)',true,'scidb'
+{48} '-','int8 -(int8,int8)',true,'scidb'
+{49} '-','rational -(rational,rational)',true,'rational'
+{50} '-','int16 -(uint16)',true,'scidb'
+{51} '-','int16 -(uint16,uint16)',true,'scidb'
+{52} '-','int32 -(uint32)',true,'scidb'
+{53} '-','int32 -(uint32,uint32)',true,'scidb'
+{54} '-','int64 -(uint64)',true,'scidb'
+{55} '-','int64 -(uint64,uint64)',true,'scidb'
+{56} '-','int8 -(uint8)',true,'scidb'
+{57} '-','int8 -(uint8,uint8)',true,'scidb'
+{58} '/','double /(double,double)',true,'scidb'
+{59} '/','float /(float,float)',true,'scidb'
+{60} '/','int16 /(int16,int16)',true,'scidb'
+{61} '/','int32 /(int32,int32)',true,'scidb'
+{62} '/','int64 /(int64,int64)',true,'scidb'
+{63} '/','int8 /(int8,int8)',true,'scidb'
+{64} '/','rational /(rational,int64)',true,'rational'
+{65} '/','rational /(rational,rational)',true,'rational'
+{66} '/','uint16 /(uint16,uint16)',true,'scidb'
+{67} '/','uint32 /(uint32,uint32)',true,'scidb'
+{68} '/','uint64 /(uint64,uint64)',true,'scidb'
+{69} '/','uint8 /(uint8,uint8)',true,'scidb'
+{70} '<','bool <(bool,bool)',true,'scidb'
+{71} '<','bool <(char,char)',true,'scidb'
+{72} '<','bool <(datetime,datetime)',true,'scidb'
+{73} '<','bool <(datetimetz,datetimetz)',true,'scidb'
+{74} '<','bool <(double,double)',true,'scidb'
+{75} '<','bool <(float,float)',true,'scidb'
+{76} '<','bool <(int16,int16)',true,'scidb'
+{77} '<','bool <(int32,int32)',true,'scidb'
+{78} '<','bool <(int64,int64)',true,'scidb'
+{79} '<','bool <(int8,int8)',true,'scidb'
+{80} '<','bool <(rational,rational)',true,'rational'
+{81} '<','bool <(string,string)',true,'scidb'
+{82} '<','bool <(uint16,uint16)',true,'scidb'
+{83} '<','bool <(uint32,uint32)',true,'scidb'
+{84} '<','bool <(uint64,uint64)',true,'scidb'
+{85} '<','bool <(uint8,uint8)',true,'scidb'
+{86} '<=','bool <=(bool,bool)',true,'scidb'
+{87} '<=','bool <=(char,char)',true,'scidb'
+{88} '<=','bool <=(datetime,datetime)',true,'scidb'
+{89} '<=','bool <=(datetimetz,datetimetz)',true,'scidb'
+{90} '<=','bool <=(double,double)',true,'scidb'
+{91} '<=','bool <=(float,float)',true,'scidb'
+{92} '<=','bool <=(int16,int16)',true,'scidb'
+{93} '<=','bool <=(int32,int32)',true,'scidb'
+{94} '<=','bool <=(int64,int64)',true,'scidb'
+{95} '<=','bool <=(int8,int8)',true,'scidb'
+{96} '<=','bool <=(rational,rational)',true,'rational'
+{97} '<=','bool <=(string,string)',true,'scidb'
+{98} '<=','bool <=(uint16,uint16)',true,'scidb'
+{99} '<=','bool <=(uint32,uint32)',true,'scidb'
+{100} '<=','bool <=(uint64,uint64)',true,'scidb'
+{101} '<=','bool <=(uint8,uint8)',true,'scidb'
+{102} '<>','bool <>(bool,bool)',true,'scidb'
+{103} '<>','bool <>(char,char)',true,'scidb'
+{104} '<>','bool <>(datetime,datetime)',true,'scidb'
+{105} '<>','bool <>(datetimetz,datetimetz)',true,'scidb'
+{106} '<>','bool <>(double,double)',true,'scidb'
+{107} '<>','bool <>(float,float)',true,'scidb'
+{108} '<>','bool <>(int16,int16)',true,'scidb'
+{109} '<>','bool <>(int32,int32)',true,'scidb'
+{110} '<>','bool <>(int64,int64)',true,'scidb'
+{111} '<>','bool <>(int8,int8)',true,'scidb'
+{112} '<>','bool <>(string,string)',true,'scidb'
+{113} '<>','bool <>(uint16,uint16)',true,'scidb'
+{114} '<>','bool <>(uint32,uint32)',true,'scidb'
+{115} '<>','bool <>(uint64,uint64)',true,'scidb'
+{116} '<>','bool <>(uint8,uint8)',true,'scidb'
+{117} '=','bool =(bool,bool)',true,'scidb'
+{118} '=','bool =(char,char)',true,'scidb'
+{119} '=','bool =(datetime,datetime)',true,'scidb'
+{120} '=','bool =(datetimetz,datetimetz)',true,'scidb'
+{121} '=','bool =(double,double)',true,'scidb'
+{122} '=','bool =(float,float)',true,'scidb'
+{123} '=','bool =(int16,int16)',true,'scidb'
+{124} '=','bool =(int32,int32)',true,'scidb'
+{125} '=','bool =(int64,int64)',true,'scidb'
+{126} '=','bool =(int8,int8)',true,'scidb'
+{127} '=','bool =(rational,rational)',true,'rational'
+{128} '=','bool =(string,string)',true,'scidb'
+{129} '=','bool =(uint16,uint16)',true,'scidb'
+{130} '=','bool =(uint32,uint32)',true,'scidb'
+{131} '=','bool =(uint64,uint64)',true,'scidb'
+{132} '=','bool =(uint8,uint8)',true,'scidb'
+{133} '>','bool >(bool,bool)',true,'scidb'
+{134} '>','bool >(char,char)',true,'scidb'
+{135} '>','bool >(datetime,datetime)',true,'scidb'
+{136} '>','bool >(datetimetz,datetimetz)',true,'scidb'
+{137} '>','bool >(double,double)',true,'scidb'
+{138} '>','bool >(float,float)',true,'scidb'
+{139} '>','bool >(int16,int16)',true,'scidb'
+{140} '>','bool >(int32,int32)',true,'scidb'
+{141} '>','bool >(int64,int64)',true,'scidb'
+{142} '>','bool >(int8,int8)',true,'scidb'
+{143} '>','bool >(rational,rational)',true,'rational'
+{144} '>','bool >(string,string)',true,'scidb'
+{145} '>','bool >(uint16,uint16)',true,'scidb'
+{146} '>','bool >(uint32,uint32)',true,'scidb'
+{147} '>','bool >(uint64,uint64)',true,'scidb'
+{148} '>','bool >(uint8,uint8)',true,'scidb'
+{149} '>=','bool >=(bool,bool)',true,'scidb'
+{150} '>=','bool >=(char,char)',true,'scidb'
+{151} '>=','bool >=(datetime,datetime)',true,'scidb'
+{152} '>=','bool >=(datetimetz,datetimetz)',true,'scidb'
+{153} '>=','bool >=(double,double)',true,'scidb'
+{154} '>=','bool >=(float,float)',true,'scidb'
+{155} '>=','bool >=(int16,int16)',true,'scidb'
+{156} '>=','bool >=(int32,int32)',true,'scidb'
+{157} '>=','bool >=(int64,int64)',true,'scidb'
+{158} '>=','bool >=(int8,int8)',true,'scidb'
+{159} '>=','bool >=(rational,rational)',true,'rational'
+{160} '>=','bool >=(string,string)',true,'scidb'
+{161} '>=','bool >=(uint16,uint16)',true,'scidb'
+{162} '>=','bool >=(uint32,uint32)',true,'scidb'
+{163} '>=','bool >=(uint64,uint64)',true,'scidb'
+{164} '>=','bool >=(uint8,uint8)',true,'scidb'
+{165} 'abs','double abs(double)',true,'scidb'
+{166} 'abs','int32 abs(int32)',true,'scidb'
+{167} 'acos','double acos(double)',true,'scidb'
+{168} 'acos','float acos(float)',true,'scidb'
+{169} 'and','bool and(bool,bool)',true,'scidb'
+{170} 'append_offset','datetimetz append_offset(datetime,int64)',true,'scidb'
+{171} 'apply_offset','datetimetz apply_offset(datetime,int64)',true,'scidb'
+{172} 'asin','double asin(double)',true,'scidb'
+{173} 'asin','float asin(float)',true,'scidb'
+{174} 'atan','double atan(double)',true,'scidb'
+{175} 'atan','float atan(float)',true,'scidb'
+{176} 'ceil','int64 ceil(double)',true,'scidb'
+{177} 'cos','double cos(double)',true,'scidb'
+{178} 'cos','float cos(float)',true,'scidb'
+{179} 'day_of_week','uint8 day_of_week(datetime)',true,'scidb'
+{180} 'day_of_week','uint8 day_of_week(datetimetz)',true,'scidb'
+{181} 'exp','double exp(double)',true,'scidb'
+{182} 'exp','float exp(float)',true,'scidb'
+{183} 'fact','string fact(int64)',true,'more_math'
+{184} 'first','int64 first(string)',true,'scidb'
+{185} 'first','int64 first(string,string)',true,'scidb'
+{186} 'floor','int64 floor(double)',true,'scidb'
+{187} 'format','string format(double,string)',true,'scidb'
+{188} 'get_offset','int64 get_offset(datetimetz)',true,'scidb'
+{189} 'getdenom','int64 getdenom(rational)',true,'rational'
+{190} 'getnumer','int64 getnumer(rational)',true,'rational'
+{191} 'high','int64 high(string)',true,'scidb'
+{192} 'high','int64 high(string,string)',true,'scidb'
+{193} 'hour_of_day','uint8 hour_of_day(datetime)',true,'scidb'
+{194} 'hour_of_day','uint8 hour_of_day(datetimetz)',true,'scidb'
+{195} 'instanceid','int64 instanceid()',true,'scidb'
+{196} 'is_nan','bool is_nan(double)',true,'scidb'
+{197} 'is_null','void is_null(void)',true,'scidb'
+{198} 'isprime','string isprime(int64)',true,'more_math'
+{199} 'lasso','double lasso(double,double,double)',true,'more_math'
+{200} 'last','int64 last(string)',true,'scidb'
+{201} 'last','int64 last(string,string)',true,'scidb'
+{202} 'length','int64 length(string)',true,'scidb'
+{203} 'length','int64 length(string,string)',true,'scidb'
+{204} 'log','double log(double)',true,'scidb'
+{205} 'log','float log(float)',true,'scidb'
+{206} 'log10','double log10(double)',true,'scidb'
+{207} 'log10','float log10(float)',true,'scidb'
+{208} 'low','int64 low(string)',true,'scidb'
+{209} 'low','int64 low(string,string)',true,'scidb'
+{210} 'max','bool max(bool,bool)',true,'scidb'
+{211} 'max','string max(string,string)',true,'scidb'
+{212} 'min','bool min(bool,bool)',true,'scidb'
+{213} 'min','string min(string,string)',true,'scidb'
+{214} 'missing','void missing(int32)',true,'scidb'
+{215} 'mylog','double mylog(double,double)',true,'more_math'
+{216} 'not','bool not(bool)',true,'scidb'
+{217} 'now','datetime now()',true,'scidb'
+{218} 'or','bool or(bool,bool)',true,'scidb'
+{219} 'point','point point()',true,'point'
+{220} 'point2str','string point2str(point)',true,'point'
+{221} 'pow','double pow(double,double)',true,'scidb'
+{222} 'random','uint32 random()',true,'scidb'
+{223} 'rational','rational rational()',true,'rational'
+{224} 'rational','rational rational(int64)',true,'rational'
+{225} 'rational','rational rational(int64,int64)',true,'rational'
+{226} 'rational','rational rational(string)',true,'rational'
+{227} 'regex','bool regex(string,string)',true,'scidb'
+{228} 'sin','double sin(double)',true,'scidb'
+{229} 'sin','float sin(float)',true,'scidb'
+{230} 'sqrt','double sqrt(double)',true,'scidb'
+{231} 'sqrt','float sqrt(float)',true,'scidb'
+{232} 'str','string str(rational)',true,'rational'
+{233} 'str2point','point str2point(string)',true,'point'
+{234} 'strchar','char strchar(string)',true,'scidb'
+{235} 'strftime','string strftime(datetime,string)',true,'scidb'
+{236} 'strip_offset','datetime strip_offset(datetimetz)',true,'scidb'
+{237} 'strlen','int32 strlen(string)',true,'scidb'
+{238} 'substr','string substr(string,int32,int32)',true,'scidb'
+{239} 'tan','double tan(double)',true,'scidb'
+{240} 'tan','float tan(float)',true,'scidb'
+{241} 'togmt','datetime togmt(datetimetz)',true,'scidb'
+{242} 'tznow','datetimetz tznow()',true,'scidb'
+{243} 'iif','<any> iif(bool, <any>, <any>)',true,'scidb'
+{244} 'missing_reason','int32 missing_reason(<any>)',true,'scidb'
 
 SCIDB QUERY : <store(list('queries'),query_array)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <attributes(query_array)>
 {No} name,type_id,nullable
-{0} "name","string",false
-{1} "query_id","int64",false
-{2} "creation_time","datetime",false
-{3} "error_code","int32",false
-{4} "error","string",false
-{5} "idle","bool",false
+{0} 'name','string',false
+{1} 'query_id','int64',false
+{2} 'creation_time','datetime',false
+{3} 'error_code','int32',false
+{4} 'error','string',false
+{5} 'idle','bool',false
 
 SCIDB QUERY : <list('aggregates')>
 {No} name
-{0} "ApproxDC"
-{1} "avg"
-{2} "count"
-{3} "max"
-{4} "min"
-{5} "stdev"
-{6} "sum"
-{7} "var"
+{0} 'ApproxDC'
+{1} 'avg'
+{2} 'count'
+{3} 'max'
+{4} 'min'
+{5} 'stdev'
+{6} 'sum'
+{7} 'var'
 
 SCIDB QUERY : <select name,schema from list()>
 [Query was executed successfully, ignoring data output by this query.]

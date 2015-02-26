@@ -92,7 +92,7 @@ public:
                 result = boost::shared_ptr<Array>(new NonEmptyableArray(result));
             }
         } else {                        // Otherwise, return empty array
-            result = boost::shared_ptr<Array>(new MemArray(_schema));
+            result = boost::shared_ptr<Array>(new MemArray(_schema,query));
         }
 
         return result;

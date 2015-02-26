@@ -36,7 +36,6 @@
 #include "smgr/io/Storage.h"
 #include "system/SystemCatalog.h"
 
-
 using namespace std;
 using namespace boost;
 
@@ -68,7 +67,7 @@ public:
        query->pushErrorHandler(ptr);
    }
 
-   boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         getInjectedErrorListener().check();
 
@@ -92,12 +91,12 @@ public:
                     ArrayDesc versionArrayDesc;
                     if (SystemCatalog::getInstance()->getArrayDesc(versionName.str(), versionArrayDesc, false))
                     {
-                        StorageManager::getInstance().remove(versionArrayDesc.getUAId(), versionArrayDesc.getId());
                         SystemCatalog::getInstance()->deleteArrayCache(versionArrayDesc.getId());
                         removeCoordinateIndices(versionArrayDesc, query);
                     }
                 }
             }
+            // remove all versions at once
             StorageManager::getInstance().remove(arrayDesc.getUAId(), arrayDesc.getId());
             removeCoordinateIndices(arrayDesc, query);
             SystemCatalog::getInstance()->deleteArrayCache(arrayDesc.getId());

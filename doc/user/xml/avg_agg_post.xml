@@ -34,11 +34,11 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example finds the average of every column of a 3<symbol role="symbolfont">×</symbol>3 matrix.</para>
+      <para>This example finds the average of every column of a 3<symbol role="symbolfont">×</symbol>3 array.</para>
 
       <procedure>
         <step>
-          <para>Create a matrix m3x3:<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
+          <para>Create an array:<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
         </step>
 
         <step>

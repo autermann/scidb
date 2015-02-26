@@ -62,7 +62,7 @@ class DelegateChunk : public ConstChunk
 
     size_t count() const;
     bool isCountKnown() const;
-    DBChunk const* getDiskChunk() const;
+    ConstChunk const* getPersistentChunk() const;
     bool isMaterialized() const;
     bool isSparse() const;
     bool isRLE() const;
@@ -133,7 +133,7 @@ class DelegateArrayIterator : public ConstArrayIterator
 	DelegateArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
 
 	virtual ConstChunk const& getChunk();
-    boost::shared_ptr<ConstArrayIterator> getInputIterator() const;
+        boost::shared_ptr<ConstArrayIterator> getInputIterator() const;
 
 	virtual bool end();
 	virtual void operator ++();
@@ -294,7 +294,6 @@ class SplitArray : public DelegateArray
     Coordinates _size;
     boost::shared_array<char> _src;
     bool        _empty;
-    const boost::weak_ptr<scidb::Query> _query;
 };
 
 /**
@@ -314,7 +313,7 @@ class MaterializedArray : public DelegateArray
     Mutex _mutex;
     size_t _cacheSize;
 
-    static void materialize(MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format);
+    static void materialize(const shared_ptr<Query>& query, MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format);
 
     boost::shared_ptr<MemChunk> getMaterializedChunk(ConstChunk const& inputChunk);
 
@@ -333,7 +332,7 @@ class MaterializedArray : public DelegateArray
         ArrayIterator(MaterializedArray& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat);
     };
 
-    MaterializedArray(boost::shared_ptr<Array> input, MaterializeFormat chunkFormat = PreserveFormat);
+    MaterializedArray(boost::shared_ptr<Array> input, shared_ptr<Query>const& query, MaterializeFormat chunkFormat = PreserveFormat);
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 };

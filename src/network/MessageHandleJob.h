@@ -63,8 +63,6 @@ private:
 
     typedef void(MessageHandleJob::*MsgHandler)();
     static MsgHandler _msgHandlers[scidb::mtSystemMax];
-    static boost::shared_ptr<WorkQueue> _replicationQueue;
-    static boost::shared_ptr<WorkQueue> getReplicationQueue();
 
     void sgSync();
     void handlePreparePhysicalPlan();
@@ -98,9 +96,8 @@ private:
     void handleWait();
     void handleBarrier();
     void handleMPISend();
-    void handleReplicaSyncRequest();
     void handleReplicaSyncResponse();
-    void handleChunkReplica();
+    void handleReplicaChunk();
     void handleInstanceStatus();
     void handleResourcesFileExists();
     void handleInvalidMessage();

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="countOperator">
   <refnamediv>
     <refname>count</refname>
 
@@ -19,15 +18,9 @@
     <title>Summary</title>
 
     <para>The count operator counts nonempty cells of the input array. When
-    dimensions are provided they are used to do a group-by and a count per
-    resulting group is returned. When dimensions are provided, they are used
-    to do a group-by, and a count per resulting group is returned.</para>
-
-    <note>
-      <para>The count aggregate provides similar functionality to the count
-      operator. For details, see the <link
-      linkend="countAggregate">count</link> aggregate reference.</para>
-    </note>
+    dimensions are provided they are used to do a group-by, and a count per
+    resulting group is returned. For the corresponding aggregate, see the
+    <link linkend="countAggregate">count aggregate</link> reference.</para>
   </refsect1>
 
   <refsect1>

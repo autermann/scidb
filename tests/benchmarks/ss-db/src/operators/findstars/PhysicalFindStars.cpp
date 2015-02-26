@@ -71,7 +71,7 @@ boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inpu
 
   boost::shared_ptr<ConstArrayIterator> aItr = inputArray->getConstIterator(aid);
     
-  boost::shared_ptr<MemArray> outputArray = boost::shared_ptr<MemArray>(new MemArray(_schema));
+  boost::shared_ptr<MemArray> outputArray = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
   ImageProvider provider(aItr, outputArray, aid);
   Cook cook(provider, threshold);
   while(!aItr->end())

@@ -67,7 +67,7 @@ public:
             return shared_ptr<Array>(new TupleArray(_schema, tuples));
         }
 
-        return boost::shared_ptr<Array>(new MemArray(_schema));
+        return boost::shared_ptr<Array>(new MemArray(_schema,query));
     }
 };
 

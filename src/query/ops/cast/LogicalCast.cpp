@@ -46,7 +46,8 @@ namespace scidb
  *   Produces a result array with data from srcArray but with the provided schema.
  *   There are three primary purposes:
  *   - To change names of attributes or dimensions.
- *   - To change a non-integer dimesion to an integer dimension.
+ *   - To change types of attributes
+ *   - To change a non-integer dimension to an integer dimension.
  *   - To change a nulls-disallowed attribute to a nulls-allowed attribute.
  *
  * @par Input:
@@ -116,12 +117,28 @@ public:
         const boost::shared_ptr<ParsingContext> &pc = _parameters[0]->getParsingContext();
         if (srcAttributes.size() != dstAttributes.size() && srcAttributes.size() != schemaParam.getAttributes(true).size())
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR1, pc);
-        for (size_t i = 0, n = srcAttributes.size(); i < n; i++) {
+        for (size_t i = 0, n = srcAttributes.size(); i < n; i++)
+        {
             if (srcAttributes[i].getType() != dstAttributes[i].getType())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR2, pc);
+            {
+                //Check if we can cast source type to destination.
+                //If no give proper error message
+                try
+                {
+                    FunctionLibrary::getInstance()->findConverter(
+                            srcAttributes[i].getType(), dstAttributes[i].getType());
+                }
+                catch (const Exception &e)
+                {
+                    throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR10, pc)
+                            << srcAttributes[i].getName()
+                            << srcAttributes[i].getType()
+                            << dstAttributes[i].getType();
+                }
+            }
             if  ( dstAttributes[i].getFlags()!= srcAttributes[i].getFlags() &&
                   dstAttributes[i].getFlags()!= (srcAttributes[i].getFlags() | AttributeDesc::IS_NULLABLE ))
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR3, pc);
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR3, pc)  << dstAttributes[i].getName();
         }
 
         if (srcDimensions.size() != dstDimensions.size())
@@ -136,13 +153,13 @@ public:
                   || (srcDim.getEndMax() < dstDim.getEndMax() 
                       && ((srcDim.getLength() % srcDim.getChunkInterval()) == 0
                           || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR5, pc);
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR5, pc) << dstDim.getBaseName();
             if (srcDim.getStart() != dstDim.getStart())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6, pc);
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR6, pc) << dstDim.getBaseName();
             if (srcDim.getChunkInterval() != dstDim.getChunkInterval())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR7, pc);
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR7, pc) << dstDim.getBaseName();
             if (srcDim.getChunkOverlap() != dstDim.getChunkOverlap())
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR8, pc);
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR8, pc) << dstDim.getBaseName();
             
             if (!srcDim.getEndMax() != dstDim.getEndMax()) {
                 _properties.tile = false;

@@ -69,123 +69,7 @@ endif(USE_LOCAL_MPI)
 # We will call this list of 4-5 packages "the ScaLAPACK stack"
 #
 
-set(USE_PLATFORM_PACKAGES "true") 
-
-if(USE_ALTERNATE_STACK_LP64)
-    unset(USE_PLATFORM_PACKAGES)
-    message(STATUS "USE_ALTERNATE_STACK_LP64:  Scalapack configured for ALTERNATE_STACK_LP64")
-    # The flags AND paths for the ALTERNATE_STACK_LP64
-    # would go here
-    set(ALTROOT "/opt/intel/alt")
-    set(ALT_INCD "${ALTROOT}/include")
-    set(ALT_LIBD "${ALTROOT}/lib/intel64")
-    # choose one of the following to select sequential or parallel:
-    # set(ALT_PARALLEL 1) # if enabled, requires setting environement variables to limit num threads used
-    if(ALT_PARALLEL)
-        message(STATUS "ALT_PARALLEL:  Scalapack configured for parallel ALT BLAS")
-        set(ALT_SEQ "gnu_thread") # threaded BLAS via openmp
-        set(ALT_SEQ2 "-fopenmp;") #  openmp support, must end with ";"
-    else()
-        set(ALT_SEQ "sequential") # single-threaded BLAS OR
-        set(ALT_SEQ2 "")          # nothing
-    endif()
-
-    set(SCALAPACK_LIBRARIES "${ALT_LIBD}/libalt_scalapack_lp64.a;-Wl,--start-group;${ALT_LIBD}/libalt_gf_lp64.a;${ALT_LIBD}/libalt_${ALT_SEQ}.a;${ALT_LIBD}/libalt_core.a;${ALT_LIBD}/libalt_blacs_openmpi_lp64.a;-Wl,--end-group;${ALT_SEQ2}-lpthread;-lm")
-    set(LAPACK_LIBRARIES "")
-    set(BLAS_LIBRARIES "")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -m64 -I${ALT_INC_DIR}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m64 -I{ALT_INC_DIR}")  # not sure if this one is needed
-
-    set(SCALAPACK_FOUND "1")        # emulate that finds worked
-    set(LAPACK_FOUND "1")
-    set(BLAS_FOUND "1")
-endif(USE_ALTERNATE_STACK_LP64)
-
-if(USE_ALT_ILP64)
-    unset(USE_PLATFORM_PACKAGES)
-    message(STATUS "USE_ALT_ILP64 set -- configuring for large-memory ALT Scalapack libs")
-    #######################################
-    # ALT ILP64 setup: (was working at one point, not tested recently)
-    #
-    # Later on, in the October timeframe, when building with ALT on RHEL 5. for the purpose of generating
-    # binaries for commercial customers, we will want to use the following settings, which extend
-    # ScaLAPACK to use 64-bit integers to describe the size of matrix WORK areas (as
-    # well as every other INTEGER type in the ScaLAPACK FORTRAN code.
-    #
-    set(CMAKE_Fortran_FLAGS "${CMAKE_FORTRAN_FLAGS} -DALT_ILP64 -m64 -I${ALT_INC_DIR}")
-    set(SCALAPACK_LIBRARIES "-L ${ALT_LIB_DIR} -lalt_scalapack_ilp64 -lalt_blacs_intelmpi_ilp64")
-    set(LAPACK_LIBRARIES "-L ${ALT_LIB_DIR} -lalt_intel_ilp64 -lalt_sequential -lalt_core -lalt_rt -lalt_def -lpthread -lm")
-    set(BLAS_LIBRARIES "-L ${ALT_LIB_DIR} -lalt_rt")
-    # alt_avx or alt_def needed
-endif(USE_ALT_ILP64)
-
-if(0 AND USE_PLATFORM_PACKAGES) # for when slave compilation returns to this directory tree
-    ######################
-    # BLAS - from platform
-    ######################
-    set(USE_LOCAL_BLAS,0)
-    find_package(BLAS)
-    if(USE_LOCAL_BLAS)
-        set(BLAS_LIBRARIES "-L/usr/local/lib")
-        # if ATLAS BLAS, have to add:
-        # set(BLAS_LIBRARIES, "$BLAS_LIBRARIES -lptcblas -lptf77blas -latlas ")
-        # set(BLAS_LIBRARIES, "$BLAS_LIBRARIES -pthread /usr/lib/gcc/x86_64-linux-gnu/4.6.1/libgfortran.so")
-    endif(USE_LOCAL_BLAS)
-
-    if (BLAS_FOUND)
-        #message(STATUS "Debug: BLAS_LIBRARIES is ${BLAS_LIBRARIES}")
-    else(BLAS_FOUND)
-        message(WARNING "BLAS not found. ScaLAPACK-based functionality will NOT be built")
-	message(STATUS "Please look to doc/build.txt for list of dependencies")
-    endif (BLAS_FOUND)
-
-    ######################
-    # LAPACK - from platform
-    ######################
-    set(USE_LOCAL_LAPACK 0)
-    find_package(LAPACK)
-    if(USE_LOCAL_LAPACK)
-        set(LAPACK_LIBRARIES "-L/usr/local/lib -ltmg -lreflapack")  # DEBUG 
-    endif(USE_LOCAL_LAPACK)
-
-    if (LAPACK_FOUND)
-        #message(STATUS "Debug: LAPACK_LIBRARIES is ${LAPACK_LIBRARIES}")
-    else(LAPACK_FOUND)
-        message(WARNING "LAPACK not found. ScaLAPACK-based functionality will NOT be built")
-	message(STATUS "Please look to doc/build.txt for list of dependencies")
-    endif(LAPACK_FOUND)
-
-    ###########################
-    # ScaLAPACK - from PLATFORM
-    ###########################
-    set(USE_LOCAL_SCALAPACK 0)
-    if(USE_LOCAL_SCALAPACK)
-        message(STATUS "WARNING-- using locally installed ScaLAPACK stack")
-        set(SCALAPACK_LIBRARIES "/usr/local/lib/libscalapack.a")
-        set(SCALAPACK_INC_DIR "/usr/local/include/BLACS/SRC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I ${SCALAPACK_INC_DIR}")
-    else()
-        message(STATUS "Using platform ScaLAPACK stack")
-	find_package(ScaLAPACK)
-    endif()
-
-    if (SCALAPACK_FOUND)
-        #message(STATUS "Debug: SCALAPACK_LIBRARIES is ${SCALAPACK_LIBRARIES}")
-    else (SCALAPACK_FOUND)
-        message(WARNING "ScaLAPACK not found. ScaLAPACK-based functionality will NOT be built.")
-	message(STATUS "Please look to doc/build.txt for list of dependencies")
-    endif (SCALAPACK_FOUND)
-endif(0 AND USE_PLATFORM_PACKAGES)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOMPI_IGNORE_CXX_SEEK")
-
-if(MPI_CXX_FOUND AND MPI_Fortran_FOUND)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_INCLUDE}")
-else(MPI_CXX_FOUND AND MPI_Fortran_FOUND)
-    #    message(WARNING "MPI not present. ScaLAPACK-based functionality will NOT be built")
-    #    message(WARNING "Debug: MPI_C_FOUND is ${MPI_C_FOUND}, MPI_CXX_FOUND is ${MPI_CXX_FOUND}, MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
-    #    message(WARNING "Ubuntu Hint: $ sudo apt-get install libopenmpi-dev")
-endif(MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+set(USE_PLATFORM_PACKAGES "true")
 
 message(STATUS "Debug: BLAS_LIBRARIES is ${BLAS_LIBRARIES}")
 message(STATUS "Debug: LAPACK_LIBRARIES is ${LAPACK_LIBRARIES}")
@@ -226,6 +110,7 @@ if (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND 
             dlaScaLA/scalapackEmulation/pdelget.f       # pdelgetOp - phys op
                 dlaScaLA/scalapackEmulation/infog2l.f   # local indices; referenced by elset/elget?
             dlaScaLA/scalapackEmulation/pxerbla.f  # error handler
+
         # BLACS emulation:
             dlaScaLA/scalapackEmulation/blacs_info_fake.c # blacs_grid_info() from Physical operators
         scalapackUtil/reformat.cpp
@@ -310,10 +195,10 @@ else (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AN
     message(WARNING "----------------------------------------------------")
 
 endif (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
-       
+
 
 #
-# complete the linar_algebra library settings
+# complete the dense_linear_algebra plugin settings
 #
 add_library(dense_linear_algebra SHARED ${dense_linear_algebra_src})
 
@@ -324,8 +209,6 @@ if (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND 
 
 endif (MPI_CXX_FOUND AND MPI_Fortran_FOUND) # SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
 
-#message(STATUS "Debug: FINAL dense_linear_algebra_LIBRARIES =========================")
-#message(STATUS "Debug: dense_linear_algebra_LIBRARIES is ${dense_linear_algebra_LIBRARIES}")
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}/plugins" "libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}" dense_linear_algebra)
 set_target_properties(dense_linear_algebra PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}/plugins)
 
@@ -333,3 +216,4 @@ if (APPLE)
     set_target_properties(dense_linear_algebra PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif ()
 
+message(STATUS "*****END linear_algebra/CMakeLists.txt ***********************")

@@ -5,11 +5,11 @@
 * This file is part of SciDB.
 * Copyright (C) 2008-2013 SciDB, Inc.
 *
-* SciDB is free software: you can redistribute it and/or modify
+* SciDB is free software: you can redioutibute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
 * the Free Software Foundation.
 *
-* SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+* SciDB is dioutibuted "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
 * INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
 * NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
 * the AFFERO GNU General Public License for the complete license terms.
@@ -30,6 +30,7 @@
 #include <boost/make_shared.hpp>
 
 #include "log4cxx/logger.h"
+#include "query/QueryPlanUtilites.h"
 #include "query/QueryPlan.h"
 #include "query/LogicalExpression.h"
 
@@ -90,7 +91,21 @@ void LogicalQueryPlanNode::inferArrayAccess(boost::shared_ptr<Query>& query)
     _logicalOperator->inferArrayAccess(query);
 }
 
-// PhysicalQueryPlanNode
+void LogicalQueryPlanNode::toString(std::ostream &out, int indent, bool children) const
+{
+    Indent prefix(indent);
+    out << prefix('>', false);
+    out << "[lInstance] children "<<_childNodes.size()<<"\n";
+    _logicalOperator->toString(out,indent+1);
+
+    if (children) {
+        for (size_t i = 0; i< _childNodes.size(); i++)
+        {
+            _childNodes[i]->toString(out, indent+1);
+        }
+    }
+}
+
 PhysicalQueryPlanNode::PhysicalQueryPlanNode(const boost::shared_ptr<PhysicalOperator>& physicalOperator,
                                              bool agg, bool ddl, bool tile)
 : _physicalOperator(physicalOperator),
@@ -103,8 +118,52 @@ PhysicalQueryPlanNode::PhysicalQueryPlanNode(const boost::shared_ptr<PhysicalOpe
                                              bool agg, bool ddl, bool tile):
 	_physicalOperator(physicalOperator),
 	_childNodes(childNodes),
-	_parent(), _agg(agg), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
+    _parent(), _agg(agg), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
 {
+}
+
+void PhysicalQueryPlanNode::toString(std::ostream &out, int indent, bool children) const
+{
+    Indent prefix(indent);
+    out << prefix('>', false);
+
+    out<<"[pNode] "<<_physicalOperator->getPhysicalName()<<" agg "<<isAgg()<<" ddl "<<isDdl()<<" tile "<<supportsTileMode()<<" children "<<_childNodes.size()<<"\n";
+    _physicalOperator->toString(out,indent+1);
+
+    if (children) {
+        out << prefix(' ');
+        out << "output full chunks: ";
+        out << (outputFullChunks() ? "yes" : "no");
+        out << "\n";
+        out << prefix(' ');
+        out << "changes dioutibution: ";
+        out << (changesDistribution() ? "yes" : "no");
+        out << "\n";
+    }
+
+    out << prefix(' ');
+    out<<"props sgm "<<_isSgMovable<<" sgo "<<_isSgOffsetable<<"\n";
+    out << prefix(' ');
+    out<<"diout "<<_distribution<<"\n";
+    const ArrayDesc& schema = _physicalOperator->getSchema();
+    out << prefix(' ');
+    out<<"bound "<<_boundaries
+      <<" cells "<<_boundaries.getNumCells();
+
+    if (_boundaries.getStartCoords().size() == schema.getDimensions().size()) {
+        out  <<" chunks "<<_boundaries.getNumChunks(schema.getDimensions())
+            <<" est_bytes "<<_boundaries.getSizeEstimateBytes(schema)
+           <<"\n";
+    }
+    else {
+        out <<" [improperly initialized]\n";
+    }
+
+    if (children) {
+        for (size_t i = 0; i< _childNodes.size(); i++) {
+            _childNodes[i]->toString(out, indent+1);
+        }
+    }
 }
 
 bool PhysicalQueryPlanNode::isStoringSg() const
@@ -125,7 +184,6 @@ bool PhysicalQueryPlanNode::isStoringSg() const
     return false;
 }
 
-
 // LogicalPlan
 LogicalPlan::LogicalPlan(const boost::shared_ptr<LogicalQueryPlanNode>& root):
         _root(root)
@@ -133,6 +191,13 @@ LogicalPlan::LogicalPlan(const boost::shared_ptr<LogicalQueryPlanNode>& root):
 
 }
 
+void LogicalPlan::toString(std::ostream &out, int indent, bool children) const
+{
+    Indent prefix(indent);
+    out << prefix('>', false);
+    out << "[lPlan]:\n";
+    _root->toString(out, indent+1, children);
+}
 
 // PhysicalPlan
 PhysicalPlan::PhysicalPlan(const boost::shared_ptr<PhysicalQueryPlanNode>& root):
@@ -141,5 +206,20 @@ PhysicalPlan::PhysicalPlan(const boost::shared_ptr<PhysicalQueryPlanNode>& root)
 
 }
 
+void PhysicalPlan::toString(std::ostream &out, int const indent, bool children) const
+{
+    Indent prefix(indent);
+    out << prefix('>', false);
+    out << "[pPlan]:";
+    if (_root.get() != NULL)
+    {
+        out << "\n";
+        _root->toString(out, indent+1, children);
+    }
+    else
+    {
+        out << "[NULL]\n";
+    }
+}
 
 } // namespace

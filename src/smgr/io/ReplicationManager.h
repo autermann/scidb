@@ -60,7 +60,7 @@ class ReplicationManager;
             assert(query);
         }
         virtual ~Item() {}
-        boost::shared_ptr<Query> getQuery() { return _query.lock(); }
+        boost::weak_ptr<Query> getQuery() { return _query; }
         InstanceID getInstanceId() { return _instanceId; }
         boost::shared_ptr<MessageDesc> getChunkMsg() { return _chunkMsg; }
         /**
@@ -115,7 +115,7 @@ class ReplicationManager;
     ReplicationManager() {}
     virtual ~ReplicationManager() {}
     /// start the operations
-    void start();
+    void start(const boost::shared_ptr<JobQueue>& jobQueue);
     /// stop the operations and release resources
     void stop();
     /// replicate an item
@@ -139,6 +139,15 @@ class ReplicationManager;
         return bool(_lsnrId);
     }
 
+    boost::shared_ptr<scidb::WorkQueue> getInboundReplicationQueue()
+    {
+        // no synchronization is needed because _inboundReplicationQ
+        // is initialized at start() time and is never changed later
+        assert(isStarted());
+        assert(_inboundReplicationQ);
+        return  _inboundReplicationQ;
+    }
+
  private:
     void handleConnectionStatus(Notification<NetworkManager::ConnectionStatus>::MessageTypePtr connStatus);
     bool sendItem(RepItems& ri);
@@ -150,8 +159,7 @@ class ReplicationManager;
         if (item->isDone()) {
             return false;
         }
-        shared_ptr<Query> q(item->getQuery());
-        return Query::validateQueryPtr(q);
+        return Query::getValidQueryPtr(item->getQuery());
     }
 
     ReplicationManager(const ReplicationManager&);
@@ -161,6 +169,8 @@ class ReplicationManager;
     Mutex    _repMutex;
     Event    _repEvent;
     Notification<NetworkManager::ConnectionStatus>::ListenerID _lsnrId;
+
+    boost::shared_ptr<WorkQueue> _inboundReplicationQ;
 };
 }
 #endif

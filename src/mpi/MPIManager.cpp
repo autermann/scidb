@@ -36,6 +36,7 @@
 #include <mpi/MPIManager.h>
 #include <mpi/MPISlaveProxy.h>
 #include <mpi/MPIUtils.h>
+#include <network/proto/scidb_msg.pb.h>
 
 using namespace std;
 
@@ -101,9 +102,9 @@ void MpiManager::cleanup()
 }
 void MpiManager::init()
 {
-    shared_ptr<scidb::NetworkMessageFactory> factory = scidb::getNetworkMessageFactory();
+    boost::shared_ptr<scidb::NetworkMessageFactory> factory = scidb::getNetworkMessageFactory();
 
-    shared_ptr<MpiMessageHandler> msgHandler(new MpiMessageHandler());
+    boost::shared_ptr<MpiMessageHandler> msgHandler(new MpiMessageHandler());
     factory->addMessageType(scidb::mtMpiSlaveHandshake,
                             boost::bind(&MpiMessageHandler::createMpiSlaveHandshake, msgHandler,_1),
                             boost::bind(&MpiMessageHandler::handleMpiSlaveHandshake, msgHandler,_1));
@@ -231,10 +232,26 @@ bool MpiManager::removeCtx(scidb::QueryID queryId)
     return (_ctxMap.erase(queryId) > 0);
 }
 
+MessagePtr MpiMessageHandler::createMpiSlaveCommand(MessageID id)
+{
+    return scidb::MessagePtr(new scidb_msg::MpiSlaveCommand());
+}
+
+MessagePtr MpiMessageHandler::createMpiSlaveHandshake(MessageID id)
+{
+    return scidb::MessagePtr(new scidb_msg::MpiSlaveHandshake());
+}
+
 void MpiMessageHandler::handleMpiSlaveHandshake(const boost::shared_ptr<scidb::MessageDescription>& messageDesc)
 {
     handleMpiSlaveMessage<scidb_msg::MpiSlaveHandshake, scidb::mtMpiSlaveHandshake>(messageDesc);
 }
+
+MessagePtr MpiMessageHandler::createMpiSlaveResult(MessageID id)
+{
+    return scidb::MessagePtr(new scidb_msg::MpiSlaveResult());
+}
+
 void MpiMessageHandler::handleMpiSlaveResult(const boost::shared_ptr<scidb::MessageDescription>& messageDesc)
 {
     handleMpiSlaveMessage<scidb_msg::MpiSlaveResult, scidb::mtMpiSlaveResult>(messageDesc);
@@ -257,7 +274,7 @@ void MpiMessageHandler::handleMpiSlaveDisconnect(uint64_t launchId,
 
 void MpiMessageHandler::processMessage(uint64_t launchId,
                                        const boost::shared_ptr<scidb::ClientMessageDescription>& cliMsg,
-                                       const shared_ptr<scidb::Query>& query)
+                                       const boost::shared_ptr<scidb::Query>& query)
 {
     try {
         boost::shared_ptr<MpiOperatorContext> ctx =

@@ -64,6 +64,7 @@ class FilterChunkIterator : public DelegateChunkIterator
     virtual void reset();
     virtual bool end();
     virtual bool setPosition(Coordinates const& pos);
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
     FilterChunkIterator(FilterArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode);
 
   protected:
@@ -76,6 +77,8 @@ class FilterChunkIterator : public DelegateChunkIterator
     int _mode;
     Value tileValue;
     TypeId _type;
+ private:
+    boost::shared_ptr<Query> _query;
 };
 
 
@@ -150,7 +153,6 @@ class FilterArray : public DelegateArray
     Mutex mutex;
     boost::shared_ptr<Expression> expression;
     vector<BindInfo> bindings;
-    boost::weak_ptr<Query> _query;
     bool _tileMode;
     size_t cacheSize;
     AttributeID emptyAttrID;

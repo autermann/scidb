@@ -4,10 +4,10 @@
 
 --set-format dcsv
 --start-igdata
-CREATE ARRAY vector1<val:double>[i=0:15,2,0]  
+CREATE ARRAY vector1<val:double>[i=0:5,2,0, j=0:5,3,0]  
 --set-format dense
 --stop-igdata
-store(build(vector1,i),vector1)  
+store(build(vector1,i*6+j),vector1)  
 --start-igdata
 sample(vector1,0.3)  
 --stop-igdata

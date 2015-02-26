@@ -54,16 +54,20 @@ public:
     virtual  Value& getItem();
     virtual void operator ++();
     virtual void reset();
-	virtual bool setPosition(Coordinates const& pos);
-	virtual bool end();
+    virtual bool setPosition(Coordinates const& pos);
+    virtual bool end();
     virtual bool isEmpty();
-    LookupChunkIterator(LookupArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode, boost::shared_ptr<Query> const& query);
+    LookupChunkIterator(LookupArrayIterator const& arrayIterator,
+                        DelegateChunk const* chunk,
+                        int iterationMode,
+                        boost::shared_ptr<Query> const& query);
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
     
 private:
     bool mapPosition();
     vector< boost::shared_ptr<ConstChunkIterator> > templateChunkIterators;
     vector< FunctionPointer> _converters;
-    boost::shared_ptr<Query> query;
+    boost::shared_ptr<Query> _query;
 
     boost::shared_ptr<ConstArrayIterator> sourceArrayIterator;
     boost::shared_ptr<ConstChunkIterator> sourceChunkIterator;
@@ -100,7 +104,6 @@ class LookupArray : public DelegateArray
   private:
     boost::shared_ptr<Array> templateArray;
     boost::shared_ptr<Array> sourceArray;
-    boost::shared_ptr<Query> query;
 };
 
 }

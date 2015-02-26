@@ -81,17 +81,19 @@ class MapJoinChunkIterator : public DelegateChunkIterator
 class MapJoinArrayIterator : public DelegateArrayIterator
 {
     friend class MapJoinChunkIterator;
+    friend class MapJoinArray;
 
-  public:
-        MapJoinArrayIterator(DelegateArray const& delegate, AttributeID attrID,
+    MapJoinArrayIterator(DelegateArray const& delegate, AttributeID attrID,
                          shared_ptr<ConstArrayIterator> leftIterator,
                          shared_ptr<ConstArrayIterator> rightIterator,
-                         shared_ptr<ConstArrayIterator> inputIterator);
-
+                         shared_ptr<ConstArrayIterator> inputIterator,
+                         bool isInputEmptyTag);
+  public:
         virtual void operator ++();
         virtual void reset();
 
   private:
+    bool _isInputEmptyTag;
     shared_ptr<ConstArrayIterator> leftIterator;
     shared_ptr<ConstArrayIterator> rightIterator;
     shared_ptr<ConstArrayIterator> inputIterator;
@@ -117,9 +119,8 @@ class MapJoinArray : public DelegateArray
         shared_ptr<Array> right;
     const size_t nLeftAttrs;
     const size_t nRightAttrs;
-    int    leftEmptyTagPosition;
-    int    rightEmptyTagPosition;
-    boost::weak_ptr<Query> _query;
+    int64_t leftEmptyTagPosition;
+    int64_t rightEmptyTagPosition;
 };
 
 

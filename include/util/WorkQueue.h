@@ -65,6 +65,11 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
 
       ~OverflowException() throw () {}
       void raise() const { throw *this; }
+      virtual Exception::Pointer copy() const
+      {
+          Exception::Pointer ep(boost::make_shared<OverflowException>(_file.c_str(), _function.c_str(), _line));
+          return ep;
+      }
    };
 
    WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue)
@@ -111,10 +116,14 @@ class WorkQueue : public boost::enable_shared_from_this<WorkQueue>
 
    void stop()
    {
-      {
-         ScopedMutexLock lock(_mutex);
-         _isStarted = false;
-      }
+      ScopedMutexLock lock(_mutex);
+      _isStarted = false;
+   }
+
+   bool isStarted()
+   {
+       ScopedMutexLock lock(_mutex);
+       return _isStarted;
    }
 
    uint32_t size()

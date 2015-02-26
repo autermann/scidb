@@ -49,7 +49,8 @@ namespace scidb
  */
 boost::shared_ptr<class LogicalQueryPlanNode> AstToLogicalPlan(
         class AstNode *ast,
-        const boost::shared_ptr<class Query> &query);
+        const boost::shared_ptr<class Query> &query,
+        bool canonicalize = false);
 
 boost::shared_ptr<class LogicalExpression> AstToLogicalExpression(class AstNode *ast);
 

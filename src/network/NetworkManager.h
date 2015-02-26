@@ -233,8 +233,6 @@ class NetworkManager: public Singleton<NetworkManager>
                       boost::shared_ptr<MessageDesc>& messageDesc,
                       MessageQueueType flowControlType = mqtNone);
 
-    static void* doRecover(void*);
-
     static void handleLivenessNotification(boost::shared_ptr<const InstanceLiveness> liveInfo) {
        getInstance()->_handleLivenessNotification(liveInfo);
     }

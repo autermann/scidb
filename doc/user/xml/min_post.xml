@@ -1,29 +1,47 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="minOperator">
   <refnamediv>
     <refname>min</refname>
 
     <refpurpose><indexterm>
         <primary>min</primary>
-      </indexterm>Select minimum value</refpurpose>
+      </indexterm>Selects the minimum value for the specified attribute,
+    optionally over one or more dimensions.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>min(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+    <synopsis>min(<replaceable>array</replaceable>[,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>])</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para>The min operator selects the minimum value from an array
-    attribute.</para>
+    <para>The min operator selects the minimum value from an array attribute.
+    For the corresponding aggregate, see the <link linkend="minAggregate">min</link> aggregate reference.</para>
+  </refsect1>
 
-    <note>
-      <para>The min operator provides the same functionality as the min
-      aggregate. For details, see the <link linkend="minAggregate">min</link>
-      aggregate reference.</para>
-    </note>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>min</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: an optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>
@@ -41,14 +59,14 @@
 
         <step>
           <para>Store random values in m3x3:<para><programlisting>AFL% store(build(m3x3,random()%20+1),m3x3);  </programlisting><screen>[
-[(11),(7),(11)],
-[(9),(1),(19)],
-[(7),(4),(20)]
+[(20),(12),(17)],
+[(15),(9),(11)],
+[(11),(5),(16)]
 ]</screen></para></para>
         </step>
 
         <step>
-          <para>Select the minimum value of each row of m3x3:<para><programlisting>AFL% min(m3x3,val,i);  </programlisting><screen>[(7),(1),(4)]
+          <para>Select the minimum value of each row of m3x3:<para><programlisting>AFL% min(m3x3,val,i);  </programlisting><screen>[(12),(9),(5)]
 </screen></para></para>
         </step>
       </procedure>
@@ -63,37 +81,37 @@
         <step>
           <para>Find the minimum value, and alias it so that we can use it in
           a cross join:<para><programlisting>AFL% aggregate(m3x3,min(val) as m)  </programlisting><screen>{i} m
-{0} 1
+{0} 5
 </screen></para></para>
         </step>
 
         <step>
           <para>Cross join the minimum value with the original array, so that
           cell {i,j}x becomes {i,i,j}(m=min,x):<para><programlisting>AFL% cross_join(aggregate(m3x3,min(val) as m),m3x3)  </programlisting><screen>{i,i,j} m,val
-{0,0,0} 1,11
-{0,0,1} 1,7
-{0,0,2} 1,11
-{0,1,0} 1,9
-{0,1,1} 1,1
-{0,1,2} 1,19
-{0,2,0} 1,7
-{0,2,1} 1,4
-{0,2,2} 1,20
+{0,0,0} 5,20
+{0,0,1} 5,12
+{0,0,2} 5,17
+{0,1,0} 5,15
+{0,1,1} 5,9
+{0,1,2} 5,11
+{0,2,0} 5,11
+{0,2,1} 5,5
+{0,2,2} 5,16
 </screen></para></para>
         </step>
 
         <step>
           <para>Remove the extra dimension added in the previous
           step:<para><programlisting>AFL% deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3))  </programlisting><screen>{i,j} m,val
-{0,0} 1,11
-{0,1} 1,7
-{0,2} 1,11
-{1,0} 1,9
-{1,1} 1,1
-{1,2} 1,19
-{2,0} 1,7
-{2,1} 1,4
-{2,2} 1,20
+{0,0} 5,20
+{0,1} 5,12
+{0,2} 5,17
+{1,0} 5,15
+{1,1} 5,9
+{1,2} 5,11
+{2,0} 5,11
+{2,1} 5,5
+{2,2} 5,16
 </screen></para></para>
         </step>
 
@@ -101,8 +119,8 @@
           <para>Filter (select) the cells that have the actual minimum
           value:<para><programlisting>AFL% filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)), val=m);  </programlisting><screen>[
 [(),(),()],
-[(),(1,1),()],
-[(),(),()]
+[(),(),()],
+[(),(5,5),()]
 ]</screen></para></para>
         </step>
 
@@ -110,8 +128,8 @@
           <para>Of the correct cells, show only <literal>val</literal>, not
           the alias, <literal>m</literal>:<para><programlisting>AFL% project(filter(deldim(cross_join(aggregate(m3x3,min(val) as m),m3x3)), val=m),val);  </programlisting><screen>[
 [(),(),()],
-[(),(1),()],
-[(),(),()]
+[(),(),()],
+[(),(5),()]
 ]</screen></para></para>
         </step>
       </procedure>

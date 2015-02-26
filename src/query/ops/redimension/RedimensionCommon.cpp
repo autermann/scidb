@@ -376,7 +376,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     }
 
     shared_ptr<MemArray> beforeRedistribution = make_shared<MemArray>(
-            ArrayDesc(_schema.getName(), addEmptyTagAttribute(attrsBeforeRedistribution), _schema.getDimensions()));
+              ArrayDesc(_schema.getName(), addEmptyTagAttribute(attrsBeforeRedistribution), _schema.getDimensions() ),query);
 
     // Write data from the RowCollection to the MemArray
     vector<shared_ptr<ArrayIterator> > arrayItersBeforeRedistribution(attrsBeforeRedistribution.size());
@@ -403,6 +403,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
 
         // Sort based on position in the chunk (again, all records in the same 'cell' were assigned the same value in the synthetic dim).
         iqsort(&items[0], items.size(), compareValueVectorsFunc);
+        query->validate();
 
         // If there is a synthetic dimension, and if there are duplicates, modify the values
         // (so that the duplicates get distinct coordinates in the synthetic dimension).
@@ -439,6 +440,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
         // Resort, if some position has been changed.
         if (needToResort) {
             iqsort(&items[0], items.size(), compareValueVectorsFunc);
+            query->validate();
         }
 
         // Create new chunks and get the iterators.
@@ -553,7 +555,7 @@ shared_ptr<Array> RedimensionCommon::redimensionArray(shared_ptr<Array> const& s
     } else {
         LOG4CXX_DEBUG(logger, "[RedimStore] begin afterRedistribution --> withAggregates");
         withAggregates = make_shared<MemArray>(
-                ArrayDesc(_schema.getName(), _schema.getAttributes(), _schema.getDimensions()));
+                  ArrayDesc(_schema.getName(), _schema.getAttributes(), _schema.getDimensions()),query);
 
         vector<shared_ptr<ConstArrayIterator> > memArrayIters(destAttrs.size());
         vector<shared_ptr<ConstChunkIterator> > memChunkIters(destAttrs.size());

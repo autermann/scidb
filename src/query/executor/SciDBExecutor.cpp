@@ -247,12 +247,6 @@ class SciDBExecutor: public scidb::SciDB
             }
             query->done();
         } catch (const Exception& e) {
-            if (e.getShortErrorCode() != SCIDB_SE_THREAD)
-            {
-                LOG4CXX_DEBUG(logger, "Broadcast ABORT message to all instances for query " << query->getQueryID());
-                shared_ptr<MessageDesc> abortMessage = makeAbortMessage(query->getQueryID());
-                NetworkManager::getInstance()->broadcast(abortMessage); //query may not have the instance map, so broadcast to all
-            }
             query->done(e.copy());
             e.raise();
         }

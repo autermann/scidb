@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="sliceOperator">
   <refnamediv>
     <refname>slice</refname>
 
@@ -19,7 +18,7 @@
 
         <secondary>slice</secondary>
       </indexterm>Produces a result array that is a subset of the source array
-    derived by holding one or more dimension values constant</refpurpose>
+    derived by holding one or more dimension values constant.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>

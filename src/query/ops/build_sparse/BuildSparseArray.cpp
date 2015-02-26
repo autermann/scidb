@@ -63,13 +63,15 @@ namespace scidb {
         for (size_t i = 0; i < nBindings; i++) {
             switch (_array._expressionBindings[i].kind) {
               case BindInfo::BI_COORDINATE:
+              {
                   _params[i] = _array._desc.getOriginalCoordinate(_array._expressionBindings[i].resolvedId,
-                                                             _currPos[_array._expressionBindings[i].resolvedId],
-                                                             _array._query.lock());
-                  break;
+                                                                  _currPos[_array._expressionBindings[i].resolvedId],
+                                                                  _query);
+              } break;
               case BindInfo::BI_VALUE:
+              {
                   _params[i] = _array._expressionBindings[i].value;
-                  break;
+              } break;
               default:
                   assert(false);
             }
@@ -124,13 +126,15 @@ namespace scidb {
         for (size_t i = 0; i < nBindings; i++) {
             switch (_array._predicateBindings[i].kind) {
               case BindInfo::BI_COORDINATE:
-              params[i] = _array._desc.getOriginalCoordinate(_array._predicateBindings[i].resolvedId,
-                                                             _currPos[_array._predicateBindings[i].resolvedId],
-                                                             _array._query.lock());
-                  break;
+              {
+                  params[i] = _array._desc.getOriginalCoordinate(_array._predicateBindings[i].resolvedId,
+                                                                 _currPos[_array._predicateBindings[i].resolvedId],
+                                                                 _query);
+              } break;
               case BindInfo::BI_VALUE:
+              {
                   params[i] = _array._predicateBindings[i].value;
-                  break;
+              } break;
               default:
                   assert(false);
             }
@@ -183,7 +187,8 @@ namespace scidb {
       _defaultValue(chunk->getAttributeDesc().getDefaultValue()),
       _expression(*_array._expression),
       _params(_expression),
-      _nullable(chunk->getAttributeDesc().isNullable())
+      _nullable(chunk->getAttributeDesc().isNullable()),
+      _query(Query::getValidQueryPtr(_array._query))
     {
         _value = _defaultValue;
         _emptyIndicator = chunk->getAttributeDesc().isEmptyIndicator();
@@ -270,8 +275,10 @@ namespace scidb {
 
     void BuildSparseArrayIterator::operator ++()
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        Query::getValidQueryPtr(array._query);
         nextChunk();
     }
 
@@ -311,6 +318,7 @@ namespace scidb {
 
     bool BuildSparseArrayIterator::setPosition(Coordinates const& pos)
     {
+        Query::getValidQueryPtr(array._query);
         for (size_t i = 0, n = currPos.size(); i < n; i++) {
             if (pos[i] < dims[i].getStart() || pos[i] > dims[i].getEndMax()) {
                 return hasCurrent = false;
@@ -324,11 +332,11 @@ namespace scidb {
             hasCurrent = false;
         }
         return hasCurrent;
-                                                                                                                                    
     }
 
     void BuildSparseArrayIterator::reset()
     {
+        Query::getValidQueryPtr(array._query);
         size_t nDims = currPos.size(); 
         for (size_t i = 0; i < nDims; i++) {
             currPos[i] = dims[i].getStart();
@@ -339,15 +347,16 @@ namespace scidb {
 
     ConstChunk const& BuildSparseArrayIterator::getChunk()
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        Query::getValidQueryPtr(array._query);
         if (!chunkInitialized) { 
             chunk.setPosition(currPos);
             chunkInitialized = true;
         }
         return chunk;
     }
-
 
     BuildSparseArrayIterator::BuildSparseArrayIterator(BuildSparseArray& arr, AttributeID attrID)
     : array(arr),
@@ -373,8 +382,10 @@ namespace scidb {
         return boost::shared_ptr<ConstArrayIterator>(new BuildSparseArrayIterator(*(BuildSparseArray*)this, attr));
     }
 
-BuildSparseArray::BuildSparseArray(boost::shared_ptr<Query>& query,
-                                   ArrayDesc const& desc, boost::shared_ptr<Expression> expression, boost::shared_ptr<Expression> predicate)
+    BuildSparseArray::BuildSparseArray(boost::shared_ptr<Query>& query,
+                                       ArrayDesc const& desc,
+                                       boost::shared_ptr<Expression> expression,
+                                       boost::shared_ptr<Expression> predicate)
     : _desc(desc),
       _expression(expression),
       _expressionBindings(expression->getBindings()),
@@ -383,10 +394,10 @@ BuildSparseArray::BuildSparseArray(boost::shared_ptr<Query>& query,
       _converter(NULL),
       nInstances( 0),
       instanceID(INVALID_INSTANCE),
-      emptyable(desc.getEmptyBitmapAttribute() != NULL),
-      _query(query)
+      emptyable(desc.getEmptyBitmapAttribute() != NULL)
     {
        assert(query);
+       _query=query;
        nInstances = query->getInstancesCount();
        instanceID = query->getInstanceID();
        assert(nInstances>0);

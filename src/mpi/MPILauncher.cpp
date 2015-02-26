@@ -111,8 +111,7 @@ void MpiLauncher::launch(const vector<string>& slaveArgs,
             throw InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
                 << " MPI launcher is already running";
         }
-        boost::shared_ptr<Query> query = _query.lock();
-        Query::validateQueryPtr(query);
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
 
         buildArgs(extraEnvVars, args, slaveArgs, membership, query, maxSlaves);
     }
@@ -622,8 +621,8 @@ void MpiLauncher::scheduleKillTimer()
     // this->_mutex must be locked
     assert (_pid > 1);
     assert(!_killTimer);
-    _killTimer = shared_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(getIOService()));
-    int rc = _killTimer->expires_from_now(posix_time::seconds(_MPI_LAUNCHER_KILL_TIMEOUT));
+    _killTimer = boost::shared_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(getIOService()));
+    int rc = _killTimer->expires_from_now(boost::posix_time::seconds(_MPI_LAUNCHER_KILL_TIMEOUT));
     if (rc != 0) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
                << "boost::asio::expires_from_now" << rc << rc << _MPI_LAUNCHER_KILL_TIMEOUT);
@@ -694,7 +693,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
                           std::min(maxSlaves, sortedInstances.size()) ;
     args.clear();
     args.reserve(totalArgsNum);
-    shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
+    boost::shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
     hosts->reserve(std::min(maxSlaves, sortedInstances.size()));
 
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
@@ -861,10 +860,10 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     envVars.push_back(mpi::getScidbMPIEnvVar(clusterUuid, queryId, launchId));
 }
 
-void MpiLauncher::resolveHostNames(shared_ptr<vector<string> >& hosts)
+void MpiLauncher::resolveHostNames(boost::shared_ptr<vector<string> >& hosts)
 {
-    shared_ptr<JobQueue>  jobQueue  = boost::make_shared<JobQueue>();
-    shared_ptr<WorkQueue> workQueue = boost::make_shared<WorkQueue>(jobQueue, hosts->size(), hosts->size());
+    boost::shared_ptr<JobQueue>  jobQueue  = boost::make_shared<JobQueue>();
+    boost::shared_ptr<WorkQueue> workQueue = boost::make_shared<WorkQueue>(jobQueue, hosts->size(), hosts->size());
     workQueue->start();
     
     for (size_t i=0; i<hosts->size(); ++i) {
@@ -883,8 +882,8 @@ void MpiLauncher::resolveHostNames(shared_ptr<vector<string> >& hosts)
     jobQueue.reset();
 }
 
-void MpiLauncher::handleHostNameResolve(const shared_ptr<WorkQueue>& workQueue,
-                                        shared_ptr<vector<string> >& hosts,
+void MpiLauncher::handleHostNameResolve(const boost::shared_ptr<WorkQueue>& workQueue,
+                                        boost::shared_ptr<vector<string> >& hosts,
                                         size_t indx,
                                         const boost::system::error_code& error,
                                         boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
@@ -895,7 +894,7 @@ void MpiLauncher::handleHostNameResolve(const shared_ptr<WorkQueue>& workQueue,
     workQueue->enqueue(item);
 }
 
-void MpiLauncher::processHostNameResolve(shared_ptr<vector<string> >& hosts,
+void MpiLauncher::processHostNameResolve(boost::shared_ptr<vector<string> >& hosts,
                                          size_t indx,
                                          const boost::system::error_code& error,
                                          boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
@@ -1058,7 +1057,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
                           std::min(maxSlaves, sortedInstances.size()) ;
     args.clear();
     args.reserve(totalArgsNum);
-    shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
+    boost::shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
     hosts->reserve(std::min(maxSlaves, sortedInstances.size()));
 
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();

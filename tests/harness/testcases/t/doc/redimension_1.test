@@ -6,8 +6,8 @@ create array z2 <trial:string,ppb:int64,device:string> [height=60:62,3,0]
 create array z3 <device:string,height:int64,trial:string>[ppb=1:10000,10000,0]
 create array z4 <trial:string>[device(string)=2,2,0, height=60:62,3,0, ppb=1:10000,10000,0]
 
---shell --command "csv2scidb -s 1 -p SNSN < testcases/doc_data/bug1709.csv > testcases/doc_data/bug1709.scidb"
---aql load zFlat from '../tests/harness/testcases/doc_data/bug1709.scidb'
+--shell --command "csv2scidb -s 1 -p SNSN < testcases/data/doc/bug1709.csv > testcases/data/doc/bug1709.scidb"
+--aql load zFlat from '../tests/harness/testcases/data/doc/bug1709.scidb'
 
 --test
 

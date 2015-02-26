@@ -1,29 +1,29 @@
 Query was executed successfully
 
 x,name
-42,"alex"
+42,'alex'
 
 x,name
-42,"alex"
-64,"bob"
+42,'alex'
+64,'bob'
 
 x,name
-42,"alex"
-64,"bob"
-1123456,"jake"
+42,'alex'
+64,'bob'
+1123456,'jake'
 
 x,name
-42,"alex"
-64,"bob"
-142,"john"
-1123456,"jake"
+42,'alex'
+64,'bob'
+142,'john'
+1123456,'jake'
 
 x,name
-42,"alex"
-64,"bob"
-142,"john"
-1123456,"jake"
-1123457,
+42,'alex'
+64,'bob'
+142,'john'
+1123456,'jake'
+1123457,null
 
 Query was executed successfully
 

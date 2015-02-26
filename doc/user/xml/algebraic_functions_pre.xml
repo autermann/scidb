@@ -5,7 +5,7 @@
   <refnamediv>
     <refname>Algebraic functions</refname>
 
-    <refpurpose>Perform basic arithmetic in a query expression</refpurpose>
+    <refpurpose>Perform basic arithmetic in a query expression.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -45,7 +45,19 @@
           <row>
             <entry>%</entry>
 
-            <entry>Remainder</entry>
+            <entry><indexterm>
+                <primary>modulo</primary>
+              </indexterm><indexterm>
+                <primary>remainder function</primary>
+              </indexterm><indexterm>
+                <primary>functions</primary>
+
+                <secondary>modulo</secondary>
+              </indexterm><indexterm>
+                <primary>functions</primary>
+
+                <secondary>remainder</secondary>
+              </indexterm>Remainder</entry>
 
             <entry>scalar % scalar</entry>
 
@@ -139,7 +151,7 @@
 
           <row>
             <entry><indexterm>
-                <primary>random</primary>
+                <primary>random function</primary>
               </indexterm>random</entry>
 
             <entry>Generate random positive integer</entry>
@@ -184,6 +196,18 @@
         <step>
           <para>Try out the square root and power functions. <programlisting
           language="test">--aql select sqrt(i) as root, pow(2.0,i) as power from C;</programlisting></para>
+        </step>
+
+        <step>
+          <para>Try out the "simple" math functions, such as plus and
+          minus.</para>
+
+          <programlisting language="test">--afl store(build(&lt;val:double&gt; [i=0:1,2,0, j=0:1,2,0],i*2 +j+1),A); --output-format=dense --chunkify=yes
+--afl store(build(A,-i*4-j -1),B); --output-format=dense --chunkify=yes
+--aql select A.val + B.val from A,B; --output-format=dense --chunkify=yes
+--aql select A.val - B.val from A,B; --output-format=dense --chunkify=yes
+--aql select A.val * B.val from A,B; --output-format=dense --chunkify=yes
+--aql select A.val / B.val from A,B; --output-format=dense --chunkify=yes</programlisting>
         </step>
       </procedure>
     </informalexample>

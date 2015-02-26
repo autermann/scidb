@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
@@ -28,7 +27,7 @@
 
   <refsynopsisdiv>
     <synopsis>redimension_store(<replaceable>source_array</replaceable>,<replaceable>named_target_array
-                  </replaceable><optional>, <replaceable>aggregate </replaceable>(source_attribute) 
+                  </replaceable><optional>, <replaceable>aggregate_call_n </replaceable>(source_attribute) 
                             [as  result_attribute]</optional>...);</synopsis>
   </refsynopsisdiv>
 
@@ -88,6 +87,34 @@
   </refsect1>
 
   <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>redimension_store</literal> operator takes the
+    following arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">source_array</emphasis>: a source array
+          with one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">target_array</emphasis>: a pre-existing,
+          output array, with one or more attributes and one or more
+          dimensions. All the dimensions in the target must exist either in
+          the source array attributes or dimensions, with one exception. One
+          new, synthetic dimension is allowed. All the target attributes
+          (other than those that are the results of aggregate calls) must
+          exist either in the source array attributes or dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">aggregate_call</emphasis>_<replaceable>n</replaceable>:
+          Zero or more aggregate calls.</para>
+        </listitem>
+      </itemizedlist></para>
+  </refsect1>
+
+  <refsect1>
     <title>Example One</title>
 
     <informalexample>
@@ -103,11 +130,11 @@
       [csvRow=0:1000,1000,0]; 
  --show-query=no 
  --show-output=no
---shell --command=csv2scidb -s 1 -p NNNN &lt; ../examples/doseData.csv &gt; ../examples/doseData.scidb 
+--shell --command=csv2scidb -s 1 -p NNNN &lt; $DOC_DATA/doseData.csv &gt; $DOC_DATA/doseData.scidb 
  --show-query=no 
  --show-output=no
 --aql load ddFlat 
-      from '../examples/doseData.scidb'; 
+      from '../tests/harness/testcases/data/doc/doseData.scidb'; 
  --show-query=no 
  --show-output=yes
 </programlisting></para>
@@ -206,11 +233,11 @@
       [csvRow=0:11,12,0]
  --show-query=no 
  --show-output=no
---shell --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/nationWinners.csv &gt; ../examples/nationWinners.scidb 
+--shell --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/nationWinners.csv &gt; $DOC_DATA/nationWinners.scidb 
  --show-query=no 
  --show-output=no
 --aql load nwFlat 
-      from '../examples/nationWinners.scidb'; 
+      from '../tests/harness/testcases/data/doc/nationWinners.scidb'; 
  --show-query=no 
  --show-output=no
 --aql create array 
@@ -249,8 +276,10 @@
         </step>
 
         <step>
-          <para>Create an array that includes a synthetic dimension (synD) for
-          collisions. The other (non-synthetic) dimensions define
+          <para><indexterm>
+              <primary>synthetic dimensions</primary>
+            </indexterm>Create an array that includes a synthetic dimension
+          (synD) for collisions. The other (non-synthetic) dimensions define
           (country,year) pairs. The attributes accommodate all other variables
           from the original array, nationWinners.<programlisting
           language="test">--aql create array vPer_CY_Synthetic 
@@ -393,12 +422,12 @@
  --show-query=no 
  --show-output=no
 --shell --command=csv2scidb -s 1 -p SSNNNN 
-          &lt; ../examples/namesData.csv &gt; 
-            ../examples/namesData.scidb 
+          &lt; $DOC_DATA/namesData.csv &gt; 
+            $DOC_DATA/namesData.scidb 
  --show-query=no 
  --show-output=no
 --aql load namesFlat 
-      from '../examples/namesData.scidb'; 
+      from '../tests/harness/testcases/data/doc/namesData.scidb'; 
  --show-query=no 
  --show-output=no
 --aql create array names 

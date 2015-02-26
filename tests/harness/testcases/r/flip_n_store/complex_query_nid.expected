@@ -54,7 +54,7 @@ SCIDB QUERY : <scan(NID)>
 
 SCIDB QUERY : <show(NID)>
 {i} schema
-{0} "NID<x:int64> [a1(double)=5,5,0,a2(double)=5,5,0]"
+{0} 'NID<x:int64> [a1(double)=5,5,0,a2(double)=5,5,0]'
 
 SCIDB QUERY : <apply(apply(NID,y,a1),z,a2)>
 {a1,a2} x,y,z
@@ -147,7 +147,7 @@ SCIDB QUERY : <store(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(
 
 SCIDB QUERY : <show(AAA)>
 {i} schema
-{0} "AAA<x:int64,z_sum:double NULL DEFAULT null> [a1(double)=5,5,0,a2(double)=5,5,0,a1_2=0:5,10,0,a2_2=0:2,5,0]"
+{0} 'AAA<x:int64,z_sum:double NULL DEFAULT null> [a1(double)=5,5,0,a2(double)=5,5,0,a1_2=0:5,10,0,a2_2=0:2,5,0]'
 
 SCIDB QUERY : <project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum)>
 {a1,a2,a1,a2} x,z_sum
@@ -211,7 +211,7 @@ SCIDB QUERY : <store(subarray(between(project(cross(NID,xgrid(regrid(apply(apply
 
 SCIDB QUERY : <show(TTT)>
 {i} schema
-{0} "TTT<x:int64,z_sum:double NULL DEFAULT null> [a1(double)=2,5,0,a2(double)=2,5,0,a1_2=0:2,10,0,a2_2=0:2,5,0]"
+{0} 'TTT<x:int64,z_sum:double NULL DEFAULT null> [a1(double)=2,5,0,a2(double)=2,5,0,a1_2=0:2,10,0,a2_2=0:2,5,0]'
 
 SCIDB QUERY : <count(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i))>
 {i} count
@@ -237,7 +237,7 @@ SCIDB QUERY : <store(unpack(subarray(between(project(cross(NID,xgrid(regrid(appl
 
 SCIDB QUERY : <show(VVV)>
 {i} schema
-{0} "VVV<a1:double,a2:double,a1_2:int64,a2_2:int64,x:int64,z_sum:double NULL DEFAULT null> [i=0:*,36,0]"
+{0} 'VVV<a1:double,a2:double,a1_2:int64,a2_2:int64,x:int64,z_sum:double NULL DEFAULT null> [i=0:*,36,0]'
 
 SCIDB QUERY : <filter(unpack(subarray(between(project(cross(NID,xgrid(regrid(apply(apply(NID,y,a1),z,a2),2,2,sum(z)),2,1)),x,z_sum),20.25,4.71825,0,0,27,6.291,2,2),20.25,4.71825,0,0,27,6.291,2,2),i), i>4)>
 {i} a1,a2,a1,a2,x,z_sum
@@ -253,7 +253,7 @@ SCIDB QUERY : <store(filter(unpack(subarray(between(project(cross(NID,xgrid(regr
 
 SCIDB QUERY : <show(MMM)>
 {i} schema
-{0} "MMM<a1:double,a2:double,a1_2:int64,a2_2:int64,x:int64,z_sum:double NULL DEFAULT null> [i=0:*,36,0]"
+{0} 'MMM<a1:double,a2:double,a1_2:int64,a2_2:int64,x:int64,z_sum:double NULL DEFAULT null> [i=0:*,36,0]'
 
 SCIDB QUERY : <scan(MMM)>
 {i} a1,a2,a1_2,a2_2,x,z_sum

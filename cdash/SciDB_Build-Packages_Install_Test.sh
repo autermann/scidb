@@ -39,7 +39,9 @@ export NETWORK=${NETWORK}
 # SciDB config
 export BASE_PATH=${BASE_PATH}
 export INSTANCE_COUNT=${INSTANCE_COUNT}
+export NO_WATCHDOG=${NO_WATCHDOG}
 export REDUNDANCY=${REDUNDANCY}
+export CHUNK_SEGMENT_SIZE=${CHUNK_SEGMENT_SIZE}
 
 # linux username (on coordinator host)
 export USERNAME=${USERNAME}
@@ -60,12 +62,16 @@ ${DEPLOY_SH} prepare_postgresql ${DB_USER} ${DB_PASSWD} ${NETWORK} ${COORDINATOR
 
 echo "Install SciDB packages"
 ${DEPLOY_SH} scidb_install ${PACKAGES_PATH} ${TEST_HOST_LIST}
+echo "Run post-install hook '${POST_INSTALL_HOOK}'"
+${POST_INSTALL_HOOK}
 
 echo "Prepare SciDB cluster"
 USER_PASSWD="${DB_PASSWD}" #XXX fix me, we should not mix the two passwords
-echo "${USER_PASSWD}" | ${DEPLOY_SH} scidb_prepare ${USERNAME} "" ${DB_USER} "${DB_PASSWD}" ${DB_NAME} ${BASE_PATH} ${INSTANCE_COUNT} ${REDUNDANCY} ${CHUNK_SEGMENT_SIZE} ${TEST_HOST_LIST}
+echo "${USER_PASSWD}" | ${DEPLOY_SH} scidb_prepare ${USERNAME} "" ${DB_USER} "${DB_PASSWD}" ${DB_NAME} ${BASE_PATH} ${INSTANCE_COUNT} ${NO_WATCHDOG} ${REDUNDANCY} ${CHUNK_SEGMENT_SIZE} ${TEST_HOST_LIST}
 
 echo "Start SciDB cluster"
 echo "${USER_PASSWD}" | ${DEPLOY_SH} scidb_start ${USERNAME} ${DB_NAME} ${COORDINATOR}
+echo "Run post-start hook '${POST_START_HOOK}'"
+${POST_START_HOOK}
 
-${BUILD_PATH}/tests/harness/runharness.sh all
+${BUILD_PATH}/cdash/runharness.sh all

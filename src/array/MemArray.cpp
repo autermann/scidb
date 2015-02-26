@@ -92,19 +92,18 @@ namespace scidb
     //
     // MemArray
     //
-    MemArray::MemArray(const MemArray& other)
-    : desc(other.desc)
+
+    MemArray::MemArray(ArrayDesc const& arr, boost::shared_ptr<Query> const& query)
+    : desc(arr)
     {
+        _query=query;
         initLRU();
     }
 
-    MemArray::MemArray(ArrayDesc const& arr) : desc(arr)
+    MemArray::MemArray(boost::shared_ptr<Array>& input, boost::shared_ptr<Query> const& query, bool vertical)
+    : desc(input->getArrayDesc())
     {
-        initLRU();
-    }
-
-    MemArray::MemArray(boost::shared_ptr<Array> input, bool vertical) : desc(input->getArrayDesc())
-    {
+        _query=query;
         initLRU();
         append(input, vertical);
     }
@@ -125,11 +124,13 @@ namespace scidb
     
     inline void MemArray::pinChunk(LruMemChunk& chunk)
     {
+        Query::getValidQueryPtr(_query);
         SharedMemCache::getInstance().pinChunk(chunk);
     }
 
     inline void MemArray::unpinChunk(LruMemChunk& chunk)
     {
+        // unpin should always succeed because it is called during exception handling
         SharedMemCache::getInstance().unpinChunk(chunk);
     }
 
@@ -204,7 +205,6 @@ namespace scidb
         return emptyBitmap ? emptyBitmap : bitmapChunk ? bitmapChunk->getEmptyBitmap() : ConstChunk::getEmptyBitmap();
     }
 
-
     bool MemChunk::isMaterialized() const
     {
         return true;
@@ -251,8 +251,12 @@ namespace scidb
                 || (isRLE() && arrayDesc->getEmptyBitmapAttribute() != NULL)) 
             ? (Chunk*)newBitmapChunk->getBitmapChunk() : NULL;
     }
- 
 
+    void LruMemChunk::initialize(ConstChunk const& srcChunk)
+    {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "LruMemChunk::initialize";
+    } 
 
     void MemChunk::initialize(ConstChunk const& srcChunk)
     {
@@ -267,6 +271,18 @@ namespace scidb
 #else 
         setRLE(srcChunk.isRLE());
 #endif
+    }
+
+    void LruMemChunk::initialize(MemArray const* arr, ArrayDesc const* desc, const Address& firstElem, int compMethod)
+    {
+        assert(arr);
+        MemChunk::initialize(arr, desc, firstElem, compMethod);
+    } 
+
+    void LruMemChunk::initialize(Array const* arr, ArrayDesc const* desc, const Address& firstElem, int compMethod)
+    {
+        assert(false);
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "LruMemChunk::initialize";
     }
 
     void MemChunk::initialize(Array const* arr, ArrayDesc const* desc, const Address& firstElem, int compMethod)
@@ -393,12 +409,20 @@ namespace scidb
 
     void MemChunk::fillRLEBitmap() 
     { 
-        boost::shared_ptr<Query> dummyQuery;
-        RLEChunkIterator iterator(*arrayDesc, addr.attId, this, NULL, ChunkIterator::NO_EMPTY_CHECK, dummyQuery); 
+        boost::shared_ptr<Query> emptyQuery;
+        RLEChunkIterator iterator(*arrayDesc, addr.attId, this, NULL, ChunkIterator::NO_EMPTY_CHECK, emptyQuery);
         boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap = iterator.getEmptyBitmap();
         allocate(emptyBitmap->packedSize());
         emptyBitmap->pack(static_cast<char*>(getData()));
         rle = true;
+    }
+
+    boost::shared_ptr<ChunkIterator> LruMemChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
+    {
+        if (Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query) != query) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "invalid query");
+        }
+        return MemChunk::getIterator(query, iterationMode);
     }
 
     boost::shared_ptr<ChunkIterator> MemChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
@@ -412,26 +436,39 @@ namespace scidb
                 : (ChunkIterator*)new MemChunkIterator(*arrayDesc, addr.attId, this, bitmapChunk,
                                                        !(iterationMode & ChunkIterator::APPEND_CHUNK), iterationMode, query));
     }
-
+    boost::shared_ptr<ConstChunkIterator> LruMemChunk::getConstIterator(int iterationMode) const
+    {
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query));
+        return MemChunk::getConstIterator(query, iterationMode);
+    }
     boost::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(int iterationMode) const
     {
-        PinBuffer scope(*this);
         boost::shared_ptr<Query> emptyQuery;
+        return MemChunk::getConstIterator(emptyQuery, iterationMode);
+    }
+    boost::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(boost::shared_ptr<Query> const& query, int iterationMode) const
+    {
+        PinBuffer scope(*this);
         return boost::shared_ptr<ConstChunkIterator>
             (isRLE() ? getAttributeDesc().isEmptyIndicator() || getData() == NULL
-                 ? (ConstChunkIterator*)new RLEBitmapChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode)
-                 : (ConstChunkIterator*)new RLEConstChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode)
+                 ? (ConstChunkIterator*)new RLEBitmapChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode, query)
+                 : (ConstChunkIterator*)new RLEConstChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, iterationMode, query)
              : isSparse()
-                 ? (ConstChunkIterator*)new SparseChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, false, iterationMode, emptyQuery)
-                 : (ConstChunkIterator*)new MemChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, false, iterationMode, emptyQuery));
+                 ? (ConstChunkIterator*)new SparseChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, false, iterationMode, query)
+                 : (ConstChunkIterator*)new MemChunkIterator(*arrayDesc, addr.attId, (Chunk*)this, bitmapChunk, false, iterationMode, query));
     }
-
     bool MemChunk::pin() const
     {
         return false;
     }
 
-    void MemChunk::unPin() const {
+    void MemChunk::unPin() const
+    {
+    }
+
+    void MemChunk::write(boost::shared_ptr<Query>& query)
+    {
+        // MemChunks can be stand-alone and not always have the query context - dont validate query (yet?)
     }
 
     void MemChunk::compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
@@ -533,6 +570,9 @@ namespace scidb
 
     void LruMemChunk::write(boost::shared_ptr<Query>& query)
     {
+        if (Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query) != query) {
+            throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "invalid query");
+        }
         unPin();
     }
 
@@ -653,13 +693,13 @@ namespace scidb
         for (map<Address, LruMemChunk>::iterator i = array._chunks.begin(); i != array._chunks.end(); i++)
         {
             LruMemChunk &chunk = i->second;
-            assert(chunk._accessCount == 0);
             if (chunk.getData() != NULL) {
                 //chunk could be pinned or just on the LRU.
                 _usedMemSize -= chunk._sizeAtLastUnPin;
             }
             if (chunk._accessCount > 0) {
-                LOG4CXX_DEBUG(logger, "Warning: accessCount is " << chunk._accessCount << " due clean up of mem array '" << chunk.arrayDesc->getName());
+                LOG4CXX_DEBUG(logger, "Warning: accessCount is " << chunk._accessCount
+                              << " due to MemArray cleanup '" << chunk.arrayDesc->getName());
             }
             if (!chunk.isEmpty()) {
                 chunk.removeFromLru();
@@ -702,11 +742,12 @@ namespace scidb
         }
     }
     
-    MemArrayIterator::MemArrayIterator(MemArray& arr, AttributeID attId) : array(arr)
+    MemArrayIterator::MemArrayIterator(MemArray& arr, AttributeID attId)
+    : _array(arr)
     {
         addr.attId = attId;
         currChunk = NULL;
-        last = array._chunks.end();
+        last = _array._chunks.end();
         positioned = false;
     }
 
@@ -741,14 +782,14 @@ namespace scidb
 
     bool MemArrayIterator::setPosition(Coordinates const& pos)
     {
-        ScopedMutexLock cs(array._mutex);
+        ScopedMutexLock cs(_array._mutex);
         currChunk = NULL;
         addr.coords = pos;
-        array.desc.getChunkPositionFor(addr.coords);
-        curr = array._chunks.find(addr);
+        _array.desc.getChunkPositionFor(addr.coords);
+        curr = _array._chunks.find(addr);
         positioned = true;
         if (curr != last) {
-            currChunk = &array._chunks[addr];
+            currChunk = &_array._chunks[addr];
             return true;
         } else {
             return false;
@@ -763,7 +804,7 @@ namespace scidb
     void MemArrayIterator::reset()
     {
         positioned = true;
-        curr = array._chunks.begin();
+        curr = _array._chunks.begin();
         while (curr != last && curr->second.addr.attId != addr.attId) {
             ++curr;
         }
@@ -775,22 +816,23 @@ namespace scidb
         LruMemChunk& chunk = (LruMemChunk&)aChunk;
         chunk._accessCount = 0;
         SharedMemCache::getInstance().deleteChunk(chunk);
-        array._chunks.erase(chunk.addr);
+        _array._chunks.erase(chunk.addr);
     }
 
     Chunk& MemArrayIterator::newChunk(Coordinates const& pos)
     {
-        if (!array.desc.contains(pos))
+        if (!_array.desc.contains(pos))
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES);
         addr.coords = pos;
-        array.desc.getChunkPositionFor(addr.coords);
-        return array[addr];
+        _array.desc.getChunkPositionFor(addr.coords);
+        return _array[addr];
     }
 
     Chunk& MemArrayIterator::newChunk(Coordinates const& pos, int compressionMethod)
     {
-        if (!array.desc.contains(pos))
+        if (!_array.desc.contains(pos)) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES);
+        }
         Chunk& chunk = newChunk(pos);
         ((MemChunk&)chunk).compressionMethod = compressionMethod;
         return chunk;
@@ -1192,7 +1234,13 @@ namespace scidb
         }
     }
 
-    MemChunkIterator::MemChunkIterator(ArrayDesc const& desc, AttributeID attId, Chunk* dataChunk, Chunk* bitmapChunk, bool newChunk, int iterationMode, boost::shared_ptr<Query> const& query)
+    MemChunkIterator::MemChunkIterator(ArrayDesc const& desc,
+                                       AttributeID attId,
+                                       Chunk* dataChunk,
+                                       Chunk* bitmapChunk,
+                                       bool newChunk,
+                                       int iterationMode,
+                                       boost::shared_ptr<Query> const& query)
     : array(desc),
       _query(query)
     {
@@ -1986,6 +2034,9 @@ namespace scidb
 
     ConstChunk const& BaseChunkIterator::getChunk()
     {
+        LOG4CXX_TRACE(logger, "BCI::getChunk this=" << this
+                      << ", chunk=" << dataChunk
+                      << ", pinned=" << dataChunkPinned);
         return *dataChunk;
     }
 
@@ -2036,11 +2087,13 @@ namespace scidb
 
     BaseChunkIterator::~BaseChunkIterator()
     {
+        LOG4CXX_TRACE(logger, "~BCI this=" << this
+                      << ", chunk=" << dataChunk
+                      << ", pinned=" << dataChunkPinned);
         if (dataChunkPinned) { 
             dataChunk->unPin();
         }
     }
-
     void BaseChunkIterator::flush()
     {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "BaseChunkIterator::flush";
@@ -2051,7 +2104,11 @@ namespace scidb
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "BaseChunkIterator::writeItem";
     }
 
-    BaseChunkIterator::BaseChunkIterator(ArrayDesc const& desc, AttributeID aid, Chunk* data, int iterationMode)
+    BaseChunkIterator::BaseChunkIterator(ArrayDesc const& desc,
+                                         AttributeID aid,
+                                         Chunk* data,
+                                         int iterationMode,
+                                         boost::shared_ptr<Query> const& query)
     : CoordinatesMapper(*data),
       array(desc),
       attrID(aid),
@@ -2063,11 +2120,16 @@ namespace scidb
       typeId(attr.getType()),
       type(TypeLibrary::getType(typeId)),
       defaultValue(attr.getDefaultValue()),
-      isEmptyIndicator(attr.isEmptyIndicator())
+      isEmptyIndicator(attr.isEmptyIndicator()),
+      _query(query)
     {
         const Dimensions& dim = array.getDimensions();
         size_t nDims = dim.size();
         dataChunkPinned = dataChunk->pin();
+
+        LOG4CXX_TRACE(logger, "BCI::BCI this=" << this
+                      << ", chunk=" << dataChunk
+                      << ", pinned=" << dataChunkPinned);
 
         position_t nElems = 1;
         hasOverlap = false;
@@ -2099,18 +2161,28 @@ namespace scidb
     // Constant RLE chunk
     //
 
-    RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode)
-    : BaseChunkIterator(desc, attr, data, iterationMode),
+RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
+                                             AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode,
+                                             boost::shared_ptr<Query> const& query)
+    : BaseChunkIterator(desc, attr, data, iterationMode, query),
       payload((char*)data->getData()),
       payloadIterator(&payload),
       value(type)
     {
+        LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
+                      <<" data="<<data
+                      <<" bitmap "<<bitmap
+                      <<" attr "<<attr
+                      <<" payload data="
+                      << data->getData()
+                      << " segment="<<&payload.getSegment(0));
+
         if (((iterationMode & APPEND_CHUNK) || bitmap == NULL) && payload.packedSize() < data->getSize()) {
             emptyBitmap = boost::shared_ptr<ConstRLEEmptyBitmap>(new ConstRLEEmptyBitmap((char*)data->getData() + payload.packedSize()));
         } else if (bitmap != NULL) { 
             emptyBitmap = bitmap->getEmptyBitmap();
         }
-        if (!emptyBitmap) { 
+        if (!emptyBitmap) {
             emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
         }
         if (hasOverlap && (iterationMode & IGNORE_OVERLAPS)) {
@@ -2119,11 +2191,23 @@ namespace scidb
                                            data->getFirstPosition(false),
                                            data->getLastPosition(false));
         }
-        //assert(emptyBitmap->count() == payload.count() || (hasOverlap && emptyBitmap->count() < payload.count()));
+
+        LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
+                      <<" ebmCount="<< emptyBitmap->count()
+                      <<" pCount="<<payload.count());
+
         assert(emptyBitmap->count() <= payload.count());
 
         emptyBitmapIterator = emptyBitmap->getIterator();
         reset();
+
+        LOG4CXX_TRACE(logger, "RLEConstChunkIterator::RLEConstChunkIterator this="<<this
+                      <<" data="<<data
+                      <<" bitmap "<<bitmap
+                      <<" attr "<<attr
+                      <<" payload data="
+                      << data->getData()
+                      << " segment="<<&payload.getSegment(0));
     }
 
     void RLEConstChunkIterator::reset()
@@ -2134,16 +2218,6 @@ namespace scidb
             {
                 if (!payloadIterator.setPosition(emptyBitmapIterator.getPPos()))
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-#if 0
-                if (!isEmptyable && (mode & IGNORE_DEFAULT_VALUES)) { 
-                    if (payloadIterator.isDefaultValue(defaultValue)) {
-                        if (emptyBitmapIterator.skip(payloadIterator.getRepeatCount())) {
-                            continue;
-                        }
-                        hasCurrent = false;
-                    }
-                }
-#endif
                 break;
             }
         }
@@ -2182,18 +2256,6 @@ namespace scidb
                         if (!payloadIterator.setPosition(pos))
                             throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
                     }
-#if 0
-                    if (!isEmptyable && (mode & IGNORE_DEFAULT_VALUES)) {
-                        if (payloadIterator.isDefaultValue(defaultValue)) {
-                            if (emptyBitmapIterator.skip(payloadIterator.getRepeatCount())) {
-                                payloadIterator.toNextSegment();
-                                continue;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-#endif
                     return;
                 }
             }
@@ -2216,8 +2278,10 @@ namespace scidb
     // RLE Bitmap chunk iterator 
     //
 
-    RLEBitmapChunkIterator::RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode)
-    : BaseChunkIterator(desc, attr, data, iterationMode),
+    RLEBitmapChunkIterator::RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr,
+                                                   Chunk* data, Chunk* bitmap, int iterationMode,
+                                                   boost::shared_ptr<Query> const& query)
+    : BaseChunkIterator(desc, attr, data, iterationMode, query),
       value(type)
     {
         if (data->getData() == NULL) { 
@@ -2252,10 +2316,14 @@ namespace scidb
     //
     // RLE write chunk iterator
     //
-    RLEChunkIterator::RLEChunkIterator(ArrayDesc const& desc, AttributeID attrID, Chunk* data, Chunk* bitmap, int iterationMode, boost::shared_ptr<Query> const& q)
-    : BaseChunkIterator(desc, attrID, data, iterationMode),
+    RLEChunkIterator::RLEChunkIterator(ArrayDesc const& desc,
+                                       AttributeID attrID,
+                                       Chunk* data,
+                                       Chunk* bitmap,
+                                       int iterationMode,
+                                       boost::shared_ptr<Query> const& query)
+    : BaseChunkIterator(desc, attrID, data, iterationMode, query),
       tileValue(type, true),
-      query(q),
       payload(type),
       bitmapChunk(bitmap),
       appender(&payload),
@@ -2293,7 +2361,7 @@ namespace scidb
             trueValue.setBool(true);
             bitmap->pin();
             mode &= ~TILE_MODE;
-            emptyChunkIterator = bitmap->getIterator(q, 0);
+            emptyChunkIterator = bitmap->getIterator(query, 0);
         }
     }
 
@@ -2494,11 +2562,6 @@ namespace scidb
         if (emptyChunkIterator) {
             emptyChunkIterator->flush();
         }
-    }
-
-    boost::shared_ptr<Query> RLEChunkIterator::getQuery() 
-    {
-        return query.lock();
     }
 
 }

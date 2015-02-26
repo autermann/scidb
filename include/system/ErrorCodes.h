@@ -302,13 +302,13 @@ ERRCODE(SCIDB_LE_OP_BUILD_SPARSE_ERROR2,            224); //Build_sparse predica
 ERRCODE(SCIDB_LE_OP_BUILD_SPARSE_ERROR3,            225); //Constructed array should have one attribute
 ERRCODE(SCIDB_LE_OP_BUILD_SPARSE_ERROR4,            226); //Array with open boundary can not be built
 ERRCODE(SCIDB_LE_OP_CAST_ERROR1,                    227); //Mismatched number of attributes
-ERRCODE(SCIDB_LE_OP_CAST_ERROR2,                    228); //Mismatched attributes types
-ERRCODE(SCIDB_LE_OP_CAST_ERROR3,                    229); //Mismatched attributes flags
+ERRCODE(SCIDB_LE_OP_CAST_ERROR2,                    228); //Attribute '%1%' type doesn't match
+ERRCODE(SCIDB_LE_OP_CAST_ERROR3,                    229); //Attribute '%1%' flags doesn't match
 ERRCODE(SCIDB_LE_OP_CAST_ERROR4,                    230); //Mismatched number of dimensions
-ERRCODE(SCIDB_LE_OP_CAST_ERROR5,                    231); //Dimension length doesn't match
-ERRCODE(SCIDB_LE_OP_CAST_ERROR6,                    232); //Dimension start doesn't match
-ERRCODE(SCIDB_LE_OP_CAST_ERROR7,                    233); //Dimension chunk interval doesn't match
-ERRCODE(SCIDB_LE_OP_CAST_ERROR8,                    234); //Dimension chunk overlap doesn't match
+ERRCODE(SCIDB_LE_OP_CAST_ERROR5,                    231); //Dimension '%1%' length doesn't match
+ERRCODE(SCIDB_LE_OP_CAST_ERROR6,                    232); //Dimension '%1%' start doesn't match
+ERRCODE(SCIDB_LE_OP_CAST_ERROR7,                    233); //Dimension '%1%' chunk interval doesn't match
+ERRCODE(SCIDB_LE_OP_CAST_ERROR8,                    234); //Dimension '%1%' chunk overlap doesn't match
 ERRCODE(SCIDB_LE_OP_CONCAT_ERROR1,                  235); //Arrays with open boundary can not be concatenated
 ERRCODE(SCIDB_LE_OP_CROSSJOIN_ERROR1,               236); //Dimension should be specified only once in JOIN ON list
 ERRCODE(SCIDB_LE_OP_DELDIM_ERROR1,                  237); //Can not delete last dimension of array
@@ -423,10 +423,10 @@ ERRCODE(SCIDB_LE_CANT_UNLOAD_MODULE,                347); //Can not unload modul
 ERRCODE(SCIDB_LE_OP_REDIMENSION_STORE_ERROR6,       348); //Aggregate '%1%' doesn't match with any attribute
 ERRCODE(SCIDB_LE_SUBSTITUTE_FAILED,                 349); //Failed to substitute missing reason '%1%'
 ERRCODE(SCIDB_LE_REMOVE_NOT_POSSIBLE,               350); //Remove of array is not possible because it is still in use
-ERRCODE(SCIDB_LE_TRUNCATION,                        351); //Varying size type with length %1% can not be converted to fixed size type %2% 
-ERRCODE(SCIDB_LE_LOOKUP_BAD_PARAM,                  352); //Number of attributes in pattern array of LOOKUP smatch number of dimensions in source array 
-ERRCODE(SCIDB_LE_INVALID_STORAGE_HEADER,            353); //Invalid storage header format
-ERRCODE(SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION, 354); //Mismatched storage format version: %1% instead of %2% required
+ERRCODE(SCIDB_LE_TRUNCATION,                        351); //Varying size type with length %1% can not be converted to fixed size type %2%
+ERRCODE(SCIDB_LE_LOOKUP_BAD_PARAM,                  352); //Number of attributes in pattern array of LOOKUP smatch number of dimensions in source array
+ERRCODE(SCIDB_LE_INVALID_STORAGE_HEADER,            353); //This version of SciDB cannot read this storage file (header magic mismatch)
+ERRCODE(SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION, 354); //This version of SciDB cannot read this storage file (file min %1%, file max %2%, system %3%)
 ERRCODE(SCIDB_LE_OP_CROSSJOIN_ERROR2,               355); //Joined dimensions should be specified for both arrays
 ERRCODE(SCIDB_LE_OP_NORMALIZE_ERROR3,               356); //Attribute must be of double type
 ERRCODE(SCIDB_LE_EXPLICIT_EMPTY_FLAG_NOT_ALLOWED,   357); //Explicit empty flag attribute not allowed. Use EMPTY keyword.
@@ -472,7 +472,7 @@ ERRCODE(SCIDB_LE_OP_RLE_EXPECTED,                   396); //Chunk expected to be
 ERRCODE(SCIDB_LE_OP_NONEMPTY_EXPECTED,              397); //Non-emptyable array expected
 ERRCODE(SCIDB_LE_RESOURCE_BUSY,                     398); //Not enough resources: %1%
 ERRCODE(SCIDB_LE_NESTING_PROHIBITED,                399); //Operator %1% can not be nested
-ERRCODE(SCIDB_LE_OP_WINDOW_ERROR5,                  400); //Algorithm must be one of %1% 
+ERRCODE(SCIDB_LE_OP_WINDOW_ERROR5,                  400); //Algorithm must be one of %1%
 ERRCODE(SCIDB_LE_OP_WINDOW_ERROR6,                  401); //Using materialize op without materialized input
 ERRCODE(SCIDB_LE_CONSTANT_EXPRESSION_EXPECTED,      402); //Constant expression expected
 ERRCODE(SCIDB_LE_TYPE_EXPECTED,                     403); //Expected constant or expression with type '%1%'
@@ -480,6 +480,12 @@ ERRCODE(SCIDB_LE_INCORRECT_CHUNK_SIZE,              404); //Chunk size must be b
 ERRCODE(SCIDB_LE_INCORRECT_OVERLAP_SIZE,            405); //Overlap length must be between 0 and %1%
 ERRCODE(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,      406); //Dimension boundaries must be between '%1%' and '%2%'
 ERRCODE(SCIDB_LE_WRONG_LANGUAGE_STRING,             407); //Language string should be AQL or AFL
+ERRCODE(SCIDB_LE_BAD_SINGLE_ATTRIBUTE_ARRAY,        408); //Operator '%1%' requires a %3% valued array as argument %2%
+ERRCODE(SCIDB_LE_BAD_ARRAY_DIMENSIONS,              409); //Operator '%1%' requires a %3% dimensional array as argument %2%
+ERRCODE(SCIDB_LE_BAD_VECTOR_LENGTH,                 410); //Operator '%1%' requires a vector of length at least %3% as argument %2%
+ERRCODE(SCIDB_LE_OP_CAST_ERROR10,                   411); //Cannot cast attribute '%1%' type from '%2%' to '%3%'
+ERRCODE(SCIDB_LE_CANNOT_RECOVER_RESTARTABLE_WORK,   412); //Cannot recover restartable work
+ERRCODE(SCIDB_LE_CANNOT_MODIFY_ENVIRONMENT,         413); //Internal error, could not modify environ.
 //Next long ERRCODE
 
 ERRCODE(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,         1001); //Execution of query '%1%' failed with error %2%

@@ -39,6 +39,7 @@
 
 
 // scidb internals
+#include <linear_algebra/blas/initMathLibs.h>
 #include <linear_algebra/dlaScaLA/slaving/pdgesvdSlave.hpp>
 #include <linear_algebra/dlaScaLA/slaving/pdgemmSlave.hpp>
 #include <linear_algebra/scalapackUtil/test/slaving/mpiCopySlave.hpp>
@@ -83,9 +84,6 @@ void mpiErrorHandler(MPI::Comm& comm, int *a1, ...)
 
 int main(int argc, char* argv[])
 {
-    int rank = initMpi(argc, argv);
-    srand(rank); // give each process a unique set of numbers
-
     if(false) {
         // allow for attachng gdb before a fault occurs
         // because not getting a core file after mpi prints stack trace.
@@ -98,6 +96,21 @@ int main(int argc, char* argv[])
             ::sleep(5);
         }
     }
+
+    try
+    {
+        scidb::earlyInitMathLibEnv();  // environ changes must precede multi-threading.
+    }
+    catch(const std::exception &e)
+    {
+        cerr << "SLAVE: Failed to initialize math lib environ: " << e.what() << endl;
+        exit(900); // MPI is not initialized yet, so no MPI_Abort()
+    }
+
+
+    int rank = initMpi(argc, argv);
+    srand(rank); // give each process a unique set of numbers
+
 
     int exitStatus = EXIT_SUCCESS;
 

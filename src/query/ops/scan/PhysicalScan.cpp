@@ -67,7 +67,7 @@ class PhysicalScan: public  PhysicalOperator
                                       boost::shared_ptr<Query> query)
     {
         boost::shared_ptr<Array> tmpArray = query->getTemporaryArray(_schema.getName());
-        return tmpArray ? tmpArray : boost::shared_ptr<Array>(new DBArray(_schema, query));
+        return tmpArray ? tmpArray : boost::shared_ptr<Array>(DBArray::newDBArray(_schema, query));
     }
 
 

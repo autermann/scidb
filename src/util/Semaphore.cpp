@@ -45,6 +45,7 @@ Semaphore::Semaphore()
 {
 	if (sem_init(_sem, 0, 0) == -1)
 	{
+            // XXX TODO: this must be an error
 	    printf("errno=%d\n", errno);
 		assert(false);
 	}
@@ -66,6 +67,7 @@ void Semaphore::enter()
         if (sem_wait(_sem) == 0)
             return;
     } while (errno == EINTR);
+    // XXX TODO: this must be an error
     printf("errno=%d\n", errno);
     assert(false);
 }
@@ -93,7 +95,8 @@ bool Semaphore::enter(ErrorChecker& errorChecker)
             continue;
         }
         if (errno != ETIMEDOUT) {
-           throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_THREAD_SEMAPHORE_ERROR) << errno;
+            assert(false);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_THREAD_SEMAPHORE_ERROR) << errno;
         }
         if (errorChecker && !errorChecker()) {
            return false;

@@ -141,7 +141,7 @@ namespace scidb
         //
         // Iterate over aligned blocks from the input, compute partial multiply for each i & j block
         //
-        boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(array._query));
         for (Coordinate ck = 0; ck < Coordinate(array.kLength); ck += array.kChunkLen)
         {
             rowPos[COL] = array.kStartLeft + ck;
@@ -165,8 +165,7 @@ namespace scidb
     MultiplyArrayIterator::MultiplyArrayIterator(MultiplyArray const& arr, AttributeID attrID)
     : array(arr),
       attr(attrID),
-      currPos(arr.dims.size()),
-      _query(arr._query)
+      currPos(arr.dims.size())
     {
         reset();
     }
@@ -182,7 +181,8 @@ namespace scidb
 
     boost::shared_ptr<Array> MultiplyArray::doIterativeMultiply(AttributeID attr)
     {
-        boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new MemArray(desc));
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        boost::shared_ptr<Array> result = boost::shared_ptr<Array>(new MemArray(desc,query));
         boost::shared_ptr<ArrayIterator> outArrayIter = result->getIterator(0);
         {
             map<Coordinates, boost::shared_ptr<ChunkIterator>, CoordinatesLess> chunkIterators;
@@ -191,7 +191,6 @@ namespace scidb
             InstanceID neighborInstance = (instanceId + 1) % nInstances;
             timeval begin, end;
             time_t delta;
-            boost::shared_ptr<Query> query(_query.lock());
 
             BOOST_SCOPE_EXIT((&chunkIterators)) 
             {
@@ -311,7 +310,8 @@ namespace scidb
 
     void MultiplyArray::multiplyChunks(boost::shared_ptr<ConstArrayIterator> const& rowArrayIter,
                                        boost::shared_ptr<ConstArrayIterator> const& colArrayIter,
-                                       boost::shared_ptr<ChunkIterator> const& outIter, Coordinate ci, Coordinate cj, Coordinate ck) const
+                                       boost::shared_ptr<ChunkIterator> const& outIter,
+                                       Coordinate ci, Coordinate cj, Coordinate ck) const
     {
         ConstChunk const* leftChunk = &rowArrayIter->getChunk();
         ConstChunk const* rightChunk = &colArrayIter->getChunk();
@@ -387,18 +387,18 @@ namespace scidb
                 }
             }
             return;
-        }    
+        }
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         MemChunk leftMatChunk, rightMatChunk;
         if (!leftChunk->isMaterialized()) {
-            MaterializedArray::materialize(leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
+            MaterializedArray::materialize(query, leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
             leftChunk = &leftMatChunk;
         }
         if (!rightChunk->isMaterialized()) {
-            MaterializedArray::materialize(rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
+            MaterializedArray::materialize(query, rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
             rightChunk = &rightMatChunk;
         }
-        boost::shared_ptr<Query> query(_query.lock());
-//        if (leftChunk.isPlain() && rightChunk.isPlain()) 
+
         if (true)
         {
             vector< boost::shared_ptr<MultiplyJob> > jobs(nCPUs);
@@ -417,7 +417,7 @@ namespace scidb
                             return;
                         }
                     }
-                    MaterializedArray::materialize(leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
+                    MaterializedArray::materialize(query, leftMatChunk, *leftChunk, MaterializedArray::DenseFormat);
                     leftData = leftMatChunk.getData();
                 } else { 
                     leftData = leftPayload.getRawValue(leftPayload.getSegment(0)._valueIndex);
@@ -436,7 +436,7 @@ namespace scidb
                             return;
                         }
                     }
-                    MaterializedArray::materialize(rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
+                    MaterializedArray::materialize(query, rightMatChunk, *rightChunk, MaterializedArray::DenseFormat);
                     rightData = rightMatChunk.getData();
                 } else { 
                     rightData = rightPayload.getRawValue(rightPayload.getSegment(0)._valueIndex);
@@ -735,9 +735,10 @@ namespace scidb
     MultiplyArray::MultiplyArray(ArrayDesc aDesc, boost::shared_ptr<Array> const& leftInputArray,
                                  boost::shared_ptr<Array> const& rightInputArray, const boost::shared_ptr<Query>& query, Algorithm algorithm)
         : desc(aDesc),
-          dims(desc.getDimensions()),
-          _query(query)
+          dims(desc.getDimensions())
     {
+        assert(query);
+        _query = query;
         nCPUs = Sysinfo::getNumberOfCPUs();
         queue = boost::shared_ptr<JobQueue>(new JobQueue());
         threadPool = boost::shared_ptr<ThreadPool>(new ThreadPool(nCPUs, queue));
@@ -838,7 +839,7 @@ namespace scidb
         Address addr(0, currPos);
         chunk.initialize(&array, &array.desc, addr, 0);
 
-        boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(array._query));
         boost::shared_ptr<ChunkIterator> outIter = chunk.getIterator(query, ChunkIterator::SPARSE_CHUNK);
         Coordinate ci = currPos[ROW];
         Coordinate cj = currPos[COL];

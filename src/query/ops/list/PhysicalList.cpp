@@ -96,7 +96,7 @@ public:
 
         if( coordinatorOnly() && query->getCoordinatorID() != COORDINATOR_INSTANCE )
         {
-            return shared_ptr<Array> (new MemArray(_schema));
+            return shared_ptr<Array> (new MemArray(_schema,query));
         }
 
         if (_parameters.size() == 2)

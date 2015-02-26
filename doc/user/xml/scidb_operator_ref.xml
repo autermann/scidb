@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
+
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter id="scidbOperatorReference">
   <title>SciDB AFL Operator Reference</title>
 
-  <para>
-    <indexterm>
+  <para><indexterm>
       <primary>operators</primary>
+
       <secondary>reference</secondary>
-    </indexterm>
-  This reference guide lists the operators available in SciDB's Array
-  Functional Language (AFL). Operators can be used in several ways in SciDB
-  queries.<itemizedlist>
+    </indexterm> This reference guide lists the operators available in SciDB's
+  Array Functional Language (AFL). Operators can be used in several ways in
+  SciDB queries.<itemizedlist>
       <listitem>
         <para>Operators can be used in AQL in <code> <command>FROM</command>
         </code> clauses.</para>
@@ -42,6 +41,9 @@
   schema</emphasis>. An operator that can take an anonymous schema instead of
   an array will be indicated in the arguments of the Synopsis section.</para>
 
+  <para>To see a categorized listing of the AFL operators, see <xref
+  linkend="scidbAFLCategories"/>.</para>
+
   <xi:include href="adddim_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
@@ -56,6 +58,9 @@
 
   <xi:include href="apply_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="approxdc_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="attribute_rename_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
@@ -64,9 +69,11 @@
 
   <xi:include href="avg_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="avg_rank_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="avg_rank_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="bernoulli_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="bernoulli_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="between_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -75,10 +82,12 @@
 
   <xi:include href="build_sparse_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
-<!--
+
+  <!--
      This is an internal operator: I want to remove it from the user guide. SJM
   <xi:include href="cancel.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
+
   <xi:include href="cast_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="concat_post.xml"
@@ -93,32 +102,35 @@
 
   <xi:include href="deldim.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="dimensions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="dimensions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-<!--
+  <!--
   These are internal operators: I want to remove them from the user guide. SJM
 
   <xi:include href="diskinfo.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="echo.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="explain_logical.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
-  <xi:include href="filter_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="filter_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="gemm_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="gesvd_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="help.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="help_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-<!--
+  <!--
    We don't want people to use "input" - we guide them to use a different input paradigm. SJM
-  <xi:include href="input.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
--->
+   Now it seems like it is okay: made pre/post files. -->
+  <xi:include href="input_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="insert_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-<!-- Inverse is going away; possibly permanently.
+  <!-- Inverse is going away; possibly permanently.
   <xi:include href="inverse_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
 
@@ -131,7 +143,8 @@
   <xi:include href="load_library.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="lookup_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="lookup_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="max_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
@@ -139,11 +152,14 @@
 
   <xi:include href="min_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="multiply_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="multiply_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="normalize_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="normalize_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="project_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="project_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="quantile_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -156,13 +172,14 @@
   <xi:include href="redimension_store_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-<!--
+  <!--
      This is an internal operator: I want to remove it from the user guide. SJM
 
   <xi:include href="reduce_distro.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
 
-  <xi:include href="regrid_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="regrid_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="remove_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -176,7 +193,8 @@
   <xi:include href="reshape_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="reverse_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="reverse_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="sample_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
@@ -185,19 +203,15 @@
 
   <xi:include href="scan_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-<!--
+  <!--
    This is an internal operator: I want to remove it from the user guide. SJM
   <xi:include href="setopt_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 -->
 
   <xi:include href="show_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
   <xi:include href="slice_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
   <xi:include href="sort_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
   <xi:include href="stdev_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
   <xi:include href="store_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="subarray_post.xml"
@@ -210,14 +224,17 @@
 
   <xi:include href="thin_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="transpose_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="transpose_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="unload_library.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="unpack_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
+<!-- Wait until the operator is actually in SciDB before adding to the doc.
+  <xi:include href="vacuum_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+-->
   <xi:include href="var_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="variable_window_post.xml"
@@ -226,8 +243,8 @@
   <xi:include href="versions_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="window_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="window_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="xgrid_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
 </chapter>

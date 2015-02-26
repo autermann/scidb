@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"docbookV4.5/docbookx.dtd">
+<refentry id="inputOperator">
+  <refnamediv>
+    <refname>input</refname>
+
+    <refpurpose><indexterm>
+        <primary>input</primary>
+      </indexterm>Read a system file.</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <synopsis>input(<replaceable>existing_array</replaceable>|<replaceable>anonymous_schema</replaceable>,<replaceable>filename, instance_id, format</replaceable><optional>,<optional><replaceable>max_errors, shadow_array</replaceable></optional></optional>)</synopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Summary</title>
+
+    <para>The <literal>input</literal> operator works exactly the same way as
+    load, except it does NOT store the data unless the <command>INTO</command>
+    clause or the AFL <literal>store</literal> operator is present.</para>
+
+    <para>The instance_id argument allows you to select which SciDB instance
+    you want to input into. To see a list of SciDB instances running on your
+    system, use the <literal>list('instances')</literal> operator. For more
+    details of the syntax, see <xref linkend="loadOperator"/>.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Example</title>
+
+    <informalexample>
+      <para>This example reads a SciDB-formatted file from the examples
+      directory.<programlisting language="test">--afl create array m4x4 &lt;val1:int32, val2:int32&gt;[i=0:3,4,0, j=0:3,4,0]; --show-output=no
+--afl input(m4x4,'../tests/harness/testcases/data/doc/m4x4_missing.txt'); --output-format=dense --chunkify=yes</programlisting></para>
+
+      <para>But note that the m4x4 array is empty—the data was not stored
+      during the execution of the <literal>input</literal>
+      operation.<programlisting language="test">--afl scan(m4x4); --output-format=dense</programlisting></para>
+    </informalexample>
+  </refsect1>
+</refentry>

@@ -26,6 +26,9 @@
         <condition property="report_dir" else="report">
             <isset property="report_dir" />
         </condition>
+        <condition property="doc_dir" else="doc">
+            <isset property="doc_dir" />
+        </condition>
         <condition property="proto_dir" else="../../../src/network/proto/">
             <isset property="proto_dir" />
         </condition>
@@ -78,6 +81,7 @@
             <entry key="build_dir" value="${build_dir}"/>
             <entry key="dist_dir" value="${dist_dir}"/>
             <entry key="deps_dir" value="${deps_dir}"/>
+            <entry key="doc_dir" value="${doc_dir}"/>
             <entry key="protobuf_lib" value="${protobuf_lib}"/>
             <entry key="junit_lib" value="${junit_lib}"/>
             <entry key="proto_dir" value="${proto_dir}"/>
@@ -89,6 +93,7 @@
         <echo message="dist_dir is set to ${dist_dir}" />
         <echo message="deps_dir is set to ${deps_dir}" />
         <echo message="report_dir is set to ${report_dir}" />
+        <echo message="doc_dir is set to ${doc_dir}" />
         <echo message="junit_lib is set to ${junit_lib}" />
         <echo message="protobuf_lib is set to ${protobuf_lib}" />
         <echo message="java.version is set to ${java.version}" />
@@ -122,6 +127,7 @@
         <mkdir dir="${test.output.dir}" />
         <mkdir dir="${dist_dir}" />
         <mkdir dir="${report_dir}" />
+        <mkdir dir="${doc_dir}" />
 
         <presetdef name="javac">
             <javac includeantruntime="false" debug="${debug}" target="1.6" source="1.6">
@@ -227,9 +233,11 @@
         <delete dir="${dist_dir}" />
         <delete dir="${deps_dir}" />
         <delete dir="${report_dir}" />
+        <delete dir="${doc_dir}" />
         <delete file="src/main/java/scidb4j/org/scidb/io/network/ScidbMsg.java" />
     </target>
 
+    <!-- Tests and coverage -->
     <target name="test" depends="build.jdbctest">
         <jacoco:coverage destfile="${jacoco_exec}">
             <java classname="org.scidb.JDBCTest" fork="true">
@@ -252,5 +260,16 @@
             </structure>
             <html destdir="${report_dir}"/>
         </jacoco:report>
+    </target>
+
+    <!-- Javadoc -->
+    <target name="javadoc" depends="build.scidb4j">
+        <javadoc destdir="${doc_dir}">
+            <classpath path="${protobuf_lib}"/>
+            <packageset dir="src/main/java/scidb4j" defaultexcludes="yes">
+                <include name="org/scidb/client/**"/>
+                <include name="org/scidb/jdbc/**"/>
+            </packageset>
+        </javadoc>
     </target>
 </project>

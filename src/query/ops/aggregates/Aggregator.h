@@ -983,7 +983,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         initializeOperator(inArrayDesc);
 
         ArrayDesc stateDesc = createStateDesc();
-        shared_ptr<MemArray> stateArray (new MemArray(stateDesc));
+        shared_ptr<MemArray> stateArray (new MemArray(stateDesc,query));
 
         if (inputArrays[0]->getSupportedAccess() == Array::SINGLE_PASS && _ioMappings.size() > 1)
         {
@@ -1041,7 +1041,7 @@ class AggregatePartitioningOperator: public  PhysicalOperator
         shared_ptr<Array> finalResultArray (new FinalResultArray(_schema, mergedArray, _aggs, _schema.getEmptyBitmapAttribute()));
         if (_tileMode)
         {
-            return shared_ptr<Array> (new MaterializedArray(finalResultArray, MaterializedArray::RLEFormat));
+            return shared_ptr<Array> (new MaterializedArray(finalResultArray, query, MaterializedArray::RLEFormat));
         }
         return finalResultArray;
     }

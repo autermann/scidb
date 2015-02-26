@@ -122,6 +122,21 @@ class OperatorInjectedError
 typedef Notification<OperatorInjectedError> OperatorInjectedErrorNotification;
 
 /**
+ * @class ThreadStartInjectedError - a specific error injected into the ThreadPool::start code path
+ * which is triggered when the ThreadPool spawns off its threads. This error should cause one or more scidb::Threads to be created but not started.
+ */
+class ThreadStartInjectedError
+: public InjectedError, public boost::enable_shared_from_this<ThreadStartInjectedError>
+{
+ public:
+    const static long int ID = 5;
+    virtual void inject() const;
+    virtual void activate() const;
+
+};
+typedef Notification<ThreadStartInjectedError> ThreadStartInjectedErrorNotification;
+ 
+/**
  * @class InjectedErrorLibrary - a library of all injected error identified by their IDs
  *
  */

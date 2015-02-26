@@ -10,14 +10,14 @@ SCIDB QUERY : <select * from count(A)>
 
 SCIDB QUERY : <select name,schema from list('arrays')>
 {No} name,schema
-{0} "A","A<a:int32> [x=0:2,3,0]"
+{0} 'A','A<a:int32> [x=0:2,3,0]'
 
 SCIDB QUERY : <rename array A to B>
 Query was executed successfully
 
 SCIDB QUERY : <select name,schema from list()>
 {No} name,schema
-{0} "B","B<a:int32> [x=0:2,3,0]"
+{0} 'B','B<a:int32> [x=0:2,3,0]'
 
 SCIDB QUERY : <select * from build(B,x+10)>
 {x} a
@@ -33,36 +33,36 @@ SCIDB QUERY : <select * from build_sparse(B,x+5,true)>
 
 SCIDB QUERY : <select * into D from dimensions(B)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,3,3,0,4611686018427387903,-4611686018427387903,"int64"
+{0} 'x',0,3,3,0,4611686018427387903,-4611686018427387903,'int64'
 
 SCIDB QUERY : <select * from attributes(D)>
 {No} name,type_id,nullable
-{0} "name","string",false
-{1} "start","int64",false
-{2} "length","uint64",false
-{3} "chunk_interval","int32",false
-{4} "chunk_overlap","int32",false
-{5} "low","int64",false
-{6} "high","int64",false
-{7} "type","string",false
+{0} 'name','string',false
+{1} 'start','int64',false
+{2} 'length','uint64',false
+{3} 'chunk_interval','int32',false
+{4} 'chunk_overlap','int32',false
+{5} 'low','int64',false
+{6} 'high','int64',false
+{7} 'type','string',false
 
 SCIDB QUERY : <select name, start, length, chunk_interval, chunk_overlap, low, high, type from dimensions(B)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,3,3,0,4611686018427387903,-4611686018427387903,"int64"
+{0} 'x',0,3,3,0,4611686018427387903,-4611686018427387903,'int64'
 
 SCIDB QUERY : <select * into C from attributes(B)>
 {No} name,type_id,nullable
-{0} "a","int32",false
+{0} 'a','int32',false
 
 SCIDB QUERY : <select * from attributes(C)>
 {No} name,type_id,nullable
-{0} "name","string",false
-{1} "type_id","string",false
-{2} "nullable","bool",false
+{0} 'name','string',false
+{1} 'type_id','string',false
+{2} 'nullable','bool',false
 
 SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
 {No} name,type_id,nullable
-{0} "a","int32",false
+{0} 'a','int32',false
 
 SCIDB QUERY : <select * from store(build(B,x+10),B)>
 {x} a
@@ -88,23 +88,23 @@ SCIDB QUERY : <select * from apply(B,z,x)>
 
 SCIDB QUERY : <select * from attributes(B)>
 {No} name,type_id,nullable
-{0} "a","int32",false
+{0} 'a','int32',false
 
 SCIDB QUERY : <select * from dimensions(B)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,3,3,0,0,2,"int64"
+{0} 'x',0,3,3,0,0,2,'int64'
 
 SCIDB QUERY : <select name, high('B'), low('B'), dim.high, dim.low from dimensions(B) as dim>
 {No} name,expr,expr_1,high,low
-{0} "x",2,0,2,0
+{0} 'x',2,0,2,0
 
 SCIDB QUERY : <select name, start, length, chunk_interval, chunk_overlap, low, high, type from dimensions(B)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,3,3,0,0,2,"int64"
+{0} 'x',0,3,3,0,0,2,'int64'
 
 SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
 {No} name,type_id,nullable
-{0} "a","int32",false
+{0} 'a','int32',false
 
 SCIDB QUERY : <select * from count(versions(B))>
 {i} count
@@ -131,14 +131,14 @@ SCIDB QUERY : <select * from allversions(B)>
 
 SCIDB QUERY : <select * from help()>
 {i} help
-{0} "Use existing operator name as argument for help operator. You can see all operators by executing list('operators')."
+{0} 'Use existing operator name as argument for help operator. You can see all operators by executing list(\'operators\').'
 
 SCIDB QUERY : <rename array B to A>
 Query was executed successfully
 
 SCIDB QUERY : <select * from dimensions(A)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,3,3,0,0,2,"int64"
+{0} 'x',0,3,3,0,0,2,'int64'
 
 SCIDB QUERY : <select * from scan(A)>
 {x} a
@@ -154,8 +154,8 @@ SCIDB QUERY : <select * into A2 from adddim(A,b)>
 
 SCIDB QUERY : <select * from dimensions(A2)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "b",0,1,1,0,0,0,"int64"
-{1} "x",0,3,3,0,0,2,"int64"
+{0} 'b',0,1,1,0,0,0,'int64'
+{1} 'x',0,3,3,0,0,2,'int64'
 
 SCIDB QUERY : <select * into A3 from deldim(A2)>
 {x} a
@@ -165,7 +165,7 @@ SCIDB QUERY : <select * into A3 from deldim(A2)>
 
 SCIDB QUERY : <select * from dimensions(A3)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,3,3,0,0,2,"int64"
+{0} 'x',0,3,3,0,0,2,'int64'
 
 SCIDB QUERY : <select * from sum(A)>
 {i} a_sum

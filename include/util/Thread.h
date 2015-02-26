@@ -64,6 +64,7 @@ public:
 
         Thread(ThreadPool& threadPool, size_t index);
         void start();
+        bool isStarted();
         virtual ~Thread();
 };
 

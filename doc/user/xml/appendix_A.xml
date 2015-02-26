@@ -19,7 +19,26 @@
     <listitem>
       <para><link linkend="JsonCpp">JsonCpp</link></para>
     </listitem>
+
+    <listitem>
+      <para><link linkend="MPICH2">MPICH2</link></para>
+    </listitem>
   </itemizedlist>
+
+  <section id="Affero">
+    <title>Affero GPL</title>
+
+    <para>SciDB is free software: you can redistribute it and/or modify it
+    under the terms of the Affero General Public License, version 3, as
+    published by the Free Software Foundation.</para>
+
+    <para>SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+    INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY, NON-INFRINGEMENT, OR
+    FITNESS FOR A PARTICULAR PURPOSE. See the Affero General Public License at
+    <ulink
+    url="http://www.gnu.org/licenses/agpl-3.0.html">http://www.gnu.org/licenses/agpl-3.0.html</ulink>
+    for the complete license terms.</para>
+  </section>
 
   <section id="ScaLAPACK">
     <title>ScaLAPACK</title>
@@ -141,7 +160,7 @@ Public Domain "license" you can re-license your copy using whatever
 license you like.</programlisting>
   </section>
 
-  <section>
+  <section id="MPICH2">
     <title>MPICH2</title>
 
     <para><programlisting>	                                  COPYRIGHT

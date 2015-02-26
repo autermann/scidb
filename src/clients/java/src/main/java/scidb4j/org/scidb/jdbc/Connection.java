@@ -23,14 +23,13 @@ package org.scidb.jdbc;
 
 import java.io.IOException;
 import java.sql.*;
-import java.sql.Array;
 import java.util.Map;
 import java.util.Properties;
 
 public class Connection implements java.sql.Connection
 {
     private org.scidb.client.Connection scidbConnection;
-    
+
     public Connection(String host, int port) throws SQLException
     {
         scidbConnection = new org.scidb.client.Connection();

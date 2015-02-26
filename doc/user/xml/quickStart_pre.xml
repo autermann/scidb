@@ -21,9 +21,9 @@
   <section>
     <title>Introduction</title>
 
-    <para>This guide is meant to help new users begin working with SciDB.
-    There is also a complete manual, the 250-page <emphasis>SciDB User's
-    Guide</emphasis>, available.</para>
+    <para>This guide helps new users begin working with SciDB. There is also a
+    complete manual, the 250-page <emphasis>SciDB User's Guide</emphasis>,
+    available.</para>
 
     <para>There are three basic ways that you can get started:</para>
 

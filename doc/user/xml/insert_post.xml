@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="insertOperator">
   <refnamediv>
     <refname>insert</refname>
 
@@ -21,7 +21,7 @@
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>insert(<replaceable>array</replaceable>,<replaceable>named_array</replaceable>);</synopsis>
+    <synopsis>insert(<replaceable>source_array</replaceable>,<replaceable>target_array</replaceable>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -108,7 +108,9 @@
 
     <note>
       <para>The AFL insert operator provides the same functionality as the AQL
-      <code><command>INSERT INTO</command></code> statement.</para>
+      <code><command>INSERT INTO</command></code> statement. The
+      <literal>merge</literal> operator is also similar, except that <link linkend="mergeOperator">merge</link> is not a write operator (that is,
+      merge does not store the result of the operation).</para>
     </note>
   </refsect1>
 
@@ -162,7 +164,7 @@
   </programlisting><screen>[
 [(),(),()],
 [(null),(null),(null)],
-[("a7"),("a8"),("a9")]
+[('a7'),('a8'),('a9')]
 ]</screen></para></para>
         </step>
 
@@ -171,18 +173,18 @@
           2 has only null values, and column 3 has only non-null
           values.<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> B
   </programlisting><screen>[
-[(),(null),("b3")],
-[(),(null),("b6")],
-[(),(null),("b9")]
+[(),(null),('b3')],
+[(),(null),('b6')],
+[(),(null),('b9')]
 ]</screen></para></para>
         </step>
 
         <step>
           <para>Insert values from A into B. <para><programlisting>AFL% insert(A,B)
   </programlisting><screen>[
-[(),(null),("b3")],
+[(),(null),('b3')],
 [(null),(null),(null)],
-[("a7"),("a8"),("a9")]
+[('a7'),('a8'),('a9')]
 ]</screen></para></para>
         </step>
 
@@ -193,8 +195,8 @@
           version of B. Version 2 is the version resulting from the insert
           operation of the previous step. <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> versions(B)
   </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2013-03-18 15:03:42"
-{2} 2,"2013-03-18 15:03:42"
+{1} 1,'2013-06-18 19:32:52'
+{2} 2,'2013-06-18 19:32:53'
 </screen></para></para>
         </step>
 
@@ -202,9 +204,9 @@
           <para>Insert values from B (the original version of B—unchanged by
           the previous insert operation) into A<para><programlisting>AFL% insert (B@1, A)
   </programlisting><screen>[
-[(),(null),("b3")],
-[(null),(null),("b6")],
-[("a7"),(null),("b9")]
+[(),(null),('b3')],
+[(null),(null),('b6')],
+[('a7'),(null),('b9')]
 ]</screen></para></para>
         </step>
       </procedure>

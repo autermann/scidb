@@ -137,13 +137,7 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
     }
     else {
         if (_selfInstanceID == INVALID_INSTANCE) {
-            if (Config::getInstance()->optionActivated(CONFIG_RECOVER)) {
-                _selfInstanceID = Config::getInstance()->getOption<int>(CONFIG_RECOVER);
-                StorageManager::getInstance().setInstanceId(_selfInstanceID);
-                LOG4CXX_DEBUG(logger, "Re-register instance # " << _selfInstanceID);
-            } else {
-                throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_NOT_REGISTERED);
-            }
+            throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_NOT_REGISTERED);
         }
         if (Config::getInstance()->getOption<int>(CONFIG_REDUNDANCY) >= (int)SystemCatalog::getInstance()->getNumberOfInstances())
             throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_INVALID_REDUNDANCY);
@@ -166,12 +160,6 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
     _aliveTimer.expires_from_now(posix_time::seconds(_aliveTimeout));
     _aliveTimer.async_wait(NetworkManager::handleAlive);
 
-    if (Config::getInstance()->optionActivated(CONFIG_RECOVER) &&
-        (int)_selfInstanceID != Config::getInstance()->getOption<int>(CONFIG_RECOVER)) {
-        pthread_t t;
-        pthread_create(&t, 0, doRecover, NULL);
-    }
-
     LOG4CXX_DEBUG(logger, "Start connection accepting and async message exchanging");
 
     // main loop
@@ -185,26 +173,6 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
     {
         LOG4CXX_ERROR(logger, "Marking instance offline failed:\n" << e.what());
     }
-}
-
-void* NetworkManager::doRecover(void*)
-{
-    sleep(RECOVER_TIMEOUT);
-    int recoveredInstanceID = Config::getInstance()->getOption<int>(CONFIG_RECOVER);
-    LOG4CXX_DEBUG(logger, "Start recovery of instance # " << recoveredInstanceID);
-
-    // create a fake query
-    shared_ptr<const scidb::InstanceLiveness> myLiveness =
-        Cluster::getInstance()->getInstanceLiveness();
-    assert(myLiveness);
-    shared_ptr<Query> query = Query::createDetached();
-    query->init(0, COORDINATOR_INSTANCE,
-                Cluster::getInstance()->getLocalInstanceId(),
-                myLiveness);
-
-    StorageManager::getInstance().recover(recoveredInstanceID, query);
-    LOG4CXX_DEBUG(logger, "Complete recovery of instance # " << recoveredInstanceID);
-    return NULL;
 }
 
 void NetworkManager::handleShutdown()
@@ -831,16 +799,18 @@ void NetworkManager::cancelClientQuery(const QueryID& queryId,
       } else {
           item = boost::bind(dh, query);
       }
+      //XXX TODO: do this on the errorQueue
       _workQueue->enqueue(item);
    } catch (const WorkQueue::OverflowException& e) {
       LOG4CXX_ERROR(logger, "Overflow exception from the work queue: "<<e.what());
-      // XXX TODO: deal with this exception
+      // XXX TODO: deal with this exception maybe by re-trying ...
       assert(false);
       throw;
    } catch (const scidb::SystemException& e) {
       if (e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND
-              && e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND2) {
-         throw;
+          && e.getLongErrorCode() != SCIDB_LE_QUERY_NOT_FOUND2) {
+          assert(false);
+          throw;
       }
    }
 }

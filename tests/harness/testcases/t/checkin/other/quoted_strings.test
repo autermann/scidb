@@ -5,7 +5,10 @@
 --aql load Q from '../tests/harness/testcases/data/quotes.txt'
 --aql select * from Q
 --aql select * from array(Q, '[("fo\"o"), ("bar")]')
+--aql select * from array(Q, '[(\'fo\\'o\'), (\'ba\\'r\')]')
 --aql select * into Q from array(Q, '[("fo\"o"), ("bar")]')
+--aql select * from Q
+--aql select * into Q from array(Q, '[(\'fo\\'o\'), (\'bar\')]')
 --aql select * from Q
 
 --cleanup

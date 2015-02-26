@@ -2,13 +2,13 @@
 --test
 --start-query-logging
 
---shell  --command="cat '../examples/raw.csv' " --store
+--shell  --command="cat $DOC_DATA/raw.csv " --store
 --set-format dcsv
 --start-igdata
 --aql CREATE ARRAY raw <pos: int64, device: int64, val: float> [offset=0:*,5,0]  
---shell  --command="csv2scidb -p NNN -s 1 < ../examples/raw.csv > ../examples/raw.scidb "
+--shell  --command="csv2scidb -p NNN -s 1 < $DOC_DATA/raw.csv > $DOC_DATA/raw.scidb "
 --stop-igdata
---aql LOAD raw FROM '../examples/raw.scidb'  
+--aql LOAD raw FROM '../tests/harness/testcases/data/doc/raw.scidb'  
 --start-igdata
 --aql create array A <val: float> [device=1:5,5,0, pos=1:5,5,0]  
 --stop-igdata

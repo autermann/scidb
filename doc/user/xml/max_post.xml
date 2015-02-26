@@ -1,16 +1,17 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="maxOperator">
   <refnamediv>
     <refname>max</refname>
 
     <refpurpose><indexterm>
         <primary>max</primary>
-      </indexterm>Select maximum value</refpurpose>
+      </indexterm>Selects the maximum value for the specified attribute,
+    optionally over one or more dimensions.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>max(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+    <synopsis>max(<replaceable>array</replaceable>[,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>])</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -18,13 +19,31 @@
 
     <para>The max operator calculates the maximum of the specified attribute
     in the array. Result is an array with single element containing the
-    maximum of the specified attribute.</para>
+    maximum of the specified attribute. For the corresponding aggregate, see
+    the <link linkend="maxAggregate">max</link> aggregate reference.</para>
+  </refsect1>
 
-    <note>
-      <para>The max operator provides the same functionality as the max
-      aggregate. For details, see the <link linkend="maxAggregate">max</link>
-      aggregate reference.</para>
-    </note>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>max</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: an optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

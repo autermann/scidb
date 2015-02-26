@@ -58,7 +58,15 @@ ctest_test()
 # copy result
 if(EXISTS "$ENV{CDASH_PATH_RESULT}")
   execute_process (COMMAND /bin/cp -R "${HARNESS_PATH}/testcases/r/" "$ENV{CDASH_PATH_RESULT}/")
-  execute_process (COMMAND /bin/cp -R "${HARNESS_PATH}/testcases/t/" "$ENV{CDASH_PATH_RESULT}/")
+
+  # remove un-needed files
+  execute_process(COMMAND /usr/bin/find . -depth \( -name *.expected -or -name *.svn \) -exec /bin/rm -rf {} \; 
+  WORKING_DIRECTORY "$ENV{CDASH_PATH_RESULT}/../" OUTPUT_QUIET)
+
+  # remove build results older than 30 days
+  execute_process(COMMAND /usr/bin/find . -maxdepth 1 -mtime +30 -type d -exec /bin/rm -rf {} \; 
+  WORKING_DIRECTORY "$ENV{CDASH_PATH_RESULT}/../" OUTPUT_QUIET)
+
 endif()
 
 # coverage

@@ -973,7 +973,6 @@ class GroupbyQuantileArray : public Array
 {
 private:
     ArrayDesc _desc;
-    weak_ptr<Query> _query;
     size_t _numQuantiles;
     shared_ptr<RowCollectionGroup> _pRowCollectionGroup;
     QueryID _queryID;
@@ -984,17 +983,16 @@ public:
 
 public:
     GroupbyQuantileArray(ArrayDesc const& desc, shared_ptr<Query>& query, size_t numQuantiles, shared_ptr<RowCollectionGroup>& pRowCollectionGroup):
-          _desc(desc), _query(query), _numQuantiles(numQuantiles), _pRowCollectionGroup(pRowCollectionGroup), _queryID(query->getQueryID())
+          _desc(desc), _numQuantiles(numQuantiles), _pRowCollectionGroup(pRowCollectionGroup), _queryID(query->getQueryID())
     {
         assert(numQuantiles>1);
+        _query=query;
     }
 
     virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
     {
-        shared_ptr<Query> query = _query.lock();
-        if (! Query::validateQueryPtr(query)) {
-            throw SYSTEM_EXCEPTION_SPTR(SCIDB_SE_QPROC, SCIDB_LE_QUERY_CANCELLED) << _queryID;
-        }
+        shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+
         return boost::shared_ptr<ConstArrayIterator>(
                 new GroupbyQuantileArrayIterator(*this, attr, _numQuantiles, _pRowCollectionGroup,
                         query->getInstanceID(), query->getInstancesCount()));

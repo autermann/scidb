@@ -43,7 +43,7 @@ namespace scidb
     /**
      * Implementation of database array
      */
-    class DBArray : public Array
+    class DBArray : public Array, public boost::enable_shared_from_this<DBArray>
     {
         string getRealName() const;
       public:
@@ -61,7 +61,7 @@ namespace scidb
          */
         virtual bool hasChunkPositions() const
         {
-            return _query.lock();
+            return true;
         }
 
         /**
@@ -69,11 +69,6 @@ namespace scidb
          * @return the new sorted set of coordinates, containing the first coordinate of every chunk present in the array
          */
         virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const;
-
-        DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query);
-        DBArray(ArrayID id, const boost::shared_ptr<Query>& query);
-        DBArray(std::string const& name, const boost::shared_ptr<Query>& query);
-        DBArray(const DBArray& other);
 
         /**
          * Populate this version of the array using only the chunks specified in input. All other chunks in the previous
@@ -89,11 +84,29 @@ namespace scidb
         {
             return true;
         }
+        static boost::shared_ptr<DBArray> newDBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query)
+        {
+            return boost::shared_ptr<DBArray>(new DBArray(desc, query));
+        }
+        static boost::shared_ptr<DBArray> newDBArray(ArrayID id, const boost::shared_ptr<Query>& query)
+        {
+            return boost::shared_ptr<DBArray>(new DBArray(id, query));
+        }
+        static boost::shared_ptr<DBArray> newDBArray(std::string const& name, const boost::shared_ptr<Query>& query)
+        {
+            return boost::shared_ptr<DBArray>(new DBArray(name, query));
+        }
+
+      private:
+        DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query);
+        DBArray(ArrayID id, const boost::shared_ptr<Query>& query);
+        DBArray(std::string const& name, const boost::shared_ptr<Query>& query);
+        DBArray();
+        DBArray(const DBArray& other);
+        DBArray& operator=(const DBArray& other);
 
       private:
         ArrayDesc _desc;
-        boost::weak_ptr<Query> _query;
-
     };
 }
 

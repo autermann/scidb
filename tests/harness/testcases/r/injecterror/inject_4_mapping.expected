@@ -42,7 +42,7 @@ SCIDB QUERY : <redimension_store(NODE_ID, NODE_ID_REDIM)>
 [An error expected at this place for the query "redimension_store(NODE_ID, NODE_ID_REDIM)". And it failed.]
 
 "Check for orphans..."
-SCIDB QUERY : <../utils/find_leaked_nids.sh $SCIDB_CLUSTER_NAME localhost>
+SCIDB QUERY : <../utils/find_leaked_nids.sh ${DB_HOST:=localhost} ${DB_PORT:=5432} ${DB_NAME:=mydb} ${DB_USER:=mydb} ${DB_PASSWD:=mydb}>
  name 
 ------
 (0 rows)

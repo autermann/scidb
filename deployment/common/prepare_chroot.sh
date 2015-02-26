@@ -52,7 +52,7 @@ chmod a-wx,o-r,ug+r ${CHROOT_SUDOERS}
 function ubuntu1204 ()
 {
 apt-get update
-apt-get install -y build-essential dpkg-dev pbuilder debhelper m4 git git-svn
+apt-get install -y build-essential dpkg-dev pbuilder debhelper m4 git git-svn cdbs quilt
 chroot_sudoers_pbuilder
 }
 

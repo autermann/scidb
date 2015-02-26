@@ -120,7 +120,6 @@ public:
 
   private:
     vector<VersionDesc> versions;
-    boost::weak_ptr<Query> _query;
 };
 
 }

@@ -124,15 +124,15 @@ a,a,b,b
 
 SCIDB QUERY : <apply(B1,z,a+'_z')>
 a,b,z
-0,'5',"1_z"
-1,'6',"2_z"
-2,'7',"3_z"
+0,'5','1_z'
+1,'6','2_z'
+2,'7','3_z'
 
 SCIDB QUERY : <apply(B1,z,b+'_z')>
 a,b,z
-0,'5',"5_z"
-1,'6',"6_z"
-2,'7',"7_z"
+0,'5','5_z'
+1,'6','6_z'
+2,'7','7_z'
 
 SCIDB QUERY : <count(B1)>
 i,count
@@ -237,15 +237,15 @@ b,b,a,a
 
 SCIDB QUERY : <apply(C1,z,a+'_z')>
 b,a,z
-0,'1',"1_z"
-1,'2',"2_z"
-2,'3',"3_z"
+0,'1','1_z'
+1,'2','2_z'
+2,'3','3_z'
 
 SCIDB QUERY : <apply(C1,z,b+'_z')>
 b,a,z
-0,'1',"5_z"
-1,'2',"6_z"
-2,'3',"7_z"
+0,'1','5_z'
+1,'2','6_z'
+2,'3','7_z'
 
 SCIDB QUERY : <count(C1)>
 i,count

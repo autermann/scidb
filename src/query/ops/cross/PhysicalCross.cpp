@@ -83,7 +83,7 @@ class PhysicalCross : public  PhysicalOperator
             left = redistribute(left, query, psLocalInstance, "", coordinatorID);
             right = redistribute(right, query, psLocalInstance, "", coordinatorID);
             if (query->getInstanceID() != coordinatorID) { 
-                return boost::shared_ptr<Array>(new MemArray(_schema));
+                return boost::shared_ptr<Array>(new MemArray(_schema,query));
             }
 #else
             right = redistribute(right, query, psReplication);

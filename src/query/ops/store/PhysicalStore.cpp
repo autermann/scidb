@@ -115,19 +115,22 @@ class PhysicalStore: public PhysicalOperator
             newVersionDims[i] = dim;
             newVersionDims[i].setCurrStart(MAX_COORDINATE);
             newVersionDims[i].setCurrEnd(MIN_COORDINATE);
-            if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) { 
-                if (arrayExists && parentArrayDesc.isImmutable() && mappingArrayName != dstDims[i].getMappingArrayName() && !dstDims[i].getMappingArrayName().empty()) { 
+            if (dim.getType() != TID_INT64 && !mappingArrayName.empty()) {
+                if (arrayExists && parentArrayDesc.isImmutable() &&
+                    mappingArrayName != dstDims[i].getMappingArrayName() &&
+                    !dstDims[i].getMappingArrayName().empty()) {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CAN_NOT_CHANGE_MAPPING) << arrayName;
                 }
                 changeMapping = true;
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(mappingArrayName);
-                if (tmpMappingArray) { 
+                if (tmpMappingArray) {
                     ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
                     string newMappingArrayName = parentArrayDesc.createMappingArrayName(i, _lastVersion+1);
-                    if (SystemCatalog::getInstance()->containsArray(newMappingArrayName)) { 
+                    if (SystemCatalog::getInstance()->containsArray(newMappingArrayName)) {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_ALREADY_EXIST) << newMappingArrayName;
                     }
-                    ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(), tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
+                    ArrayDesc mappingArrayDesc(newMappingArrayName, tmpMappingArrayDesc.getAttributes(),
+                                               tmpMappingArrayDesc.getDimensions(), ArrayDesc::LOCAL);
                     SystemCatalog::getInstance()->addArray(mappingArrayDesc, psReplication);
                     assert(mappingArrayDesc.getId()>0);
                     newVersionDims[i] = DimensionDesc(dim.getBaseName(),
@@ -143,8 +146,13 @@ class PhysicalStore: public PhysicalOperator
             }
         }
         if (parentArrayDesc.isImmutable()) {
-            if (changeMapping) { 
-                SystemCatalog::getInstance()->updateArray(ArrayDesc(parentArrayDesc.getId(), parentArrayDesc.getUAId(), parentArrayDesc.getVersionId(), parentArrayDesc.getName(), parentArrayDesc.getAttributes(), newVersionDims));
+            if (changeMapping) {
+                SystemCatalog::getInstance()->updateArray(ArrayDesc(parentArrayDesc.getId(),
+                                                                    parentArrayDesc.getUAId(),
+                                                                    parentArrayDesc.getVersionId(),
+                                                                    parentArrayDesc.getName(),
+                                                                    parentArrayDesc.getAttributes(),
+                                                                    newVersionDims));
             };
             return;
         }
@@ -212,13 +220,17 @@ class PhysicalStore: public PhysicalOperator
               << baseArrayName;
            }
         }
+
         shared_ptr<Array> srcArray = inputArrays[0];
         ArrayDesc const& srcArrayDesc = srcArray->getArrayDesc();
-        shared_ptr<Array> dstArray = shared_ptr<Array>(new DBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
+        shared_ptr<Array> dstArray(DBArray::newDBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
         ArrayDesc const& dstArrayDesc = dstArray->getArrayDesc();
+
+        query->getReplicationContext()->enableInboundQueue(dstArrayDesc.getId(), dstArray);
+
         size_t nAttrs = dstArrayDesc.getAttributes().size();
 
-        if (nAttrs == 0) { 
+        if (nAttrs == 0) {
             return dstArray;
         }
         if (nAttrs > srcArrayDesc.getAttributes().size()) {
@@ -266,18 +278,20 @@ class PhysicalStore: public PhysicalOperator
         }
 
         SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
-        StorageManager::getInstance().flush();
-        query->replicationBarrier();
+        query->getReplicationContext()->replicationSync(dstArrayDesc.getId());
+        query->getReplicationContext()->removeInboundQueue(dstArrayDesc.getId());
 
+        // XXX this business with NIDs is NOT transactional -> NID are not rolled back = storage+memory leak
+        // XXX however, NIDs are not replicated (they are stored on each instance anyway)
         for (size_t i = 0; i < nDims; i++) {
             string const& dstMappingArrayName = dims[i].getMappingArrayName();
             string const& srcMappingArrayName = srcDims[i].getMappingArrayName();
             if (dims[i].getType() != TID_INT64 && srcMappingArrayName != dstMappingArrayName) { 
                 boost::shared_ptr<Array> tmpMappingArray = query->getTemporaryArray(srcMappingArrayName);
-                if (tmpMappingArray) { 
-                    DBArray dbMappingArray(dstMappingArrayName, query);
+                if (tmpMappingArray) {
+                    shared_ptr<DBArray> dbMappingArray(DBArray::newDBArray(dstMappingArrayName, query));
                     ArrayDesc const& tmpMappingArrayDesc = tmpMappingArray->getArrayDesc();
-                    ArrayDesc const& dbMappingArrayDesc = dbMappingArray.getArrayDesc();
+                    ArrayDesc const& dbMappingArrayDesc = dbMappingArray->getArrayDesc();
                     if (query->getCoordinatorID() == COORDINATOR_INSTANCE 
                         && tmpMappingArrayDesc.getDimensions()[0].getChunkInterval() != dbMappingArrayDesc.getDimensions()[0].getChunkInterval()) { 
                         SystemCatalog::getInstance()->updateArray(ArrayDesc(dbMappingArrayDesc.getId(),
@@ -289,7 +303,7 @@ class PhysicalStore: public PhysicalOperator
                                                                             dbMappingArrayDesc.getFlags()));
                     }
                     shared_ptr<ArrayIterator> srcArrayIterator = tmpMappingArray->getIterator(0);
-                    shared_ptr<ArrayIterator> dstArrayIterator = dbMappingArray.getIterator(0);
+                    shared_ptr<ArrayIterator> dstArrayIterator = dbMappingArray->getIterator(0);
                     Chunk& dstChunk = dstArrayIterator->newChunk(srcArrayIterator->getPosition(), 0);
                     ConstChunk const& srcChunk = srcArrayIterator->getChunk();
                     PinBuffer scope(srcChunk);
@@ -300,6 +314,7 @@ class PhysicalStore: public PhysicalOperator
                 }
             }
         }
+        StorageManager::getInstance().flush();
         getInjectedErrorListener().check();
         return dstArray;
     }

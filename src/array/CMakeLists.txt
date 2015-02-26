@@ -23,10 +23,9 @@ set (array_src
     Metadata.cpp
     Array.cpp
     MemArray.cpp
-    EmbeddedArray.cpp
     StreamArray.cpp
     DelegateArray.cpp
-	TupleArray.cpp
+    TupleArray.cpp
     ComplementArray.cpp
     FileArray.cpp
     DBArray.cpp

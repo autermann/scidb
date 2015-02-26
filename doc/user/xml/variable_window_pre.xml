@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="varwinOperator">
   <refnamediv>
     <refname>variable_window</refname>
 
@@ -16,13 +15,13 @@
         <tertiary>variable</tertiary>
       </indexterm><indexterm>
         <primary>data windows</primary>
-      </indexterm>Select nonempty cells from a variable size 1-dimensional
-    window</refpurpose>
+      </indexterm>Calculates aggregate values over nonempty cells from a
+    variable size, 1-dimensional window.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>variable_window(<replaceable>array</replaceable>,<replaceable>dimension</replaceable>,<replaceable>left_edge</replaceable>,
-     <replaceable>right_edge</replaceable>,<replaceable>aggregate_call</replaceable>)</synopsis>
+    <synopsis>variable_window(<replaceable>array</replaceable>, <replaceable>dimension</replaceable>,<replaceable>left_edge</replaceable>, <replaceable>right_edge</replaceable>,
+<replaceable>   aggregate_1</replaceable>(<replaceable>attr_name_1</replaceable>)<optional>,<replaceable>aggrgegate_2</replaceable>(<replaceable>attr_name_2</replaceable>), ...</optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -30,8 +29,43 @@
 
     <para>The <code>variable_window</code> command aggregates along a
     1-dimensional window of variable length. The window is defined by the left
-    and right edges, however, this type of window aggregate excludes cells
-    that are empty.</para>
+    and right edges and excludes empty cells.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>variable_window</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">dimension</emphasis>: the dimension
+          along which the window is defined.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">left_edge</emphasis>: the number of
+          cells to the left of the current cell to include in the
+          window.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">right_edge</emphasis>: the number of
+          cells to the right of the current cell to include in the
+          window.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">aggregate_</emphasis><emphasis>n</emphasis>(<replaceable>attr_name</replaceable>):
+          one or more aggregate calls, over the specified attribute,
+          <replaceable>attr_name</replaceable>,</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

@@ -73,7 +73,7 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example creates a a matrix with two attributes and saves the
+      <para>This example creates an array with two attributes and saves the
       cell values to a file.</para>
 
       <procedure>

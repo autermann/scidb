@@ -222,6 +222,8 @@
 
       <para><indexterm>
           <primary>collisions</primary>
+        </indexterm><indexterm>
+          <primary>cell collisions</primary>
         </indexterm>The redimension and redimension_store operators can yield
       result arrays with fewer cells than the source array. This can occur
       when there are "cell collisions." A cell collision occurs when a single
@@ -231,15 +233,25 @@
       <para>There are three techniques for handling cell
       collisions:<itemizedlist>
           <listitem>
-            <para>synthetic dimensions</para>
+            <para><indexterm>
+                <primary>dimensions</primary>
+
+                <secondary>synthetic</secondary>
+              </indexterm><indexterm>
+                <primary>synthetic dimensions</primary>
+              </indexterm><emphasis role="bold">Include a synthetic
+            dimension.</emphasis> A synthetic dimension is a vector that
+            consists of the counts for all the candidate cell values for each
+            cell location.</para>
           </listitem>
 
           <listitem>
-            <para>aggregation</para>
+            <para><emphasis role="bold">Perform aggregation.</emphasis></para>
           </listitem>
         </itemizedlist><itemizedlist>
           <listitem>
-            <para>randomly choose a cell from among the candidate cells</para>
+            <para><emphasis role="bold">Select randomly.</emphasis> Randomly
+            choose a cell from among the candidate cells.</para>
           </listitem>
         </itemizedlist></para>
 
@@ -269,16 +281,16 @@ val2:string NULL DEFAULT null,
 val3:double &gt;
 
 [i=0:9,10,0]</screen><programlisting>AFL% scan(redim_missing);   </programlisting><screen>{i} val1,val2,val3
-{0} "0","0",1
-{1} "0","1",0.540302
-{2} "0","2",-0.416147
-{3} "0","3",-0.989992
-{4} "0","4",-0.653644
-{5} "1",null,0.7
-{6} "1","1",0.841471
-{7} "1","2",0.909297
-{8} "1","3",0.14112
-{9} "1","4",-0.756802
+{0} '0','0',1
+{1} '0','1',0.540302
+{2} '0','2',-0.416147
+{3} '0','3',-0.989992
+{4} '0','4',-0.653644
+{5} '1',null,0.7
+{6} '1','1',0.841471
+{7} '1','2',0.909297
+{8} '1','3',0.14112
+{9} '1','4',-0.756802
 </screen></para></para>
 
       <para>Suppose you want to change the first two attributes into dimension
@@ -385,7 +397,7 @@ j=0:3,4,0]</screen> As long as the two array schemas have the same number of
       </symbol>2, as the new schema: </para></para>
 
       <para><indexterm>
-          <primary>unpacking</primary>
+          <primary>unpack</primary>
         </indexterm><indexterm>
           <primary>arrays</primary>
 
@@ -694,13 +706,13 @@ j=0:2,3,0]</screen></para></para>
       and then later find that you need a different chunk size, you can use
       the <code>repart </code> operator to change the chunk size. For example,
       suppose you have an array that is 1000-by-1000 with chunk size 100 in
-      each dimension: <para><programlisting>AFL% show(chunks);  </programlisting><screen>[("chunks&lt;val1:double,val2:double&gt; [i=0:999,100,0,j=0:999,100,0]")]
+      each dimension: <para><programlisting>AFL% show(chunks);  </programlisting><screen>[('chunks&lt;val1:double,val2:double&gt; [i=0:999,100,0,j=0:999,100,0]')]
 </screen> You can repartition the chunks to be 10 along one dimension
       and 1000 in the other:</para></para>
 
       <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> chunks_part
     <command>FROM</command> repart(chunks,&lt;val1:double,val2:double&gt;
-    [i=0:999,10,0,j=0:999,1000,0]);  </programlisting><programlisting>AFL% show(chunks_part);  </programlisting><screen>[("chunks_part&lt;val1:double,val2:double&gt; [i=0:999,10,0,j=0:999,1000,0]")]
+    [i=0:999,10,0,j=0:999,1000,0]);  </programlisting><programlisting>AFL% show(chunks_part);  </programlisting><screen>[('chunks_part&lt;val1:double,val2:double&gt; [i=0:999,10,0,j=0:999,1000,0]')]
 </screen><para>Repartitioning is also important if you want the change the chunk
       overlap to speed up nearest-neighbor or window aggregate
       queries.<para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> chunks_overlap
@@ -722,31 +734,31 @@ j=0:2,3,0]</screen></para></para>
       your array. This example demonstrates how you can take slices from an
       existing array and then reassemble them into a array with a different
       schema. Consider the following 2-dimensional array: <para><programlisting>AFL% scan(Dsp)  </programlisting><screen>{d,t} val
-{"device-0","probe-0"} 0.01
-{"device-0","probe-1"} 30.36
-{"device-0","probe-2"} 111.21
-{"device-0","probe-3"} 242.56
-{"device-0","probe-4"} 424.41
-{"device-1","probe-0"} 2.04
-{"device-1","probe-1"} 42.49
-{"device-1","probe-2"} 133.44
-{"device-1","probe-3"} 274.89
-{"device-1","probe-4"} 466.84
-{"device-2","probe-0"} 6.09
-{"device-2","probe-1"} 56.64
-{"device-2","probe-2"} 157.69
-{"device-2","probe-3"} 309.24
-{"device-2","probe-4"} 511.29
-{"device-3","probe-0"} 12.16
-{"device-3","probe-1"} 72.81
-{"device-3","probe-2"} 183.96
-{"device-3","probe-3"} 345.61
-{"device-3","probe-4"} 557.76
-{"device-4","probe-0"} 20.25
-{"device-4","probe-1"} 91
-{"device-4","probe-2"} 212.25
-{"device-4","probe-3"} 384
-{"device-4","probe-4"} 606.25
+{'device-0','probe-0'} 0.01
+{'device-0','probe-1'} 30.36
+{'device-0','probe-2'} 111.21
+{'device-0','probe-3'} 242.56
+{'device-0','probe-4'} 424.41
+{'device-1','probe-0'} 2.04
+{'device-1','probe-1'} 42.49
+{'device-1','probe-2'} 133.44
+{'device-1','probe-3'} 274.89
+{'device-1','probe-4'} 466.84
+{'device-2','probe-0'} 6.09
+{'device-2','probe-1'} 56.64
+{'device-2','probe-2'} 157.69
+{'device-2','probe-3'} 309.24
+{'device-2','probe-4'} 511.29
+{'device-3','probe-0'} 12.16
+{'device-3','probe-1'} 72.81
+{'device-3','probe-2'} 183.96
+{'device-3','probe-3'} 345.61
+{'device-3','probe-4'} 557.76
+{'device-4','probe-0'} 20.25
+{'device-4','probe-1'} 91
+{'device-4','probe-2'} 212.25
+{'device-4','probe-3'} 384
+{'device-4','probe-4'} 606.25
 </screen><programlisting>AFL% show(Dsp)</programlisting><screen><command>Dsp</command>
 
 &lt; val:double &gt;
@@ -757,23 +769,23 @@ t(string)=5,5,0]</screen></para></para>
       <para>Suppose you want to examine a sample plane from each dimension of
       the array. You can use the slice operator to select array slices from
       array <code>Dsp </code>: <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_0 <command>FROM</command> slice(Dsp, d, 'device-0');  </programlisting><screen>{t} val
-{"probe-0"} 0.01
-{"probe-1"} 30.36
-{"probe-2"} 111.21
-{"probe-3"} 242.56
-{"probe-4"} 424.41
+{'probe-0'} 0.01
+{'probe-1'} 30.36
+{'probe-2'} 111.21
+{'probe-3'} 242.56
+{'probe-4'} 424.41
 </screen><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_1 <command>FROM</command> slice(Dsp, d, 'device-1');  </programlisting><screen>{t} val
-{"probe-0"} 2.04
-{"probe-1"} 42.49
-{"probe-2"} 133.44
-{"probe-3"} 274.89
-{"probe-4"} 466.84
+{'probe-0'} 2.04
+{'probe-1'} 42.49
+{'probe-2'} 133.44
+{'probe-3'} 274.89
+{'probe-4'} 466.84
 </screen><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_slice_2 <command>FROM</command> slice(Dsp, d, 'device-2');  </programlisting><screen>{t} val
-{"probe-0"} 6.09
-{"probe-1"} 56.64
-{"probe-2"} 157.69
-{"probe-3"} 309.24
-{"probe-4"} 511.29
+{'probe-0'} 6.09
+{'probe-1'} 56.64
+{'probe-2'} 157.69
+{'probe-3'} 309.24
+{'probe-4'} 511.29
 </screen>The
       slices are 1-dimensional. <para><programlisting>AFL% show(Dsp_slice_2)</programlisting><screen><command>Dsp_slice_2</command>
 
@@ -800,16 +812,16 @@ t(string)=5,5,0]</screen></para></para>
       dimension to both. The <code>adddim</code> operator will add a stub
       dimension to the array to increase its dimensionality. <para><programlisting>AQL% <command>SELECT</command> * <command>INTO</command> Dsp_new <command>FROM</command> concat(adddim(Dsp_slice_0, d), adddim(Dsp_slice_2, d));
 </programlisting><screen>{d,t} val
-{0,"probe-0"} 0.01
-{0,"probe-1"} 30.36
-{0,"probe-2"} 111.21
-{0,"probe-3"} 242.56
-{0,"probe-4"} 424.41
-{1,"probe-0"} 6.09
-{1,"probe-1"} 56.64
-{1,"probe-2"} 157.69
-{1,"probe-3"} 309.24
-{1,"probe-4"} 511.29
+{0,'probe-0'} 0.01
+{0,'probe-1'} 30.36
+{0,'probe-2'} 111.21
+{0,'probe-3'} 242.56
+{0,'probe-4'} 424.41
+{1,'probe-0'} 6.09
+{1,'probe-1'} 56.64
+{1,'probe-2'} 157.69
+{1,'probe-3'} 309.24
+{1,'probe-4'} 511.29
 </screen><programlisting>AFL% show(Dsp_new)</programlisting><screen><command>Dsp_new</command>
 
 &lt; val:double &gt;

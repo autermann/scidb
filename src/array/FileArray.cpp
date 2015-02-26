@@ -52,20 +52,25 @@ namespace scidb
 
     void  FileChunk::write(boost::shared_ptr<Query>& query)
     {
-       // the query is ignored because we are writing to a temp file
+        query->validate();
         ((FileArray*)array)->writeChunk(this);
     }
 
     //
     // File Array
     //
-    FileArray::FileArray(ArrayDesc const& arr, char const* filePath)
+    FileArray::FileArray(ArrayDesc const& arr, const boost::shared_ptr<Query>& query, char const* filePath)
     {
+        assert(query);
+        _query=query;
         init(arr, filePath);
     }
 
-    FileArray::FileArray(boost::shared_ptr<Array> input, bool vertical, char const* filePath)
+    FileArray::FileArray(boost::shared_ptr<Array> input, const boost::shared_ptr<Query>& query,
+                         bool vertical, char const* filePath)
     {
+        assert(query);
+        _query=query;
         init(input->getArrayDesc(), filePath);
         append(input, vertical);
     }
@@ -118,7 +123,8 @@ namespace scidb
     //
     // File Array Iterator
     //
-    FileArrayIterator::FileArrayIterator(FileArray& arr, AttributeID attId) : array(arr)
+    FileArrayIterator::FileArrayIterator(FileArray& arr, AttributeID attId)
+    : array(arr)
     {
         addr.attId = attId;
         reset();
@@ -222,15 +228,15 @@ namespace scidb
         }
     }
 
-shared_ptr<Array> createTmpArray(ArrayDesc const& arr)
+shared_ptr<Array> createTmpArray(ArrayDesc const& arr, boost::shared_ptr<Query>& query)
 {
     if (Config::getInstance()->getOption<bool>(CONFIG_SAVE_RAM))
     {
-        return shared_ptr<Array>(new FileArray(arr));
+        return shared_ptr<Array>(new FileArray(arr, query));
     }
     else
     {
-        return shared_ptr<Array>(new MemArray(arr));
+        return shared_ptr<Array>(new MemArray(arr, query));
     }
 }
 

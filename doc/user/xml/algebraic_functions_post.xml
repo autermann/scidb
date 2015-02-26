@@ -4,7 +4,7 @@
   <refnamediv>
     <refname>Algebraic functions</refname>
 
-    <refpurpose>Perform basic arithmetic in a query expression</refpurpose>
+    <refpurpose>Perform basic arithmetic in a query expression.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -44,7 +44,19 @@
           <row>
             <entry>%</entry>
 
-            <entry>Remainder</entry>
+            <entry><indexterm>
+                <primary>modulo</primary>
+              </indexterm><indexterm>
+                <primary>remainder function</primary>
+              </indexterm><indexterm>
+                <primary>functions</primary>
+
+                <secondary>modulo</secondary>
+              </indexterm><indexterm>
+                <primary>functions</primary>
+
+                <secondary>remainder</secondary>
+              </indexterm>Remainder</entry>
 
             <entry>scalar % scalar</entry>
 
@@ -138,7 +150,7 @@
 
           <row>
             <entry><indexterm>
-                <primary>random</primary>
+                <primary>random function</primary>
               </indexterm>random</entry>
 
             <entry>Generate random positive integer</entry>
@@ -174,11 +186,11 @@
         <step>
           <para>Construct an array that contains a random set of values
           between 0 and 1. <para><programlisting>AFL% create array C &lt;val:double&gt; [i=0:4,5,0];  </programlisting><para><programlisting>AFL% store(build(C,random() /  2147483647.0),C);  </programlisting><screen>{i} val
-{0} 0.142564
-{1} 0.172893
-{2} 0.689528
-{3} 0.179606
-{4} 0.573532
+{0} 0.619441
+{1} 0.217831
+{2} 0.349238
+{3} 0.467368
+{4} 0.553006
 </screen>The
           largest value that random() can produce is 2,147,483,647. So we
           divide the output by a double that is equivalent; this returns a
@@ -194,6 +206,30 @@
 {4} 2,16
 </screen></para></para>
         </step>
+
+        <step>
+          <para>Try out the "simple" math functions, such as plus and
+          minus.</para>
+
+          <para><programlisting>AFL% store(build(&lt;val:double&gt; [i=0:1,2,0, j=0:1,2,0],i*2 +j+1),A);  </programlisting><screen>[
+[(1),(2)],
+[(3),(4)]
+]</screen><programlisting>AFL% store(build(A,-i*4-j -1),B);  </programlisting><screen>[
+[(-1),(-2)],
+[(-5),(-6)]
+]</screen><programlisting>AQL% <command>SELECT</command> A.val + B.val <command>FROM</command> A,B;  </programlisting><screen>[
+[(0),(0)],
+[(-2),(-2)]
+]</screen><programlisting>AQL% <command>SELECT</command> A.val - B.val <command>FROM</command> A,B;  </programlisting><screen>[
+[(2),(4)],
+[(8),(10)]
+]</screen><programlisting>AQL% <command>SELECT</command> A.val * B.val <command>FROM</command> A,B;  </programlisting><screen>[
+[(-1),(-4)],
+[(-15),(-24)]
+]</screen><programlisting>AQL% <command>SELECT</command> A.val / B.val <command>FROM</command> A,B;  </programlisting><screen>[
+[(-1),(-1)],
+[(-0.6),(-0.666667)]
+]</screen></para></step>
       </procedure>
     </informalexample>
   </refsect1>

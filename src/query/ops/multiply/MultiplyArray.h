@@ -60,7 +60,6 @@ class MultiplyArrayIterator : public ConstArrayIterator
     Coordinates currPos;
     bool hasCurrent;
     MemChunk chunk;
-    boost::weak_ptr<Query> _query;
 };
 
 class MultiplySparseArrayIterator : public MultiplyArrayIterator
@@ -136,7 +135,6 @@ class MultiplyArray : public Array
     bool isSparse;
     InstanceID instanceId;
     size_t nInstances;
-    boost::weak_ptr<Query> _query;
     boost::shared_ptr<Array> result;
     int rangePartitionBy;
     TypeId attrType;

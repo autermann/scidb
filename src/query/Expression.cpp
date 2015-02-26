@@ -30,8 +30,10 @@
 #include <cmath>
 #include <boost/format.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 #include <cstdarg>
 
+#include "query/QueryPlanUtilites.h"
 #include "query/Expression.h"
 #include "query/LogicalExpression.h"
 #include "query/TypeSystem.h"
@@ -140,7 +142,6 @@ void Expression::compile(boost::shared_ptr<LogicalExpression> expr,
         _eargs.resize(_props.size());
         for (size_t i = 0; i < _props.size(); i++)
         {
-            assert(i == 0 || _props[i].type != TID_VOID || _eargs[i].isNull());
             // Create new value with needed type if it's not a constant
             if (!_props[i].isConst) {
                 Type const& type = TypeLibrary::getType(_props[i].type);
@@ -277,7 +278,7 @@ void Expression::compile(const string& expression, vector<string> names, vector<
     for (size_t i = 0; i < names.size(); i++) {
         addVariableInfo(names[i], types[i]);
     }
-    shared_ptr<Query> emptyQuery;
+    shared_ptr<Query> emptyQuery; //XXX tigor TODO: expressions should not read/write data and need a query context (right?)
     compile(logicalExpression, emptyQuery, false, expectedType);
 }
 
@@ -366,30 +367,6 @@ BindInfo Expression::resolveContext(const boost::shared_ptr<AttributeReference>&
     if (bind.type != TID_VOID) {
         bind.inputNo = ~0;
         return bind;
-    }
-
-    // If array name presents point is used and it's not necessary to check converting array name to value
-    if (ref->getArrayName() == "")
-    {
-        string arrayName = ref->getAttributeName();
-        ArrayDesc desc;
-        if (SystemCatalog::getInstance()->getArrayDesc(arrayName, desc, false))
-        {
-            if (!desc.isImmutable()) {
-                std::stringstream ss;
-                ss << arrayName << "@" << SystemCatalog::getInstance()->getLastVersion(desc.getId());
-                arrayName = ss.str();
-            }
-            DBArray array(arrayName, query);
-            Dimensions const& dims = desc.getDimensions();
-            Attributes const& attrs = desc.getAttributes();
-            if (dims.size() != 1 || dims[0].getLength() != 1 || attrs.size() != 1)
-                throw USER_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_CANT_CONVERT_ARRAY_TO_SCALAR);
-            bind.kind = BindInfo::BI_VALUE;
-            bind.value = array.getItemIterator(0)->getItem();
-            bind.type = attrs[0].getType();
-            return bind;
-        }
     }
 
     throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REF_NOT_FOUND, ref->getParsingContext())
@@ -690,6 +667,19 @@ void Expression::insertConverter(TypeId newType, FunctionPointer converter,
     _eargs[resultIndex] = val;
 }
 
+void Expression::toString (std::ostream &out, int indent) const
+{
+    Indent prefix(indent);
+    out << prefix(' ', false) << "[Expression] ";
+    out << "resultType " <<  TypeLibrary::getType(_resultType).name();
+    out << "\n";
+
+    for (size_t i = 0; i < _inputSchemas.size(); i++ )
+    {
+        out << prefix(' ') << "[in] "<< _inputSchemas[i] << "\n";
+    }
+    out << prefix(' ') << "[out] "<< _outputSchema << "\n";
+}
 
 const Value& Expression::evaluate(ExpressionContext& e)
 {

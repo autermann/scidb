@@ -45,6 +45,7 @@
 #include "query/Expression.h"
 #include "query/TypeSystem.h"
 
+using namespace std;
 using namespace scidb;
 
 class ExpressionTests: public CppUnit::TestFixture

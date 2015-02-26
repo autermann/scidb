@@ -58,21 +58,22 @@
 #include "query/Expression.h"
 #include "query/Query.h"
 #include "system/Config.h"
-#include "../src/system/SciDBConfigOptions.h"
-#include "../src/smgr/io/DimensionIndex.h"
-#include <util/InjectedError.h>
+#include "query/DimensionIndex.h"
+#include "util/InjectedError.h"
 #include "util/ThreadPool.h"
+#include <query/SGChunkReceiver.h>
 
 namespace scidb
 {
 
 class Query;
 class DistributionMapper;
+class SGChunkReceiver;
 
 #define PARAMETERS public: void initParameters()
 
 /*
- * Don't forget update HELP operator if some new placeholders added!
+ * Don't forget to update the 'HELP' operator when adding placeholders.
  */
 enum OperatorParamPlaceholderType
 {
@@ -94,36 +95,20 @@ enum PlaceholderArrayName
     PLACEHOLDER_ARRAY_NAME_INDEX_NAME = 2
 };
 
-#define stringify(name) #name
-
-static const char *OperatorParamPlaceholderTypeNames[] =
-{
-        stringify(PLACEHOLDER_INPUT),
-        stringify(PLACEHOLDER_ARRAY_NAME),
-        stringify(PLACEHOLDER_ATTRIBUTE_NAME),
-        stringify(PLACEHOLDER_DIMENSION_NAME),
-        stringify(PLACEHOLDER_CONSTANT),
-        stringify(PLACEHOLDER_EXPRESSION),
-        stringify(PLACEHOLDER_VARIES),
-        stringify(PLACEHOLDER_SCHEMA),
-        stringify(PLACEHOLDER_AGGREGATE_CALL),
-        stringify(PLACEHOLDER_END_OF_VARIES)
-};
-
 struct OperatorParamPlaceholder
 {
 public:
-        OperatorParamPlaceholder(
-                OperatorParamPlaceholderType placeholderType,
-                Type requiredType,
-                bool inputScheme,
-                int flags
-                ) :
-                _placeholderType(placeholderType),
-                _requiredType(requiredType),
-                _inputSchema(inputScheme),
-                _flags(flags)
-        {}
+    OperatorParamPlaceholder(
+            OperatorParamPlaceholderType placeholderType,
+            Type requiredType,
+            bool inputScheme,
+            int flags
+    ) :
+        _placeholderType(placeholderType),
+        _requiredType(requiredType),
+        _inputSchema(inputScheme),
+        _flags(flags)
+    {}
 
     virtual ~OperatorParamPlaceholder() {}
 
@@ -131,51 +116,37 @@ public:
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * each line. Terminate with newline.
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-        virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-            for ( int i = 0; i < indent; i++) {
-                str<<" ";
-            }
-            int typeIndex = 0, type = _placeholderType;
-            while ((type >>= 1) != 0) {
-                typeIndex += 1;
-            }
-            str<<"[opParamPlaceholder] "<<OperatorParamPlaceholderTypeNames[typeIndex]
-              <<" requiredType "<<_requiredType.name()<<" ischeme "<<_inputSchema<<"\n";
-        }
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
-        OperatorParamPlaceholderType getPlaceholderType() const
-        {
-            return _placeholderType;
-        }
+    OperatorParamPlaceholderType getPlaceholderType() const
+    {
+        return _placeholderType;
+    }
 
-        const Type& getRequiredType() const
-        {
-            return _requiredType;
-        }
+    const Type& getRequiredType() const
+    {
+        return _requiredType;
+    }
 
-        bool isInputSchema() const
-        {
-            return _inputSchema;
-        }
+    bool isInputSchema() const
+    {
+        return _inputSchema;
+    }
 
-        int getFlags() const
-        {
-            return _flags;
-        }
+    int getFlags() const
+    {
+        return _flags;
+    }
 
-private:
-        OperatorParamPlaceholderType _placeholderType;
-
-        Type _requiredType;
-
-        bool _inputSchema;
-
-        int _flags;
+  private:
+    OperatorParamPlaceholderType _placeholderType;
+    Type _requiredType;
+    bool _inputSchema;
+    int _flags;
 };
 
 typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamPlaceholders;
@@ -319,51 +290,53 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
 
 enum OperatorParamType
 {
-        PARAM_UNKNOWN,
-        PARAM_ARRAY_REF,
-        PARAM_ATTRIBUTE_REF,
-        PARAM_DIMENSION_REF,
-        PARAM_LOGICAL_EXPRESSION,
-        PARAM_PHYSICAL_EXPRESSION,
-        PARAM_SCHEMA,
-        PARAM_AGGREGATE_CALL,
+    PARAM_UNKNOWN,
+    PARAM_ARRAY_REF,
+    PARAM_ATTRIBUTE_REF,
+    PARAM_DIMENSION_REF,
+    PARAM_LOGICAL_EXPRESSION,
+    PARAM_PHYSICAL_EXPRESSION,
+    PARAM_SCHEMA,
+    PARAM_AGGREGATE_CALL,
     PARAM_ASTERISK
 };
 
 class OperatorParam
 {
-public:
-        OperatorParam() :
-                _paramType(PARAM_UNKNOWN)
-        {
-        }
+  public:
+    OperatorParam() :
+        _paramType(PARAM_UNKNOWN)
+    {
+    }
 
-        OperatorParam(OperatorParamType paramType, const boost::shared_ptr<ParsingContext>& parsingContext) :
-                _paramType(paramType),
-                _parsingContext(parsingContext)
-        {}
+    OperatorParam(OperatorParamType paramType,
+                  const boost::shared_ptr<ParsingContext>& parsingContext) :
+        _paramType(paramType),
+        _parsingContext(parsingContext)
+    {
+    }
 
 
-        OperatorParamType getParamType() const
-        {
-                return _paramType;
-        }
+    OperatorParamType getParamType() const
+    {
+        return _paramType;
+    }
 
-        boost::shared_ptr<ParsingContext> getParsingContext() const
-        {
-                return _parsingContext;
-        }
+    boost::shared_ptr<ParsingContext> getParsingContext() const
+    {
+        return _parsingContext;
+    }
 
-        //Must be strongly virtual for successful serialization
-        virtual ~OperatorParam()
-        {
-        }
+    //Must be strongly virtual for successful serialization
+    virtual ~OperatorParam()
+    {
+    }
 
-protected:
-        OperatorParamType _paramType;
-        boost::shared_ptr<ParsingContext> _parsingContext;
+  protected:
+    OperatorParamType _paramType;
+    boost::shared_ptr<ParsingContext> _parsingContext;
 
-public:
+  public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -371,91 +344,86 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-        virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-                for ( int i = 0; i < indent; i++)
-        {
-                str<<" ";
-        }
-        str<<"[param] type "<<_paramType<<"\n";
-        }
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 class OperatorParamReference: public OperatorParam
 {
-public:
-        OperatorParamReference() :
-                OperatorParam(),
-                _arrayName(""),
-                _objectName(""),
-                _inputNo(-1),
-                _objectNo(-1),
-                _inputScheme(false)
-        {
-        }
+  public:
+    OperatorParamReference() : OperatorParam(),
+        _arrayName(""),
+        _objectName(""),
+        _inputNo(-1),
+        _objectNo(-1),
+        _inputScheme(false)
+    {
+    }
 
-        OperatorParamReference(OperatorParamType paramType, const boost::shared_ptr<ParsingContext>& parsingContext,
-                const std::string& arrayName, const std::string& objectName, bool inputScheme):
-                OperatorParam(paramType, parsingContext),
-                _arrayName(arrayName),
-                _objectName(objectName),
-                _inputNo(-1),
-                _objectNo(-1),
-                _inputScheme(inputScheme)
-        {}
+    OperatorParamReference(
+            OperatorParamType paramType,
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::string& arrayName,
+            const std::string& objectName, bool inputScheme):
+        OperatorParam(paramType, parsingContext),
+        _arrayName(arrayName),
+        _objectName(objectName),
+        _inputNo(-1),
+        _objectNo(-1),
+        _inputScheme(inputScheme)
+    {}
 
-        const std::string& getArrayName() const
-        {
-                return _arrayName;
-        }
+    const std::string& getArrayName() const
+    {
+        return _arrayName;
+    }
 
-        const std::string& getObjectName() const
-        {
-                return _objectName;
-        }
+    const std::string& getObjectName() const
+    {
+        return _objectName;
+    }
 
-        int32_t getInputNo() const
-        {
-                return _inputNo;
-        }
+    int32_t getInputNo() const
+    {
+        return _inputNo;
+    }
 
-        int32_t getObjectNo() const
-        {
-                return _objectNo;
-        }
+    int32_t getObjectNo() const
+    {
+        return _objectNo;
+    }
 
-        void setInputNo(int32_t inputNo)
-        {
-                _inputNo = inputNo;
-        }
+    void setInputNo(int32_t inputNo)
+    {
+        _inputNo = inputNo;
+    }
 
-        void setObjectNo(int32_t objectNo)
-        {
-                _objectNo = objectNo;
-        }
+    void setObjectNo(int32_t objectNo)
+    {
+        _objectNo = objectNo;
+    }
 
-        bool isInputScheme() const
-        {
-                return _inputScheme;
-        }
+    bool isInputScheme() const
+    {
+        return _inputScheme;
+    }
 
-private:
-        std::string _arrayName;
-        std::string _objectName;
+  private:
+    std::string _arrayName;
+    std::string _objectName;
 
-        int32_t _inputNo;
-        int32_t _objectNo;
+    int32_t _inputNo;
+    int32_t _objectNo;
 
-        bool _inputScheme;
+    bool _inputScheme;
 
-public:
+  public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -468,22 +436,14 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-        virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-        str<<"object "<<_objectName
-                   <<" inputNo "<<_inputNo
-                   <<" objectNo "<<_objectNo
-                   <<" inputScheme "<<_inputScheme
-                   <<"\n";
-        }
-
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 class OperatorParamArrayReference: public OperatorParamReference
@@ -495,10 +455,11 @@ public:
         _paramType = PARAM_ARRAY_REF;
     }
 
-    OperatorParamArrayReference(const boost::shared_ptr<ParsingContext>& parsingContext,
-        const std::string& arrayName, const std::string& objectName, bool inputScheme,
-        VersionID version = 0,
-        std::string index = ""):
+    OperatorParamArrayReference(
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::string& arrayName, const std::string& objectName, bool inputScheme,
+            VersionID version = 0,
+            std::string index = ""):
         OperatorParamReference(PARAM_ARRAY_REF, parsingContext, arrayName, objectName, inputScheme),
         _version(version),
         _index(index)
@@ -517,19 +478,11 @@ public:
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * each line. Terminate with newline.
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-        str<<"[paramArrayReference] ";
-        OperatorParamReference::toString(str,indent);
-    }
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
     VersionID getVersion() const;
 
@@ -542,19 +495,26 @@ private:
 
 class OperatorParamAttributeReference: public OperatorParamReference
 {
-public:
-        OperatorParamAttributeReference() :
-                OperatorParamReference(),
+  public:
+    OperatorParamAttributeReference() :
+        OperatorParamReference(),
         _sortAscent(true)
-        {
-                _paramType = PARAM_ATTRIBUTE_REF;
-        }
+    {
+        _paramType = PARAM_ATTRIBUTE_REF;
+    }
 
-        OperatorParamAttributeReference(const boost::shared_ptr<ParsingContext>& parsingContext,
-                const std::string& arrayName, const std::string& objectName, bool inputScheme):
-                OperatorParamReference(PARAM_ATTRIBUTE_REF, parsingContext, arrayName, objectName, inputScheme),
+    OperatorParamAttributeReference(
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::string& arrayName,
+            const std::string& objectName,
+            bool inputScheme):
+        OperatorParamReference(PARAM_ATTRIBUTE_REF,
+                               parsingContext,
+                               arrayName,
+                               objectName,
+                               inputScheme),
         _sortAscent(true)
-        {}
+    {}
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -564,22 +524,14 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-        virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-                for ( int i = 0; i < indent; i++)
-        {
-                str<<" ";
-        }
-                str<<"[paramAttributeReference] ";
-                OperatorParamReference::toString(str,indent);
-        }
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
     bool getSortAscent() const
     {
@@ -591,7 +543,7 @@ public:
         _sortAscent = sortAscent;
     }
 
-private:
+  private:
     //Sort quirk
     bool _sortAscent;
 };
@@ -599,16 +551,18 @@ private:
 class OperatorParamDimensionReference: public OperatorParamReference
 {
 public:
-        OperatorParamDimensionReference() :
-                OperatorParamReference()
-        {
-                _paramType = PARAM_DIMENSION_REF;
-        }
+    OperatorParamDimensionReference() : OperatorParamReference()
+    {
+        _paramType = PARAM_DIMENSION_REF;
+    }
 
-        OperatorParamDimensionReference(const boost::shared_ptr<ParsingContext>& parsingContext,
-                const std::string& arrayName, const std::string& objectName, bool inputScheme):
-                OperatorParamReference(PARAM_DIMENSION_REF, parsingContext, arrayName, objectName, inputScheme)
-        {}
+    OperatorParamDimensionReference(
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::string& arrayName,
+            const std::string& objectName,
+            bool inputScheme):
+        OperatorParamReference(PARAM_DIMENSION_REF, parsingContext, arrayName, objectName, inputScheme)
+    {}
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -617,65 +571,57 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-        virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-                for ( int i = 0; i < indent; i++)
-        {
-                str<<" ";
-        }
-                str<<"[paramDimensionReference] ";
-                OperatorParamReference::toString(str,indent);
-        }
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 class OperatorParamLogicalExpression: public OperatorParam
 {
-public:
-        OperatorParamLogicalExpression() :
-                OperatorParam()
-        {
-                _paramType = PARAM_LOGICAL_EXPRESSION;
-        }
+  public:
+    OperatorParamLogicalExpression() : OperatorParam()
+    {
+        _paramType = PARAM_LOGICAL_EXPRESSION;
+    }
 
-        OperatorParamLogicalExpression(const boost::shared_ptr<ParsingContext>& parsingContext,
-                const boost::shared_ptr<LogicalExpression>& expression,  Type expectedType,
-                bool constant = false):
-                OperatorParam(PARAM_LOGICAL_EXPRESSION, parsingContext),
-                _expression(expression),
-                _expectedType(expectedType),
-                _constant(constant)
-                {}
+    OperatorParamLogicalExpression(
+        const boost::shared_ptr<ParsingContext>& parsingContext,
+        const boost::shared_ptr<LogicalExpression>& expression,  Type expectedType,
+        bool constant = false):
+            OperatorParam(PARAM_LOGICAL_EXPRESSION, parsingContext),
+            _expression(expression),
+            _expectedType(expectedType),
+            _constant(constant)
+    {
 
-        boost::shared_ptr<LogicalExpression> getExpression() const
-        {
-                return _expression;
-        }
+    }
 
-        const  Type& getExpectedType() const
-        {
-                return _expectedType;
-        }
+    boost::shared_ptr<LogicalExpression> getExpression() const
+    {
+        return _expression;
+    }
 
-        bool isConstant() const
-        {
-                return _constant;
-        }
+    const  Type& getExpectedType() const
+    {
+        return _expectedType;
+    }
 
-private:
-        boost::shared_ptr<LogicalExpression> _expression;
+    bool isConstant() const
+    {
+        return _constant;
+    }
 
-         Type _expectedType;
+  private:
+    boost::shared_ptr<LogicalExpression> _expression;
+    Type _expectedType;
+    bool _constant;
 
-        bool _constant;
-
-public:
+  public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -686,54 +632,45 @@ public:
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * each line. Terminate with newline.
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-        virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-                for ( int i = 0; i < indent; i++)
-        {
-                str<<" ";
-        }
-                str<<"[paramLogicalExpression] type "<<_expectedType.name()<<" const "<<_constant<<"\n";
-                _expression->toString(str, indent+1);
-        }
-
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
-class OperatorParamPhysicalExpression: public OperatorParam
+class OperatorParamPhysicalExpression : public OperatorParam
 {
 public:
-        OperatorParamPhysicalExpression() :
-                OperatorParam()
-        {
-                _paramType = PARAM_PHYSICAL_EXPRESSION;
-        }
+    OperatorParamPhysicalExpression() : OperatorParam()
+    {
+        _paramType = PARAM_PHYSICAL_EXPRESSION;
+    }
 
-        OperatorParamPhysicalExpression(const boost::shared_ptr<ParsingContext>& parsingContext,
-                const boost::shared_ptr<Expression>& expression, bool constant = false):
-                OperatorParam(PARAM_PHYSICAL_EXPRESSION, parsingContext),
-                _expression(expression),
-                _constant(constant)
-                {}
+    OperatorParamPhysicalExpression(
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const boost::shared_ptr<Expression>& expression,
+            bool constant = false):
+        OperatorParam(PARAM_PHYSICAL_EXPRESSION, parsingContext),
+        _expression(expression),
+        _constant(constant)
+    {}
 
-        boost::shared_ptr<Expression> getExpression() const
-        {
-                return _expression;
-        }
+    boost::shared_ptr<Expression> getExpression() const
+    {
+        return _expression;
+    }
 
-        bool isConstant() const
-        {
-                return _constant;
-        }
+    bool isConstant() const
+    {
+        return _constant;
+    }
 
-private:
-        boost::shared_ptr<Expression> _expression;
+  private:
+    boost::shared_ptr<Expression> _expression;
+    bool _constant;
 
-        bool _constant;
-
-public:
+  public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -743,50 +680,41 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-        {
-                for ( int i = 0; i < indent; i++)
-                {
-                        str<<" ";
-                }
-                str<<"[paramPhysicalExpression] const "<<_constant<<"\n";
-                _expression->toString(str, indent+1);
-        }
-
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 
 class OperatorParamSchema: public OperatorParam
 {
-public:
-    OperatorParamSchema() :
-        OperatorParam()
+  public:
+    OperatorParamSchema() : OperatorParam()
     {
         _paramType = PARAM_SCHEMA;
     }
 
-    OperatorParamSchema(const boost::shared_ptr<ParsingContext>& parsingContext,
-        const ArrayDesc& schema):
+    OperatorParamSchema(
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const ArrayDesc& schema):
         OperatorParam(PARAM_SCHEMA, parsingContext),
         _schema(schema)
-        {}
+    {}
 
     const ArrayDesc& getSchema() const
     {
         return _schema;
     }
 
-private:
+  private:
     ArrayDesc _schema;
 
-public:
+  public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -795,69 +723,61 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-        str<<"[paramSchema] " << _schema <<"\n";
-    }
-
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Call toString on interesting children. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 class OperatorParamAggregateCall: public OperatorParam
 {
-public:
-    OperatorParamAggregateCall() :
-        OperatorParam()
+  public:
+    OperatorParamAggregateCall() : OperatorParam()
     {
         _paramType = PARAM_AGGREGATE_CALL;
     }
 
-    OperatorParamAggregateCall(const boost::shared_ptr<ParsingContext>& parsingContext,
-                               const std::string& aggregateName,
-                               boost::shared_ptr <OperatorParam> const& inputAttribute,
-                               const std::string& alias):
+    OperatorParamAggregateCall(
+            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::string& aggregateName,
+            boost::shared_ptr <OperatorParam> const& inputAttribute,
+            const std::string& alias):
         OperatorParam(PARAM_AGGREGATE_CALL, parsingContext),
         _aggregateName(aggregateName),
         _inputAttribute(inputAttribute),
         _alias(alias)
     {}
 
-    inline std::string const& getAggregateName() const
+    std::string const& getAggregateName() const
     {
         return _aggregateName;
     }
 
-    inline boost::shared_ptr<OperatorParam> const& getInputAttribute() const
+    boost::shared_ptr<OperatorParam> const& getInputAttribute() const
     {
         return _inputAttribute;
     }
 
-    inline void setAlias(const string& alias)
+    void setAlias(const string& alias)
     {
         _alias = alias;
     }
 
-    inline std::string const& getAlias() const
+    std::string const& getAlias() const
     {
         return _alias;
     }
 
-private:
+  private:
     std::string _aggregateName;
     boost::shared_ptr <OperatorParam> _inputAttribute;
     std::string _alias;
 
-public:
+  public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -868,37 +788,14 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-        str<<"[paramAggregateCall] " << _aggregateName << "\n" ;
-
-        for ( int i = 0; i < indent+1; i++)
-        {
-            str<<" ";
-        }
-        str<<"input: ";
-        _inputAttribute->toString(str);
-
-        if (_alias.size() )
-        {
-            for ( int i = 0; i < indent+1; i++)
-            {
-                str<<" ";
-            }
-            str<<"alias "<<_alias<<"\n";
-        }
-    }
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Call toString on interesting children. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 /**
@@ -906,14 +803,15 @@ public:
  */
 class OperatorParamAsterisk: public OperatorParam
 {
-public:
-    OperatorParamAsterisk():
-        OperatorParam()
+  public:
+    OperatorParamAsterisk(): OperatorParam()
     {
         _paramType = PARAM_ASTERISK;
     }
 
-    OperatorParamAsterisk(const boost::shared_ptr<ParsingContext>& parsingContext):
+    OperatorParamAsterisk(
+            const boost::shared_ptr<ParsingContext>& parsingContext
+            ) :
         OperatorParam(PARAM_ASTERISK, parsingContext)
     {
     }
@@ -925,27 +823,20 @@ public:
     }
 
     /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-        str << "[paramAsterisk] *" << endl;
-    }
+    * Retrieve a human-readable description.
+    * Append a human-readable description of this onto str. Description takes up
+    * one or more lines. Append indent spacer characters to the beginning of
+    * each line. Call toString on interesting children. Terminate with newline.
+    * @param[out] stream to write to
+    * @param[in] indent number of spacer characters to start every line with.
+    */
+    virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
 /**
- *      This is pure virtual class for all logical operators. It provides API of logical operator.
- *      In order to add new logical operator we must inherit new class and implement all methods in it.
- *      Derived implementations are located in ops folder. See example there to know how to write new operators.
+ * This is pure virtual class for all logical operators. It provides API of logical operator.
+ * In order to add new logical operator we must inherit new class and implement all methods in it.
+ * Derived implementations are located in ops folder. See example there to know how to write new operators.
  */
 class LogicalOperator
 {
@@ -959,7 +850,7 @@ public:
         bool tile;
         bool secondPhase;
         bool noNesting;
-        Properties(): ddl(false), exclusive(false), tile(false), secondPhase(false), noNesting(false)
+        Properties() : ddl(false), exclusive(false), tile(false), secondPhase(false), noNesting(false)
         {
         }
     };
@@ -1095,33 +986,10 @@ public:
       * Append a human-readable description of this onto str. Description takes up
       * one or more lines. Append indent spacer characters to the beginning of
       * each line. Call toString on interesting children. Terminate with newline.
-      * @param[out] str buffer to write to
+      * @param[out] stream to write to
       * @param[in] indent number of spacer characters to start every line with.
       */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-
-        str<<"[lOperator] "<<_logicalName<<" ddl "<<_properties.ddl<<"\n";
-        for (size_t i = 0; i < _parameters.size(); i++)
-        {
-            _parameters[i]->toString(str, indent+1);
-        }
-
-        for ( size_t i = 0; i < _paramPlaceholders.size(); i++)
-        {
-            _paramPlaceholders[i]->toString(str,indent+1);
-        }
-
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-        str<<"schema: "<<_schema<<"\n";
-    }
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
 protected:
     Parameters _parameters;
@@ -2053,18 +1921,10 @@ class PhysicalOperator
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        //Could also call toString on the operator but gets to be too much clutter
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<" ";
-        }
-        str<<"schema "<<_schema<<"\n";
-    }
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
     virtual boost::shared_ptr< Array> execute(
             std::vector< boost::shared_ptr< Array> >&,
@@ -2310,7 +2170,8 @@ class PhysicalOperatorFactory: public BasePhysicalOperatorFactory
     }
     virtual ~PhysicalOperatorFactory() {}
 
-    boost::shared_ptr<PhysicalOperator> createPhysicalOperator(const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema)
+    boost::shared_ptr<PhysicalOperator> createPhysicalOperator(const PhysicalOperator::Parameters& parameters,
+                                                               const ArrayDesc& schema)
     {
         return boost::shared_ptr<PhysicalOperator>(new T(_logicalName, _physicalName, parameters, schema));
     }
@@ -2357,7 +2218,7 @@ InstanceID getInstanceForChunk(boost::shared_ptr<Query> query,
  * Case 2: _redimInfo.hasSynthetic is true. There is a synthetic dimension.
  * Case 3: _redimInfo.hasSynthetic is false. There is no synthetic dimension. Conflict is resolved arbitrarily.
  *
- * It is stored in the SGContext (for now, until we migrate OperatorContext to belong to the operators, not the query).
+ * RedimInfo is stored in the SGContext (for now, until we migrate OperatorContext to belong to the operators, not the query).
  */
 struct RedimInfo {
     /**
@@ -2387,63 +2248,14 @@ class SGContext : virtual public Query::OperatorContext
 {
 public:
     /**
-     * Whether each receiver should cache the empty bitmap in the SGContext.
+     * SGChunkReceiver handles chunk fragments during SG.
      */
-    bool _shouldCacheEmptyBitmap;
-
-private:
-    /**
-     * A receiver stores, for each sender, the most recent empty-bitmap chunk that was received from the particular sender.
-     * The usage is that, to process each follow-up real-attribute chunk from the same sender, the empty bitmap can be reused.
-     * The goal is to eliminate the need to embed the empty tag in the real-attribute chunks.
-     */
-    std::vector<boost::shared_ptr<MemChunk> >            _lastEmptyBitmapChunks;      // the bitmap chunks
-    std::vector<boost::shared_ptr<ConstRLEEmptyBitmap> > _lastEmptyBitmaps;           // the bitmaps acquired from the bitmap chunks
-    std::vector<boost::shared_ptr<PinBuffer> >           _lastEmptyBitmapChunkPins;   // the pins for the bitmap chunks
+    boost::shared_ptr<SGChunkReceiver> _chunkReceiver;
 
     /**
-     * The the empty bitmap's chunkPos is used only for debug purpose.
+     * RedimInfo is specific to redimension.
      */
-    std::vector<Coordinates> _lastChunkPos;
-
-public:
-
-    /**
-     * Cache a bitmap into the SGContext.
-     * @param[in]  sourceId     the sender of the bitmap chunk
-     * @param[in]  bitmapChunk
-     * @param[in]  coordinates  the coordinates of the chunk, for debug purpose -- later if the bitmap is used on the real attribute chunk, the chunk positions must match!
-     */
-    void setCachedEmptyBitmapChunk(size_t sourceId, boost::shared_ptr<MemChunk>& bitmapChunk, Coordinates const& coordinates)
-    {
-        assert(_shouldCacheEmptyBitmap);
-        assert(_lastEmptyBitmapChunks.size()>sourceId);
-
-        _lastEmptyBitmapChunkPins[sourceId] = make_shared<PinBuffer>(*bitmapChunk);
-        _lastEmptyBitmapChunks[sourceId] = bitmapChunk;
-        _lastEmptyBitmaps[sourceId] = bitmapChunk->getEmptyBitmap();
-
-        assert(_lastEmptyBitmapChunkPins[sourceId] && _lastEmptyBitmapChunks[sourceId] && _lastEmptyBitmaps[sourceId]);
-#ifndef NDEBUG
-        _lastChunkPos[sourceId] = coordinates;
-#endif
-    }
-
-    /**
-     * Retrieve a cached bitmap.
-     * @param[in]  sourceId              the sender of the bitmap chunk
-     * @param[in]  expectedCcoordinates  the coordinates of the real-attribute chunk; must match those of the bitmap chunk!
-     * @return     the bitmap
-     */
-    boost::shared_ptr<ConstRLEEmptyBitmap> getCachedEmptyBitmap(size_t sourceId, Coordinates const& expectedCoordinates)
-    {
-        assert(_shouldCacheEmptyBitmap);
-        assert(_lastEmptyBitmapChunks.size()>sourceId);
-        assert(_lastEmptyBitmapChunkPins[sourceId] && _lastEmptyBitmapChunks[sourceId] && _lastEmptyBitmaps[sourceId]);
-        assert(coordinatesCompare(_lastChunkPos[sourceId], expectedCoordinates) == 0);
-
-        return _lastEmptyBitmaps[sourceId];
-    }
+    boost::shared_ptr<RedimInfo> _redimInfo;
 
     /* Array pointer to SCATTER/GATHER result array.
     * We must keep it in context because we use it both from
@@ -2461,12 +2273,7 @@ public:
     set<Coordinates, CoordinatesLess> _newChunks;
 
     /**
-     * RedimInfo is specific to redimension.
-     */
-    boost::shared_ptr<RedimInfo> _redimInfo;
-
-    /**
-     * In some cases (shadow and NID array in INPUT) we have to perfrom SG inside SG. To prevent collision of SG messages we 
+     * In some cases (shadow and NID array in INPUT) we have to perform SG inside SG. To prevent collision of SG messages we
      * should postpone second SG till the end of first SG. It is done by associating on-completion callback for SG.
      */
     void* callbackArg; /* user provided argument for callback */
@@ -2477,49 +2284,23 @@ public:
      */
     bool _targetVersioned;
 
-    /**
-     * @param[in]  shouldCacheEmptyBitmap  true means the array has an empty bitmap, and the receiver should cache it in the SGContext
-     * @param[in]  nInstances              the number of instances
-     * @param[in]  res                     the result array
-     */
-    SGContext(bool shouldCacheEmptyBitmap, size_t nInstances, boost::shared_ptr<Array> res):
-        _shouldCacheEmptyBitmap(shouldCacheEmptyBitmap),
-        _lastEmptyBitmapChunks(shouldCacheEmptyBitmap ? nInstances : 0),
-        _lastEmptyBitmaps(shouldCacheEmptyBitmap ? nInstances : 0),
-        _lastEmptyBitmapChunkPins(shouldCacheEmptyBitmap ? nInstances : 0),
-        _lastChunkPos(shouldCacheEmptyBitmap ? nInstances : 0),
-        _resultSG(res), _aggregateList(0), onSGCompletionCallback(NULL),
+    SGContext(boost::shared_ptr<SGChunkReceiver>& chunkReceiver,
+            boost::shared_ptr<RedimInfo>& redimInfo,
+            boost::shared_ptr<Array> res,
+            std::vector<AggregatePtr> const& aggregateList)
+    :
+        _chunkReceiver(chunkReceiver),
+        _redimInfo(redimInfo),
+        _resultSG(res),
+        _aggregateList(aggregateList),
+        onSGCompletionCallback(NULL),
         _targetVersioned(res->getArrayDesc().getId() != 0 && !res->getArrayDesc().isImmutable())
-    {}
-
-    /**
-     * @param[in]  shouldCacheEmptyBitmap  true means the array has an empty bitmap, and the receiver should cache it in the SGContext
-     * @param[in]  nInstances              the number of instances
-     * @param[in]  res                     the result array
-     * @param[in]  aggList                 the list of aggregate pointers
-     * @param[in]  redimInfo               the information specific to redimension()
-     */
-    SGContext(bool shouldCacheEmptyBitmap, size_t nInstances, boost::shared_ptr< Array> res, std::vector<AggregatePtr> const& aggList, boost::shared_ptr<RedimInfo> const& redimInfo):
-        _shouldCacheEmptyBitmap(shouldCacheEmptyBitmap),
-        _lastEmptyBitmapChunks(shouldCacheEmptyBitmap ? nInstances : 0),
-        _lastEmptyBitmaps(shouldCacheEmptyBitmap ? nInstances : 0),
-        _lastEmptyBitmapChunkPins(shouldCacheEmptyBitmap ? nInstances : 0),
-        _lastChunkPos(shouldCacheEmptyBitmap ? nInstances : 0),
-        _resultSG(res), _aggregateList(aggList), _redimInfo(redimInfo), onSGCompletionCallback(NULL),
-        _targetVersioned(res->getArrayDesc().getId() != 0 && !res->getArrayDesc().isImmutable())
-    {}
-
-    virtual ~SGContext()
     {
-        _lastEmptyBitmaps.clear();
-        _lastEmptyBitmapChunks.clear();
-        _lastEmptyBitmapChunkPins.clear();
-        _redimInfo.reset();
     }
 };
 
 /**
- * This function perform repartitioning of inputArray.
+ * This function repartitions the inputArray.
  *
  * @param inputArray a pointer to local part of repartitioning array
  * @param query a query context
@@ -2550,7 +2331,7 @@ void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const
                              ArrayDesc const& inputDesc,
                              ArrayDesc& outputDesc);
 
-void syncBarrier(int barrierId, boost::shared_ptr<scidb::Query> query);
+void syncBarrier(uint64_t barrierId, boost::shared_ptr<scidb::Query> query);
 
 
 /**

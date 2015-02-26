@@ -139,10 +139,15 @@ namespace scidb
     //
     // AccumulatorArray
     //
-    AccumulatorArray::AccumulatorArray(boost::shared_ptr<Array> array) : StreamArray(array->getArrayDesc(), false), pipe(array), iterators(array->getArrayDesc().getAttributes().size())
+    AccumulatorArray::AccumulatorArray(boost::shared_ptr<Array> array,
+                                       boost::shared_ptr<Query>const& query)
+    : StreamArray(array->getArrayDesc(), false),
+      pipe(array),
+      iterators(array->getArrayDesc().getAttributes().size())
     {
+        assert(query);
+        _query=query;
     }
-
     ConstChunk const* AccumulatorArray::nextChunk(AttributeID attId, MemChunk& chunk)
     {
         if (!iterators[attId]) {
@@ -161,8 +166,8 @@ namespace scidb
         chunk.initialize(this, &desc, addr, inputChunk.getCompressionMethod());
         chunk.setBitmapChunk((Chunk*)&inputChunk);
         boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|ChunkIterator::IGNORE_EMPTY_CELLS);
-        boost::shared_ptr<Query> emptyQuery;
-        boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(emptyQuery,
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(query,
                                                                  (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0)|ChunkIterator::SEQUENTIAL_WRITE);
         bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
         src->setVectorMode(vectorMode);
@@ -185,17 +190,16 @@ namespace scidb
     //
     // Multistream array
     //
-    MultiStreamArray::MultiStreamArray(size_t n, ArrayDesc const& arr, bool emptyCheck)
+    MultiStreamArray::MultiStreamArray(size_t n, ArrayDesc const& arr,
+                                       boost::shared_ptr<Query>const& query,
+                                       bool emptyCheck)
     : StreamArray(arr, emptyCheck),
       nStreams(n),
       chunkPos(arr.getAttributes().size())
-    {}
-
-    MultiStreamArray::MultiStreamArray(MultiStreamArray const& other)
-    : StreamArray(other),
-      nStreams(other.nStreams),
-      chunkPos(other.desc.getAttributes().size())
-    {}
+    {
+        assert(query);
+        _query=query;
+    }
 
     ConstChunk const* MultiStreamArray::nextChunk(AttributeID attId, MemChunk& chunk)
     {
@@ -237,8 +241,8 @@ namespace scidb
                     if (next->isRLE() || merge->isRLE() || next->isSparse() || merge->isSparse() || attr.isNullable() || !defaultValue.isDefault(attr.getType()) || TypeLibrary::getType(attr.getType()).variableSize()) {
                         int sparseMode = next->isSparse() ? ChunkIterator::SPARSE_CHUNK : 0;
                         if (!dstIterator) {
-                           boost::shared_ptr<Query> emptyQuery;
-                           dstIterator = ((Chunk*)next)->getIterator(emptyQuery,
+                           boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+                           dstIterator = ((Chunk*)next)->getIterator(query,
                                                                      sparseMode|ChunkIterator::APPEND_CHUNK|ChunkIterator::NO_EMPTY_CHECK);
                         }
                         boost::shared_ptr<ConstChunkIterator> srcIterator = merge->getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_NULL_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS);
@@ -287,11 +291,15 @@ namespace scidb
     //
     // Merge stream
     //
-    MergeStreamArray::MergeStreamArray(ArrayDesc const& array, vector< boost::shared_ptr<Array> > input)
+    MergeStreamArray::MergeStreamArray(ArrayDesc const& array,
+                                       vector< boost::shared_ptr<Array> >& input,
+                                       boost::shared_ptr<Query>const& query)
     : StreamArray(array, false),
       inputArrays(input),
       inputIterators(array.getAttributes().size())
-    {}
+    {
+        _query=query;
+    }
 
     void MergeStreamArray::merge(boost::shared_ptr<ChunkIterator> dst, boost::shared_ptr<ConstChunkIterator> src)
     {
@@ -330,8 +338,8 @@ namespace scidb
         Address addr(attId, minPos);
         chunk.initialize(this, &desc, addr, inputChunk.getCompressionMethod());
         chunk.setBitmapChunk((Chunk*)&inputChunk);
-        boost::shared_ptr<Query> emptyQuery;
-        boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(emptyQuery,
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(query,
                                                                  ChunkIterator::NO_EMPTY_CHECK|(inputChunk.isSparse()?ChunkIterator::SPARSE_CHUNK:0));
         {
             boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_DEFAULT_VALUES);

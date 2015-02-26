@@ -26,7 +26,7 @@ set -eu
 function print_help ()
 {
 echo <<EOF "Usage: 
-  SciDBSubmitBuild.sh <source_path> <build_path> <packages_path> <platform> <test_type> <build_thread_count> <db_user> <db_passwd> <db_name> <network> <base_path> <instance_count> <username> <coordinator> [host_list]
+  SciDBSubmitBuild.sh <source_path> <build_path> <packages_path> <platform> <test_type> <build_thread_count> <db_user> <db_passwd> <db_name> <network> <base_path> <instance_count> <username> <post_install_hook> <post_start_hook> <build_tag_suffix> <coordinator> [host_list]
 
     source_path           path to SciDB source
     build_path            path to SciDB build (if source_path != build_path, then build path !!!would be recreated!!!)
@@ -41,6 +41,9 @@ echo <<EOF "Usage:
     base_path             base path (SciDB)
     instance_count        count of SciDB instance per machine
     username              linux username for access to test machines
+    post_install_hook     action for execute immediatelly after SciDB install
+    post_start_hook       action for execute immediatelly after SciDB start
+    build_tag_suffix      extra suffix for build tag
     coordinator           IP address or hostname of the coordinator
     [host_list]           IP addresses or hostnames of another test machines"
 EOF
@@ -65,7 +68,10 @@ export NETWORK="${10}"
 export BASE_PATH=${11}
 export INSTANCE_COUNT=${12}
 export USERNAME=${13}
-shift 13
+export POST_INSTALL_HOOK=${14}
+export POST_START_HOOK=${15}
+export BUILD_TAG_SUFFIX=${16}
+shift 16
 TEST_HOST_LIST=($@)
 export COORDINATOR=${TEST_HOST_LIST[0]}
 echo "Coordinator: ${COORDINATOR}"
@@ -96,15 +102,28 @@ echo "${TEST_HOST_LIST}" > ${BUILD_PATH}/host_list
 # Build/Test types
 REDUNDANCY="default"
 CHUNK_SEGMENT_SIZE="default"
+NO_WATCHDOG="false"
 TEST_TYPE=${TEST_TYPE}
 case ${TEST_TYPE} in 
-	release)
-	    BUILD_TYPE="RelWithDebInfo"
-	    ;;
-	debug)
-	    BUILD_TYPE="Debug"
-	    REDUNDANCY="1"
-	    ;;
+    release)
+	BUILD_TYPE="RelWithDebInfo"
+	;;
+    debug)
+	BUILD_TYPE="Debug"
+	REDUNDANCY="1"
+	;;
+    valgrind)
+	BUILD_TYPE="Valgrind"
+	if [ "${INSTANCE_COUNT}" != "1" ]; then
+	    echo "For build_type=Valgrind, <instance_count> must be 1"
+	    exit -1
+	fi;
+	NO_WATCHDOG="true"
+	;;
+    *) 
+	echo "TEST_TYPE should be 'release', 'debug' or 'valgrind' (you provided '${TEST_TYPE}')"
+	exit -1
+	;;
 esac
 
 # Define variables 
@@ -112,12 +131,13 @@ export TEST_TYPE
 export BUILD_TYPE
 export REDUNDANCY
 export CHUNK_SEGMENT_SIZE
+export NO_WATCHDOG
 export SCIDB_VER=`awk -F . '{print $1"."$2}' ${SOURCE_PATH}/version`
 export TEST_MODEL="Continuous"
 export TIMESTAMP=$(date +%Y.%m.%d_%H-%M-%S)
 export BUILD_REVISION=`(cd ${SOURCE_PATH} && svn info | grep Revision | awk '{ print $2 }')`
 export BRANCH_NAME=`(cd ${SOURCE_PATH} && svn info | grep '^URL:' | egrep -o '(tags|branches)/[^/]+|trunk' | egrep -o '[^/]+$')`
-export BUILD_TAG="${TIMESTAMP}-${TEST_TYPE}-${PLATFORM}-${BUILD_REVISION}" 
+export BUILD_TAG="${TIMESTAMP}-${TEST_TYPE}-${PLATFORM}-${BUILD_REVISION}${BUILD_TAG_SUFFIX}"
 
 # Path to CDash log, added as "Notes" to build
 export CDASH_LOG="/tmp/${BUILD_TAG}"

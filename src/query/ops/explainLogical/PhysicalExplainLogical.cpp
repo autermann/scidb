@@ -35,6 +35,7 @@
 #include "array/TupleArray.h"
 #include "query/QueryProcessor.h"
 #include "query/optimizer/Optimizer.h"
+#include <util/Thread.h>
 #include "SciDBAPI.h"
 
 using namespace std;
@@ -72,11 +73,14 @@ public:
         }
 
         boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
-        boost::shared_ptr<Query> innerQuery = Query::createDetached();
-        innerQuery->init(INVALID_QUERY_ID-1,
+        boost::shared_ptr<Query> innerQuery = Query::createFakeQuery(
                          query->mapLogicalToPhysical(query->getCoordinatorID()),
                          query->mapLogicalToPhysical(query->getInstanceID()),
                          query->getCoordinatorLiveness());
+
+        boost::function<void()> func = boost::bind(&Query::destroyFakeQuery, innerQuery.get());
+        Destructor<boost::function<void()> > fqd(func);
+
         innerQuery->queryString = queryString;
 
         queryProcessor->parseLogical(innerQuery, afl);

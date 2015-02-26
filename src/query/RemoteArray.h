@@ -81,7 +81,7 @@ private:
     bool proceedChunkMsg(size_t stream, AttributeID attId, MemChunk* chunk);
     void requestNextChunk(size_t stream, AttributeID attId, bool positionOnly);
 
-    RemoteMergedArray(const ArrayDesc& arrayDesc, QueryID queryId, Statistics& statistics);
+    RemoteMergedArray(const ArrayDesc& arrayDesc, const boost::shared_ptr<Query>& query, Statistics& statistics);
 
     QueryID _queryId;
     std::vector< std::vector< Semaphore > > _received;

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter remap="h1" xml:id="iqueryClient">
@@ -53,7 +52,11 @@ quit or exit   - End iquery session</programlisting></para>
     <para>You can pass an AQL query directly to <literal>iquery</literal> from
     the command line using the -q flag:<programlisting>iquery -q "<replaceable>my AQL statement</replaceable>"</programlisting></para>
 
-    <para>You can also pass a file containing an AQL query to
+    <para><indexterm>
+        <primary>iquery</primary>
+
+        <secondary>input file</secondary>
+      </indexterm>You can also pass a file containing an AQL query to
     <literal>iquery</literal> with the -f flag:<programlisting>iquery -f <replaceable>my_input_filename</replaceable></programlisting></para>
 
     <para>AQL is the default language for <literal>iquery</literal>. To switch
@@ -127,7 +130,7 @@ quit or exit   - End iquery session</programlisting></para>
           <row>
             <entry>dense</entry>
 
-            <entry>Ideal for viewing 2-dimensional matrices. Displays empty
+            <entry>Ideal for viewing 2-dimensional arrays. Displays empty
             cells as parentheses. Not recommended for very sparse
             arrays.</entry>
           </row>
@@ -135,14 +138,15 @@ quit or exit   - End iquery session</programlisting></para>
           <row>
             <entry>lcsv+</entry>
 
-            <entry>Comma-separated values with dimension indices and a boolean
-            flag attribute EmptyTag showing if a cell is empty.</entry>
+            <entry>Comma-separated values with dimension indices and a Boolean
+            flag attribute, <emphasis role="bold">EmptyTag</emphasis>, showing
+            if a cell is empty.</entry>
           </row>
 
           <row>
             <entry>lsparse</entry>
 
-            <entry>Sparse SciDB array format and a boolean flag attribute,
+            <entry>Sparse SciDB array format and a Boolean flag attribute,
             <emphasis role="bold">EmptyTag</emphasis>, showing if a cell is
             empty.</entry>
           </row>
@@ -185,8 +189,12 @@ quit or exit   - End iquery session</programlisting></para>
                 <replaceable>precision</replaceable>
               </entry>
 
-              <entry>Precision for printing floating point numbers. Default is
-              6.</entry>
+              <entry><indexterm>
+                  <primary>digits to display</primary>
+                </indexterm><indexterm>
+                  <primary>precision, digits displayed</primary>
+                </indexterm>Precision for printing floating point numbers.
+              Default is 6.</entry>
             </row>
 
             <row>
@@ -305,7 +313,11 @@ quit or exit   - End iquery session</programlisting></para>
                 <code>-V [ --version ]</code>
               </entry>
 
-              <entry>Show version information.</entry>
+              <entry><indexterm>
+                  <primary>versions</primary>
+
+                  <secondary>SciDB</secondary>
+                </indexterm>Show SciDB version information.</entry>
             </row>
 
             <row>
@@ -319,7 +331,21 @@ quit or exit   - End iquery session</programlisting></para>
         </tgroup>
       </informaltable></para>
 
-    <para>The <literal>iquery</literal> interface is case sensitive.</para>
+    <para>Note the following:<itemizedlist>
+        <listitem>
+          <para>The <literal>iquery</literal> interface is case
+          sensitive.</para>
+        </listitem>
+
+        <listitem>
+          <para><indexterm>
+              <primary>strings</primary>
+
+              <secondary>output format</secondary>
+            </indexterm>When <literal>iquery</literal> outputs string
+          attributes, the strings are wrapped in single quotes.</para>
+        </listitem>
+      </itemizedlist></para>
   </section>
 
   <section xml:id="iqueryConfiguration">
@@ -404,7 +430,7 @@ quit or exit   - End iquery session</programlisting></para>
 
             <entry>
               <para>Set the format of query output. Options are csv, csv+,
-              lcsv+, sparse, and lsparse.</para>
+              dcsv, lcsv+, sparse, and lsparse.</para>
             </entry>
           </row>
 
@@ -469,11 +495,11 @@ quit or exit   - End iquery session</programlisting></para>
       </listitem>
     </itemizedlist>
 
-    <para>The are more detailed examples on creating a SciDB array in the
-    chapter "Creating and Removing SciDB Arrays."</para>
+    <para>The are more detailed examples on creating a SciDB array in <xref
+    linkend="creatingArraysChapter"/>.</para>
 
     <para><indexterm>
-        <primary>random</primary>
+        <primary>random function</primary>
       </indexterm>The following example creates an array, generates random
     numbers and stores them in the array, and saves the array data into a
     csv-formatted file.</para>
@@ -520,8 +546,8 @@ iquery -o csv -r /tmp/random_values.csv -aq "scan(random_numbers)"
       <step>
         <para>Starting from a csv file, prepare a file to load into a SciDB
         array. Use the file <emphasis>datafile.csv</emphasis>, which is
-        contained in the <code>doc/user/examples/</code> directory of your
-        SciDB installation:<programlisting>Type,MPG
+        contained in the <code>tests/harness/testcases/data/doc</code>
+        directory of your SciDB installation:<programlisting>Type,MPG
 Truck, 23.5
 Sedan, 48.7
 SUV, 19.6
@@ -531,7 +557,9 @@ Convertible, 26.8
 
       <step>
         <para>Convert the file to SciDB format with the command
-        csv2scidb:<programlisting>csv2scidb -p SN -s 1 &lt; doc/user/examples/datafile.csv &gt; <replaceable>output_path</replaceable>/datafile.scidb</programlisting><emphasis
+        csv2scidb:<programlisting>csv2scidb -p SN -s 1
+   &lt; <replaceable>scidb_root</replaceable>/tests/harness/testcases/data/doc/datafile.csv
+   &gt; <replaceable>output_path</replaceable>/datafile.scidb</programlisting><emphasis
         role="bold">Note</emphasis>: <literal>csv2scidb</literal> is a
         separate data-preparation utility provided with SciDB. To see all
         options available for csv2scidb, type <literal>csv2scidb
@@ -540,10 +568,12 @@ Convertible, 26.8
 
       <step>
         <para>Use the load command to load the SciDB-formatted file that you
-        just created into <literal>target</literal>:<programlisting>iquery -aq "load(target, '<replaceable>output_path</replaceable>/datafile.scidb')"
-[("Truck",23.5),("Sedan",48.7),
-("SUV",19.6),("Convertible",26.8)]
-</programlisting>You will need to use the full pathname for
+        just created into <literal>target</literal>:<programlisting>iquery -o csv aq "load(target, '<replaceable>output_path</replaceable>/datafile.scidb')"</programlisting><screen>type,mpg
+'Truck',23.5
+'Sedan',48.7
+'SUV',19.6
+'Convertible',26.8
+</screen>You will need to use the full pathname for
         <replaceable>output_path</replaceable>. For example, if the file
         <code>datafile.scidb</code> is located in
         <code>/home/username/files</code>, you should use the string
@@ -560,8 +590,8 @@ Convertible, 26.8
       <step>
         <para>Now, suppose that you want to convert miles per gallon to
         kilometers per liter. Use the apply operator to perform a calculation
-        on the <literal>mpg</literal> attribute values:<programlisting>iquery -aq "apply(target,kpl,mpg*.4251)"</programlisting><screen> [("Truck",23.5,9.98985),("Sedan",48.7,20.7024),
- ("SUV",19.6,8.33196),("Convertible",26.8,11.3927)]
+        on the <literal>mpg</literal> attribute values:<programlisting>iquery -aq "apply(target,kpl,mpg*.4251)"</programlisting><screen> [('Truck',23.5,9.98985),('Sedan',48.7,20.7024),
+ ('SUV',19.6,8.33196),('Convertible',26.8,11.3927)]
 </screen>Note that this does not update <literal>target</literal>. Instead,
         SciDB creates an result array with the new calculated attribute
         <literal>kpl</literal>. To create an array containing the kpl
@@ -577,7 +607,8 @@ Gerrd, SUV,42000
 Maudi,Convertible,45000
 </programlisting>You want to add the data on <literal>price</literal> and
         <literal>make</literal> to your array. Use csv2scidb to convert the
-        file to SciDB data format:<programlisting>csv2scidb -p SSN -s 1 &lt; doc/user/examples/datafile_price.csv &gt; <replaceable>output_path</replaceable>/datafile_price.scidb</programlisting>Create
+        file to SciDB data format:<programlisting>csv2scidb -p SSN -s 1 &lt; <replaceable>scidb_root</replaceable>/tests/harness/testcases/data/doc/datafile_price.csv
+    &gt; <replaceable>output_path</replaceable>/datafile_price.scidb</programlisting>Create
         an array called storage:<programlisting>iquery -aq "create array storage&lt;make:string, type:string, price:int64&gt; [x=0:*,1,0]"</programlisting>Load
         the <literal>datafile_price.scidb</literal> file into
         storage:<programlisting>iquery -naq "load(storage, '/tmp/datafile_price.scidb')"</programlisting></para>
@@ -587,13 +618,14 @@ Maudi,Convertible,45000
         <para>Now, you want to combine the data in these two files so that
         each entry has a make and model, a price, an mpg, and a kpl. You can
         join the arrays with the <literal>join</literal>
-        operator:<programlisting>iquery -aq "join(storage,target_new)"
-[("Handa","Truck",26700,"Truck",23.5,9.98985),
-("Tolona","Sedan",31000,"Sedan",48.7,20.7024),
-("Gerrd"," SUV",42000,"SUV",19.6,8.33196),
-("Maudi","Convertible",45000,"Convertible",26.8,11.3927)]</programlisting>Note
-        that attributes 2 and 4 are identical. Before you store the combined
-        data in an array, you want to get rid of duplicated data.</para>
+        operator:<programlisting>iquery -o csv -aq "join(storage,target_new)"</programlisting><screen>make,type,price,type,mpg,kpl
+'Handa','Truck',26700,'Truck',23.5,9.98985
+'Tolona','Sedan',31000,'Sedan',48.7,20.7024
+'Gerrd',' SUV',42000,'SUV',19.6,8.33196
+'Maudi','Convertible',45000,'Convertible',26.8,11.3927
+</screen>Note that attributes 2 and 4 are identical. Before you store the
+        combined data in an array, you want to get rid of duplicated
+        data.</para>
       </step>
 
       <step>
@@ -606,13 +638,12 @@ Maudi,Convertible,45000
       <step>
         <para>Use the <literal>join</literal> and <literal>project</literal>
         operators to put the car data together. Use csv as the query output
-        format:<programlisting>iquery -o csv -aq "join(storage,project(target_new,mpg,kpl))"
-make,type,price,mpg,kpl
-"Handa","Truck",26700,23.5,9.98985
-"Tolona","Sedan",31000,48.7,20.7024
-"Gerrd"," SUV",42000,19.6,8.33196
-"Maudi","Convertible",45000,26.8,11.3927
-</programlisting></para>
+        format:<programlisting>iquery -o csv -aq "join(storage,project(target_new,mpg,kpl))"</programlisting><screen>make,type,price,mpg,kpl
+'Handa','Truck',26700,23.5,9.98985
+'Tolona','Sedan',31000,48.7,20.7024
+'Gerrd',' SUV',42000,19.6,8.33196
+'Maudi','Convertible',45000,26.8,11.3927
+</screen></para>
       </step>
     </procedure>
   </section>
@@ -652,5 +683,11 @@ rename      select       set
 then        true         unload
 update      variable     when
 where       window</screen></para>
+
+    <para>To avoid possible errors, we recommend that you avoid using
+    <emphasis role="bold">all </emphasis>of the reserved words as
+    identifiers—no matter which language you use. Some SciDB utilities may use
+    both AQL and AFL, "under the covers." Thus, any AQL or AFL reserved word
+    identifier could cause errors.</para>
   </section>
 </chapter>

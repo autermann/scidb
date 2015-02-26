@@ -34,12 +34,13 @@ BUILD_RESULT='/tmp/scidb_build'
 USE_SUDO = True
 
 class Col():
-    grey =   '\033[90m'
-    red =    '\033[91m'
-    green =  '\033[92m'
-    yellow = '\033[93m'
-    blue =   '\033[94m'
-    white =   '\033[97m'
+    grey =   '\033[90;1m'
+    red =    '\033[91;1m'
+    green =  '\033[92;1m'
+    yellow = '\033[93;1m'
+    blue =   '\033[94;1m'
+    white =  '\033[97;1m'
+    reset =  '\033[0m'
 
     @staticmethod
     def disable():
@@ -51,13 +52,16 @@ class Col():
         Col.white = ''
 
 def info(str):
-    print(Col.green + str + Col.white)
+    sys.stdout.write(Col.green + str + Col.reset + "\n")
+    sys.stdout.flush()
 
 def warn(str):
-    print(Col.yellow + str + Col.white)
+    sys.stdout.write(Col.yellow + str + Col.reset)
+    sys.stdout.flush()
 
 def err(str):
-    print(Col.red + str + Col.white)
+    sys.stderr.write(Col.red + str + Col.reset)
+    sys.stderr.flush()
     exit(1)
 
 def which(program):
@@ -83,6 +87,22 @@ def RunAndWait(arguments):
 def RunSudoAndWait(arguments):
     sudoargs = ['sudo'] + arguments if USE_SUDO else arguments
     return RunAndWait(sudoargs)
+
+class TailFileToStdout(object):
+    def __init__(self, filepath):
+        # read data from filepath and print to stdout
+        self.tail = subprocess.Popen(["tail", "-F", filepath], stderr=subprocess.PIPE)
+        # read stderr from tail, skip first line, print to stderr
+        # (supress "can't read filepath' message
+        self.stderr = subprocess.Popen(["tail", "-n+2"], stdout=sys.stderr, stdin=self.tail.stderr)
+
+    def stop(self):
+        # kill 'tail -F'
+        self.tail.kill()
+        # close 'tail -F' process
+        self.tail.wait()
+        # close 'tail -F' stderr filter process
+        self.stderr.wait()
 
 class UbuntuChroot():
     distroname = 'ubuntu'
@@ -129,6 +149,7 @@ class UbuntuChroot():
         info("Done. %s was updated" % self.tgz)
 
     def build(self, sources, jobs, buildresult):
+        logfile = os.path.join(buildresult, "build.log")
         pbargs = ['pbuilder', '--build',
             '--basetgz', self.tgz,
             '--distribution', self.release,
@@ -138,11 +159,11 @@ class UbuntuChroot():
             '--buildresult', buildresult,
             '--debbuildopts', '-j%i'%jobs,
             '--override-config',
-            '--logfile', self.logfile,
+            '--logfile', logfile,
             sources]
         info("Building %s in %s" % (sources, self.tgz))
         if RunSudoAndWait(pbargs):
-            err("pbuilder returned error. See log %s for details." % self.logfile)
+            err("pbuilder returned error. See log %s for details." % logfile)
         info("Done. Result stored in %s" % buildresult)
 
     def login(self):
@@ -188,14 +209,21 @@ class CentOSChroot():
         info("Done")
 
     def build(self, sources, jobs, buildresult):
+        build_log = os.path.join(buildresult, "build.log") 
+        root_log = os.path.join(buildresult, "root.log")
+        tail = TailFileToStdout(build_log)
         mockargs = ['mock', '--rebuild',
             '--root', self.chroot,
             '--arch', self.arch,
             '--resultdir', buildresult,
             sources]
         info("Building %s in %s" % (sources, self.chroot))
-        if RunSudoAndWait(mockargs):
-            err("mock returned error. See log %s for details." % (buildresult+'/root.log'))
+        try:
+            if RunSudoAndWait(mockargs):
+                message = "mock returned error. See logs %s, %s for details."
+                err(message % (root_log, build_log))
+        finally:
+            tail.stop()
         info("Done. Result stored in %s" % buildresult)
 
     def login(self):

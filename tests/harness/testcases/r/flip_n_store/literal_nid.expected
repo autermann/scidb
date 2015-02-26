@@ -49,11 +49,11 @@ SCIDB QUERY : <redimension(apply(build(<a:double>[x=0:5,3,0,y=0:5,3,0],'[[(0),(1
 
 SCIDB QUERY : <show(AAA)>
 {i} schema
-{0} "AAA<count:uint64 NULL DEFAULT null> [even_or_odd=0:1,2,0]"
+{0} 'AAA<count:uint64 NULL DEFAULT null> [even_or_odd=0:1,2,0]'
 
 SCIDB QUERY : <show(ZZZ)>
 {i} schema
-{0} "ZZZ<a:double,even_or_odd:int64> [x=0:5,3,0,y=0:5,3,0]"
+{0} 'ZZZ<a:double,even_or_odd:int64> [x=0:5,3,0,y=0:5,3,0]'
 
 SCIDB QUERY : <redimension(ZZZ,AAA, count(a) as count)>
 {even_or_odd} count

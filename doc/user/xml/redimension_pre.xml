@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
@@ -27,7 +26,7 @@
   <refsynopsisdiv>
     <synopsis>AFL% redimension(<replaceable>source_array</replaceable>,<replaceable>
                  template_array</replaceable>|<replaceable>schema_definition
-                 </replaceable><optional>, <replaceable>aggregate </replaceable>(source_attribute) 
+                 </replaceable><optional>, <replaceable>aggregate_call_n </replaceable>(source_attribute) 
                             [as result_attribute]</optional>...)</synopsis>
   </refsynopsisdiv>
 
@@ -95,6 +94,8 @@
 
     <para><indexterm>
         <primary>collisions</primary>
+      </indexterm><indexterm>
+        <primary>cell collisions</primary>
       </indexterm>If the redimension operator produces a collision at a cell
     location, SciDB will produce a single cell from all of the candidate
     cells. The attributes of that cell in the target array will be populated
@@ -141,6 +142,35 @@
         accommodate aggregate values.</para>
       </listitem>
     </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>redimension</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">source_array</emphasis>: a source array
+          with one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">template_array |
+          schema_definition</emphasis>: an array or schema from which the
+          output attributes and dimensions can be acquired. All the dimensions
+          in the target must exist either in the source array attributes or
+          dimensions, with one exception. One new, synthetic dimension is
+          allowed. All the target attributes (other than those that are the
+          results of aggregate calls) must exist either in the source array
+          attributes or dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">aggregate_call</emphasis>_<replaceable>n</replaceable>:
+          Zero or more aggregate calls.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>
@@ -217,7 +247,7 @@
       <para>This example redimensions a raw 1-dimensional array into a
       2-dimensional array by transforming two of the attributes into
       dimensions. This example uses the data set in the file raw.csv shown
-      here: <programlisting language="test">--shell --command=cat '../examples/raw.csv'
+      here: <programlisting language="test">--shell --command=cat $DOC_DATA/raw.csv
  --show-query=no
  --show-output=yes
 </programlisting></para>
@@ -237,14 +267,14 @@
           your iquery session or do this in a new terminal window because the
           csv2scidb tool is run at the command line.<programlisting
           language="test">--shell --command=csv2scidb -p NNN -s 1 
-          &lt; ../examples/raw.csv &gt; 
-            ../examples/raw.scidb
+          &lt; $DOC_DATA/raw.csv &gt; 
+            $DOC_DATA/raw.scidb
  --show-query=yes
  --show-output=no</programlisting></para>
         </step>
 
         <step>
-          <para>Load the data:<programlisting language="test">--aql LOAD raw FROM '../examples/raw.scidb';
+          <para>Load the data:<programlisting language="test">--aql LOAD raw FROM '../tests/harness/testcases/data/doc/raw.scidb';
  --show-query=yes
  --show-output=yes
 </programlisting></para>

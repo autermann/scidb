@@ -2,11 +2,11 @@
 --test
 --start-query-logging
 
---shell  --command="cat ../examples/expo_example.txt " --store
+--shell  --command="cat $DOC_DATA/expo_example.txt " --store
 --set-format dcsv
 --start-igdata
 CREATE ARRAY device_probe <d:string, p:string, val:double> [i=1:25,5,0]  
-load(device_probe, '../examples/expo_example.scidb')  
+load(device_probe, '../tests/harness/testcases/data/doc/expo_example.scidb')  
 create array two_dim<val:double>[d(string)=5,5,0, p(string)=5,5,0]  
 --set-format dense
 --stop-igdata
@@ -18,7 +18,7 @@ CREATE ARRAY redim_missing< val1:string,val2:string NULL,val3:double >[i=0:9,10,
 --stop-igdata
 show(redim_missing)
 --start-igdata
-load(redim_missing, '../examples/redim_missing.scidb')  
+load(redim_missing, '../tests/harness/testcases/data/doc/redim_missing.scidb')  
 --stop-igdata
 scan(redim_missing)  
 --start-igdata
@@ -37,7 +37,7 @@ scan(m4x4)
 show(m4x4)
 --start-igdata
 CREATE ARRAY m3x3 < val:double >[i=0:2,3,0,j=0:2,3,0]  
-load(m3x3, '../examples/m3x3.txt')  
+load(m3x3, '../tests/harness/testcases/data/doc/m3x3.txt')  
 --set-format dense
 --stop-igdata
 --aql SELECT * INTO m1 FROM unpack(m3x3,k)  
@@ -106,7 +106,7 @@ show(chunks_part)
 --aql SELECT * INTO chunks_overlap FROM repart(chunks,<val1:double,val2:double> [i=0:999,100,10,j=0:999,100,10])  
 CREATE ARRAY Dsp_raw<d: string, t: string, val: double >[i=1:25,5,0]  
 CREATE ARRAY Dsp<val: double>[d(string)=5,5,0,t(string)=5,5,0]  
-load(Dsp_raw, '../examples/expo_example.scidb')  
+load(Dsp_raw, '../tests/harness/testcases/data/doc/expo_example.scidb')  
 redimension_store(Dsp_raw, Dsp)  
 --stop-igdata
 scan(Dsp) 

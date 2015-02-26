@@ -33,7 +33,7 @@ SCIDB QUERY : <redimension_store(A_derivative,NID)>
 
 SCIDB QUERY : <show(NID)>
 {i} schema
-{0} "NID<x:int64> [a1(double)=6,3,0,a2(double)=6,3,0,a3(double)=6,3,0]"
+{0} 'NID<x:int64> [a1(double)=6,3,0,a2(double)=6,3,0,a3(double)=6,3,0]'
 
 SCIDB QUERY : <scan(NID)>
 {a1,a2,a3} x
@@ -145,7 +145,7 @@ SCIDB QUERY : <store(subarray(NID,16.2,92.664,46.332,81,463.32,231.66),AAA)>
 
 SCIDB QUERY : <show(AAA)>
 {i} schema
-{0} "AAA<x:int64> [a1(double)=5,3,0,a2(double)=4,3,0,a3(double)=4,3,0]"
+{0} 'AAA<x:int64> [a1(double)=5,3,0,a2(double)=4,3,0,a3(double)=4,3,0]'
 
 SCIDB QUERY : <merge(NID,AAA)>
 [An error expected at this place for the query "merge(NID,AAA)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_NOT_IMPLEMENTED. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_NOT_IMPLEMENTED.]

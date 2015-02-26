@@ -51,8 +51,8 @@ namespace scidb
  * @par Input:
  *   - srcArray: the source array to save from.
  *   - file: the file to save to.
- *   - instanceId: which instance
- *   - format: what format.
+ *   - instanceId: positive number means an instance ID on which file will be saved. -1 means to save file on every instance. -2 - on coordinator.
+ *   - format: format in which file will be stored. Possible values are 'store', 'lcsv+', 'lsparse', 'dcsv', 'opaque', '(<custom plugin>)'
  *
  * @par Output array:
  *   the srcArray is returned

@@ -68,6 +68,7 @@ void RowCollection<Group,Hash>::getChunkIterators(vector<boost::shared_ptr<Chunk
     if (isLastChunkFull(rowId)) {
         int chunkMode = ChunkIterator::SEQUENTIAL_WRITE;
         for (size_t i=0; i<_attributes.size(); ++i) {
+            ScopedMutexLock lock(_mutexArrayIterators);
             Chunk& chunk = _arrayIterators[i]->newChunk(chunkPos, 0);
             chunkIterators[i] = chunk.getIterator(_query, chunkMode);
             chunkMode |= ChunkIterator::NO_EMPTY_CHECK;
@@ -79,12 +80,27 @@ void RowCollection<Group,Hash>::getChunkIterators(vector<boost::shared_ptr<Chunk
         itemPos[1] = _counts[rowId];
         int chunkMode = ChunkIterator::APPEND_CHUNK;
         for (size_t i=0; i<_attributes.size(); ++i) {
+            ScopedMutexLock lock(_mutexArrayIterators);
             _arrayIterators[i]->setPosition(chunkPos);
             Chunk& chunk = _arrayIterators[i]->updateChunk();
             chunkIterators[i] = chunk.getIterator(_query, chunkMode);
             chunkMode |= ChunkIterator::NO_EMPTY_CHECK; // no empty check except for attribute 0
             chunkIterators[i]->setPosition(itemPos);
         }
+    }
+}
+
+template<class Group, class Hash>
+void RowCollection<Group,Hash>::getConstChunkIterators(
+        vector<boost::shared_ptr<ConstChunkIterator> >& chunkIterators,
+        Coordinates const& chunkPos) {
+    assert( _attributes.size() == chunkIterators.size() );
+
+    for (size_t i=0; i<_attributes.size(); ++i) {
+        ScopedMutexLock lock(_mutexArrayIterators);
+        _arrayIterators[i]->setPosition(chunkPos);
+        const ConstChunk& chunk = _arrayIterators[i]->getChunk(); // getChunk() does not pin it
+        chunkIterators[i] = chunk.getConstIterator();
     }
 }
 
@@ -163,7 +179,7 @@ RowCollection<Group,Hash>::RowCollection(boost::shared_ptr<Query> const& query, 
     ArrayDesc schema(name, attributesWithET, dims, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY);
 
     // create a MemArray
-    _theArray = make_shared<MemArray>(schema);
+    _theArray = make_shared<MemArray>(schema,query);
 
     // get the array iterators
     _arrayIterators.reserve(attributes.size());
@@ -210,6 +226,8 @@ void RowCollection<Group,Hash>::appendItem(size_t& rowId, const Group& group, co
 
     if (_sizeBuffered > _maxSizeBuffered) {
         flushBuffer();
+    } else if ((_sizeBuffered % _chunkSize) == 0) {
+        _query->validate();
     }
 }
 

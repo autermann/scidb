@@ -1,4 +1,4 @@
---setup
+--setup 
 --start-query-logging
 create array a1 <val1:double> [x=0:3,2,0,y=0:3,2,0]
 store(build(a1,x+y+2.5),a1)

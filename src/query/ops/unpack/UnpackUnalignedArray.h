@@ -45,7 +45,8 @@ class UnpackUnalignedChunk;
 class UnpackUnalignedChunkIterator;
 
 class UnpackUnalignedChunkIterator : public ConstChunkIterator
-{  
+{
+ private:
     UnpackUnalignedArray const& array;
     UnpackUnalignedChunk& chunk;
     Coordinates outPos;
@@ -58,6 +59,7 @@ class UnpackUnalignedChunkIterator : public ConstChunkIterator
     bool hasCurrent;
     AttributeID attrID;
     Value _value;
+    boost::shared_ptr<Query> _query;
 
   public:
     virtual int    getMode();
@@ -69,7 +71,7 @@ class UnpackUnalignedChunkIterator : public ConstChunkIterator
     virtual bool   isEmpty();
     virtual bool   end();
     virtual ConstChunk const& getChunk();
-
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
 
     UnpackUnalignedChunkIterator(UnpackUnalignedArray const& array, UnpackUnalignedChunk& chunk, int iterationMode);
 };
@@ -114,7 +116,6 @@ class UnpackUnalignedArray : public DelegateArray
     friend class UnpackUnalignedArrayIterator;
 
     Dimensions dims;
-    boost::weak_ptr<Query> _query;
 
     Coordinate in2out(Coordinates const& inPos) const;
     void out2in(Coordinate outPos, Coordinates& inPos) const;

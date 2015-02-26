@@ -57,6 +57,7 @@ install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libgroupstars${CMAKE_SHARED_L
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libdense_linear_algebra${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libexample_udos${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 if (TARGET mpi_slave_scidb)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/mpi_slave_scidb" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 endif ()

@@ -137,5 +137,12 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
  set(CONFIGURE_DISABLE_TESTS_NOT_DEBUG "injecterror")
 endif(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 
+if(CMAKE_BUILD_TYPE STREQUAL "Valgrind")
+ # enable after fix #3191
+ set(CONFIGURE_DISABLE_TESTS_VALGRIND "docscript.avg_rank")
+else(CMAKE_BUILD_TYPE STREQUAL "Valgrind")
+ set(CONFIGURE_DISABLE_TESTS_VALGRIND "z_valgrind.z_valgrind")
+endif(CMAKE_BUILD_TYPE STREQUAL "Valgrind")
+
 configure_file(${DISABLE_TESTS_IN} ${DISABLE_TESTS})
 configure_file(${DISABLE_TESTS_1I_IN} ${DISABLE_TESTS_1I})

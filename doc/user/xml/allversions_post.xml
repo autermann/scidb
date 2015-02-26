@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="allversionsOperator">
   <refnamediv>
     <refname>allversions</refname>
 
@@ -10,7 +10,11 @@
         <secondary>arrays</secondary>
       </indexterm><indexterm>
         <primary>allversions</primary>
-      </indexterm>Return a result array containing all versions of an existing
+      </indexterm><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>VersionNo</secondary>
+      </indexterm>Returns a result array containing all versions of the stored
     array.</refpurpose>
   </refnamediv>
 
@@ -23,8 +27,9 @@
 
     <para>The allversions operator takes all versions of an array and returns
     a result array that combines all versions of
-    <replaceable>named_arrary</replaceable> into one array. The resulting
-    array has a dimension called VersionNo that has indices
+    <replaceable>named_arrary</replaceable> into one array.</para>
+
+    <para>The resulting array has a dimension called <emphasis role="bold">VersionNo</emphasis> that has indices
     1–<replaceable>final_array_version</replaceable> appended to the left-most
     dimension. The argument <replaceable>named_array</replaceable> must be an
     array that was previously created and stored in the SciDB
@@ -36,7 +41,7 @@
 
     <informalexample>
       <para>This example creates a 3<symbol role="symbolfont">×</symbol>3
-      matrix, updates it, and then uses allversions to combine all previous
+      array, updates it, and then uses allversions to combine all previous
       versions of the array.</para>
 
       <procedure>
@@ -65,8 +70,8 @@
         </step>
 
         <step>
-          <para>Use allversions in a store statement to store an array
-          containing all three versions of m3x3:<para><programlisting>AFL% store(allversions(m3x3),m3x3_versions);  </programlisting><screen>[
+          <para>Use allversions to return all three versions of
+          m3x3:<para><programlisting>AFL% allversions(m3x3);  </programlisting><screen>[
 [
 [(0),(0),(0)],
 [(0),(0),(0)],
@@ -82,10 +87,13 @@
 [(200),(200),(200)],
 [(200),(200),(200)]
 ]
-]</screen>
-          The array m3x3_versions has the following schema: <para><screen>{i} schema
-{0} "m3x3_versions&lt;val:double&gt; [VersionNo=1:3,1,0,i=0:2,3,0,j=0:2,3,0]"
-</screen></para></para></para>
+]</screen></para></para>
+        </step>
+
+        <step>
+          <para>View the schema for the result array.<para><programlisting>AFL% show('allversions(m3x3)','afl');</programlisting><screen>{i} schema
+{0} 'm3x3&lt;val:double&gt; [VersionNo=1:3,1,0,i=0:2,3,0,j=0:2,3,0]'
+</screen></para></para>
         </step>
       </procedure>
     </informalexample>

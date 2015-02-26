@@ -37,6 +37,7 @@
 #include <iostream>
 #include <iomanip>
 
+#include "query/QueryPlanUtilites.h"
 #include "query/optimizer/Optimizer.h"
 #include "query/optimizer/HabilisOptimizer.h"
 #include "system/SystemCatalog.h"
@@ -108,11 +109,16 @@ PhysPlanPtr HabilisOptimizer::optimize(const boost::shared_ptr<Query>& query,
 
         if (isFeatureEnabled(CONDENSE_SG))
         {
+            LOG4CXX_TRACE(logger, "CONDENSE_SG: begin");
+
             tw_collapseSgNodes(_root);
+
             while (tw_pushupJoinSgs(_root))
             {
                 tw_collapseSgNodes(_root);
             }
+
+            LOG4CXX_TRACE(logger, "CONDENSE_SG: end");
         }
 
         if (isFeatureEnabled(INSERT_MATERIALIZATION))
@@ -133,24 +139,38 @@ PhysPlanPtr HabilisOptimizer::optimize(const boost::shared_ptr<Query>& query,
     return result;
 }
 
-void HabilisOptimizer::dbg_printPlan()
+void HabilisOptimizer::printPlan(PhysNodePtr node, bool children)
 {
-    PhysPlanPtr plan(new PhysicalPlan(_root));
-    std::ostringstream out;
-    plan->toString(out);
-    std::cout << out.str() << "\n";
+    if (!node) {
+        node = _root;
+    }
+    scidb::printPlan(node, 0, children);
 }
 
-void HabilisOptimizer::dbg_logPlan()
+void HabilisOptimizer::logPlanDebug(PhysNodePtr node, bool children)
 {
-    PhysPlanPtr plan(new PhysicalPlan(_root));
-    std::ostringstream out;
-    plan->toString(out);
-    LOG4CXX_DEBUG(logger, out.str().c_str())
+    if (!node) {
+        node = _root;
+    }
+    scidb::logPlanDebug(logger, node, 0, children);
+}
+
+void HabilisOptimizer::logPlanTrace(PhysNodePtr node, bool children)
+{
+    if (!node) {
+        node = _root;
+    }
+    scidb::logPlanTrace(logger, node, 0, children);
 }
 
 void HabilisOptimizer::n_addParentNode(PhysNodePtr target, PhysNodePtr nodeToInsert)
 {
+    LOG4CXX_TRACE(logger, "[n_addParentNode] begin");
+    LOG4CXX_TRACE(logger, "[n_addParentNode] node to insert:");
+    logPlanTrace(nodeToInsert, false);
+    LOG4CXX_TRACE(logger, "[n_addParentNode] target tree:");
+    logPlanTrace(target);
+
     if (target->hasParent())
     {
         PhysNodePtr parent = target->getParent();
@@ -165,10 +185,16 @@ void HabilisOptimizer::n_addParentNode(PhysNodePtr target, PhysNodePtr nodeToIns
 
     target->setParent(nodeToInsert);
     nodeToInsert->addChild(target);
+
+    LOG4CXX_TRACE(logger, "[n_addParentNode] done");
+    logPlanTrace();
+    LOG4CXX_TRACE(logger, "[n_addParentNode] end");
 }
 
 void HabilisOptimizer::n_cutOutNode(PhysNodePtr nodeToRemove)
 {
+    LOG4CXX_TRACE(logger, "[n_cutOutNode] begin");
+    logPlanTrace(nodeToRemove, false);
     vector<PhysNodePtr> children = nodeToRemove->getChildren();
     assert(children.size()<=1);
 
@@ -201,6 +227,9 @@ void HabilisOptimizer::n_cutOutNode(PhysNodePtr nodeToRemove)
             _root.reset();
         }
     }
+    LOG4CXX_TRACE(logger, "[n_cutOutNode] done");
+    logPlanTrace();
+    LOG4CXX_TRACE(logger, "[n_cutOutNode] end");
 }
 
 boost::shared_ptr<OperatorParam> HabilisOptimizer::n_createPhysicalParameter(const boost::shared_ptr<OperatorParam> & logicalParameter,
@@ -495,20 +524,34 @@ static PhysNodePtr s_findThinPoint(PhysNodePtr root)
 }
 
 static ArrayDistribution s_propagateDistribution(PhysNodePtr node,
-                                                 PhysNodePtr end = PhysNodePtr())
+                                                 PhysNodePtr end)
 {
+    SCIDB_ASSERT(node);
+    SCIDB_ASSERT(end);
+    LOG4CXX_TRACE(logger, "[s_propagateDistribution] begin");
+    logPlanTrace(logger, node, 0 , false);
+    LOG4CXX_TRACE(logger, "[s_propagateDistribution] propogation: begin");
     ArrayDistribution dist;
     do
     {
         dist = node->inferDistribution();
-        node = node->getParent();
-    } while (node && node != end && node->getChildren().size() <= 1);
+        if (node == end) {
+            break;
+        } else {
+            node = node->getParent();
+        }
+    } while (node->getChildren().size() <= 1);
+
+    LOG4CXX_TRACE(logger, "[s_propagateDistribution] propogation: end");
+    logPlanTrace(logger, node, 0 , false);
+    LOG4CXX_TRACE(logger, "[s_propagateDistribution] end");
 
     return dist;
 }
 
 void HabilisOptimizer::tw_insertSgNodes(PhysNodePtr root)
 {
+    LOG4CXX_TRACE(logger, "[tw_insertSgNodes]");
     assert(_root.get() != NULL);
 
     for (size_t i = 0; i < root->getChildren().size(); i ++)
@@ -818,6 +861,8 @@ void HabilisOptimizer::cw_rectifyChainDistro(PhysNodePtr root,
 
 void HabilisOptimizer::tw_collapseSgNodes(PhysNodePtr root)
 {
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] begin");
+
     bool topChain = (root == _root);
 
     PhysNodePtr chainBottom = s_getChainBottom(root);
@@ -827,8 +872,18 @@ void HabilisOptimizer::tw_collapseSgNodes(PhysNodePtr root)
     ArrayDistribution runningDistribution = curNode->getDistribution();
     ArrayDistribution chainOutputDistribution = root->getDistribution();
 
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] cycle: begin");
     do
     {
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] cycle iteration: begin");
+        logPlanTrace(root);
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] chainBottom:");
+        logPlanTrace(chainBottom, false);
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode:");
+        logPlanTrace(curNode, false);
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] sgCandidate:");
+        logPlanTrace(sgCandidate, false);
+
         runningDistribution = curNode->inferDistribution();
 
         if (curNode->isSgNode() == false &&
@@ -836,27 +891,34 @@ void HabilisOptimizer::tw_collapseSgNodes(PhysNodePtr root)
               curNode->outputFullChunks() == false ||
               curNode->getDataWidth() < sgCandidate->getDataWidth()))
         {
+            LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] sgCandidate switched to curNode");
             sgCandidate = curNode;
         }
-
         if (curNode->hasParent() &&
             curNode->getParent()->getChildren().size() == 1 &&
             curNode->getParent()->needsSpecificDistribution())
         {
+            LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode has parent and single child; need specific distribution");
             ArrayDesc curSchema =  curNode->getPhysicalOperator()->getSchema();
             ArrayDistribution neededDistribution = curNode->getParent()->getDistributionRequirement().getSpecificRequirements()[0];
             if (runningDistribution != neededDistribution)
             {
+                LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode and required for parent distributions are different");
                 if (curNode->isSgNode() && runningDistribution.getPartitioningSchema() == neededDistribution.getPartitioningSchema())
                 {
+                    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode is SG, update distribution: begin");
+                    logPlanTrace(curNode, false);
                     curNode->getPhysicalOperator()->setSchema(curSchema);
                     s_setSgDistribution(curNode, neededDistribution);
                     curNode->setSgMovable(false);
                     curNode->setSgOffsetable(false);
                     runningDistribution = curNode->inferDistribution();
+                    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode is SG, update distribution: end");
+                    logPlanTrace(curNode, false);
                 }
                 else
                 {
+                    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNod is not SG, inserting one: begin");
                     PhysNodePtr newSg = n_buildSgNode(curSchema, neededDistribution.getPartitioningSchema());
                     n_addParentNode(sgCandidate,newSg);
                     s_setSgDistribution(newSg, neededDistribution);
@@ -867,44 +929,65 @@ void HabilisOptimizer::tw_collapseSgNodes(PhysNodePtr root)
 
                     if (curNode == sgCandidate)
                     {
+                        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode switched to sgCandidate");
                         curNode = newSg;
                     }
+                    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNod is not SG, inserting one: end");
                 }
             }
         }
         else if (curNode->isSgNode() && curNode->isSgMovable())
         {
+            LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode is movable SG node, remove it: begin");
             PhysNodePtr newCur = curNode->getChildren()[0];
             n_cutOutNode(curNode);
             if (curNode == sgCandidate)
             {
+                LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] sgCandidate switched to curNode");
                 sgCandidate = newCur;
             }
             curNode = newCur;
             runningDistribution = curNode->getDistribution();
+            LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode is movable SG node, remove it: end");
         }
 
         root = curNode;
         curNode = curNode->getParent();
+
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] cycle iteration: end");
     } while (curNode.get() != NULL && curNode->getChildren().size()<=1);
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] cycle: end");
 
     assert(root);
 
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] chainBottom:");
+    logPlanTrace(chainBottom, false);
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] curNode:");
+    logPlanTrace(curNode, false);
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] sgCandidate:");
+    logPlanTrace(sgCandidate, false);
+
     if (!topChain)
     {
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] is not top chain: begin");
         PhysNodePtr parent = root->getParent();
         if (parent->getDistributionRequirement().getReqType() != DistributionRequirement::Any)
         {
+            LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] required distribution is not Any");
             //we have a parent instance that has multiple children and needs a specific distribution
             //so we must correct the distribution back to the way it was before we started messing with the chain
             cw_rectifyChainDistro(root, sgCandidate, chainOutputDistribution);
         }
+        LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] is not top chain: end");
     }
 
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] process children chains");
     for (size_t i = 0; i< chainBottom->getChildren().size(); i++)
     {
         tw_collapseSgNodes(chainBottom->getChildren()[i]);
     }
+
+    LOG4CXX_TRACE(logger, "[tw_collapseSgNodes] end");
 }
 
 static PhysNodePtr s_getTopSgFromChain(PhysNodePtr chainRoot)
@@ -998,11 +1081,11 @@ void HabilisOptimizer::cw_swapSg (PhysNodePtr root, PhysNodePtr sgToRemove, Phys
     n_addParentNode(root,newRootSg);
     newRootSg->inferDistribution();
 
-    dbg_logPlan();
+    logPlanDebug();
 
     newRootSg->inferBoundaries();
 
-    dbg_logPlan();
+    logPlanDebug();
 }
 
 bool HabilisOptimizer::tw_pushupJoinSgs(PhysNodePtr root)

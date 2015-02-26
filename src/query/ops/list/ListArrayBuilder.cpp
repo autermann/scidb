@@ -58,7 +58,7 @@ void ListArrayBuilder<T>::initialize(shared_ptr<Query> const& query)
     _query = query;
     ArrayDesc schema = getSchema(_query);
     _nAttrs = schema.getAttributes().size() - 1;
-    _array = shared_ptr<MemArray>(new MemArray(schema));
+    _array = shared_ptr<MemArray>(new MemArray(schema, query));
     Coordinate myInstance = query->getInstanceID();
     _currPos = Coordinates(LIST_NUM_DIMS,0);
     _currPos[0] = myInstance;
@@ -115,24 +115,23 @@ shared_ptr<MemArray> ListArrayBuilder<T>::getArray()
 
 Attributes ListChunkDescriptorsArrayBuilder::getAttributes() const
 {
-    Attributes attrs(15);
-    attrs[0] = AttributeDesc(0,  "instn", TID_UINT32,  0, 0);
-    attrs[1] = AttributeDesc(1,  "dseg",  TID_UINT8,  0, 0);
-    attrs[2] = AttributeDesc(2,  "dhdrp", TID_UINT64, 0, 0);
-    attrs[3] = AttributeDesc(3,  "doffs", TID_UINT64, 0, 0);
-    attrs[4] = AttributeDesc(4,  "arrid", TID_UINT64, 0, 0);
-    attrs[5] = AttributeDesc(5,  "attid", TID_UINT64, 0, 0);
-    attrs[6] = AttributeDesc(6,  "coord", TID_STRING, 0, 0);
-    attrs[7] = AttributeDesc(7,  "comp",  TID_INT8,   0, 0);
-    attrs[8] = AttributeDesc(8,  "flags", TID_UINT8,   0, 0);
-    attrs[9] = AttributeDesc(9,  "nelem", TID_UINT32,  0, 0);
-    attrs[10] = AttributeDesc(10,"csize", TID_UINT32, 0, 0);
-    attrs[11] = AttributeDesc(11,"usize", TID_UINT32, 0, 0);
-    attrs[12] = AttributeDesc(12,"asize", TID_UINT32,  0, 0);
-
-    attrs[13] = AttributeDesc(13,"free",  TID_BOOL,   0, 0);
-
-    attrs[14] = AttributeDesc(14,"empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+    Attributes attrs(NUM_ATTRIBUTES);
+    attrs[STORAGE_VERSION]    = AttributeDesc(STORAGE_VERSION,   "svrsn",           TID_UINT32, 0, 0);
+    attrs[INSTANCE_ID]        = AttributeDesc(INSTANCE_ID,       "insn",            TID_UINT32, 0, 0);
+    attrs[DISK_SEGMENT_NO]    = AttributeDesc(DISK_SEGMENT_NO,   "dseg",            TID_UINT8,  0, 0);
+    attrs[DISK_HEADER_POS]    = AttributeDesc(DISK_HEADER_POS,   "dhdrp",           TID_UINT64, 0, 0);
+    attrs[DISK_OFFSET]        = AttributeDesc(DISK_OFFSET,       "doffs",           TID_UINT64, 0, 0);
+    attrs[V_ARRAY_ID]           = AttributeDesc(V_ARRAY_ID,      "arrid",           TID_UINT64, 0, 0);
+    attrs[ATTRIBUTE_ID]       = AttributeDesc(ATTRIBUTE_ID,      "attid",           TID_UINT64, 0, 0);
+    attrs[COORDINATES]        = AttributeDesc(COORDINATES,       "coord",           TID_STRING, 0, 0);
+    attrs[COMPRESSION]        = AttributeDesc(COMPRESSION,       "comp",            TID_INT8,   0, 0);
+    attrs[FLAGS]              = AttributeDesc(FLAGS,             "flags",           TID_UINT8,  0, 0);
+    attrs[NUM_ELEMENTS]       = AttributeDesc(NUM_ELEMENTS,      "nelem",           TID_UINT32, 0, 0);
+    attrs[COMPRESSED_SIZE]    = AttributeDesc(COMPRESSED_SIZE,   "csize",           TID_UINT32, 0, 0);
+    attrs[UNCOMPRESSED_SIZE]  = AttributeDesc(UNCOMPRESSED_SIZE, "usize",           TID_UINT32, 0, 0);
+    attrs[ALLOCATED_SIZE]     = AttributeDesc(ALLOCATED_SIZE,    "asize",           TID_UINT32, 0, 0);
+    attrs[FREE]               = AttributeDesc(FREE,              "free",            TID_BOOL,   0, 0);
+    attrs[EMPTY_INDICATOR]    = AttributeDesc(EMPTY_INDICATOR,   "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
     return attrs;
 }
 
@@ -140,152 +139,119 @@ void ListChunkDescriptorsArrayBuilder::addToArray(pair<ChunkDescriptor, bool> co
 {
     Value v;
     ChunkDescriptor const& desc = value.first;
-
+    v.setUint32(desc.hdr.storageVersion);
+    _outCIters[STORAGE_VERSION]->writeItem(v);
     v.setUint32(desc.hdr.instanceId);
-    _outCIters[0]->writeItem(v);
-
+    _outCIters[INSTANCE_ID]->writeItem(v);
     v.setUint8(desc.hdr.pos.segmentNo);
-    _outCIters[1]->writeItem(v);
-
+    _outCIters[DISK_SEGMENT_NO]->writeItem(v);
     v.setUint64(desc.hdr.pos.hdrPos);
-    _outCIters[2]->writeItem(v);
-
+    _outCIters[DISK_HEADER_POS]->writeItem(v);
     v.setUint64(desc.hdr.pos.offs);
-    _outCIters[3]->writeItem(v);
-
+    _outCIters[DISK_OFFSET]->writeItem(v);
     v.setUint64(desc.hdr.arrId);
-    _outCIters[4]->writeItem(v);
-
+    _outCIters[V_ARRAY_ID]->writeItem(v);
     v.setUint64(desc.hdr.attId);
-    _outCIters[5]->writeItem(v);
-
+    _outCIters[ATTRIBUTE_ID]->writeItem(v);
     Coordinates coords(desc.coords,  desc.coords + desc.hdr.nCoordinates);
     std::ostringstream str;
     str<<CoordsToStr(coords);
     v.setString(str.str().c_str());
-    _outCIters[6]->writeItem(v);
-
+    _outCIters[COORDINATES]->writeItem(v);
     v.setInt8(desc.hdr.compressionMethod);
-    _outCIters[7]->writeItem(v);
-
+    _outCIters[COMPRESSION]->writeItem(v);
     v.setUint8(desc.hdr.flags);
-    _outCIters[8]->writeItem(v);
-
+    _outCIters[FLAGS]->writeItem(v);
     v.setUint32(desc.hdr.nElems);
-    _outCIters[9]->writeItem(v);
-
+    _outCIters[NUM_ELEMENTS]->writeItem(v);
     v.setUint32(desc.hdr.compressedSize);
-    _outCIters[10]->writeItem(v);
-
+    _outCIters[COMPRESSED_SIZE]->writeItem(v);
     v.setUint32(desc.hdr.size);
-    _outCIters[11]->writeItem(v);
-
+    _outCIters[UNCOMPRESSED_SIZE]->writeItem(v);
     v.setUint32(desc.hdr.allocatedSize);
-    _outCIters[12]->writeItem(v);
-
+    _outCIters[ALLOCATED_SIZE]->writeItem(v);
     v.setBool(value.second);
-    _outCIters[13]->writeItem(v);
+    _outCIters[FREE]->writeItem(v);
 }
 
 Attributes ListChunkMapArrayBuilder::getAttributes() const
 {
-    Attributes attrs(31);
-    attrs[0]  = AttributeDesc(0,  "instn", TID_UINT32, 0, 0);
-    attrs[1]  = AttributeDesc(1,  "dseg",  TID_UINT8,  0, 0);
-    attrs[2]  = AttributeDesc(2,  "dhdrp", TID_UINT64, 0, 0);
-    attrs[3]  = AttributeDesc(3,  "doffs", TID_UINT64, 0, 0);
-    attrs[4]  = AttributeDesc(4,  "uaid", TID_UINT64, 0, 0);
-    attrs[5]  = AttributeDesc(5,  "arrid", TID_UINT64, 0, 0);
-    attrs[6]  = AttributeDesc(6,  "attid", TID_UINT64, 0, 0);
-    attrs[7]  = AttributeDesc(7,  "coord", TID_STRING, 0, 0);
-    attrs[8]  = AttributeDesc(8,  "comp",  TID_INT8,   0, 0);
-    attrs[9]  = AttributeDesc(9,  "flags", TID_UINT8,  0, 0);
-    attrs[10] = AttributeDesc(10,  "nelem", TID_UINT32, 0, 0);
-    attrs[11] = AttributeDesc(11, "csize", TID_UINT32, 0, 0);
-    attrs[12] = AttributeDesc(12, "usize", TID_UINT32, 0, 0);
-    attrs[13] = AttributeDesc(13, "asize", TID_UINT32, 0, 0);
-
-    attrs[14] = AttributeDesc(14, "addrs", TID_UINT64, 0, 0);
-    attrs[15] = AttributeDesc(15, "clnof", TID_UINT64, 0, 0);
-    attrs[16] = AttributeDesc(16, "clons", TID_STRING, 0, 0);
-    attrs[17] = AttributeDesc(17, "next",  TID_UINT64, 0, 0);
-    attrs[18] = AttributeDesc(18, "prev",  TID_UINT64, 0, 0);
-    attrs[19] = AttributeDesc(19, "data",  TID_UINT64, 0, 0);
-
-    attrs[20] = AttributeDesc(20, "accnt", TID_INT32,  0, 0);
-    attrs[21] = AttributeDesc(21, "nwrit", TID_INT32,  0, 0);
-    attrs[22] = AttributeDesc(22, "tstmp", TID_UINT64, 0, 0);
-    attrs[23] = AttributeDesc(23, "raw",   TID_BOOL,   0, 0);
-    attrs[24] = AttributeDesc(24, "waitn", TID_BOOL,   0, 0);
-
-    attrs[25] = AttributeDesc(25, "lpos",  TID_STRING, 0, 0);
-    attrs[26] = AttributeDesc(26, "fposo", TID_STRING, 0, 0);
-    attrs[27] = AttributeDesc(27, "lposo", TID_STRING, 0, 0);
-
-    attrs[28] = AttributeDesc(28, "strge", TID_UINT64, 0, 0);
-    attrs[29] = AttributeDesc(29, "loadr", TID_UINT64, 0, 0);
-
-    attrs[30] = AttributeDesc(30, "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
-
+    Attributes attrs(NUM_ATTRIBUTES);
+    attrs[STORAGE_VERSION]     = AttributeDesc(STORAGE_VERSION,   "svrsn",           TID_UINT32, 0, 0);
+    attrs[INSTANCE_ID]         = AttributeDesc(INSTANCE_ID,       "instn",           TID_UINT32, 0, 0);
+    attrs[DISK_SEGMENT_NO]     = AttributeDesc(DISK_SEGMENT_NO,   "dseg",            TID_UINT8,  0, 0);
+    attrs[DISK_HEADER_POS]     = AttributeDesc(DISK_HEADER_POS,   "dhdrp",           TID_UINT64, 0, 0);
+    attrs[DISK_OFFSET]         = AttributeDesc(DISK_OFFSET,       "doffs",           TID_UINT64, 0, 0);
+    attrs[U_ARRAY_ID]          = AttributeDesc(U_ARRAY_ID,        "uaid",            TID_UINT64, 0, 0);
+    attrs[V_ARRAY_ID]          = AttributeDesc(V_ARRAY_ID,        "arrid",           TID_UINT64, 0, 0);
+    attrs[ATTRIBUTE_ID]        = AttributeDesc(ATTRIBUTE_ID,      "attid",           TID_UINT64, 0, 0);
+    attrs[COORDINATES]         = AttributeDesc(COORDINATES,       "coord",           TID_STRING, 0, 0);
+    attrs[COMPRESSION]         = AttributeDesc(COMPRESSION,       "comp",            TID_INT8,   0, 0);
+    attrs[FLAGS]               = AttributeDesc(FLAGS,             "flags",           TID_UINT8,  0, 0);
+    attrs[NUM_ELEMENTS]        = AttributeDesc(NUM_ELEMENTS,      "nelem",           TID_UINT32, 0, 0);
+    attrs[COMPRESSED_SIZE]     = AttributeDesc(COMPRESSED_SIZE,   "csize",           TID_UINT32, 0, 0);
+    attrs[UNCOMPRESSED_SIZE]   = AttributeDesc(UNCOMPRESSED_SIZE, "usize",           TID_UINT32, 0, 0);
+    attrs[ALLOCATED_SIZE]      = AttributeDesc(ALLOCATED_SIZE,    "asize",           TID_UINT32, 0, 0);
+    attrs[ADDRESS]             = AttributeDesc(ADDRESS,           "addrs",           TID_UINT64, 0, 0);
+    attrs[CLONE_OF]            = AttributeDesc(CLONE_OF,          "clnof",           TID_UINT64, 0, 0);
+    attrs[CLONES]              = AttributeDesc(CLONES,            "clons",           TID_STRING, 0, 0);
+    attrs[NEXT]                = AttributeDesc(NEXT,              "next",            TID_UINT64, 0, 0);
+    attrs[PREV]                = AttributeDesc(PREV,              "prev",            TID_UINT64, 0, 0);
+    attrs[DATA]                = AttributeDesc(DATA,              "data",            TID_UINT64, 0, 0);
+    attrs[ACCESS_COUNT]        = AttributeDesc(ACCESS_COUNT,      "accnt",           TID_INT32,  0, 0);
+    attrs[N_WRITERS]           = AttributeDesc(N_WRITERS,         "nwrit",           TID_INT32,  0, 0);
+    attrs[TIMESTAMP]           = AttributeDesc(TIMESTAMP,         "tstmp",           TID_UINT64, 0, 0);
+    attrs[RAW]                 = AttributeDesc(RAW,               "raw",             TID_BOOL,   0, 0);
+    attrs[WAITING]             = AttributeDesc(WAITING,           "waitn",           TID_BOOL,   0, 0);
+    attrs[LAST_POS]            = AttributeDesc(LAST_POS,          "lpos",            TID_STRING, 0, 0);
+    attrs[FIRST_POS_OVERLAP]   = AttributeDesc(FIRST_POS_OVERLAP, "fposo",           TID_STRING, 0, 0);
+    attrs[LAST_POS_OVERLAP]    = AttributeDesc(LAST_POS_OVERLAP,  "lposo",           TID_STRING, 0, 0);
+    attrs[STORAGE]             = AttributeDesc(STORAGE,           "strge",           TID_UINT64, 0, 0);
+    attrs[LOADER]              = AttributeDesc(LOADER,            "loadr",           TID_UINT64, 0, 0);
+    attrs[EMPTY_INDICATOR]     = AttributeDesc(EMPTY_INDICATOR,   "empty_indicator", TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
     return attrs;
 }
 
 void ListChunkMapArrayBuilder::addToArray(ChunkMapEntry const& value)
 {
     Value v;
-    DBChunk const* chunk = value._chunk;
-    assert(chunk == NULL || value._uaid == chunk->getArrayDesc().getUAId());
-
+    PersistentChunk const* chunk = value._chunk;
+    v.setUint32(chunk == NULL ? -1 : chunk->_hdr.storageVersion);
+    _outCIters[STORAGE_VERSION]->writeItem(v);
     v.setUint32(chunk == NULL ? -1 : chunk->_hdr.instanceId);
-    _outCIters[0]->writeItem(v);
-
+    _outCIters[INSTANCE_ID]->writeItem(v);
     v.setUint8(chunk == NULL ? -1 : chunk->_hdr.pos.segmentNo);
-    _outCIters[1]->writeItem(v);
-
+    _outCIters[DISK_SEGMENT_NO]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : chunk->_hdr.pos.hdrPos);
-    _outCIters[2]->writeItem(v);
-
+    _outCIters[DISK_HEADER_POS]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : chunk->_hdr.pos.offs);
-    _outCIters[3]->writeItem(v);
-
+    _outCIters[DISK_OFFSET]->writeItem(v);
     v.setUint64(value._uaid);
-    _outCIters[4]->writeItem(v);
-
+    _outCIters[U_ARRAY_ID]->writeItem(v);
     v.setUint64(value._addr.arrId);
-    _outCIters[5]->writeItem(v);
-
+    _outCIters[V_ARRAY_ID]->writeItem(v);
     v.setUint64(value._addr.attId);
-    _outCIters[6]->writeItem(v);
-
+    _outCIters[ATTRIBUTE_ID]->writeItem(v);
     std::ostringstream str;
     str<<CoordsToStr(value._addr.coords);
     v.setString(str.str().c_str());
-    _outCIters[7]->writeItem(v);
-
+    _outCIters[COORDINATES]->writeItem(v);
     v.setInt8(chunk == 0 ? -1 : chunk->_hdr.compressionMethod);
-    _outCIters[8]->writeItem(v);
-
+    _outCIters[COMPRESSION]->writeItem(v);
     v.setUint8(chunk == 0 ? -1 : chunk->_hdr.flags);
-    _outCIters[9]->writeItem(v);
-
+    _outCIters[FLAGS]->writeItem(v);
     v.setUint32(chunk == 0 ? -1 : chunk->_hdr.nElems);
-    _outCIters[10]->writeItem(v);
-
+    _outCIters[NUM_ELEMENTS]->writeItem(v);
     v.setUint32(chunk == 0 ? -1 : chunk->_hdr.compressedSize);
-    _outCIters[11]->writeItem(v);
-
+    _outCIters[COMPRESSED_SIZE]->writeItem(v);
     v.setUint32(chunk == 0 ? -1 : chunk->_hdr.size);
-    _outCIters[12]->writeItem(v);
-
+    _outCIters[UNCOMPRESSED_SIZE]->writeItem(v);
     v.setUint32(chunk == 0 ? -1 : chunk->_hdr.allocatedSize);
-    _outCIters[13]->writeItem(v);
-
+    _outCIters[ALLOCATED_SIZE]->writeItem(v);
     v.setUint64((uint64_t)(chunk));
-    _outCIters[14]->writeItem(v);
-
+    _outCIters[ADDRESS]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_cloneOf);
-    _outCIters[15]->writeItem(v);
-
+    _outCIters[CLONE_OF]->writeItem(v);
     str.str("");
     str<<"[";
     if ( chunk )
@@ -297,61 +263,49 @@ void ListChunkMapArrayBuilder::addToArray(ChunkMapEntry const& value)
     }
     str<<"]";
     v.setString(str.str().c_str());
-    _outCIters[16]->writeItem(v);
-
+    _outCIters[CLONES]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_next);
-    _outCIters[17]->writeItem(v);
-
+    _outCIters[NEXT]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_prev);
-    _outCIters[18]->writeItem(v);
-
+    _outCIters[PREV]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_data);
-    _outCIters[19]->writeItem(v);
-
+    _outCIters[DATA]->writeItem(v);
     v.setInt32(chunk == 0 ? -1 : chunk->_accessCount);
-    _outCIters[20]->writeItem(v);
-
-    v.setInt32(chunk == 0 ? -1 : chunk->_nWriters);
-    _outCIters[21]->writeItem(v);
-
+    _outCIters[ACCESS_COUNT]->writeItem(v);
+    //XXX tigor TODO: remove _nWrite from the schema
+    v.setInt32(chunk == 0 ? -1 : -1);
+    _outCIters[N_WRITERS]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : chunk->_timestamp);
-    _outCIters[22]->writeItem(v);
-
+    _outCIters[TIMESTAMP]->writeItem(v);
     v.setBool(chunk == 0 ? false : chunk->_raw);
-    _outCIters[23]->writeItem(v);
-
+    _outCIters[RAW]->writeItem(v);
     v.setBool(chunk == 0 ? false : chunk->_waiting);
-    _outCIters[24]->writeItem(v);
-
+    _outCIters[WAITING]->writeItem(v);
     str.str("");
     if ( chunk )
     {
         str<<CoordsToStr(chunk->_lastPos);
     }
     v.setString(str.str().c_str());
-    _outCIters[25]->writeItem(v);
-
+    _outCIters[LAST_POS]->writeItem(v);
     str.str("");
     if ( chunk )
     {
         str<< CoordsToStr(chunk->_firstPosWithOverlaps);
     }
     v.setString(str.str().c_str());
-    _outCIters[26]->writeItem(v);
-
+    _outCIters[FIRST_POS_OVERLAP]->writeItem(v);
     str.str("");
     if (chunk)
     {
         str<< CoordsToStr(chunk->_lastPosWithOverlaps);
     }
     v.setString(str.str().c_str());
-    _outCIters[27]->writeItem(v);
-
+    _outCIters[LAST_POS_OVERLAP]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_storage);
-    _outCIters[28]->writeItem(v);
-
+    _outCIters[STORAGE]->writeItem(v);
     v.setUint64(chunk == 0 ? -1 : (uint64_t)chunk->_loader);
-    _outCIters[29]->writeItem(v);
+    _outCIters[LOADER]->writeItem(v);
 }
 
 }

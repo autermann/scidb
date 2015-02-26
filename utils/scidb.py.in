@@ -911,7 +911,8 @@ def start(srv, liid):
 	  reserveClause = ''
    # end if
 
-   if d.get('no-watchdog') in ['true', 'True', 'on', 'On']:
+   no_watchdog = (d.get('no-watchdog') in ['true', 'True', 'on', 'On'])
+   if no_watchdog:
 	  noWatchDogClause = "--no-watchdog"
    else:
 	  noWatchDogClause = ''
@@ -992,9 +993,11 @@ def start(srv, liid):
 
    relink_binary(srv, liid)
    print "Starting SciDB server."
-   cmdList = [ "LD_LIBRARY_PATH="+"@CMAKE_INSTALL_PREFIX@/lib:@CMAKE_INSTALL_PREFIX@/lib/scidb/plugins"+":${LD_LIBRARY_PATH} ",
-			   "exec",
-			   getInstanceDataPath(srv,liid)+'/'+binFile(srv, liid),
+   cmdList = [ "LD_LIBRARY_PATH="+"@CMAKE_INSTALL_PREFIX@/lib:@CMAKE_INSTALL_PREFIX@/lib/scidb/plugins:" + os.environ.get("LD_LIBRARY_PATH", "") + " ", "exec" ]
+
+   @CONFIGURE_SCIDB_PY_VALGRIND@
+
+   cmdList += [ getInstanceDataPath(srv,liid)+'/'+binFile(srv, liid),
 			  "-i", srv[1],
 			  "-p", str(basePort+liid),
 			  saveRamClause,  "--merge-sort-buffer", mergeSortClause,

@@ -69,6 +69,7 @@ boost::shared_ptr<AstNode> QueryParser::parse(const std::string& input, bool aql
 
         if (parser.parse(input) != 0)
         {
+            delete _ast; //By some reason Bison sometimes not launch destruction in case error so remove AST manually
             throw USER_QUERY_EXCEPTION(SCIDB_SE_PARSER, SCIDB_LE_QUERY_PARSING_ERROR, _errorContext) << _errorString;
         }
     }
@@ -78,6 +79,7 @@ boost::shared_ptr<AstNode> QueryParser::parse(const std::string& input, bool aql
 
         if (parser.parse(input) != 0)
         {
+            delete _ast; //By some reason Bison sometimes not launch destruction in case error so remove AST manually
             throw USER_QUERY_EXCEPTION(SCIDB_SE_PARSER, SCIDB_LE_QUERY_PARSING_ERROR, _errorContext) << _errorString;
         }
     }

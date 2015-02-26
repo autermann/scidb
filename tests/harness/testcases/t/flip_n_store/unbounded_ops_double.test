@@ -65,7 +65,6 @@ project(versions(unbounded2), version_id)
 #multiply
 #reshape  -as of 4392
 #reverse
-#inverse
 #concat
 #build
 #build_sparse

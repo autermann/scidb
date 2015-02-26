@@ -20,9 +20,9 @@
   <section>
     <title>Introduction</title>
 
-    <para>This guide is meant to help new users begin working with SciDB.
-    There is also a complete manual, the 250-page <emphasis>SciDB User's
-    Guide</emphasis>, available.</para>
+    <para>This guide helps new users begin working with SciDB. There is also a
+    complete manual, the 250-page <emphasis>SciDB User's Guide</emphasis>,
+    available.</para>
 
     <para>There are three basic ways that you can get started:</para>
 
@@ -461,12 +461,12 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
     <itemizedlist>
       <listitem>
         <para>List all of the existing arrays.<para><programlisting>AFL% list('arrays');  </programlisting><screen>name,id,schema,availability
-"test",4462,"test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]",true
+'test',671,'test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]',true
 </screen></para></para>
       </listitem>
 
       <listitem>
-        <para>Retrieve the schema for a particular array.<para><programlisting>AFL% show(test);  </programlisting><screen>[("test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]")]
+        <para>Retrieve the schema for a particular array.<para><programlisting>AFL% show(test);  </programlisting><screen>[('test&lt;val:double&gt; [i=0:4,6,0,j=0:4,6,0]')]
 </screen></para></para>
       </listitem>
 
@@ -565,9 +565,9 @@ SciDB13.2-CentOS6.3-VirtualBox4.1.12.</screen>
           is useful for populating an array with randomly-generated values.
           Here, we create a 3<symbol>x</symbol>4 array, and fill it with
           random numbers between 10 and 99.<para><programlisting>AFL% store(build(&lt;randomVal:int64&gt;[i=0:2,3,0, j=0:3,4,0],random()%90+10),random_100);  </programlisting><screen>[
-[(56),(47),(37),(93)],
-[(88),(22),(35),(31)],
-[(54),(99),(49),(24)]
+[(99),(10),(40),(35)],
+[(78),(69),(68),(87)],
+[(17),(77),(13),(10)]
 ]</screen>Note
           that in this query, our attribute is of type int64 (an integer data
           type). Of course, your output will differ, as the random() function
@@ -774,7 +774,7 @@ Convertible, 26.8</screen></para>
 
       <step>
         <para>Let's take a look at the schema of
-        <literal>functionsArray</literal>:<para><programlisting>AFL% show(functionsArray);  </programlisting><screen>[("functionsArray&lt;name:string&gt; [n=0:*,354,0]")]
+        <literal>functionsArray</literal>:<para><programlisting>AFL% show(functionsArray);  </programlisting><screen>[('functionsArray&lt;name:string&gt; [n=0:*,357,0]')]
 </screen></para></para>
       </step>
 
@@ -791,63 +791,63 @@ Convertible, 26.8</screen></para>
       <step>
         <para>And finally, we redimension the source array into the
         target.<para><programlisting>AFL% redimension_store(functionsArray, target, count(*) as count);  </programlisting><screen>{name} count
-{"%"} 9
-{"*"} 10
-{"+"} 12
-{"-"} 23
-{"/"} 10
-{"&lt;"} 15
-{"&lt;="} 15
-{"&lt;&gt;"} 15
-{"="} 15
-{"&gt;"} 15
-{"&gt;="} 15
-{"abs"} 2
-{"acos"} 2
-{"and"} 1
-{"append_offset"} 1
-{"apply_offset"} 1
-{"asin"} 2
-{"atan"} 2
-{"ceil"} 1
-{"cos"} 2
-{"day_of_week"} 2
-{"exp"} 2
-{"first"} 2
-{"floor"} 1
-{"format"} 1
-{"get_offset"} 1
-{"high"} 2
-{"hour_of_day"} 2
-{"iif"} 1
-{"instanceid"} 1
-{"is_nan"} 1
-{"is_null"} 1
-{"last"} 2
-{"length"} 2
-{"log"} 2
-{"log10"} 2
-{"low"} 2
-{"max"} 2
-{"min"} 2
-{"missing"} 1
-{"missing_reason"} 1
-{"not"} 1
-{"now"} 1
-{"or"} 1
-{"pow"} 1
-{"random"} 1
-{"regex"} 1
-{"sin"} 2
-{"sqrt"} 2
-{"strchar"} 1
-{"strftime"} 1
-{"strip_offset"} 1
-{"strlen"} 1
-{"substr"} 1
-{"tan"} 2
-{"togmt"} 1
-{"tznow"} 1
+{'%'} 9
+{'*'} 10
+{'+'} 12
+{'-'} 23
+{'/'} 10
+{'&lt;'} 15
+{'&lt;='} 15
+{'&lt;&gt;'} 15
+{'='} 15
+{'&gt;'} 15
+{'&gt;='} 15
+{'abs'} 2
+{'acos'} 2
+{'and'} 1
+{'append_offset'} 1
+{'apply_offset'} 1
+{'asin'} 2
+{'atan'} 2
+{'ceil'} 1
+{'cos'} 2
+{'day_of_week'} 2
+{'exp'} 2
+{'first'} 2
+{'floor'} 1
+{'format'} 1
+{'get_offset'} 1
+{'high'} 2
+{'hour_of_day'} 2
+{'iif'} 1
+{'instanceid'} 1
+{'is_nan'} 1
+{'is_null'} 1
+{'last'} 2
+{'length'} 2
+{'log'} 2
+{'log10'} 2
+{'low'} 2
+{'max'} 2
+{'min'} 2
+{'missing'} 1
+{'missing_reason'} 1
+{'not'} 1
+{'now'} 1
+{'or'} 1
+{'pow'} 1
+{'random'} 1
+{'regex'} 1
+{'sin'} 2
+{'sqrt'} 2
+{'strchar'} 1
+{'strftime'} 1
+{'strip_offset'} 1
+{'strlen'} 1
+{'substr'} 1
+{'tan'} 2
+{'togmt'} 1
+{'tznow'} 1
 </screen>As
         you can see, the dimension actually contains the names of the SciDB
         functions. The attribute, <emphasis role="bold">count</emphasis>,

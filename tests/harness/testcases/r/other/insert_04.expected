@@ -50,7 +50,7 @@ Query was executed successfully
 
 SCIDB QUERY : <show(C)>
 {i} schema
-{0} "C<fact:bool,enroll:int64> [x=1:2,2,1,y=1:2,2,1,z=1:2,2,0]"
+{0} 'C<fact:bool,enroll:int64> [x=1:2,2,1,y=1:2,2,1,z=1:2,2,0]'
 
 SCIDB QUERY : <insert(filter(build(A,2000*x+10000),x>-2 and y=1) As Q1,A)>
 {x,y} a
@@ -130,7 +130,7 @@ SCIDB QUERY : <store(sort(insert(filter( build(A,2000*x+10000),x=0 and y=2),A)),
 
 SCIDB QUERY : <show(ZZ)>
 {i} schema
-{0} "ZZ<a:int64> [n=0:*,16,0]"
+{0} 'ZZ<a:int64> [n=0:*,16,0]'
 
 SCIDB QUERY : <insert(sort(insert(filter( build(A,2000*x+10000),x=0 and y=2),A),a desc),ZZ)>
 {n} a
@@ -232,7 +232,7 @@ SCIDB QUERY : <insert(build(NOT EMPTY <a:int64 NULL> [x=-3:0,4,2, y=0:3,4,2], '[
 
 SCIDB QUERY : <show(MIB)>
 {i} schema
-{0} "not empty MIB<a:int64 NULL DEFAULT null> [x=-3:0,4,2,y=0:3,4,2]"
+{0} 'not empty MIB<a:int64 NULL DEFAULT null> [x=-3:0,4,2,y=0:3,4,2]'
 
 SCIDB QUERY : <scan(MIB)>
 {x,y} a

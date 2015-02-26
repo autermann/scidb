@@ -856,7 +856,7 @@ void hourOfDayTZ(const Value** args, Value* res, void*)
 
 void scidb_random(const Value** args, Value* res, void*)
 {
-    res->setUint32(random());
+    res->setUint32(::random());
 }
 
 void tzToGmt(const Value** args, Value* res, void*)

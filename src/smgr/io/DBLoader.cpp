@@ -191,14 +191,19 @@ namespace scidb
 
     static void s_fprintValue(FILE *f, const Value* v, TypeId const& valueType, FunctionPointer const converter, int precision = 6)
     {
-        if ( converter )
-        {
+        if (converter) {
             Value strValue;
             (*converter)(&v, &strValue, NULL);
-            fprintf(f, "\"%s\"", strValue.getString());
-        }
-        else
-        {
+            if ( strValue.isNull() ) {
+                if (strValue.getMissingReason() == 0) {
+                    fprintf(f, "null");
+                } else {
+                    fprintf(f, "'?'%i",  strValue.getMissingReason());
+                }
+            } else {
+                fprintf(f, "\'%s\'",  strValue.getString());
+            }
+        } else {
             fprintf(f, "%s", ValueToString(valueType, *v, precision).c_str());
         }
     }
@@ -215,7 +220,10 @@ namespace scidb
         }
         else
         {
-            s_fprintValue(f, &origCoord, dimension.getType(), dimConverter);
+            s_fprintValue(f,
+                    &origCoord,
+                    isBuiltinType(dimension.getType()) ? dimension.getType() : TID_STRING,
+                    dimConverter);
         }
     }
 
@@ -272,7 +280,6 @@ namespace scidb
                 arrayIterators[j] = array.getConstIterator((AttributeID)i);
                 types[j] = attrs[i].getType();
                 if (! isBuiltinType(types[j])) {
-                    TypeLibrary::getType(types[j]); // force loading of type
                     converters[j] =  FunctionLibrary::getInstance()->findConverter(types[j],  TID_STRING, false);
                 }
                 ++j;
@@ -316,20 +323,8 @@ namespace scidb
                             if (i != 0 || withCoordinates) {
                                 fputc(',', f);
                             }
-                            Value strValue;
-                            if (converters[i]) {
-                                const Value* v = &chunkIterators[i]->getItem();
-                                if (!v->isNull())
-                                {
-                                    (*converters[i])(&v, &strValue, NULL);
-                                    fprintf(f, "\"%s\"",  strValue.getString());
-                                }
-                            } else {
-                                Value const& val = chunkIterators[i]->getItem();
-                                if (!val.isNull()) {
-                                    fprintf(f, "%s",  ValueToString(types[i], val, precision).c_str());
-                                }
-                            }
+                            const Value* v = &chunkIterators[i]->getItem();
+                            s_fprintValue(f, v, types[i], converters[i], precision);
                             ++(*chunkIterators[i]);
                         }
                         fputc('\n', f);
@@ -541,14 +536,8 @@ namespace scidb
                                         if (i != 0) {
                                             putc(',', f);
                                         }
-                                        Value strValue;
-                                        if (converters[i]) {
-                                            const Value* v = &chunkIterators[i]->getItem();
-                                            (*converters[i])(&v, &strValue, NULL);
-                                            fprintf(f, "\"%s\"",  strValue.getString());
-                                        } else {
-                                            fprintf(f, "%s",  ValueToString(types[i], chunkIterators[i]->getItem(), precision).c_str());
-                                        }
+                                        const Value* v = &chunkIterators[i]->getItem();
+                                        s_fprintValue(f, v, types[i], converters[i], precision);
                                     }
                                 }
                                 n += 1;
@@ -622,24 +611,6 @@ namespace scidb
             {
                 arrayIterators[i] = array.getConstIterator((AttributeID)i);
                 attTypes[i] = attrs[i].getType();
-                if (! isBuiltinType(attTypes[i]))
-                {
-                    TypeLibrary::getType(attTypes[i]); // force loading of type
-                    attConverters[i] =  FunctionLibrary::getInstance()->findConverter(attTypes[i],  TID_STRING, false);
-                }
-            }
-
-            for (i = 0; i < nDimensions; i++)
-            {
-                if (!dims[i].isInteger())
-                {
-                    TypeId dt = dims[i].getType();
-                    if (! isBuiltinType(  dt ))
-                    {
-                        TypeLibrary::getType(dt); // force loading of type
-                        dimConverters[i] = FunctionLibrary::getInstance()->findConverter(dt, TID_STRING, false);
-                    }
-                }
             }
 
             bool dcsv = compareStringsIgnoreCase(format, "dcsv") == 0;
@@ -959,7 +930,7 @@ namespace scidb
         if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
             || fwrite(&s[0], 1, hdr.size, f) != hdr.size)
         { 
-            throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+            throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
         }
         
         for (size_t i = 0; i < nAttrs; i++) {
@@ -995,7 +966,7 @@ namespace scidb
                     || fwrite(&pos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims
                     || fwrite(chunk->getData(), 1, hdr.size, f) != hdr.size) 
                 { 
-                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                 }
             }
             for (size_t i = 0; i < nAttrs; i++) {
@@ -1024,7 +995,7 @@ namespace scidb
                         || fwrite(&chunkInterval, sizeof(chunkInterval), 1, f) != 1
                         || (chunkInterval != 0 && fwrite(chunk.getData(), 1, hdr.size, f) != hdr.size)) 
                     { 
-                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                     }
                 }
             }
@@ -1079,17 +1050,17 @@ namespace scidb
                             }
                             int8_t missingReason = (int8_t)v->getMissingReason();
                             if (fwrite(&missingReason, sizeof(missingReason), 1, f) != 1) { 
-                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                             }
                         }
                         if (v->isNull()) { 
                             if (!column.nullable) {
                                 throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
                             }
-                            char filler = 0;
                             size_t size = column.fixedSize == 0 ? 4 : column.fixedSize; // for varying size type write 4-bytes counter
-                            if (fwrite(&filler, 1, size, f) != size) {
-                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                            vector<char> filler(size, 0);
+                            if (fwrite(&filler[0], 1, size, f) != size) {
+                                throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                             }
                         } else { 
                             if (column.converter) { 
@@ -1101,7 +1072,7 @@ namespace scidb
                                 if (fwrite(&size, sizeof(size), 1, f) != 1
                                     || fwrite(v->data(), 1, size, f) != size) 
                                 { 
-                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                                 }
                             } else { 
                                 if (size > column.fixedSize) {  
@@ -1109,14 +1080,14 @@ namespace scidb
                                 }
                                 if (fwrite(v->data(), 1, size, f) != size) 
                                 { 
-                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                    throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                                 }
                                 if (size < column.fixedSize) { 
                                     size_t padSize = column.fixedSize - size;
                                     assert(padSize <= padBuffer.size());
                                     if (fwrite(&padBuffer[0], 1, padSize, f) != padSize) 
                                     {         
-                                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << errno;
+                                        throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_FILE_WRITE_ERROR) << ferror(f);
                                     }      
                                 }
                             }
@@ -1144,7 +1115,8 @@ namespace scidb
     {
         ArrayDesc desc;
         SystemCatalog::getInstance()->getArrayDesc(arrayName, desc);
-        return save(DBArray(desc.getId(),query), file, query, format, append);
+        boost::shared_ptr<DBArray> dbArr(DBArray::newDBArray(desc.getId(),query));
+        return save(*dbArr, file, query, format, append);
     }
 #else
 
@@ -1172,8 +1144,8 @@ namespace scidb
         } else {
             f = fopen(file.c_str(), isBinary ? append ? "ab" : "wb" : append ? "a" : "w");
             if (NULL == f) {
-                int error = errno;
-                LOG4CXX_DEBUG(logger, "Attempted to open output file '" << file << "' and failed with errno = " << error);
+                int error = ferror(f);
+                LOG4CXX_DEBUG(logger, "Attempted to open output file '" << file << "' and failed with ferror = " << error);
                 if (!f)
                     throw USER_EXCEPTION(SCIDB_SE_DBLOADER, SCIDB_LE_CANT_OPEN_FILE) << file << error;
             }

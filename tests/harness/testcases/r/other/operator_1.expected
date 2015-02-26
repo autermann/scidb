@@ -131,21 +131,21 @@ SCIDB QUERY : <project(versions(Test1),timestamp,version_id)>
 
 SCIDB QUERY : <project(attributes(Test1),nullable,type_id,name)>
 {No} nullable,type_id,name
-{0} true,"double","a"
-{1} false,"string","b"
+{0} true,'double','a'
+{1} false,'string','b'
 
 SCIDB QUERY : <project(attributes(Test2),nullable,type_id)>
 {No} nullable,type_id
-{0} false,"double"
+{0} false,'double'
 
 SCIDB QUERY : <project(dimensions(Test1),length,chunk_overlap,name)>
 {No} length,chunk_overlap,name
-{0} 10,0,"x"
+{0} 10,0,'x'
 
 SCIDB QUERY : <project(dimensions(Test2),length,chunk_overlap,name)>
 {No} length,chunk_overlap,name
-{0} 2,0,"x"
-{1} 2,0,"y"
+{0} 2,0,'x'
+{1} 2,0,'y'
 
 SCIDB QUERY : <project(reshape(subarray(Test2,1,1,1,2),<a:double> [x=0:1,2,0 ,y=0:0,2,0]),a)>
 {x,y} a

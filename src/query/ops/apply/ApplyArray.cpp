@@ -100,7 +100,7 @@ Value& ApplyChunkIterator::getItem()
                     {
                         _iterators[i]->getItem().getTile()->getCoordinates(_array.getInputArray()->getArrayDesc(), _bindings[i].resolvedId,
                                                                            _iterators[i]->getChunk().getFirstPosition(false),
-                                                                           _iterators[i]->getPosition(), _array._query.lock(), _params[i], !(_mode & IGNORE_OVERLAPS));
+                                                                           _iterators[i]->getPosition(), _query, _params[i], !(_mode & IGNORE_OVERLAPS));
                     }
                     else
                     {
@@ -109,7 +109,7 @@ Value& ApplyChunkIterator::getItem()
                                 = _array.getInputArray()->getArrayDesc().getOriginalCoordinate(
                                                                                                _bindings[i].resolvedId,
                                                                                                inputIterator->getPosition()[_bindings[i].resolvedId],
-                                                                                               _array._query.lock());
+                                                                                               _query);
                     }
                     break;
                 default:
@@ -179,8 +179,8 @@ ApplyChunkIterator::ApplyChunkIterator(ApplyArrayIterator const& arrayIterator, 
     _params(*_array._expressions[_outAttrId]),
     _mode(iterationMode),
     _applied(false),
-    _nullable(_array._attributeNullable[_outAttrId])
-
+    _nullable(_array._attributeNullable[_outAttrId]),
+    _query(Query::getValidQueryPtr(_array._query))
 {
     _supportsVectorMode = ! _nullable && _array._expressions[_outAttrId]->supportsVectorMode() && inputIterator->supportsVectorMode();
     for (size_t i = 0, n = _bindings.size(); i < n; i++)
@@ -207,7 +207,7 @@ ApplyChunkIterator::ApplyChunkIterator(ApplyArrayIterator const& arrayIterator, 
                 }
                 else
                 {
-                    _iterators[i] = arrayIterator.iterators[i]->getChunk().getConstIterator((_mode & TILE_MODE) | IGNORE_EMPTY_CELLS);
+                    _iterators[i] = arrayIterator.iterators[i]->getChunk().getConstIterator(inputIterator->getMode());
                 }
                 break;
             case BindInfo::BI_VALUE:
@@ -380,11 +380,12 @@ ApplyArray::ApplyArray(ArrayDesc const& desc,
                        bool tile) :
    DelegateArray(desc, array),
    _expressions(expressions),
-   _query(query),
    _attributeNullable(desc.getAttributes().size(), false),
    _runInTileMode(desc.getAttributes().size(), tile),
    _bindingSets(desc.getAttributes().size(), vector<BindInfo>(0))
 {
+    assert(query);
+    _query=query;
     for(size_t i =0; i<expressions.size(); i++)
     {
         _attributeNullable[i] = desc.getAttributes()[i].isNullable();

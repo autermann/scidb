@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="bernoulliOperator">
   <refnamediv>
     <refname>bernoulli</refname>
 
     <refpurpose><indexterm>
         <primary>bernoulli</primary>
-      </indexterm>Select random array cells</refpurpose>
+      </indexterm>Select random array cells.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,15 +18,18 @@
 
     <para>The <literal>bernoulli</literal> operator evaluates each cell by
     generating a random number and seeing if it lies in the range (0,
-    probability). If it does, the cell is included.</para>
+    <replaceable>probability</replaceable>). If it does, the cell is included.
+    Use the optional, integer <replaceable>seed</replaceable> parameter to
+    reproduce results; each run using the same seed returns identical
+    results.</para>
   </refsect1>
 
   <refsect1>
     <title>Example</title>
 
     <informalexample>
-      <para>This example select cells at random from a 5<symbol role="symbolfont">×</symbol>5 matrix, and uses a seed value to select
-      the same cells in successive trials.</para>
+      <para>This example select cells at random from a 5<symbol role="symbolfont">×</symbol>5 array, and uses a seed value to select the
+      same cells in successive trials.</para>
 
       <procedure>
         <step>
@@ -47,17 +50,17 @@
           <para>Select cells at random with a probability of .5 that a cell
           will be included. Each successive call to bernoulli will return
           different results.<para><programlisting>AFL% bernoulli(bernoulli_array,0.5);  </programlisting><screen>[
-[(),(),(),(),()],
-[(),(),(),(9),(10)],
-[(),(12),(),(14),(15)],
-[(),(),(18),(19),()],
-[(21),(22),(),(),()]
+[(),(2),(3),(),(5)],
+[(),(),(8),(),()],
+[(11),(12),(),(14),()],
+[(),(17),(18),(19),(20)],
+[(),(22),(),(24),()]
 ]</screen><para><para><programlisting>AFL% bernoulli(bernoulli_array,0.5);  </programlisting><screen>[
-[(),(2),(),(),(5)],
-[(6),(),(),(9),()],
-[(),(),(13),(14),(15)],
-[(16),(17),(18),(),()],
-[(21),(),(23),(),()]
+[(),(2),(3),(4),(5)],
+[(),(7),(),(),(10)],
+[(),(12),(),(14),(15)],
+[(16),(17),(),(),()],
+[(),(22),(),(),()]
 ]</screen></para></para></para></para>
         </step>
 

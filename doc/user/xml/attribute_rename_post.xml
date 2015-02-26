@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="attRenameOperator">
   <refnamediv>
     <refname>attribute_rename</refname>
 
@@ -23,9 +23,17 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The attribute_rename operator produces a result array that is nearly
-    identical to a source array, except that one or more attributes are
-    renamed.</para>
+    <para>The <literal>attribute_rename</literal> operator produces a result
+    array that is nearly identical to a source array, except that one or more
+    attributes are renamed.</para>
+
+    <para>To persist the new attribute names when you use
+    <literal>attribute_rename</literal>, you must store the results to a new
+    array—if you store to the original array, the original attribute names are
+    left in place.</para>
+
+    <para>You can achieve the same functionality (and more) by using the
+    <literal>cast</literal> operator. For details, see <xref linkend="castOperator"/>.</para>
 
     <para>You can use the attribute_rename operator in the FROM clause of an
     AQL SELECT statement, as a stand-alone operator in a AFL statement, or as
@@ -42,12 +50,12 @@
       <procedure>
         <step>
           <para>Show the source_array:<para><programlisting>AFL% scan(champions)</programlisting><screen>{year,event} person,country,time
-{1996,"dash"} "Bailey","Canada",9.84
-{1996,"marathon"} "Thugwane","RSA",7956
-{2000,"dash"} "Greene","USA",9.87
-{2000,"marathon"} "Abera","Ethiopia",7811
-{2000,"steeplechase"} "Kosgei","Kenya",503.17
-{2008,"marathon"} "Wanjiru","Kenya",7596
+{1996,'dash'} 'Bailey','Canada',9.84
+{1996,'marathon'} 'Thugwane','RSA',7956
+{2000,'dash'} 'Greene','USA',9.87
+{2000,'marathon'} 'Abera','Ethiopia',7811
+{2000,'steeplechase'} 'Kosgei','Kenya',503.17
+{2008,'marathon'} 'Wanjiru','Kenya',7596
 </screen></para></para>
         </step>
 
@@ -57,12 +65,12 @@
           operator to rename the <literal>time</literal>
           attribute:<para><programlisting>AFL% attribute_rename(project(champions,country,time)
    ,time,time_in_seconds);</programlisting><screen>{year,event} country,time_in_seconds
-{1996,"dash"} "Canada",9.84
-{1996,"marathon"} "RSA",7956
-{2000,"dash"} "USA",9.87
-{2000,"marathon"} "Ethiopia",7811
-{2000,"steeplechase"} "Kenya",503.17
-{2008,"marathon"} "Kenya",7596
+{1996,'dash'} 'Canada',9.84
+{1996,'marathon'} 'RSA',7956
+{2000,'dash'} 'USA',9.87
+{2000,'marathon'} 'Ethiopia',7811
+{2000,'steeplechase'} 'Kenya',503.17
+{2008,'marathon'} 'Kenya',7596
 </screen></para></para>
         </step>
       </procedure>

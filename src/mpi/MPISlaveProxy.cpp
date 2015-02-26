@@ -114,8 +114,7 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
                << "MPI slave handshake has invalid launchId");
     }
 
-    boost::shared_ptr<scidb::Query> query( _query.lock());
-    Query::validateQueryPtr(query);
+    boost::shared_ptr<scidb::Query> query(Query::getValidQueryPtr(_query));
 
     if (handshake->rank() != query->getInstanceID()) { // logical instance ID
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)

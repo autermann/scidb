@@ -542,9 +542,9 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 			new_command.append(" -aq \"project(list('instances'),instance_path)\"");
 			stringstream bstream;
 			int rbytes, exit_code=FAILURE;
-		        char buf[BUFSIZ];
+		        char buf[BUFSIZ+1];
 		        FILE *pipe = 0;
-		        while ((rbytes = ReadOutputOf (new_command, &pipe, buf, sizeof (buf), &exit_code)) > 0)
+		        while ((rbytes = ReadOutputOf (new_command, &pipe, buf, BUFSIZ, &exit_code)) > 0)
 		        {
 		                buf[rbytes] = 0;
 	                        bstream << buf;
@@ -602,9 +602,9 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 	}
 
 	int rbytes, exit_code=FAILURE;
-	char buf[BUFSIZ];
+	char buf[BUFSIZ+1];
 	FILE *pipe = 0;
-	while ((rbytes = ReadOutputOf (sco->_command, &pipe, buf, sizeof (buf), &exit_code)) > 0)
+	while ((rbytes = ReadOutputOf (sco->_command, &pipe, buf, BUFSIZ, &exit_code)) > 0)
 	{
 		buf[rbytes] = 0;
 

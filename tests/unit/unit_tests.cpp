@@ -62,6 +62,7 @@
 #include "array/BitmaskUnitTests.h"
 #include "query/AuxUnitTests.h"
 //#include "system/ExceptionUnitTests.h"
+#include "PointerRangeUnitTests.h"
 
 using namespace std;
 

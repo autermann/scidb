@@ -11,9 +11,6 @@ store(build(I3,x+5),I3)
 normalize(I2)
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_NORMALIZE_ERROR2 "normalize(I1)"
 
-# #2194: inverse disabled until (#2182) SplitArray is fixed
-#--error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_OP_INVERSE_ERROR3 "inverse(I3)"
-
 --cleanup
 
 remove(I1)

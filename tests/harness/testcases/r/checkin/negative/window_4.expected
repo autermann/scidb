@@ -3,9 +3,9 @@ Query was executed successfully
 
 SCIDB QUERY : <select * into A from build(<a:int32> [x=0:2,3,3],x),build(<b:string> [x=0:2,3,3],x)>
 {x} a,b
-{0} 0,"0"
-{1} 1,"1"
-{2} 2,"2"
+{0} 0,'0'
+{1} 1,'1'
+{2} 2,'2'
 
 SCIDB QUERY : <window(A,1,1,sum(A))>
 [An error expected at this place for the query "window(A,1,1,sum(A))". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ATTRIBUTE_NOT_EXIST. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ATTRIBUTE_NOT_EXIST.]

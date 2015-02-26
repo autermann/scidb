@@ -1,77 +1,102 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="approxdcOperator">
   <refnamediv>
     <refname>approxdc</refname>
 
-    <refpurpose>Produces a result array containing approximate counts of the
+    <refpurpose><indexterm>
+        <primary>approximate count</primary>
+      </indexterm>Produces a result array containing approximate counts of the
     number of distinct values of an attribute.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>AQL% <command>SELECT</command> approxdc(<replaceable>attribute</replaceable>) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
-
-    <synopsis>AFL% aggregate(<replaceable>array</replaceable>,approxdc(<replaceable>attribute</replaceable>)<optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
+    <synopsis>approxdc(<replaceable>array</replaceable><optional>,<replaceable>attribute,dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>aggregates</primary>
+    <para>The <literal>approxdc</literal> operator takes a set of values from
+    an array attribute and returns an approximate count of the number of
+    distinct values present.</para>
 
-        <secondary>approximate count</secondary>
-      </indexterm><indexterm>
-        <primary>approximate count</primary>
-      </indexterm>The approxdc aggregate takes a set of values from an array
-    attribute and returns an approximate count of the number of distinct
-    values present.</para>
+    <para>The result array contains the aggregation result as a new attribute.
+    The name of this attribute is
+    <literal><replaceable>inputAttribute</replaceable>_adc</literal> , where
+    <replaceable>inputAttribute</replaceable> is the name of the attribute
+    being aggregated on.</para>
 
-    <para>The approxdc aggregate does not count null values.</para>
+    <para>If you do not specify an attribute, the first attribute is used, You
+    can also specify one or more dimensions to group the results by dimension.
+    For the corresponding aggregate, see the <link
+    linkend="approxdcAgg">approxdc aggregate</link> reference</para>
   </refsect1>
 
   <refsect1>
-    <title>Example</title>
+    <title>Inputs</title>
+
+    <para>The <literal>approxdc</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: A source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: Optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
+  </refsect1>
+
+  <refsect1>
+    <title>Examples</title>
 
     <informalexample>
-      <para>These examples find the approximate number of distinct words in an
-      array or in various subsets of the array.</para>
+      <para>These examples find the approximate number of distinct integers in
+      an array.</para>
 
       <procedure>
         <step>
-          <para>Show the array schema:<programlisting language="test">
---afl create array wordOfConversation 
-                   &lt;wordID:int64&gt; 
-                   [languageID=1:1000,100,0, 
-                    conversationID=1:5000000,1000,0, 
-                    timeOffsetInSeconds=1:10000,1000,100] 
- --show-query=no 
- --show-output=no
---schema wordOfConversation --show-output=yes  </programlisting></para>
+          <para>Create an array.<programlisting language="test">--afl create array counting &lt;val:int32&gt;
+      [i=0:999,1000,0, j=0:999,1000,0];  --show-output=no</programlisting></para>
         </step>
 
         <step>
-          <para>Show the approximate count of distinct words in the
-          array:<programlisting language="test">--aql SELECT approxdc(wordID) 
-       FROM wordOfConversation; --show-output=no</programlisting></para>
+          <para>Store values from 0 to 999,999—one million distinct
+          values.<programlisting language="test">--afl store(build(counting, (i * 1000) + j),counting); --show-output=no</programlisting></para>
         </step>
 
         <step>
-          <para>For each language represented in the array, show the
-          approximate count of distinct words used in all conversations in
-          that language:<programlisting language="test">--aql SELECT approxdc(wordID) 
-       FROM wordOfConversation 
-       GROUP BY languageID; --show-output=no</programlisting></para>
+          <para>Retrieve an approximate count of the number of distinct values
+          in the array.<programlisting language="test">--afl approxdc(counting);</programlisting>As
+          you can see, the result, 997498, is within a few percent of the
+          actual number of distinct values in the array.</para>
+        </step>
+      </procedure>
+
+      <para>Now, let's store 2000 different values, and use approxdc to
+      retrieve the actual number of distinct values.</para>
+
+      <procedure>
+        <step>
+          <para>Take the mod 2000 to cut down the number of distinct
+          values.<programlisting language="test">--afl store(build(counting, ((i * 1000) + j) % 2000),counting); --show-output=no</programlisting></para>
         </step>
 
         <step>
-          <para>For each conversation represented in the array, show the
-          approximate count of distinct words used:<programlisting
-          language="test">--aql SELECT approxdc(wordID) 
-       FROM wordOfConversation 
-       GROUP BY conversationID; --show-output=no</programlisting></para>
+          <para>Retrieve an approximate count of the number of distinct values
+          in the array.<programlisting language="test">--afl approxdc(counting,val);</programlisting>In
+          this case, notice that the result is exact.</para>
         </step>
       </procedure>
     </informalexample>

@@ -19,8 +19,8 @@ Query was executed successfully
 {3,3} 4,4
 
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
-{0} "x",0,4,4,0,0,3,"int64"
-{1} "y",0,4,4,0,0,3,"int64"
+{0} 'x',0,4,4,0,0,3,'int64'
+{1} 'y',0,4,4,0,0,3,'int64'
 
 Query was executed successfully
 

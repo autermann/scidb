@@ -138,7 +138,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 		}
 */
 
-	string trac_url = "http://trac.scidb.org/browser/trunk/tests/harness/testcases/";
+	string trac_url = "http://trac.scidb.net/browser/trunk/tests/harness/testcases/";
 	char *env_trac = getenv ("trac_url");
 	if (env_trac && *env_trac)
 	  {
@@ -146,7 +146,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 	  }
 	else
 	  {
-	    trac_url = "http://trac.scidb.org/browser/trunk/tests/harness/testcases/";
+	    trac_url = "http://trac.scidb.net/browser/trunk/tests/harness/testcases/";
 	  }
 	
 	string url = "";
@@ -159,7 +159,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 		url = trac_url + "t/" + tmp + revisionURL;
 		}
 	else
-//		url = "http://trac.scidb.org/browser/trunk/tests/basic/" + tmp + revisionURL;
+//		url = "http://trac.scidb.net/browser/trunk/tests/basic/" + tmp + revisionURL;
 //		url = trac_url + tmp + revisionURL;
 //		url = "http://" + cdashclntip + "/" + scidbtestresultsURL + "/" + "/tests_basic/" + tmp;
 

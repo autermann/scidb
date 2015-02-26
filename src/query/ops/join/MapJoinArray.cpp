@@ -115,7 +115,7 @@ namespace scidb
     {
         MapJoinArrayIterator const& arrayIterator = (MapJoinArrayIterator const&)chunk->getArrayIterator();
         rightArrayIterator = arrayIterator.rightIterator;
-        isEmptyIndicator = !arrayIterator.inputIterator || arrayIterator.inputIterator->end() || arrayIterator.inputIterator->getChunk().getAttributeDesc().isEmptyIndicator();
+        isEmptyIndicator = !arrayIterator.inputIterator || arrayIterator.inputIterator->end() || arrayIterator._isInputEmptyTag;
         isLeftAttribute = arrayIterator.inputIterator == arrayIterator.leftIterator;
         reset();
     }
@@ -126,8 +126,10 @@ namespace scidb
     MapJoinArrayIterator::MapJoinArrayIterator(DelegateArray const& delegate, AttributeID attrID,
                                                shared_ptr<ConstArrayIterator> left,
                                                shared_ptr<ConstArrayIterator> right,
-                                               shared_ptr<ConstArrayIterator> input)
+                                               shared_ptr<ConstArrayIterator> input,
+                                               bool isInputEmptyTag)
     : DelegateArrayIterator(delegate, attrID, left),
+      _isInputEmptyTag(isInputEmptyTag),
       leftIterator(left),
       rightIterator(right),
       inputIterator(input)
@@ -168,9 +170,10 @@ MapJoinArray::MapJoinArray(ArrayDesc& d, shared_ptr<Array> leftArray, shared_ptr
       left(leftArray),
       right(rightArray),
       nLeftAttrs(leftDesc.getAttributes().size()),
-      nRightAttrs(rightDesc.getAttributes().size()),
-      _query(query)
+      nRightAttrs(rightDesc.getAttributes().size())
     {
+        assert(query);
+        _query=query;
         leftEmptyTagPosition = leftDesc.getEmptyBitmapAttribute() != NULL ? leftDesc.getEmptyBitmapAttribute()->getId() : -1;
         rightEmptyTagPosition = rightDesc.getEmptyBitmapAttribute() != NULL ? rightDesc.getEmptyBitmapAttribute()->getId() : -1;
     }
@@ -187,6 +190,7 @@ MapJoinArray::MapJoinArray(ArrayDesc& d, shared_ptr<Array> leftArray, shared_ptr
         shared_ptr<ConstArrayIterator> rightIterator;
         shared_ptr<ConstArrayIterator> inputIterator;
         AttributeID inputAttrID = attrID;
+        bool isEmptyTagIndicator=false;
 
         if (leftEmptyTagPosition >= 0) { // left array is emptyable
             if (rightEmptyTagPosition >= 0) { // right array is also emptyable: ignore left empty-tag attribute
@@ -196,26 +200,35 @@ MapJoinArray::MapJoinArray(ArrayDesc& d, shared_ptr<Array> leftArray, shared_ptr
                 if (inputAttrID >= nLeftAttrs) {
                     leftIterator = left->getConstIterator(leftEmptyTagPosition);
                     inputIterator = rightIterator = right->getConstIterator(inputAttrID - nLeftAttrs);
+                    isEmptyTagIndicator=(static_cast<int64_t>(inputAttrID - nLeftAttrs)==rightEmptyTagPosition);
                 } else {
                     inputIterator = leftIterator = left->getConstIterator(inputAttrID);
                     rightIterator = right->getConstIterator(rightEmptyTagPosition);
+                    assert(static_cast<int64_t>(inputAttrID)!=leftEmptyTagPosition);
+                    isEmptyTagIndicator=false;
                 }
             } else { // emptyable array only from left side
                 if (inputAttrID >= nLeftAttrs) {
                     leftIterator = left->getConstIterator(leftEmptyTagPosition);
                     inputIterator = rightIterator = right->getConstIterator(inputAttrID - nLeftAttrs);
+                    assert(static_cast<int64_t>(inputAttrID - nLeftAttrs)!=rightEmptyTagPosition);
+                    isEmptyTagIndicator=false;
                 } else {
                     inputIterator = leftIterator = left->getConstIterator(inputAttrID);
                     rightIterator = right->getConstIterator(0);
+                    isEmptyTagIndicator=(static_cast<int64_t>(inputAttrID)==leftEmptyTagPosition);
                 }
             }
         } else if (rightEmptyTagPosition >= 0) { // only right array is emptyable
             if (inputAttrID >= nLeftAttrs) {
                 leftIterator = left->getConstIterator(0);
                 inputIterator = rightIterator = right->getConstIterator(inputAttrID - nLeftAttrs);
+                isEmptyTagIndicator=(static_cast<int64_t>(inputAttrID - nLeftAttrs)==rightEmptyTagPosition);
             } else {
                 inputIterator = leftIterator = left->getConstIterator(inputAttrID);
                 rightIterator = right->getConstIterator(rightEmptyTagPosition);
+                assert(static_cast<int64_t>(inputAttrID)!=leftEmptyTagPosition);
+                isEmptyTagIndicator=false;
             }
         } else { // both input arrays are non-emptyable
             if (inputAttrID >= nLeftAttrs) {
@@ -224,18 +237,23 @@ MapJoinArray::MapJoinArray(ArrayDesc& d, shared_ptr<Array> leftArray, shared_ptr
                     rightIterator = right->getConstIterator(0);
                 } else {
                     inputIterator = rightIterator = right->getConstIterator(inputAttrID - nLeftAttrs);
+                    assert(static_cast<int64_t>(inputAttrID - nLeftAttrs)!=rightEmptyTagPosition);
+                    isEmptyTagIndicator=false;
                 }
             } else {
                 inputIterator = leftIterator = left->getConstIterator(inputAttrID);
                 rightIterator = right->getConstIterator(0);
+                assert(static_cast<int64_t>(inputAttrID)!=leftEmptyTagPosition);
+                isEmptyTagIndicator=false;
             }
         }
-        return new MapJoinArrayIterator(*this, attrID, leftIterator, rightIterator, inputIterator);
+
+        return new MapJoinArrayIterator(*this, attrID, leftIterator, rightIterator, inputIterator,  isEmptyTagIndicator);
     }
 
     bool MapJoinArray::mapPosition(Coordinates& pos) const
     {
-       boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         for (size_t i = 0, n = pos.size(); i < n; i++) {
            Coordinate c = rightDesc.getOrdinalCoordinate(i,
                                                          leftDesc.getOriginalCoordinate(i, pos[i], query),

@@ -3,9 +3,9 @@ Query was executed successfully
 
 SCIDB QUERY : <store(build(A,datetime('10/10/2010 01:12:21')),A)>
 {x} a
-{0} "2010-10-10 01:12:21"
-{1} "2010-10-10 01:12:21"
-{2} "2010-10-10 01:12:21"
+{0} '2010-10-10 01:12:21'
+{1} '2010-10-10 01:12:21'
+{2} '2010-10-10 01:12:21'
 
 SCIDB QUERY : <select a + ('01/01/01 00:00:01') from A>
 [An error expected at this place for the query "select a + ('01/01/01 00:00:01') from A". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_FUNCTION_NOT_FOUND.]

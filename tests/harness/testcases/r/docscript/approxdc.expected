@@ -1,18 +1,17 @@
-SCIDB QUERY : <create array wordOfConversation <wordID:int64> [languageID=1:1000,100,0, conversationID=1:5000000,1000,0, timeOffsetInSeconds=1:10000,1000,100]>
+SCIDB QUERY : <create array counting <val:int32> [i=0:999,1000,0, j=0:999,1000,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <show(wordOfConversation)>
-{i} schema
-{0} "wordOfConversation<wordID:int64> [languageID=1:1000,100,0,conversationID=1:5000000,1000,0,timeOffsetInSeconds=1:10000,1000,100]"
-
-SCIDB QUERY : <SELECT approxdc(wordID) FROM wordOfConversation>
+SCIDB QUERY : <store(build(counting, (i * 1000) + j),counting)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <SELECT approxdc(wordID) FROM wordOfConversation GROUP BY languageID>
+SCIDB QUERY : <approxdc(counting)>
+[(997498)]
+
+SCIDB QUERY : <store(build(counting, ((i * 1000) + j) % 2000),counting)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <SELECT approxdc(wordID) FROM wordOfConversation GROUP BY conversationID>
-[Query was executed successfully, ignoring data output by this query.]
+SCIDB QUERY : <approxdc(counting,val)>
+[(2000)]
 
 Query was executed successfully
 

@@ -134,7 +134,7 @@ ArrayDesc getRankingSchema(ArrayDesc const& inputSchema, AttributeID rankedAttri
 shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
                                  AttributeID rankedAttributeID,
                                  Dimensions const& groupedDimensions,
-                                 shared_ptr<Query> query,
+                                 shared_ptr<Query>& query,
                                  shared_ptr<RankingStats> rstats)
 {
     const ArrayDesc& input = inputArray->getArrayDesc();
@@ -215,7 +215,7 @@ shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
 shared_ptr<Array> buildDualRankArray(shared_ptr<Array>& inputArray,
                                      AttributeID rankedAttributeID,
                                      Dimensions const& groupedDimensions,
-                                     shared_ptr<Query> query,
+                                     shared_ptr<Query>& query,
                                      shared_ptr<RankingStats> rstats)
 {
     const ArrayDesc& input = inputArray->getArrayDesc();

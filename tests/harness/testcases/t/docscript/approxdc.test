@@ -4,18 +4,21 @@
 
 --set-format dcsv
 --start-igdata
-create array wordOfConversation <wordID:int64> [languageID=1:1000,100,0, conversationID=1:5000000,1000,0, timeOffsetInSeconds=1:10000,1000,100] 
+create array counting <val:int32> [i=0:999,1000,0, j=0:999,1000,0]  
+store(build(counting, (i * 1000) + j),counting)  
+--set-format dense
 --stop-igdata
-show(wordOfConversation)
+approxdc(counting)  
+--set-format dcsv
 --start-igdata
---aql SELECT approxdc(wordID) FROM wordOfConversation  
---aql SELECT approxdc(wordID) FROM wordOfConversation GROUP BY languageID  
---aql SELECT approxdc(wordID) FROM wordOfConversation GROUP BY conversationID  
+store(build(counting, ((i * 1000) + j) % 2000),counting)  
+--set-format dense
 --stop-igdata
+approxdc(counting,val)  
 
 --stop-query-logging
 
 
 --cleanup
 
-remove(wordOfConversation)
+remove(counting)

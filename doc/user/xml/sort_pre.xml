@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="sortOperator">
   <refnamediv>
     <refname>sort</refname>
 
@@ -14,7 +13,6 @@
 
   <refsynopsisdiv>
     <synopsis> sort(<replaceable>array</replaceable>,
-      <replaceable>attribute </replaceable><optional><replaceable> asc </replaceable> |  <replaceable>desc </replaceable></optional>
    <optional><replaceable>, attribute </replaceable><optional><replaceable> asc </replaceable> |  <replaceable>desc </replaceable></optional></optional>...
    <optional><replaceable>, chunk_size </replaceable></optional> );</synopsis>
   </refsynopsisdiv>
@@ -27,7 +25,10 @@
     non-empty cell of the source array. Note that the result array does not
     show values of the original dimensions in the source array.</para>
 
-    <para>The result array's sole dimension is unbounded.</para>
+    <para><indexterm>
+        <primary>generated variable names</primary>
+      </indexterm>The result array's sole dimension is named <emphasis
+    role="bold">n</emphasis>, and is unbounded.</para>
 
     <para>The sort operator can sort by one or more attributes. The operator
     first sorts by the first attribute, then by the second, et cetera. Use the
@@ -37,10 +38,29 @@
 
     <para>You can control the chunk size of the resulting array with the
     optional <literal>chunk_size</literal> parameter.</para>
+  </refsect1>
 
-    <para>You can use the sort operator in the FROM clause of an AQL SELECT
-    statement, as a stand-alone operator in a AFL statement, or as an operand
-    within other SciDB operators.</para>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>sort</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: a source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: Zero or more
+          attributes. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">chunk_size</emphasis>: An optional chunk
+          size for the result array.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>
@@ -53,8 +73,8 @@
       <procedure>
         <step>
           <para>Show the source_array: <programlisting language="test">--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winners2.csv &gt; ../examples/winners2.scidb
---aql load winnersFlat from '../examples/winners2.scidb'; --show-query=no --show-output=no
+--shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winners2.csv &gt; $DOC_DATA/winners2.scidb
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2.scidb'; --show-query=no --show-output=no
 --afl CREATE ARRAY champions&lt;person:string,country:string,time:double&gt; 
    [year=1996:2008,13,0,event(string)=3,3,0]; --show-query=no --show-output=no
 --afl redimension_store(winnersFlat,champions); --show-query=no --show-output=no</programlisting><programlisting
@@ -83,8 +103,8 @@
       cells in ascending order, then sorts them in descending order.</para>
 
       <programlisting language="test">--afl create array numbers &lt;number:int64 null&gt;[i=0:4,5,0] --show-query=no --show-output=no
---shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p N &lt; ../examples/mostNumbers.csv &gt; ../examples/mostNumbers.scidb
---aql load numbers from '../examples/mostNumbers.scidb'; --show-query=no --show-output=no</programlisting>
+--shell --show-query=no --show-output=no --command=csv2scidb -s 1 -p N &lt; $DOC_DATA/mostNumbers.csv &gt; $DOC_DATA/mostNumbers.scidb
+--aql load numbers from '../tests/harness/testcases/data/doc/mostNumbers.scidb'; --show-query=no --show-output=no</programlisting>
 
       <procedure>
         <step>

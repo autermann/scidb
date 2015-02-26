@@ -514,10 +514,10 @@ Query was executed successfully
 
 SCIDB QUERY : <redimension_store(apply(join(A,variable_window(A,i, 3,0, count(*) as count)),x, int64(count*3), y, 'abc_'+string(count)), target)>
 {x,y} j
-{3,"abc_1"} 2
-{6,"abc_2"} 3
-{9,"abc_3"} 12
-{12,"abc_4"} 13
+{3,'abc_1'} 2
+{6,'abc_2'} 3
+{9,'abc_3'} 12
+{12,'abc_4'} 13
 
 SCIDB QUERY : <project(dimensions(target), low,high)>
 {No} low,high
@@ -526,8 +526,8 @@ SCIDB QUERY : <project(dimensions(target), low,high)>
 
 SCIDB QUERY : <redimension_store(filter(apply(join(A,variable_window(A,i, 3,0, count(*) as count)),x, int64(count*3), y, 'abc_'+string(count)), count%2<>0), target)>
 {x,y} j
-{3,"abc_1"} 2
-{9,"abc_3"} 12
+{3,'abc_1'} 2
+{9,'abc_3'} 12
 
 SCIDB QUERY : <project(dimensions(target), low,high)>
 {No} low,high

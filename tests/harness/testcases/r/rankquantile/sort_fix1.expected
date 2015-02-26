@@ -3,25 +3,25 @@ Query was executed successfully
 
 SCIDB QUERY : <store(build(A,20*x+1),A)>
 {x} r
-{10} "201"
-{11} "221"
-{12} "241"
-{13} "261"
-{14} "281"
-{15} "301"
-{16} "321"
-{17} "341"
+{10} '201'
+{11} '221'
+{12} '241'
+{13} '261'
+{14} '281'
+{15} '301'
+{16} '321'
+{17} '341'
 
 SCIDB QUERY : <store(apply(A,s, iif(x=13,na,iif(x=16,null,x))),B)>
 {x} r,s
-{10} "201",10
-{11} "221",11
-{12} "241",12
-{13} "261",NA
-{14} "281",14
-{15} "301",15
-{16} "321",null
-{17} "341",17
+{10} '201',10
+{11} '221',11
+{12} '241',12
+{13} '261',NA
+{14} '281',14
+{15} '301',15
+{16} '321',null
+{17} '341',17
 
 SCIDB QUERY : <create array Z <val:double NULL> [x=0:5,3,0]>
 Query was executed successfully
@@ -58,36 +58,36 @@ SCIDB QUERY : <load ( SortNanNullInf, '../tests/harness/testcases/data/sort_nan_
 
 SCIDB QUERY : <sort(A)>
 {n} r
-{0} "201"
-{1} "221"
-{2} "241"
-{3} "261"
-{4} "281"
-{5} "301"
-{6} "321"
-{7} "341"
+{0} '201'
+{1} '221'
+{2} '241'
+{3} '261'
+{4} '281'
+{5} '301'
+{6} '321'
+{7} '341'
 
 SCIDB QUERY : <sort(A,r)>
 {n} r
-{0} "201"
-{1} "221"
-{2} "241"
-{3} "261"
-{4} "281"
-{5} "301"
-{6} "321"
-{7} "341"
+{0} '201'
+{1} '221'
+{2} '241'
+{3} '261'
+{4} '281'
+{5} '301'
+{6} '321'
+{7} '341'
 
 SCIDB QUERY : <sort(A, r desc)>
 {n} r
-{0} "341"
-{1} "321"
-{2} "301"
-{3} "281"
-{4} "261"
-{5} "241"
-{6} "221"
-{7} "201"
+{0} '341'
+{1} '321'
+{2} '301'
+{3} '281'
+{4} '261'
+{5} '241'
+{6} '221'
+{7} '201'
 
 SCIDB QUERY : <sort(A desc)>
 [An error expected at this place for the query "sort(A desc)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE.]
@@ -100,36 +100,36 @@ SCIDB QUERY : <sort(A, desc)>
 
 SCIDB QUERY : <sort(B,s)>
 {n} r,s
-{0} "321",null
-{1} "261",NA
-{2} "201",10
-{3} "221",11
-{4} "241",12
-{5} "281",14
-{6} "301",15
-{7} "341",17
+{0} '321',null
+{1} '261',NA
+{2} '201',10
+{3} '221',11
+{4} '241',12
+{5} '281',14
+{6} '301',15
+{7} '341',17
 
 SCIDB QUERY : <sort(B, s desc)>
 {n} r,s
-{0} "341",17
-{1} "301",15
-{2} "281",14
-{3} "241",12
-{4} "221",11
-{5} "201",10
-{6} "261",NA
-{7} "321",null
+{0} '341',17
+{1} '301',15
+{2} '281',14
+{3} '241',12
+{4} '221',11
+{5} '201',10
+{6} '261',NA
+{7} '321',null
 
 SCIDB QUERY : <sort(B, s asc)>
 {n} r,s
-{0} "321",null
-{1} "261",NA
-{2} "201",10
-{3} "221",11
-{4} "241",12
-{5} "281",14
-{6} "301",15
-{7} "341",17
+{0} '321',null
+{1} '261',NA
+{2} '201',10
+{3} '221',11
+{4} '241',12
+{5} '281',14
+{6} '301',15
+{7} '341',17
 
 SCIDB QUERY : <sort(B desc)>
 [An error expected at this place for the query "sort(B desc)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SORTING_QUIRK_WRONG_USAGE.]

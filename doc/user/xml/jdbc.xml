@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
-<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd">
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd"
+[ <!ENTITY % myents SYSTEM "scidb_ug.ent" > %myents; ]
+>
 <chapter id="JDBC">
   <title>JDBC Driver for SciDB</title>
 
@@ -75,7 +75,7 @@
     driver:</para>
 
     <programlisting>cd $JDBC
-wget http://downloads.paradigm4.com/client/13.3/jdbc/scidb4j.jar</programlisting>
+wget http://downloads.paradigm4.com/client/&scidb_version;/jdbc/scidb4j.jar</programlisting>
   </section>
 
   <section id="JDBCPATH">
@@ -208,7 +208,7 @@ class JDBCExample
 
     <para>To run this example, make sure SciDB is running, then run the
     following commands:<programlisting>cd $JDBC
-wget http://downloads.paradigm4.com/client/13.3/jdbc/example.jar
+wget http://downloads.paradigm4.com/client/&scidb_version;/jdbc/example.jar
 java -classpath example.jar:scidb4j.jar:/usr/share/java/protobuf.jar
     org.scidb.JDBCExample</programlisting></para>
 

@@ -5,8 +5,8 @@
 --set-format dcsv
 --start-igdata
 create array letters <letter:string> [i=0:2,3,0] 
---shell  --command="csv2scidb -s 1 -p S < ../examples/letters.csv > ../examples/letters.scidb "
---aql load letters from '../examples/letters.scidb' 
+--shell  --command="csv2scidb -s 1 -p S < $DOC_DATA/letters.csv > $DOC_DATA/letters.scidb "
+--aql load letters from '../tests/harness/testcases/data/doc/letters.scidb' 
 --stop-igdata
 scan(letters) 
 --start-igdata
@@ -18,8 +18,8 @@ cross(numbers,letters)
 --set-format dcsv
 --start-igdata
 create array lettersPlus <letter:string, type:string> [i=0:2,3,0] 
---shell  --command="csv2scidb -s 1 -p S < ../examples/lettersPlus.csv > ../examples/lettersPlus.scidb "
---aql load lettersPlus from '../examples/lettersPlus.scidb' 
+--shell  --command="csv2scidb -s 1 -p S < $DOC_DATA/lettersPlus.csv > $DOC_DATA/lettersPlus.scidb "
+--aql load lettersPlus from '../tests/harness/testcases/data/doc/lettersPlus.scidb' 
 --stop-igdata
 scan(lettersPlus) 
 --set-format auto
@@ -27,8 +27,8 @@ cross(numbers,lettersPlus)
 --set-format dcsv
 --start-igdata
 create array oddNumbers <number:int64 null> [i=0:4,5,0] 
---shell  --command="csv2scidb -s 1 -p N < ../examples/oddNumbers.csv > ../examples/oddNumbers.scidb "
---aql load oddNumbers from '../examples/oddNumbers.scidb' 
+--shell  --command="csv2scidb -s 1 -p N < $DOC_DATA/oddNumbers.csv > $DOC_DATA/oddNumbers.scidb "
+--aql load oddNumbers from '../tests/harness/testcases/data/doc/oddNumbers.scidb' 
 --stop-igdata
 scan(oddNumbers) 
 --set-format auto

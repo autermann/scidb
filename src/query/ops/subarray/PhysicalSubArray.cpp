@@ -114,7 +114,7 @@ public:
 
     virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
     {
-        boost::shared_ptr<Query> query(_query.lock());
+        shared_ptr<Query> query(Query::getValidQueryPtr(PhysicalOperator::_query));
         ArrayDesc const& input = inputSchemas[0];
         Coordinates windowStart = getWindowStart(input, query);
         Coordinates windowEnd = getWindowEnd(input, query);
@@ -134,7 +134,7 @@ public:
         Dimensions const& inputDimensions = desc.getDimensions();
         size_t numCoords = inputDimensions.size();
         DimensionVector result(numCoords);
-        boost::shared_ptr<Query> query(_query.lock());
+        shared_ptr<Query> query(Query::getValidQueryPtr(PhysicalOperator::_query));
         Coordinates windowStart = getWindowStart(inputSchemas[0], query);
 
         for (size_t i = 0; i < numCoords; i++)
@@ -176,7 +176,7 @@ public:
                                                    const std::vector< ArrayDesc> & inputSchemas) const
     {
         size_t nDims = _schema.getDimensions().size();
-        boost::shared_ptr<Query> query(_query.lock());
+        shared_ptr<Query> query(Query::getValidQueryPtr(PhysicalOperator::_query));
         PhysicalBoundaries window(getWindowStart(inputSchemas[0], query),
                                   getWindowEnd(inputSchemas[0], query));
         PhysicalBoundaries result = inputBoundaries[0].intersectWith(window);
@@ -223,7 +223,7 @@ public:
         for(size_t i=0; i<nDims; i++)
         {
             if (lowPos[i] > highPos[i]) {
-                return boost::shared_ptr<Array>(new MemArray(_schema));
+                return boost::shared_ptr<Array>(new MemArray(_schema,query));
             }
             if (query->getCoordinatorID() != COORDINATOR_INSTANCE) { 
                 string const& oldMapping = srcDims[i].getMappingArrayName();
@@ -236,7 +236,7 @@ public:
         /***
          * Create an iterator-based array implementation for the operator
          */
-        boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, inputArrays[0] ));
+        boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, inputArrays[0],query));
         return arr;
     }
 };

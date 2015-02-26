@@ -138,33 +138,53 @@ class LogicalJoin: public LogicalOperator
         {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LOGICAL_JOIN_ERROR1);
         }
-        for (size_t i = 0, n = leftDimensions.size(); i < n; i++) {
+        Dimensions joinDimensions;
+        for (size_t i = 0, n = leftDimensions.size(); i < n; i++)
+        {
             if(!(leftDimensions[i].getType() ==  rightDimensions[i].getType()
                        && (leftDimensions[i].getType() != TID_INT64 
                            || (leftDimensions[i].getStart() == rightDimensions[i].getStart()
-                              && leftDimensions[i].getChunkInterval() == rightDimensions[i].getChunkInterval()
-                              && leftDimensions[i].getChunkOverlap() == rightDimensions[i].getChunkOverlap()))))
-           {
+                              && leftDimensions[i].getChunkInterval() == rightDimensions[i].getChunkInterval()))))
+            {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LOGICAL_JOIN_ERROR2);
-           }
-           leftDimensions[i].addAlias(leftArrayDesc.getName());
+            }
+            DimensionDesc &lDim = leftDimensions[i];
+            joinDimensions.push_back(
+                   DimensionDesc(
+                           lDim.getBaseName(),
+                           lDim.getNamesAndAliases(),
+                           lDim.getStartMin(),
+                           lDim.getCurrStart(),
+                           lDim.getCurrEnd(),
+                           lDim.getEndMax(),
+                           lDim.getChunkInterval(),
+                           min(lDim.getChunkOverlap(), rightDimensions[i].getChunkOverlap()),
+                           lDim.getType(),
+                           lDim.getFlags(),
+                           lDim.getMappingArrayName(),
+                           lDim.getComment(),
+                           lDim.getFuncMapOffset(),
+                           lDim.getFuncMapScale()
+                       )
+                   );
+           joinDimensions[i].addAlias(leftArrayDesc.getName());
            if (!mapJoin) {
                Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
                Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
                Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
-               leftDimensions[i].setCurrStart(newCurrStart);
-               leftDimensions[i].setCurrEnd(newCurrEnd);
-               leftDimensions[i].setEndMax(newEndMax);
+               joinDimensions[i].setCurrStart(newCurrStart);
+               joinDimensions[i].setCurrEnd(newCurrEnd);
+               joinDimensions[i].setEndMax(newEndMax);
            }
            BOOST_FOREACH(const ObjectNames::NamesPairType &rDimName, rightDimensions[i].getNamesAndAliases())
            {
                BOOST_FOREACH(const string &alias, rDimName.second)
                {
-                   leftDimensions[i].addAlias(alias, rDimName.first);
+                   joinDimensions[i].addAlias(alias, rDimName.first);
                }
            }
         }
-        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(), joinAttributes, leftDimensions);
+        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(), joinAttributes, joinDimensions);
     }
 };
 

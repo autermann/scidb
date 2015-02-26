@@ -6,9 +6,9 @@ SCIDB QUERY : <build(<a:int32> [x=0:2,3,0], '[(1),(2),(3)]', true)>
 
 SCIDB QUERY : <build(<a:int32, b:string> [x=0:2,3,0], '[(1, "a"),(2, "b"),(3, "c")]', true)>
 {x} a,b
-{0} 1,"a"
-{1} 2,"b"
-{2} 3,"c"
+{0} 1,'a'
+{1} 2,'b'
+{2} 3,'c'
 
 SCIDB QUERY : <build(<a:int32> [x=0:2,3,0], 'blah', true)>
 [An error expected at this place for the query "build(<a:int32> [x=0:2,3,0], 'blah', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
@@ -27,9 +27,9 @@ SCIDB QUERY : <select * from array(<a:int32> [x=0:2,3,0], '[(1),(2),(3)]')>
 
 SCIDB QUERY : <select * from array(<a:int32, b:string> [x=0:2,3,0], '[(1, "a"),(2, "b"),(3, "c")]')>
 {x} a,b
-{0} 1,"a"
-{1} 2,"b"
-{2} 3,"c"
+{0} 1,'a'
+{1} 2,'b'
+{2} 3,'c'
 
 SCIDB QUERY : <select * from array(<a:int32> [x=0:2,3,0], 'blah')>
 [An error expected at this place for the query "select * from array(<a:int32> [x=0:2,3,0], 'blah')". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
@@ -57,7 +57,7 @@ SCIDB QUERY : <store(merge(build(<val:int64> [x,y], '[[{1000,1000}(1)]]', true),
 
 SCIDB QUERY : <show(bar)>
 {i} schema
-{0} "bar<val:int64> [x=0:*,707,0,y=0:*,707,0]"
+{0} 'bar<val:int64> [x=0:*,707,0,y=0:*,707,0]'
 
 SCIDB QUERY : <remove(foo)>
 Query was executed successfully

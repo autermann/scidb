@@ -51,6 +51,7 @@
 #endif
 #include <fstream>
 
+#include <linear_algebra/blas/initMathLibs.h>
 #include "network/NetworkManager.h"
 #include "system/SciDBConfigOptions.h"
 #include "system/Config.h"
@@ -236,8 +237,9 @@ void runSciDB()
        // Pull in the injected error library symbols
        InjectedErrorLibrary::getLibrary()->getError(0);
        PhysicalOperator::getInjectedErrorListener();
+       ThreadPool::startInjectedErrorListener();
 
-       ReplicationManager::getInstance()->start();
+       ReplicationManager::getInstance()->start(messagesJobQueue);
 
        messagesThreadPool->start();
        NetworkManager::getInstance()->run(messagesJobQueue);
@@ -450,6 +452,17 @@ class LoggerControl {
 int main(int argc, char* argv[])
 {
     LoggerControl logCtx;
+
+    try
+    {
+        earlyInitMathLibEnv();  // environ changes must precede multi-threading.
+    }
+    catch(const std::exception &e)
+    {
+        printPrefix();
+        cerr << "Failed to initialize math lib environ: " << e.what() << endl;
+        scidb::exit(1);
+    }
 
     // need to adjust sigaction SIGCHLD ?
    try

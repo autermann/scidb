@@ -21,13 +21,15 @@
 */
 package org.scidb.client;
 
+import org.scidb.io.network.Message;
+import org.scidb.io.network.Message.QueryResult;
+import org.scidb.io.network.Network;
+
 import java.io.IOException;
 import java.net.SocketException;
-import java.util.logging.*;
-
-import org.scidb.io.network.Message;
-import org.scidb.io.network.Network;
-import org.scidb.io.network.Message.QueryResult;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * SciDB connection
@@ -36,8 +38,9 @@ public class Connection
 {
     private Network net;
     private boolean afl = false;
-    private long queryId = 0;
+    private long _queryId = 0;
     private WarningCallback warningCallback;
+    private List<Long> _activeQueries = new ArrayList<Long>();
 
     private static Logger log = Logger.getLogger(Connection.class.getName());
 
@@ -98,7 +101,7 @@ public class Connection
             case Message.mtQueryResult:
                 log.fine("Got result from server");
                 Result res = new Result((QueryResult) msg, this);
-                queryId = res.getQueryId(); 
+                _queryId = res.getQueryId();
                 return res;
 
             case Message.mtError:
@@ -111,7 +114,7 @@ public class Connection
                         msg.getHeader().messageType));
         }
     }
-    
+
     /**
      * Set query execution mode to AFL or language
      * @param afl true - AFL, false - AQL
@@ -134,7 +137,7 @@ public class Connection
      * Return AQL flag
      * @return true if AQL mode
      */
-    public boolean isAQL()
+    public boolean isAql()
     {
         return !afl;
     }
@@ -147,13 +150,13 @@ public class Connection
      */
     public Array execute() throws IOException, Error
     {
-        if (queryId == 0)
+        if (_queryId == 0)
         {
             throw new Error("Query not prepared");
         }
         
-        log.fine(String.format("Executing query"));
-        Message msg = new Message.Query(queryId, "", afl, "", true);
+        log.fine(String.format("Executing query %d", _queryId));
+        Message msg = new Message.Query(_queryId, "", afl, "", true);
         net.write(msg);
         msg = net.read();
 
@@ -162,6 +165,7 @@ public class Connection
             case Message.mtQueryResult:
                 log.fine("Got result from server");
                 Result res = new Result((QueryResult) msg, this);
+                _activeQueries.add(res.getQueryId());
                 if (res.isSelective())
                     return new Array(res.getQueryId(), res.getSchema(), net);
                 else
@@ -177,31 +181,37 @@ public class Connection
                         msg.getHeader().messageType));
         }
     }
-    
+
     /**
      * Commit query
      */
     public void commit() throws IOException, Error
     {
-        net.write(new Message.CompleteQuery(queryId));
-        Message msg = net.read();
-
-        switch (msg.getHeader().messageType)
+        List<Long> activeQueries = new ArrayList<Long>(_activeQueries);
+        _activeQueries.clear();
+        for (long queryId: activeQueries)
         {
-            case Message.mtError:
-                Message.Error err = (Message.Error) msg;
-                if (err.getRecord().getLongErrorCode() != 0)
-                {
-                    log.fine("Got error message from server");
-                    throw new Error((Message.Error) msg);
-                }
-                log.fine("Query completed successfully");
-                break;
+            log.fine(String.format("Committing query %d", queryId));
+            net.write(new Message.CompleteQuery(queryId));
+            Message msg = net.read();
 
-            default:
-                log.severe("Got unhandled network message during query completing");
-                throw new Error(String.format("Can not handle network message '%s'",
-                        msg.getHeader().messageType));
+            switch (msg.getHeader().messageType)
+            {
+                case Message.mtError:
+                    Message.Error err = (Message.Error) msg;
+                    if (err.getRecord().getLongErrorCode() != 0)
+                    {
+                        log.fine("Got error message from server");
+                        throw new Error((Message.Error) msg);
+                    }
+                    log.fine("Query completed successfully");
+                    break;
+
+                default:
+                    log.severe("Got unhandled network message during query completing");
+                    throw new Error(String.format("Can not handle network message '%s'",
+                            msg.getHeader().messageType));
+            }
         }
     }
     
@@ -210,25 +220,31 @@ public class Connection
      */
     public void rollback() throws IOException, Error
     {
-        net.write(new Message.AbortQuery(queryId));
-        Message msg = net.read();
-
-        switch (msg.getHeader().messageType)
+        List<Long> activeQueries = new ArrayList<Long>(_activeQueries);
+        _activeQueries.clear();
+        for (long queryId: activeQueries)
         {
-            case Message.mtError:
-                Message.Error err = (Message.Error) msg;
-                if (err.getRecord().getLongErrorCode() != 0)
-                {
-                    log.fine("Got error message from server");
-                    throw new Error((Message.Error) msg);
-                }
-                log.fine("Query aborted successfully");
-                break;
+            log.fine(String.format("Rolling back query %d", queryId));
+            net.write(new Message.AbortQuery(queryId));
+            Message msg = net.read();
 
-            default:
-                log.severe("Got unhandled network message during query aborting");
-                throw new Error(String.format("Can not handle network message '%s'",
-                        msg.getHeader().messageType));
+            switch (msg.getHeader().messageType)
+            {
+                case Message.mtError:
+                    Message.Error err = (Message.Error) msg;
+                    if (err.getRecord().getLongErrorCode() != 0)
+                    {
+                        log.fine("Got error message from server");
+                        throw new Error((Message.Error) msg);
+                    }
+                    log.fine("Query aborted successfully");
+                    break;
+
+                default:
+                    log.severe("Got unhandled network message during query aborting");
+                    throw new Error(String.format("Can not handle network message '%s'",
+                            msg.getHeader().messageType));
+            }
         }
     }
     

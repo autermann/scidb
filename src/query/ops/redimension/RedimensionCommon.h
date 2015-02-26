@@ -43,7 +43,7 @@
 #include "system/SystemCatalog.h"
 #include "network/NetworkManager.h"
 #include "smgr/io/Storage.h"
-#include "smgr/io/DimensionIndex.h"
+#include "query/DimensionIndex.h"
 #include "util/iqsort.h"
 #include <log4cxx/logger.h>
 #include <array/RowCollection.h>

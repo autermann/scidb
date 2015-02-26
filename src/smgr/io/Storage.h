@@ -196,6 +196,7 @@ namespace scidb
         Segment() {}
     };
 
+    class PersistentChunk;
     /**
      * Storage manager interface
      */
@@ -231,7 +232,7 @@ namespace scidb
          * @param query in the context of which the iterator is requeted
          * @return shared pointer to the array iterator
          */
-        virtual boost::shared_ptr<ArrayIterator> getArrayIterator(const ArrayDesc& arrDesc,
+        virtual boost::shared_ptr<ArrayIterator> getArrayIterator(boost::shared_ptr<const Array>& arr,
                                                                   AttributeID attId,
                                                                   boost::shared_ptr<Query>& query) = 0;
 
@@ -242,7 +243,7 @@ namespace scidb
          * @param query in the context of which the iterator is requeted
          * @return shared pointer to the array iterator
          */
-        virtual boost::shared_ptr<ConstArrayIterator> getConstArrayIterator(const ArrayDesc& arrDesc,
+        virtual boost::shared_ptr<ConstArrayIterator> getConstArrayIterator(boost::shared_ptr<const Array>& arr,
                                                                             AttributeID attId,
                                                                             boost::shared_ptr<Query>& query) = 0;
 
@@ -273,6 +274,7 @@ namespace scidb
          * specified array is not present.
          * This routine must be called on either all versions of uaId in sequence
          * (as in "remove(array)") or on the last version of uaId only (as in "rollback").
+         * If uaId==arrId and timestamp==0, all chunks for uaId are removed.
          * @param uaId the Unversioned Array ID
          * @param arrId the Versioned Array ID
          * @param timestamp optional - if set, remove only chunks older than timestamp
@@ -313,12 +315,6 @@ namespace scidb
          */
         virtual void rollback(std::map<ArrayID,VersionID> const& undoUpdates) = 0;
 
-        /**
-         * Recover instance
-         * @param recoveredInstance ID of recovered instance
-         */
-        virtual void recover(InstanceID recoveredInstance, boost::shared_ptr<Query>& query) = 0;
-
         struct DiskInfo 
         {             
             uint64_t used;
@@ -355,80 +351,93 @@ namespace scidb
          * @param chunk destination chunk to receive decompressed data
          * @param buf buffer containing compressed data.
          */
-        virtual void decompressChunk(Chunk* chunk, CompressedBuffer const& buf) = 0;
+        virtual void decompressChunk(ArrayDesc const& desc, PersistentChunk* chunk, CompressedBuffer const& buf) = 0;
 
         /**
          * Compress chunk to the specified buffer
          * @param chunk chunk to be compressed
          * @param buf buffer where compressed data will be placed. It is inteded to be initialized using default constructore and will be filled by this method.
          */
-        virtual void compressChunk(Chunk const* chunk, CompressedBuffer& buf) = 0;
+        virtual void compressChunk(ArrayDesc const& desc, PersistentChunk const* chunk, CompressedBuffer& buf) = 0;
 
         /**
          * Pin chunk in memory: prevent cache replacement algorithm to throw away this chunk from memory
          * @param chunk chunk to be pinned in memory
          */
-        virtual void pinChunk(Chunk const* chunk) = 0;
+        virtual void pinChunk(PersistentChunk const* chunk) = 0;
 
         /**
          * Unpin chunk in memory: decrement access couter for this chunk
          * @param chunk chunk to be unpinned
          */
-        virtual void unpinChunk(Chunk const* chunk) = 0;
+        virtual void unpinChunk(PersistentChunk const* chunk) = 0;
 
         /**
          * Write new chunk in the storage.
          * @param chunk new chunk created by newChunk Method
+         * @param query performing the operation
          */
-        virtual void writeChunk(Chunk* chunk, boost::shared_ptr<Query>& query) = 0;
+        virtual void writeChunk(ArrayDesc const& desc, PersistentChunk* chunk, boost::shared_ptr<Query>& query) = 0;
 
         /**
          * Find and fetch a chunk from a particular array. Throws exception if chunk does not exist.
          * @param desc the array descriptor
          * @param addr the address of the chunk
+         * @param query performing the operation
          * @return the pointer to the chunk.
          */
-        virtual Chunk* readChunk(ArrayDesc const& desc, StorageAddress const& addr) = 0;
+        virtual PersistentChunk* readChunk(ArrayDesc const& desc,
+                                           StorageAddress const& addr,
+                                           const boost::shared_ptr<Query>& query) = 0;
 
         /**
          * Load chunk body from the storage.
          * @oaran desc the array descriptor
          * @param chunk loaded chunk
          */
-        virtual void loadChunk(ArrayDesc const& desc, Chunk* chunk) = 0;
+        virtual void loadChunk(ArrayDesc const& desc, PersistentChunk* chunk) = 0;
 
         /**
          * Get latch for the specified chunk
          * @param chunk chunk to be locked
          */
-        virtual RWLock& getChunkLatch(DBChunk* chunk) = 0;
+        virtual RWLock& getChunkLatch(PersistentChunk* chunk) = 0;
 
         /**
          * Create new chunk in the storage. There should be no chunk with such address in the storage.
          * @param desc the array descriptor
          * @param addr chunk address
          * @param compressionMethod compression method for this chunk
+         * @param query performing the operation
          * @throw SystemException if the chunk with such address already exists
          */
-        virtual Chunk* createChunk(ArrayDesc const& desc, StorageAddress const& addr, int compressionMethod) = 0;
+        virtual PersistentChunk* createChunk(ArrayDesc const& desc,
+                                             StorageAddress const& addr,
+                                             int compressionMethod,
+                                             const boost::shared_ptr<Query>& query) = 0;
 
-	    /**
+        /**
          * Clone a persistent chunk; create a chunk in the target array which acts as a "pointer" to some chunk in the source array.
-         * Currently, this function has only one caller - the message handler, which receives a message sent by a private method of CachedStorage.
+         * Currently, this function has only one caller -
+         * the message handler, which receives a message sent by a private method of CachedStorage.
          * This is only used when both arrays are immutable and (obviously) the chunk contains the exact same data.
          * @param pos the coordinates of the chunk
          * @param targetDesc the descriptor of the target array
-         * @param targetAttrID the attribute id of the chunk in the target array 
+         * @param targetAttrID the attribute id of the chunk in the target array
          * @param sourceDesc the descriptor of the source array
          * @param sourceAttrID the attribute id of the chunk in the source array
+         * @param query performing the operation
          */
-        virtual void cloneChunk(Coordinates const& pos, ArrayDesc const& targetDesc, AttributeID targetAttrID, ArrayDesc const& sourceDesc, AttributeID sourceAttrID) = 0;
+        virtual void cloneLocalChunk(Coordinates const& pos, ArrayDesc const& targetDesc,
+                                     AttributeID targetAttrID, ArrayDesc const& sourceDesc,
+                                     AttributeID sourceAttrID,
+                                     boost::shared_ptr<Query>& query) = 0;
 
         /**
          * Delete chunk
          * @param chunk chunk to be deleted
          */
-        virtual void deleteChunk(Chunk& chunk) = 0;
+        virtual void deleteChunk(ArrayDesc const& desc, PersistentChunk& chunk) = 0;
 
         virtual size_t getNumberOfInstances() const = 0;
 
@@ -443,8 +452,6 @@ namespace scidb
          */
         virtual InstanceID getPrimaryInstanceId(ArrayDesc const& desc, StorageAddress const& address) const =0;
 
-        virtual Array const& getDBArray(ArrayID) = 0;
-  
         /**
          * Get a list of the chunk positions for a particular persistent array. If the array is not found, no fields
          * shall be added to the chunks argument.
@@ -485,8 +492,9 @@ namespace scidb
           * the responsibility of determining that. Note this method removes all attributes at once.
           * @param arrayDesc the array descriptor. The id field is used for version purposes.
           * @param coords the coordinates of the removed chunk
+          * @param query the query context
           */
-         virtual void removeLocalChunkVersion(ArrayDesc const& arrayDesc, Coordinates const& coords) =0;
+         virtual void removeLocalChunkVersion(ArrayDesc const& arrayDesc, Coordinates const& coord, boost::shared_ptr<Query>& query) =0;
 
          /**
           * Remove a previously existing chunk from existence in the given version in the system.

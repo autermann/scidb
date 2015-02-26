@@ -36,6 +36,7 @@
 #include "Semaphore.h"
 #include "JobQueue.h"
 #include "system/Sysinfo.h"
+#include <util/InjectedError.h>
 
 namespace scidb
 {
@@ -46,7 +47,7 @@ class Thread;
  * Pool of threads. Process jobs from queue.
  *
  */
-class ThreadPool
+class ThreadPool : public InjectedErrorListener<ThreadStartInjectedError>
 {
 friend class Thread;
 private:
@@ -54,9 +55,9 @@ private:
     boost::shared_ptr<JobQueue> _queue;
     Mutex _mutex;
     std::vector< boost::shared_ptr<Job> > _currentJobs;
-    Semaphore _terminatedThreads;
     bool _shutdown;
     size_t _threadCount;
+    boost::shared_ptr<Semaphore> _terminatedThreads;
 
 public:
 
@@ -133,11 +134,21 @@ public:
      */
     bool isStarted();
 
-    // Waits completing current jobs
-    void waitCurrentJobs();
+    static void startInjectedErrorListener()
+    {
+        s_injectedErrorListener.start();
+    }
+
+    static InjectedErrorListener<ThreadStartInjectedError>&
+    getInjectedErrorListener()
+    {
+        return s_injectedErrorListener;
+    }
+
+ private:
+    static InjectedErrorListener<ThreadStartInjectedError> s_injectedErrorListener;
 
 };
-
 
 } //namespace
 

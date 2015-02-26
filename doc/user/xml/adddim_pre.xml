@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
-  <refnamediv id="adddim">
+<refentry id="adddim">
+  <refnamediv>
     <refname>adddim</refname>
 
-    <refpurpose>Produces a result array with one more dimension than a given
+    <refpurpose><indexterm>
+        <primary>adddim</primary>
+      </indexterm><indexterm>
+        <primary>dimensions</primary>
+
+        <secondary>adding</secondary>
+      </indexterm>Produces a result array with one more dimension than a given
     source array.</refpurpose>
   </refnamediv>
 
@@ -17,15 +22,9 @@
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>adddim</primary>
-      </indexterm><indexterm>
-        <primary>dimensions</primary>
-
-        <secondary>adding</secondary>
-      </indexterm>The adddim operator adds a stub, integer dimension to an
-    array to increase its dimensionality by 1. The datatype of the new
-    dimension is int64. The size of the new dimension is 1.</para>
+    <para>The adddim operator adds a stub, integer dimension to an array to
+    increase its dimensionality by 1. The datatype of the new dimension is
+    int64. The size of the new dimension is 1.</para>
 
     <para>The cardinality of the added dimension is limited to 1—that is, you
     can only increase a 1-dimensional array to 2 dimensions, a 2-dimensional

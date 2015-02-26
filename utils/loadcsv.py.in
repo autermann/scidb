@@ -93,7 +93,10 @@ def flatten(collection):
 ####################
 def getHostAddresses():
     addresses = ["localhost"]
-    addresses.extend(flatten(socket.gethostbyaddr(socket.gethostname())))
+    try:
+        addresses.extend(flatten(socket.gethostbyaddr(socket.gethostname())))
+    except Exception, e:
+        addresses.append(socket.gethostname())
     return addresses
 
 ####################
@@ -155,7 +158,7 @@ def setChunkSize():
     cs = opts.chunk_size
     if opts.load_schema:
         logNormal("Parsing chunk size from provided load schema.")
-        cs = long(opts.load_schema.split("[")[1].split("]")[0].split(",")[1])
+        cs = long(opts.load_schema.split("[")[1].split(",")[1])
     elif opts.load_name:
         # Need to query SciDB for the schema.
         logNormal("Retrieving load array schema from SciDB and parsing it to determine load array chunk size.")
@@ -170,7 +173,7 @@ def setChunkSize():
             raise Exception(err)
         arrayDef = p.stdout.read()     
         logVerbose("Result: " + arrayDef.rstrip("\n"))   
-        cs = long(arrayDef.split("[(\"")[1].split("\")]")[0].split("[")[1].split("]")[0].split(",")[1])
+        cs = long(arrayDef.split("[")[2].split(",")[1])
     if cs != opts.chunk_size:
         logVerbose("Using chunk size of %d for load array based on load array schema definition." % cs)
         opts.chunk_size = cs
@@ -239,8 +242,9 @@ def getInstances():
     configCsv = p.stdout.read();
     reader = csv.DictReader(cStringIO.StringIO(configCsv))
     for item in reader:
+        item["name"] = item["name"].replace("'", "")
         item["csv_fragment"] = "%s_%04d" % (outputBase, int(item["instance_id"]))
-        item["dlf_fragment"] = "%s/%s" % (item["instance_path"], dlfFragmentName)
+        item["dlf_fragment"] = "%s/%s" % (item["instance_path"].replace("'", ""), dlfFragmentName)
         instances.append(item)
     logNormal("This SciDB installation has %d instance(s)." % len(instances))
 
@@ -344,7 +348,7 @@ def split():
     logNormal("Starting CSV splitting process.")
 
     # Split the input file.
-    cmd = "\"%ssplitcsv\" -n %d -s %d -o \"%s\"" % (sciDbBinFolder, len(instances), opts.skip, outputBase)
+    cmd = "\"%ssplitcsv\" -n %d -c %d -s %d -o \"%s\"" % (sciDbBinFolder, len(instances), opts.chunk_size, opts.skip, outputBase)
     logVerbose(cmd)
     p = subprocess.Popen(cmd, stdin=sys.stdin, stdout=subprocess.PIPE, stderr=sys.stderr, shell=True, close_fds=True, preexec_fn=os.setsid)
     childProcesses.append(p)

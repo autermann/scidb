@@ -131,7 +131,6 @@ private:
                                 // size, you can support ScaLAPACK block-cyclic quite
                                 // naturally.  When we iterate on a single node, we
                                 // iterate from chunk to chunk locally this way.
-    const boost::weak_ptr<scidb::Query> _query; // for ArrayIterator::getChunk()
 };
 
 template<class Op_tt>
@@ -244,7 +243,7 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
         }
         chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
 
-        const boost::shared_ptr<scidb::Query> localQueryPtr(_array._query.lock());  // duration of getChunk() short enough
+        const boost::shared_ptr<scidb::Query> localQueryPtr(Query::getValidQueryPtr(_array._query));  // duration of getChunk() short enough
         boost::shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(localQueryPtr, ChunkIterator::SEQUENTIAL_WRITE);
 
         Coordinates const& first = chunk.getFirstPosition(false);

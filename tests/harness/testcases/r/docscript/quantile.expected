@@ -1,7 +1,7 @@
 SCIDB QUERY : <create array quantile_array <val:int64>[i=0:10,11,0]>
 Query was executed successfully
 
-SCIDB QUERY : <load(quantile_array,'../examples/11numbers.scidb')>
+SCIDB QUERY : <load(quantile_array,'../tests/harness/testcases/data/doc/11numbers.scidb')>
 [(10),(3),(0),(3),(4),(5),(9),(11),(7),(3),(3)]
 
 SCIDB QUERY : <quantile(quantile_array,2)>
@@ -13,12 +13,12 @@ SCIDB QUERY : <create array m25 <val:int32>[i=0:24,25,0]>
 SCIDB QUERY : <create array m5x5 <val:int32>[i=0:4,5,0, j=0:4,5,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load(m25,'../examples/25ints.scidb')>
+SCIDB QUERY : <load(m25,'../tests/harness/testcases/data/doc/25ints.scidb')>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <show(m5x5)>
 {i} schema
-{0} "m5x5<val:int32> [i=0:4,5,0,j=0:4,5,0]"
+{0} 'm5x5<val:int32> [i=0:4,5,0,j=0:4,5,0]'
 
 SCIDB QUERY : <store(reshape(m25,m5x5),m5x5)>
 [[(16),(13),(22),(7),(13)],[(11),(19),(23),(21),(24)],[(16),(21),(15),(7),(16)],[(10),(19),(0),(23),(23)],[(12),(7),(18),(7),(8)]]

@@ -27,13 +27,8 @@
     <para>Substitute null values in one array with non-null values from
     another array. By default, all nullable attributes have their null values
     substituted. Optionally, you can list specific attributes to participate
-    in the substitution.</para>
-
-    <para>The substitute operator renders attributes in
-    <replaceable>nullable_array</replaceable> non-nullable. If an attribute
-    has null values, you can use this operator to substitute null values in
-    the array and change the nullability of the attribute in the
-    schema.</para>
+    in the substitution. The substitute operator renders attributes in the
+    result array non-nullable.</para>
 
     <para>Note the following limitations:</para>
 
@@ -57,8 +52,7 @@
 
       <procedure>
         <step>
-          <para>Create an array
-          <literal><literal>m4x4_null</literal></literal> with two nullable
+          <para>Create an array <literal>m4x4_null</literal> with two nullable
           attributes.<para><programlisting>AFL% create array m4x4_null &lt;val1:double null, val2:double null&gt;[i=0:3,4,0, j=0:3,4,0];  </programlisting></para></para>
         </step>
 
@@ -66,7 +60,7 @@
           <para>We have a 2-attribute, 4x4 array,
           <literal>substitute_example</literal> that we load into
           <literal>m4x4_null</literal>. Note that some values for each
-          attribute are null.<para><programlisting>AQL% <command>LOAD</command> m4x4_null <command>FROM</command> '../examples/substitute_example.scidb'
+          attribute are null.<para><programlisting>AFL% load(m4x4_null, '../tests/harness/testcases/data/doc/substitute_example.scidb');
        </programlisting><screen>[
 [(1,null),(null,2.5),(),()],
 [(),(6,null),(nan,null),(null,3.14153)],
@@ -77,7 +71,7 @@
 
         <step>
           <para>Create a single-cell array called <literal>zeros</literal>,
-          and load it with the value 0.<para><programlisting>AFL% store(build(&lt;subVal:double&gt;[i=0:0,1,0],0),zeros)  </programlisting><screen>[(0)]
+          and load it with the value 0.<para><programlisting>AFL% store(build(&lt;subVal:double&gt;[i=0:0,1,0],0),zeros);  </programlisting><screen>[(0)]
 </screen></para></para>
         </step>
 

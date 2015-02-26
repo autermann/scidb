@@ -59,7 +59,7 @@ namespace scidb {
         if (attrID < array.dims.size()) {
            _value = array.getInputArray()->getArrayDesc().getOriginalCoordinate(attrID,
                                                                                 inputIterator->getPosition()[attrID],
-                                                                                array._query.lock());
+                                                                                _query);
             return _value;
         } else {
             return inputIterator->getItem();
@@ -136,7 +136,8 @@ namespace scidb {
       last(chunk.getLastPosition(!(iterationMode & IGNORE_OVERLAPS))),
       arrayIterator(chunk.getArrayIterator().getInputIterator()),
       mode(iterationMode & ~INTENDED_TILE_MODE),
-      attrID(chunk.getAttributeDesc().getId())
+      attrID(chunk.getAttributeDesc().getId()),
+      _query(Query::getValidQueryPtr(array._query))
     {
         reset();
     }
@@ -278,9 +279,10 @@ namespace scidb {
 
     UnpackUnalignedArray::UnpackUnalignedArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array, const boost::shared_ptr<Query>& query)
     : DelegateArray(desc, array),
-      dims(array->getArrayDesc().getDimensions()),
-      _query(query)
+      dims(array->getArrayDesc().getDimensions())
     {
+        assert(query);
+        _query=query;
     } 
 }
 

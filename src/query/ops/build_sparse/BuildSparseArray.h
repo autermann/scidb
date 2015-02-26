@@ -84,6 +84,7 @@ class BuildSparseChunkIterator : public ConstChunkIterator
     virtual bool setPosition(Coordinates const& pos);
     virtual void reset();
     ConstChunk const& getChunk();
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
 
     BuildSparseChunkIterator(BuildSparseArray& array, ConstChunk const* chunk, AttributeID attrID, int iterationMode);
 
@@ -107,6 +108,7 @@ class BuildSparseChunkIterator : public ConstChunkIterator
     Expression _expression;
     ExpressionContext _params;
     bool _nullable;
+    boost::shared_ptr<Query> _query;
 };
 
 class BuildSparseArrayIterator : public ConstArrayIterator
@@ -155,7 +157,6 @@ class BuildSparseArray : public Array
     size_t nInstances;
     size_t instanceID;
     bool emptyable;
-    boost::weak_ptr<Query> _query;
 };
 
 }

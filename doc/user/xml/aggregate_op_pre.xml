@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
@@ -7,10 +6,8 @@
     <refname>aggregate</refname>
 
     <refpurpose><indexterm>
-        <primary>aggregates</primary>
-
-        <secondary>operator syntax</secondary>
-      </indexterm>The aggregate operator take as input a set of 1 or more
+        <primary>aggregate operator</primary>
+      </indexterm>The aggregate operator takes as input a set of 1 or more
     values and returns a SciDB array.</refpurpose>
   </refnamediv>
 
@@ -51,6 +48,27 @@
         performed.</para>
       </listitem>
     </itemizedlist>
+
+    <para><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>result names</secondary>
+      </indexterm><indexterm>
+        <primary>attributes</primary>
+
+        <secondary>generated names</secondary>
+      </indexterm><indexterm>
+        <primary>generated variable names</primary>
+      </indexterm>The aggregate operator returns a SciDB array, which contains
+    the aggregation result as a new attribute. The name of this attribute is
+    constructed as follows:
+    <replaceable>inputAttribute_aggregateFunction</replaceable> , where
+    <replaceable>inputAttribute</replaceable> is the name of the attribute
+    being aggregated on, and <replaceable>aggregateFunction</replaceable> is
+    the name of the aggregate function called. For example, assume an array
+    <emphasis role="bold">A</emphasis> with an attribute <emphasis
+    role="bold">sales</emphasis>. The name for the result attribute of
+    <command>aggregate(A,sum(sales));</command> is 'sales_sum'.</para>
   </refsect1>
 
   <refsect1>
@@ -63,7 +81,7 @@
       <procedure>
         <step>
           <para>Create an array containing values along the diagonal, and
-          empty cells everywhere else<programlisting language="test">--afl store(build_sparse(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],i,i=j), A); --output-format=dense --chunkify=yes</programlisting></para>
+          empty cells everywhere else.<programlisting language="test">--afl store(build_sparse(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],i,i=j), A); --output-format=dense --chunkify=yes</programlisting></para>
         </step>
 
         <step>
@@ -73,7 +91,7 @@
 
         <step>
           <para>Use the aggregate operator to calculate the sum of all cells
-          in the matrix.<programlisting language="test">--afl aggregate(A, sum(val)); --output-format=csv</programlisting></para>
+          in the array.<programlisting language="test">--afl aggregate(A, sum(val)); --output-format=csv</programlisting></para>
         </step>
       </procedure>
     </informalexample>

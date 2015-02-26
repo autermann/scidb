@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter id="scidbAggregateReference">
@@ -12,24 +11,36 @@
 
       <secondary>reference</secondary>
     </indexterm>This chapter lists SciDB aggregates. Aggregates take as input
-  a set of 1 or more values and return a SciDB array. SciDB aggregates have
-  the syntax aggregate_call_N where an aggregate call is one of the
-  following:<itemizedlist>
-      <listitem>
-        <para><code>aggregate_name(attribute_name)</code></para>
-      </listitem>
+  a set of 1 or more values and return a SciDB array.</para>
 
-      <listitem>
-        <para><code>aggregate_name(expression)</code></para>
+  <section>
+    <title>Aggregate Syntax</title>
 
-        <para>Note: the <code>aggregate_name(expression)</code> syntax exists
-        only in AQL.</para>
-      </listitem>
-    </itemizedlist></para>
+    <para>SciDB aggregates have the syntax aggregate_call_N where an aggregate
+    call is one of the following:<itemizedlist>
+        <listitem>
+          <para>
+            <code>aggregate_name(attribute_name)</code>
+          </para>
+        </listitem>
 
-  <para>Aggregate calls can occur in AQL and AFL statements as follows:</para>
+        <listitem>
+          <para>
+            <code>aggregate_name(expression)</code>
+          </para>
 
-  <para><emphasis role="bold">AQL syntaxes</emphasis><synopsis><command>SELECT</command> <replaceable>aggregate_call_1</replaceable><optional>,<replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional> 
+          <para>Note: the <code>aggregate_name(expression)</code> syntax
+          exists only in AQL.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <para>Aggregate calls can occur in AQL and AFL statements as
+    follows:</para>
+
+    <para>
+      <emphasis role="bold">AQL syntaxes</emphasis>
+
+      <synopsis><command>SELECT</command> <replaceable>aggregate_call_1</replaceable><optional>,<replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional> 
 <command>FROM</command> <replaceable>array</replaceable>;
 
 <command>SELECT</command> <replaceable>aggregate_call_1</replaceable><optional>,<replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional> 
@@ -53,9 +64,13 @@
     <command>FIXED</command> | <command>VARIABLE</command> <command>WINDOW AS </command>
     (<command>PARTITION BY</command> <replaceable>dimension1</replaceable> <replaceable>dim1-low</replaceable> <command>PRECEDING</command> <command>AND</command> <replaceable>dim1-high</replaceable> <command>FOLLOWING</command> 
                [, <replaceable>dimension2</replaceable> <replaceable>dim2-low</replaceable> <command>PRECEDING</command> <command> AND</command> <replaceable>dim2-high</replaceable> <command>FOLLOWING</command> ]... );
-</synopsis></para>
+</synopsis>
+    </para>
 
-  <para><emphasis role="bold">AFL syntaxes</emphasis><synopsis>AFL% aggregate(<replaceable>array</replaceable>, <replaceable>aggregate_call_1</replaceable>
+    <para>
+      <emphasis role="bold">AFL syntaxes</emphasis>
+
+      <synopsis>AFL% aggregate(<replaceable>array</replaceable>, <replaceable>aggregate_call_1</replaceable>
 <optional>, <replaceable>aggregate_call_2</replaceable>,... <replaceable>aggregate_call_N</replaceable></optional>
 <optional>,<replaceable>dimension_1</replaceable>, <replaceable>dimension_2</replaceable>,...</optional>)
 
@@ -70,9 +85,37 @@ AFL% variable_window(<replaceable>array</replaceable>,
 <replaceable>aggregate_1</replaceable><optional>,<replaceable>aggrgegate_2</replaceable>, ...</optional>
 
 AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<replaceable>grid_2</replaceable>,...,<replaceable>grid_N</replaceable>,
-<replaceable>aggregate_call_1</replaceable><optional>,<replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional>);</synopsis></para>
+<replaceable>aggregate_call_1</replaceable><optional>,<replaceable>aggregate_call_2</replaceable>,...,<replaceable>aggregate_call_N</replaceable></optional>);</synopsis>
+    </para>
+  </section>
 
-  <xi:include href="approxdc_post.xml"
+  <section>
+    <title>Result Naming Convention</title>
+
+    <para><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>result names</secondary>
+      </indexterm>Aggregate calls return a value or values as attributes. Each
+    aggregate call has an <replaceable>aggregateFunction</replaceable>, an
+    <replaceable>inputAttribute</replaceable>, and a
+    <replaceable>resultAttribute</replaceable>. The name for the result
+    is<replaceable> inputAttribute_aggregateFunction</replaceable>. For
+    example, assume an array <emphasis role="bold">A</emphasis> with an
+    attribute <emphasis role="bold">sales</emphasis>. The name for the result
+    attribute of <command>aggregate(A,sum(sales));</command> is
+    'sales_sum'.<programlisting>AFL% aggregate(A,sum(sales));</programlisting><screen>i,sales_sum
+0,14
+</screen></para>
+
+    <para>The count aggregate may take * as the input attribute, meaning to
+    count all the items in the group including null items. The result name for
+    count(*) is 'count'.<programlisting>AFL% aggregate(A,count(*));</programlisting><screen>i,count
+0,10
+</screen></para>
+  </section>
+
+  <xi:include href="approxdc_agg.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="avg_agg_post.xml"
@@ -89,5 +132,6 @@ AFL% regrid(<replaceable>array</replaceable>,<replaceable>grid_1</replaceable>,<
 
   <xi:include href="sum_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="var_agg.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="var_agg_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 </chapter>

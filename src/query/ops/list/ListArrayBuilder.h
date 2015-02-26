@@ -123,6 +123,30 @@ class ListChunkDescriptorsArrayBuilder : public ListArrayBuilder < pair<ChunkDes
 {
 private:
     /**
+     * Verbose names of all the attributes output by list('chunk descriptors') for internal consistency and dev readability.
+     */
+    enum Attrs
+    {
+        STORAGE_VERSION     =0,
+        INSTANCE_ID         =1,
+        DISK_SEGMENT_NO     =2,
+        DISK_HEADER_POS     =3,
+        DISK_OFFSET         =4,
+        V_ARRAY_ID          =5,
+        ATTRIBUTE_ID        =6,
+        COORDINATES         =7,
+        COMPRESSION         =8,
+        FLAGS               =9,
+        NUM_ELEMENTS        =10,
+        COMPRESSED_SIZE     =11,
+        UNCOMPRESSED_SIZE   =12,
+        ALLOCATED_SIZE      =13,
+        FREE                =14,
+        EMPTY_INDICATOR     =15,
+        NUM_ATTRIBUTES      =16
+    };
+
+    /**
      * Add information abotu a ChunkDescriptor to the array.
      * @param value the first element is the descriptor, the second element is true if descriptor is free.
      */
@@ -143,9 +167,9 @@ struct ChunkMapEntry
 {
     ArrayUAID _uaid;
     StorageAddress _addr;
-    DBChunk const* _chunk;
+    PersistentChunk const* _chunk;
 
-    ChunkMapEntry(ArrayUAID const uaid, StorageAddress const& addr, DBChunk const* const chunk):
+    ChunkMapEntry(ArrayUAID const uaid, StorageAddress const& addr, PersistentChunk const* const chunk):
         _uaid(uaid),
         _addr(addr),
         _chunk(chunk)
@@ -154,16 +178,56 @@ struct ChunkMapEntry
 
 
 /**
- * A ListArrayBuilder for listing DBChunk objects.
- * Technically, we could take the ArrayUAID from the DBChunk. That value should be the same as the ArrayUAID that
+ * A ListArrayBuilder for listing PersistentChunk objects.
+ * Technically, we could take the ArrayUAID from the PersistentChunk. That value should be the same as the ArrayUAID that
  * points to the node in the tree. But we are taking the value from the tree to be extra defensive.
  */
 class ListChunkMapArrayBuilder : public ListArrayBuilder <ChunkMapEntry>
 {
 private:
     /**
-     * Add information about a DBChunk to the array.
-     * @param value - a pair of the Unversioned Array ID and DBChunk to list
+     * Verbose names of all the attributes output by list('chunk map') for internal consistency and dev readability.
+     */
+    enum Attrs
+    {
+        STORAGE_VERSION     =0,
+        INSTANCE_ID         =1,
+        DISK_SEGMENT_NO     =2,
+        DISK_HEADER_POS     =3,
+        DISK_OFFSET         =4,
+        U_ARRAY_ID          =5,
+        V_ARRAY_ID          =6,
+        ATTRIBUTE_ID        =7,
+        COORDINATES         =8,
+        COMPRESSION         =9,
+        FLAGS               =10,
+        NUM_ELEMENTS        =11,
+        COMPRESSED_SIZE     =12,
+        UNCOMPRESSED_SIZE   =13,
+        ALLOCATED_SIZE      =14,
+        ADDRESS             =15,
+        CLONE_OF            =16,
+        CLONES              =17,
+        NEXT                =18,
+        PREV                =19,
+        DATA                =20,
+        ACCESS_COUNT        =21,
+        N_WRITERS           =22,
+        TIMESTAMP           =23,
+        RAW                 =24,
+        WAITING             =25,
+        LAST_POS            =26,
+        FIRST_POS_OVERLAP   =27,
+        LAST_POS_OVERLAP    =28,
+        STORAGE             =29,
+        LOADER              =30,
+        EMPTY_INDICATOR     =31,
+        NUM_ATTRIBUTES      =32
+    };
+
+    /**
+     * Add information about a PersistentChunk to the array.
+     * @param value - a pair of the Unversioned Array ID and PersistentChunk to list
      */
     virtual void addToArray(ChunkMapEntry const& value);
 

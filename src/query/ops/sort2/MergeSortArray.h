@@ -115,8 +115,6 @@ namespace scidb
         { 
             return -comparator.compare(streams[i].tuple, streams[j].tuple);
         }
-        
-        boost::weak_ptr<Query> _query;
     };
 
 } //namespace scidb

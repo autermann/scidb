@@ -5,6 +5,8 @@
 
   <para><indexterm>
       <primary>data types</primary>
+    </indexterm><indexterm>
+      <primary>default attribute values</primary>
     </indexterm>SciDB supports the following data types. You can access this
   list by using <code>list('types')</code> at the AFL command line.</para>
 
@@ -32,7 +34,9 @@
 
           <entry>false</entry>
 
-          <entry>Boolean TRUE (1) or FALSE (0)</entry>
+          <entry><indexterm>
+              <primary>boolean type</primary>
+            </indexterm>Boolean TRUE (1) or FALSE (0)</entry>
         </row>
 
         <row>
@@ -110,9 +114,10 @@
         <row>
           <entry>string</entry>
 
-          <entry>""</entry>
+          <entry>''</entry>
 
-          <entry>Variable length character string</entry>
+          <entry>Variable length character string; default is the empty
+          string</entry>
         </row>
 
         <row>
@@ -191,8 +196,315 @@
       <step>
         <para>A numeric data type can also be converted to string, which
         returns a UTF-8 encoded string.<para><programlisting>AFL% apply(A, a2, string(a1));  </programlisting><screen>{i} a1,a2
-{0} 2,"2"
+{0} 2,'2'
 </screen></para></para>
+      </step>
+    </procedure>
+  </section>
+
+  <section>
+    <title>Temporal Data Formats</title>
+
+    <para><indexterm>
+        <primary>datetime formats</primary>
+      </indexterm><indexterm>
+        <primary>temporal data formats</primary>
+      </indexterm>This section lists the acceptable formats for the SciDB
+    datatypes datetime and datetimetz.</para>
+
+    <para>These tokens represent portions of the date and time:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">MON: </emphasis>three-character month
+          name: Jan, Feb, Mar, and so on. The three-character month name is
+          case insensitive—any combination of lowercase and uppercase letters
+          is acceptable.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">mm: </emphasis>month number: 01 for
+          January, 02 for February, and so on. Note that you can omit the
+          leading 0.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">yyyy: </emphasis>4-digit year. If you
+          specify a 2-digit year, SciDB prepends '20'. So, for years in the
+          twenty first century, you need only use 2-digits to represent the
+          year.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">hour: </emphasis>hour of the day. Can be
+          12- or 24-hour time</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">min: </emphasis>minutes</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">sec: </emphasis>seconds</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">frac: </emphasis>fractional portion of a
+          second; you can specify as many digits as you like</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">AMPM: </emphasis>For one of the
+          acceptable syntaxes, you must specify 'AM' or 'PM', to indicate the
+          period of the day.</para>
+        </listitem>
+      </itemizedlist></para>
+
+    <table>
+      <title>Acceptable formats for the datetime datatype</title>
+
+      <tgroup cols="2">
+        <colspec colname="c1" colwidth="26*"/>
+
+        <colspec colname="cgen1" colwidth="26*"/>
+
+        <thead>
+          <row>
+            <entry>Date/Time Syntax</entry>
+
+            <entry>Example</entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry>mm/dd/yyyy hour:min:sec</entry>
+
+            <entry>11/25/2009 16:11:19</entry>
+          </row>
+
+          <row>
+            <entry>dd.mm.yyyy hour:min:sec</entry>
+
+            <entry>25.11.2009 16:11:19</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour:min:sec</entry>
+
+            <entry>2009-11-25 16:11:19</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour.min.sec</entry>
+
+            <entry>2009-11-25 16.11.19</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour:min:sec.frac</entry>
+
+            <entry>2009-11-25 16:11:19.76</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour.min.sec.frac</entry>
+
+            <entry>2009-11-25 16.11.19.76</entry>
+          </row>
+
+          <row>
+            <entry>mm/dd/yyyy hour:min</entry>
+
+            <entry>11/25/2009 16:11</entry>
+          </row>
+
+          <row>
+            <entry>dd.mm.yy hour:min</entry>
+
+            <entry>25.11.2009 16:11</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour:min</entry>
+
+            <entry>2009-11-25 16:11</entry>
+          </row>
+
+          <row>
+            <entry>ddMONyyyy:hour:min:sec</entry>
+
+            <entry>25Nov2009:16:11:19</entry>
+          </row>
+
+          <row>
+            <entry>dd-MON-yyyy hour.min.sec AMPM</entry>
+
+            <entry>25-Nov-2009 4.11.19 PM</entry>
+          </row>
+
+          <row>
+            <entry nameend="cgen1" namest="c1"><emphasis role="bold">Date
+            Syntax (no time element)</emphasis></entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd</entry>
+
+            <entry>2009-11-25</entry>
+          </row>
+
+          <row>
+            <entry>mm/dd/yyyy</entry>
+
+            <entry>25.11.2009</entry>
+          </row>
+
+          <row>
+            <entry>dd.mm.yyyy</entry>
+
+            <entry>25.11.2009</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <para>For the datetimetz datatype, you can use any of the following
+    syntaxes, where the offset (OFF) is between -13:59 and +13:59.</para>
+
+    <table>
+      <title>Acceptable formats for the datetimetz datatype</title>
+
+      <tgroup cols="2">
+        <colspec colname="c1" colwidth="26*"/>
+
+        <colspec colname="cgen1" colwidth="26*"/>
+
+        <thead>
+          <row>
+            <entry>Date/Time Syntax with offset</entry>
+
+            <entry>Example</entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry>mm/dd/yyyy hour:min:sec OFF</entry>
+
+            <entry>11/25/2009 16:11:19 +10:00</entry>
+          </row>
+
+          <row>
+            <entry>dd.mm.yyyy hour:min:sec OFF</entry>
+
+            <entry>25.11.2009 16:11:19 -9:15</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour:min:sec OFF</entry>
+
+            <entry>2009-11-25 16:11:19 +01:10</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour.min.sec OFF</entry>
+
+            <entry>2009-11-25 16.11.19 -5:22</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour:min:sec.frac OFF</entry>
+
+            <entry>2009-11-25 16:11:19.76 +6:10</entry>
+          </row>
+
+          <row>
+            <entry>yyyy-mm-dd hour.min.sec.frac OFF</entry>
+
+            <entry>2009-11-25 16.11.19.76 -11:05</entry>
+          </row>
+
+          <row>
+            <entry>dd-MON-yyyy hour.min.sec AMPM OFF</entry>
+
+            <entry>25-Nov-2009 4.11.19 PM +00:30</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <para>The following examples illustrate how to specify date/time values in
+    SciDB.</para>
+
+    <procedure>
+      <step>
+        <para>Create arrays to hold date/time information.</para>
+
+        <para><programlisting>AFL% create array datetime1 &lt;dt:datetime&gt;[i=0:*,100,0];  </programlisting><programlisting>AFL% create array datetime2 &lt;dtz:datetimetz&gt;[i=0:*,100,0];  </programlisting></para></step>
+
+      <step>
+        <para>Load array <literal>datetime1</literal> with values in the
+        SciDB-formatted file, <emphasis role="bold">dates</emphasis>:</para>
+
+        <programlisting>$ cat dates</programlisting>
+
+        <para><screen>[
+ ("11/25/2009 16:11:19"),
+ ("25.11.2009 16:11:19"),
+ ("2009-11-25 16:11:19.7612"),
+ ("2009-11-25 16.11.19.76"),
+ ("2009-11-25 16.11.19"),
+ ("2009-11-25 16:11:19"),
+ ("11/25/2009 16:11"),
+ ("25.11.2009 16:11"),
+ ("2009-11-25 16:11"),
+ ("25Nov2009:16:11:19"),
+ ("25-Nov-2009 4.11.19 PM"),
+ ("25-Nov-2009 4.11.19 AM"),
+ ("2009-11-25"),
+ ("11/25/2009"),
+ ("25.11.2009"),
+]
+</screen><programlisting>%AFL load(datetime1,'./dates');</programlisting>
+
+        <para><screen>i,dt
+0,'2009-11-25 16:11:19'
+1,'2009-11-25 16:11:19'
+2,'2009-11-25 16:11:19'
+3,'2009-11-25 16:11:19'
+4,'2009-11-25 16:11:19'
+5,'2009-11-25 16:11:19'
+6,'2009-11-25 16:11:00'
+7,'2009-11-25 16:11:00'
+8,'2009-11-25 16:11:00'
+9,'2009-11-25 16:11:19'
+10,'2009-11-25 16:11:19'
+11,'2009-11-25 04:11:19'
+12,'2009-11-25 00:00:00'
+13,'2009-11-25 00:00:00'
+14,'2009-11-25 00:00:00'
+</screen></para></para></step>
+
+      <step>
+        <para>Load array <literal>datetime2</literal> with values in the
+        SciDB-formatted file, <emphasis role="bold">dates_TZ</emphasis>
+        (containing date/time values with offsets):<programlisting>$ cat dates_TZ</programlisting><para><screen>[
+ ("11/25/2009 16:11:19 +10:01"),
+ ("25.11.2009 16:11:19 +09:02"),
+ ("2009-11-25 16:11:19.76 +08:03"),
+ ("2009-11-25 16.11.19.76 +07:04"),
+ ("2009-11-25 16.11.19 +06:05"),
+ ("2009-11-25 16:11:19 +05:06"),
+ ("25-Nov-2009 4.11.19 PM +00:11")
+]
+</screen><programlisting>%AFL load(datetime1,'./dates_TZ');</programlisting><para><screen>i,dtz
+0,'2009-11-25 16:11:19 +10:01'
+1,'2009-11-25 16:11:19 +09:02'
+2,'2009-11-25 16:11:19 +08:03'
+3,'2009-11-25 16:11:19 +07:04'
+4,'2009-11-25 16:11:19 +06:05'
+5,'2009-11-25 16:11:19 +05:06'
+6,'2009-11-25 16:11:19 +00:11'
+</screen></para></para></para>
       </step>
     </procedure>
   </section>
@@ -200,30 +512,32 @@
   <section>
     <title>Casting Between Temporal Data Types</title>
 
-    <para>SciDB includes special functions for converting between temporal
-    data types.</para>
+    <para>SciDB includes functions for converting between temporal data
+    types.</para>
 
     <para>The following examples demonstrate how to use conversion functions
     between the datetime data type and the datetime with timezone, datetimetz
     data type. The date time with time zone data type, datetimetz, uses a
     timezone offset relative to GMT. You can cast datetime to datetimetz by
-    appending an offset using the following example: <para><programlisting>AFL% create array T&lt;td: datetime&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(build(T, now()), T);  </programlisting><screen>[("2013-03-01 20:01:44")]
+    appending an offset using the following example: <para><programlisting>AFL% create array T&lt;td: datetime&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(build(T, now()), T);  </programlisting><screen>[('2013-05-31 15:10:27')]
 </screen><programlisting>AFL% apply(T, dst, append_offset(td, 3600));  </programlisting><screen>{i} td,dst
-{0} "2013-03-01 20:01:44","2013-03-01 20:01:44 +01:00"
+{0} '2013-05-31 15:10:27','2013-05-31 15:10:27 +01:00'
 </screen></para></para>
 
     <para>To append an offset and apply it to the time, use the
     <code>apply_offset</code> function, which adds a timezone offset to the
     datetime. The offset must be expressed in seconds. <para><programlisting>AFL% create array T1 &lt;t:datetimetz&gt;[i=0:0,1,0];  </programlisting><programlisting>AFL% store(project(apply(T,dst,apply_offset(td,3600)),dst),T1);  </programlisting><screen>{i} t
-{0} "2013-03-01 21:01:44 +01:00"
+{0} '2013-05-31 16:10:27 +01:00'
 </screen>
     To return the datetime portion of a datetimetz value, use the
     <code>strip_offset </code>function: <para><programlisting>AFL% apply(T1,dst,strip_offset(t));  </programlisting><screen>{i} t,dst
-{0} "2013-03-01 21:01:44 +01:00","2013-03-01 21:01:44"
+{0} '2013-05-31 16:10:27 +01:00','2013-05-31 16:10:27'
 </screen>
     To apply the offset to the datetime and return a GMT datetime, use the
     <code>togmt</code> function: <para><programlisting>AFL% apply(T1,dst,togmt(t))  </programlisting><screen>{i} t,dst
-{0} "2013-03-01 21:01:44 +01:00","2013-03-01 20:01:44"
+{0} '2013-05-31 16:10:27 +01:00','2013-05-31 15:10:27'
 </screen></para></para></para></para>
+
+    <para>For more details on the SciDB temporal functions, see <xref linkend="temporalFunctions"/>.</para>
   </section>
 </chapter>

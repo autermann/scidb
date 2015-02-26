@@ -61,7 +61,14 @@ namespace scidb
         compressors.push_back(new BZlibCompressor());
     }
 
-    size_t NoCompression::compress(void* dst, const ConstChunk& chunk, size_t size) 
+    CompressorFactory::~CompressorFactory()
+    {
+        for (size_t i = compressors.size() - 1; i; i--) {
+            delete compressors[i];
+        }
+    }
+
+    size_t NoCompression::compress(void* dst, const ConstChunk& chunk, size_t size)
     {
         return size;
     }

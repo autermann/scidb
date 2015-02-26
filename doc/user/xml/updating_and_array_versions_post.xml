@@ -109,10 +109,9 @@
     null/not-null setting on each corresponding pair of attributes, and
     restrictions on dimension starting indexes, chunk sizes, and chunk
     overlaps. In addition, the current release of SciDB requires that every
-    dimension of either array must have datatype int64. The complete list of
-    compatibility rules for insertion operations appears in the chapter called
-    SciDB AFL Operator Reference, in the section on the insert
-    operator.</para>
+    dimension of either array must have datatype int64. For the complete list
+    of compatibility rules for insertion operations, see the <link linkend="insertOperator">insert operator</link> AFL reference
+    topic.</para>
 
     <para>Here is the schema for array A:</para>
 
@@ -160,21 +159,21 @@ col=1:3,3,0]</screen>Provided the two arrays are schema compatible, the insert
   </programlisting><screen>[
 [(),(),()],
 [(null),(null),(null)],
-[("a7"),("a8"),("a9")]
+[('a7'),('a8'),('a9')]
 ]</screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> B
   </programlisting><screen>[
-[(),(null),("b3")],
-[(),(null),("b6")],
-[(),(null),("b9")]
+[(),(null),('b3')],
+[(),(null),('b6')],
+[(),(null),('b9')]
 ]</screen>And here is the result of the insert operation:</para></para>
 
     <para><para><programlisting>AQL% insert 
           <command>INTO</command> B 
           <command>SELECT</command> * <command>FROM</command> A
   </programlisting><screen>[
-[(),(null),("b3")],
+[(),(null),('b3')],
 [(null),(null),(null)],
-[("a7"),("a8"),("a9")]
+[('a7'),('a8'),('a9')]
 ]</screen><indexterm>
         <primary>insert into</primary>
 
@@ -211,9 +210,9 @@ value2:string NULL DEFAULT null &gt;
 [row=1:3,3,0,
 col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> C
   </programlisting><screen>[
-[("c1","c111"),(),("c3","c333")],
-[(),("c5","c555"),()],
-[("c7","c777"),(),("c9","c999")]
+[('c1','c111'),(),('c3','c333')],
+[(),('c5','c555'),()],
+[('c7','c777'),(),('c9','c999')]
 ]</screen></para></para>
 
     <para>Although C is not insert-compatible with B (because B has fewer
@@ -225,9 +224,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
           <command>INTO</command> B 
           <command>SELECT</command> value <command>FROM</command> C
   </programlisting><screen>[
-[("c1"),(null),("c3")],
-[(),("c5"),("b6")],
-[("c7"),(null),("c9")]
+[('c1'),(null),('c3')],
+[(),('c5'),('b6')],
+[('c7'),(null),('c9')]
 ]</screen></para></para>
 
     <para>Note that to be insert-compatible, two arrays must have the same
@@ -243,15 +242,21 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
           <command>INTO</command> B 
           <command>SELECT</command> value2 <command>FROM</command> C
   </programlisting><screen>[
-[("c111"),(null),("c333")],
-[(),("c555"),("b6")],
-[("c777"),(null),("c999")]
+[('c111'),(null),('c333')],
+[(),('c555'),('b6')],
+[('c777'),(null),('c999')]
 ]</screen></para></para>
 
     <para><indexterm>
         <primary>insert into</primary>
 
         <secondary>literals</secondary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>literals</secondary>
+      </indexterm><indexterm>
+        <primary>literals, inserting</primary>
       </indexterm>When supplying the array to be inserted in the source array,
     you are not limited to a select statement. Alternative syntax lets you use
     an array literal, as in the following command:</para>
@@ -264,9 +269,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
            [(777777777)()()]
            ]'
   </programlisting><screen>[
-[(),(null),("333333333")],
-[(),("555555555"),("b6")],
-[("777777777"),(null),("b9")]
+[(),(null),('333333333')],
+[(),('555555555'),('b6')],
+[('777777777'),(null),('b9')]
 ]</screen></para></para>
   </section>
 
@@ -324,9 +329,9 @@ col=1:3,3,0]</screen><programlisting>AQL% <command>SELECT</command> * <command>F
     SciDB stored every version of m4x4 created by the <code>
     <command>UPDATE</command> </code> command. You can see these versions with
     <code>versions</code>:<para><programlisting>AFL% versions(m4x4);  </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2013-03-20 13:36:30"
-{2} 2,"2013-03-20 13:36:30"
-{3} 3,"2013-03-20 13:36:30"
+{1} 1,'2013-06-18 20:59:51'
+{2} 2,'2013-06-18 20:59:52'
+{3} 3,'2013-06-18 20:59:52'
 </screen>You
     can see the contents of any previous version of the array by using the
     version number:<para><programlisting>AFL% scan(m4x4@1);  </programlisting><screen>[

@@ -26,7 +26,7 @@
 
   <refsynopsisdiv>
     <synopsis>redimension_store(<replaceable>source_array</replaceable>,<replaceable>named_target_array
-                  </replaceable><optional>, <replaceable>aggregate </replaceable>(source_attribute) 
+                  </replaceable><optional>, <replaceable>aggregate_call_n </replaceable>(source_attribute) 
                             [as  result_attribute]</optional>...);</synopsis>
   </refsynopsisdiv>
 
@@ -82,6 +82,33 @@
       </indexterm>If cell collisions occur, but the target array includes
     neither a synthetic dimension nor aggregates, SciDB will arbitrarily
     choose a cell from the set of candidate cells.</para>
+  </refsect1>
+
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>redimension_store</literal> operator takes the
+    following arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">source_array</emphasis>: a source array
+          with one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">target_array</emphasis>: a pre-existing,
+          output array, with one or more attributes and one or more
+          dimensions. All the dimensions in the target must exist either in
+          the source array attributes or dimensions, with one exception. One
+          new, synthetic dimension is allowed. All the target attributes
+          (other than those that are the results of aggregate calls) must
+          exist either in the source array attributes or dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">aggregate_call</emphasis>_<replaceable>n</replaceable>:
+          Zero or more aggregate calls.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>
@@ -280,18 +307,18 @@
       <procedure>
         <step>
           <para>Show the source array.<para><screen>{event,year} person,country,time
-{"dash",1996} "Bailey","Canada",9.84
-{"dash",2000} "Greene","USA",9.87
-{"dash",2004} "Gatlin","USA",9.85
-{"dash",2008} "Bolt","Jamaica",9.69
-{"marathon",1996} "Thugwane","RSA",7956
-{"marathon",2000} "Abera","Ethiopia",7811
-{"marathon",2004} "Baldini","Italy",7855
-{"marathon",2008} "Wanjiru","Kenya",7596
-{"steeplechase",1996} "Keter","Kenya",487.12
-{"steeplechase",2000} "Kosgei","Kenya",503.17
-{"steeplechase",2004} "Kemboi","Kenya",485.81
-{"steeplechase",2008} "Kipruto","Kenya",490.34
+{'dash',1996} 'Bailey','Canada',9.84
+{'dash',2000} 'Greene','USA',9.87
+{'dash',2004} 'Gatlin','USA',9.85
+{'dash',2008} 'Bolt','Jamaica',9.69
+{'marathon',1996} 'Thugwane','RSA',7956
+{'marathon',2000} 'Abera','Ethiopia',7811
+{'marathon',2004} 'Baldini','Italy',7855
+{'marathon',2008} 'Wanjiru','Kenya',7596
+{'steeplechase',1996} 'Keter','Kenya',487.12
+{'steeplechase',2000} 'Kosgei','Kenya',503.17
+{'steeplechase',2004} 'Kemboi','Kenya',485.81
+{'steeplechase',2008} 'Kipruto','Kenya',490.34
 </screen></para></para>
         </step>
 
@@ -314,23 +341,25 @@
        victoryCountPerCountryYear,
        count(*) as victoryCount)
   </programlisting><screen>{year,country} victoryCount
-{1996,"Canada"} 1
-{1996,"Kenya"} 1
-{1996,"RSA"} 1
-{2000,"Ethiopia"} 1
-{2000,"Kenya"} 1
-{2000,"USA"} 1
-{2004,"Italy"} 1
-{2004,"Kenya"} 1
-{2004,"USA"} 1
-{2008,"Jamaica"} 1
-{2008,"Kenya"} 2
+{1996,'Canada'} 1
+{1996,'Kenya'} 1
+{1996,'RSA'} 1
+{2000,'Ethiopia'} 1
+{2000,'Kenya'} 1
+{2000,'USA'} 1
+{2004,'Italy'} 1
+{2004,'Kenya'} 1
+{2004,'USA'} 1
+{2008,'Jamaica'} 1
+{2008,'Kenya'} 2
 </screen></para></para>
         </step>
 
         <step>
-          <para>Create an array that includes a synthetic dimension (synD) for
-          collisions. The other (non-synthetic) dimensions define
+          <para><indexterm>
+              <primary>synthetic dimensions</primary>
+            </indexterm>Create an array that includes a synthetic dimension
+          (synD) for collisions. The other (non-synthetic) dimensions define
           (country,year) pairs. The attributes accommodate all other variables
           from the original array, nationWinners.<para><programlisting>AQL% <command>CREATE ARRAY</command> vPer_CY_Synthetic 
       &lt;person:string,event:string,time:double&gt; 
@@ -344,18 +373,18 @@
           revealed by the cell whose value for synD is greater than
           1).<para><programlisting>AFL% redimension_store(nationWinners,vPer_CY_Synthetic)
   </programlisting><screen>{country,year,synD} person,event,time
-{"Canada",1996,1} "Bailey","dash",9.84
-{"Ethiopia",2000,1} "Abera","marathon",7811
-{"Italy",2004,1} "Baldini","marathon",7855
-{"Jamaica",2008,1} "Bolt","dash",9.69
-{"Kenya",1996,1} "Keter","steeplechase",487.12
-{"Kenya",2000,1} "Kosgei","steeplechase",503.17
-{"Kenya",2004,1} "Kemboi","steeplechase",485.81
-{"Kenya",2008,1} "Wanjiru","marathon",7596
-{"Kenya",2008,2} "Kipruto","steeplechase",490.34
-{"RSA",1996,1} "Thugwane","marathon",7956
-{"USA",2000,1} "Greene","dash",9.87
-{"USA",2004,1} "Gatlin","dash",9.85
+{'Canada',1996,1} 'Bailey','dash',9.84
+{'Ethiopia',2000,1} 'Abera','marathon',7811
+{'Italy',2004,1} 'Baldini','marathon',7855
+{'Jamaica',2008,1} 'Bolt','dash',9.69
+{'Kenya',1996,1} 'Keter','steeplechase',487.12
+{'Kenya',2000,1} 'Kosgei','steeplechase',503.17
+{'Kenya',2004,1} 'Kemboi','steeplechase',485.81
+{'Kenya',2008,1} 'Wanjiru','marathon',7596
+{'Kenya',2008,2} 'Kipruto','steeplechase',490.34
+{'RSA',1996,1} 'Thugwane','marathon',7956
+{'USA',2000,1} 'Greene','dash',9.87
+{'USA',2004,1} 'Gatlin','dash',9.85
 </screen></para></para>
         </step>
 
@@ -376,17 +405,17 @@
           Kenya, 2008), and resolves it by arbitrarily choosing one of the
           Kenyan victories of that year.<para><programlisting>AFL% redimension_store(nationWinners,arbitraryWinner)
   </programlisting><screen>{country,year} person,event,time
-{"Canada",1996} "Bailey","dash",9.84
-{"Ethiopia",2000} "Abera","marathon",7811
-{"Italy",2004} "Baldini","marathon",7855
-{"Jamaica",2008} "Bolt","dash",9.69
-{"Kenya",1996} "Keter","steeplechase",487.12
-{"Kenya",2000} "Kosgei","steeplechase",503.17
-{"Kenya",2004} "Kemboi","steeplechase",485.81
-{"Kenya",2008} "Wanjiru","marathon",7596
-{"RSA",1996} "Thugwane","marathon",7956
-{"USA",2000} "Greene","dash",9.87
-{"USA",2004} "Gatlin","dash",9.85
+{'Canada',1996} 'Bailey','dash',9.84
+{'Ethiopia',2000} 'Abera','marathon',7811
+{'Italy',2004} 'Baldini','marathon',7855
+{'Jamaica',2008} 'Bolt','dash',9.69
+{'Kenya',1996} 'Keter','steeplechase',487.12
+{'Kenya',2000} 'Kosgei','steeplechase',503.17
+{'Kenya',2004} 'Kemboi','steeplechase',485.81
+{'Kenya',2008} 'Wanjiru','marathon',7596
+{'RSA',1996} 'Thugwane','marathon',7956
+{'USA',2000} 'Greene','dash',9.87
+{'USA',2004} 'Gatlin','dash',9.85
 </screen></para></para>
         </step>
       </procedure>
@@ -405,18 +434,18 @@
         <step>
           <para>Show the source array.<para><programlisting>AFL% scan(nationWinners) 
   </programlisting><screen>{event,year} person,country,time
-{"dash",1996} "Bailey","Canada",9.84
-{"dash",2000} "Greene","USA",9.87
-{"dash",2004} "Gatlin","USA",9.85
-{"dash",2008} "Bolt","Jamaica",9.69
-{"marathon",1996} "Thugwane","RSA",7956
-{"marathon",2000} "Abera","Ethiopia",7811
-{"marathon",2004} "Baldini","Italy",7855
-{"marathon",2008} "Wanjiru","Kenya",7596
-{"steeplechase",1996} "Keter","Kenya",487.12
-{"steeplechase",2000} "Kosgei","Kenya",503.17
-{"steeplechase",2004} "Kemboi","Kenya",485.81
-{"steeplechase",2008} "Kipruto","Kenya",490.34
+{'dash',1996} 'Bailey','Canada',9.84
+{'dash',2000} 'Greene','USA',9.87
+{'dash',2004} 'Gatlin','USA',9.85
+{'dash',2008} 'Bolt','Jamaica',9.69
+{'marathon',1996} 'Thugwane','RSA',7956
+{'marathon',2000} 'Abera','Ethiopia',7811
+{'marathon',2004} 'Baldini','Italy',7855
+{'marathon',2008} 'Wanjiru','Kenya',7596
+{'steeplechase',1996} 'Keter','Kenya',487.12
+{'steeplechase',2000} 'Kosgei','Kenya',503.17
+{'steeplechase',2004} 'Kemboi','Kenya',485.81
+{'steeplechase',2008} 'Kipruto','Kenya',490.34
 </screen></para></para>
         </step>
 
@@ -439,13 +468,13 @@
          victoryCountPerCountry,
          count(*) as victoryCount)
   </programlisting><screen>{country} victoryCount
-{"Canada"} 1
-{"Ethiopia"} 1
-{"Italy"} 1
-{"Jamaica"} 1
-{"Kenya"} 5
-{"RSA"} 1
-{"USA"} 2
+{'Canada'} 1
+{'Ethiopia'} 1
+{'Italy'} 1
+{'Jamaica'} 1
+{'Kenya'} 5
+{'RSA'} 1
+{'USA'} 2
 </screen></para></para>
         </step>
 
@@ -481,18 +510,18 @@
           synthetic dimension suffices to accommodate all the cells that
           constitute the collisions.<para><programlisting>AFL% redimension_store(nationWinners,vPer_C_Synthetic)
   </programlisting><screen>{country,synD} person,event,time
-{"Canada",1} "Bailey","dash",9.84
-{"Ethiopia",1} "Abera","marathon",7811
-{"Italy",1} "Baldini","marathon",7855
-{"Jamaica",1} "Bolt","dash",9.69
-{"Kenya",1} "Wanjiru","marathon",7596
-{"Kenya",2} "Keter","steeplechase",487.12
-{"Kenya",3} "Kosgei","steeplechase",503.17
-{"Kenya",4} "Kemboi","steeplechase",485.81
-{"Kenya",5} "Kipruto","steeplechase",490.34
-{"RSA",1} "Thugwane","marathon",7956
-{"USA",1} "Greene","dash",9.87
-{"USA",2} "Gatlin","dash",9.85
+{'Canada',1} 'Bailey','dash',9.84
+{'Ethiopia',1} 'Abera','marathon',7811
+{'Italy',1} 'Baldini','marathon',7855
+{'Jamaica',1} 'Bolt','dash',9.69
+{'Kenya',1} 'Wanjiru','marathon',7596
+{'Kenya',2} 'Keter','steeplechase',487.12
+{'Kenya',3} 'Kosgei','steeplechase',503.17
+{'Kenya',4} 'Kemboi','steeplechase',485.81
+{'Kenya',5} 'Kipruto','steeplechase',490.34
+{'RSA',1} 'Thugwane','marathon',7956
+{'USA',1} 'Greene','dash',9.87
+{'USA',2} 'Gatlin','dash',9.85
 </screen></para></para>
         </step>
       </procedure>
@@ -511,12 +540,12 @@
       <procedure>
         <step>
           <para>Show the source array.<para><screen>{givenName,surname} a,b,c,d
-{"Adam","Richards"} 77,5555,-5111,800
-{"Adam","Welch"} 44,8888,-8111,300
-{"Adam","Zwick"} 22,9999,-9111,100
-{"Bill","Welch"} 55,7777,-7111,400
-{"Bill","Zwick"} 33,null,-2111,233
-{"Cathy","Welch"} 66,6666,-6111,550
+{'Adam','Richards'} 77,5555,-5111,800
+{'Adam','Welch'} 44,8888,-8111,300
+{'Adam','Zwick'} 22,9999,-9111,100
+{'Bill','Welch'} 55,7777,-7111,400
+{'Bill','Zwick'} 33,null,-2111,233
+{'Cathy','Welch'} 66,6666,-6111,550
 </screen></para></para>
         </step>
 
@@ -540,9 +569,9 @@
         namesRedimensioned,
         avg(d) as avgD)
   </programlisting><screen>{surname} b,c,avgD
-{"Richards"} 5555,-5111,800
-{"Welch"} 8888,-8111,416.667
-{"Zwick"} 9999,-9111,166.5
+{'Richards'} 5555,-5111,800
+{'Welch'} 8888,-8111,416.667
+{'Zwick'} 9999,-9111,166.5
 </screen>The redimension_store operation yields a
           target array with three cells. The first cell is not the result of a
           collision (because the source array included only one person with

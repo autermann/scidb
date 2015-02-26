@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="approxdcAgg">
   <refnamediv>
     <refname>approxdc</refname>
 
-    <refpurpose>Approximate count of number of distinct values</refpurpose>
+    <refpurpose><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>approximate count</secondary>
+      </indexterm><indexterm>
+        <primary>approximate count</primary>
+      </indexterm>Produces a result array containing approximate counts of the
+    number of distinct values of an attribute.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,17 +24,40 @@
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>approximate count</primary>
-      </indexterm><indexterm>
-        <primary>aggregates</primary>
+    <para>The <literal>approxdc</literal> aggregate takes a set of values from
+    an array attribute and returns an approximate count of the number of
+    distinct values present.</para>
 
-        <secondary>approximate count</secondary>
-      </indexterm>The approxdc aggregate takes a set of values from an array
-    attribute and returns an approximate count of the number of distinct
-    values present.</para>
+    <para>Getting a distinct count of an attribute is computationally
+    expensive. Additionally, if you have a live and changing data set (there
+    are concurrent updates / inserts / deletes going on) then you have an
+    imprecise answer as soon as you have computed it.</para>
 
-    <para>The approxdc aggregate does not count null values.</para>
+    <para>Thus, SciDB offers a an imprecise but much faster "approximate"
+    method. The motivation being that in many cases, an approximate count is
+    just as useful as an exact count, especially when the numbers involved are
+    very large. Often, it is better to get a number that's accurate to within
+    1-2% that takes 1/10th the time to compute.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The <literal>approxdc</literal> aggregate does not count null
+        values.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <literal>approxdc</literal> aggregate is a hybrid. If the
+        number of distinct values is less than about 3,000,
+        <literal>approxdc</literal> returns a precise count. If the number of
+        distinct values is more than 3,000, the result is accurate to within
+        about 1-2%.</para>
+      </listitem>
+
+      <listitem>
+        <para>The <literal>analyze</literal> operator also returns the
+        approximate count—in addition to some other useful information</para>
+      </listitem>
+    </itemizedlist>
   </refsect1>
 
   <refsect1>
@@ -40,33 +69,44 @@
 
       <procedure>
         <step>
-          <para>Show the array schema:<programlisting>select * from show(wordOfConversation);</programlisting>This
-          query returns:<screen>wordOfConversation
-&lt;wordID:int64&gt; 
+          <para>Show the array schema:<para>
+              <programlisting>AFL% show(wordOfConversation)</programlisting>
+
+              <screen><command>wordOfConversation</command>
+
+&lt; wordID:int64 &gt;
+
 [languageID=1:1000,100,0,
 conversationID=1:5000000,1000,0,
-timeOffsetInSeconds=1:10000,1000,100]</screen></para>
+timeOffsetInSeconds=1:10000,1000,100]</screen>
+            </para></para>
         </step>
 
         <step>
           <para>Show the approximate count of distinct words in the
-          array:<programlisting>SELECT approxdc(wordID) 
-       FROM wordOfConversation;</programlisting></para>
+          array:<para>
+              <programlisting>AQL% <command>SELECT</command> approxdc(wordID) 
+       <command>FROM</command> wordOfConversation;  </programlisting>
+            </para></para>
         </step>
 
         <step>
           <para>For each language represented in the array, show the
           approximate count of distinct words used in all conversations in
-          that language:<programlisting>SELECT approxdc(wordID) 
-       FROM wordOfConversation 
-       GROUP BY languageID;</programlisting></para>
+          that language:<para>
+              <programlisting>AQL% <command>SELECT</command> approxdc(wordID) 
+       <command>FROM</command> wordOfConversation 
+       <command>GROUP BY</command> languageID;  </programlisting>
+            </para></para>
         </step>
 
         <step>
           <para>For each conversation represented in the array, show the
-          approximate count of distinct words used:<programlisting>SELECT approxdc(wordID) 
-       FROM wordOfConversation 
-       GROUP BY conversationID;</programlisting></para>
+          approximate count of distinct words used:<para>
+              <programlisting>AQL% <command>SELECT</command> approxdc(wordID) 
+       <command>FROM</command> wordOfConversation 
+       <command>GROUP BY</command> conversationID;  </programlisting>
+            </para></para>
         </step>
       </procedure>
     </informalexample>

@@ -1,0 +1,16 @@
+
+--test
+--start-query-logging
+
+--set-format dense
+store(build_sparse(<val:double>[i=0:3,4,0,j=0:3,4,0],i,i=j), A)  
+--set-format csv
+aggregate(A, count(val))  
+aggregate(A, sum(val))  
+
+--stop-query-logging
+
+
+--cleanup
+
+remove(A)

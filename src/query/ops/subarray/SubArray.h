@@ -252,7 +252,9 @@ class SubArray : public DelegateArray
     static const size_t SUBARRAY_MAP_ITERATOR_THRESHOLD = 6000;
 
   public:
-	SubArray(ArrayDesc& d, Coordinates lowPos, Coordinates highPos, boost::shared_ptr<Array> input);
+    SubArray(ArrayDesc& d, Coordinates lowPos, Coordinates highPos,
+             boost::shared_ptr<Array>& input,
+             boost::shared_ptr<Query> const& query);
 
     DelegateArrayIterator* createArrayIterator(AttributeID attrID) const;
     DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID attrID) const;

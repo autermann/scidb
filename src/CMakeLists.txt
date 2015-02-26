@@ -19,6 +19,7 @@
 # END_COPYRIGHT
 ########################################
 
+message(STATUS "****************** BEGIN src/CMakeLists.txt ******************")
 add_subdirectory("capi")
 add_subdirectory("network")
 add_subdirectory("system")
@@ -31,12 +32,17 @@ if (NOT WITHOUT_SERVER)
     add_subdirectory("array")
     add_subdirectory("query")
 
+    # $include_src is not necessary. It is a convenience for the qtcreator and xcode IDEs
     file(GLOB include_src "../include/*.h" "../include/array/*.h" "../include/system/*.h"
             "../include/query/*.h" "../include/util/*.h")
 
-    add_executable(scidb network/entry.cpp ${include_src})
+    add_executable(scidb network/entry.cpp linear_algebra/blas/initMathLibs.cpp ${include_src})
+
     extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "scidb" scidb)
     set_target_properties(scidb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
     target_link_libraries(scidb network_lib util_lib system_lib qproc_lib array_lib
-        ${LIBRT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+        ${LIBRT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
+        ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 endif()
+
+message(STATUS "****************** END src/CMakeLists.txt ******************")

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # BEGIN_COPYRIGHT
 #
@@ -20,7 +20,10 @@
 # END_COPYRIGHT
 #
 
-#$1 - db name = password = instance
-#$2 - PG host
+#$1 - host
+#$2 - port
+#$3 - db_name
+#$4 - db_user
+#$5 - db_passwd
 
-PGPASSWORD="$1" psql -U ${1} -h ${2} --dbname ${1} --command "select AR.name from \"array\" as AR where not exists (select AD.array_id from array_dimension as AD where AR.name=AD.mapping_array_name) and AR.name like '%:%'"
+PGPASSWORD="$5" psql --no-psqlrc -U "${4}" -h "${1}" -p "${2}" --dbname "${3}" --command "select AR.name from \"array\" as AR where not exists (select AD.array_id from array_dimension as AD where AR.name=AD.mapping_array_name) and AR.name like '%:%'"

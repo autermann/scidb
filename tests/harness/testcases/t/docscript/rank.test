@@ -4,14 +4,14 @@
 
 --set-format dcsv
 --start-igdata
-CREATE ARRAY rank_matrix <val:int64>[i=0:3,4,0,j=0:3,4,0]  
+CREATE ARRAY rank_array <val:int64>[i=0:3,4,0,j=0:3,4,0]  
 --set-format dense
 --stop-igdata
-store(build(rank_matrix, '[[9,1,0,6], [1,3,7,7], [2,3,9,8], [5,9,5,9]]',true),rank_matrix)  
+store(build(rank_array, '[[9,1,0,6], [1,3,7,7], [2,3,9,8], [5,9,5,9]]',true),rank_array)  
 --set-format dcsv
 --start-igdata
-rank(rank_matrix,val,i)  
-rank(rank_matrix,val)  
+rank(rank_array,val,i)  
+rank(rank_array,val)  
 --stop-igdata
 
 --stop-query-logging
@@ -19,4 +19,4 @@ rank(rank_matrix,val)
 
 --cleanup
 
-remove(rank_matrix)
+remove(rank_array)

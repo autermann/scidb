@@ -1,14 +1,14 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="avgOperator">
   <refnamediv>
     <refname>avg</refname>
 
-    <refpurpose>Average (mean) value</refpurpose>
+    <refpurpose>Calculates the average (mean) value.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>avg(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional></synopsis>
+    <synopsis>avg(<replaceable>array</replaceable>,[<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>])</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -17,12 +17,30 @@
     <para><indexterm>
         <primary>average</primary>
       </indexterm>The avg operator finds the average value of an array
-    attribute.</para>
+    attribute. For the corresponding aggregate, see the <link linkend="avgAggregate">avg aggregate</link> reference.</para>
+  </refsect1>
 
-    <note>
-      <para>The avg operator provides the same functionality as the avg
-      aggregate, but has a different syntax. For details, see the <link linkend="avgAggregate">avg</link> aggregate reference.</para>
-    </note>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>avg</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: A source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: Optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>
@@ -30,7 +48,7 @@
 
     <informalexample>
       <para>This example finds the average value along the second dimension of
-      a 4<symbol role="symbolfont">×</symbol>4 matrix.</para>
+      a 4<symbol role="symbolfont">×</symbol>4 array.</para>
 
       <procedure>
         <step>

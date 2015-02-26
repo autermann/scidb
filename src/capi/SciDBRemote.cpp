@@ -111,7 +111,8 @@ public:
     {
     }
     
-    virtual void getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()) const
+    virtual void getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords,
+                                     const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()/*emptyQuery*/) const
     {
         size_t nDims = intCoords.size();
         origCoords.resize(nDims);
@@ -119,7 +120,10 @@ public:
         Dimensions const& dims = desc.getDimensions();
         for (size_t i = 0; i < nDims; i++) { 
             if (_queryResult.mappingArrays[i]) { 
-                boost::shared_ptr<ConstArrayIterator> ai = _queryResult.mappingArrays[i]->getConstIterator(0);
+                boost::shared_ptr<ConstArrayIterator> ai = _queryResult.mappingArrays[i]->getConstIterator(
+                        //for builtin types we use 'value' attribute (0) and for UDTs 'label' attribute (1)
+                        isBuiltinType(dims[i].getType()) ? 0 : 1
+                );
                 boost::shared_ptr<ConstChunkIterator> ci = ai->getChunk().getConstIterator();
                 pos[0] = intCoords[i];
                 if (ci->setPosition(pos)) {                 
@@ -248,16 +252,6 @@ public:
                         );
         }
 
-        if (queryResultRecord->selective())
-        {
-            queryResult.plugins.resize(queryResultRecord->plugins_size());
-            for (int i = 0; i < queryResultRecord->plugins_size(); i++)
-            {
-                queryResult.plugins[i] = queryResultRecord->plugins(i);
-                PluginManager::getInstance()->loadLibrary(queryResult.plugins[i], false);
-            }
-        }
-
          // Processing result message
         queryResult.queryID = resultMessage->getQueryID();
         if (queryResultRecord->has_exclusive_array_access()) {
@@ -303,13 +297,6 @@ public:
         queryResult.selective = queryResultRecord->selective();
         if (queryResult.selective)
         {
-            queryResult.plugins.resize(queryResultRecord->plugins_size());
-            for (int i = 0; i < queryResultRecord->plugins_size(); i++)
-            {
-                queryResult.plugins[i] = queryResultRecord->plugins(i);
-                PluginManager::getInstance()->loadLibrary(queryResult.plugins[i], false);
-            }
-
             Attributes attributes;
             for (int i = 0; i < queryResultRecord->attributes_size(); i++)
             {
@@ -367,8 +354,16 @@ public:
 
                     if ( !mappingAlreadyCollected )
                     {
-                        Attributes mapAttrs(1);
-                        mapAttrs[0] = AttributeDesc(0, "value", dim.getType(), 0, 0);
+                        Attributes mapAttrs;
+                        if (isBuiltinType(dim.getType()))
+                        {
+                            mapAttrs.push_back(AttributeDesc(0, "value", dim.getType(), 0, 0));
+                        }
+                        else
+                        {
+                            mapAttrs.push_back(AttributeDesc(0, "value", TID_VOID, 0, 0));
+                            mapAttrs.push_back(AttributeDesc(1, "label", TID_STRING, 0, 0));
+                        }
                         Dimensions mapDims(1);
                         mapDims[0] = DimensionDesc("no", dim.getStart(), dim.getStart(), dim.getStart() + dimMapSize-1, dim.getStart() + dimMapSize-1, dimMapSize, 0);
                         ArrayDesc mapArrayDesc(mappingArrayName, mapAttrs, mapDims);
@@ -376,7 +371,8 @@ public:
                         boost::shared_ptr<Array> clientArray = boost::shared_ptr<Array>(
                                     new ClientArray(static_cast<BaseConnection*>(connection),
                                                     mapArrayDesc, queryResult.queryID, queryResult));
-                        boost::shared_ptr<Array> mapArray = boost::shared_ptr<Array>(new MemArray(clientArray, true));
+                        const boost::shared_ptr<Query> emptyQuery; // no query on the client side
+                        boost::shared_ptr<Array> mapArray = boost::shared_ptr<Array>(new MemArray(clientArray,emptyQuery,true));
                         queryResult.mappingArrays[i] = mapArray;
                     }
                 }

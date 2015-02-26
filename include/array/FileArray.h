@@ -32,8 +32,9 @@
 #include <map>
 #include <assert.h>
 
-#include "array/MemArray.h"
-#include "query/Statistics.h"
+#include <array/MemArray.h>
+#include <query/Query.h>
+#include <query/Statistics.h>
 
 using namespace std;
 using namespace boost;
@@ -72,8 +73,9 @@ class FileArray : public Array
     virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
     virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
 
-    FileArray(ArrayDesc const& arr, char const* filePath = NULL);
-    FileArray(boost::shared_ptr<Array> input, bool verical = true, char const* filePath = NULL);
+    FileArray(ArrayDesc const& arr, const boost::shared_ptr<Query>& query, char const* filePath = NULL);
+    FileArray(boost::shared_ptr<Array> input, const boost::shared_ptr<Query>& query,
+              bool vertical = true, char const* filePath = NULL);
     ~FileArray();
 
     void writeChunk(FileChunk* chunk);
@@ -103,6 +105,7 @@ class FileArray : public Array
  */
 class FileArrayIterator : public ArrayIterator
 {
+ private:
     map<Coordinates, ChunkHeader, CoordinatesLess>::iterator curr;
     map<Coordinates, ChunkHeader, CoordinatesLess>::iterator last;
     FileArray& array;
@@ -124,9 +127,10 @@ class FileArrayIterator : public ArrayIterator
     void reset();
     Chunk& newChunk(Coordinates const& pos);
     Chunk& newChunk(Coordinates const& pos, int compressionMethod);
+    virtual boost::shared_ptr<Query> getQuery() { return Query::getValidQueryPtr(array._query); }
 };
 
-boost::shared_ptr<Array> createTmpArray(ArrayDesc const& arr);
+ boost::shared_ptr<Array> createTmpArray(ArrayDesc const& arr, boost::shared_ptr<Query>& query);
 
 }
 

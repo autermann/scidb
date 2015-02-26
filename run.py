@@ -223,30 +223,48 @@ def mkdir_p(path):
         if e.errno != errno.EEXIST or not os.path.isdir(path):
             raise
 
-def setup(scidbEnv):
-    oldCmakeCache = os.path.join(scidbEnv.source_path,"CMakeCache.txt")
+def runSetup(force, sourcePath,buildPath,installPath,defs={}):
+    oldCmakeCache = os.path.join(sourcePath,"CMakeCache.txt")
     if os.access(oldCmakeCache, os.R_OK):
         printInfo("WARNING: Deleting old CMakeCache file:"+oldCmakeCache)
         os.remove(oldCmakeCache)
 
-    oldCmakeCache = os.path.join(scidbEnv.build_path,"CMakeCache.txt")
+    oldCmakeCache = os.path.join(buildPath,"CMakeCache.txt")
     if os.access(oldCmakeCache, os.R_OK):
         printInfo("WARNING: Deleting old CMakeCache file:"+oldCmakeCache)
         os.remove(oldCmakeCache)
 
     build_type=os.environ.get("SCIDB_BUILD_TYPE","Debug")
-    rm_rf(scidbEnv.build_path+"/*",scidbEnv.args.force, throw=False)
-    mkdir_p(scidbEnv.build_path)
+    rm_rf(os.path.join(buildPath,"*"),force, throw=False)
+    mkdir_p(buildPath)
     curr_dir=os.getcwd()
     cmdList=["cmake",
              "-DCMAKE_BUILD_TYPE=%s"%build_type,
-             "-DCMAKE_INSTALL_PREFIX=%s"%scidbEnv.install_path,
-             scidbEnv.source_path]
+             "-DCMAKE_INSTALL_PREFIX=%s"%installPath]
+
+    # add -D's
+    for (key, value) in defs.items():
+        cmdList.append("-D%s=%s"%(key,str(value)))
+    cmdList.append(sourcePath)
+
     ret = executeIt(cmdList,
-                    cwd=scidbEnv.build_path)
+                    cwd=buildPath)
     os.chdir(curr_dir)
 
-def make(scidbEnv):
+def setup(scidbEnv):
+    runSetup(scidbEnv.args.force, scidbEnv.source_path, scidbEnv.build_path, scidbEnv.install_path)
+
+def getPluginBuildPath(buildPath,name):
+    return os.path.join(buildPath,"external_plugins",name)
+
+def pluginSetup(scidbEnv):
+    defs={}
+    defs["SCIDB_SOURCE_DIR"]=scidbEnv.source_path
+    defs["SCIDB_BUILD_DIR"]=scidbEnv.build_path
+    pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
+    runSetup(scidbEnv.args.force, scidbEnv.args.path, pluginBuildPath, scidbEnv.install_path, defs)
+
+def runMake(scidbEnv, makeDir):
     jobs=os.environ.get("SCIDB_MAKE_JOBS","1")
     if scidbEnv.args.jobs:
        jobs = scidbEnv.args.jobs
@@ -258,12 +276,21 @@ def make(scidbEnv):
         cmdList.append(scidbEnv.args.target)
 
     ret = executeIt(cmdList,
-                    cwd=scidbEnv.build_path)
+                    cwd=makeDir)
     os.chdir(curr_dir)
+
+def make(scidbEnv):
+    runMake(scidbEnv, scidbEnv.build_path)
+
+def pluginMake(scidbEnv):
+    pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
+    runMake(scidbEnv, pluginBuildPath)
 
 def make_packages (scidbEnv):
     bin_path=os.path.join(scidbEnv.source_path,"deployment/deploy.sh")
     curr_dir=os.getcwd()
+
+    rm_rf(os.path.join(scidbEnv.args.package_path,"*"), scidbEnv.args.force)
 
     extra_env={}
     extra_env["SCIDB_BUILD_PATH"]=scidbEnv.build_path
@@ -276,20 +303,46 @@ def make_packages (scidbEnv):
                     cwd=scidbEnv.build_path)
     os.chdir(curr_dir)
 
-def confirmRecordedInstallPath (scidbEnv):
-    cmakeConfFile=os.path.join(scidbEnv.build_path,"CMakeCache.txt")
+def pluginMakePackages(scidbEnv):
+    pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
+    pluginPath=getRecordedVar(pluginBuildPath,"CMAKE_HOME_DIRECTORY")
+    buildType=getRecordedVar(pluginBuildPath,"CMAKE_BUILD_TYPE")
+    packagePath=scidbEnv.args.package_path
+    if not packagePath:
+        packagePath=os.path.join(pluginBuildPath, "packages")
+
+    rm_rf(os.path.join(packagePath,"*"), scidbEnv.args.force)
+
+    binPath=os.path.join(pluginPath,"deployment/deploy.sh")
     curr_dir=os.getcwd()
 
-    cmdList=["grep", "CMAKE_INSTALL_PREFIX", cmakeConfFile]
-    ret,out,err = executeIt(cmdList, collectOutput=True)
+    # Usage: plugin-trunk/deployment/deploy.sh build <Debug|RelWithDebInfo> <packages_path> <scidb_source_path>
 
+    cmdList=[binPath,
+             "build", buildType,
+             packagePath, scidbEnv.source_path ]
+    ret = executeIt(cmdList,
+                    cwd=pluginPath)
     os.chdir(curr_dir)
-    printDebug(out+" (install path raw)")
-    installPath = out.split('=')[1]
-    printDebug(installPath+" (install path parsed)")
-    if installPath.strip() != scidbEnv.install_path:
+
+def confirmRecordedInstallPath (scidbEnv):
+    installPath = getRecordedVar (scidbEnv.build_path,"CMAKE_INSTALL_PREFIX")
+    if installPath != scidbEnv.install_path:
         raise Exception("Inconsistent install path: recorded by setup=%s vs default/environment=%s" %
                         (installPath, scidbEnv.install_path))
+
+def getRecordedVar (buildPath, varName):
+    cmakeConfFile=os.path.join(buildPath,"CMakeCache.txt")
+
+    curr_dir=os.getcwd()
+    cmdList=["grep", varName, cmakeConfFile]
+    ret,out,err = executeIt(cmdList, collectOutput=True)
+    os.chdir(curr_dir)
+
+    printDebug(out+" (raw var line)")
+    value = out.split('=')[1].strip()
+    printDebug(value+" (parsed var)")
+    return value
 
 def getScidbVersion (scidbEnv):
     bin_path=os.path.join(scidbEnv.source_path,"deployment/deploy.sh")
@@ -333,20 +386,18 @@ def make_src_package(scidbEnv):
 def cleanup(scidbEnv):
     curr_dir=os.getcwd()
 
-    configFile = os.path.join(scidbEnv.install_path,"etc/config.ini")
+    configFile = getConfigFile(scidbEnv)
     if os.access(configFile, os.R_OK):
         stop(scidbEnv)
-        config={}
         db_name=os.environ.get("SCIDB_NAME","mydb")
-        config=parseOptions(configFile, db_name)
-        data_path = config["base-path"]
-        rm_rf(data_path+"/*", scidbEnv.args.force)
+        dataPath = getDataPath(configFile, db_name)
+        rm_rf(dataPath+"/*", scidbEnv.args.force)
 
     rm_rf(scidbEnv.install_path+"/*", scidbEnv.args.force)
     rm_rf(scidbEnv.build_path+"/*", scidbEnv.args.force)
     os.chdir(curr_dir)
 
-def generateConfigFile(scidbEnv, db_name, data_path, instance_num, configFile):
+def generateConfigFile(scidbEnv, db_name, data_path, instance_num, no_watchdog, configFile):
     if os.access(configFile, os.R_OK):
         os.remove(configFile)
     fd = open(configFile,"w")
@@ -360,11 +411,22 @@ def generateConfigFile(scidbEnv, db_name, data_path, instance_num, configFile):
     print >>fd, "base-path=%s"    %(data_path)
     print >>fd, "base-port=1239"
     print >>fd, "interface=eth0"
-    print >>fd, "redundancy=1"
+    if no_watchdog:
+        print >>fd, "no-watchdog=true"
+    if instance_num > 1:
+        print >>fd, "redundancy=1"
     fd.close()
 
+def getConfigFile(scidbEnv):
+    return os.path.join(scidbEnv.install_path,"etc","config.ini")
+
+def getDataPath(configFile, dbName):
+    configOpts=parseOptions(configFile, dbName)
+    return str(configOpts["base-path"])
+
 def install(scidbEnv):
-    configFile = os.path.join(scidbEnv.install_path,"etc/config.ini")
+    configFile = getConfigFile(scidbEnv)
+
     if os.access(configFile, os.R_OK):
         stop(scidbEnv)
 
@@ -374,11 +436,16 @@ def install(scidbEnv):
     curr_dir=os.getcwd()
     os.chdir(scidbEnv.build_path)
 
-    rm_rf(scidbEnv.install_path+"/*", scidbEnv.args.force)
+    if not scidbEnv.args.light:
+        rm_rf(scidbEnv.install_path+"/*", scidbEnv.args.force)
+
     mkdir_p(scidbEnv.install_path)
 
     cmdList=["/usr/bin/make", "install"]
     ret = executeIt(cmdList)
+
+    if scidbEnv.args.light:
+        return
 
     # Generate config.ini or allow for a custom one
 
@@ -386,13 +453,14 @@ def install(scidbEnv):
     if scidbEnv.args.config:
         cmdList=[ "cp", scidbEnv.args.config, configFile]
         ret = executeIt(cmdList)
-        configOpts=parseOptions(configFile, db_name)
-        data_path = configOpts["base-path"]
+        data_path = getDataPath(configFile, db_name)
     else:
         data_path=os.path.join(scidbEnv.stage_path, "DB-"+db_name)
         data_path=os.environ.get("SCIDB_DATA_PATH", data_path)
         instance_num=int(os.environ.get("SCIDB_INSTANCE_NUM","4"))
-        generateConfigFile(scidbEnv, db_name, data_path, instance_num, configFile)
+        no_watchdog=os.environ.get("SCIDB_NO_WATCHDOG","false")
+        no_watchdog=(no_watchdog in ['true', 'True', 'on', 'On'])
+        generateConfigFile(scidbEnv, db_name, data_path, instance_num, no_watchdog, configFile)
 
     # Create log4j config files
 
@@ -431,15 +499,22 @@ def install(scidbEnv):
 
     # Setup test links
 
-    testLinkPath = os.path.join(data_path,"000","tests")
-    if os.access(testLinkPath, os.R_OK):
-        os.remove(testLinkPath)
-    os.symlink(os.path.join(scidbEnv.build_path,"tests"), testLinkPath)
+    os.chdir(curr_dir)
 
-    testLinkPath = os.path.join(data_path,"000","examples")
-    if os.access(testLinkPath, os.R_OK):
-        os.remove(testLinkPath)
-    os.symlink(os.path.join(scidbEnv.build_path,"tests/examples"), testLinkPath)
+def pluginInstall(scidbEnv):
+    pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
+
+    if not os.access(pluginBuildPath, os.R_OK):
+        raise Exception("Invalid plugin %s build directory %s" % (scidbEnv.args.name, pluginBuildDir))
+
+    pluginInstallPath = os.path.join(scidbEnv.install_path,"lib","scidb","plugins")
+    if not os.access(pluginInstallPath, os.R_OK):
+        raise Exception("Invalid plugin install directory %s" % (pluginInstallPath))
+
+    curr_dir=os.getcwd()
+
+    cmdList=["/usr/bin/make", "install"]
+    ret = executeIt(cmdList, cwd=pluginBuildPath)
 
     os.chdir(curr_dir)
 
@@ -472,25 +547,34 @@ def forceStop(scidbEnv):
               stdoutFile="/dev/null",
               stderrFile="/dev/null")
 
-def tests(scidbEnv):
+def runTests(scidbEnv, testsPath, commands=[]):
     curr_dir=os.getcwd()
 
-    os.chdir(os.path.join(scidbEnv.build_path, "tests/harness"))
+    configFile = getConfigFile(scidbEnv)
+    db_name=os.environ.get("SCIDB_NAME","mydb")
+    dataPath = getDataPath(configFile, db_name)
 
     version = getScidbVersion(scidbEnv)
 
     libPath = os.path.join(scidbEnv.install_path,"lib")
     binPath = os.path.join(scidbEnv.install_path,"bin")
-    testEnv = os.path.join(scidbEnv.source_path,"tests/harness/scidbtestharness.env")
-    testBin = os.path.join(scidbEnv.install_path,"bin/scidbtestharness ")
+    testEnv = os.path.join(scidbEnv.build_path,"tests","harness","scidbtestharness_env.sh")
+    testBin = os.path.join(scidbEnv.install_path,"bin","scidbtestharness")
 
-    cmdList=[".", testEnv, ";",
-             "PATH=%s:${PATH}"%(binPath),
-             "LD_LIBRARY_PATH=%s:${LD_LIBRARY_PATH}"%(libPath),
-             testBin,
-             "--port=${IQUERY_PORT}",
-             "--connect=${IQUERY_HOST}",
-             "--root-dir=./testcases"]
+    cmdList=["export", "SCIDB_NAME=%s"%db_name,";",
+             "export", "SCIDB_BUILD_PATH=%s"%scidbEnv.build_path,";",
+             "export", "SCIDB_INSTALL_PATH=%s"%scidbEnv.install_path,";",
+             "export", "SCIDB_DATA_PATH=%s"%dataPath, ";",
+             ".", testEnv, ";"]
+    for cmd in commands:
+       cmdList.extend([cmd,";"])
+
+    cmdList.extend(["PATH=%s:${PATH}"%(binPath),
+                    "LD_LIBRARY_PATH=%s:${LD_LIBRARY_PATH}"%(libPath),
+                    testBin,
+                    "--port=${IQUERY_PORT}",
+                    "--connect=${IQUERY_HOST}",
+                    "--root-dir=./testcases"])
 
     if scidbEnv.args.all:
         pass  # nothing to add
@@ -506,8 +590,36 @@ def tests(scidbEnv):
 
     cmdList.extend([ "|", "tee", "run.tests.log" ])
     ret = executeIt(cmdList,
-                    useShell=True)
+                    useShell=True,
+                    cwd=testsPath)
     os.chdir(curr_dir)
+
+
+def tests(scidbEnv):
+    testsPath=os.path.join(scidbEnv.build_path,"tests","harness")
+    runTests(scidbEnv, testsPath)
+
+def pluginTests(scidbEnv):
+    pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
+
+    if not os.access(pluginBuildPath, os.R_OK):
+        raise Exception("Invalid plugin %s build directory %s" % (scidbEnv.args.name, pluginBuildDir))
+
+    pluginInstallPath = os.path.join(scidbEnv.install_path,"lib","scidb","plugins")
+    if not os.access(pluginInstallPath, os.R_OK):
+        raise Exception("Invalid plugin install directory %s" % (pluginInstallPath))
+
+    plugin_tests=os.environ.get("SCIDB_PLUGIN_TESTS","test")
+
+    pluginTestsPath = os.path.join(pluginBuildPath, plugin_tests)
+
+    pluginTestEnv = os.path.join(pluginTestsPath,"scidbtestharness_env.sh")
+
+    commands=[]
+    if os.access(pluginTestEnv, os.R_OK):
+        commands.append(". "+pluginTestEnv)
+
+    runTests(scidbEnv, pluginTestsPath, commands)
 
 # Environment setup (variables with '_' are affected by environment)
 
@@ -550,15 +662,39 @@ def main():
                                        "\nSCIDB_INSTALL_PATH - SciDB installation directory, default = %s\n\nSubcommands"%(os.path.join(scidbEnv.bin_path,"stage","install")),
                                        description="Use -h/--help with a particular subcommand from the list below to learn its usage")
 
+
+    pluginBuildPathStr = "$SCIDB_BUILD_PATH/external_plugins/<name>"
+
     subParser = subparsers.add_parser('setup', usage=
     """%(prog)s [-h | options]\n
 Creates a new build directory for an out-of-tree build and runs cmake there.
 Environment variables:
 SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
-
     subParser.add_argument('-f','--force', action='store_true', help=
                            "automatically confirm any old state/directory cleanup")
     subParser.set_defaults(func=setup)
+
+
+    subParser = subparsers.add_parser('plugin_setup', usage=
+                                      "%(prog)s [-h | options]\n"+
+"\nCreates the %s directory for an out-of-tree plugin build and runs cmake there."%(pluginBuildPathStr)+
+"\nThe plugin in in the directory specified by --path must conform to the following rules:"
+"\n1. It is based on cmake."+
+"\n2. The plugin build directory %s must be configurable by \'cmake -DCMAKE_INSTALL_PREFIX=<scidb_installation_dir>  -DSCIDB_SOURCE_DIR=<scidb_source_dir> ...\'"%(pluginBuildPathStr)+
+"\n3. Running \'make\' in that directory must build all the deliverables."+
+"\n4. Running \'make install\' in that directory must install all the deliverables into the scidb installation."+
+"\n5. Running \'./deployment/deploy.sh build $SCIDB_BUILD_TYPE <packages_path> %s\' in the directory specified by --path must generate installable plugin packages. See \'plugin_make_packages --help\'"%(scidbEnv.bin_path)+
+"\n6. \'scidbtestharness --rootdir=./tescases ...\' must be runnable in %s."%(pluginBuildPathStr+"/<name>/$SCIDB_PLUGIN_TESTS")+
+"""\nEnvironment variables:
+SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
+    subParser.add_argument('-n', '--name',  required=True,
+                           help= "plugin name")
+    subParser.add_argument('-p','--path', required=True,
+                           help= "directory path for plugin src")
+    subParser.add_argument('-f','--force', action='store_true', help=
+                           "automatically confirm any old state/directory cleanup")
+    subParser.set_defaults(func=pluginSetup)
+
 
     subParser = subparsers.add_parser('make', usage=
     """%(prog)s [-h | options]\n
@@ -571,13 +707,47 @@ SCIDB_MAKE_JOBS - number of make jobs to spawn (the -j parameter of make)""")
                            "number of make jobs to spawn (the -j parameter of make)")
     subParser.set_defaults(func=make)
 
+
+    subParser = subparsers.add_parser('plugin_make', usage=
+    """%(prog)s [-h | options]\n
+Builds the plugin sources
+Environment variables:
+SCIDB_MAKE_JOBS - number of make jobs to spawn (the -j parameter of make)""")
+    subParser.add_argument('-n', '--name',  required=True,
+                           help= "plugin name")
+    subParser.add_argument('target', nargs='?', default=None, help=
+                           "make target, default is no target")
+    subParser.add_argument('-j','--jobs', type=int, help=
+                           "number of make jobs to spawn (the -j parameter of make)")
+    subParser.set_defaults(func=pluginMake)
+
+
     subParser = subparsers.add_parser('make_packages', usage=
     """%(prog)s [-h | options]\n
 Builds deployable SciDB packages""")
     subParser.add_argument('package_path', default=os.path.join(scidbEnv.build_path,"packages"),
                            nargs='?', help=
                            "directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/packages")
+    subParser.add_argument('-f','--force', action='store_true', help=
+                           "automatically confirm any old state/directory cleanup")
     subParser.set_defaults(func=make_packages)
+
+
+    subParser = subparsers.add_parser('plugin_make_packages', usage=
+    """%(prog)s [-h | options]\n
+Builds deployable plugin packages by invoking \'deploy.sh build $SCIDB_BUILD_TYPE ...\' in the plugin source directory See \'plugin_setup --help\'.
+WARNING:
+Currently, the plugin packages are allowed to be generated from scratch (not from the results of \'plugin_make\') on every invocation.
+""")
+    subParser.add_argument('-n', '--name',  required=True,
+                           help= "plugin name")
+    subParser.add_argument('package_path',
+                           nargs='?', help=
+                           "directory path for newly generated_packages, default is $SCIDB_BUILD_PATH/external_plugins/<name>/packages")
+    subParser.add_argument('-f','--force', action='store_true', help=
+                           "automatically confirm any old state/directory cleanup")
+    subParser.set_defaults(func=pluginMakePackages)
+
 
     subParser = subparsers.add_parser('make_src_package', usage=
     """%(prog)s [-h | options]\n
@@ -591,6 +761,16 @@ SCIDB_MAKE_JOBS - number of make jobs to spawn (the -j parameter of make)""")
                            "number of make jobs to spawn (the -j parameter of make)")
     subParser.set_defaults(func=make_src_package)
 
+
+    subParser = subparsers.add_parser('plugin_install', usage=
+    "%(prog)s [-h | options]\n"+
+"\nInstalls the plugin by depositing the contents of %s into %s"%(pluginBuildPathStr+"<name>/plugins",
+                                                                "$SCIDB_INSTALL_PATH/lib/scidbplugins"))
+    subParser.add_argument('-n', '--name', required=True,
+                           help= "plugin name")
+    subParser.set_defaults(func=pluginInstall)
+
+
     subParser = subparsers.add_parser('install', usage=
     """%(prog)s [-h | options]\n
 Re-create SciDB Postgres user. Install and initialize SciDB.
@@ -599,13 +779,20 @@ SCIDB_NAME      - the name of the SciDB database to be installed, default = mydb
 SCIDB_PG_USER   - OS user under which the Postgres DB is running, default = postgres
 SCIDB_DATA_PATH - the common directory path prefix used to create SciDB instance directories (aka base-path).
                   It is overidden by the command arguments, default is $SCIDB_BUILD_PATH/DB-$SCIDB_NAME
-SCIDB_INSTANCE_NUM - the number of SciDB instances to initialize."
-                  It is overidden by the command arguments, default is 4.""")
+SCIDB_INSTANCE_NUM - the number of SciDB instances to initialize.
+                  It is overidden by the command arguments, default is 4.
+SCIDB_NO_WATCHDOG - do not start a watch-dog process, default is false
+""")
     subParser.add_argument('config', default=None, nargs='?', help=
                            "config.ini file to use with scidb.py, default is generated")
-    subParser.add_argument('-f','--force', action='store_true', help=
-                           "automatically confirm any old state/directory cleanup")
+
+    group = subParser.add_mutually_exclusive_group()
+    group.add_argument('-f','--force', action='store_true', help=
+                       "automatically confirm any old state/directory cleanup")
+    group.add_argument('-l','--light', action='store_true', help=
+                       "just install new binaries, no changes to configuration are made")
     subParser.set_defaults(func=install)
+
 
     subParser = subparsers.add_parser('start', usage=
     """%(prog)s [-h]\n
@@ -633,13 +820,34 @@ SCIDB_NAME - the name of the SciDB database to stop, default = mydb""")
 Run scidbtestharness for a given set of tests
 The results are stored in $SCIDB_BUILD_PATH/tests/harness/run.tests.log
 Environment variables:"""+
-"\n%s/tests/harness/scidbtestharness.env is source'd to create the environment for scidbtestharness"%(scidbEnv.bin_path))
+"\n%s/tests/harness/scidbtestharness_env.sh is source'd to create the environment for scidbtestharness"%(scidbEnv.build_path))
     group = subParser.add_mutually_exclusive_group()
     group.add_argument('--all', action='store_true', help="run all scidbtestharness tests")
     group.add_argument('--test-id', help="run a specific scidbtestharness test")
     group.add_argument('--suite-id', default='checkin', help="run a specific scidbtestharness test suite, default is \'checkin\'")
     subParser.add_argument('--record', action='store_true', help="record the expected output")
     subParser.set_defaults(func=tests)
+
+
+    subParser = subparsers.add_parser('plugin_tests', usage=
+    """%(prog)s [-h | options]\n
+Run scidbtestharness for a given set of tests of a given plugin."""+
+" The results are stored in %s/$SCIDB_PLUGIN_TESTS/run.tests.log"%(pluginBuildPathStr)+
+"""\nEnvironment variables:
+SCIDB_PLUGIN_TESTS - the subdirectory wrt the plugin build path where the the scidbtestharness rootdir is located, default = test"""+
+"\nSCIDB_BUILD_PATH and SCIDB_DATA_PATH are exported into the environment"+
+"\n%s/tests/harness/scidbtestharness_env.sh is source'd to create the environment for scidbtestharness."%("$SCIDB_BUILD_PATH")+
+"\n%s/$SCIDB_PLUGIN_TESTS/scidbtestharness_env.sh is source'd to create the plugin specific environment for scidbtestharness"%(pluginBuildPathStr))
+
+    subParser.add_argument('-n', '--name',  required=True,
+                               help= "plugin name")
+    group = subParser.add_mutually_exclusive_group()
+    group.add_argument('--all', action='store_true', help="run all scidbtestharness tests")
+    group.add_argument('--test-id', help="run a specific scidbtestharness test")
+    group.add_argument('--suite-id', default='checkin', help="run a specific scidbtestharness test suite, default is \'checkin\'")
+    subParser.add_argument('--record', action='store_true', help="record the expected output")
+    subParser.set_defaults(func=pluginTests)
+
 
     subParser = subparsers.add_parser('cleanup', usage=
     """%(prog)s [-h | options]\n

@@ -118,14 +118,17 @@ private:
     /**
      * Print current WIP plan to stdout.
      */
-    void
-    dbg_printPlan();
+    void printPlan(PhysNodePtr node = PhysNodePtr(), bool children=true);
 
     /**
-     * Print current WIP plan to log.
+     * Print current WIP plan to log with DEBUG level.
      */
-    void
-    dbg_logPlan();
+    void logPlanDebug(PhysNodePtr node = PhysNodePtr(), bool children=true);
+
+    /**
+     * Print current WIP plan to log with TRACE level.
+     */
+    void logPlanTrace(PhysNodePtr node = PhysNodePtr(), bool children=true);
 
     //////Helper functions - node-level manipulators:
 

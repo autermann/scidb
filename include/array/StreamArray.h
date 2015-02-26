@@ -108,7 +108,8 @@ namespace scidb
     class AccumulatorArray : public StreamArray
     {
       public:
-        AccumulatorArray(boost::shared_ptr<Array> pipe);
+        AccumulatorArray(boost::shared_ptr<Array> pipe,
+                         boost::shared_ptr<Query>const& query);
 
       protected:
         virtual ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
@@ -128,9 +129,8 @@ namespace scidb
         MemChunk mergeChunk;
         MemChunk joinBitmapChunk;
       public:
-        MultiStreamArray(size_t nStreams, ArrayDesc const& arr, bool emptyCheck = false);
-        MultiStreamArray(const MultiStreamArray& other);
-
+        MultiStreamArray(size_t nStreams, ArrayDesc const& arr,
+                         boost::shared_ptr<Query>const& query, bool emptyCheck = false);
       protected:
         virtual ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
 
@@ -152,7 +152,9 @@ namespace scidb
         virtual void merge(boost::shared_ptr<ChunkIterator> dst, boost::shared_ptr<ConstChunkIterator> src);
 
       public:
-        MergeStreamArray(ArrayDesc const& desc, vector< boost::shared_ptr<Array> > inputArrays);
+        MergeStreamArray(ArrayDesc const& desc,
+                         vector< boost::shared_ptr<Array> >& inputArrays,
+                         boost::shared_ptr<Query>const& query);
     };
 }
 

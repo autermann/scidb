@@ -62,8 +62,6 @@ validCommands = ["--aql", "--afl", "--shell", "--schema"]
 
 validOptions = ["show-query", "show-output", "command", "query", "output-format", "chunkify", "anon", "show-output-in-test-file", "cwd"]
 
-executableOptions = ["help", "version"]
-
 reservedKeywords = ["SELECT", "INTO", "FROM", "WHERE", "REGRID", "VARIABLE WINDOW", "FIXED WINDOW", "WINDOW", "JOIN", "PARTITION BY", "PRECEDING", "FOLLOWING", "UPDATE", "SET", "AS", "GROUP BY", "AND", "CREATE ARRAY", "LOAD", "SAVE", "CURRENT INSTANCE", "ERRORS", "SHADOW ARRAY", "DROP ARRAY"]
 
 # starting word for two-word keywords
@@ -94,7 +92,7 @@ def set_test_dir(dir_to_search):
       mydir = mydir + '/../../../../../test/testcases/t/docscript'
       mydir = os.path.abspath(mydir)
       if not os.path.isdir(mydir):
-        print 'Warning: Please set valid TEST_DIR_PATH in the script.'
+        print '\nWarning: Please set valid TEST_DIR_PATH in the script.'
   TEST_DIR_PATH = mydir + '/'
 
 
@@ -230,9 +228,9 @@ def generateXML(iqCmdList,pBlock):
       if iqCmd['queryType'] == '--schema':
         if iqCmd['output'] != '':
           res = iqCmd['output']
-          arrName = res.split('<')[0].split('"')[1]
+          arrName = res.split('<')[0].split("'")[1]
           attrClause = res.split('<')[1].split('>')[0].replace(',',',\n')
-          dimClause = res.split('<')[1].split('>')[1].split('"')[0].strip()
+          dimClause = res.split('<')[1].split('>')[1].split("'")[0].strip()
           sDims = ''
           i = 0
           while ( i < len(dimClause) ):
@@ -333,12 +331,17 @@ def auto_cleanup(testFileName):
   arr_list = arr.split(',')
   list = []
   for ele in arr_list:
-    list.append(ele[ele.find('"')+1:ele.rfind('"')])
+    list.append(ele[ele.find("'")+1:ele.rfind("'")])
   iqCmdList = []
   removeStr = ''
   if list[0] != '[]':
     for ele in list:
-      run_cmd('iquery -p '+str(IQUERY_PORT)+' -aq \'remove('+ele+')\'')
+      res = run_cmd('iquery -p '+str(IQUERY_PORT)+' -aq \'remove('+ele+')\'')
+      if res.lower().find('error') > -1:
+        print "An error occurred in auto_cleanup section"
+        log_it("ScriptException in auto_cleanup",1)
+        ERROR_OCCURRED = True
+        break
       removeStr = removeStr + '\nremove('+ele+')'
   if testFileName != 'ERROR':
     try:
@@ -350,7 +353,7 @@ def auto_cleanup(testFileName):
       testFile.write(removeStr+'\n')
       testFile.close()
     except Exception, inst:
-      log_it("ScriptException in auto_cleanup",1)
+      log_it("ScriptException in writing cleanup section to .test file",1)
       log_it(inst.message,1)
       ERROR_OCCURRED = True
 
@@ -416,7 +419,8 @@ def add_to_test_file(iqCmdList,fname):
         if iqCmd['queryType'] == '--aql':
           stmt = '--aql '
         stmt = stmt + initialize_string(iqCmd['query'])
-      testFile.write('\n'+stmt.replace(';',' '))
+        stmt = stmt.replace(';',' ')
+      testFile.write('\n'+stmt)
     testFile.close()
   except Exception, inst:
     log_it("ScriptException in add_to_test_file",1)
@@ -484,13 +488,14 @@ def getCmdOptions(cmdStr):
   iqCmd['query'] = tmp[1][4:]
   commandExtend = ''
   for ele in tmp:
-    if ele.count("=") == 1:
-      if ele.split("=")[0] in validOptions:
-        iqCmd[ele.split("=")[0]] = ele.split("=")[1]
+    if (ele.count("=") == 1) or ele.startswith('command='):
+      currOption = ele.split("=",1)
+      if currOption[0] in validOptions:
+        iqCmd[currOption[0]] = currOption[1]
       elif ele[0:3] not in ['afl', 'aql']:
-        log_it('Invalid option detected: ' + ele.split("=")[0],1)
+        log_it('Invalid option detected: ' + currOption[0],1)
         ERROR_OCCURRED = True
-    elif ele.strip().lower() in executableOptions:
+    elif (iqCmd['queryType'] == '--shell') and (ele.strip() not in ['', 'shell']):
         commandExtend = commandExtend + ' --' + ele
   if iqCmd['queryType'] == '--shell':
     iqCmd['command'] = iqCmd['command'] + commandExtend
@@ -548,8 +553,12 @@ def generatePostBlock(pBlock,tFileName):
     log_it('pBlock.text is: '+pBlock.text,3)
     log_it('source xml line no.: %d'%pBlock.sourceline,3)
     tCmdList = getCmdList(pBlock.text)
-    for ele in tCmdList:
-      tCmds.append(getCmdOptions(ele))
+    try:
+      for ele in tCmdList:
+        tCmds.append(getCmdOptions(ele))
+    except Exception, inst:
+      log_it('ScriptException in getCmdOptions',1)
+      raise Exception(inst)
     validCount = 0
     for ele in tCmds:
       if validate_cmd_options(ele) == 'ok':
@@ -624,7 +633,7 @@ def process_directory(myDir):
   print "\nFound %d _pre.xml file(s)." % len(preFiles)
   i = 1
   for preFile in preFiles:
-    print "\nCurrently processing (%d/%d): %s\n " % (i,len(preFiles),preFile)
+    print "\nCurrently processing (%d/%d): %s " % (i,len(preFiles),preFile)
     process_doc(preFile)
     i = i + 1
 

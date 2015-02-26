@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd">
+"docbookV4.5/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "scidb_ug.ent">
+%myents;
+]>
 <chapter>
   <title>SciDB Installation and Administration</title>
 
@@ -19,11 +21,11 @@
     </listitem>
 
     <listitem>
-      <para>CentOS 6.3</para>
+      <para>CentOS 6</para>
     </listitem>
 
     <listitem>
-      <para>Red Hat Enterprise Linux (RHEL) 6.3</para>
+      <para>Red Hat Enterprise Linux (RHEL) 6</para>
     </listitem>
   </itemizedlist>
 
@@ -99,7 +101,43 @@
       <?dbfo term-width="1.5in"?>
 
       <varlistentry>
-        <term>Single server</term>
+        <term>
+          <emphasis>Array</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>arrays</primary>
+
+              <secondary>definition</secondary>
+            </indexterm>A data structure that is used to store SciDB data. An
+          array has any number of dimensions and attributes. Comparing with
+          the relational model, arrays act like tables, array cells act like
+          rows, dimensions and attributes both act like columns, while the set
+          of all dimensions acts like the primary key. For more details, see
+          <xref linkend="section_arrayDataModel"/>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Matrix</emphasis>
+        </term>
+
+        <listitem>
+          <para><indexterm>
+              <primary>matrix</primary>
+
+              <secondary>definition</secondary>
+            </indexterm>A SciDB array that has two dimensions and one numeric
+          attribute. Linear algebra is performed on matrices.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <emphasis>Single server</emphasis>
+        </term>
 
         <listitem>
           <para><indexterm>
@@ -113,7 +151,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>Virtual server</term>
+        <term>
+          <emphasis>Virtual server</emphasis>
+        </term>
 
         <listitem>
           <para><indexterm>
@@ -126,7 +166,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>Coordinator server</term>
+        <term>
+          <emphasis>Coordinator server</emphasis>
+        </term>
 
         <listitem>
           <para><indexterm>
@@ -138,7 +180,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>SciDB instance</term>
+        <term>
+          <emphasis>SciDB instance</emphasis>
+        </term>
 
         <listitem>
           <para>An independent SciDB group of processes, that is, a single
@@ -148,7 +192,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>Coordinator instance</term>
+        <term>
+          <emphasis>Coordinator instance</emphasis>
+        </term>
 
         <listitem>
           <para><indexterm>
@@ -165,7 +211,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>Worker instance</term>
+        <term>
+          <emphasis>Worker instance</emphasis>
+        </term>
 
         <listitem>
           <para><indexterm>
@@ -180,7 +228,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>Cluster</term>
+        <term>
+          <emphasis>Cluster</emphasis>
+        </term>
 
         <listitem>
           <para>A group of one or more single servers connected by TCP/IP,
@@ -190,7 +240,9 @@
       </varlistentry>
 
       <varlistentry>
-        <term>SciDB cluster</term>
+        <term>
+          <emphasis>SciDB cluster</emphasis>
+        </term>
 
         <listitem>
           <para>A collection of SciDB instances (one coordinator and zero or
@@ -285,7 +337,8 @@
       and belongs to one SciDB Installation. Within any SciDB installation,
       each SciDB cluster name is unique. There are servers. Each server has an
       IP address, belongs to one SciDB cluster, and can host multiple
-      instances. There are instances. <indexterm>
+      instances. There are instances. <indexterm class="startofrange"
+          id="portnumbers">
           <primary>port numbers</primary>
         </indexterm>Each instance is hosted by one server. Each instance has a
       port number. Each instance has a unique combination of server and port
@@ -329,16 +382,14 @@
       each SciDB cluster name is unique. There are servers. Each server has an
       IP address, belongs to one SciDB cluster, and can host multiple
       instances. There are instances. Each instance is hosted by one server.
-      <indexterm>
-          <primary>port numbers</primary>
-        </indexterm>Each instance has a port number. Each instance has a
-      unique combination of server and port number. (That is, two instances
-      can have the same port number, but only if they are hosted by different
-      servers.) An instance can be a coordinator instance, a worker instance,
-      or both. Every coordinator instance is an instance. Every worker
-      instance is an instance. Each coordinator instance coordinates the work
-      of one SciDB cluster, and each SciDB cluster can be coordinated by one
-      coordinator instance.</para>
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) An
+      instance can be a coordinator instance, a worker instance, or both.
+      Every coordinator instance is an instance. Every worker instance is an
+      instance. Each coordinator instance coordinates the work of one SciDB
+      cluster, and each SciDB cluster can be coordinated by one coordinator
+      instance.</para>
     </section>
 
     <section xml:id="DM_CS_WS">
@@ -383,19 +434,16 @@
       each SciDB cluster name is unique. There are servers. Each server has an
       IP address, belongs to one SciDB cluster, and can host multiple
       instances. There are instances. Each instance is hosted by one server.
-      <indexterm>
-          <primary>port numbers</primary>
-        </indexterm>Each instance has a port number. Each instance has a
-      unique combination of server and port number. (That is, two instances
-      can have the same port number, but only if they are hosted by different
-      servers.) An instance can be a coordinator instance, a worker instance,
-      or both. Each coordinator instance coordinates the work of one SciDB
-      cluster, and each SciDB cluster can be coordinated by one coordinator
-      instance. A server can be a coordinator server or a worker server. The
-      coordinator server hosts the coordinator instance (and because every
-      coordinator instance is an instance, might also host other instances).
-      The coordinator server will ultimately host the Postgres
-      installation.</para>
+      Each instance has a port number. Each instance has a unique combination
+      of server and port number. (That is, two instances can have the same
+      port number, but only if they are hosted by different servers.) An
+      instance can be a coordinator instance, a worker instance, or both. Each
+      coordinator instance coordinates the work of one SciDB cluster, and each
+      SciDB cluster can be coordinated by one coordinator instance. A server
+      can be a coordinator server or a worker server. The coordinator server
+      hosts the coordinator instance (and because every coordinator instance
+      is an instance, might also host other instances). The coordinator server
+      will ultimately host the Postgres installation.</para>
     </section>
 
     <section xml:id="DM_DP_D">
@@ -432,7 +480,7 @@
       each SciDB cluster name is unique. There are servers. Each server has an
       IP address, belongs to one SciDB cluster, and can host multiple
       instances. There are instances. Each instance is hosted by one server.
-      <indexterm>
+      <indexterm class="endofrange" startref="portnumbers">
           <primary>port numbers</primary>
         </indexterm>Each instance has a port number. Each instance has a
       unique combination of server and port number. (That is, two instances
@@ -506,7 +554,9 @@
         <listitem>
           <para>For CentOS and RHEL, you should create a user account
           (<command>adduser</command>), and provide sudo access for this
-          account. For details, see your OS documentation.</para>
+          account. For details, see your OS documentation. If you need to
+          install <command>sudo</command>, execute the following command (as
+          root):<programlisting>yum install sudo</programlisting></para>
         </listitem>
       </itemizedlist></para>
 
@@ -583,12 +633,13 @@
 
       <orderedlist>
         <listitem>
-          <para>Create a key:<programlisting>ssh-keygen</programlisting>By
-          default, this creates a key file with a public/private key pair in
-          ~/.ssh/id_rsa.pub and ~/.ssh/id_rsa. Optionally, a key file name may
-          be specified. If a non-default filename is used for the key pair, it
-          must be listed in the SciDB configuration file for use by
-          scidb.py.</para>
+          <para>Create a key:<programlisting>ssh-keygen</programlisting><indexterm>
+              <primary>key file</primary>
+            </indexterm>By default, this creates a key file with a
+          public/private key pair in ~/.ssh/id_rsa.pub and ~/.ssh/id_rsa.
+          Optionally, a key file name may be specified. If a non-default
+          filename is used for the key pair, it must be listed in the SciDB
+          configuration file for use by scidb.py.</para>
 
           <programlisting>
 scidb@monolith1:~/.ssh$ ssh-keygen 
@@ -604,21 +655,21 @@ Your public key has been saved in id_rsa.pub.
         <listitem>
           <para>Copy the key to all instances—the coordinator and to each
           worker—to authorize ssh clients connecting to SciDB:
-          <programlisting>ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@<replaceable>worker</replaceable>
-ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@localhost</programlisting></para>
+          <programlisting>ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@localhost
+ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@0.0.0.0
+ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@127.0.0.1
+ssh-copy-id -i ~/.ssh/id_rsa.pub scidb@<replaceable>worker</replaceable>
+</programlisting></para>
         </listitem>
 
         <listitem>
-          <para>Login to remote host. Note that no password is required
-          now:<programlisting>ssh scidb@<replaceable>worker</replaceable></programlisting><note>
-              <para>If you are running SciDB on CentOS or RHEL, you may need
-              to perform additional configuration steps. See the next section
-              for details.</para>
-            </note></para>
-        </listitem>
-
-        <listitem>
-          <para>Test the connection on localhost as well.<programlisting>ssh scidb@localhost</programlisting><note>
+          <para>Login to the localhost (and 0.0.0.0 and 127.0.0.1) and each
+          remote host. Note that no password is required now (though you still
+          need to approve each host by responding 'yes' at the
+          prompt):<programlisting>ssh scidb@localhost
+ssh scidb@0.0.0.0
+ssh scidb@127.0.0.1
+ssh scidb@<replaceable>worker</replaceable></programlisting><note>
               <para>If you are running SciDB on CentOS or RHEL, you may need
               to perform additional configuration steps. See the next section
               for details.</para>
@@ -761,48 +812,77 @@ ssh scidb@<replaceable>hostname</replaceable> "chcon -R -v -t user_ssh_home_t ~/
       </listitem>
 
       <listitem>
-        <para>The <code>libscidbclient-13.3</code> and
-        <code>libscidbclient13.3-python</code> packages contain the SciDB
-        client library and the SciDB connector for python applications.</para>
+        <para>The <code>libscidbclient-&scidb_version;</code> and
+        <code>libscidbclient-&scidb_version;-python</code> packages contain
+        the SciDB client library and the SciDB connector for python
+        applications.</para>
       </listitem>
 
       <listitem>
-        <para>The <code>scidb-13.3-plugins </code>package contains plugins
-        that can be added to SciDB to extend its capabilities. This package
-        contains the <code>dense_linear_algebra</code> plugin.</para>
+        <para>The <code>scidb-&scidb_version;-plugins </code>package contains
+        plugins that can be added to SciDB to extend its capabilities. This
+        package contains the <code>dense_linear_algebra</code> plugin.</para>
       </listitem>
 
       <listitem>
-        <para>The <code>scidb-13.3-utils</code> package contains SciDB server
-        utilities.</para>
+        <para>The <code>scidb-&scidb_version;-utils</code> package contains
+        SciDB server utilities.</para>
       </listitem>
 
       <listitem>
-        <para>The <code>scidb-13.3-dev</code> contains development header
-        files for developers creating SciDB extensions (types, operators, and
-        aggregates).</para>
+        <para>The <code>scidb-&scidb_version;-dev</code> contains development
+        header files for developers creating SciDB extensions (types,
+        operators, and aggregates).</para>
       </listitem>
 
       <listitem>
-        <para>The <code>scidb-13.3-dev</code> contains development header
-        files for developers creating SciDB extensions (types, operators, and
-        aggregates).</para>
+        <para>The <code>scidb-&scidb_version;-dev</code> contains development
+        header files for developers creating SciDB extensions (types,
+        operators, and aggregates).</para>
       </listitem>
 
       <listitem>
-        <para>The <code>libscidbclient-13.3-dbg,
-        libscidbclient-13.3-python-dbg, scidb-13.3-dbg,
-        scidb-13.3-dev-tools-dbg, scidb-13.3-plugins-dbg</code>, and
-        <code>scidb-13.3-utils-dbg</code> packages contain debugging
-        symbols.</para>
+        <para>The <code>libscidbclient-&scidb_version;-dbg,
+        libscidbclient-&scidb_version;-python-dbg, scidb-&scidb_version;-dbg,
+        scidb-&scidb_version;-dev-tools-dbg,
+        scidb-&scidb_version;-plugins-dbg</code>, and
+        <code>scidb-&scidb_version;-utils-dbg</code> packages contain
+        debugging symbols.</para>
       </listitem>
     </itemizedlist>
+
+    <para><indexterm>
+        <primary>wget</primary>
+      </indexterm><indexterm>
+        <primary>sudo</primary>
+      </indexterm><indexterm>
+        <primary>packages</primary>
+
+        <secondary>sudo</secondary>
+      </indexterm><indexterm>
+        <primary>packages</primary>
+
+        <secondary>wget</secondary>
+      </indexterm>In order to install SciDB packages, you need to have
+    <command>wget</command>.<itemizedlist>
+        <listitem>
+          <para>On CentOS or RHEL:<programlisting>sudo yum install wget</programlisting></para>
+        </listitem>
+
+        <listitem>
+          <para>On Ubuntu:<programlisting>sudo apt-get install wget </programlisting></para>
+        </listitem>
+      </itemizedlist></para>
 
     <section xml:id="InstallSciDBfrombinarypackage">
       <title>Install SciDB on Ubuntu from binary package</title>
 
-      <para>This section describes how to download and install SciDB on
-      Ubuntu, using pre-built binary packages.</para>
+      <para><indexterm>
+          <primary>packages</primary>
+
+          <secondary>SciDB</secondary>
+        </indexterm>This section describes how to download and install SciDB
+      on Ubuntu, using pre-built binary packages.</para>
 
       <note>
         <para>This step must be performed by a user with sudo privileges. In a
@@ -820,8 +900,11 @@ ssh scidb@<replaceable>hostname</replaceable> "chcon -R -v -t user_ssh_home_t ~/
 
         <listitem>
           <para>Add SciDB's APT repository to the apt configuration file
-          <code>/etc/apt/sources.list.d/scidb.list</code>. <programlisting>deb  http://downloads.paradigm4.com/  ubuntu12.04/13.3/
-deb-src  http://downloads.paradigm4.com/  ubuntu12.04/13.3/</programlisting></para>
+          <code>/etc/apt/sources.list.d/scidb.list</code>. <programlisting>deb  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/
+deb-src  http://downloads.paradigm4.com/  ubuntu12.04/&scidb_version;/</programlisting></para>
+
+          <para>If the <code>/etc/apt/sources.list.d/scidb.list</code> file
+          does not exist, create it (using sudo).</para>
         </listitem>
 
         <listitem>
@@ -830,27 +913,32 @@ deb-src  http://downloads.paradigm4.com/  ubuntu12.04/13.3/</programlisting></pa
           scidb-all (or scidb-all-coord) metapackage. This package includes
           all of the standard SciDB packages.<programlisting>sudo apt-get update
 sudo apt-cache search scidb
-sudo apt-get install scidb-13.3-all-coord # On the coordinator server only
-sudo apt-get install scidb-13.3-all # On all servers other than the coordinator server
+sudo apt-get install scidb-&scidb_version;-all-coord # On the coordinator server only
+sudo apt-get install scidb-&scidb_version;-all # On all servers other than the coordinator server
 sudo apt-get source scidb # If you want the SciDB source</programlisting></para>
         </listitem>
       </orderedlist>
 
       <note>
-        <para>The only difference between the scidb-13.3-all and
-        scidb-13.3-all-coord packages is that the latter has a dependence on
-        PostgreSQL 8.4. Installing scidb-13.3-all-coord will also install
-        PostgreSQL 8.4, if it is not already installed on your system. If you
-        already have PostgreSQL 8.4 on your coordinator server, there is no
-        particular need to use the scidb-13.3-all-coord package.</para>
+        <para>The only difference between the scidb-&scidb_version;-all and
+        scidb-&scidb_version;-all-coord packages is that the latter has a
+        dependence on PostgreSQL 8.4. Installing
+        scidb-&scidb_version;-all-coord will also install PostgreSQL 8.4, if
+        it is not already installed on your system. If you already have
+        PostgreSQL 8.4 on your coordinator server, there is no particular need
+        to use the scidb-&scidb_version;-all-coord package.</para>
       </note>
     </section>
 
     <section xml:id="packageCentOS">
       <title>Install SciDB on CentOS / RHEL from binary package</title>
 
-      <para>This section describes how to download and install SciDB on CentOS
-      and RHEL, using pre-built binary packages.</para>
+      <para><indexterm>
+          <primary>packages</primary>
+
+          <secondary>SciDB</secondary>
+        </indexterm>This section describes how to download and install SciDB
+      on CentOS and RHEL, using pre-built binary packages.</para>
 
       <note>
         <para>This procedure must be performed by a user with sudo privileges.
@@ -861,7 +949,7 @@ sudo apt-get source scidb # If you want the SciDB source</programlisting></para>
         <listitem>
           <para>Add SciDB's GPG public key by running the following command.
           <programlisting>wget http://downloads.paradigm4.com/key
-rpm --import key
+sudo rpm --import key
 rm -f key</programlisting></para>
         </listitem>
 
@@ -875,7 +963,7 @@ rm -f key</programlisting></para>
           <para>Add the following lines to the
           <code>/etc/yum.repos.d/scidb.repo</code> file:<programlisting>[scidb]
 name=SciDB
-baseurl=http://downloads.paradigm4.com/centos6.3/13.3/
+baseurl=http://downloads.paradigm4.com/centos6.3/&scidb_version;/
 gpgcheck=1</programlisting></para>
         </listitem>
 
@@ -891,26 +979,28 @@ gpgcheck=1</programlisting></para>
 
         <listitem>
           <para>Install SciDB. If you want the default SciDB installation with
-          all packages installed, you can install the scidb-13.3-all (or
-          scidb-13.3-all-coord) metapackage. This package includes all of the
-          standard SciDB packages.<programlisting>sudo yum search scidb
-sudo yum install scidb-13.3-all-coord # On the coordinator server only
-sudo yum install scidb-13.3-all # On all servers other than the coordinator server</programlisting></para>
+          all packages installed, you can install the
+          scidb-&scidb_version;-all (or scidb-&scidb_version;-all-coord)
+          metapackage. This package includes all of the standard SciDB
+          packages.<programlisting>sudo yum search scidb
+sudo yum install scidb-&scidb_version;-all-coord # On the coordinator server only
+sudo yum install scidb-&scidb_version;-all # On all servers other than the coordinator server</programlisting></para>
         </listitem>
       </orderedlist>
 
       <note>
-        <para>The only difference between the scidb-13.3-all and
-        scidb-13.3-all-coord packages is that the latter has a dependence on
-        PostgreSQL 8.4. Installing scidb-13.3-all-coord will also install
-        PostgreSQL 8.4, if it is not already installed on your system. If you
-        already have PostgreSQL 8.4 on your coordinator server, there is no
-        particular need to use the scidb-13.3-all-coord package..</para>
+        <para>The only difference between the scidb-&scidb_version;-all and
+        scidb-&scidb_version;-all-coord packages is that the latter has a
+        dependence on PostgreSQL 8.4. Installing
+        scidb-&scidb_version;-all-coord will also install PostgreSQL 8.4, if
+        it is not already installed on your system. If you already have
+        PostgreSQL 8.4 on your coordinator server, there is no particular need
+        to use the scidb-&scidb_version;-all-coord package..</para>
       </note>
     </section>
 
     <section xml:id="PostgresInstallationandConfiguration">
-      <title>System Catalog Setup</title>
+      <title>Set Up Postgres as the SciDB System Catalog</title>
 
       <para>If you are upgrading from a previous version of SciDB, you can
       skip this section, and continue with <xref
@@ -1044,8 +1134,8 @@ port = 5432
 
     <para>This section introduces the SciDB config.ini and shows how to
     configure SciDB prior to initialization (usually
-    <literal>/opt/scidb/13.3/etc/config.ini</literal>). Logging configuration
-    is also described.</para>
+    <literal>/opt/scidb/&scidb_version;/etc/config.ini</literal>). Logging
+    configuration is also described.</para>
 
     <note>
       <para><indexterm>
@@ -1076,172 +1166,9 @@ port = 5432
           <primary>environment variables</primary>
         </indexterm>The following variables should be set in the scidb user's
       environment. <programlisting>
-export SCIDB_VER=13.3
-export PATH="$PATH:/opt/scidb/$SCIDB_VER/bin:
-   /opt/scidb/$SCIDB_VER/share/scidb"
+export SCIDB_VER=&scidb_version;
+export PATH="$PATH:/opt/scidb/$SCIDB_VER/bin:/opt/scidb/$SCIDB_VER/share/scidb"
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/scidb/$SCIDB_VER/lib"</programlisting></para>
-    </section>
-
-    <section>
-      <title>SciDB Configuration File</title>
-
-      <note>
-        <para>The configuration file resides on the coordinator server
-        only.</para>
-      </note>
-
-      <para><indexterm>
-          <primary>configuration</primary>
-        </indexterm>The standard location of the SciDB configuration file is
-      <literal>/opt/scidb/13.3/etc/config.ini</literal>.</para>
-
-      <para>The configuration 'test1' below is an example of the configuration
-      for a single-instance system (coordinator only):<programlisting>[test1]
-server-0=localhost,0
-db_user=test1user
-db_passwd=test1passwd
-install_root=/opt/scidb/13.3
-metadata=/opt/scidb/13.3/share/scidb/meta.sql
-pluginsdir=/opt/scidb/13.3/lib/scidb/plugins
-logconf=/opt/scidb/13.3/share/scidb/log4cxx.properties
-base-path=/home/scidb/data
-base-port=1239
-interface=eth0
-network-buffer=1024
-mem-array-threshold=1024
-smgr-cache-size=1024
-execution-threads=16
-result-prefetch-queue-size=4
-result-prefetch-threads=4
-chunk-segment-size=100485760
-</programlisting></para>
-    </section>
-
-    <section id="SaltyConfig">
-      <title>Cluster Configuration Example</title>
-
-      <para><indexterm>
-          <primary>configuration</primary>
-
-          <secondary>example</secondary>
-        </indexterm><indexterm>
-          <primary>data-dir-prefix</primary>
-        </indexterm>The following SciDB cluster configuration is called
-      'salty.' This cluster consists of 4 identical servers. Each server has
-      the the following characteristics:<itemizedlist>
-          <listitem>
-            <para>x86_64 8-core processor</para>
-          </listitem>
-
-          <listitem>
-            <para>4 physical disks: each disk has 1 TB direct attached
-            storage</para>
-          </listitem>
-
-          <listitem>
-            <para>8 GB of RAM</para>
-          </listitem>
-
-          <listitem>
-            <para>1Gbps Ethernet</para>
-          </listitem>
-
-          <listitem>
-            <para>Linux OS from the list of supported distributions.</para>
-          </listitem>
-        </itemizedlist></para>
-
-      <para>The following configuration file applies to such a cluster called
-      <literal>salty</literal>. <programlisting>[salty]
-server-0=p4xen1.local.paradigm4.com,7
-server-1=p4xen2.local.paradigm4.com,8
-server-2=p4xen2.local.paradigm4.com,8
-server-3=p4xen4.local.paradigm4.com,8
-db_user=salty
-db_passwd=salty
-install_root=/opt/scidb/13.3
-pluginsdir=/opt/scidb/13.3/lib/scidb/plugins
-logconf=/opt/scidb/13.3/share/scidb/log4cxx.properties
-base-path=/home/scidb/DB-salty
-# note that this cluster does not use the default base-port, 1239,
-# so you may need to open port 1600 on your firewall.
-base-port=1600
-interface=eth0
-
-# server-0
-# Port numbers: 1600 - 1607
-data-dir-prefix-0-0=/datadisk1/salty.000.0
-data-dir-prefix-0-1=/datadisk2/salty.000.1
-data-dir-prefix-0-2=/datadisk3/salty.000.2
-data-dir-prefix-0-3=/datadisk4/salty.000.3
-data-dir-prefix-0-4=/datadisk1/salty.000.4
-data-dir-prefix-0-5=/datadisk2/salty.000.5
-data-dir-prefix-0-6=/datadisk3/salty.000.6
-data-dir-prefix-0-7=/datadisk4/salty.000.7
-
-# server-1
-# Port numbers: 1601 - 1608
-data-dir-prefix-1-1=/datadisk1/salty.001.1
-data-dir-prefix-1-2=/datadisk2/salty.001.2
-data-dir-prefix-1-3=/datadisk3/salty.001.3
-data-dir-prefix-1-4=/datadisk4/salty.001.4
-data-dir-prefix-1-5=/datadisk1/salty.001.5
-data-dir-prefix-1-6=/datadisk2/salty.001.6
-data-dir-prefix-1-7=/datadisk3/salty.001.7
-data-dir-prefix-1-8=/datadisk4/salty.001.8
-
-# server-2
-# Port numbers: 1601 - 1608
-data-dir-prefix-2-1=/datadisk1/salty.002.1
-data-dir-prefix-2-2=/datadisk2/salty.002.2
-data-dir-prefix-2-3=/datadisk3/salty.002.3
-data-dir-prefix-2-4=/datadisk4/salty.002.4
-data-dir-prefix-2-5=/datadisk1/salty.002.5
-data-dir-prefix-2-6=/datadisk2/salty.002.6
-data-dir-prefix-2-7=/datadisk3/salty.002.7
-data-dir-prefix-2-8=/datadisk4/salty.002.8
-
-# server-3
-# Port numbers: 1601 - 1608
-data-dir-prefix-3-1=/datadisk1/salty.003.1
-data-dir-prefix-3-2=/datadisk2/salty.003.2
-data-dir-prefix-3-3=/datadisk3/salty.003.3
-data-dir-prefix-3-4=/datadisk4/salty.003.4
-data-dir-prefix-3-5=/datadisk1/salty.003.5
-data-dir-prefix-3-6=/datadisk2/salty.003.6
-data-dir-prefix-3-7=/datadisk3/salty.003.7
-data-dir-prefix-3-8=/datadisk4/salty.003.8</programlisting></para>
-
-      <para>Note the following about this cluster:</para>
-
-      <itemizedlist>
-        <listitem>
-          <para>Each datadisk<replaceable>n</replaceable> is mounted on a
-          physical disk. Each SciDB server uses four physical disks and has
-          eight instances. Thus each instance has its own processor and shares
-          a disk with one other instance.</para>
-        </listitem>
-
-        <listitem>
-          <para>This SciDB cluster has a total of 32 instances, split evenly
-          amongst the 32 cores and 16 disks.</para>
-        </listitem>
-
-        <listitem>
-          <para>The names of the disk are local per server; thus datadisk1 on
-          server-0 is a different disk than datadisk1 on server-1.</para>
-        </listitem>
-
-        <listitem>
-          <para><indexterm>
-              <primary>port numbers</primary>
-            </indexterm>The port numbers for each instance on a server are
-          incremental. The port numbers in the above example are listed in the
-          comments for each server. Thus, instance number 4 on each server
-          uses the same port, 1604. Note that only the coordinator instance
-          uses the base port, 1600.</para>
-        </listitem>
-      </itemizedlist>
     </section>
 
     <section id="configParameters">
@@ -1300,8 +1227,11 @@ data-dir-prefix-3-8=/datadisk4/salty.003.8</programlisting></para>
 
               <entry>
                 <para>Name of the SciDB cluster. The cluster name must appear
-                as a section heading in the config.ini file, e.g.,<emphasis>
-                [cluster1]</emphasis></para>
+                as a section heading in the config.ini file, e.g.
+                <emphasis>[cluster1]</emphasis></para>
+
+                <para>To avoid possible problems, we recommend that you use
+                all lowercase for the cluster name.</para>
               </entry>
             </row>
 
@@ -1321,23 +1251,39 @@ data-dir-prefix-3-8=/datadisk4/salty.003.8</programlisting></para>
 
             <row>
               <entry>
-                <para>db_user</para>
+                <para><indexterm>
+                    <primary>Postgres</primary>
+
+                    <secondary>db_user</secondary>
+                  </indexterm>db_user</para>
               </entry>
 
               <entry>
                 <para>User name to use in the catalog connection string. This
-                example uses<emphasis> test1user</emphasis></para>
+                example uses <emphasis>test1user</emphasis></para>
+
+                <para>To avoid possible problems, we recommend that you use
+                all lowercase for the <literal>db_user</literal>
+                parameter.</para>
               </entry>
             </row>
 
             <row>
               <entry>
-                <para>db_passwd</para>
+                <para><indexterm>
+                    <primary>Postgres</primary>
+
+                    <secondary>db_passwd</secondary>
+                  </indexterm>db_passwd</para>
               </entry>
 
               <entry>
                 <para>Password to use in the catalog connection string. This
-                example uses<emphasis> test1passwd</emphasis></para>
+                example uses<emphasis>test1passwd</emphasis></para>
+
+                <para>To avoid possible problems, we recommend that you use
+                all lowercase for the <literal>db_passwd</literal>
+                parameter.</para>
               </entry>
             </row>
 
@@ -1460,7 +1406,9 @@ data-dir-prefix-3-8=/datadisk4/salty.003.8</programlisting></para>
 
             <row>
               <entry>
-                <para>data-dir-prefix (optional)</para>
+                <para><indexterm>
+                    <primary>data-dir-prefix</primary>
+                  </indexterm>data-dir-prefix (optional)</para>
               </entry>
 
               <entry>
@@ -1509,6 +1457,34 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout>
 
             <row>
               <entry>
+                <para>redundancy (optional)</para>
+              </entry>
+
+              <entry>
+                <para><indexterm>
+                    <primary>replication</primary>
+                  </indexterm><indexterm>
+                    <primary>redundancy</primary>
+                  </indexterm><indexterm>
+                    <primary>fault tolerance</primary>
+                  </indexterm>Indicates the number of replications of array
+                data. The value of this parameter specifies the number of
+                <emphasis role="bold">extra</emphasis> copies of array data to
+                store.</para>
+
+                <para>Setting this parameter to a positive value is the first
+                step in creating a fault tolerant SciDB cluster. Default: 0
+                (meaning only one copy of data is stored).</para>
+
+                <para>The number of copies of your data equals 1 + the
+                redundancy value. Maximum value for the redundancy parameter
+                is one less than the number of instances in your SciDB
+                cluster.</para>
+              </entry>
+            </row>
+
+            <row>
+              <entry>
                 <para>ssh-port (optional)</para>
               </entry>
 
@@ -1524,9 +1500,16 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout>
               </entry>
 
               <entry>
-                <para>Comma-separated list of filenames that include keys for
-                ssh authentication. Default: /home/scidb/.ssh/id_rsa and
-                id_dsa.</para>
+                <para><indexterm>
+                    <primary>ssh</primary>
+                  </indexterm><indexterm>
+                    <primary>key file</primary>
+                  </indexterm>Comma-separated list of filenames that include
+                keys for ssh authentication. Default: /home/scidb/.ssh/id_rsa
+                and id_dsa.</para>
+
+                <para>If you do not use the default name and path for the key,
+                then you must set a value for this parameter.</para>
               </entry>
             </row>
 
@@ -1547,8 +1530,19 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout>
               </entry>
 
               <entry>
-                <para>Set this to true if you do not want automatic restart of
-                the SciDB server on a software crash. Default: false.</para>
+                <para><indexterm>
+                    <primary>watchdog process</primary>
+                  </indexterm><indexterm>
+                    <primary>processes, SciDB instances</primary>
+                  </indexterm>Set this to true if you do not want automatic
+                restart of the SciDB server on a software crash. Default:
+                false.</para>
+
+                <para>By default, each SciDB instance spawns two Linux
+                processes; one for the instance itself, and one as a watchdog.
+                The watchdog process detects if the instance process fails. If
+                it detects a failure, then it forks a new, replacement
+                process, which brings the instance back online.</para>
               </entry>
             </row>
           </tbody>
@@ -1762,6 +1756,197 @@ data-dir-prefix-0-7=/datadisk4/myserver.000.7</literallayout>
       <emphasis>test1passwd</emphasis>.</para>
     </section>
 
+    <section>
+      <title>SciDB Configuration File Example</title>
+
+      <note>
+        <para>The configuration file resides on the coordinator server
+        only.</para>
+      </note>
+
+      <para><indexterm>
+          <primary>configuration</primary>
+        </indexterm>The standard location of the SciDB configuration file is
+      <literal>/opt/scidb/&scidb_version;/etc/config.ini</literal>.</para>
+
+      <para>The configuration 'test1' below is an example of the configuration
+      for a single-instance system (coordinator only):<programlisting>[test1]
+server-0=localhost,0
+db_user=test1user
+db_passwd=test1passwd
+install_root=/opt/scidb/&scidb_version;
+metadata=/opt/scidb/&scidb_version;/share/scidb/meta.sql
+pluginsdir=/opt/scidb/&scidb_version;/lib/scidb/plugins
+logconf=/opt/scidb/&scidb_version;/share/scidb/log4cxx.properties
+base-path=/home/scidb/data
+base-port=1239
+interface=eth0
+network-buffer=1024
+mem-array-threshold=1024
+smgr-cache-size=1024
+execution-threads=16
+result-prefetch-queue-size=4
+result-prefetch-threads=4
+chunk-segment-size=100485760
+</programlisting></para>
+    </section>
+
+    <section id="SaltyConfig">
+      <title>Cluster Configuration Example</title>
+
+      <para><indexterm>
+          <primary>configuration</primary>
+
+          <secondary>example</secondary>
+        </indexterm><indexterm>
+          <primary>data-dir-prefix</primary>
+        </indexterm>The following SciDB cluster configuration is called
+      'salty.' This cluster consists of 4 identical servers. Each server has
+      the the following characteristics:<itemizedlist>
+          <listitem>
+            <para>x86_64 8-core processor</para>
+          </listitem>
+
+          <listitem>
+            <para>4 physical disks: each disk has 1 TB direct attached
+            storage</para>
+          </listitem>
+
+          <listitem>
+            <para>8 GB of RAM</para>
+          </listitem>
+
+          <listitem>
+            <para>1Gbps Ethernet</para>
+          </listitem>
+
+          <listitem>
+            <para>Linux OS from the list of supported distributions.</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>The following configuration file applies to such a cluster called
+      <literal>salty</literal>. <programlisting>[salty]
+server-0=p4xen1.local.paradigm4.com,7
+server-1=p4xen2.local.paradigm4.com,8
+server-2=p4xen2.local.paradigm4.com,8
+server-3=p4xen4.local.paradigm4.com,8
+db_user=salty
+db_passwd=salty
+install_root=/opt/scidb/&scidb_version;
+pluginsdir=/opt/scidb/&scidb_version;/lib/scidb/plugins
+logconf=/opt/scidb/&scidb_version;/share/scidb/log4cxx.properties
+base-path=/home/scidb/DB-salty
+# note that this cluster does not use the default base-port, 1239,
+# so you may need to open port 1600 on your firewall.
+base-port=1600
+interface=eth0
+
+# Specifying values for the data-dir-prefix
+# parameter is optional. See below for details.
+
+# server-0
+# Port numbers: 1600 - 1607
+data-dir-prefix-0-0=/datadisk1/salty.000.0
+data-dir-prefix-0-1=/datadisk2/salty.000.1
+data-dir-prefix-0-2=/datadisk3/salty.000.2
+data-dir-prefix-0-3=/datadisk4/salty.000.3
+data-dir-prefix-0-4=/datadisk1/salty.000.4
+data-dir-prefix-0-5=/datadisk2/salty.000.5
+data-dir-prefix-0-6=/datadisk3/salty.000.6
+data-dir-prefix-0-7=/datadisk4/salty.000.7
+
+# server-1
+# Port numbers: 1601 - 1608
+data-dir-prefix-1-1=/datadisk1/salty.001.1
+data-dir-prefix-1-2=/datadisk2/salty.001.2
+data-dir-prefix-1-3=/datadisk3/salty.001.3
+data-dir-prefix-1-4=/datadisk4/salty.001.4
+data-dir-prefix-1-5=/datadisk1/salty.001.5
+data-dir-prefix-1-6=/datadisk2/salty.001.6
+data-dir-prefix-1-7=/datadisk3/salty.001.7
+data-dir-prefix-1-8=/datadisk4/salty.001.8
+
+# server-2
+# Port numbers: 1601 - 1608
+data-dir-prefix-2-1=/datadisk1/salty.002.1
+data-dir-prefix-2-2=/datadisk2/salty.002.2
+data-dir-prefix-2-3=/datadisk3/salty.002.3
+data-dir-prefix-2-4=/datadisk4/salty.002.4
+data-dir-prefix-2-5=/datadisk1/salty.002.5
+data-dir-prefix-2-6=/datadisk2/salty.002.6
+data-dir-prefix-2-7=/datadisk3/salty.002.7
+data-dir-prefix-2-8=/datadisk4/salty.002.8
+
+# server-3
+# Port numbers: 1601 - 1608
+data-dir-prefix-3-1=/datadisk1/salty.003.1
+data-dir-prefix-3-2=/datadisk2/salty.003.2
+data-dir-prefix-3-3=/datadisk3/salty.003.3
+data-dir-prefix-3-4=/datadisk4/salty.003.4
+data-dir-prefix-3-5=/datadisk1/salty.003.5
+data-dir-prefix-3-6=/datadisk2/salty.003.6
+data-dir-prefix-3-7=/datadisk3/salty.003.7
+data-dir-prefix-3-8=/datadisk4/salty.003.8</programlisting></para>
+
+      <para>Note the following about this cluster:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para>Each datadisk<replaceable>n</replaceable> is mounted on a
+          physical disk. Each SciDB server uses four physical disks and has
+          eight instances. Thus each instance has its own processor and shares
+          a disk with one other instance.</para>
+        </listitem>
+
+        <listitem>
+          <para>This SciDB cluster has a total of 32 instances, split evenly
+          amongst the 32 cores and 16 disks.</para>
+        </listitem>
+
+        <listitem>
+          <para>The names of the disk are local per server; thus datadisk1 on
+          server-0 is a different disk than datadisk1 on server-1.</para>
+        </listitem>
+
+        <listitem>
+          <para><indexterm>
+              <primary>port numbers</primary>
+            </indexterm>The port numbers for each instance on a server are
+          incremental. The port numbers in the above example are listed in the
+          comments for each server. Thus, instance number 4 on each server
+          uses the same port, 1604. Note that only the coordinator instance
+          uses the base port, 1600.</para>
+        </listitem>
+
+        <listitem>
+          <para><indexterm>
+              <primary>data-dir-prefix</primary>
+            </indexterm>In this example, we specified data-dir-prefix values
+          for each instance in the cluster. Once you create the folders, the
+          <command>scidb.py initall</command> command creates symbolic links
+          from the base-path to the directories that you specified for the
+          data-dir-prefix parameter in the config.ini file. Note the
+          following:<itemizedlist>
+              <listitem>
+                <para>Specifying values for data-dir-prefix is optional. If
+                you do not specify a data-dir-prefix value for an instance,
+                then SciDB creates a folder using the default naming
+                scheme—this will be a sub-folder of the base-path.</para>
+              </listitem>
+
+              <listitem>
+                <para>If you <emphasis role="bold">do</emphasis> specify a
+                data-dir-prefix value for an instance, then you must ensure
+                that the specified folder exists, and that it is completely
+                empty. Otherwise, you will get errors when you try to start
+                SciDB.</para>
+              </listitem>
+            </itemizedlist></para>
+        </listitem>
+      </itemizedlist>
+    </section>
+
     <section xml:id="LoggingConfiguration">
       <title>Logging Configuration</title>
 
@@ -1802,9 +1987,7 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
     <title>Initializing and Starting SciDB</title>
 
     <para><indexterm>
-        <primary>scidb.py</primary>
-      </indexterm><indexterm>
-        <primary>scidb script</primary>
+        <primary>scidb.py script</primary>
       </indexterm>To begin a SciDB session, use the
     <literal>scidb.py</literal> script. In a standard SciDB build, this script
     is located here:<programlisting>/opt/scidb/<replaceable>version.number</replaceable>/bin</programlisting></para>
@@ -1834,8 +2017,8 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
               role="bold"> Warning</emphasis>: This will remove any existing
               SciDB arrays from the current namespace and recreate the system
               catalog entries for this database. This must be run as user
-              'root' or as user 'Postgres' since it requires administrative
-              privileges to the Postgres database.</para>
+              'postgres' since it requires administrative privileges to the
+              Postgres database.</para>
             </entry>
           </row>
 
@@ -1967,8 +2150,8 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
     cluster you want to create or get information about.</para>
 
     <para>The configuration file is set by default to
-    <code>/opt/scidb/13.3/etc/config.ini</code>. If you want to use a custom
-    configuration file for a particular SciDB cluster, use the
+    <code>/opt/scidb/&scidb_version;/etc/config.ini</code>. If you want to use
+    a custom configuration file for a particular SciDB cluster, use the
     <replaceable>conffile</replaceable> argument.</para>
 
     <section xml:id="Thescidb.pyScript">
@@ -1981,9 +2164,9 @@ log4j.appender.file.layout.ConversionPattern=%d [%t] [%-5p]: %m%n</programlistin
         <step>
           <para><indexterm>
               <primary>Postgres</primary>
-            </indexterm>initialize the system catalog database in Postgres.
+            </indexterm>Initialize the system catalog database in Postgres.
           This must be done as user Postgres, therefore, this command must be
-          run as user Postgres, or as superuser as follows. <programlisting>sudo -u postgres /opt/scidb/13.3/bin/scidb.py init_syscat <replaceable>db</replaceable></programlisting></para>
+          run as user Postgres, or as superuser as follows. <programlisting>sudo -u postgres /opt/scidb/&scidb_version;/bin/scidb.py init_syscat <replaceable>db</replaceable></programlisting></para>
         </step>
 
         <step>

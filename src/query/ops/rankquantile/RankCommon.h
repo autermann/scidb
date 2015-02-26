@@ -581,9 +581,24 @@ public:
     }
 
 private:
+    /**
+     * Memory for the returned value.
+     */
     Value _outputValue;
-    shared_ptr<ConstChunkIterator> _mergerIterator;
+
+    /**
+     * The high-rank array iterator.
+     * The data from this->inputIterator is averaged with the data from _mergerArrayIterator to produce the average rank.
+     */
     shared_ptr<ConstArrayIterator> _mergerArrayIterator;
+
+    /**
+     * The high-rank chunk iterator.
+     * The data from this->inputIterator is averaged with the data from _mergeIterator to produce the average rank.
+     * VERY IMPORTANT: this must be declared after _mergerArrayIterator to enforce proper order of destruction. Otherwise,
+     * _mergerArrayIterator is destructed first, which could cause a crash.
+     */
+    shared_ptr<ConstChunkIterator> _mergerIterator;
 };
 
 class RankArray : public DelegateArray
@@ -791,13 +806,13 @@ ArrayDesc getRankingSchema(ArrayDesc const& inputSchema, AttributeID rankedAttri
 shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
                                  AttributeID rankedAttributeID,
                                  Dimensions const& grouping,
-                                 shared_ptr<Query> query,
+                                 shared_ptr<Query>& query,
                                  shared_ptr<RankingStats> rstats = shared_ptr<RankingStats>());
 //inputArray must be distributed round-robin
 shared_ptr<Array> buildDualRankArray(shared_ptr<Array>& inputArray,
                                      AttributeID rankedAttributeID,
                                      Dimensions const& grouping,
-                                     shared_ptr<Query> query,
+                                     shared_ptr<Query>& query,
                                      shared_ptr<RankingStats> rstats = shared_ptr<RankingStats>());
 
 /**

@@ -27,11 +27,12 @@
  *
  * @brief The Thread class
  */
+#include <sstream>
 
-#include "log4cxx/logger.h"
+#include <log4cxx/logger.h>
 
-#include "util/Thread.h"
-#include "util/JobQueue.h"
+#include <util/Thread.h>
+#include <util/JobQueue.h>
 
 namespace {
 class PAttrEraser
@@ -55,17 +56,25 @@ namespace scidb
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.common.thread"));
 
-Thread::Thread(ThreadPool& threadPool, size_t index): _threadPool(threadPool), _index(index)
+Thread::Thread(ThreadPool& threadPool, size_t index):
+_threadPool(threadPool),
+_index(index),
+_isStarted(false)
 {
-    _isStarted = false;
 }
 
+bool Thread::isStarted()
+{
+    ScopedMutexLock lock(_threadPool._mutex);
+    return _isStarted;
+}
 void Thread::start()
 {
     ScopedMutexLock lock(_threadPool._mutex);
 
     assert(!_isStarted);
     if (_isStarted) {
+        assert(false);
         return;
     }
 
@@ -73,7 +82,8 @@ void Thread::start()
     int rc = pthread_attr_init(&attr);
 
     if (rc!=0) {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_UNKNOWN_ERROR) << rc;
+        std::stringstream ss; ss<<"pthread_attr_init: "<<rc;
+        throw std::runtime_error(ss.str());
     }
     PAttrEraser onStack(&attr);
 
@@ -81,17 +91,20 @@ void Thread::start()
     assert(stackSize > PTHREAD_STACK_MIN);
     rc = pthread_attr_setstacksize(&attr, stackSize);
     if (rc != 0) {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_UNKNOWN_ERROR) << rc;
+        std::stringstream ss; ss<<"pthread_attr_setstacksize: "<<rc;
+        throw std::runtime_error(ss.str());
     }
 
     rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     if (rc != 0) {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_UNKNOWN_ERROR) << rc;
+        std::stringstream ss; ss<<"pthread_attr_setdetachstate: "<<rc;
+        throw std::runtime_error(ss.str());
     }
 
     rc = pthread_create(&_handle, &attr, &Thread::threadFunction, this);
     if (rc != 0) {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_THREAD, SCIDB_LE_UNKNOWN_ERROR) << rc;
+        std::stringstream ss; ss<<"pthread_attr_create: "<<rc;
+        throw std::runtime_error(ss.str());
     }
     _isStarted = true;
 }
@@ -110,7 +123,13 @@ void* Thread::threadFunction(void* arg)	// static member
 
 void Thread::_threadFunction()
 {
-    LOG4CXX_TRACE(logger, "Thread::threadFunction: begin tid =" << pthread_self());
+    // pin the semaphore
+    boost::shared_ptr<Semaphore> sem(_threadPool._terminatedThreads);
+    ThreadPool* tp = &_threadPool;
+
+    LOG4CXX_TRACE(logger, "Thread::threadFunction: begin tid = "
+                  << pthread_self()
+                  << ", pool = " << tp);
     while (true)
     {
         try
@@ -133,13 +152,19 @@ void Thread::_threadFunction()
         catch (const std::exception& e)
         {
             try {  // This try catch block must prevent crash if there is no space on disk where log file is located.
-                LOG4CXX_ERROR(logger, "Thread::threadFunction: unhandled exception: " << e.what())
+                LOG4CXX_ERROR(logger, "Thread::threadFunction: unhandled exception: "
+                              << e.what()
+                              << ", tid = " << pthread_self()
+                              << ", pool = " << tp);
             } catch (...) {}
             throw;
         }
     }
-    _threadPool._terminatedThreads.release();
-    LOG4CXX_TRACE(logger, "Thread::threadFunction: end tid =" << pthread_self());
+
+    sem->release();
+    LOG4CXX_TRACE(logger, "Thread::threadFunction: end tid = "
+                  << pthread_self()
+                  << ", pool = " << tp);
 }
 
 

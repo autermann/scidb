@@ -114,9 +114,9 @@ namespace scidb
         return isClone ? chunk->isCountKnown() : ConstChunk::isCountKnown();
     }
 
-    DBChunk const* DelegateChunk::getDiskChunk() const
+    ConstChunk const* DelegateChunk::getPersistentChunk() const
     {
-        return isClone ? chunk->getDiskChunk() : NULL;
+        return isClone ? chunk->getPersistentChunk() : NULL;
     }
 
     bool DelegateChunk::isMaterialized() const
@@ -435,9 +435,10 @@ namespace scidb
       _till(till),
       _size(from.size()),
       _src(src),
-      _empty(false),
-      _query(query)
+      _empty(false)
     {
+        assert(query);
+        _query = query;
         desc.getChunkPositionFor(_startingChunk);
         Dimensions const& dims = desc.getDimensions();
         for (size_t i = 0, n = dims.size(); i < n; i++) { 
@@ -485,8 +486,7 @@ namespace scidb
                 last[i] = min(lastChunkPosition[i], lastArrayPosition[i]);
             }
             Value value;
-            const boost::shared_ptr<scidb::Query> localQueryPtr(array._query.lock());  // duration of getChunk() short enough
-            Query::validateQueryPtr(localQueryPtr);
+            const boost::shared_ptr<scidb::Query> localQueryPtr(Query::getValidQueryPtr(array._query));  // duration of getChunk() short enough
             boost::shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(localQueryPtr, nDims <= 2 ? ChunkIterator::SEQUENTIAL_WRITE : 0);
             double* src = reinterpret_cast<double*>(array._src.get());
             CoordinatesMapper bufMapper( array.from(), array.till());
@@ -600,8 +600,9 @@ namespace scidb
         if (!_materializedChunk) {
             _materializedChunk = boost::shared_ptr<MemChunk>(new MemChunk());
         }
-        MaterializedArray::materialize(*_materializedChunk, chunk, _format);
-#else      
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_array._query));
+        MaterializedArray::materialize(query, *_materializedChunk, chunk, _format);
+#else
         _materializedChunk = _array.getMaterializedChunk(chunk);
 #endif
         _chunkToReturn = _materializedChunk.get();
@@ -643,7 +644,8 @@ namespace scidb
             }
         }
         if (newChunk) {
-            materialize(*chunk, inputChunk, _format);
+            boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+            materialize(query, *chunk, inputChunk, _format);
             if (!bitmap) { 
                 bitmap = chunk->getEmptyBitmap();
             }
@@ -663,11 +665,15 @@ namespace scidb
         return chunk;
     }
 
-    MaterializedArray::MaterializedArray(boost::shared_ptr<Array> input, MaterializeFormat chunkFormat)
+MaterializedArray::MaterializedArray(boost::shared_ptr<Array> input,
+                                     shared_ptr<Query>const& query,
+                                     MaterializeFormat chunkFormat)
     : DelegateArray(input->getArrayDesc(), input, true),
       _format(chunkFormat),
       _chunkCache(desc.getAttributes().size())
     {
+        assert(query);
+        _query = query;
 #ifndef SCIDB_CLIENT
         _cacheSize = Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS);
 #else
@@ -677,7 +683,10 @@ namespace scidb
 
     size_t nMaterializedChunks = 0;
 
-    void MaterializedArray::materialize(MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format)
+void MaterializedArray::materialize(const shared_ptr<Query>& query,
+                                    MemChunk& materializedChunk,
+                                    ConstChunk const& chunk,
+                                    MaterializeFormat format)
     {
         nMaterializedChunks += 1;
         materializedChunk.initialize(chunk);
@@ -691,9 +700,8 @@ namespace scidb
         boost::shared_ptr<ConstChunkIterator> src 
             = chunk.getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|
                                      (chunk.isSolid() ? ChunkIterator::INTENDED_TILE_MODE : 0));
-        shared_ptr<Query> emptyQuery;
         boost::shared_ptr<ChunkIterator> dst 
-            = materializedChunk.getIterator(emptyQuery, 
+            = materializedChunk.getIterator(query,
                                             (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
         bool vectorMode = src->supportsVectorMode() && dst->supportsVectorMode();
         src->setVectorMode(vectorMode);

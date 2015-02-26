@@ -5,8 +5,8 @@
 --set-format dcsv
 --start-igdata
 create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
---shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winnersFew.csv > ../examples/winnersFew.scidb "
---aql load winnersFlat from '../examples/winnersFew.scidb' 
+--shell  --command="csv2scidb -s 1 -p SNSSN < $DOC_DATA/winnersFew.csv > $DOC_DATA/winnersFew.scidb "
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' 
 --stop-igdata
 show(winnersFlat)
 attributes(winnersFlat) 

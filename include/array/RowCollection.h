@@ -84,16 +84,17 @@
 #ifndef ROWCOLLECTION_H_
 #define ROWCOLLECTION_H_
 
+#include <boost/scoped_ptr.hpp>
+#include <boost/unordered_map.hpp>
+#include <algorithm>
+#include <exception>
 #include <array/Metadata.h>
 #include <util/iqsort.h>
-#include <boost/unordered_map.hpp>
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
 #include <log4cxx/helpers/exception.h>
-#include <algorithm>
-#include <exception>
 #include <util/ValueVector.h>
-#include <boost/scoped_ptr.hpp>
+#include <util/Mutex.h>
 
 namespace scidb
 {
@@ -117,7 +118,7 @@ const size_t UNKNOWN_ROW_ID = static_cast<size_t>(-1);
  * At any time, end() is true iff _chunkIterators[i] does NOT exist.
  *
  * Array vs. chunk iterators:
- *   - Conceptualy, each row iterator has a vector of arrayIterators (one for each attribute), and a vector of chunkIterators.
+ *   - Conceptually, each row iterator has a vector of arrayIterators (one for each attribute), and a vector of chunkIterators.
  *   - All the row iterators share the same vector of arrayIterators.
  *   - Each row iterator manages its own vector of chunkIterators.
  *
@@ -134,15 +135,18 @@ private:
     size_t _chunkSize;
     size_t _totalInRow;
     size_t _locInRow;
-    vector<boost::shared_ptr<ArrayIterator> >& _arrayIterators;
     ChunkIterators _chunkIterators;
 
     // A volatile variable that is used to turn columnId to a two-dim coordinates.
     // This is not thread safe!
     Coordinates _tmpTwoDim;
 
+    // A reference to the RowCollection is stored, so as to call getConstChunkIterators.
+    MyRowCollection& _rc;
+
     // Given a columne, return a 2D coordinate, combining _rowId with the column.
-    const Coordinates& toTwoDim(size_t columnId) {
+    const Coordinates& toTwoDim(size_t columnId)
+    {
         _tmpTwoDim[1] = static_cast<Coordinate>(columnId);
         return _tmpTwoDim;
     }
@@ -152,22 +156,20 @@ private:
      *
      * @pre the current location is a multiple of chunk size, and !end().
      */
-    void getChunkIterators() {
+    void getChunkIterators()
+    {
         assert(_locInRow % _chunkSize == 0);
         assert(!end());
 
         Coordinates const& chunkPos = toTwoDim(_locInRow);
-        for (size_t i=0; i<_numAttributes; ++i) {
-            _arrayIterators[i]->setPosition(chunkPos);
-            const ConstChunk& chunk = _arrayIterators[i]->getChunk(); // getChunk() does not pin it
-            _chunkIterators[i] = chunk.getConstIterator();
-        }
+        _rc.getConstChunkIterators(_chunkIterators, chunkPos);
     }
 
     /**
      * Reset the chunk iterators to NULL.
      */
-    void resetChunkIterators() {
+    void resetChunkIterators()
+    {
         if (_chunkIterators[0]) {
             for (size_t i=0; i<_numAttributes; ++i) {
                 _chunkIterators[i].reset();
@@ -179,10 +181,9 @@ public:
     /**
      * Constructor should not be called directly. The users should get an RowIterator* through RowCollection::openRow().
      */
-    RowIterator(size_t rowId, size_t numAttributes, size_t chunkSize, size_t totalInRow,
-            vector<boost::shared_ptr<ArrayIterator> >& arrayIterators)
+    RowIterator(size_t rowId, size_t numAttributes, size_t chunkSize, size_t totalInRow, MyRowCollection& rc)
     : _rowId(rowId), _numAttributes(numAttributes), _chunkSize(chunkSize), _totalInRow(totalInRow), _locInRow(0),
-      _arrayIterators(arrayIterators), _chunkIterators(numAttributes), _tmpTwoDim(2)
+      _chunkIterators(numAttributes), _tmpTwoDim(2), _rc(rc)
     {
         _tmpTwoDim[0] =_rowId;
         _tmpTwoDim[1] = 0;
@@ -191,12 +192,14 @@ public:
         }
     }
 
-    virtual ~RowIterator() {
+    virtual ~RowIterator()
+    {
         resetChunkIterators();
         _locInRow = _totalInRow;
     }
 
-    virtual void getItem(vector<Value>& item){
+    virtual void getItem(vector<Value>& item)
+    {
         assert(! end());
 
         for (size_t i=0; i<_numAttributes; ++i) {
@@ -204,7 +207,8 @@ public:
         }
     }
 
-    virtual bool end() {
+    virtual bool end()
+    {
         assert(_locInRow <= _totalInRow);
 
         return _locInRow == _totalInRow;
@@ -213,7 +217,8 @@ public:
     /**
      * Advance to the next item in the same row.
      */
-    virtual void operator ++() {
+    virtual void operator ++()
+    {
         assert(!end());
         assert(_chunkIterators[0]);
 
@@ -233,14 +238,16 @@ public:
     /**
      * Get the current position.
      */
-    virtual Coordinates const& getPosition() {
+    virtual Coordinates const& getPosition()
+    {
         return toTwoDim(_locInRow);
     }
 
     /**
      * Set the current postion. Could be made to work if needed.
      */
-    virtual bool setPosition(Coordinates const& pos) {
+    virtual bool setPosition(Coordinates const& pos)
+    {
         assert(false);
         return false;
     }
@@ -248,7 +255,8 @@ public:
     /**
      * Reset to beginning. Could be made to work if needed.
      */
-    virtual void reset() {
+    virtual void reset()
+    {
         assert(false);
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "RowIterator::reset()";
     }
@@ -259,7 +267,8 @@ public:
  * For now, we only allow single-threaded appends.
  */
 template<class Group, class Hash = boost::hash<Group> >
-class RowCollection {
+class RowCollection
+{
 public:
     typedef RowIterator<Group, Hash> MyRowIterator;
     typedef typename boost::unordered_map<Group, size_t, Hash> GroupToRowId;
@@ -289,6 +298,9 @@ private:
     // non-const array iterator that is shared among the row-iterators
     vector<boost::shared_ptr<ArrayIterator> > _arrayIterators;
 
+    // mutex that protects the shared _arrayIterators
+    Mutex _mutexArrayIterators;
+
     // a buffer of the appended items
     MapRowIdToItems _appendBuffer;
 
@@ -304,7 +316,8 @@ private:
     /**
      * Flush the buffer.
      */
-    void flushBuffer() {
+    void flushBuffer()
+    {
         assert(_mode == RowCollectionModeAppend);
 
         // Reset the counter.
@@ -324,7 +337,8 @@ private:
     /**
      * Whether the last chunk in a given row (if exists) is completely filled.
      */
-    inline bool isLastChunkFull(size_t rowId) {
+    inline bool isLastChunkFull(size_t rowId)
+    {
         return _counts[rowId] % _chunkSize == 0;
     }
 
@@ -343,6 +357,12 @@ private:
 public:
 
     /**
+     * Given a chunk position, get the chunk iterators to read data from.
+     * @note This is called from RowIterator.
+     */
+    void getConstChunkIterators(vector<boost::shared_ptr<ConstChunkIterator> >& chunkIterators, Coordinates const& chunkPos);
+
+    /**
      * Constructor.
      * @param   query
      * @param   name        aray name
@@ -351,25 +371,12 @@ public:
      */
     RowCollection(boost::shared_ptr<Query> const& query, const string& name, const Attributes& attributes, size_t chunkSize = defaultChunkSize);
 
-    ~RowCollection() {
-        try {
-            if (_mode==RowCollectionModeAppend) {
-                flushBuffer();
-            }
-        } catch (...) {
-            try {
-                LOG4CXX_DEBUG(logger, "[ERROR] in RowCollection::Destructor's second try block.");
-            } catch (...) {
-                // Ok we tried, but sorry. The file system must be full or something.
-            }
-        }
-    }
-
     /**
      * This allows the caller to iterate through the existing groups.
      * @return the map of group-->rowId
      */
-    GroupToRowId const& getGroupToRowId() {
+    GroupToRowId const& getGroupToRowId()
+    {
         return _groupToRowId;
     }
 
@@ -380,16 +387,17 @@ public:
      * @param rowId  which row
      * @return a pointer to RowIterator
      */
-    MyRowIterator* openRow(size_t rowId) {
+    MyRowIterator* openRow(size_t rowId)
+    {
         assert(_mode==RowCollectionModeRead);
-
-        return new MyRowIterator(rowId, _attributes.size(), _chunkSize, _counts[rowId], _arrayIterators);
+        return new MyRowIterator(rowId, _attributes.size(), _chunkSize, _counts[rowId], *this);
     }
 
     /**
      * Toggle read/append modes.
      */
-    void switchMode(RowCollectionMode destMode) {
+    void switchMode(RowCollectionMode destMode)
+    {
         if (destMode==_mode) {
             return;
         }
@@ -406,7 +414,8 @@ public:
      * @param  rc  the source RowCollection
      * @note This should be performed on a newly created RowCollection.
      */
-    void copyGroupsFrom(const RowCollection& rc) {
+    void copyGroupsFrom(const RowCollection& rc)
+    {
         assert(_groupToRowId.size()==0);
 
         // Resize the array of counts.
@@ -427,7 +436,8 @@ public:
      * @param   group   group
      * @return  the rowId
      */
-    size_t rowIdFromExistingGroup(const Group& group){
+    size_t rowIdFromExistingGroup(const Group& group)
+    {
         GroupToRowIdIterator it = _groupToRowId.find(group);
         assert(it!=_groupToRowId.end());
         return it->second;
@@ -436,7 +446,8 @@ public:
     /**
      * Whether a group exists.
      */
-    bool existsGroup(const Group& group) {
+    bool existsGroup(const Group& group)
+    {
         GroupToRowIdIterator it = _groupToRowId.find(group);
         return it!=_groupToRowId.end();
     }
@@ -477,7 +488,8 @@ public:
      * How many rows are in the RowCollection?
      * A rowId is in [0..n-1].
      */
-    size_t numRows()  {
+    size_t numRows()
+    {
         return _counts.size();
     }
 };

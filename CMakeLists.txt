@@ -18,6 +18,7 @@
 #
 # END_COPYRIGHT
 ########################################
+message(STATUS "****************** BEGIN CMakeLists.txt ******************")
 
 cmake_minimum_required(VERSION 2.6)
 
@@ -61,7 +62,7 @@ if(Subversion_SVN_EXECUTABLE)
         file(WRITE "${CMAKE_BINARY_DIR}/revision" ${SCIDB_REVISION})
     endif()
 endif()
-if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git/svn/.metadata")
     # Get version from git-svn working copy 
     execute_process(COMMAND ${GIT_EXECUTABLE} svn find-rev master
         OUTPUT_VARIABLE SCIDB_REVISION
@@ -81,6 +82,7 @@ endif()
 if(NOT SCIDB_REVISION AND EXISTS "${CMAKE_SOURCE_DIR}/revision")
     # Get version from plain source tarball/directory    
     file(READ "${CMAKE_SOURCE_DIR}/revision" SCIDB_REVISION)
+    string(STRIP ${SCIDB_REVISION} SCIDB_REVISION)
     message(STATUS "Reading revision from file: ${SCIDB_REVISION}")
 endif()
 if(NOT SCIDB_REVISION)
@@ -97,7 +99,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo) # Default value for end user who want to install scidb from sources
 endif(NOT CMAKE_BUILD_TYPE)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -W -Wextra -Wall -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D__STDC_FORMAT_MACROS")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++98 -pedantic -W -Wextra -Wall -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D__STDC_FORMAT_MACROS")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-system-headers -isystem /opt/local/include/ -isystem /usr/local/include/")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_LIMIT_MACROS")
 if ("${CMAKE_GENERATOR}" STREQUAL "Xcode")
@@ -138,15 +140,19 @@ set(PYTHON_SAMPLE_DIRECTORY "${CMAKE_BINARY_DIR}/bin/pythonexamples")
 set(DEFAULT_RPATH "$ORIGIN") # This for working from developer catalog
 list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
 if("${isSystemDir}" STREQUAL "-1")
-	#This one for installed binaris. Note if system prefix used RPATH not setted.
-	set (DEFAULT_RPATH "${DEFAULT_RPATH}:${CMAKE_INSTALL_PREFIX}/lib")
+    #This one for installed binaries. Note if system prefix used RPATH is not set
+    set (DEFAULT_RPATH "${DEFAULT_RPATH}:${CMAKE_INSTALL_PREFIX}/lib")
+    message(WARNING: "executable will have RPATH set to ${DEFAULT_RPATH}")
 endif("${isSystemDir}" STREQUAL "-1")
 
 include(FindPkgConfig)
+#
+# configure DISTRO_NAME_VERSION
+#
 include(LinuxDistroVersion)
+message(STATUS "DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
 
 # Set option for static linking
-message("DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
 if(${DISTRO_NAME_VER} MATCHES "RedHat-6")
  message(FATAL_ERROR "We do not support RedHat build. Use CentOS instead")
 endif()
@@ -157,15 +163,12 @@ if(${DISTRO_NAME_VER} MATCHES "CentOS-6")
  set(Boost_NO_BOOST_CMAKE TRUE)
 endif(${DISTRO_NAME_VER} MATCHES "CentOS-6")
 
+#
+# BOOST
+#
 find_package(Boost REQUIRED system program_options serialization regex filesystem thread)
-find_package(Protobuf REQUIRED)
-find_package(Log4CXX REQUIRED)
-find_package(Doxygen)
-find_package(LibPQXX REQUIRED)
-find_package(LibPQ REQUIRED)
-
 if(NOT Boost_FOUND)
- message(FATAL_ERROR "Could not find the required 1.46 version of boost")
+ message(FATAL_ERROR "Could not find any version of boost (1.46 required)")
 endif(NOT Boost_FOUND)
 
 if(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND 
@@ -174,6 +177,17 @@ if(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND
 endif(NOT (${Boost_MAJOR_VERSION} EQUAL 1 AND 
            ${Boost_MINOR_VERSION} EQUAL 46))
 
+find_package(Protobuf REQUIRED)
+find_package(Log4CXX REQUIRED)
+find_package(Doxygen)
+find_package(LibPQXX REQUIRED)
+find_package(LibPQ REQUIRED)
+
+#
+# configure CPPUNIT
+# configure SWIG & PYTHON
+# TODO: configuring of SWIG and PYTHON should be separated as
+#       items should not be grouped by special platform handling
 if (APPLE)
     FIND_PATH(CPPUNIT_INCLUDE_DIR cppunit/TestCase.h /usr/local/include /usr/include)
     FIND_LIBRARY(CPPUNIT_LIBRARY cppunit ${CPPUNIT_INCLUDE_DIR}/../lib /usr/local/lib /usr/lib)
@@ -215,10 +229,18 @@ find_package(BZip2 REQUIRED)
 set(LIBREADLINE_STATIC OFF)
 find_package(LibReadline REQUIRED)
 find_package(Threads REQUIRED)
+find_package(PythonInterp REQUIRED)
+# configure BLAS & LAPACK
+# set BLA_VENDOR (see Find{BLAS,LAPACK}.cmake) to experiment
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+
+#
+# doc packages, not required
+#
 find_package(XsltProc)
 find_package(Fop)
 find_package(DocBook)
-find_package(PythonInterp REQUIRED)
 if(XSLTPROC_EXECUTABLE AND FOP_EXECUTABLE AND DOCBOOK_XSL_FILE)
     set(BUILD_USER_DOC 1)
 else()
@@ -251,7 +273,9 @@ link_directories(${LIBPQ_LIBRARY_DIRS})
 # static link requires adding a few more libraries
 set (LINK_APR_LIBS "")
 
-# macroses
+#
+# DEBUG symbols
+#
 set(DEBUG_SYMBOLS_DIRECTORY ".debug")
 set(DEBUG_SYMBOLS_EXTENSION "${DEBUG_SYMBOLS_DIRECTORY}")
 
@@ -273,17 +297,21 @@ macro(extractDebugInfo input_dir input_file targ)
     endif()
 endmacro(extractDebugInfo)
 
+#
+# SUBDIRECTORIES
+#
 add_subdirectory("extern")
 add_subdirectory("src")
 add_subdirectory("utils")
 add_subdirectory("doc")
-
 if (NOT WITHOUT_SERVER)
     add_subdirectory("tests")
     add_subdirectory("examples")
 endif()
 
-## # The following are required to uses Dart and the Cdash dashboard
+#
+# TESTING: CTest, Dart, and Cdash
+#
 ENABLE_TESTING()
 INCLUDE(CTest)
 
@@ -305,10 +333,7 @@ configure_file(
 add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/uninstall.cmake)
 
-# These are dummy target for adding misc files into the IDE projects like QtCreator
-# for easy access to edit
-
-# Add here your files or masks
+# BEGIN dummy target for adding misc files into the IDE projects like QtCreator
 file(GLOB MISC_FILES_SRC
     "doc/pages/*.dox"
     "doc/*.htm*"
@@ -316,25 +341,32 @@ file(GLOB MISC_FILES_SRC
     "doc/api/*"
     "doc/*.txt"
 )
+add_library(misc_files EXCLUDE_FROM_ALL examples/point/point.cpp ${MISC_FILES_SRC})
+# End of dummy target
 
-# Mirror the cdash, test, doc and version files to the build area
 
+#
+# all outputs must go to CMAKE_BINARY_DIR to support out-of-tree build and test
+# TODO: these should be done at make time, not cmake time, so a developer need
+#       not do a full rebuild when only changing a test or doc file.
+#       (HINT add CMakeLists.txt files, with targets with ADD_CUSTOM_COMMAND()s intead of execute_process()
+#
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/cdash
                                                            ${CMAKE_BINARY_DIR}/cdash)
 
-# NOTE: doc must be copied before tests, because test/examples is a link into
-# doc. This does not seem to cause a problem when the source and destination
-# are in the same volume.
-# However, when they are in different volumes, copy_directory seems to check
-# and detect that the link "tests/examples" to "../doc/tests/examples is not
-# valid (the first time), and the copy of tests stops with an error, and
-# without copying the rest of tests.
-# To confuse matters, doc is then copied, and the second time this is tried,
-# it succeeds.
-#
-# This is a workaround.  The 'right' fix is that source code repositories
-# should not have links in them.
-#
+    # NOTE: doc must be copied before tests, so long as test/examples is a link into
+    # doc. This does not seem to cause a problem when the source and destination
+    # are in the same volume.
+    # However, when they are in different volumes, copy_directory seems to check
+    # and detect that the link "tests/examples" to "../doc/tests/examples is not
+    # valid (the first time), and the copy of tests stops with an error, and
+    # without copying the rest of tests.
+    # To confuse matters, doc is then copied, and the second time this is tried,
+    # it succeeds.
+
+    # This is a workaround.  The 'right' fix is that source code repositories
+    # should not have links in them.
+    #
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/doc
                                                            ${CMAKE_BINARY_DIR}/doc)
 
@@ -346,8 +378,8 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/t
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/version
                                                  ${CMAKE_BINARY_DIR}/version)
 
-add_library(misc_files EXCLUDE_FROM_ALL examples/point/point.cpp ${MISC_FILES_SRC})
-# End of dummy target
 
 # Installation module include
 include(install.cmake)
+
+message(STATUS "****************** END CMakeLists.txt ******************")

@@ -18,7 +18,7 @@ SCIDB QUERY : <store(cast(A,B),C)>
 
 SCIDB QUERY : <show(C)>
 {i} schema
-{0} "C<b:int32> [y=0:2,3,0]"
+{0} 'C<b:int32> [y=0:2,3,0]'
 
 Query was executed successfully
 

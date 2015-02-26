@@ -6,9 +6,7 @@
 store(build(<val:double>[i=0:2,3,0,j=0:2,3,0],0),m3x3)  
 store(build(m3x3,100),m3x3)  
 store(build(m3x3,200),m3x3)  
-store(allversions(m3x3),m3x3_versions)  
---set-format dcsv
-show(m3x3_versions)  
+allversions(m3x3)  
 
 --stop-query-logging
 
@@ -16,4 +14,3 @@ show(m3x3_versions)
 --cleanup
 
 remove(m3x3)
-remove(m3x3_versions)

@@ -77,8 +77,8 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     # used as a unit test that avoids all scidb-isms, useful for 1st-level
     # divide-and-conquer if slave problems occur when driven by scidb
     #
-    add_executable(mpi_slave_direct mpi_slave_direct.cpp)
-    add_executable(mpi_slave_scidb mpi_slave_scidb.cpp)
+    add_executable(mpi_slave_direct mpi_slave_direct.cpp ../../linear_algebra/blas/initMathLibs.cpp)
+    add_executable(mpi_slave_scidb  mpi_slave_scidb.cpp  ../../linear_algebra/blas/initMathLibs.cpp)
 
     # Temporary until separate dla-scalapack slave
     target_link_libraries(mpi_slave_direct mpi_slave_common
@@ -100,3 +100,5 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
 
 endif (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
        MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+
+message(STATUS "****************** END mpi/slaving/CMakeLists.txt ******************")

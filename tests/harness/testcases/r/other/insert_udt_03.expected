@@ -15,28 +15,28 @@ Query was executed successfully
 
 SCIDB QUERY : <store(build_sparse(S, rational('(1/3)'), x=2),S)>
 {x} s
-{2} "(1/3)"
+{2} '(1/3)'
 
 SCIDB QUERY : <create array SPSP <a:string,b:point,c:string,d:point> [x=0:2,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <insert(build_sparse(A, rational('(1/3)'), x=2),A)>
 {x} a
-{2} "(1/3)"
+{2} '(1/3)'
 
 SCIDB QUERY : <insert(build_sparse(A, rational('(7/5)'), x=0),A)>
 {x} a
-{0} "(7/5)"
-{2} "(1/3)"
+{0} '(7/5)'
+{2} '(1/3)'
 
 SCIDB QUERY : <insert(build_sparse(P, point('(1,3)'), x=1),P)>
 {x} p
-{1} "(1,3)"
+{1} '(1,3)'
 
 SCIDB QUERY : <insert(build_sparse(P, point('(23,25)'), x=0),P)>
 {x} p
-{0} "(23,25)"
-{1} "(1,3)"
+{0} '(23,25)'
+{1} '(1,3)'
 
 SCIDB QUERY : <insert(build_sparse(P, point('(23,25)'), x=0),S)>
 [An error expected at this place for the query "insert(build_sparse(P, point('(23,25)'), x=0),S)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE.]

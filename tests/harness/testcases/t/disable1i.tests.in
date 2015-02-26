@@ -1,56 +1,89 @@
 #
-# keep this file sorted to avoid accidental merges of duplicate lines
+# keep this file sorted to avoid accidental merges of duplicate lines, each part has its
+# own sort rules
+#
+
+# PART I
+#
+# THIS PART SHOULD BE FOR TESTS THAT ARE NORMALLY DISABLED, not disabled due to bug/ticket
+# e.g. they take too long to run under any supported Cdash config, they are for design or TDD
+#   and the code that runs them will fail, etc
+#
+# - it is best practice if long tests are pushed to a "long" or "slow" subdirectory of the other
+#   related tests that are not, for example, scalapack/64instance is of this type
+# - it is best practice to give a line explaining why disabled, so others can validate
+#   that it is appropriate that they are disabled (and not just leftover from before we started
+#   adding ticket numbers for disabled-due-to-failure)
+#
+#  KEEP THIS IN ALPHABETICAL ORDER
 #
 
 # Disable suite containing very large data
 bigdata
-
-# other tests/suites
+# NEED COMMENT
 aql_misc.update_versions
+# NEED COMMENTS
 checkin.other.sample_1
 checkin.other.sample_2
+# NEED COMMENTS
 checkin.other.bernoulli_1
 checkin.other.bernoulli_3
 checkin.other.bernoulli_3
+# NEED COMMENTS
 checkin.other.scidbLoadCsv_01_basic
 checkin.other.scidbLoadCsv_02_non_int_dimensions
+# NEED COMMENT
 checkin.newaql.aggregate_004
+# NEED COMMENT
 checkin.other.update
+# NEED COMMENT
 checkin.other.xgrid_dn
 # next needs conversion to chunksize 32x32
 checkin.scalapack.20_svd_oldVals
 # next has output that is currently too verbose
 checkin.scalapack.31_svd_doSvdWithMetrics_verySmall
+# NEED COMMENT
 checkin.update.version1
 data_model
+# NEED COMMENTS
 doc.redimension_2
 doc.redimension_store_1
+# NEED COMMENTS
 doc.ug_loadingData_CSV
 doc.ug_loadingData_binary
 doc.ug_loadingData_opaque
 doc.ug_loadingData_specialValues
 doc.ug_loadingData_errors
+# NEED COMMENT
 perf.repart
-#next 4 are now for 64instance clusters only (4 instance ones are o1to96)
-scalapack.64instance.10_gemm_driver_allstd_o1to288c32
-scalapack.64instance.20_svd_doSvd_o1to288c32
-scalapack.64instance.31_svd_driver_random_t1to4_o1to1024c32
-scalapack.64instance.35_svd_driver_allstd_o1to288c32
-scalapack.perf.30_svd_doSvd_2_M
+# 40_svd_tickets @ 18min is too slow to leave enabled during functional freeze
+scalapack.40_svd_tickets
+# DIR scalapack.64instance are needed for scale-up testing on salty, but take too long to run anywhere else
+scalapack.64instance
+# DIR used for development and other non-production purposes
+scalapack.disabled
+# DIR used for performance testing, too slow for normal use
+scalapack.perf
+# DIR may come back into service sometime
 scalapack.smallest_sizes
+# NEED COMMENT
 update.kill
-@CONFIGURE_DISABLE_TESTS_SCALAPACK@
-@CONFIGURE_DISABLE_TESTS_NOT_DEBUG@
 
 #
-# next 3 lines: grouped at end because they all concern the same operator
-# inverse: #2194: inverse disabled
-# code will be removed on the completion of QR and Solve for SciDB, so that if
-# there is a problem with that schedule we can re-enable inverse quickly and at low cost if necessary
+# PART II
+# THIS PART IS FOR FAILING TESTS.  These represent known defects in the code or in the tests
+# - each disabled test must have a corresponding ticket number
+# - TODO: DAVE, please decide whether you would like this sorted
+#         A) alpabetical, so that each test is surely added only once OR
+#         B) in ticket order
+#         as right now it seems random and is inconsistent between disable{,1i}.tests.in
+#   TODO: DAVE, speak to j.mcq, he thinks we should change the testharness so that
+#         disable1i.tests.in to be only the *additional* tests that should be disabled
+#         in a 1-instance case.
 #
-checkin.other.inverse
-docscript.inverse
-other.basic_matrix_inverse
+
+@CONFIGURE_DISABLE_TESTS_SCALAPACK@
+@CONFIGURE_DISABLE_TESTS_NOT_DEBUG@
 
 # re-enable after solving ticket 2234
 docscript.load
@@ -65,13 +98,11 @@ injecterror.inject_2_store
 injecterror.inject_2_update
 
 # re-enable after solving ticket 2238
-injecterror.inject_4_mapping
+# tigor: re-enabling to repro
+# injecterror.inject_4_mapping
 
 # re-enable after solving ticket 2239
 iqueryabort.abort_load
-
-# re-enable after solving ticket 2240
-pload.loadcsv_shadow_array
 
 #re-enable after solving ticket 2200, test is on rectangular inputs
 scalapack.gemm_01
@@ -88,21 +119,8 @@ other.bernoulli_2
 #re-enable after solving ticket 2232
 docscript.allversions
 
-#re-enable after solving tickets 2171 and 2278
-pload.loadcsv_shadow_array
-
-#re-enable after solving ticket 2158
-client.python_1
-
-#re-enable after solving ticket 2218
-other.binary_loader
-
-#re-enable after solving ticket 2272
-other.loadlib
-
 #re-enable after solving ticket 2258
 other.random_check
 
 #re-enable after solving ticket 2329
-docscript/quickStart
-
+docscript.quickStart

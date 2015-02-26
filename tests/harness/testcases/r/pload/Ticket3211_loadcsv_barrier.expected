@@ -1,0 +1,7 @@
+SCIDB QUERY : <count(barrier)>
+{i} count
+{0} 250001
+
+SCIDB QUERY : <remove(barrier)>
+Query was executed successfully
+

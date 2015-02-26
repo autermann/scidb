@@ -372,7 +372,7 @@ SCIDB QUERY : <between(B,-10,50,0,99)>
 
 SCIDB QUERY : <show(A)>
 {i} schema
-{0} "A<val:int64> [x=-100:199,10,2,y=-10:289,20,3]"
+{0} 'A<val:int64> [x=-100:199,10,2,y=-10:289,20,3]'
 
 SCIDB QUERY : <store(subarray(A),AAA)>
 {x,y} val
@@ -679,11 +679,11 @@ SCIDB QUERY : <store(subarray(A),AAA)>
 
 SCIDB QUERY : <show(AAA)>
 {i} schema
-{0} "AAA<val:int64> [x=0:299,10,2,y=0:299,20,3]"
+{0} 'AAA<val:int64> [x=0:299,10,2,y=0:299,20,3]'
 
 SCIDB QUERY : <show(B)>
 {i} schema
-{0} "B<val:double> [x=-10:100,10,2,y=0:100,20,3]"
+{0} 'B<val:double> [x=-10:100,10,2,y=0:100,20,3]'
 
 SCIDB QUERY : <store(subarray(B),BBB)>
 {x,y} val
@@ -692,7 +692,7 @@ SCIDB QUERY : <store(subarray(B),BBB)>
 
 SCIDB QUERY : <show(BBB)>
 {i} schema
-{0} "BBB<val:double> [x=0:110,10,2,y=0:100,20,3]"
+{0} 'BBB<val:double> [x=0:110,10,2,y=0:100,20,3]'
 
 SCIDB QUERY : <subarray(A,171,261,191,281)>
 {x,y} val
@@ -836,11 +836,11 @@ SCIDB QUERY : <count(store(subarray(A,171,261,191,281),ZZZ))>
 
 SCIDB QUERY : <show(XXX)>
 {i} schema
-{0} "XXX<val:int64> [x=-100:199,10,2,y=-10:289,20,3]"
+{0} 'XXX<val:int64> [x=-100:199,10,2,y=-10:289,20,3]'
 
 SCIDB QUERY : <show(ZZZ)>
 {i} schema
-{0} "ZZZ<val:int64> [x=0:20,10,2,y=0:20,20,3]"
+{0} 'ZZZ<val:int64> [x=0:20,10,2,y=0:20,20,3]'
 
 SCIDB QUERY : <count(XXX)>
 {i} count

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter>
@@ -19,7 +18,45 @@
   some detailed information (such as handling errors during load) that applies
   to all the techniques.</para>
 
-  <section>
+  <para>This chapter contains the following sections:<itemizedlist>
+      <listitem>
+        <para><link linkend="loadOverview">Overview of Moving Data Into
+        SciDB</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadCSV">Loading CSV Data</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadParallel">Loading in Parallel</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadBinary">Loading Binary Data</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadTransfer">Transferring Data Between SciDB
+        Installations</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="missingValues">Loading Data with Missing
+        Values</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="emptyCells">Loading Empty Cells</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadErrors">Handling Errors During
+        Load</link></para>
+      </listitem>
+    </itemizedlist></para>
+
+  <section id="loadOverview">
     <title>Overview of Moving Data Into SciDB</title>
 
     <para>You typically load data into SciDB one array at a time. In most
@@ -74,7 +111,7 @@
     </orderedlist>
   </section>
 
-  <section>
+  <section id="loadCSV">
     <title>Loading CSV Data</title>
 
     <para><indexterm>
@@ -183,7 +220,7 @@
       cells, the CSV file will have 12 rows of data, like this:</para>
 
       <programlisting language="test">
---shell --show-query=no --command=cat ../examples/olympic_data.csv
+--shell --show-query=no --command=cat $DOC_DATA/olympic_data.csv
 </programlisting>
 
       <para>To include a null value for an attribute, you have several
@@ -229,7 +266,7 @@
 --shell --show-query=no --show-output=yes --command=csv2scidb -h
 </programlisting>This command will transform <code>olympic_data.csv</code> to
       SciDB load file format: <programlisting>
-csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olympic_data.scidb
+csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_data.scidb
 </programlisting>The -s flag specifies the number of lines to skip at the
       beginning of the file. Since the file has a header, you can strip that
       line with "-s 1". The -p flag specifies the types of data in the columns
@@ -238,7 +275,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para>The file <code>olympic_data.scidb</code> looks like this:
       <programlisting language="test">
---shell --show-output=yes --command=cat ../examples/olympic_data.scidb
+--shell --show-output=yes --command=cat $DOC_DATA/olympic_data.scidb
 </programlisting>The square braces show the beginning and end of the array
       dimension. The parentheses enclose the individual cells of the array.
       There are commas between attributes in cells and between cells in the
@@ -316,7 +353,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
           <secondary>load</secondary>
         </indexterm>After you create the target array, you can populate it
       with data using the <code>LOAD</code> statement: <programlisting
-      language="test">--aql LOAD winnersFlat FROM '../examples/olympic_data.scidb'; --show-output=no
+      language="test">--aql LOAD winnersFlat FROM '../tests/harness/testcases/data/doc/olympic_data.scidb'; --show-output=no
 </programlisting>The data file paths in the AFL and AQL commands are relative
       to the working directory of the server.</para>
     </section>
@@ -368,16 +405,15 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       data about olympic winners. To populate this array with the data, use
       the following command:</para>
 
-      <programlisting language="test">--afl redimension_store(winnersFlat,winners); --show-output=no 
-</programlisting>
+      <programlisting language="test">--afl redimension_store(winnersFlat,winners); --show-output=no</programlisting>
 
       <para>The result of this command is the desired array; you have
-      completed the CSV load procedure.</para>
+      completed the CSV load procedure.<programlisting language="test">--afl scan(winners); --show-query=no --output-format=dcsv</programlisting></para>
     </section>
   </section>
 
-  <section>
-    <title>Parallel Load</title>
+  <section id="loadParallel">
+    <title>Loading in Parallel</title>
 
     <para><indexterm>
         <primary>loading data</primary>
@@ -480,7 +516,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       the multi-dimensional array you desire.</para>
     </section>
 
-    <section>
+    <section id="loadcsvPY">
       <title>Load the Data</title>
 
       <para><indexterm>
@@ -961,9 +997,50 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         not the multidimensional target array.</para>
       </note>
     </section>
+
+    <section>
+      <title>Loading HDFS Data</title>
+
+      <para><indexterm>
+          <primary>HDFS</primary>
+        </indexterm><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>from HDFS</secondary>
+        </indexterm><indexterm>
+          <primary>Hadoop</primary>
+
+          <see>HDFS</see>
+        </indexterm>HDFS is a distributed file system written in Java for the
+      Hadoop framework. HDFS can store CSV files, but they are not directly
+      visible to Linux systems. To load HDFS data into SciDB, you can
+      circumvent this restriction by piping the contents of the CSV file
+      directly into the SciDB script for parallel loading of CSV files,
+      <command>loadcsv.py</command>.</para>
+
+      <para>On a normal Linux file system, you would execute a command similar
+      to the following:<programlisting>$ cat test.csv | loadcsv.py <replaceable>option_list</replaceable></programlisting></para>
+
+      <para>The analogous command on an HDFS file system is the
+      following:<programlisting>$ hadoop dfs -cat test.csv | loadcsv.py <replaceable>option_list</replaceable></programlisting></para>
+
+      <para>Note the following:</para>
+
+      <para><itemizedlist>
+          <listitem>
+            <para><literal>hadoop dfs -cat</literal> is the Hadoop command to
+            list a file to STDOUT.</para>
+          </listitem>
+
+          <listitem>
+            <para>The options for loadcsv.py are described in <xref
+            linkend="loadcsvPY"/>.</para>
+          </listitem>
+        </itemizedlist></para>
+    </section>
   </section>
 
-  <section>
+  <section id="loadBinary">
     <title>Loading Binary Data</title>
 
     <para><indexterm>
@@ -1263,7 +1340,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         </indexterm>After you create the load array, you can populate it with
       data using the <code>LOAD</code> statement: <programlisting
       language="test">
---aql LOAD intensityFlat FROM '../examples/intensity_data.bin'
+--aql LOAD intensityFlat FROM '../tests/harness/testcases/data/doc/intensity_data.bin'
       AS '(string, 
            int64, 
            int64 null)';  --show-output=no 
@@ -1282,7 +1359,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <title>Loading Binary String Data</title>
 
       <para><indexterm>
-          <primary>strings, binary loading</primary>
+          <primary>strings</primary>
+
+          <secondary>binary loading of</secondary>
         </indexterm><indexterm>
           <primary>binary data</primary>
         </indexterm>You must null-terminate strings when loading binary data.
@@ -1388,7 +1467,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
        [i=0:*,1000000,0]; --show-output=no 
 
 --aql LOAD intensityFlat
-     FROM '../examples/intensity_data.bin'
+     FROM '../tests/harness/testcases/data/doc/intensity_data.bin'
      AS   '(string, 
             int64, 
             int64 null)'; --show-output=no 
@@ -1400,7 +1479,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
  &lt; elapsedTime:int64, measuredIntensity:int64 null &gt; 
  [i=0:*,1000000,0]; --show-output=no 
 --aql LOAD intensityFlat_NoExposure
-     FROM '../examples/intensity_data.bin'
+     FROM '../tests/harness/testcases/data/doc/intensity_data.bin'
      AS   '(skip, 
             int64, 
             int64 null)'; --show-output=no
@@ -1411,7 +1490,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
  [i=0:*,1000000,0];  --show-output=no
 
 --aql LOAD intensityFlat_NoTime_NoMeasurement
-     FROM '../examples/intensity_data.bin'
+     FROM '../tests/harness/testcases/data/doc/intensity_data.bin'
      AS   '(string, 
             skip(8), 
             skip(8) null)';  --show-output=no
@@ -1443,8 +1522,8 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     </section>
   </section>
 
-  <section>
-    <title>Transferring Data From One SciDB Installation to Another</title>
+  <section id="loadTransfer">
+    <title>Transferring Data Between SciDB Installations</title>
 
     <para><indexterm>
         <primary>data</primary>
@@ -1693,7 +1772,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para><programlisting language="test">
 --aql LOAD intensityCopy
-     FROM CURRENT INSTANCE '../examples/intensity_data.opaque'
+     FROM CURRENT INSTANCE '../tests/harness/testcases/data/doc/intensity_data.opaque'
      AS 'OPAQUE'; --show-output=no 
 </programlisting> The result of this command is the array in the destination
       installation of SciDB. You have completed the opaque loading
@@ -1701,90 +1780,77 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     </section>
   </section>
 
-  <section id="dataSpecial">
-    <title>Data with Special Values</title>
+  <section id="missingValues">
+    <title>Loading Data with Missing Values</title>
 
-    <para>This section discusses default attribute values for missing values,
-    and some behavior for empty cells.</para>
+    <para><indexterm>
+        <primary>loading data</primary>
 
-    <section>
-      <title>Data with Missing Values</title>
+        <secondary>special values</secondary>
+      </indexterm><indexterm>
+        <primary>data</primary>
 
-      <para><indexterm>
-          <primary>loading data</primary>
+        <secondary>loading special</secondary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
 
-          <secondary>special values</secondary>
-        </indexterm><indexterm>
-          <primary>data</primary>
+        <secondary>special values</secondary>
+      </indexterm>Suppose you have a load file that is missing some values,
+    like this file, <code>v4.scidb</code>:</para>
 
-          <secondary>loading special</secondary>
-        </indexterm><indexterm>
-          <primary>arrays</primary>
+    <programlisting language="test">--shell --show-output=yes --show-query=no --command=cat $DOC_DATA/v4.scidb</programlisting>
 
-          <secondary>special values</secondary>
-        </indexterm>Suppose you have a load file that is missing some values,
-      like this file, <code>v4.scidb</code>:</para>
+    <para>The load file <code>v4.scidb</code> has a missing value in the third
+    cell. If you create an array and load this data set, SciDB will substitute
+    0 for the missing value: <programlisting language="test">--aql CREATE ARRAY v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0] --show-output=no
+--aql LOAD v4 FROM '../tests/harness/testcases/data/doc/v4.scidb' --output-format=dense</programlisting></para>
 
-      <programlisting language="test">--shell --show-output=yes --show-query=no --command=cat ../examples/v4.scidb</programlisting>
+    <para><indexterm>
+        <primary>attributes</primary>
 
-      <para>The load file <code>v4.scidb</code> has a missing value in the
-      third cell. If you create an array and load this data set, SciDB will
-      substitute 0 for the missing value: <programlisting language="test">--aql CREATE ARRAY v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0] --show-output=no
---aql LOAD v4 FROM '../examples/v4.scidb' --output-format=dense</programlisting></para>
+        <secondary>default values</secondary>
+      </indexterm><indexterm>
+        <primary>default attribute values</primary>
+      </indexterm>The out-of-the-box default value for each datatype is
+    described in <xref linkend="dataTypes"/>.To change the default value, that
+    is, the value the SciDB substitutes for the missing data, set the DEFAULT
+    attribute option. This code creates an array <code>v4_dflt</code> with
+    default attribute value set to 111:</para>
 
-      <para><indexterm>
-          <primary>attributes</primary>
-
-          <secondary>default values</secondary>
-        </indexterm><indexterm>
-          <primary>default attribute values</primary>
-        </indexterm>The out-of-the-box default value for each datatype is
-      described in <xref linkend="dataTypes"/>.To change the default value,
-      that is, the value the SciDB substitutes for the missing data, set the
-      DEFAULT attribute option. This code creates an array
-      <code>v4_dflt</code> with default attribute value set to 111:</para>
-
-      <programlisting language="test">--aql CREATE ARRAY v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0] --show-output=no
---aql LOAD v4_dflt FROM '../examples/v4.scidb' --output-format=dense
+    <programlisting language="test">--aql CREATE ARRAY v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0] --show-output=no
+--aql LOAD v4_dflt FROM '../tests/harness/testcases/data/doc/v4.scidb' --output-format=dense
 </programlisting>
 
-      <para>Load files may also contain null values, such as in this file,
-      <code>v4_null.scidb</code>: <programlisting language="test">--shell --show-query=no --show-output=yes --command=cat ../examples/v4_null.scidb</programlisting>
-      To preserve null values at load time, add the NULL option to the
-      attribute type: <programlisting language="test">--aql CREATE ARRAY v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0]; --show-output=no 
---aql LOAD v4_null FROM '../examples/v4_null.scidb'; --show-output=no </programlisting></para>
-    </section>
-
-    <section>
-      <title>Empty Cells</title>
-
-      <para><indexterm>
-          <primary>empty cells</primary>
-        </indexterm><indexterm>
-          <primary>arrays</primary>
-
-          <secondary>empty cells</secondary>
-        </indexterm>In addition to missing values for attributes, SciDB arrays
-      may also contain completely empty cells. For example, if we load
-      <code>v4.scidb</code> into an array with a dimension that is larger than
-      the supplied data, the array will contain empty cells:<programlisting
-      language="test">--aql CREATE ARRAY v6_dflt &lt;val1:int8,val2:int8 default 111&gt;
-      [i=0:5,6,0] --show-output=no
---aql LOAD v6_dflt FROM '../examples/v4.scidb' --output-format=dense
-</programlisting></para>
-
-      <para>Note that the last two cells of the array are empty. If you do not
-      want empty cells, you can use the NOT EMPTY keywords when you create the
-      array:<programlisting language="test">--aql CREATE NOT EMPTY ARRAY v6_dflt_notEmpty &lt;val1:int8,val2:int8 default 111&gt;[i=0:5,6,0] --show-output=no
---aql LOAD v6_dflt_notEmpty FROM '../examples/v4.scidb' --output-format=dense
-</programlisting></para>
-
-      <para>Note that for val2, the supplied default value (111) is used, and
-      for val1, the default value of the int8 datatype is used (zero).</para>
-    </section>
+    <para>Load files may also contain null values, such as in this file,
+    <code>v4_null.scidb</code>: <programlisting language="test">--shell --show-query=no --show-output=yes --command=cat $DOC_DATA/v4_null.scidb</programlisting>
+    To preserve null values at load time, add the NULL option to the attribute
+    type: <programlisting language="test">--aql CREATE ARRAY v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0]; --show-output=no 
+--aql LOAD v4_null FROM '../tests/harness/testcases/data/doc/v4_null.scidb'; --show-output=no </programlisting></para>
   </section>
 
-  <section>
+  <section id="emptyCells">
+    <title>Loading Empty Cells</title>
+
+    <para><indexterm>
+        <primary>empty cells</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
+
+        <secondary>empty cells</secondary>
+      </indexterm>In addition to missing values for attributes, SciDB arrays
+    may also contain completely empty cells. For example, if we load
+    <code>v4.scidb</code> into an array with a dimension that is larger than
+    the supplied data, the array will contain empty cells:<programlisting
+    language="test">--aql CREATE ARRAY v6_dflt &lt;val1:int8,val2:int8 default 111&gt;
+      [i=0:5,6,0] --show-output=no
+--aql LOAD v6_dflt FROM '../tests/harness/testcases/data/doc/v4.scidb' --output-format=dense
+</programlisting></para>
+
+    <para>Note that for val2, the supplied default value (111) is used, and
+    for val1, the default value of the int8 datatype is used (zero).</para>
+  </section>
+
+  <section id="loadErrors">
     <title>Handling Errors During Load</title>
 
     <para><indexterm>
@@ -1874,7 +1940,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     <para>Assume that you want to load into this array the data from the
     following CSV file, which contains some errors:</para>
 
-    <programlisting language="test">--shell --show-query=no --command=cat ../examples/csv-errors.txt</programlisting>
+    <programlisting language="test">--shell --show-query=no --command=cat $DOC_DATA/csv-errors.txt</programlisting>
 
     <para>As you compare the CSV file with the CREATE ARRAY statement, notice
     the following:<itemizedlist>
@@ -1906,7 +1972,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
     <para>The corresponding SciDB-formatted text file—that is, the file that
     results when you run csv2scidb on this CSV file, is shown
-    below:<programlisting language="test">--shell --command=cat '../examples/int4error.scidb'  --show-output=yes</programlisting></para>
+    below:<programlisting language="test">--shell --command=cat $DOC_DATA/int4error.scidb  --show-output=yes</programlisting></para>
 
     <para><indexterm>
         <primary>AQL</primary>
@@ -1919,7 +1985,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       </indexterm>To load this file into SciDB using a shadow array to keep
     track of load errors, use this AQL statement:<programlisting
     language="test">--aql LOAD intensityFlat
-      FROM '../examples/int4error.scidb'
+      FROM '../tests/harness/testcases/data/doc/int4error.scidb'
       AS   'text'
       ERRORS 99
       SHADOW ARRAY intensityFlatShadow; 

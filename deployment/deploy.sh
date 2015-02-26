@@ -49,7 +49,7 @@ SciDB control on remote machines:
   deploy.sh scidb_remove     <packages_path> <coordinator-host> [host ...]
   deploy.sh scidb_prepare    <scidb_os_user> <scidb_os_passwd> <db_user> <db_passwd>
                              <database> <base_path>
-                             <instance_count> <redundancy> <chunk-segment-size>
+                             <instance_count> <no_watchdog> <redundancy> <chunk-segment-size>
                              <coordinator-host> [host ...]
   deploy.sh scidb_start      <scidb_os_user> <database> <coordinator-host>
   deploy.sh scidb_stop       <scidb_os_user> <database> <coordinator-host>"
@@ -124,10 +124,10 @@ echo <<EOF "DESCRIPTION
 
 Commands:
   access               Provide password-less ssh access to each <host ...> for <scidb_os_user> with <ssh_public_key>.
-                       <os_user_passwd> should be "" and be supplied on stdin.
-                       Supplying passwords on the command line in clear text is a well-known security risk because
-                       they can be viewed by other users of the system. The option is only for backwards compatibility.
-                       Use "" for <ssh_public_key> if you want use the existing (default) ~/.ssh/id_rsa.pub key.
+                       do not supply <os_user_passwd> (first '') on the command line, which exposes it via ps(1)
+                       and leaves a copy in your shell history file even after logout. The option is for backwards compatibility
+                       only.
+                       Giving '' for <ssh_public_key> uses ~/.ssh/id_rsa.pub key.
 
   prepare_toolchain    Install the package dependencies required for building SciDB from sources.
                        The operation is performed on all specified <host ...> as root.
@@ -171,6 +171,7 @@ Commands:
                        <db_passwd>  - PostgreSQL user password
                        <base_path> - directory root for SciDB instance data directories
                        <instance_count> - number of instances per host
+                       <no_watchdog> - do not start watchdog process (default: 'false')
                        <redundancy> - the number of data replicas (distributed among the instances)
                        <chunk-segment-size> - the size of storage file segments
                        Use 'default' for either <redundancy> or <chunk-segment-size> to keep SciDB defaults.
@@ -497,10 +498,11 @@ local password="${2}"
 local database="${3}"
 local base_path="${4}"
 local instance_count="${5}"
-local redundancy="${6}"
-local chunk_segment_size="${7}"
-local coordinator="${8}"
-shift 8
+local no_watchdog="${6}"
+local redundancy="${7}"
+local chunk_segment_size="${8}"
+local coordinator="${9}"
+shift 9
 echo "[${database}]"
 local coordinator_instance_count=${instance_count}
 let coordinator_instance_count--
@@ -513,6 +515,9 @@ for hostname in $@; do
 done;
 echo "db_user=${username}"
 echo "db_passwd=${password}"
+if [ "${no_watchdog}" != "default" ]; then
+    echo "no-watchdog=${no_watchdog}"
+fi;
 if [ "${redundancy}" != "default" ]; then
     echo "redundancy=${redundancy}"
 fi;
@@ -525,7 +530,6 @@ echo "logconf=/opt/scidb/${SCIDB_VER}/share/scidb/log4cxx.properties"
 echo "base-path=${base_path}"
 echo "base-port=1239"
 echo "interface=eth0"
-echo "no-watchdog=false"
 }
 
 # Prepare machine for run SciDB (setup environment, generate config file, etc)
@@ -548,16 +552,17 @@ function scidb_prepare ()
     local database=${5}
     local base_path=${6}
     local instance_count=${7}
-    local redundancy=${8}
-    local chunk_segment_size=${9}
-    local coordinator=${10}
-    shift 10
+    local no_watchdog=${8}
+    local redundancy=${9}
+    local chunk_segment_size=${10}
+    local coordinator=${11}
+    shift 11
 
     # grab coordinator public key
     local coordinator_key=`remote_no_password "${username}" "${password}" "${coordinator}" "${SSH} ${username}@${coordinator}  \"cat ~/.ssh/id_rsa.pub\"" | tail -1`
 
     # generate config.ini locally
-    scidb_config ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${redundancy} ${chunk_segment_size} ${coordinator} "$@" | tee ./config.ini
+    scidb_config ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${chunk_segment_size} ${coordinator} "$@" | tee ./config.ini
 
     # deposit config.ini to coordinator
 
@@ -767,7 +772,7 @@ case ${1} in
 	done;
 	;;
     scidb_prepare)
-	if [ $# -lt 11 ]; then
+	if [ $# -lt 12 ]; then
 	    print_usage_exit 1
 	fi
         username=${2}
@@ -777,16 +782,17 @@ case ${1} in
         database=${6}
         base_path=${7}
         instance_count=${8}
-        redundancy=${9}
-        chunk_segment_size=${10}
-        coordinator=${11}
-        shift 11
+        no_watchdog=${9}
+        redundancy=${10}
+        chunk_segment_size=${11}
+        coordinator=${12}
+        shift 12
 
         # get password from stdin if not given on cmd
         if [ "${password}" == "" ]; then
            get_password "${username}"
         fi
-	scidb_prepare ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${redundancy} ${chunk_segment_size} ${coordinator} $@
+	scidb_prepare ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${chunk_segment_size} ${coordinator} $@
 	;;
     scidb_start)
 	if [ $# -lt 4 ]; then

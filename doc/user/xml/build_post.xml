@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="build">
   <refnamediv>
     <refname>build</refname>
 
@@ -60,7 +60,7 @@
 
     <informalexample>
       <para>This query creates a 4<symbol role="symbolfont">×</symbol>4
-      identity matrix from a schema definition:<para><programlisting>AFL% build(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],iif(i=j,1,0));  </programlisting><screen>[
+      identity array from a schema definition:<para><programlisting>AFL% build(&lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0],iif(i=j,1,0));  </programlisting><screen>[
 [(1),(0),(0),(0)],
 [(0),(1),(0),(0)],
 [(0),(0),(1),(0)],
@@ -82,8 +82,8 @@
       <para>Remember, the build operator produces a result array and does not
       modify the template array. To store the result from a build operator,
       create an array and use the store operator with the build operator. This
-      query creates an array called identity_matrix and then stores the result
-      of the build operator:<para><programlisting>AFL% CREATE ARRAY identity_matrix &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];  </programlisting><programlisting>AFL% store(build(identity_matrix,iif(i=j,1,0)),identity_matrix);  </programlisting><programlisting>AFL% scan(identity_matrix);  </programlisting><screen>[
+      query creates an array called <emphasis role="bold">identity_matrix</emphasis> and then stores the result of the
+      build operator:<para><programlisting>AFL% CREATE ARRAY identity_matrix &lt;val:double&gt;[i=0:3,4,0,j=0:3,4,0];  </programlisting><programlisting>AFL% store(build(identity_matrix,iif(i=j,1,0)),identity_matrix);  </programlisting><programlisting>AFL% scan(identity_matrix);  </programlisting><screen>[
 [(1),(0),(0),(0)],
 [(0),(1),(0),(0)],
 [(0),(0),(1),(0)],

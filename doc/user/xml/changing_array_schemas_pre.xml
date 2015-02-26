@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter id="ChangingArraySchemas">
@@ -50,7 +49,7 @@
 
     <para>For example, suppose you have a csv file like this: <programlisting
     language="test">
---shell --show-query=no --show-output=yes --command=cat ../examples/expo_example.txt
+--shell --show-query=no --show-output=yes --command=cat $DOC_DATA/expo_example.txt
 </programlisting> This data has three columns, two of which are strings and
     one which is a floating-point number. The column headers are 'd','p',and
     'val'. To load this data set, create a 1-dimensional SciDB array with
@@ -59,7 +58,7 @@
     size is 5. The attributes are s, of type string, p of type string, and val
     of type double. <programlisting language="test">
 --afl CREATE ARRAY device_probe &lt;d:string, p:string, val:double&gt; [i=1:25,5,0]; --show-query=yes --show-output=no
---afl load(device_probe, '../examples/expo_example.scidb'); --show-query=no --show-output=no  
+--afl load(device_probe, '../tests/harness/testcases/data/doc/expo_example.scidb'); --show-query=no --show-output=no  
       </programlisting></para>
 
     <para>When you examine the data, notice that it could be expressed in a
@@ -195,6 +194,8 @@
 
       <para><indexterm>
           <primary>collisions</primary>
+        </indexterm><indexterm>
+          <primary>cell collisions</primary>
         </indexterm>The redimension and redimension_store operators can yield
       result arrays with fewer cells than the source array. This can occur
       when there are "cell collisions." A cell collision occurs when a single
@@ -204,15 +205,25 @@
       <para>There are three techniques for handling cell
       collisions:<itemizedlist>
           <listitem>
-            <para>synthetic dimensions</para>
+            <para><indexterm>
+                <primary>dimensions</primary>
+
+                <secondary>synthetic</secondary>
+              </indexterm><indexterm>
+                <primary>synthetic dimensions</primary>
+              </indexterm><emphasis role="bold">Include a synthetic
+            dimension.</emphasis> A synthetic dimension is a vector that
+            consists of the counts for all the candidate cell values for each
+            cell location.</para>
           </listitem>
 
           <listitem>
-            <para>aggregation</para>
+            <para><emphasis role="bold">Perform aggregation.</emphasis></para>
           </listitem>
         </itemizedlist><itemizedlist>
           <listitem>
-            <para>randomly choose a cell from among the candidate cells</para>
+            <para><emphasis role="bold">Select randomly.</emphasis> Randomly
+            choose a cell from among the candidate cells.</para>
           </listitem>
         </itemizedlist></para>
 
@@ -239,7 +250,7 @@
       redimension_store. For example, consider the 1-dimensional array
       redim_missing: <programlisting language="test">--afl CREATE ARRAY redim_missing&lt; val1:string,val2:string NULL,val3:double &gt;[i=0:9,10,0]; --show-output=no --show-query=yes
 --schema redim_missing  --show-query=yes --show-output=yes
---afl load(redim_missing, '../examples/redim_missing.scidb'); --show-query=no --show-output=no
+--afl load(redim_missing, '../tests/harness/testcases/data/doc/redim_missing.scidb'); --show-query=no --show-output=no
 --afl scan(redim_missing);  --show-query=yes --show-output=yes</programlisting></para>
 
       <para>Suppose you want to change the first two attributes into dimension
@@ -342,7 +353,7 @@
 	</programlisting></para>
 
       <para><indexterm>
-          <primary>unpacking</primary>
+          <primary>unpack</primary>
         </indexterm><indexterm>
           <primary>arrays</primary>
 
@@ -364,7 +375,7 @@
       1-attribute array will output a 1-dimensional, 3-attribute array as
       follows: <programlisting language="test">
 --afl CREATE ARRAY m3x3  &lt; val:double &gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no
---afl load(m3x3, '../examples/m3x3.txt'); --show-query=no --show-output=no
+--afl load(m3x3, '../tests/harness/testcases/data/doc/m3x3.txt'); --show-query=no --show-output=no
 --aql SELECT * INTO m1 FROM unpack(m3x3,k); --show-query=yes --show-output=yes  --output-format=dense
 --schema m1 --show-query=no --show-output=yes 
 </programlisting></para>
@@ -609,7 +620,7 @@
       language="test">
 --afl CREATE ARRAY Dsp_raw&lt;d: string, t: string, val: double &gt;[i=1:25,5,0]; --show-output=no --show-query=no
 --afl CREATE ARRAY Dsp&lt;val: double&gt;[d(string)=5,5,0,t(string)=5,5,0]; --show-query=no --show-output=no 
---afl load(Dsp_raw, '../examples/expo_example.scidb'); --show-query=no --show-output=no 
+--afl load(Dsp_raw, '../tests/harness/testcases/data/doc/expo_example.scidb'); --show-query=no --show-output=no 
 --afl redimension_store(Dsp_raw, Dsp); --show-query=no --show-output=no
 --afl scan(Dsp) --show-output=yes --show-query=yes
 --schema Dsp --show-output=yes --show-query=yes

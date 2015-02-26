@@ -34,7 +34,7 @@ namespace scidb
 {
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.replication"));
 
-void ReplicationManager::start()
+void ReplicationManager::start(const boost::shared_ptr<JobQueue>& jobQueue)
 {
     ScopedMutexLock cs(_repMutex);
     assert(!_lsnrId);
@@ -42,6 +42,14 @@ void ReplicationManager::start()
     bind(&ReplicationManager::handleConnectionStatus, this, _1); // bare pointer because RM should never go away
     _lsnrId = Notification<NetworkManager::ConnectionStatus>::addPublishListener(pListener);
     assert(_lsnrId);
+
+    // initialize inbound replication queue
+    uint64_t size = Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE);
+    assert(size>0);
+    size = (size<1) ? 1 : size;
+    // this queue is single-threaded because the order of replicas is important (per source)
+    // and CachedStorage serializes everything anyway via THE mutex.
+    _inboundReplicationQ = boost::make_shared<WorkQueue>(jobQueue, 1, size);
     InjectedErrorListener<ReplicaSendInjectedError>::start();
     InjectedErrorListener<ReplicaWaitInjectedError>::start();
 }
@@ -164,8 +172,8 @@ bool ReplicationManager::sendItem(RepItems& ri)
         return true;
     }
     try {
-        shared_ptr<Query> q(item->getQuery());
-        Query::validateQueryPtr(q);
+        shared_ptr<Query> q(Query::getValidQueryPtr(item->getQuery()));
+
         boost::shared_ptr<MessageDesc> chunkMsg(item->getChunkMsg());
         NetworkManager::getInstance()->sendMessage(item->getInstanceId(), chunkMsg,
                                                    NetworkManager::mqtReplication);

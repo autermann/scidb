@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="store">
   <refnamediv>
     <refname>store</refname>
 
@@ -41,7 +40,7 @@
     <title>Examples</title>
 
     <informalexample>
-      <para>Build and store a 2-dimensional, 1-attribute matrix of zeros:
+      <para>Build and store a 2-dimensional, 1-attribute array of zeros:
       <programlisting language="test">--afl store(build(&lt;val: double&gt;[i=0:2,3,0,j=0:2,3,0],0),zeros_array); --show-output=no --output-format=dense --chunkify=yes
 </programlisting> You can change the name of the array zeros_array to
       ones_array and the cell values to 1 with a store statement:
@@ -49,7 +48,7 @@
     </informalexample>
 
     <informalexample>
-      <para>Build and store a 2-dimensional, 1-attribute matrix of random
+      <para>Build and store a 2-dimensional, 1-attribute array of random
       numbers between 1 and 10: <programlisting language="test">--afl CREATE ARRAY random_array &lt;val:double null&gt;[i=0:3,4,0,j=0:3,4,0]; --show-output=no
 --afl store(build(random_array,random()%10),random_array); --output-format=dense --chunkify=yes --show-output-in-test-file=no
 </programlisting> You can update the array with a different set of random

@@ -167,6 +167,11 @@ static void constructComplex(const Value** args, Value* res, void*)
     c.im = args[1]->getDouble();
 }
 
+static void constructDefaultComplex(const Value** args, Value* res, void*)
+{
+    *(Complex*)res->data() = Complex();
+}
+
 static void double2complex(const Value** args, Value* res, void*)
 {
     Complex& c = *(Complex*)res->data();
@@ -196,8 +201,6 @@ static void complex2string(const Value** args, Value* res, void*)
     res->setString(ss.str().c_str());
 }
   
-REGISTER_TYPE(complex, 16);
-
 REGISTER_FUNCTION(+, list_of("complex")("complex"), "complex", addComplex);
 REGISTER_FUNCTION(-, list_of("complex")("complex"), "complex", subComplex);
 REGISTER_FUNCTION(*, list_of("complex")("complex"), "complex", mulComplex);
@@ -207,12 +210,23 @@ REGISTER_FUNCTION(<>, list_of("complex")("complex"), "bool", neComplex);
 
 REGISTER_FUNCTION(re, list_of("complex"), "double", reComplex);
 REGISTER_FUNCTION(im, list_of("complex"), "double", imComplex);
-REGISTER_FUNCTION(complex, list_of("double")("double"), "complex", constructComplex);
 
 REGISTER_CONVERTER(double, complex, IMPLICIT_CONVERSION_COST, double2complex);
 REGISTER_CONVERTER(int64, complex, IMPLICIT_CONVERSION_COST, integer2complex);
 REGISTER_CONVERTER(string, complex, EXPLICIT_CONVERSION_COST, string2complex);
 REGISTER_CONVERTER(complex, string, EXPLICIT_CONVERSION_COST, complex2string);
+
+vector<Type> _types;
+EXPORTED_FUNCTION const vector<Type>& GetTypes()
+{
+    return _types;
+}
+
+vector<FunctionDescription> _functionDescs;
+EXPORTED_FUNCTION const vector<FunctionDescription>& GetFunctions()
+{
+    return _functionDescs;
+}
 
 vector<AggregatePtr> _aggregates;
 EXPORTED_FUNCTION const vector<AggregatePtr>& GetAggregates()
@@ -229,6 +243,10 @@ public:
     ComplexLibrary()
     {
         Type complexType("complex", sizeof(Complex) * 8);
+        _types.push_back(complexType);
+
+        _functionDescs.push_back(FunctionDescription("complex", ArgTypes(), TypeId("complex"), &constructDefaultComplex));
+        _functionDescs.push_back(FunctionDescription("complex", list_of("double")("double"), TypeId("complex"), &constructComplex));
 
         // Aggregates
         _aggregates.push_back(AggregatePtr(new BaseAggregate<AggSum, Complex, Complex>("sum", complexType, complexType)));

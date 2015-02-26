@@ -97,7 +97,7 @@ AllVersionsArrayIterator::AllVersionsArrayIterator(AllVersionsArray const& arr, 
 boost::shared_ptr<Query>
 AllVersionsArrayIterator::getQuery()
 {
-   return array._query.lock();
+    return Query::getValidQueryPtr(array._query);
 }
 
 ConstChunk const& AllVersionsArrayIterator::getChunk()
@@ -129,7 +129,7 @@ void AllVersionsArrayIterator::operator ++()
             return;
         }
         inputIterator.reset();
-        inputVersion = shared_ptr<Array>(new DBArray(array.getVersionName(++currVersion), query));
+        inputVersion = shared_ptr<Array>(DBArray::newDBArray(array.getVersionName(++currVersion), query));
         inputIterator = inputVersion->getConstIterator(attr);
     }
 }
@@ -150,7 +150,7 @@ bool AllVersionsArrayIterator::setPosition(Coordinates const& pos)
         return hasCurrent = false;
     }
     inputIterator.reset();
-    inputVersion = shared_ptr<Array>(new DBArray(array.getVersionName(currVersion), query));
+    inputVersion = shared_ptr<Array>(DBArray::newDBArray(array.getVersionName(currVersion), query));
     inputIterator = inputVersion->getConstIterator(attr);
     return hasCurrent = inputIterator->setPosition(Coordinates(pos.begin()+1, pos.end()));
 
@@ -163,7 +163,7 @@ void AllVersionsArrayIterator::reset()
     chunkInitialized = false;
     for (currVersion = 1; currVersion <= array.versions.size(); currVersion++) {
         inputIterator.reset();
-        inputVersion = shared_ptr<Array>(new DBArray(array.getVersionName(currVersion), query));
+        inputVersion = shared_ptr<Array>(DBArray::newDBArray(array.getVersionName(currVersion), query));
         inputIterator = inputVersion->getConstIterator(attr);
         if (!inputIterator->end()) {
             hasCurrent = true;
@@ -196,10 +196,10 @@ DelegateChunkIterator* AllVersionsArray::createChunkIterator(DelegateChunk const
 
 AllVersionsArray::AllVersionsArray(ArrayDesc const& arrayDesc, vector<VersionDesc> const& versionIds,  boost::shared_ptr<Query>& query)
 : DelegateArray(arrayDesc, shared_ptr<Array>(), true),
-  versions(versionIds),
-  _query(query)
+  versions(versionIds)
 {
    assert(query);
+   _query=query;
 }
 
 }

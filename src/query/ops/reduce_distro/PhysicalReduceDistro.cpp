@@ -62,7 +62,9 @@ public:
         while (!inputIterator->end())
         {
             Coordinates const& pos = inputIterator->getPosition();
-            if (getInstanceForChunk(_query, pos, array.getArrayDesc(), _ps, shared_ptr<DistributionMapper>(), 0, 0) == _myInstance)
+            if (getInstanceForChunk(Query::getValidQueryPtr(_query), pos,
+                                    array.getArrayDesc(), _ps,
+                                    shared_ptr<DistributionMapper>(), 0, 0) == _myInstance)
             {
                 _nextChunk = &inputIterator->getChunk();
                 _hasNext = true;
@@ -96,7 +98,8 @@ public:
     bool setPosition(Coordinates const& pos)
     {
         chunkInitialized = false;
-        if (getInstanceForChunk(_query, pos, array.getArrayDesc(), _ps, shared_ptr<DistributionMapper>(), 0, 0) == _myInstance &&
+        if (getInstanceForChunk(Query::getValidQueryPtr(_query), pos, array.getArrayDesc(),
+                                _ps, shared_ptr<DistributionMapper>(), 0, 0) == _myInstance &&
             inputIterator->setPosition(pos))
         {
             _nextChunk = &inputIterator->getChunk();
@@ -121,7 +124,7 @@ private:
     PartitioningSchema _ps;
     InstanceID _myInstance;
     ConstChunk const* _nextChunk;
-    boost::shared_ptr<Query> _query;
+    boost::weak_ptr<Query> _query;
 };
 
 
@@ -130,18 +133,20 @@ class ReduceDistroArray: public DelegateArray
 {
 public:
     ReduceDistroArray(const boost::shared_ptr<Query>& query, ArrayDesc const& desc, boost::shared_ptr<Array> const& array, PartitioningSchema ps):
-    DelegateArray(desc, array, true), _ps(ps), _query(query)
-    {}
+    DelegateArray(desc, array, true), _ps(ps)
+    {
+        assert(query);
+        _query = query;
+    }
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const
     {
-       return new ReduceDistroArrayIterator(_query, *this, id, inputArray->getConstIterator(id), _ps);
+        return new ReduceDistroArrayIterator(Query::getValidQueryPtr(_query),
+                                             *this, id, inputArray->getConstIterator(id), _ps);
     }
 
 private:
    PartitioningSchema _ps;
-   boost::shared_ptr<Query> _query;
-   
 };
 
 class PhysicalReduceDistro: public  PhysicalOperator

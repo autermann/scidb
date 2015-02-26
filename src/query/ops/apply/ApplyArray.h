@@ -59,6 +59,7 @@ public:
     virtual void setVectorMode(bool enabled);
     ApplyChunkIterator(ApplyArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode);
     bool isNull();
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
 
 private:
     ApplyArray const& _array;
@@ -71,6 +72,7 @@ private:
     Value* _value;
     bool _applied;
     bool _nullable;
+    shared_ptr<Query> _query;
 
 };
 
@@ -103,7 +105,6 @@ class ApplyArray : public DelegateArray
 
   private:
     vector <shared_ptr<Expression> > _expressions;
-    weak_ptr<Query> _query;
     vector <bool> _attributeNullable;
     vector <bool> _runInTileMode;
     vector <vector<BindInfo> > _bindingSets;

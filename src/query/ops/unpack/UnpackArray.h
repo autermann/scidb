@@ -59,6 +59,7 @@ private:
     Coordinate  first;
     Coordinate  last;
     Coordinate  base;
+    boost::shared_ptr<Query> _query;
 
 public:
     virtual bool   setPosition(Coordinates const& pos);
@@ -70,6 +71,7 @@ public:
     virtual  Value& getItem();
     virtual int    getMode();
     virtual ConstChunk const& getChunk();
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
 
     UnpackChunkIterator(UnpackArray const& array, UnpackChunk const& chunk, int iterationMode);
 };
@@ -78,10 +80,11 @@ class UnpackChunk : public DelegateChunk
 {
     friend class UnpackChunkIterator;
     friend class UnpackArrayIterator;
-
+ private:
     UnpackArray const& array;
     ConstChunk const* inputChunk;
     MemChunk chunk;
+
 
   public:
     virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
@@ -93,6 +96,7 @@ class UnpackChunk : public DelegateChunk
 
 class UnpackArrayIterator : public DelegateArrayIterator
 {
+ private:
     UnpackArray const& array;
     Coordinates inPos;
     Coordinates outPos;
@@ -106,7 +110,7 @@ class UnpackArrayIterator : public DelegateArrayIterator
     virtual void operator ++();
     virtual void reset();
 
-        UnpackArrayIterator(UnpackArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
+    UnpackArrayIterator(UnpackArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
 };
 
 class UnpackArray : public DelegateArray
@@ -116,7 +120,6 @@ class UnpackArray : public DelegateArray
     friend class UnpackArrayIterator;
 
     Dimensions dims;
-    boost::weak_ptr<Query> _query;
 
     Coordinate in2out(Coordinates const& inPos) const;
     void out2in(Coordinate outPos, Coordinates& inPos) const;

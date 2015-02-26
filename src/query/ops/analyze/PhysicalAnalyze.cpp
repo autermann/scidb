@@ -74,7 +74,7 @@ boost::shared_ptr<Array> PhysicalAnalyze::execute(vector<boost::shared_ptr<Array
 {
     map<string /*name*/, size_t /*id*/> atts_id;
     Attributes atts = inputArrays[0]->getArrayDesc().getAttributes();
-    boost::shared_ptr<Array> resultArray = createTmpArray(_schema);
+    boost::shared_ptr<Array> resultArray = createTmpArray(_schema, query);
     const AttributeDesc *emptyIndicator = inputArrays[0]->getArrayDesc().getEmptyBitmapAttribute();
 
     for (size_t i = 0; i < _parameters.size(); i++)
@@ -160,7 +160,7 @@ boost::shared_ptr<Array> PhysicalAnalyze::execute(vector<boost::shared_ptr<Array
                     cIter[j]->flush();
 
                 Chunk& chunk = resultIterator[j]->newChunk(Coordinates(1, i));
-                chunk.setRLE(false);
+                chunk.setRLE(true);
                 chunk.setSparse(false);
                 cIter[j] = chunk.getIterator(query);
             }

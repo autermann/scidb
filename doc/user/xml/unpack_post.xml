@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="unpackOperator">
   <refnamediv>
     <refname>unpack</refname>
 
@@ -85,21 +85,22 @@
         <step>
           <para>We use a previously created 3x3 array, A, where row 1 has only
           empty cells, row 2 has only null values, and row 3 has only non-null
-          values. <para><screen>[
+          values. <para><screen>[('A&lt;value:string NULL DEFAULT null&gt; [row=1:3,3,0,col=1:3,3,0]')]
+</screen><screen>[
 [(),(),()],
 [(null),(null),(null)],
-[("a7"),("a8"),("a9")]
+[('a7'),('a8'),('a9')]
 ]</screen></para></para>
         </step>
 
         <step>
-          <para>Unpack array A. <para><programlisting>AFL% unpack(A, x);</programlisting><screen>{x} row,col,value
+          <para>Unpack array A.<para><programlisting>AFL% unpack(A, x);</programlisting><screen>{x} row,col,value
 {0} 2,1,null
 {1} 2,2,null
 {2} 2,3,null
-{3} 3,1,"a7"
-{4} 3,2,"a8"
-{5} 3,3,"a9"
+{3} 3,1,'a7'
+{4} 3,2,'a8'
+{5} 3,3,'a9'
 </screen>
           Note that <code>unpack</code> has excluded the empty cells from the
           result array.</para></para>

@@ -1,10 +1,14 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="concatOperator">
   <refnamediv>
     <refname>concat</refname>
 
-    <refpurpose>Concatenate two arrays</refpurpose>
+    <refpurpose><indexterm>
+        <primary>concatenate</primary>
+      </indexterm>Returns a result array that consists of all of the cells of
+    the first array, followed by all of the cells of the second
+    array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -14,14 +18,11 @@
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>concatenate</primary>
-      </indexterm>The concat operator concatenates two arrays with the same
-    number of dimensions. Concatenation is performed by the left-most
-    dimension. All other dimensions of the input arrays must match. The
-    left-most dimension of both arrays must have a fixed size (not unbounded)
-    and same chunk size and overlap. Both inputs must have the same
-    attributes.</para>
+    <para>The concat operator concatenates two arrays with the same number of
+    dimensions. Concatenation is performed by the left-most dimension. All
+    other dimensions of the input arrays must match. The left-most dimension
+    of both arrays must have a fixed size (not unbounded) and same chunk size
+    and overlap. Both inputs must have the same attributes.</para>
   </refsect1>
 
   <refsect1>
@@ -45,7 +46,7 @@
         <step>
           <para>Concatenate left_array and right_array:<para><programlisting>AFL% create array concat_array &lt;val:double&gt;[i=0:5,6,0,j=0:2,3,0];  </programlisting><programlisting>AFL% store(concat(left_array,right_array),concat_array);  </programlisting>This
           produces an array concat_array with contents and schema as
-          follows:<para><screen>[("concat_array&lt;val:double&gt; [i=0:5,6,0,j=0:2,3,0]")]
+          follows:<para><screen>[('concat_array&lt;val:double&gt; [i=0:5,6,0,j=0:2,3,0]')]
 </screen><screen>[[(1),(1),(1)],[(1),(1),(1)],[(1),(1),(1)],[(1),(1),(1)],[(0),(0),(0)],[(0),(0),(0)]]
 </screen></para></para></para>
         </step>

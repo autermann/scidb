@@ -7,14 +7,8 @@ SCIDB QUERY : <store(build(m3x3,100),m3x3)>
 SCIDB QUERY : <store(build(m3x3,200),m3x3)>
 [[(200),(200),(200)],[(200),(200),(200)],[(200),(200),(200)]]
 
-SCIDB QUERY : <store(allversions(m3x3),m3x3_versions)>
+SCIDB QUERY : <allversions(m3x3)>
 [[[(0),(0),(0)],[(0),(0),(0)],[(0),(0),(0)]],[[(100),(100),(100)],[(100),(100),(100)],[(100),(100),(100)]],[[(200),(200),(200)],[(200),(200),(200)],[(200),(200),(200)]]]
-
-SCIDB QUERY : <show(m3x3_versions)>
-{i} schema
-{0} "m3x3_versions<val:double> [VersionNo=1:3,1,0,i=0:2,3,0,j=0:2,3,0]"
-
-Query was executed successfully
 
 Query was executed successfully
 

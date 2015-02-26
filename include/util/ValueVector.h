@@ -32,7 +32,7 @@
 #define VALUEVECTOR_H_
 
 #include <vector>
-#include <../src/smgr/io/DimensionIndex.h>
+#include "query/DimensionIndex.h"
 
 namespace scidb
 {

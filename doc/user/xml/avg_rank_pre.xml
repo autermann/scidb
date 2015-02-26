@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="avgRankOperator">
   <refnamediv id="avgRank">
     <refname>avg_rank</refname>
 
@@ -12,11 +11,11 @@
         <primary>ranking methods</primary>
 
         <secondary>avg_rank</secondary>
-      </indexterm>Rank elements of a matrix</refpurpose>
+      </indexterm>Rank elements of an array.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>avg_rank (<replaceable>array</replaceable>, [<replaceable>attribute</replaceable> [, <replaceable>dimension_1</replaceable> [, <replaceable>dimension_2</replaceable>... ]]])</synopsis>
+    <synopsis>avg_rank(<replaceable>array</replaceable><optional>, <replaceable>attribute</replaceable></optional><optional>,<replaceable> dimension_1</replaceable>, <replaceable>dimension_2</replaceable>,...]</optional>);</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -38,7 +37,7 @@
     <title>Example</title>
 
     <informalexample>
-      <para>This example calculates ranks along the columns of a matrix where
+      <para>This example calculates ranks along the columns of an array where
       there are ties within columns.</para>
 
       <procedure>

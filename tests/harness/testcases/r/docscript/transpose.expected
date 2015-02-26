@@ -7,5 +7,8 @@ SCIDB QUERY : <store(build(m3x3,i*3+j),m3x3)>
 SCIDB QUERY : <transpose(m3x3)>
 [[(0),(3),(6)],[(1),(4),(7)],[(2),(5),(8)]]
 
+SCIDB QUERY : <reverse(m3x3)>
+[[(8),(7),(6)],[(5),(4),(3)],[(2),(1),(0)]]
+
 Query was executed successfully
 

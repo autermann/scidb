@@ -20,28 +20,44 @@
 # END_COPYRIGHT
 #
 
+function detect ()
+{
+    local input="${1}"
+
+    if [ `echo "${input}" | grep "CentOS" | grep "6." | wc -l` = "1" ]; then
+        OS="CentOS 6"
+    fi
+
+    if [ `echo "${input}" | grep "Ubuntu" | grep "12.04" | wc -l` = "1" ]; then
+        OS="Ubuntu 12.04"
+    fi
+
+    if [ `echo "${input}" | grep "Red Hat" | grep "6." | wc -l` = "1" ]; then
+        OS="RedHat 6"
+    fi
+}
+
 OS="not supported"
 FILE=/etc/issue
 if [ $# -eq 1 ]; then
     FILE=`readlink -f ${1}`
 fi;
-if [ `cat ${FILE} | grep "CentOS" | grep "6." | wc -l` = "1" ]; then
-    OS="CentOS 6"
+
+PLATFORM=`cat ${FILE}`
+detect "${PLATFORM}"
+
+if [ "${OS}" != "not supported" ]; then
+    echo "${OS}"
+    exit 0
 fi
 
-if [ `cat ${FILE} | grep "Ubuntu" | grep "12.04" | wc -l` = "1" ]; then
-    OS="Ubuntu 12.04"
-fi
-
-if [ `cat ${FILE} | grep "Red Hat" | grep "6." | wc -l` = "1" ]; then
-    OS="RedHat 6"
-fi
+PLATFORM=`lsb_release -d || cat ${FILE}`
+detect "${PLATFORM}"
 
 if [ "${OS}" == "not supported" ]; then
-    echo "Not supported: "`cat ${FILE} | head -n1`
+    echo "Not supported: "`echo ${PLATFORM} | head -n1`
     exit 1
 fi
 
-echo ${OS}
-
+echo "${OS}"
 exit 0

@@ -1,0 +1,13 @@
+SCIDB QUERY : <store(build_sparse(<val:double>[i=0:3,4,0,j=0:3,4,0],i,i=j), A)>
+[[(0),(),(),()],[(),(1),(),()],[(),(),(2),()],[(),(),(),(3)]]
+
+SCIDB QUERY : <aggregate(A, count(val))>
+val_count
+4
+
+SCIDB QUERY : <aggregate(A, sum(val))>
+val_sum
+6
+
+Query was executed successfully
+

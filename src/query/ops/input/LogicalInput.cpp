@@ -171,7 +171,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
         {
             throw USER_QUERY_EXCEPTION(
                 SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                _parameters[1]->getParsingContext()) << path;
+                _parameters[1]->getParsingContext()) << filesystem3::absolute(path);
         }
     }
     else
@@ -181,7 +181,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
         {
             throw USER_QUERY_EXCEPTION(
                 SCIDB_SE_INFER_SCHEMA, SCIDB_LE_FILE_NOT_FOUND,
-                _parameters[1]->getParsingContext()) << path;
+                _parameters[1]->getParsingContext()) << filesystem3::absolute(path);
         }
     }
 
@@ -233,7 +233,7 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
             ArrayDesc mappingArrayDesc(tmpMappingArrayName,
                                        indexMapAttr,
                                        indexMapDim, ArrayDesc::LOCAL|ArrayDesc::TEMPORARY);
-            query->setTemporaryArray(shared_ptr<Array>(new MemArray(mappingArrayDesc)));
+            query->setTemporaryArray(shared_ptr<Array>(new MemArray(mappingArrayDesc,query)));
 
 
             dstDims[i] = DimensionDesc(srcDim.getBaseName(), srcDim.getNamesAndAliases(),

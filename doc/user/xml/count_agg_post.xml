@@ -19,7 +19,7 @@
 
 AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>))</synopsis>
 
-    <para> OR</para>
+    <para>OR</para>
 
     <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
 
@@ -50,11 +50,11 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
     <title>Examples</title>
 
     <informalexample>
-      <para>This example finds the number of nonempty cells in a 3<symbol role="symbolfont">×</symbol>3 matrix.</para>
+      <para>This example finds the number of nonempty cells in a 3<symbol role="symbolfont">×</symbol>3 array.</para>
 
       <procedure>
         <step>
-          <para>Create a matrix m3x3:<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
+          <para>Create an array:<para><programlisting>AFL% CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];  </programlisting></para></para>
         </step>
 
         <step>
@@ -67,8 +67,7 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
         </step>
 
         <step>
-          <para>Find the number of nonempty cells in the
-          matrix:<para><programlisting>AFL% aggregate(m3x3,count(val));  </programlisting><screen>[(3)]
+          <para>Find the number of nonempty cells in the array:<para><programlisting>AFL% aggregate(m3x3,count(val));  </programlisting><screen>[(3)]
 </screen></para></para>
         </step>
       </procedure>
@@ -76,14 +75,14 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
     <informalexample>
       <para>This example finds the number of nonempty and non-null cells from
-      a matrix that contains some NULL values.</para>
+      an array that contains some NULL values.</para>
 
       <procedure>
         <step>
           <para>Show the contents of count_array:<para><screen>[
 [(),(),()],
 [(null),(null),(null)],
-[("a7"),("a8"),("a9")]
+[('a7'),('a8'),('a9')]
 ]</screen></para></para>
         </step>
 

@@ -12,8 +12,8 @@ aggregate(m3x3,count(val))
 --set-format dcsv
 --start-igdata
 --aql create array aFlat <row:int64, col:int64, value:string null> [csvRow=0:5,6,0] 
---shell  --command="csv2scidb -s 1 -p NNs < ../examples/aInsert.csv > ../examples/aInsert.scidb "
---aql load aFlat from '../examples/aInsert.scidb' 
+--shell  --command="csv2scidb -s 1 -p NNs < $DOC_DATA/aInsert.csv > $DOC_DATA/aInsert.scidb "
+--aql load aFlat from '../tests/harness/testcases/data/doc/aInsert.scidb' 
 --aql create array A <value:string null> [row=1:3,3,0, col=1:3,3,0] 
 redimension_store(aFlat,A) 
 --set-format dense

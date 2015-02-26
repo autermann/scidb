@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
@@ -21,7 +20,7 @@
 
 AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</replaceable>))</synopsis>
 
-    <para> OR</para>
+    <para>OR</para>
 
     <synopsis>AQL% <command>SELECT</command> count(*) <command>FROM</command> <replaceable>array</replaceable>;</synopsis>
 
@@ -53,11 +52,11 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
 
     <informalexample>
       <para>This example finds the number of nonempty cells in a 3<symbol
-      role="symbolfont">×</symbol>3 matrix.</para>
+      role="symbolfont">×</symbol>3 array.</para>
 
       <procedure>
         <step>
-          <para>Create a matrix m3x3:<programlisting language="test">--afl CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no</programlisting></para>
+          <para>Create an array:<programlisting language="test">--afl CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0]; --show-output=no</programlisting></para>
         </step>
 
         <step>
@@ -66,15 +65,15 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
         </step>
 
         <step>
-          <para>Find the number of nonempty cells in the
-          matrix:<programlisting language="test">--afl aggregate(m3x3,count(val)); --output-format=dense</programlisting></para>
+          <para>Find the number of nonempty cells in the array:<programlisting
+          language="test">--afl aggregate(m3x3,count(val)); --output-format=dense</programlisting></para>
         </step>
       </procedure>
     </informalexample>
 
     <informalexample>
       <para>This example finds the number of nonempty and non-null cells from
-      a matrix that contains some NULL values.</para>
+      an array that contains some NULL values.</para>
 
       <procedure>
         <step>
@@ -86,13 +85,13 @@ AFL% aggregate(<replaceable>array</replaceable>,count(<replaceable>attribute</re
  --show-output=no
 
 --shell --command=csv2scidb -s 1 -p NNs 
-            &lt; ../examples/aInsert.csv &gt; 
-              ../examples/aInsert.scidb
+            &lt; $DOC_DATA/aInsert.csv &gt; 
+              $DOC_DATA/aInsert.scidb
  --show-query=no
  --show-output=no
 
 --aql load aFlat 
-      from '../examples/aInsert.scidb'
+      from '../tests/harness/testcases/data/doc/aInsert.scidb'
  --show-query=no
  --show-output=no
 

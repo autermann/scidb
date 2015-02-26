@@ -1,7 +1,7 @@
 SCIDB QUERY : <create array winnersFlat <event:string,year:int64,person:string,country:string,time:double> [i=0:*,12,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <load winnersFlat from '../examples/winnersFew.scidb'>
+SCIDB QUERY : <load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb'>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <create array champions <person:string,country:string,time:double> [year=1996:2008,13,0, event(string)=3,3,0]>
@@ -12,21 +12,21 @@ SCIDB QUERY : <redimension_store(winnersFlat,champions)>
 
 SCIDB QUERY : <scan(champions)>
 {year,event} person,country,time
-{1996,"dash"} "Bailey","Canada",9.84
-{1996,"marathon"} "Thugwane","RSA",7956
-{2000,"dash"} "Greene","USA",9.87
-{2000,"marathon"} "Abera","Ethiopia",7811
-{2000,"steeplechase"} "Kosgei","Kenya",503.17
-{2008,"marathon"} "Wanjiru","Kenya",7596
+{1996,'dash'} 'Bailey','Canada',9.84
+{1996,'marathon'} 'Thugwane','RSA',7956
+{2000,'dash'} 'Greene','USA',9.87
+{2000,'marathon'} 'Abera','Ethiopia',7811
+{2000,'steeplechase'} 'Kosgei','Kenya',503.17
+{2008,'marathon'} 'Wanjiru','Kenya',7596
 
 SCIDB QUERY : <attribute_rename(project(champions,country,time) ,time,time_in_seconds)>
 {year,event} country,time_in_seconds
-{1996,"dash"} "Canada",9.84
-{1996,"marathon"} "RSA",7956
-{2000,"dash"} "USA",9.87
-{2000,"marathon"} "Ethiopia",7811
-{2000,"steeplechase"} "Kenya",503.17
-{2008,"marathon"} "Kenya",7596
+{1996,'dash'} 'Canada',9.84
+{1996,'marathon'} 'RSA',7956
+{2000,'dash'} 'USA',9.87
+{2000,'marathon'} 'Ethiopia',7811
+{2000,'steeplechase'} 'Kenya',503.17
+{2008,'marathon'} 'Kenya',7596
 
 Query was executed successfully
 

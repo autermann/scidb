@@ -66,7 +66,7 @@ Query was executed successfully
 
 SCIDB QUERY : <select name,schema from list('arrays')>
 {No} name,schema
-{0} "Foo","Foo<x:double> [i=1:10,10,0]"
+{0} 'Foo','Foo<x:double> [i=1:10,10,0]'
 
 SCIDB QUERY : <remove(Foo)>
 Query was executed successfully

@@ -48,21 +48,21 @@ SCIDB QUERY : <store(build_sparse(A,x+y+10,y%2=1),A)>
 
 SCIDB QUERY : <store(build_sparse(B,string(x)+'_'+string(y),y%2=1),B)>
 {x,y} b
-{0,1} "0_1"
-{1,1} "1_1"
-{2,1} "2_1"
+{0,1} '0_1'
+{1,1} '1_1'
+{2,1} '2_1'
 
 SCIDB QUERY : <select * into C from A,B>
 {x,y} b,a
-{0,1} "0_1",11
-{1,1} "1_1",12
-{2,1} "2_1",13
+{0,1} '0_1',11
+{1,1} '1_1',12
+{2,1} '2_1',13
 
 SCIDB QUERY : <select * into D from A,B>
 {x,y} b
-{0,1} "0_1"
-{1,1} "1_1"
-{2,1} "2_1"
+{0,1} '0_1'
+{1,1} '1_1'
+{2,1} '2_1'
 
 SCIDB QUERY : <select * into E from A,B>
 {x,y} a
@@ -78,12 +78,12 @@ SCIDB QUERY : <select * into G from A,B>
 
 SCIDB QUERY : <select * into C1 from A,B where x=0>
 {x,y} b,a
-{0,1} "0_1",11
+{0,1} '0_1',11
 
 SCIDB QUERY : <select * into D1 from A,B where x<>0>
 {x,y} b
-{1,1} "1_1"
-{2,1} "2_1"
+{1,1} '1_1'
+{2,1} '2_1'
 
 SCIDB QUERY : <select * into E1 from A,B where x<=1>
 {x,y} a
@@ -101,8 +101,8 @@ SCIDB QUERY : <select * into C2 from A,B where a=10>
 
 SCIDB QUERY : <select * into D2 from A,B where b<>'2_1'>
 {x,y} b
-{0,1} "0_1"
-{1,1} "1_1"
+{0,1} '0_1'
+{1,1} '1_1'
 
 SCIDB QUERY : <select * into E2 from A,B where a<11 or b>'1_'>
 {x,y} a

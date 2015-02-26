@@ -20,7 +20,7 @@ SCIDB QUERY : <select * into B from build(A,x+1) where x<>1>
 
 SCIDB QUERY : <select * from attributes(B)>
 {No} name,type_id,nullable
-{0} "a","int64",false
+{0} 'a','int64',false
 
 SCIDB QUERY : <select * into C from build(A,x+1)>
 {x} a
@@ -30,7 +30,7 @@ SCIDB QUERY : <select * into C from build(A,x+1)>
 
 SCIDB QUERY : <select * from attributes(C)>
 {No} name,type_id,nullable
-{0} "a","int64",false
+{0} 'a','int64',false
 
 SCIDB QUERY : <select x into D from build(A,x+10)>
 {x} expr

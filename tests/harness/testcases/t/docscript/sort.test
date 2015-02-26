@@ -5,8 +5,8 @@
 --set-format dcsv
 --start-igdata
 create array winnersFlat <event:string,year:int64,person:string,country:string,time:double>[i=0:*,12,0] 
---shell  --command="csv2scidb -s 1 -p SNSSN < ../examples/winners2.csv > ../examples/winners2.scidb "
---aql load winnersFlat from '../examples/winners2.scidb'  
+--shell  --command="csv2scidb -s 1 -p SNSSN < $DOC_DATA/winners2.csv > $DOC_DATA/winners2.scidb "
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winners2.scidb'  
 CREATE ARRAY champions<person:string,country:string,time:double> [year=1996:2008,13,0,event(string)=3,3,0]  
 redimension_store(winnersFlat,champions)  
 --stop-igdata
@@ -18,8 +18,8 @@ store(project(winnersFlat,country, year, event),winnersAbridged)
 sort(winnersAbridged,country, year desc, 100) 
 --start-igdata
 create array numbers <number:int64 null>[i=0:4,5,0] 
---shell  --command="csv2scidb -s 1 -p N < ../examples/mostNumbers.csv > ../examples/mostNumbers.scidb "
---aql load numbers from '../examples/mostNumbers.scidb'  
+--shell  --command="csv2scidb -s 1 -p N < $DOC_DATA/mostNumbers.csv > $DOC_DATA/mostNumbers.scidb "
+--aql load numbers from '../tests/harness/testcases/data/doc/mostNumbers.scidb'  
 --stop-igdata
 scan(numbers) 
 sort(numbers, number asc) 

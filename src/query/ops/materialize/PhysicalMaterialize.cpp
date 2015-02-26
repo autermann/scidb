@@ -57,7 +57,7 @@ public:
     {
         assert(inputArrays.size() == 1);
         MaterializedArray::MaterializeFormat format = (MaterializedArray::MaterializeFormat)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getUint32();
-        return boost::shared_ptr<Array>(new MaterializedArray(inputArrays[0], format));
+        return boost::shared_ptr<Array>(new MaterializedArray(inputArrays[0], query, format));
     }
 };
 

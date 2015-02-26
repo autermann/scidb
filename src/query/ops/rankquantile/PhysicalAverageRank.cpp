@@ -70,7 +70,7 @@ class PhysicalAverageRank: public PhysicalOperator
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
                                                     const std::vector< ArrayDesc> & inputSchemas) const
     {
-        boost::shared_ptr<Query> query(_query);
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         size_t nInstances = query->getInstancesCount();
         size_t nDims = _schema.getDimensions().size();
 

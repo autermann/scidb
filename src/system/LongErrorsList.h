@@ -83,7 +83,7 @@ ERRMSG(SCIDB_LE_LOGICAL_OP_DOESNT_EXIST,             "Logical operator '%1%' doe
 ERRMSG(SCIDB_LE_PHYSICAL_OP_DOESNT_EXIST,            "Physical operator '%1%' for logical operator '%2%' does not exist");
 ERRMSG(SCIDB_LE_LOGICAL_OP_ALREADY_REGISTERED,       "Logical operator '%1%' already registered");
 ERRMSG(SCIDB_LE_PHYSICAL_OP_ALREADY_REGISTERED,      "Physical operator '%1%' for logical operator '%2%' already registered");
-ERRMSG(SCIDB_LE_QUERY_CANCELLED,                      "Query %1% was cancelled");
+ERRMSG(SCIDB_LE_QUERY_CANCELLED,                      "Query %1% was cancelled"); // tigor: this error code is reserved to indicate query abort state
 ERRMSG(SCIDB_LE_NO_QUORUM,                           "Instance liveness has changed");
 ERRMSG(SCIDB_LE_QUERY_NOT_FOUND,                     "Query %1% not found");
 ERRMSG(SCIDB_LE_QUERY_NOT_FOUND2,                    "Query already deallocated/cancelled");
@@ -249,13 +249,13 @@ ERRMSG(SCIDB_LE_OP_BUILD_SPARSE_ERROR2,             "Build_sparse predicate shou
 ERRMSG(SCIDB_LE_OP_BUILD_SPARSE_ERROR3,             "Constructed array should have one attribute");
 ERRMSG(SCIDB_LE_OP_BUILD_SPARSE_ERROR4,             "Cannot BUILD array with open boundary");
 ERRMSG(SCIDB_LE_OP_CAST_ERROR1,                     "Mismatched number of attributes");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR2,                     "Mismatched attributes types");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR3,                     "Mismatched attributes flags");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR2,                     "Attribute '%1%' type doesn't match");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR3,                     "Attribute '%1%' flags doesn't match");
 ERRMSG(SCIDB_LE_OP_CAST_ERROR4,                     "Mismatched number of dimensions");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR5,                     "Dimension length doesn't match");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR6,                     "Dimension start doesn't match");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR7,                     "Dimension chunk size doesn't match");
-ERRMSG(SCIDB_LE_OP_CAST_ERROR8,                     "Dimension chunk overlap doesn't match");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR5,                     "Dimension '%1%' length doesn't match");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR6,                     "Dimension '%1%' start doesn't match");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR7,                     "Dimension '%1%' chunk size doesn't match");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR8,                     "Dimension '%1%' chunk overlap doesn't match");
 ERRMSG(SCIDB_LE_OP_CONCAT_ERROR1,                   "Arrays with open boundary cannot be concatenated");
 ERRMSG(SCIDB_LE_OP_CROSSJOIN_ERROR1,                "Dimension should be specified only once in JOIN ON list");
 ERRMSG(SCIDB_LE_OP_DELDIM_ERROR1,                   "Cannot delete the only dimension of array");
@@ -370,10 +370,10 @@ ERRMSG(SCIDB_LE_CANT_UNLOAD_MODULE,                 "Cannot unload module '%1%'.
 ERRMSG(SCIDB_LE_OP_REDIMENSION_STORE_ERROR6,        "Aggregate '%1%' doesn't match with any attribute");
 ERRMSG(SCIDB_LE_SUBSTITUTE_FAILED,                  "Failed to substitute missing reason '%1%'");
 ERRMSG(SCIDB_LE_REMOVE_NOT_POSSIBLE,                "Removal of array is not possible because it is still in use");
-ERRMSG(SCIDB_LE_TRUNCATION,                         "Varying size type with length %1% cannot be converted to fixed size type with limit %2%"); 
-ERRMSG(SCIDB_LE_LOOKUP_BAD_PARAM,                   "Number of attributes in pattern array of LOOKUP should match number of dimensions in source array"); 
-ERRMSG(SCIDB_LE_INVALID_STORAGE_HEADER,             "Invalid storage header format");
-ERRMSG(SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION,  "Mismatched storage format version: %1% instead of %2% required");
+ERRMSG(SCIDB_LE_TRUNCATION,                         "Varying size type with length %1% cannot be converted to fixed size type with limit %2%");
+ERRMSG(SCIDB_LE_LOOKUP_BAD_PARAM,                   "Number of attributes in pattern array of LOOKUP should match number of dimensions in source array");
+ERRMSG(SCIDB_LE_INVALID_STORAGE_HEADER,             "This version of SciDB cannot read this storage file (header magic mismatch)");
+ERRMSG(SCIDB_LE_MISMATCHED_STORAGE_FORMAT_VERSION,  "This version of SciDB cannot read this storage file (file min %1%, file max %2%, system %3%)");
 ERRMSG(SCIDB_LE_OP_CROSSJOIN_ERROR2,                "Joined dimensions should be specified for both arrays");
 ERRMSG(SCIDB_LE_OP_NORMALIZE_ERROR3,                "Attribute must be of double type");
 ERRMSG(SCIDB_LE_EXPLICIT_EMPTY_FLAG_NOT_ALLOWED,    "Explicit empty flag attribute not allowed. Use EMPTY keyword");
@@ -427,6 +427,12 @@ ERRMSG(SCIDB_LE_INCORRECT_CHUNK_SIZE,               "Chunk size must be between 
 ERRMSG(SCIDB_LE_INCORRECT_OVERLAP_SIZE,             "Overlap length must be between 0 and %1%");
 ERRMSG(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,       "Dimension boundaries must be between '%1%' and '%2%'");
 ERRMSG(SCIDB_LE_WRONG_LANGUAGE_STRING,              "Language string should be AQL or AFL");
+ERRMSG(SCIDB_LE_BAD_SINGLE_ATTRIBUTE_ARRAY,         "Operator '%1%' requires a %3% valued array as argument %2%");
+ERRMSG(SCIDB_LE_BAD_ARRAY_DIMENSIONS,               "Operator '%1%' requires a %3% dimensional array as argument %2%");
+ERRMSG(SCIDB_LE_BAD_VECTOR_LENGTH,                  "Operator '%1%' requires a vector of length at least %3% as argument %2%");
+ERRMSG(SCIDB_LE_OP_CAST_ERROR10,                    "Cannot cast attribute '%1%' type from '%2%' to '%3%'");
+ERRMSG(SCIDB_LE_CANNOT_RECOVER_RESTARTABLE_WORK,    "Cannot recover restartable work");
+ERRMSG(SCIDB_LE_CANNOT_MODIFY_ENVIRONMENT,          "Internal error, could not modify environ.");
 //Next ERRMSG
 
 ERRMSG(SCIDB_LE_PG_QUERY_EXECUTION_FAILED,          "Execution of query '%1%' failed with error %2%");

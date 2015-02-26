@@ -21,10 +21,7 @@
 
     <listitem>
       <para><emphasis role="bold">Null (missing) values. </emphasis>These
-      match the semantics of NULL in a relational database. Note that join
-      operations do not take place across nulls. That is, joining any value
-      with a null results in a null. <emphasis role="bold">(Is that correct?
-      Or do things fail?)</emphasis></para>
+      match the semantics of NULL in a relational database.</para>
 
       <para>Null values can contain a missing reason code. This allows
       applications to optionally specify multiple types of null values and
@@ -32,24 +29,24 @@
       null value with a missing reason code by using
       "?<replaceable>n</replaceable>", where <replaceable>n</replaceable> is
       an integer from 0 to 127. There are two SciDB functions that are
-      associated with missing value codes: missing() and
-      missing_reason().</para>
+      associated with missing value codes: <literal>missing()</literal> and
+      <literal>missing_reason()</literal>.</para>
     </listitem>
 
     <listitem>
       <para><emphasis role="bold">Empty cells. </emphasis>This is purely a
-      SciDB concept. Missing values allow for a type of default value when
+      SciDB concept. Empty cells allow for a type of default value when
       building an array; that is, they act as a shortcut so that you do not
-      need to specify all values when creating an array. Missing values can
-      participate in join operations.</para>
+      need to specify all values when creating an array. Typically, when you
+      create an array that is very sparse, most of its cells will be
+      empty..</para>
     </listitem>
 
     <listitem>
       <para><emphasis role="bold">Infinity.</emphasis> During calculations, it
       is possible to divide by 0 and store the result into an attribute value.
       SciDB represents this as either <literal>inf</literal> or
-      <literal>-inf</literal>, depending on the sign of the dividend.
-      <emphasis role="bold">What are the implications?</emphasis></para>
+      <literal>-inf</literal>, depending on the sign of the dividend.</para>
 
       <para>Multiply an ordinary value by <symbol>∞ </symbol>and it returns
       <symbol>∞</symbol>. So it seems like <symbol>∞</symbol> acts like a big
@@ -141,10 +138,6 @@
     <para>Okay, so the previous section is my first pass at writing up the 6
     kinds of values (5 special, while the first is "ordinary").</para>
 
-    <para>The bug mentions that the <emphasis>missing value type </emphasis>is
-    different from the way the doc has described the concept of
-    <emphasis>missing values/data</emphasis>.</para>
-
     <para>One objective, as part of documenting these different types, is to
     clearly define what happens when a value is converted from one of these
     types to another, but is not representable in the target. For example,
@@ -175,7 +168,7 @@
 
       <procedure>
         <step>
-          <para>First, let's build a 2x2 matrix with inf.</para>
+          <para>First, let's build a 2x2 array with inf.</para>
 
           <para><programlisting language="test">--afl store(build(&lt;val:double&gt; [i=0:1,2,0, j=0:1,2,0], '[[(1),(inf)],[(-inf),2]]',true),A);
   --output-format=dense --chunkify=yes</programlisting></para>
@@ -191,7 +184,9 @@
         <step>
           <para>Multiply them.</para>
 
-          <programlisting language="test">--afl multiply(A,B); --output-format=dense --chunkify</programlisting>
+          <programlisting language="test">--afl store(multiply(A,B),C_special); --show-output=no
+--afl show(C_special)
+--afl scan(C_special); --output-format=dense --chunkify</programlisting>
 
           <para>So, the first result cell, C<subscript>00</subscript> = (1
           <symbol>x</symbol> 4) + ( <symbol>∞ x </symbol>() ) = NaN. Which
@@ -225,6 +220,31 @@
           language="test">--afl store(build(&lt;val:double&gt;[i=1:10,10,0],i/3.0 - 2),C); --output-format=dense
 --aql select asin(val) from C; --output-format=dense
 </programlisting></para>
+        </step>
+
+        <step>
+          <para>Assume we have the following arrays, <emphasis
+          role="bold">A_null</emphasis> and <emphasis
+          role="bold">B_null</emphasis>:<programlisting language="test">--afl create array A_null&lt;val_n:double NULL&gt; [i=0:9,10,0]; --show-output=no --show-query=no
+--afl store(build(A_null,'[(?4),2,(NA),(?100),5,6,(),8,(NaN),null]',true),A_null); --show-output=no --show-query=no
+--afl store(build(A_null,i+101),B_null); --show-output=no --show-query=no
+--afl show(A_null); --show-query=no
+--afl scan(A_null) --show-query=no--output-format=dense
+--afl show(B_null); --show-query=no
+--afl scan(B_null) --show-query=no --output-format=dense</programlisting></para>
+
+          <substeps>
+            <step>
+              <para>Now, join the two arrays.<programlisting language="test">--afl store(join(A_null, B_null),C_null); --output-format=dense
+--afl show(C_null);</programlisting>As you can see, if either cell in a join
+              is empty, then the resulting cell is empty. Otherwise, all the
+              special values carry through to the result array.</para>
+            </step>
+
+            <step>
+              <para>Click <emphasis role="bold">EC2</emphasis>.</para>
+            </step>
+          </substeps>
         </step>
       </procedure>
     </informalexample>

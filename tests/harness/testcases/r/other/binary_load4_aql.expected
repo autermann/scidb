@@ -32,7 +32,7 @@ Query was executed successfully
 
 SCIDB QUERY : <select * from show(A11)>
 {i} schema
-{0} "A11<num:int64,sum:int64> [x=1:2,2,0,y=1:2,2,0,z=1:2,2,0]"
+{0} 'A11<num:int64,sum:int64> [x=1:2,2,0,y=1:2,2,0,z=1:2,2,0]'
 
 SCIDB QUERY : <save A11 into '/tmp/a11.txt'>
 {x,y,z} num,sum

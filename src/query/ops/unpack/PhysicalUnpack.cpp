@@ -489,7 +489,7 @@ public:
      */
     shared_ptr<Array> fillOutputArray(shared_ptr<Array> const& inputArray, UnpackArrayInfo const& chunkInfo, shared_ptr<Query> &query)
     {
-        shared_ptr<Array> result = make_shared<MemArray>(_schema);
+        shared_ptr<Array> result = make_shared<MemArray>(_schema,query);
         ArrayDesc const& inputSchema = inputArray->getArrayDesc();
         size_t nSrcDims = inputSchema.getDimensions().size();
         size_t nSrcAttrs = inputSchema.getAttributes(true).size();

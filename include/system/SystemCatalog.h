@@ -179,7 +179,7 @@ public:
      * @param[in] instanceId
      * @return number of locks deleted
      */
-    uint32_t deleteArrayLocks(const InstanceID& instanceId);
+    uint32_t deleteArrayLocks(InstanceID instanceId);
 
     /**
      * Delete all arrays locks from the catalog for a given query on a given instance.
@@ -187,9 +187,7 @@ public:
      * @param[in] queryId
      * @return number of locks deleted
      */
-    uint32_t deleteArrayLocks(const InstanceID& instanceId, const QueryID& queryId);
-
-
+    uint32_t deleteArrayLocks(InstanceID instanceId, QueryID queryId);
 
     /**
      * Check if a coordinator lock for given array name and query ID exists in the catalog
@@ -198,7 +196,7 @@ public:
      * @return the lock found in the catalog possibly empty
      */
     boost::shared_ptr<LockDesc> checkForCoordinatorLock(const std::string& arrayName,
-            const QueryID& queryId);
+            QueryID queryId);
 
 
     /**
@@ -248,7 +246,7 @@ public:
      * Fills vector with array names from the persistent catalog manager.
      * @param arrays Vector of strings
      */
-    void getArrays(std::vector<std::string> &arrays) const;
+    void getArrays(std::vector<std::string> &arrays);
 
     /**
      * Checks if there is an array with the specified ID in the catalog. First
@@ -258,7 +256,7 @@ public:
      * @param[in] array_id Array id
      * @return true if there is array with such ID, false otherwise
      */
-    bool containsArray(const ArrayID array_id) const;
+    bool containsArray(const ArrayID array_id);
 
     /**
      * Checks if there is array with specified name in the storage. First
@@ -268,14 +266,14 @@ public:
      * @param[in] array_name Array name
      * @return true if there is array with such name in the storage, false otherwise
      */
-    bool containsArray(const std::string &array_name) const;
+    bool containsArray(const std::string &array_name);
 
     /**
      * Get array ID by array name
      * @param[in] array_name Array name
      * @return array id or 0 if there is no array with such name
      */
-    ArrayID findArrayByName(const std::string &array_name) const;
+    ArrayID findArrayByName(const std::string &array_name);
 
     /**
      * Returns array metadata using the array name. If throwException is true then 
@@ -396,7 +394,7 @@ public:
      * @param[in] arrayId array identifier
      * @return vector of VersionDesc
      */
-    std::vector< VersionDesc> getArrayVersions(const ArrayID array_id) const;
+    std::vector<VersionDesc> getArrayVersions(const ArrayID array_id);
 
     /**
      * Get array actual upper boundary
@@ -423,27 +421,27 @@ public:
      * Get number of registered instances
      * return total number of instances registered in catalog
      */
-    uint32_t getNumberOfInstances() const;
+    uint32_t getNumberOfInstances();
 
     /**
      * Add new instance to catalog
      * @param[in] instance Instance descriptor
      * @return Identifier of instance (ordinal number actually)
      */
-    uint64_t addInstance(const InstanceDesc &instance) const;
+    uint64_t addInstance(const InstanceDesc &instance);
 
     /**
      * Return all instances registered in catalog.
      * @param[out] instances Instances vector
      */
-    void getInstances(Instances &instances) const;
+    void getInstances(Instances &instances);
 
     /**
      * Get instance metadata by its identifier
      * @param[in] instance_id Instance identifier
      * @param[out] instance Instance metadata
      */
-    void getClusterInstance(InstanceID instance_id, InstanceDesc &instance) const;
+    void getClusterInstance(InstanceID instance_id, InstanceDesc &instance);
 
     /**
      * Switch instance to online and update its host and port
@@ -451,13 +449,13 @@ public:
      * @param[in] host Instance host
      * @param[in] port Instance port
      */
-    void markInstanceOnline(const InstanceID instance_id, const std::string host, const uint16_t port) const;
+    void markInstanceOnline(InstanceID instance_id, const std::string& host, uint16_t port);
 
     /**
      * Switch instance to offline
      * @param[in] instance_id Instance identifier
      */
-    void markInstanceOffline(const InstanceID instance_id) const;
+    void markInstanceOffline(InstanceID instance_id);
 
     /**
      * Set default compression method for the specified array attribute:
@@ -465,8 +463,8 @@ public:
      * @param attId attribute identifier
      * @param compressionMethod default compression for this attribute
      */
-    void setDefaultCompressionMethod(const ArrayID arrId, const AttributeID attId,
-            const int16_t compressionMethod);
+    void setDefaultCompressionMethod(ArrayID arrId, AttributeID attId,
+            int16_t compressionMethod);
 
     /**
      * Temporary method for connecting to PostgreSQL database used as metadata
@@ -489,7 +487,7 @@ public:
      *
      * @param[in] library name
      */
-    void addLibrary(const std::string& libraryName) const;
+    void addLibrary(const std::string& libraryName);
 
     /**
      * Get info about loaded libraries from the persistent system catalog
@@ -497,14 +495,14 @@ public:
      *
      * @param[out] vector of library names
      */
-    void getLibraries(std::vector< std::string >& libraries) const;
+    void getLibraries(std::vector< std::string >& libraries);
 
     /**
      * Unload library.
      *
      * @param[in] library name
      */
-    void removeLibrary(const std::string& libraryName) const;
+    void removeLibrary(const std::string& libraryName);
 
     /**
      * Returns version of loaded catalog metadata
@@ -514,7 +512,6 @@ public:
     int getMetadataVersion() const;
 
 private:
-
     /**
      * Helper method to get an appropriate SQL string for a given lock
      */
@@ -529,6 +526,48 @@ private:
     SystemCatalog();
     virtual ~SystemCatalog();
 
+    void _renameArray(const std::string &old_array_name, const std::string &new_array_name);
+    bool _lockArray(const boost::shared_ptr<LockDesc>&  lockDesc, ErrorChecker& errorChecker);
+    bool _unlockArray(const boost::shared_ptr<LockDesc>& lockDesc);
+    bool _updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc);
+    void _readArrayLocks(const InstanceID instanceId,
+            std::list< boost::shared_ptr<LockDesc> >& coordLocks,
+            std::list< boost::shared_ptr<LockDesc> >& workerLocks);
+    uint32_t _deleteArrayLocks(InstanceID instanceId, QueryID queryId);
+    boost::shared_ptr<LockDesc> _checkForCoordinatorLock(const std::string& arrayName,
+            QueryID queryId);
+    size_t _countReferences(std::string const& arrayName);
+    void _initializeCluster();
+    void _addArray(ArrayDesc &array_desc, PartitioningSchema ps);
+    void _updateArray(const ArrayDesc &array_desc);
+    void _getArrays(std::vector<std::string> &arrays);
+    bool _containsArray(const ArrayID array_id);
+    ArrayID _findArrayByName(const std::string &array_name);
+    void _getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException, boost::shared_ptr<Exception> &exception);
+    boost::shared_ptr<ArrayDesc> _getArrayDesc(const ArrayID id);
+    PartitioningSchema _getPartitioningSchema(const ArrayID arrayId);
+    bool _deleteArrayByName(const std::string &array_name);
+    void _deleteArrayById(const ArrayID id);
+    VersionID _createNewVersion(const ArrayID id, const ArrayID version_array_id);
+    void _deleteVersion(const ArrayID arrayID, const VersionID versionID);
+    VersionID _getLastVersion(const ArrayID id);
+    VersionID _lookupVersionByTimestamp(const ArrayID id, const uint64_t timestamp);
+    std::vector<VersionDesc> _getArrayVersions(const ArrayID array_id);
+    Coordinates _getHighBoundary(const ArrayID array_id);
+    Coordinates _getLowBoundary(const ArrayID array_id);
+    void _updateArrayBoundaries(ArrayDesc const& desc, PhysicalBoundaries const& bounds);
+    uint32_t _getNumberOfInstances();
+    uint64_t _addInstance(const InstanceDesc &instance);
+    void _getInstances(Instances &instances);
+    void _getClusterInstance(InstanceID instance_id, InstanceDesc &instance);
+    void _markInstanceOnline(InstanceID instance_id, const std::string& host, uint16_t port);
+    void _markInstanceOffline(InstanceID instance_id);
+    void _setDefaultCompressionMethod(ArrayID arrId, AttributeID attId,
+            int16_t compressionMethod);
+    void _addLibrary(const std::string& libraryName);
+    void _getLibraries(std::vector< std::string >& libraries);
+    void _removeLibrary(const std::string& libraryName);
+
     bool _initialized;
     pqxx::connection *_connection;
     std::string _uuid;
@@ -542,6 +581,8 @@ private:
     friend class Singleton<SystemCatalog>;
 
     std::map<ArrayID, boost::shared_ptr<ArrayDesc> > _arrDescCache;
+
+    int _reconnectTries;
 };
 
 } // namespace catalog

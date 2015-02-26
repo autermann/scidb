@@ -17,7 +17,45 @@
   some detailed information (such as handling errors during load) that applies
   to all the techniques.</para>
 
-  <section>
+  <para>This chapter contains the following sections:<itemizedlist>
+      <listitem>
+        <para><link linkend="loadOverview">Overview of Moving Data Into
+        SciDB</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadCSV">Loading CSV Data</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadParallel">Loading in Parallel</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadBinary">Loading Binary Data</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadTransfer">Transferring Data Between SciDB
+        Installations</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="missingValues">Loading Data with Missing
+        Values</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="emptyCells">Loading Empty Cells</link></para>
+      </listitem>
+
+      <listitem>
+        <para><link linkend="loadErrors">Handling Errors During
+        Load</link></para>
+      </listitem>
+    </itemizedlist></para>
+
+  <section id="loadOverview">
     <title>Overview of Moving Data Into SciDB</title>
 
     <para>You typically load data into SciDB one array at a time. In most
@@ -71,7 +109,7 @@
     </orderedlist>
   </section>
 
-  <section>
+  <section id="loadCSV">
     <title>Loading CSV Data</title>
 
     <para><indexterm>
@@ -228,27 +266,28 @@ marathon,2008,Wanjiru,7596
 
       <para>To see the options for <code>csv2scidb</code>, type
       <code>csv2scidb --help</code> at the command line. The options for
-      csv2scidb are: <para><screen>csv2scidb: Utility for conversion of CSV file to SciDB input text format
-	Usage: csv2scidb [options] [ &lt; input-file ] [ &gt; output-file ]
-	Default: -f 0 -c 1000000 -q
-	Options:
-	  -v version of utility
-	  -i PATH	input file
-	  -o PATH	output file
-	  -a PATH	appended output file
-	  -c INT	length of chunk
-	  -f INT	starting coordinate
-	  -n INT	number of instances
-	  -d char	delimiter - default ,
-	  -p STR	type pattern - N number, S string, s nullable-string, 
-	     C char, c nullable-char
-	  -q Quote the input line exactly, simply wrap it in ()
-	  -s N	skip N lines at the beginning of the file
-	  -h 	prints this helpful error message
-	 You cannot specify both -q and a set of -p options.
+      csv2scidb are: <para><screen>csv2scidb: Convert CSV file to SciDB input text format.
+Usage:   csv2scidb [options] [ &lt; input-file ] [ &gt; output-file ]
+Default: -f 0 -c 1000000 -q
+Options:
+  -v        version information
+  -i PATH   input file
+  -o PATH   output file
+  -a PATH   appended output file
+  -c INT    length of chunk
+  -f INT    starting coordinate
+  -n INT    number of instances
+  -d CHAR   delimiter: defaults to ,
+  -p STR    type pattern: N number, S string, s nullable-string,
+            C char, c nullable-char
+  -q        quote the input line exactly by wrapping it in ()
+  -s N      skip N lines at the beginning of the file
+  -h        prints this helpful message
+
+Note: the -q and -p options are mutually exclusive.
 </screen>This command will transform <code>olympic_data.csv</code> to
       SciDB load file format: <programlisting>
-csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olympic_data.scidb
+csv2scidb -s 1 -p SNSN &lt; $DOC_DATA/olympic_data.csv &gt; $DOC_DATA/olympic_data.scidb
 </programlisting>The -s flag specifies the number of lines to skip at the
       beginning of the file. Since the file has a header, you can strip that
       line with "-s 1". The -p flag specifies the types of data in the columns
@@ -256,7 +295,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       (nullable string), and C (char).</para></para>
 
       <para>The file <code>olympic_data.scidb</code> looks like this:
-      <para><programlisting>$ cat ../examples/olympic_data.scidb
+      <para><programlisting>$ cat $DOC_DATA/olympic_data.scidb
 </programlisting><screen>{0}[
 ("dash",1996,"Bailey",9.84),
 ("dash",2000,"Greene",9.87),
@@ -344,7 +383,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
           <secondary>load</secondary>
         </indexterm>After you create the target array, you can populate it
-      with data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> winnersFlat <command>FROM</command> '../examples/olympic_data.scidb';  </programlisting>The data file paths in the AFL and AQL commands are relative
+      with data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> winnersFlat <command>FROM</command> '../tests/harness/testcases/data/doc/olympic_data.scidb';  </programlisting>The data file paths in the AFL and AQL commands are relative
       to the working directory of the server.</para></para>
     </section>
 
@@ -370,10 +409,10 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> analyze(winnersFlat);
 </programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} "event","dash","steeplechase",3,12
-{1} "person","Abera","Wanjiru",12,12
-{2} "time","9.69","7956",12,12
-{3} "year","1996","2008",4,12
+{0} 'event','dash','steeplechase',3,12
+{1} 'person','Abera','Wanjiru',12,12
+{2} 'time','9.69','7956',12,12
+{3} 'year','1996','2008',4,12
 </screen><para>For the simple example presented here, the simple statistics
       reveal little of interest. For large arrays however, the data can be
       illuminating and can influence your decisions about chunk size and chunk
@@ -394,12 +433,25 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       the following command:</para>
 
       <para><programlisting>AFL% redimension_store(winnersFlat,winners);  </programlisting><para>The result of this command is the desired array; you have
-      completed the CSV load procedure.</para>
+      completed the CSV load procedure.<para><screen>{year,event} person,time
+{1996,'dash'} 'Bailey',9.84
+{1996,'marathon'} 'Thugwane',7956
+{1996,'steeplechase'} 'Keter',487.12
+{2000,'dash'} 'Greene',9.87
+{2000,'marathon'} 'Abera',7811
+{2000,'steeplechase'} 'Kosgei',503.17
+{2004,'dash'} 'Gatlin',9.85
+{2004,'marathon'} 'Baldini',7855
+{2004,'steeplechase'} 'Kemboi',485.81
+{2008,'dash'} 'Bolt',9.69
+{2008,'marathon'} 'Wanjiru',7596
+{2008,'steeplechase'} 'Kipruto',490.34
+</screen></para></para>
     </para></para></para></section>
   </section>
 
-  <section>
-    <title>Parallel Load</title>
+  <section id="loadParallel">
+    <title>Loading in Parallel</title>
 
     <para><indexterm>
         <primary>loading data</primary>
@@ -501,7 +553,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       the multi-dimensional array you desire.</para>
     </section>
 
-    <section>
+    <section id="loadcsvPY">
       <title>Load the Data</title>
 
       <para><indexterm>
@@ -982,9 +1034,49 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
         not the multidimensional target array.</para>
       </note>
     </section>
+
+    <section>
+      <title>Loading HDFS Data</title>
+
+      <para><indexterm>
+          <primary>HDFS</primary>
+        </indexterm><indexterm>
+          <primary>loading data</primary>
+
+          <secondary>from HDFS</secondary>
+        </indexterm><indexterm>
+          <primary>Hadoop</primary>
+
+          <see>HDFS</see>
+        </indexterm>HDFS is a distributed file system written in Java for the
+      Hadoop framework. HDFS can store CSV files, but they are not directly
+      visible to Linux systems. To load HDFS data into SciDB, you can
+      circumvent this restriction by piping the contents of the CSV file
+      directly into the SciDB script for parallel loading of CSV files,
+      <command>loadcsv.py</command>.</para>
+
+      <para>On a normal Linux file system, you would execute a command similar
+      to the following:<programlisting>$ cat test.csv | loadcsv.py <replaceable>option_list</replaceable></programlisting></para>
+
+      <para>The analogous command on an HDFS file system is the
+      following:<programlisting>$ hadoop dfs -cat test.csv | loadcsv.py <replaceable>option_list</replaceable></programlisting></para>
+
+      <para>Note the following:</para>
+
+      <para><itemizedlist>
+          <listitem>
+            <para><literal>hadoop dfs -cat</literal> is the Hadoop command to
+            list a file to STDOUT.</para>
+          </listitem>
+
+          <listitem>
+            <para>The options for loadcsv.py are described in <xref linkend="loadcsvPY"/>.</para>
+          </listitem>
+        </itemizedlist></para>
+    </section>
   </section>
 
-  <section>
+  <section id="loadBinary">
     <title>Loading Binary Data</title>
 
     <para><indexterm>
@@ -1267,7 +1359,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
           <secondary>load</secondary>
         </indexterm>After you create the load array, you can populate it with
-      data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> intensityFlat <command>FROM</command> '../examples/intensity_data.bin'
+      data using the <code>LOAD</code> statement: <para><programlisting>AQL% <command>LOAD</command> intensityFlat <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
       <command>AS</command> '(string, 
            int64, 
            int64 null)';   </programlisting></para></para>
@@ -1285,7 +1377,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <title>Loading Binary String Data</title>
 
       <para><indexterm>
-          <primary>strings, binary loading</primary>
+          <primary>strings</primary>
+
+          <secondary>binary loading of</secondary>
         </indexterm><indexterm>
           <primary>binary data</primary>
         </indexterm>You must null-terminate strings when loading binary data.
@@ -1305,30 +1399,30 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para>The following example shows the string lengths for strings in the
       intensityFlat array:<para><programlisting>AQL% <command>SELECT</command> exposure, strlen(exposure) <command>FROM</command> intensityFlat;  </programlisting><screen>{i} exposure,expr
-{0} "High",4
-{1} "High",4
-{2} "High",4
-{3} "High",4
-{4} "High",4
-{5} "High",4
-{6} "High",4
-{7} "High",4
-{8} "Medium",6
-{9} "Medium",6
-{10} "Medium",6
-{11} "Medium",6
-{12} "Medium",6
-{13} "Medium",6
-{14} "Medium",6
-{15} "Medium",6
-{16} "Low",3
-{17} "Low",3
-{18} "Low",3
-{19} "Low",3
-{20} "Low",3
-{21} "Low",3
-{22} "Low",3
-{23} "Low",3
+{0} 'High',4
+{1} 'High',4
+{2} 'High',4
+{3} 'High',4
+{4} 'High',4
+{5} 'High',4
+{6} 'High',4
+{7} 'High',4
+{8} 'Medium',6
+{9} 'Medium',6
+{10} 'Medium',6
+{11} 'Medium',6
+{12} 'Medium',6
+{13} 'Medium',6
+{14} 'Medium',6
+{15} 'Medium',6
+{16} 'Low',3
+{17} 'Low',3
+{18} 'Low',3
+{19} 'Low',3
+{20} 'Low',3
+{21} 'Low',3
+{22} 'Low',3
+{23} 'Low',3
 </screen></para></para>
     </section>
 
@@ -1350,9 +1444,9 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
 
       <para><para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> analyze(intensityFlat)
 </programlisting><screen>{attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} "elapsedTime","0","7",8,24
-{1} "exposure","High","Medium",3,24
-{2} "measuredIntensity","29","100",16,20
+{0} 'elapsedTime','0','7',8,24
+{1} 'exposure','High','Medium',3,24
+{2} 'measuredIntensity','29','100',16,20
 </screen> Of course, for the simple example presented here, the simple
       statistics reveal little of interest. For large arrays however, the data
       can be illuminating and can influence your decisions about chunk size
@@ -1411,7 +1505,7 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
            elapsedTime:int64, 
            measuredIntensity:int64 null &gt;
        [i=0:*,1000000,0];  </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat
-     <command>FROM</command> '../examples/intensity_data.bin'
+     <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
      <command>AS</command>   '(string, 
             int64, 
             int64 null)';  </programlisting> The second pair of statements excludes a string
@@ -1420,14 +1514,14 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
       <para><para><programlisting>AQL% <command>CREATE ARRAY</command> intensityFlat_NoExposure 
  &lt; elapsedTime:int64, measuredIntensity:int64 null &gt; 
  [i=0:*,1000000,0];  </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat_NoExposure
-     <command>FROM</command> '../examples/intensity_data.bin'
+     <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
      <command>AS</command>   '(skip, 
             int64, 
             int64 null)';  </programlisting> The third pair of statements excludes two int64 fields, one
       of which allows null values: <para><programlisting>AQL% <command>CREATE ARRAY</command> intensityFlat_NoTime_NoMeasurement 
  &lt; exposure:string &gt; 
  [i=0:*,1000000,0];   </programlisting><programlisting>AQL% <command>LOAD</command> intensityFlat_NoTime_NoMeasurement
-     <command>FROM</command> '../examples/intensity_data.bin'
+     <command>FROM</command> '../tests/harness/testcases/data/doc/intensity_data.bin'
      <command>AS</command>   '(string, 
             skip(8), 
             skip(8) null)';   </programlisting> The preceding pairs of AQL statements illustrate the
@@ -1458,8 +1552,8 @@ csv2scidb -s 1 -p SNSN &lt; .../examples/olympic_data.csv &gt; .../examples/olym
     </section>
   </section>
 
-  <section>
-    <title>Transferring Data From One SciDB Installation to Another</title>
+  <section id="loadTransfer">
+    <title>Transferring Data Between SciDB Installations</title>
 
     <para><indexterm>
         <primary>data</primary>
@@ -1707,92 +1801,80 @@ elapsedTime=0:40000,10000,0]</screen></para></para>
       data into it:</para>
 
       <para><para><programlisting>AQL% <command>LOAD</command> intensityCopy
-     <command>FROM</command> <command>CURRENT INSTANCE</command> '../examples/intensity_data.opaque'
+     <command>FROM</command> <command>CURRENT INSTANCE</command> '../tests/harness/testcases/data/doc/intensity_data.opaque'
      <command>AS</command> 'OPAQUE';  </programlisting> The result of this command is the array in the destination
       installation of SciDB. You have completed the opaque loading
       procedure.</para></para>
     </section>
   </section>
 
-  <section id="dataSpecial">
-    <title>Data with Special Values</title>
+  <section id="missingValues">
+    <title>Loading Data with Missing Values</title>
 
-    <para>This section discusses default attribute values for missing values,
-    and some behavior for empty cells.</para>
+    <para><indexterm>
+        <primary>loading data</primary>
 
-    <section>
-      <title>Data with Missing Values</title>
+        <secondary>special values</secondary>
+      </indexterm><indexterm>
+        <primary>data</primary>
 
-      <para><indexterm>
-          <primary>loading data</primary>
+        <secondary>loading special</secondary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
 
-          <secondary>special values</secondary>
-        </indexterm><indexterm>
-          <primary>data</primary>
+        <secondary>special values</secondary>
+      </indexterm>Suppose you have a load file that is missing some values,
+    like this file, <code>v4.scidb</code>:</para>
 
-          <secondary>loading special</secondary>
-        </indexterm><indexterm>
-          <primary>arrays</primary>
-
-          <secondary>special values</secondary>
-        </indexterm>Suppose you have a load file that is missing some values,
-      like this file, <code>v4.scidb</code>:</para>
-
-      <para><screen>[
+    <para><screen>[
  (0,100),(1,99),(2,),(3,97)
-]</screen><para>The load file <code>v4.scidb</code> has a missing value in the
-      third cell. If you create an array and load this data set, SciDB will
-      substitute 0 for the missing value: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4 <command>FROM</command> '../examples/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,0),(3,97)]
+]</screen><para>The load file <code>v4.scidb</code> has a missing value in the third
+    cell. If you create an array and load this data set, SciDB will substitute
+    0 for the missing value: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4 &lt;val1:int8,val2:int8&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4 <command>FROM</command> '../tests/harness/testcases/data/doc/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,0),(3,97)]
 </screen></para></para>
 
-      <para><indexterm>
-          <primary>attributes</primary>
+    <para><indexterm>
+        <primary>attributes</primary>
 
-          <secondary>default values</secondary>
-        </indexterm><indexterm>
-          <primary>default attribute values</primary>
-        </indexterm>The out-of-the-box default value for each datatype is
-      described in <xref linkend="dataTypes"/>.To change the default value,
-      that is, the value the SciDB substitutes for the missing data, set the
-      DEFAULT attribute option. This code creates an array
-      <code>v4_dflt</code> with default attribute value set to 111:</para>
+        <secondary>default values</secondary>
+      </indexterm><indexterm>
+        <primary>default attribute values</primary>
+      </indexterm>The out-of-the-box default value for each datatype is
+    described in <xref linkend="dataTypes"/>.To change the default value, that
+    is, the value the SciDB substitutes for the missing data, set the DEFAULT
+    attribute option. This code creates an array <code>v4_dflt</code> with
+    default attribute value set to 111:</para>
 
-      <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4_dflt <command>FROM</command> '../examples/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97)]
+    <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_dflt &lt;val1:int8,val2:int8 default 111&gt;[i=0:3,4,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v4_dflt <command>FROM</command> '../tests/harness/testcases/data/doc/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97)]
 </screen><para>Load files may also contain null values, such as in this file,
-      <code>v4_null.scidb</code>: <para><screen>[
+    <code>v4_null.scidb</code>: <para><screen>[
  (0,100),(1,99),(2,null),(3,97)
 ]</screen>
-      To preserve null values at load time, add the NULL option to the
-      attribute type: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0];  </programlisting><programlisting>AQL% <command>LOAD</command> v4_null <command>FROM</command> '../examples/v4_null.scidb';  </programlisting></para></para></para>
-    </para></para></section>
+    To preserve null values at load time, add the NULL option to the attribute
+    type: <para><programlisting>AQL% <command>CREATE ARRAY</command> v4_null &lt;val1:int8,val2:int8 NULL&gt; [i=0:3,4,0];  </programlisting><programlisting>AQL% <command>LOAD</command> v4_null <command>FROM</command> '../tests/harness/testcases/data/doc/v4_null.scidb';  </programlisting></para></para></para>
+  </para></para></section>
 
-    <section>
-      <title>Empty Cells</title>
+  <section id="emptyCells">
+    <title>Loading Empty Cells</title>
 
-      <para><indexterm>
-          <primary>empty cells</primary>
-        </indexterm><indexterm>
-          <primary>arrays</primary>
+    <para><indexterm>
+        <primary>empty cells</primary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
 
-          <secondary>empty cells</secondary>
-        </indexterm>In addition to missing values for attributes, SciDB arrays
-      may also contain completely empty cells. For example, if we load
-      <code>v4.scidb</code> into an array with a dimension that is larger than
-      the supplied data, the array will contain empty cells:<para><programlisting>AQL% <command>CREATE ARRAY</command> v6_dflt &lt;val1:int8,val2:int8 default 111&gt;
-      [i=0:5,6,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v6_dflt <command>FROM</command> '../examples/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97),(),()]
+        <secondary>empty cells</secondary>
+      </indexterm>In addition to missing values for attributes, SciDB arrays
+    may also contain completely empty cells. For example, if we load
+    <code>v4.scidb</code> into an array with a dimension that is larger than
+    the supplied data, the array will contain empty cells:<para><programlisting>AQL% <command>CREATE ARRAY</command> v6_dflt &lt;val1:int8,val2:int8 default 111&gt;
+      [i=0:5,6,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v6_dflt <command>FROM</command> '../tests/harness/testcases/data/doc/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97),(),()]
 </screen></para></para>
 
-      <para>Note that the last two cells of the array are empty. If you do not
-      want empty cells, you can use the NOT EMPTY keywords when you create the
-      array:<para><programlisting>AQL% CREATE NOT EMPTY ARRAY v6_dflt_notEmpty &lt;val1:int8,val2:int8 default 111&gt;[i=0:5,6,0]  </programlisting><programlisting>AQL% <command>LOAD</command> v6_dflt_notEmpty <command>FROM</command> '../examples/v4.scidb'  </programlisting><screen>[(0,100),(1,99),(2,111),(3,97),(0,111),(0,111)]
-</screen></para></para>
-
-      <para>Note that for val2, the supplied default value (111) is used, and
-      for val1, the default value of the int8 datatype is used (zero).</para>
-    </section>
+    <para>Note that for val2, the supplied default value (111) is used, and
+    for val1, the default value of the int8 datatype is used (zero).</para>
   </section>
 
-  <section>
+  <section id="loadErrors">
     <title>Handling Errors During Load</title>
 
     <para><indexterm>
@@ -1915,7 +1997,7 @@ Low,1888,?
 
     <para>The corresponding SciDB-formatted text file—that is, the file that
     results when you run csv2scidb on this CSV file, is shown
-    below:<para><programlisting>$ cat '../examples/int4error.scidb'   </programlisting><screen>{0}[
+    below:<para><programlisting>$ cat $DOC_DATA/int4error.scidb   </programlisting><screen>{0}[
 ("High",777,100),
 ("High",Jack,99),
 ("Medium",777,100),
@@ -1936,18 +2018,18 @@ Low,1888,?
         <secondary>errors</secondary>
       </indexterm>To load this file into SciDB using a shadow array to keep
     track of load errors, use this AQL statement:<para><programlisting>AQL% <command>LOAD</command> intensityFlat
-      <command>FROM</command> '../examples/int4error.scidb'
+      <command>FROM</command> '../tests/harness/testcases/data/doc/int4error.scidb'
       <command>AS</command>   'text'
       <command>ERRORS</command> 99
       <command>SHADOW ARRAY</command> intensityFlatShadow; 
   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
-{0} "High",777,100
-{1} "High",0,99
-{2} "Medium",777,100
-{3} "Medium",888,95
-{4} "Medium",0,null
-{5} "Low",0,null
-{6} "Low",1888,null
+{0} 'High',777,100
+{1} 'High',0,99
+{2} 'Medium',777,100
+{3} 'Medium',888,95
+{4} 'Medium',0,null
+{5} 'Low',0,null
+{6} 'Low',1888,null
 </screen>In the LOAD statement, notice the
     following:<itemizedlist>
         <listitem>
@@ -1988,9 +2070,9 @@ row_offset:int64 &gt;
     <para>Another result of the preceding LOAD statement is the set of
     populated values of the shadow array. To examine these values, use this
     AQL statement:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlatShadow;   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity,row_offset
-{1} null,"Failed to parse string",null,35
-{4} null,"Failed to parse string","Failed to parse string",94
-{5} null,"Assigning NULL to non-nullable attribute","Failed to parse string",110
+{1} null,'Failed to parse string',null,35
+{4} null,'Failed to parse string','Failed to parse string',94
+{5} null,'Assigning NULL to non-nullable attribute','Failed to parse string',110
 </screen></para></para>
 
     <para>The data in the intensityFlatShadow array includes three non-empty
@@ -2021,13 +2103,13 @@ row_offset:int64 &gt;
     <para>And of course, the other result of the LOAD command is data loaded
     into the load array. To examine that data, use this AQL
     statement:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlat;   </programlisting><screen>{i} exposure,elapsedTime,measuredIntensity
-{0} "High",777,100
-{1} "High",0,99
-{2} "Medium",777,100
-{3} "Medium",888,95
-{4} "Medium",0,null
-{5} "Low",0,null
-{6} "Low",1888,null
+{0} 'High',777,100
+{1} 'High',0,99
+{2} 'Medium',777,100
+{3} 'Medium',888,95
+{4} 'Medium',0,null
+{5} 'Low',0,null
+{6} 'Low',1888,null
 </screen></para></para>
 
     <para>The data in the intensityFlat array indicates the
@@ -2099,9 +2181,9 @@ row_offset:int64 &gt;
 
     <para>You can examine the result of this AQL statement as
     follows:<para><programlisting>AQL% <command>SELECT</command> * <command>FROM</command> intensityFlatBadCells;  </programlisting><screen>{i} exp,expMSG,elTime,elTimeMSG,Intensity,IntensityMSG,row_offset
-{1} "High",null,0,"Failed to parse string",99,null,35
-{4} "Medium",null,0,"Failed to parse string",null,"Failed to parse string",94
-{5} "Low",null,0,"Assigning NULL to non-nullable attribute",null,"Failed to parse string",110
+{1} 'High',null,0,'Failed to parse string',99,null,35
+{4} 'Medium',null,0,'Failed to parse string',null,'Failed to parse string',94
+{5} 'Low',null,0,'Assigning NULL to non-nullable attribute',null,'Failed to parse string',110
 </screen></para></para>
 
     <para>The query result shows the usefulness of the array

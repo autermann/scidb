@@ -168,7 +168,7 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     size_t nRows = dims[0].getLength();
     size_t nCols = dims[1].getLength();
     if (!nRows || !nCols ) {
-        return shared_ptr<Array>(new MemArray(_schema));
+        return shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     //
@@ -195,7 +195,7 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         //
         // We are an "extra" instance that must return an empty array
         // we will not start mpi slaves for such instances
-        return shared_ptr<Array>(new MemArray(_schema));
+        return shared_ptr<Array>(new MemArray(_schema,query));
     } else {
         if(DBG) {
             std::cerr << "instID:" << instanceID << " myGridPos.row:" << myGridPos.row

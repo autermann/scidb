@@ -166,7 +166,7 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): participating in MPI");
     } else {
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): not participating in MPI");
-        return shared_ptr<Array>(new MemArray(_schema));
+        return shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     // REFACTOR: this is a pattern in DLAs
@@ -378,7 +378,7 @@ shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
         assert(resultShmIpcIndx == BUF_MAT_CC);
     } else {
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): participated, but not in output array, creating empty output array: first ("<<first[R]<<","<<first[C]<<"), last(" << last[R] <<"," <<last[C]<<")");
-        result = shared_ptr<Array>(new MemArray(_schema));  // same as when we don't participate at all
+        result = shared_ptr<Array>(new MemArray(_schema,query));  // same as when we don't participate at all
         resultShmIpcIndx = shmIpc.size();                   // indicate we don't want to hold on to buffer BUF_MAT_CC after all
     }
 

@@ -135,11 +135,6 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalWindow);
 LOGICAL_BUILDIN_OPERATOR(LogicalMultiply);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalMultiply);
 
-// Inverse
-// #2194: inverse disabled until (#2182) SplitArray is fixed
-// LOGICAL_BUILDIN_OPERATOR(LogicalInverse);
-// PHYSICAL_BUILDIN_OPERATOR(PhysicalInverse);
-
 // Slice
 LOGICAL_BUILDIN_OPERATOR(LogicalSlice);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalSlice);

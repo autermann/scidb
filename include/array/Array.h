@@ -33,6 +33,7 @@
 #define ARRAY_H_
 
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include "array/Metadata.h"
 #include "query/Aggregate.h"
@@ -44,7 +45,6 @@ namespace scidb
 class Array;
 class Query;
 class Chunk;
-class DBChunk;
 class ConstArrayIterator;
 class ConstRLEEmptyBitmap;
 
@@ -61,12 +61,12 @@ public:
      * @return constant pointer to binary buffer. You can only read this data.
      * Note, data is available only during object is live.
      */
-    virtual void* getData() const;
+   virtual void* getData() const = 0;
 
     /**
      * @return size of buffer in bytes
      */
-    virtual size_t getSize() const;
+    virtual size_t getSize() const = 0;
 
     /**
      * Method allocates memory for buffer inside implementation.
@@ -92,13 +92,13 @@ public:
      * Tell to increase reference counter to hold buffer in memory
      * @return true if buffer is pinned (need to be unpinned) false otherwise
      */
-    virtual bool pin() const;
+    virtual bool pin() const = 0;
 
     /**
      * Tell to decrease reference counter to release buffer in memory
      * to know when it's not needed.
      */
-    virtual void unPin() const;
+    virtual void unPin() const = 0;
 };
 
 class MemoryBuffer : public SharedBuffer
@@ -398,7 +398,8 @@ public:
      */
     virtual void flush() = 0;
 
-    virtual boost::shared_ptr<Query> getQuery() { return boost::shared_ptr<Query>(); }
+    /// Query context for this iterator
+    virtual boost::shared_ptr<Query> getQuery() = 0;
 };
 
 /**
@@ -457,9 +458,9 @@ class ConstChunk : public SharedBuffer
 
    /**
     * Get disk chunk containing data of this chunk
-    * @return DBChunk if data of this chunk is stored on the disk, NULL otherwise
+    * @return a chunk if data of this chunk is stored on the disk, NULL otherwise
     */
-   virtual DBChunk const* getDiskChunk() const;
+   virtual ConstChunk const* getPersistentChunk() const;
 
    size_t getBitmapSize() const;
 
@@ -484,17 +485,22 @@ class ConstChunk : public SharedBuffer
    virtual const AttributeDesc& getAttributeDesc() const = 0;
 
    /**
-    * Count number of present (non-empty) elements in the chunk
+    * Count number of present (non-empty) elements in the chunk.
+    * Materialized subclasses that do not use the field materializedChunk might want to provide their own implementation.
+    * @return the number of non-empty elements in the chunk.
     */
    virtual size_t count() const;
 
    /**
-    * Check if count of non-empty elements in the chunk is known
+    * Check if count of non-empty elements in the chunk is known.
+    * Materialized subclasses that do not use the field materializedChunk might want to provide their own implementation.
+    * @return true if count() will run in constant time; false otherwise.
     */
    virtual bool isCountKnown() const;
 
    /**
-    * Get numer of element in the chunk
+    * Get numer of logical elements in the chunk.
+    * @return the product of the chunk sizes in all dimensions.
     */
    size_t getNumberOfElements(bool withOverlap) const;
 
@@ -542,7 +548,11 @@ class ConstChunk : public SharedBuffer
     virtual boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
     virtual ConstChunk const* getBitmapChunk() const;
 
-    ConstChunk* materialize() const;
+    /**
+     * Compute and place the chunk data in memory (if needed) and return a pointer to it.
+     * @return a pointer to a chunk object that is materialized; may be a pointer to this.
+     */
+    virtual ConstChunk* materialize() const;
 
     virtual void overrideTileMode(bool) {}
     
@@ -550,6 +560,10 @@ class ConstChunk : public SharedBuffer
     ConstChunk();
     virtual ~ConstChunk();
     
+    /**
+     * A pointer to a materialized copy of this chunk. Deallocated on destruction. Used as part of materialize() and other routines like count().
+     * Note that not all subclasses use this field. Note also that PersistentChunk objects can exist indefinitely without being destroyed.
+     */
     MemChunk* materializedChunk;
     boost::shared_ptr<ConstArrayIterator> emptyIterator;
 };
@@ -685,7 +699,7 @@ public:
                                    AggregatePtr const& aggregate,
                                    boost::shared_ptr<Query>& query);
 
-   virtual void write(boost::shared_ptr<Query>& query);
+   virtual void write(boost::shared_ptr<Query>& query) = 0;
    virtual void truncate(Coordinate lastCoord);
    virtual void setCount(size_t count);
 };
@@ -750,7 +764,8 @@ public:
 
     virtual void deleteChunk(Chunk& chunk);
 
-    virtual boost::shared_ptr<Query> getQuery() { return boost::shared_ptr<Query>(); }
+    /// Query context for this iterator
+    virtual boost::shared_ptr<Query> getQuery() = 0;
 };
 
 class Array;
@@ -950,7 +965,13 @@ public:
      * @param origCoords [OUT] original coordiantes
      * @param intCoords [IN] integer coordiantes
      */
-    virtual void getOriginalPosition(std::vector<Value>& origCoords, Coordinates const& intCoords, const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()) const;
+    virtual void getOriginalPosition(std::vector<Value>& origCoords,
+                                     Coordinates const& intCoords,
+                                     const boost::shared_ptr<Query>& query) const;
+
+ protected:
+    /// The query context for this array
+    boost::weak_ptr<Query> _query;
 };
 
 class PinBuffer {

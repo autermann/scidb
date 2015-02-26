@@ -98,8 +98,8 @@ namespace scidb
         chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
         chunk.setSparse(srcChunk.isSparse());
 
-        boost::shared_ptr<Query> query;
-        boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE|ChunkIterator::NO_EMPTY_CHECK);
+        boost::shared_ptr<Query> emptyQuery;
+        boost::shared_ptr<ChunkIterator> dst = chunk.getIterator(emptyQuery, ChunkIterator::SEQUENTIAL_WRITE|ChunkIterator::NO_EMPTY_CHECK);
 
         if (match->initialized) { 
             boost::shared_ptr<ConstChunkIterator> src = srcChunk.getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS);

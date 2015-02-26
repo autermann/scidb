@@ -76,7 +76,10 @@ public:
      * @param mapCoordToCount   [inout] an initially empty map that will receive the count per collapsed coordinates
      * @param chunk             [in] the LruMemChunk from which the count should be aquired
      */
-    void updateMapCoordToCount(boost::shared_ptr<MapCoordToCount>& mapCoordToCount, LruMemChunk const* chunk) {
+    void updateMapCoordToCount(boost::shared_ptr<MapCoordToCount>& mapCoordToCount, ConstChunk const* chunk) {
+        // XXX tigor TODO: investigate if it does not have to be a MemChunk 
+        assert(dynamic_cast<MemChunk const*>(chunk)!=NULL);
+
         // Note that default values can't be ignored. Otherwise the coordinate in the synthetic dimension would mess up.
         boost::shared_ptr<ConstChunkIterator> chunkIter = chunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::APPEND_CHUNK);
         while (!chunkIter->end()) {

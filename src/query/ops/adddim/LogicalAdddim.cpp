@@ -101,7 +101,13 @@ public:
         Dimensions const& srcDimensions = srcArrayDesc.getDimensions();
         Dimensions dstDimensions(srcDimensions.size()+1);
 
-        for (size_t i = 0, n = srcDimensions.size(); i < n; i++) {
+        for (size_t i = 0, n = srcDimensions.size(); i < n; i++)
+        {
+            if (dimensionName == srcDimensions[i].getBaseName())
+            {
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DUPLICATE_DIMENSION_NAME,
+                        _parameters[0]->getParsingContext()) << dimensionName;
+            }
             dstDimensions[i+1] = srcDimensions[i];
         }
         dstDimensions[0] = DimensionDesc(dimensionName, 0, 0, 0, 0, 1, 0);

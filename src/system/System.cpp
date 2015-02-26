@@ -58,7 +58,6 @@ bool isFullyQualified(const std::string& filePath)
 FILE* openMemoryStream(char const* ptr, size_t size)
 {
     FILE* f;
-#ifdef __APPLE__
     f = tmpfile();
     if (NULL == f) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "tmpfile";
@@ -68,12 +67,6 @@ FILE* openMemoryStream(char const* ptr, size_t size)
         throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "fwrite";
     }
     fseek(f, 0, SEEK_SET);
-#else
-    f = fmemopen((void*)ptr, size, "r");
-    if (NULL == f) {   
-        throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED_WITH_ERRNO) << "fmemopen" << errno;
-    }
-#endif
     return f;
 }
 

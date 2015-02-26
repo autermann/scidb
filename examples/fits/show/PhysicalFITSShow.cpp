@@ -60,7 +60,7 @@ public:
 
         if (query->getCoordinatorID() != COORDINATOR_INSTANCE )
         {
-            return shared_ptr<Array> (new MemArray(_schema));
+            return shared_ptr<Array> (new MemArray(_schema,query));
         }
 
         const string &filePath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();

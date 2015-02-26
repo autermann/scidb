@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd">
+"docbookV4.5/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "scidb_ug.ent">
+%myents;
+]>
 <chapter id="ch01">
   <title>Introduction to SciDB</title>
 
@@ -33,13 +35,13 @@
   Language (AQL) and Array Functional Language (AFL)—and an overview of
   transactions in SciDB.</para>
 
-  <section xreflabel="array_data_model" xml:id="ArrayDataModel">
+  <section id="section_arrayDataModel" xml:id="ArrayDataModel">
     <title>Array Data Model</title>
 
     <para><indexterm>
         <primary>arrays</primary>
 
-        <seealso>matrices</seealso>
+        <seealso>matrix</seealso>
       </indexterm><indexterm>
         <primary>array data model</primary>
       </indexterm>SciDB uses multidimensional arrays as its basic storage and
@@ -62,8 +64,8 @@
     arrays with one or more non-integer dimensions, such as variable-length
     strings (<emphasis>alpha</emphasis>,<emphasis> beta</emphasis>,<emphasis>
     gamma</emphasis>, ...) or floating-point values (1.2, 2.76, 4.3, ...).
-    Version 13.3 of SciDB and Paradigm4 support non-int64 dimensions only
-    partially.</para>
+    Version &scidb_version; of SciDB and Paradigm4 support non-int64
+    dimensions only partially.</para>
 
     <para>When the total number of values or cardinality of a dimension is
     known in advance, the SciDB array can be declared with a<emphasis>
@@ -104,6 +106,34 @@
     <para>Once you have created a SciDB database and defined the arrays, you
     must prepare and load data into it. Loaded data is then available to be
     accessed and queried using SciDB's built-in analytics capabilities.</para>
+
+    <para>
+      <emphasis role="bold">Array Indexing</emphasis>
+    </para>
+
+    <para><indexterm>
+        <primary>array indexing</primary>
+      </indexterm><indexterm>
+        <primary>indexing</primary>
+
+        <secondary>of arrays</secondary>
+      </indexterm><indexterm>
+        <primary>data clustering</primary>
+      </indexterm><indexterm>
+        <primary>clustering</primary>
+
+        <secondary>of data</secondary>
+      </indexterm>SciDB uses array indexing—your dimensions are essentially
+    indices. This splits the data into fixed-size chunks. When you need to
+    retrieve data, you specify the coordinates and SciDB can very quickly
+    determine the chunk that contains the requested data. In other databases,
+    this functionality comes at a cost: you need to create an index and
+    maintain it—and the maintenance over time can become very costly, in terms
+    of the need to re-index as the data set grows.</para>
+
+    <para>Another advantage of SciDB array indexing is that your data is
+    clustered: data that logically belongs together is stored close together
+    on disk.</para>
   </section>
 
   <section xml:id="BasicArchitecture">
@@ -240,7 +270,9 @@
         <?dbfo term-width="1.5in"?>
 
         <varlistentry>
-          <term>Vertical partitioning</term>
+          <term>
+            <emphasis>Vertical partitioning</emphasis>
+          </term>
 
           <listitem>
             <para><indexterm>
@@ -259,7 +291,9 @@
         </varlistentry>
 
         <varlistentry>
-          <term>Storage of array versions</term>
+          <term>
+            <emphasis>Storage of array versions</emphasis>
+          </term>
 
           <listitem>
             <para><indexterm>
@@ -285,7 +319,9 @@
         </varlistentry>
 
         <varlistentry>
-          <term>Storage segments</term>
+          <term>
+            <emphasis>Storage segments</emphasis>
+          </term>
 
           <listitem>
             <para><indexterm>
@@ -307,7 +343,9 @@
         </varlistentry>
 
         <varlistentry>
-          <term>Transient storage</term>
+          <term>
+            <emphasis>Transient storage</emphasis>
+          </term>
 
           <listitem>
             <para><indexterm>
@@ -342,8 +380,7 @@
 
           <listitem>
             <para>Information about SciDB extensions, such as plug-in
-            libraries containing user-defined objects, which are described in
-            the section "Array Processing."</para>
+            libraries containing user-defined objects.</para>
           </listitem>
         </itemizedlist></para>
 
@@ -535,11 +572,10 @@
     <para><indexterm>
         <primary>iquery</primary>
       </indexterm>The SciDB software package that you downloaded contains a
-    special command line utility called<emphasis> iquery</emphasis> which
-    provides an interactive Linux shell and supports both AQL and AFL. For
-    more information about iquery, see <link
-    linkend="UsingtheiqueryClient">Getting Started With SciDB
-    Development</link>.</para>
+    command line utility called<emphasis> iquery</emphasis> which provides an
+    interactive Linux shell and supports both AQL and AFL. For more
+    information about iquery, see <link linkend="UsingtheiqueryClient">Getting
+    Started With SciDB Development</link>.</para>
 
     <para>Client applications connect to SciDB using an appropriate connector
     package which implements the client-side of the SciDB client-server

@@ -19,7 +19,7 @@
 # END_COPYRIGHT
 ########################################
 
-message(STATUS "****************** BEGIN mpi/CMakeLists.txt ******************")
+message(STATUS "****************** BEGIN src/mpi/CMakeLists.txt ******************")
 
 if(SCALAPACK_TIMING)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCALAPACK_TIMING")
@@ -67,156 +67,11 @@ else (USE_LOCAL_MPI)
    MESSAGE(STATUS "MPI_Fortran_COMPILER=${MPI_Fortran_COMPILER}")
 endif(USE_LOCAL_MPI)
 
-#
-# DLA is built, by default, using the platform-provided set of ScaLAPACK, BLACS, LAPACK, and BLAS
-# packages (called ScaLAPACK stack below, for brevity).
-#
-# A much faster version of those can be provided by the Intel MKL, if you have
-# a license for Intel MKL on the machine which you are compiling.
-# (because although the MKL binaries can be re-distributed by licensees, the
-#  corresponding Intel headers may not be redistributed -- each copy requires
-#  a license).
-#
-# So we want to be able to have the default configuration build against the platform
-# version, even on build machines where the MKL is installed, but be able to change
-# a setting and have the build switch to using MKL.  We want explicit control of whether
-# MKL is used, as the same build machine must build regular and MKL versions without
-# installing and removing the MKL component.  Instead, a configuration parameter at
-# the time of the cmake command must control whether MKL building is attempted.
-# Most developers will not be concerned with this option, as their development of the
-# DLA plugins does not depend on the performance of the implementation of the
-# ScaLAPACK stack behind it.
-#
-# The current implementation is to have this file check for
-# USE_MKL_LP64 and USE_MKL_ILP64 parameters.
-#
-# USE_MKL_LP64 - the ScaLAPACK stack uses 64-bit pointers and arithmetic, but
-#                the FORTRAN "INTEGER" type is 32bits.  64-bit integers are only used for the
-#                "INTEGER*8" type.  This is complatible with the Ubuntu version of the
-#                ScaLAPACK stack, but problem "WORK" space is limited to 2^31 values.
-#
-# USE_MKL_ILP64 - the ScaLPACK stack uses 64-bit pointers, arithmetic, and INTEGER types.
-#                The RHEL / Centos default stack may well be using this model, TBD.
-#
-
 set(USE_FIND "true") # assume not using MKL
 
-if(USE_MKL_LP64)
-    unset(USE_FIND)
-    message(STATUS "USE_MKL_LP64:  Scalapack configured for MKL")
-    # The flags and paths for the LP64 model
-    # below were determined with the assistance of the web applet at:
-    # http://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
-    # with the following inputs:
-    # -------------------
-    # Intel(R) MKL 10.3
-    # Linux*
-    # Intel(R) 64
-    # GNUFortran
-    # Static
-    # LP64 (32-bit integer)
-    # Sequential (and repeated with Parallel)
-    # [check] ScaLAPACK (BLACS required)
-    # [check] BLACS
-    # Open MPI
-    # -----------------
-
-    set(MKLROOT "/opt/intel/mkl")
-    set(MKL_INCD "${MKLROOT}/include")
-    set(MKL_LIBD "${MKLROOT}/lib/intel64")
-    # choose one of the following to select sequential or parallel:
-    # set(MKL_PARALLEL 1) # if enabled, requires setting environement variables to limit num threads used
-    if(MKL_PARALLEL)
-        message(STATUS "MKL_PARALLEL:  Scalapack configured for parallel MKL BLAS")
-        set(MKL_SEQ "gnu_thread") # threaded BLAS via openmp
-        set(MKL_SEQ2 "-fopenmp;") #  openmp support, must end with ";"
-    else()
-        set(MKL_SEQ "sequential") # single-threaded BLAS OR
-        set(MKL_SEQ2 "")          # nothing
-    endif()
-
-    set(SCALAPACK_LIBRARIES "${MKL_LIBD}/libmkl_scalapack_lp64.a;-Wl,--start-group;${MKL_LIBD}/libmkl_gf_lp64.a;${MKL_LIBD}/libmkl_${MKL_SEQ}.a;${MKL_LIBD}/libmkl_core.a;${MKL_LIBD}/libmkl_blacs_openmpi_lp64.a;-Wl,--end-group;${MKL_SEQ2}-lpthread;-lm")
-    set(LAPACK_LIBRARIES "")
-    set(BLAS_LIBRARIES "")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -m64 -I${MKL_INC_DIR}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m64 -I{MKL_INC_DIR}")  # not sure if this one is needed
-
-    set(SCALAPACK_FOUND "1")        # emulate that finds worked
-    set(LAPACK_FOUND "1")
-    set(BLAS_FOUND "1")
-endif(USE_MKL_LP64)
-
-if(USE_MKL_ILP64)
-    unset(USE_FIND)
-    message(STATUS "USE_MKL_ILP64 set -- configuring for large-memory MKL Scalapack libs")
-    #######################################
-    # MKL ILP64 setup: (was working at one point, not tested recently)
-    #
-    # Later on, in the October timeframe, when building with MKL on RHEL 5. for the purpose of generating
-    # binaries for commercial customers, we will want to use the following settings, which extend
-    # ScaLAPACK to use 64-bit integers to describe the size of matrix WORK areas (as
-    # well as every other INTEGER type in the ScaLAPACK FORTRAN code.
-    #
-    set(CMAKE_Fortran_FLAGS "${CMAKE_FORTRAN_FLAGS} -DMKL_ILP64 -m64 -I${MKL_INC_DIR}")
-    set(SCALAPACK_LIBRARIES "-L ${MKL_LIB_DIR} -lmkl_scalapack_ilp64 -lmkl_blacs_intelmpi_ilp64")
-    set(LAPACK_LIBRARIES "-L ${MKL_LIB_DIR} -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lmkl_rt -lmkl_def -lpthread -lm")
-    set(BLAS_LIBRARIES "-L ${MKL_LIB_DIR} -lmkl_rt")
-    # mkl_avx or mkl_def needed
-endif(USE_MKL_ILP64)
 
 if(USE_FIND)
     set(LIBGF "/usr/lib/gcc/x86_64-linux-gnu/4.6/libgfortran.a")
-    ######################
-    # BLAS
-    ######################
-    set(USE_LOCAL_BLAS 0) # the find modules are bringing in over-specific library names, this may be necessary for SciDB 12.11
-    if(USE_LOCAL_BLAS)
-        message(STATUS "WARNING-- using locally installed BLAS")
-        set(BLAS_FOUND 1) # as if FIND had been used
-        set(BLAS_LIBRARIES "/usr/lib/libblas.so") # most flexible
-        #set(BLAS_DIR "/home/james/packages/atlas/atlas3.8.4/Linux_x64sbeO3/lib/")
-        #set(BLAS_LIBRARIES "-L${BLAS_DIR} -lptf77blas -latlas -pthread ${LIBGF}") # ptcblas
-        # if ATLAS BLAS, have to add:
-        # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -lptcblas -lptf77blas -latlas ")
-        # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -pthread /usr/lib/gcc/x86_64-linux-gnu/4.6.1/libgfortran.so")
-        # The generic BLAS, add:
-        # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} -lblas ")
-        # or:
-        # set(BLAS_LIBRARIES, "${BLAS_LIBRARIES} /usr/local/lib/libblas.a ")
-    else(USE_LOCAL_BLAS)
-        message(STATUS "Using platform BLAS")
-        find_package(BLAS)
-    endif(USE_LOCAL_BLAS)
-
-    if (BLAS_FOUND)
-        #message(STATUS "Debug: BLAS_LIBRARIES is ${BLAS_LIBRARIES}")
-    else(BLAS_FOUND)
-        message(WARNING "BLAS not found. ScaLAPACK-based functionality will NOT be built")
-	message(STATUS "Please look to doc/build.txt for list of dependencies")
-    endif (BLAS_FOUND)
-
-    ######################
-    # LAPACK
-    ######################
-    set(USE_LOCAL_LAPACK 0) # the find modules are bringing in over-specific library names, this may be necessary for SciDB 12.11
-    if(USE_LOCAL_LAPACK)
-        message(STATUS "WARNING-- using locally installed LAPACK")
-        set (LAPACK_FOUND 1) # as if FIND had been used
-        set(LAPACK_LIBRARIES "/usr/lib/liblapack.so")
-        #set(LAPACK_DIR "/home/james/packages/scalapack_installer/1.0.2/scalapack_installer_1.0.2/install/lib")
-        #set(LAPACK_LIBRARIES "-L${LAPACK_DIR} -ltmg -lreflapack ${LIBGF}")
-        # or set(LAPACK_LIBRARIES "/usr/local/lib/liblapack.a")
-    else(USE_LOCAL_LAPACK)
-      message(STATUS "Using platform LAPACK")
-      find_package(LAPACK)
-    endif(USE_LOCAL_LAPACK)
-
-    if (LAPACK_FOUND)
-        #message(STATUS "Debug: LAPACK_LIBRARIES is ${LAPACK_LIBRARIES}")
-    else(LAPACK_FOUND)
-        message(WARNING "LAPACK not found. ScaLAPACK-based functionality will NOT be built")
-	message(STATUS "Please look to doc/build.txt for list of dependencies")
-    endif(LAPACK_FOUND)
 
     ###########################
     # ScaLAPACK
@@ -226,12 +81,12 @@ if(USE_FIND)
         message(STATUS "WARNING-- using locally installed ScaLAPACK for MPICH2")
         message(STATUS "Debug: To refresh/rebuild the local copy of scalapack, remove ${CMAKE_CURRENT_BINARY_DIR}/local_scalapack/container.")
         add_subdirectory("local_scalapack")
-        # can these next two be "returned" from local_scalapack/CMakeLists.txt?
+        # TODO: can these next two be "returned" from local_scalapack/CMakeLists.txt?
         set(SCALAPACK_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/local_scalapack/container/src/scalapackForMPICH2-build")
         set(SCALAPACK_LIB_DIR   "${SCALAPACK_BUILD_DIR}/install/lib")
         set(SCALAPACK_LIBRARIES "${SCALAPACK_LIB_DIR}/libscalapack.a") # -ltmg ${LIBGF}
         set(SCALAPACK_INC_DIR   "${SCALAPACK_LIB_DIR}/include")   #UNSURE
-        set(SCALAPACK_FOUND 1)   # emulate find_package() 
+        set(SCALAPACK_FOUND 1)   # emulate find_package()
     else()
         message(STATUS "Using platform ScaLAPACK stack")
         find_package(ScaLAPACK)
@@ -275,6 +130,8 @@ message(STATUS "Debug: FINAL PACKAGE SETTINGS <================================"
 if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     MPI_CXX_FOUND AND MPI_Fortran_FOUND)
 
+    message(STATUS "Debug: Building MPI Slave")
+
     #
     # build the common mpi framework code
     #
@@ -310,6 +167,15 @@ if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
 
 else (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
       MPI_CXX_FOUND AND MPI_Fortran_FOUND)
+
+    message(WARNING "Can't build MPI/ScaLAPACK functionality")
+    message(WARNING "because one of the following is missing:")
+    message(WARNING "BLAS_FOUND        is ${BLAS_FOUND}")
+    message(WARNING "LAPACK_FOUND      is ${LAPACK_FOUND}")
+    message(WARNING "SCALAPACK_FOUND   is ${SCALAPACK_FOUND}")
+    message(WARNING "MPI_CXX_FOUND     is ${MPI_CXX_FOUND}")
+    message(WARNING "MPI_Fortran_FOUND is ${MPI_Fortran_FOUND}")
+    message(WARNING "")
 
      set (mpi_src
           pluginNoMpi.cpp
@@ -350,3 +216,5 @@ set_target_properties(mpi PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_D
 if (APPLE)
     set_target_properties(mpi PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif ()
+
+message(STATUS "****************** END src/mpi/CMakeLists.txt ******************")

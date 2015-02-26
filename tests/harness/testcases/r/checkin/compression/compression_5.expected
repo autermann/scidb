@@ -188,25 +188,25 @@ SCIDB QUERY : <load Ts_nf from '../tests/basic/data/null_11.txt'>
 [(null),(null),(?2),(null),(null),(null)]
 
 SCIDB QUERY : <load dTs_rle from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load dTs_d from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load dTs_ns from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load dTs_be from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load dTs_z from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load dTs_bz from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load dTs_nf from '../tests/basic/data/null_11.txt'>
-[(null),("default"),(?2),("default"),(null),("default")]
+[(null),('default'),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load eTs_rle from '../tests/basic/data/null_15.txt'>
 [(null),(),(?2),(null),(null),(null)]
@@ -230,25 +230,25 @@ SCIDB QUERY : <load eTs_nf from '../tests/basic/data/null_15.txt'>
 [(null),(),(?2),(null),(null),(null)]
 
 SCIDB QUERY : <load edTs_rle from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load edTs_d from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load edTs_ns from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load edTs_be from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load edTs_z from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load edTs_bz from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load edTs_nf from '../tests/basic/data/null_15.txt'>
-[(null),(),(?2),("default"),(null),("default")]
+[(null),(),(?2),('default'),(null),('default')]
 
 SCIDB QUERY : <load Ts_rle2 from '../tests/basic/data/null_12.txt'>
 [(null),(?2),(null),(null),(null),(null)]
@@ -272,25 +272,25 @@ SCIDB QUERY : <load Ts_nf2 from '../tests/basic/data/null_12.txt'>
 [(null),(?2),(null),(null),(null),(null)]
 
 SCIDB QUERY : <load dTs_rle2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load dTs_d2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load dTs_ns2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load dTs_be2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load dTs_z2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load dTs_bz2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load dTs_nf2 from '../tests/basic/data/null_12.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load eTs_rle2 from '../tests/basic/data/null_16.txt'>
 [(null),(?2),(null),(null),(null),(null)]
@@ -314,25 +314,25 @@ SCIDB QUERY : <load eTs_nf2 from '../tests/basic/data/null_16.txt'>
 [(null),(?2),(null),(null),(null),(null)]
 
 SCIDB QUERY : <load edTs_rle2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load edTs_d2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load edTs_ns2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load edTs_be2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load edTs_z2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load edTs_bz2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <load edTs_nf2 from '../tests/basic/data/null_16.txt'>
-[("default"),(?2),(null),("default"),("default"),(null)]
+[('default'),(?2),(null),('default'),('default'),(null)]
 
 SCIDB QUERY : <remove(Ts_rle)>
 Query was executed successfully

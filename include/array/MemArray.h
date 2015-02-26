@@ -34,6 +34,7 @@
 #include <map>
 #include <assert.h>
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <boost/shared_array.hpp>
 #include <query/Query.h>
 #include <util/Lru.h>
@@ -389,6 +390,8 @@ namespace scidb
         Chunk* bitmapChunk;
         Array const* array;
         boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+        boost::shared_ptr<ConstChunkIterator>
+        getConstIterator(boost::shared_ptr<Query> const& query, int iterationMode) const;
       public:
         MemChunk();
         ~MemChunk();
@@ -415,19 +418,37 @@ namespace scidb
 
         virtual bool isTemporary() const;
 
+        /**
+         * @see ConstChunk::isMaterialized
+         */
         bool isMaterialized() const;
+
+        /**
+         * @see ConstChunk::materialize
+         */
+        ConstChunk* materialize() const
+        {
+            assert(materializedChunk == NULL);
+            return const_cast<MemChunk*> (this);
+        }
+
+        /**
+         * @see Chunk::write
+         */
+        virtual void write(boost::shared_ptr<Query>& query);
+
         bool isSparse() const;
         bool isRLE() const;
         void setSparse(bool sparse);
         void setRLE(bool rle);
         void fillRLEBitmap();
 
-        void initialize(Array const* array, ArrayDesc const* desc, const Address& firstElem, int compressionMethod);
-        void initialize(ConstChunk const& srcChunk);
+        virtual void initialize(Array const* array, ArrayDesc const* desc, const Address& firstElem, int compressionMethod);
+        virtual void initialize(ConstChunk const& srcChunk);
 
         void setBitmapChunk(Chunk* bitmapChunk);
 
-        bool isInitialized() const
+        virtual bool isInitialized() const
         {
             return arrayDesc != NULL;
         }
@@ -541,6 +562,22 @@ namespace scidb
          * @see Chunk::write
          */
         virtual void write(boost::shared_ptr<Query>& query);
+
+        /**
+         * Initialize chunk
+         * @param array to which this chunk belongs
+         * @param desc the array descriptor
+         * @param firsElem chunk coords
+         * @param compressionMethod
+         */
+        void initialize(MemArray const* array, ArrayDesc const* desc,
+        const Address& firstElem, int compressionMethod);
+        virtual void initialize(Array const* array, ArrayDesc const* desc,
+                                const Address& firstElem, int compressionMethod);
+        virtual void initialize(ConstChunk const& srcChunk);
+        boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+        boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
+                                                     int iterationMode);
     };
     
 
@@ -643,8 +680,7 @@ namespace scidb
 
         Chunk& operator[](Address const& addr);
 
-        MemArray(ArrayDesc const& arr);
-        MemArray(const MemArray& other);
+        MemArray(ArrayDesc const& arr, boost::shared_ptr<Query> const& query);
 
         /**
          * Construct by first creating an empty MemArray with the shape of input,
@@ -658,7 +694,7 @@ namespace scidb
          * array does not support the independent scanning of attributes
          * (i.e. MergeSortArray).
          */
-        MemArray(boost::shared_ptr<Array> input, bool vertical = true);
+        MemArray(boost::shared_ptr<Array>& input, boost::shared_ptr<Query> const& query, bool vertical = true);
         ~MemArray();
 
         /**
@@ -680,6 +716,8 @@ namespace scidb
         int _swapFile;
         map<Address, LruMemChunk> _chunks;
         Mutex _mutex;
+    private:
+        MemArray(const MemArray&);
     };
 
     /**
@@ -687,9 +725,10 @@ namespace scidb
      */
     class MemArrayIterator : public ArrayIterator
     {
+      private:
         map<Address, LruMemChunk>::iterator curr;
         map<Address, LruMemChunk>::iterator last;
-        MemArray& array;
+        MemArray& _array;
         Address addr;
         Chunk* currChunk;
         boost::shared_ptr<Array> parent;
@@ -712,6 +751,10 @@ namespace scidb
         Chunk& newChunk(Coordinates const& pos);
         Chunk& newChunk(Coordinates const& pos, int compressionMethod);
         void deleteChunk(Chunk& chunk);
+        virtual boost::shared_ptr<Query> getQuery()
+        {
+            return Query::getValidQueryPtr(_array._query);
+        }
     };
 
     /**
@@ -733,7 +776,14 @@ namespace scidb
         ConstChunk const& getChunk();
         bool supportsVectorMode() const;
         void setVectorMode(bool enabled);
-        virtual boost::shared_ptr<Query> getQuery() { return _query.lock(); }
+        virtual boost::shared_ptr<Query> getQuery()
+        {
+            // XXX note: there is still code that does not set the query context correctly
+            // e.g. Chunk::materialize() and other cases of using intermediate MemChunk objects
+            // so we dont try to validate _query here. At the points where this context must absolutely
+            // be present (i.e. DBArray, MemArray, InputArray, BuildArray, etc.), it will be validate 
+            return _query.lock();
+        }
 
         /**
          * Temporary array chunk iterator constructor
@@ -809,7 +859,11 @@ namespace scidb
         void writeItem(const  Value& item);
         void flush();
         ConstChunk const& getChunk();
-        virtual boost::shared_ptr<scidb::Query> getQuery() { return _query.lock(); }
+        virtual boost::shared_ptr<scidb::Query> getQuery()
+        {
+            // See XXX note in MemChunkIterator
+            return _query.lock();
+        }
 
         /**
          * Temporary array chunk iterator constructor
@@ -898,7 +952,6 @@ namespace scidb
         bool   moveToNextAvailable;
     private:
         boost::weak_ptr<Query> _query;
-
     };
 
     /**
@@ -926,8 +979,9 @@ namespace scidb
         uint64_t tilePos;
         uint64_t tileSize;
         bool isEmptyIndicator;
+        boost::weak_ptr<Query> _query;
 
-        BaseChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, int iterationMode);
+        BaseChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, int iterationMode, boost::shared_ptr<Query> const& query);
         ~BaseChunkIterator();
 
       public:
@@ -944,13 +998,18 @@ namespace scidb
         void flush();
         Coordinates const& getPosition();
         boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap();
+        boost::shared_ptr<Query> getQuery()
+        {
+            // See XXX note in MemChunkIterator
+            return _query.lock();
+        }
     };
-
 
     class RLEConstChunkIterator : public BaseChunkIterator
     {
       public:
-        RLEConstChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode);
+        RLEConstChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode,
+                              boost::shared_ptr<Query> const& query);
 
         Value& getItem();
         bool setPosition(Coordinates const& pos);
@@ -969,7 +1028,11 @@ namespace scidb
       public:
         Value& getItem();
 
-        RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode);
+        RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr,
+                               Chunk* data,
+                               Chunk* bitmap,
+                               int iterationMode,
+                               boost::shared_ptr<Query> const& query);
 
       private:
         Value trueValue;
@@ -984,9 +1047,12 @@ namespace scidb
         void writeItem(const Value& item);
         void flush();
         bool setPosition(Coordinates const& pos);
-        boost::shared_ptr<Query> getQuery();
-        
-        RLEChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode, boost::shared_ptr<Query> const& q);
+
+        RLEChunkIterator(ArrayDesc const& desc, AttributeID attr,
+                         Chunk* data,
+                         Chunk* bitmap,
+                         int iterationMode,
+                         boost::shared_ptr<Query> const& query);
         virtual ~RLEChunkIterator();
 
       private:
@@ -999,8 +1065,7 @@ namespace scidb
         Value    falseValue;
         Value    tmpValue;
         Value    tileValue;
-        shared_ptr<ChunkIterator> emptyChunkIterator; 
-        boost::weak_ptr<Query> query;
+        shared_ptr<ChunkIterator> emptyChunkIterator;
         RLEPayload payload;
         Chunk* bitmapChunk;
         RLEPayload::append_iterator appender;

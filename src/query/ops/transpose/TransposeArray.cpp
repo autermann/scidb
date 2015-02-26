@@ -53,8 +53,7 @@ ConstChunk const& TransposeArray::TransposeArrayIterator::getChunk()
         _emptyTagChunk.setSparse(inputChunk.isSparse());
         _outputChunk.setBitmapChunk(&_emptyTagChunk);
     }
-    shared_ptr<Query> localQueryPtr = _query.lock();
-    Query::validateQueryPtr(localQueryPtr);
+    shared_ptr<Query> localQueryPtr(Query::getValidQueryPtr(_query));
     shared_ptr<ChunkIterator> outputChunkIterator = _outputChunk.getIterator(localQueryPtr, 0);
     //For each value in inputChunk, reorder its coordinates and place it into _outputChunk in the proper order
     while (!inputChunkIterator->end())

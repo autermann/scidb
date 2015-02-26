@@ -15,6 +15,17 @@ CREATE ARRAY right_array <val:double>[i=0:2,3,0,j=0:2,6,0]
 --stop-igdata
 store(build_sparse(right_array,1,i=j),right_array)  
 merge(left_array,right_array)  
+--set-format dcsv
+--start-igdata
+CREATE ARRAY sparse <val:int32>[i=0:4,5,0]  
+CREATE ARRAY dense <val:int32>[i=0:4,5,0]  
+--set-format dense
+--stop-igdata
+store(build_sparse(sparse, i*3 + 1, i%3=0),sparse)  
+store(build(dense,-i-1),dense)  
+--set-format auto
+merge(sparse,dense)  
+merge(dense,sparse)  
 
 --stop-query-logging
 
@@ -23,3 +34,5 @@ merge(left_array,right_array)
 
 remove(left_array)
 remove(right_array)
+remove(sparse)
+remove(dense)

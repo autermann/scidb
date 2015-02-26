@@ -1,0 +1,26 @@
+SCIDB QUERY : <create array A <x:int64, y:int64, att1:int64, att2:int64>[dummy=0:250,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(join(join(join(build(<x:int64>[dummy=0:250,3,0], dummy/130),build(<y:int64>[dummy=0:250,3,0], dummy%2)),build(<att1:int64>[dummy=0:250,3,0], dummy)),build(<att2:int64>[dummy=0:250,3,0], dummy)), A)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <create array B<att1:int64, att2:int64>[x=0:*,1,0, y=0:*,1,0, synth=0:*,100,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <redimension_store(A,B)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <count(filter(B, att1<>att2))>
+{i} count
+{0} 0
+
+SCIDB QUERY : <count(B)>
+{i} count
+{0} 251
+
+SCIDB QUERY : <remove(A)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(B)>
+Query was executed successfully
+

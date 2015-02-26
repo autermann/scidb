@@ -61,14 +61,7 @@ public:
 		return _parsingContext;
 	}
 
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-	{
-		for ( int i = 0; i < indent; i++)
-		{
-			str<<" ";
-		}
-		str<<"[logicalExpression]\n";
-	}
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
 private:
 	boost::shared_ptr<ParsingContext> _parsingContext;
@@ -95,19 +88,11 @@ public:
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * each line. Terminate with newline.
+    * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-	{
-		for ( int i = 0; i < indent; i++)
-		{
-			str<<" ";
-		}
-		str<<"[attributeReference] array "<<_arrayName<<" attr "<<_attributeName<<"\n";
-	}
-
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
 private:
 	std::string _arrayName;
@@ -135,20 +120,11 @@ public:
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
-     * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * each line. Terminate with newline.
+    * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-	{
-		for ( int i = 0; i < indent; i++)
-		{
-			str<<" ";
-		}
-		str<<"[constant] type "<<_type<<" value "<< ValueToString(_type,_value)<<"\n";
-	}
-
-
+    virtual void toString(std::ostream &str, int indent = 0) const;
 
 private:
 	 Value _value;
@@ -173,18 +149,7 @@ public:
 		return _args;
 	}
 
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-	{
-		for ( int i = 0; i < indent; i++)
-		{
-			str<<" ";
-		}
-		str<<"[function] "<<_function<<" args:\n";
-		for ( size_t i = 0; i < _args.size(); i ++)
-		{
-			_args[i]->toString(str, indent + 1);
-		}
-	}
+    virtual void toString(std::ostream &out, int indent = 0) const;
 
 private:
 	std::string _function;

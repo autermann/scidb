@@ -193,7 +193,7 @@ class PhysicalSaveBmp: public PhysicalOperator
         if (query->getInstanceID() != 0)
         {
             //I am not instance 0 - I don't need to do anything. Return an empty array.
-            return shared_ptr<Array>(new MemArray(_schema));
+            return shared_ptr<Array>(new MemArray(_schema,query));
         }
 
         //I am instance 0, let's save the array to a bmp image.
@@ -267,7 +267,7 @@ class PhysicalSaveBmp: public PhysicalOperator
         }
         fclose(f);
 
-        shared_ptr<Array> dstArray(new MemArray(_schema));
+        shared_ptr<Array> dstArray(new MemArray(_schema,query));
         Coordinates outPos(1);
         outPos[0]=0;
         Value outValue;

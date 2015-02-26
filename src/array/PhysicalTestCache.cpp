@@ -82,7 +82,7 @@ public:
         Dimensions dims;
         dims.push_back(DimensionDesc("i",0,MAX_COORDINATE,_defaultChunkSize,0));
         ArrayDesc schema("arr", attrs, dims);
-        shared_ptr<Array> array(new MemArray(schema));
+        shared_ptr<Array> array(new MemArray(schema,query));
         Coordinates pos(1,0);
         shared_ptr<ArrayIterator> aiter = array->getIterator(0);
         shared_ptr<ChunkIterator> citer;
@@ -242,7 +242,7 @@ public:
             SharedMemCache::getInstance().setMemThreshold(maxArraySize);
             throw;
         }
-        return shared_ptr<Array> (new MemArray(_schema));
+        return shared_ptr<Array> (new MemArray(_schema,query));
     }
 };
 

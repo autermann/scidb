@@ -184,6 +184,271 @@ on host ) ~= (number of CPU cores on host) + 2</screen></para>
   </section>
 
   <section>
+    <title>Troubleshooting</title>
+
+    <para>Beyond using the configuration parameters for optimizing your SciDB
+    installation, this section provides a few useful guidelines.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The <link linkend="max-memory-limit">max-memory-limit</link>
+        parameter</para>
+      </listitem>
+
+      <listitem>
+        <para>How to identify <link linkend="strayLocks">unreleased
+        locks</link></para>
+      </listitem>
+
+      <listitem>
+        <para>Determine optimal <link linkend="chunkSize">chunk
+        size</link></para>
+      </listitem>
+
+      <listitem>
+        <para>Useful <link linkend="ulimit">Linux commands</link></para>
+      </listitem>
+    </itemizedlist>
+
+    <section id="max-memory-limit">
+      <title>Max-memory-limit</title>
+
+      <para>You should <emphasis role="bold">always</emphasis> set the
+      <parameter role="bold">max-memory-limit</parameter> parameter.</para>
+
+      <para>If this parameter is not set, you will not receive "out of memory"
+      notifications. If a query runs up against the limit, and then tries to
+      use more memory than is available, Linux kills the process.</para>
+
+      <para>Note that if you are using the Paradigm4 add-ons to SciDB, the
+      <literal>system</literal> plugin contains code that helps you detect
+      failures sooner.</para>
+    </section>
+
+    <section id="strayLocks">
+      <title>Unreleased Locks</title>
+
+      <para>It is possible for SciDB to get into a state where a database lock
+      was never released. This can happen if a write query fails in some way.
+      Now, SciDB is in a state where the next time a query attempts to write
+      to that array, the write will fail.</para>
+
+      <para>If a query appears to be running longer than anticipated, you can
+      check the array to see if it is in this state. You can use the
+      <literal>list</literal> operator to check the availability of all of
+      your arrays.</para>
+
+      <para><programlisting>AFL% list('arrays');</programlisting><screen>name,id,schema,availability
+'A',23,'A&lt;val:double&gt; [i=0:2,32,0,j=0:1,32,0]',false
+</screen>Here, you can see that the availability of array A is false. This can
+      indicate that there is an unreleased lock for this array.</para>
+
+      <para>To recover from this situation, you need to restart SciDB.</para>
+    </section>
+
+    <section id="chunkSize">
+      <title>Chunk Size</title>
+
+      <para><indexterm>
+          <primary>chunks</primary>
+
+          <secondary>selecting chunk size</secondary>
+        </indexterm><indexterm>
+          <primary>chunk map</primary>
+        </indexterm>The chunk size for your array can have a negative impact
+      on memory usage in either of the following ways:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">Chunk size is too big.</emphasis> If you
+          have a chunk that you thought would be sparser than it turned out to
+          be, the chunk may be too big for the available memory.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">Too many small chunks.</emphasis> If you
+          have lots of nearly empty chunks, then the sheer number of chunks
+          may be too large for the available memory, since the chunk map needs
+          to fit in memory.</para>
+        </listitem>
+      </itemizedlist>
+
+      <para>You can use the following query (listed on the SciDB forum, as
+      well) to analyze your chunks.<programlisting>project(
+ cross_join(
+  redimension(
+   apply(filter(list('chunk map'), inst=instn and attid=0), iid, int64(inst), aid, int64(arrid)),
+   &lt;nchunks:uint64 null,
+    min_ccnt:uint32 null,
+    avg_ccnt:double null,
+    max_ccnt:uint32 null,
+    total_cnt: uint64 null&gt;
+   [iid = 0:*,1000,0, aid= 0:*,1000,0],
+   count(*) as nchunks,
+   min(nelem) as min_ccnt,
+   avg(nelem) as avg_ccnt,
+   max(nelem) as max_ccnt,
+   sum(nelem) as total_cnt
+  ) as A,
+  redimension(
+   apply( list('arrays', true), aid, int64(id)),
+   &lt;name: string null&gt;
+   [aid = 0:*,1000,0]
+  ) as B,
+  A.aid, B.aid
+ ),
+ name, nchunks, min_ccnt, avg_ccnt, max_ccnt, total_cnt
+);</programlisting></para>
+
+      <para>Output looks like this:<screen> iid,aid,name,nchunks,min_ccnt,avg_ccnt,max_ccnt,total_cnt
+ 0,79,'flat@1',5,1000000,1e+06,1000000,5000000
+ 0,81,'matrix@1',5,999546,1.00017e+06,1001470,5000865
+ 0,85,'svd_result@1',3000,10000,10000,10000,30000000
+ 1,79,'flat@1',5,1000000,1e+06,1000000,5000000
+ 1,81,'matrix@1',5,998209,999826,1000741,4999128
+ 1,85,'svd_result@1',3002,3,9993.34,10000,30000013
+</screen></para>
+
+      <itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">iid</emphasis> is the Instance ID; this
+          example is using two instances</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">aid</emphasis> is the versioned array
+          ID; this example contains 3 arrays</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">nchunks</emphasis> is the number of
+          chunks for the given array on that instance</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">ccnt</emphasis> is the chunk count—the
+          number of cells per chunk</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">min_ccnt</emphasis>, <emphasis
+          role="bold">avg_ccnt</emphasis>, and <emphasis
+          role="bold">max_ccnt</emphasis>; the query collects min, max and
+          average of <emphasis role="bold">ccnt</emphasis>.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">total_cnt</emphasis> is the total number
+          of cells, for the specified array and instance</para>
+        </listitem>
+      </itemizedlist>
+
+      <para>This query can help detect cross-chunk skew and cross-instance
+      skew.</para>
+    </section>
+
+    <section id="ulimit">
+      <title>Useful Linux Commands</title>
+
+      <para>The <command>ulimit</command> command provides control over the
+      resources available to the shell and to processes started by it. We
+      recommend that you always set this limit to <emphasis
+      role="bold">unlimited</emphasis> by issuing the following
+      command:<programlisting>sudo ulimit -c unlimited</programlisting></para>
+
+      <para>This allows Linux to dump core files in the event of a crash. You
+      can then use these dumps to diagnose the problem, or send us the details
+      so that we can identify the issue.</para>
+
+      <para>Also, in the event of a crash, run <command>dmesg</command> on
+      each SciDB server. You use the <command>dmesg</command> command to write
+      out the kernel messages in Linux. This will provide additional debugging
+      information.</para>
+
+      <para>Before a crash, you can run the Linux utility
+      <command>pstack</command>. It presents a well-formatted, multi-threaded
+      picture of the running processes.</para>
+    </section>
+  </section>
+
+  <section>
+    <title>MPI Troubleshooting</title>
+
+    <para><indexterm>
+        <primary>MPI</primary>
+      </indexterm>MPICH is a high performance and widely portable
+    implementation of the Message Passing Interface (MPI) standard. SciDB
+    depends upon <emphasis role="bold">mpich2-1.2</emphasis> being installed
+    and configured. This section provides a checklist for ensuring that MPICH
+    is communicating with SciDB.<itemizedlist>
+        <listitem>
+          <para>Password-less SSH must be set up for the scidb user from the
+          coordinator to 0.0.0.0, 127.0.0.1, localhost, and all the workers.
+          For each worker:<itemizedlist>
+              <listitem>
+                <para>Make sure that you copy the authorization key, as
+                described in section <xref
+                linkend="RemoteExecutionConfigurationssh"/>, step 2.</para>
+              </listitem>
+
+              <listitem>
+                <para>Log in once: ssh
+                scidb@&lt;<replaceable>worker</replaceable>&gt;. At the
+                following prompt, answer <emphasis
+                role="bold">yes</emphasis>.<screen>Are you sure you want to continue connecting (yes/no)?</screen></para>
+              </listitem>
+
+              <listitem>
+                <para>Confirm it works by running:
+                scidb@&lt;<replaceable>worker</replaceable>&gt; again. This
+                must take you directly to a shell prompt on the worker.
+                Otherwise, password-less SSH is not yet set up on this
+                worker.</para>
+              </listitem>
+            </itemizedlist></para>
+        </listitem>
+
+        <listitem>
+          <para>DNS must be configured on all SciDB servers. In particular,
+          verify that the worker instances are able to resolve the coordinator
+          host name to the correct IP.</para>
+        </listitem>
+
+        <listitem>
+          <para>Configuration with multiple Network Interface Cards (NICs),
+          such as eth0, eth1, and so on, has not been tested. We recommend
+          that you disable all but one of your NICs. If you cannot disable all
+          but one of your NICs, make sure that the DNS names resolve to the
+          correct IPs.</para>
+        </listitem>
+
+        <listitem>
+          <para><indexterm>
+              <primary>memory, shared</primary>
+            </indexterm><indexterm>
+              <primary>shared memory</primary>
+            </indexterm>Make sure there is enough shared memory available. On
+          each SciDB server, run the following command to see your shared
+          memory usage:<programlisting>$ df -h /dev/shm</programlisting> Your
+          output should look similar to the following:<screen>Filesystem      Size  Used Avail Use% Mounted on
+none            3.8G  320K  3.8G   1% /run/shm</screen>Your available shared
+          memory needs to be at least 512 MB * #instances_per_host. You can
+          change the size of shared memory by adding a line to the
+          <literal>/etc/fstab</literal> file:<programlisting># shared memory device
+none    /dev/shm     tmpfs   defaults,size=48G     0 0</programlisting>Running
+          out of the shared memory from <literal>/dev/shm</literal> usually
+          manifests itself by the SciDB process being killed with the
+          <emphasis role="bold">SIGBUS</emphasis> signal as reported in the
+          SciDB error log (<emphasis
+          role="bold">scidb-stderr.log</emphasis>):</para>
+
+          <programlisting>2013-5-13 23:17:10 (ppid=23581): Started.
+2013-5-14 0:2:0 (ppid=23581): SciDB child (pid=23604) terminated by signal = 7, core dumped</programlisting>
+        </listitem>
+      </itemizedlist></para>
+  </section>
+
+  <section>
     <title>Configuration Example</title>
 
     <para>This section suggests configuration settings for a small, multi-disk

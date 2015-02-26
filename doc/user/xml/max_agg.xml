@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <refentry>
   <refnamediv id="maxAggregate">
     <refname>max</refname>
 
-    <refpurpose>Maximum value aggregate</refpurpose>
+    <refpurpose><indexterm>
+        <primary>aggregates</primary>
+
+        <secondary>max</secondary>
+      </indexterm><indexterm>
+        <primary>max</primary>
+      </indexterm>Maximum value aggregate</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -18,13 +23,7 @@
   <refsect1>
     <title>Summary</title>
 
-    <para><indexterm>
-        <primary>aggregates</primary>
-
-        <secondary>max</secondary>
-      </indexterm><indexterm>
-        <primary>max</primary>
-      </indexterm>The max aggregate takes a set of scalar values from an array
+    <para>The max aggregate takes a set of scalar values from an array
     attribute and returns the maximum value.</para>
 
     <para>The maximum value of an empty set is NULL. The max of a set that
@@ -37,11 +36,11 @@
 
     <informalexample>
       <para>This example finds the maximum of every column of a 3<symbol
-      role="symbolfont">×</symbol>3 matrix.</para>
+      role="symbolfont">×</symbol>3 array.</para>
 
       <procedure>
         <step>
-          <para>Create a matrix m3x3:<programlisting>CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
+          <para>Create an array:<programlisting>CREATE ARRAY m3x3&lt;val:double&gt;[i=0:2,3,0,j=0:2,3,0];</programlisting></para>
         </step>
 
         <step>

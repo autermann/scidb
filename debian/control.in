@@ -44,7 +44,7 @@ Description: SciDB querying tool and other utilities (debug symbols)
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (>= ${source:Upstream-Version}~), time
+Depends: ${shlibs:Depends}, ${misc:Depends}, libscidbclient-VERSION_MAJOR.VERSION_MINOR (>= ${source:Upstream-Version}~), time, valgrind, lsof
 Description: SciDB developer and tester utilities
 
 Package: scidb-VERSION_MAJOR.VERSION_MINOR-dev-tools-dbg

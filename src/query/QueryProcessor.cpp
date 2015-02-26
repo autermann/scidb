@@ -111,7 +111,7 @@ void QueryProcessorImpl::parseLogical(boost::shared_ptr<Query> query, bool afl)
     boost::shared_ptr<AstNode> root = queryParser.parse(query->queryString, !afl);
     // Infer AQL Types
     //if (!afl) root->inferAQLTypes();
-    query->logicalPlan = boost::make_shared<LogicalPlan>(AstToLogicalPlan(root.get(), query));
+    query->logicalPlan = boost::make_shared<LogicalPlan>(AstToLogicalPlan(root.get(), query, true));
 }
 
 
@@ -238,7 +238,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
                 currentResultArray = paa;
                 paa->start(query);
             } else {
-                currentResultArray = boost::make_shared<AccumulatorArray>(currentResultArray);
+                currentResultArray = boost::make_shared<AccumulatorArray>(currentResultArray,query);
             }
         }
         query->setCurrentResultArray(currentResultArray);
@@ -280,7 +280,7 @@ boost::shared_ptr<Array> QueryProcessorImpl::execute(boost::shared_ptr<PhysicalQ
              * For example count2 uses MergeArray.
              */
             return depth != 0
-                ? boost::shared_ptr<Array>(new MemArray(physicalOperator->getSchema()))
+                ? boost::shared_ptr<Array>(new MemArray(physicalOperator->getSchema(), query))
                 : query->getCurrentResultArray();
         }
     }
@@ -323,7 +323,7 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
             }
         } else {
             if (typeid(*currentResultArray) != typeid(AccumulatorArray)) {
-                currentResultArray = boost::make_shared<AccumulatorArray>(currentResultArray);
+                currentResultArray = boost::make_shared<AccumulatorArray>(currentResultArray,query);
             }
         }
         if (query->getInstancesCount() > 1 &&
@@ -340,7 +340,7 @@ void QueryProcessorImpl::execute(boost::shared_ptr<Query> query)
         for (size_t i = 0; i < arrayDesc.getDimensions().size(); i++) {
             const string& mappingArrayName = arrayDesc.getDimensions()[i].getMappingArrayName();
             if (arrayDesc.getDimensions()[i].getType() != TID_INT64 && !mappingArrayName.empty()) {
-                query->_mappingArrays[mappingArrayName] = make_shared<AccumulatorArray>(query->getArray(mappingArrayName));
+                query->_mappingArrays[mappingArrayName] = make_shared<AccumulatorArray>(query->getArray(mappingArrayName),query);
             }
         }
     }

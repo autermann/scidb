@@ -1284,7 +1284,6 @@ private:
     RepartCommonSettings const common;
     RepartArraySettings  const source;
     RepartArraySettings  const result;
-    boost::weak_ptr<Query> _query;
 
 public:
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
@@ -1327,7 +1326,6 @@ class RepartArrayIterator : public DelegateArrayIterator
     Coordinates current;
     bool hasCurrent;
 
-    boost::weak_ptr<Query> _query;
     ConstChunk const* currentChunk;
 
   private:
@@ -1340,8 +1338,7 @@ class RepartArrayIterator : public DelegateArrayIterator
 
   public:
     RepartArrayIterator(RepartArray const& array, AttributeID attrID,
-                        boost::shared_ptr<ConstArrayIterator> inputIterator,
-                        const boost::shared_ptr<Query>& query);
+                        boost::shared_ptr<ConstArrayIterator> inputIterator);
     virtual void reset();
     virtual void operator ++();
     virtual bool setPosition(Coordinates const& pos);
@@ -1351,7 +1348,7 @@ class RepartArrayIterator : public DelegateArrayIterator
     virtual Coordinates const& getPosition();
     virtual boost::shared_ptr<Query> getQuery()
     {
-        return _query.lock();
+        return Query::getValidQueryPtr(repartArray._query);
     }
 
 };
@@ -2536,8 +2533,7 @@ void RepartArrayIterator::searchNotEmpty()
 
 RepartArrayIterator::RepartArrayIterator(RepartArray const& array,
                                          AttributeID attrID,
-                                         boost::shared_ptr<ConstArrayIterator> inputIterator,
-                                         const boost::shared_ptr<Query>& query)
+                                         boost::shared_ptr<ConstArrayIterator> inputIterator)
     : DelegateArrayIterator(array, attrID, inputIterator),
       repartArray(array),
       common(array.common),
@@ -2547,7 +2543,6 @@ RepartArrayIterator::RepartArrayIterator(RepartArray const& array,
       hasChunkPositionSet(!source.sequenceScan()),
       walker(result),
       current(array.common.n),
-      _query(query),
       currentChunk(NULL)
 {
     if (hasChunkPositionSet) {
@@ -2662,8 +2657,7 @@ DelegateChunk* RepartArray::createChunk(DelegateArrayIterator const* iterator, A
 
 DelegateArrayIterator* RepartArray::createArrayIterator(AttributeID id) const
 {
-    boost::shared_ptr<Query> query(_query.lock());
-    return new RepartArrayIterator(*this, id, inputArray->getConstIterator(id), query);
+    return new RepartArrayIterator(*this, id, inputArray->getConstIterator(id));
 }
 
 RepartArray::RepartArray(ArrayDesc const& desc,
@@ -2683,9 +2677,10 @@ RepartArray::RepartArray(ArrayDesc const& desc,
              tileMode,
              array->getArrayDesc().getDimensions().size()),
       source(common, array->getArrayDesc(), sequenceScanThreshold),
-      result(common, desc, sequenceScanThreshold, &source),
-      _query(query)
+      result(common, desc, sequenceScanThreshold, &source)
 {
+    assert(query);
+    _query=query;
 }
 
 Array* createRepartArray(ArrayDesc const& desc,

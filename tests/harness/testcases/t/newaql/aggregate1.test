@@ -49,8 +49,7 @@ store(build(B,x*2),B)
 --aql select x,sin(x),cos(2*a*a*x/2),tan(a) from A where sqrt(x)>1
 --aql select x,sin(x),cos(2*a*a*x/2),tan(a) from A where (sqrt(x)+x)<3
 --aql select x,sin(x),cos(2*a*a*x/2),tan(a) from B where (sqrt(x)+x)<3
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_LOGICAL_JOIN_ERROR2 --aql="select * from A,B"
-## The above case failed due to overlap mismatch, inorder to make it work repart is used as under.
+--aql select * from A,B
 --aql select * from A,repart(B,<a:double> [x=-3:8,4,0])
 --aql select * from A,reverse(A)
 --aql select * from A,reverse(repart(B,<a:double> [x=-3:8,4,0]))

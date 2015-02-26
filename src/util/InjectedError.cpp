@@ -72,6 +72,9 @@ InjectedErrorLibrary::InjectedErrorLibrary()
     rc = registerError(OperatorInjectedError::ID,
                        boost::shared_ptr<InjectedError>(new OperatorInjectedError()));
     assert(rc);
+    rc = registerError(ThreadStartInjectedError::ID,
+                       boost::shared_ptr<InjectedError>(new ThreadStartInjectedError()));
+    assert(rc);
 #endif
 }
 
@@ -124,5 +127,18 @@ void OperatorInjectedError::activate() const
 {
     throw SYSTEM_EXCEPTION(SCIDB_SE_INJECTED_ERROR, SCIDB_LE_INJECTED_ERROR);
 }
+
+void ThreadStartInjectedError::inject() const
+{
+    boost::shared_ptr<const ThreadStartInjectedError> err(shared_from_this());
+    Notification< ThreadStartInjectedError> event(err);
+    event.publish();
+}
+
+void  ThreadStartInjectedError::activate() const
+{
+    throw std::runtime_error("Injected Error");
+}
+
 
 }

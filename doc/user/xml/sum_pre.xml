@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="sumOperator">
   <refnamediv>
     <refname>sum</refname>
 
-    <refpurpose>Sum attribute values</refpurpose>
+    <refpurpose>Sum attribute values.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
-    <synopsis>sum(<replaceable>array</replaceable>,<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>)</synopsis>
+    <synopsis>sum(<replaceable>array</replaceable>,[<replaceable>attribute</replaceable><optional>,<replaceable>dimension_1</replaceable>,<replaceable>dimension_2</replaceable>,...</optional>])</synopsis>
   </refsynopsisdiv>
 
   <refsect1>
@@ -19,13 +18,32 @@
     <para><indexterm>
         <primary>sum</primary>
       </indexterm>The sum operator calculates the cumulative sum of a group of
-    values.</para>
+    values. For the corresponding aggregate, see the <link
+    linkend="sumAggregate">sum aggregate</link> reference.</para>
+  </refsect1>
 
-    <note>
-      <para>The sum operator offers the same functionality as the sum
-      aggregate. For details, see the <link linkend="sumAggregate">sum</link>
-      aggregate reference.</para>
-    </note>
+  <refsect1>
+    <title>Inputs</title>
+
+    <para>The <literal>sum</literal> operator takes the following
+    arguments:<itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">array</emphasis>: A source array with
+          one or more attributes and one or more dimensions.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">attribute</emphasis>: Optional
+          attribute. If no attribute is provided, the first attribute in the
+          source array is used.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis
+          role="bold">dimension_</emphasis><replaceable>n</replaceable>: An
+          optional list of dimensions to group by.</para>
+        </listitem>
+      </itemizedlist></para>
   </refsect1>
 
   <refsect1>

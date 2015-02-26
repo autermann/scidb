@@ -38,7 +38,7 @@
 
 namespace scidb
 {
-    /** 
+    /**
      * The macro is used to avoid compile-time warning.
      * @note
      *   Sample usage is:
@@ -98,41 +98,6 @@ namespace scidb
      * @return input file stream (can be used in any read stdio operations)
      */
     FILE* openMemoryStream(char const* ptr, size_t size);
-
-    /**
-     * @brief Inserts a range of stream-insertable objects onto an output stream,
-     * and separates each element of the range with an optional delimiter.
-     *
-     * This variant accepts its range argument as a pair of forward iterators.
-     */
-    template<class Iterator,class Delimiter>
-    std::ostream& insertRange(std::ostream& stream,Iterator i,Iterator e,Delimiter delimiter = "")
-    {
-        if (i != e)
-        {
-            stream << *i;
-
-            for ( ++i; i != e; ++i)
-            {
-                stream << delimiter << *i;
-            }
-        }
-
-        return stream;
-    }
-
-    /**
-     * @brief Inserts a range of stream-insertable objects onto an output stream,
-     * and separates each element of the range with an optional delimiter.
-     *
-     * This variant accepts its range argument as any type that models the boost
-     * 'range' concept.
-     */
-    template<class Range,class Delimiter>
-    inline std::ostream& insertRange(std::ostream& stream,const Range& range,Delimiter delimiter = "")
-    {
-        return insertRange(stream,range.begin(),range.end(),delimiter);
-    }
 }
 
 #endif //SYSTEM_H_

@@ -28,7 +28,7 @@
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
  */
-
+#include <log4cxx/logger.h>
 #include "array/DBArray.h"
 #include "smgr/io/InternalStorage.h"
 #include "system/Exceptions.h"
@@ -36,6 +36,7 @@
 
 namespace scidb
 {
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.storage"));
     //
     // DBArray
     //
@@ -43,42 +44,32 @@ namespace scidb
     {
         return SystemCatalog::getInstance()->getArrayDesc(_desc.getId())->getName();
     }
-            
 
-    DBArray::DBArray(const DBArray& other)
-    : _desc(other._desc),
-      _query(other._query)
-    {}
-
-    DBArray::DBArray(ArrayID id, const boost::shared_ptr<Query>& query) 
-    : _query(query)
+    DBArray::DBArray(ArrayID id, const boost::shared_ptr<Query>& query)
     {
+        assert(query);
+        _query = query;
         SystemCatalog::getInstance()->getArrayDesc(id, _desc);
-        if (query) { 
-            query->sharedLock(getRealName());
-        }
+        query->sharedLock(getRealName());
     }
 
     DBArray::DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query) 
-    : 
-    _desc(desc),
-    _query(query)
+    : _desc(desc)
     {
+        assert(query);
+        _query = query;
         _desc.setPartitioningSchema(SystemCatalog::getInstance()->getPartitioningSchema(desc.getId()));
-        if (query) { 
-            query->sharedLock(getRealName());
-        }
+        query->sharedLock(getRealName());
     }
 
     DBArray::DBArray(std::string const& name, const boost::shared_ptr<Query>& query)
-    : _query(query)
     {
+        assert(query);
+        _query = query;
         SystemCatalog::getInstance()->getArrayDesc(name, _desc);
-        if (query) { 
-            query->sharedLock(name);
-        }
+        query->sharedLock(name);
     }
-    
+
     std::string const& DBArray::getName() const
     {
         return _desc.getName();
@@ -96,28 +87,26 @@ namespace scidb
 
     boost::shared_ptr<ArrayIterator> DBArray::getIterator(AttributeID attId)
     {
-       boost::shared_ptr<Query> query(_query.lock());
-       return StorageManager::getInstance().getArrayIterator(_desc, attId, query);
+       LOG4CXX_TRACE(logger, "Getting DB iterator for ID="<<_desc.getId()<<", attrID="<<attId);
+       boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+       shared_ptr<const Array> arr= boost::dynamic_pointer_cast<const Array>(shared_from_this());
+       return StorageManager::getInstance().getArrayIterator(arr, attId, query);
     }
 
     boost::shared_ptr<ConstArrayIterator> DBArray::getConstIterator(AttributeID attId) const
     {
-        boost::shared_ptr<Query> query(_query.lock());
-        return StorageManager::getInstance().getConstArrayIterator(_desc, attId, query);
+        LOG4CXX_TRACE(logger, "Getting const DB iterator for ID="<<_desc.getId()<<", attrID="<<attId);
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        shared_ptr<const Array> arr= boost::dynamic_pointer_cast<const Array>(shared_from_this());
+        return StorageManager::getInstance().getConstArrayIterator(arr, attId, query);
     }
 
     boost::shared_ptr<CoordinateSet> DBArray::getChunkPositions() const
     {
-        if( !hasChunkPositions() )
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << "calling getChunkPositions on an invalid array";
-        }
-        boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         boost::shared_ptr<CoordinateSet> result (new CoordinateSet());
-        if(query)
-        {
-            StorageManager::getInstance().getChunkPositions(_desc, query, *(result.get()));
-        }
+        assert(query);
+        StorageManager::getInstance().getChunkPositions(_desc, query, *(result.get()));
         return result;
     }
 
@@ -126,7 +115,7 @@ namespace scidb
         bool vertical = (input->getSupportedAccess() == Array::RANDOM);
         set<Coordinates, CoordinatesLess> newChunkCoords;
         Array::append(input, vertical, &newChunkCoords);
-        boost::shared_ptr<Query> query(_query.lock());
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         StorageManager::getInstance().removeDeadChunks(_desc, newChunkCoords, query);
     }
 }

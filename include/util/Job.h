@@ -59,12 +59,16 @@ protected:
     virtual void run() = 0;
 
 public:
-    Job(boost::shared_ptr<Query> query): _removed(false), _query(query) {
+    Job(boost::shared_ptr<Query> query): _removed(false), _query(query)
+    {
     }
-
-    virtual ~Job() {
+    virtual ~Job()
+    {
     }
-
+    boost::shared_ptr<Query> getQuery()
+    {
+        return _query;
+    }
     void execute();
 
     // Waits until job is done

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="unpackOperator">
   <refnamediv>
     <refname>unpack</refname>
 
@@ -71,20 +70,13 @@
         <step>
           <para>We use a previously created 3x3 array, A, where row 1 has only
           empty cells, row 2 has only null values, and row 3 has only non-null
-          values. <programlisting lang="test" language="test">--aql create array aFlat 
+          values. <programlisting lang="test" language="test">--afl create array aFlat 
       &lt;row:int64, col:int64, value:string null&gt; 
       [csvRow=0:5,6,0]
  --show-query=no
  --show-output=no
 
---shell --command=csv2scidb -s 1 -p NNs 
-            &lt; ../examples/aInsert.csv &gt; 
-              ../examples/aInsert.scidb
- --show-query=no
- --show-output=no
-
---aql load aFlat 
-      from '../examples/aInsert.scidb'
+--afl store(build(aFlat,'[(2,1,null),(2,2,null),(2,3,null),(3,1,"a7"),(3,2,"a8"),(3,3,"a9")]',true),aFlat);
  --show-query=no
  --show-output=no
 
@@ -98,6 +90,8 @@
  --show-query=no
  --show-output=no
 
+--afl show(A); --show-query=no --output-format=dense
+
 --aql select * from A
  --output-format=dense
  --chunkify=yes
@@ -106,7 +100,7 @@
         </step>
 
         <step>
-          <para>Unpack array A. <programlisting language="test">--afl unpack(A, x);</programlisting>
+          <para>Unpack array A.<programlisting language="test">--afl unpack(A, x);</programlisting>
           Note that <code>unpack</code> has excluded the empty cells from the
           result array.</para>
         </step>

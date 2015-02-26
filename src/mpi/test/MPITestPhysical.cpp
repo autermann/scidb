@@ -82,7 +82,7 @@ class PhysicalMpiTest: public MPIPhysical
         testSlaveExit(installPath, membership,  query);
 
         _ctx.reset();
-        return shared_ptr<Array> (new MemArray(_schema));
+        return shared_ptr<Array> (new MemArray(_schema,query));
     }
 
     void postSingleExecute(shared_ptr<Query> query)

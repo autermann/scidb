@@ -41,7 +41,6 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <string>
-#include <errno.h>
 
 #include "query/Operator.h"
 #include "array/Metadata.h"
@@ -275,58 +274,49 @@ CommonCase:
                 return TKN_LITERAL;
             }
 
-            switch (ch) {
+            switch (ch)
+            {
             case ',':
-              return TKN_COMMA;
+                return TKN_COMMA;
             case '(':
-              return TKN_TUPLE_BEGIN;
+                return TKN_TUPLE_BEGIN;
             case ')':
-              return TKN_TUPLE_END;
+                return TKN_TUPLE_END;
             case '\'':
-                ch = getChar();
-                if (ch == '\\') {
-                    ch = getChar();
-                    switch (ch) {
-                      case 'n':
-                        ch = '\n';
-                        break;
-                      case 'r':
-                        ch = '\r';
-                        break;
-                      case 'f':
-                        ch = '\f';
-                        break;
-                      case 't':
-                        ch = '\t';
-                        break;
-                      case '0':
-                        ch = 0;
-                        break;
-                    }
-
-                }
-                if (ch == EOF)
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR12);
-                nStringBuf = 1;
-                stringBuf[0] = (char)ch;
-                tmpValue.clear();
-                ch = getChar();
-                if (ch != '\'')
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR12);
-                missingReason = -1;
-                return TKN_LITERAL;
-              case '"':
+            case '\"':
+            {
+                char begin = ch;
                 nStringBuf = 0;
                 tmpValue.clear();
-                while (true) {
+                while (true)
+                {
                     ch = getChar();
                     if (ch == '\\')
                     {
                         ch = getChar();
+                        switch (ch)
+                        {
+                        case 'n':
+                            ch = '\n';
+                            break;
+                        case 'r':
+                            ch = '\r';
+                            break;
+                        case 'f':
+                            ch = '\f';
+                            break;
+                        case 't':
+                            ch = '\t';
+                            break;
+                        case '0':
+                            ch = 0;
+                            break;
+                        }
                     }
                     else
                     {
-                        if (ch == '\"') {
+                        if (ch == begin)
+                        {
                             missingReason = -1;
                             return TKN_LITERAL;
                         }
@@ -336,32 +326,34 @@ CommonCase:
                     Append(ch);
                 }
                 break;
-              case '{':
+            }
+            case '{':
                 return TKN_COORD_BEGIN;
-              case '}':
+            case '}':
                 return TKN_COORD_END;
-              case '*':
+            case '*':
                 return TKN_MULTIPLY;
-              case '[':
+            case '[':
                 return TKN_ARRAY_BEGIN;
-              case ']':
+            case ']':
                 return TKN_ARRAY_END;
-              case ';':
+            case ';':
                 return TKN_SEMICOLON;
-              case '?':
-                  nStringBuf = 0;
-                  tmpValue.clear();
-                  missingReason = 0;
-                  while ((ch = getChar()) >= '0' && ch <= '9') {
-                      missingReason = missingReason*10 + ch - '0';
-                  }
-                  ungetChar(ch);
-                  return TKN_LITERAL;
-              case EOF:
+            case '?':
+                nStringBuf = 0;
+                tmpValue.clear();
+                missingReason = 0;
+                while ((ch = getChar()) >= '0' && ch <= '9')
+                {
+                    missingReason = missingReason * 10 + ch - '0';
+                }
+                ungetChar(ch);
+                return TKN_LITERAL;
+            case EOF:
                 return TKN_EOF;
 
-              default:
-                  goto CommonCase;
+            default:
+                goto CommonCase;
             }
         }
     };
@@ -465,7 +457,6 @@ CommonCase:
         InstanceID myInstanceID;
         size_t nInstances;
         bool parallelLoad;
-        boost::weak_ptr<Query> _query;
     };
 
 } //namespace scidb

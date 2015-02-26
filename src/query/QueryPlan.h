@@ -102,24 +102,11 @@ public:
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
+     * @param[in] children print or not children.
      */
-    void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<">";
-        }
-
-        str<<"[lInstance] children "<<_childNodes.size()<<"\n";
-        _logicalOperator->toString(str,indent+1);
-
-        for (size_t i = 0; i< _childNodes.size(); i++)
-        {
-            _childNodes[i]->toString(str, indent+1);
-        }
-    }
+    void toString(std::ostream &str, int indent = 0, bool children = true) const;
 
   private:
     boost::shared_ptr<LogicalOperator> _logicalOperator;
@@ -256,56 +243,11 @@ class PhysicalQueryPlanNode : boost::noncopyable
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
+     * @param[in] children print or not children.
      */
-    void toString (std::ostringstream &str, int indent = 0) const
-    {
-        for ( int i = 0; i < indent; i++)
-        {
-            str<<">";
-        }
-
-        str<<"[pNode] "<<_physicalOperator->getPhysicalName()<<" agg "<<isAgg()<<" ddl "<<isDdl()<<" tile "<<supportsTileMode()<<" children "<<_childNodes.size()<<"\n";
-        _physicalOperator->toString(str,indent+1);
-
-        for (int i = 0; i<indent+1; i++)
-        {
-            str<<" ";
-        }
-        str<<"props sgm "<<_isSgMovable<<" sgo "<<_isSgOffsetable<<"\n";
-
-        for (int i = 0; i<indent+1; i++)
-        {
-            str<<" ";
-        }
-        str<<"distr "<<_distribution<<"\n";
-
-        const ArrayDesc& schema = _physicalOperator->getSchema();
-        for (int i = 0; i<indent+1; i++)
-        {
-            str<<" ";
-        }
-
-        str<<"bound "<<_boundaries
-          <<" cells "<<_boundaries.getNumCells();
-
-        if (_boundaries.getStartCoords().size() == schema.getDimensions().size())
-        {
-            str  <<" chunks "<<_boundaries.getNumChunks(schema.getDimensions())
-                <<" est_bytes "<<_boundaries.getSizeEstimateBytes(schema)
-               <<"\n";
-        }
-        else
-        {
-            str <<" [improperly initialized]\n";
-        }
-
-        for (size_t i = 0; i< _childNodes.size(); i++)
-        {
-            _childNodes[i]->toString(str, indent+1);
-        }
-    }
+    void toString(std::ostream &str, int indent = 0, bool children = true) const;
 
     /**
      * Retrieve an ordered list of the shapes of the arrays to be input to this
@@ -580,19 +522,11 @@ public:
 	 * Append a human-readable description of this onto str. Description takes up
 	 * one or more lines. Append indent spacer characters to the beginning of
 	 * each line. Call toString on interesting children. Terminate with newline.
-	 * @param[out] str buffer to write to
-	 * @param[in] indent number of spacer characters to start every line with.
-	 */
-	void toString(std::ostringstream &str, int const indent = 0) const
-	{
-		for ( int x = 0; x < indent; x++)
-		{
-			str<<">";
-		}
-		str << "[lPlan]:\n";
-		_root->toString(str, indent+1);
-	}
-
+     * @param[out] stream to write to
+     * @param[in] indent number of spacer characters to start every line with.
+     * @param[in] children print or not children.
+     */
+    void toString(std::ostream &str, int indent = 0, bool children = true) const;
 
 private:
     boost::shared_ptr<LogicalQueryPlanNode> _root;
@@ -638,26 +572,11 @@ public:
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
+     * @param[in] children print or not children.
      */
-	void toString(std::ostringstream &str, int const indent = 0) const
-	{
-		for ( int x = 0; x < indent; x++)
-		{
-			str<<">";
-		}
-		str << "[pPlan]:";
-		if (_root.get() != NULL)
-		{
-			str << "\n";
-			_root->toString(str, indent+1);
-		}
-		else
-		{
-			str << "[NULL]\n";
-		}
-	}
+    void toString(std::ostream &out, int indent = 0, bool children = true) const;
 
 private:
     boost::shared_ptr<PhysicalQueryPlanNode> _root;

@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="mergeOperator">
   <refnamediv>
     <refname>merge</refname>
 
@@ -66,13 +66,24 @@
       </listitem>
     </itemizedlist>
 
-    <para>Merge combines elements from the input arrays the following way: for
-    each cell in the two inputs, if the cell of first (left) array is not
-    empty, then the attributes from that cell are selected and placed in the
-    output. If the cell in the first array is marked as empty, then the
-    attributes of the corresponding cell in the second array are taken. If the
-    cell is empty in both input arrays, the output's cell is set to
-    empty.</para>
+    <para>For each cell, <literal>merge</literal> combines elements from the
+    input arrays the following way:<itemizedlist>
+        <listitem>
+          <para>If the cell of the first array is not empty, then the
+          attributes from that cell are selected and placed in the
+          output.</para>
+        </listitem>
+
+        <listitem>
+          <para>If the cell in the first array is empty, then the attributes
+          of the corresponding cell in the second array are taken.</para>
+        </listitem>
+
+        <listitem>
+          <para>If the cell is empty in both input arrays, the output cell is
+          set to empty.</para>
+        </listitem>
+      </itemizedlist></para>
 
     <para>If the dimensions are not the same size, merge will return an output
     array the same size as the larger input array.</para>
@@ -83,7 +94,7 @@
 
     <para>In both <replaceable>left_array</replaceable> and
     <replaceable>right_array</replaceable>, each dimension must have datatype
-    int64.</para>
+    int64 (this is the default datatype for SciDB dimensions).</para>
   </refsect1>
 
   <refsect1>
@@ -94,8 +105,8 @@
 
       <procedure>
         <step>
-          <para>Create a sparse array left_array and store value 1 in the
-          first row:<para><programlisting>AFL% CREATE ARRAY left_array &lt;val:double&gt;[i=0:2,3,0,j=0:5,6,0];  </programlisting><programlisting>AFL% store(build_sparse(left_array,1,i=0),left_array);  </programlisting><screen>[
+          <para>Create a sparse array, <emphasis role="bold">left_array</emphasis> and store value 1 in the first
+          row:<para><programlisting>AFL% CREATE ARRAY left_array &lt;val:double&gt;[i=0:2,3,0,j=0:5,6,0];  </programlisting><programlisting>AFL% store(build_sparse(left_array,1,i=0),left_array);  </programlisting><screen>[
 [(1),(1),(1),(1),(1),(1)],
 [(),(),(),(),(),()],
 [(),(),(),(),(),()]
@@ -103,8 +114,7 @@
         </step>
 
         <step>
-          <para>Create a sparse identity matrix called
-          right_array<para><programlisting>AFL% CREATE ARRAY right_array &lt;val:double&gt;[i=0:2,3,0,j=0:2,6,0];  </programlisting><programlisting>AFL% store(build_sparse(right_array,1,i=j),right_array);  </programlisting><screen>[
+          <para>Create a sparse identity array called <emphasis role="bold">right_array</emphasis>.<para><programlisting>AFL% CREATE ARRAY right_array &lt;val:double&gt;[i=0:2,3,0,j=0:2,6,0];  </programlisting><programlisting>AFL% store(build_sparse(right_array,1,i=j),right_array);  </programlisting><screen>[
 [(1),(),()],
 [(),(1),()],
 [(),(),(1)]

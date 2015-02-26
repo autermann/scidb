@@ -172,7 +172,7 @@ Other .
     return token::REAL;
 }
 
-L?\'(\\.|[^\\\'])*\'    {
+L?'(\\.|[^'])*' {
     //FIXME: Ugly unescaping.
     std::string str = std::string(yytext, 1, yyleng - 2);
     boost::replace_all(str, "\\'", "'");

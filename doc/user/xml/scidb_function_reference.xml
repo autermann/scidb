@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
 <chapter>
@@ -7,7 +6,11 @@
 
   <para><indexterm>
       <primary>functions</primary>
-    </indexterm> This chapter lists the SciDB functions that are available for
+    </indexterm><indexterm>
+      <primary>expressions</primary>
+
+      <secondary>syntax for AFL and AQL</secondary>
+    </indexterm>This chapter lists the SciDB functions that are available for
   use in SciDB expressions. Expressions can be used in the following types of
   syntaxes:</para>
 
@@ -37,11 +40,25 @@
         <para><link linkend="trigonometricFunctions">Trigonometric and
         Transcendental Functions</link></para>
       </listitem>
+
+      <listitem>
+        <para><link linkend="miscFunctions">Miscellaneous
+        functions</link></para>
+      </listitem>
     </itemizedlist></para>
 
-  <xi:include href="algebraic_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-  <xi:include href="comparison_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-  <xi:include href="temporal_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-  <xi:include href="transcendental_functions_post.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="algebraic_functions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="comparison_functions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="temporal_functions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="transcendental_functions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="misc_functions_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
 </chapter>

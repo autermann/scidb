@@ -96,6 +96,8 @@ Summary: SciDB developer and tester utilities
 Group: Applications/Databases
 Requires: %{libscidbclient} >= %{version}-%{release} 
 Requires: time
+Requires: valgrind
+Requires: lsof
 %description -n %{scidb}-dev-tools
 SciDB developer and tester utilities
 

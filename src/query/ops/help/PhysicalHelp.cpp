@@ -45,7 +45,6 @@ public:
         const ArrayDesc& schema) :
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
-        _result = boost::shared_ptr<MemArray>(new MemArray(_schema));
     }
 
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution>& inputDistributions,
@@ -136,6 +135,7 @@ public:
                 << "Use existing operator name as argument for help operator. You can see all operators by executing list('operators').";
         }
 
+        _result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
         boost::shared_ptr<ArrayIterator> arrIt = _result->getIterator(0);
         Coordinates coords;
         coords.push_back(0);
@@ -152,6 +152,9 @@ public:
         boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
+        if (!_result) {
+            _result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
+        }
         return _result;
     }
 

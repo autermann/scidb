@@ -148,7 +148,7 @@ public:
             }
 
             LOG4CXX_WARN(oplogger, "Failed to open file " << fileName << " for input");
-            result = boost::shared_ptr<Array>(new MemArray(_schema));
+            result = boost::shared_ptr<Array>(new MemArray(_schema,query));
         }
 
         return result;

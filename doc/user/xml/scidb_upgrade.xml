@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd">
+"docbookV4.5/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "scidb_ug.ent">
+%myents;
+]>
 <section id="upgradingSciDB">
   <title>Upgrading SciDB</title>
 
@@ -10,6 +13,10 @@
       <secondary>upgrading</secondary>
     </indexterm><indexterm>
       <primary>upgrade SciDB</primary>
+    </indexterm><indexterm>
+      <primary>versions</primary>
+
+      <secondary>SciDB</secondary>
     </indexterm>This section describes how to upgrade your version of SciDB.
   For this section, we use the following conventions:<itemizedlist>
       <listitem>
@@ -23,13 +30,15 @@
       </listitem>
     </itemizedlist></para>
 
-  <para>For example, if you are upgrading from 12.10 to 13.3:<itemizedlist>
+  <para>For example, if you are upgrading from 12.10 to
+  &scidb_version;:<itemizedlist>
       <listitem>
         <para><emphasis role="bold">scidbOldVersion</emphasis> = 12.10</para>
       </listitem>
 
       <listitem>
-        <para><emphasis role="bold">scidbNewVersion</emphasis> = 13.3</para>
+        <para><emphasis role="bold">scidbNewVersion</emphasis> =
+        &scidb_version;</para>
       </listitem>
     </itemizedlist></para>
 
@@ -96,6 +105,11 @@
     </step>
 
     <step>
+      <para>To continue the upgrade process, proceed to <xref
+      linkend="PackageInstall"/> to install the latest packages.</para>
+    </step>
+
+    <step>
       <para>Update your environment variables to refer to the new version of
       SciDB. Make sure to change your SciDB Version variable from its current
       value to the <emphasis role="bold">scidbNewVersion</emphasis>. Old
@@ -105,21 +119,35 @@
     </step>
 
     <step>
-      <para>To continue the upgrade process, proceed to <xref
-      linkend="PackageInstall"/>.</para>
+      <para>Set up your configuration file.</para>
+
+      <itemizedlist>
+        <listitem>
+          <para><emphasis role="bold">If you copied your existing config.ini
+          file:</emphasis> make sure to change all occurrences of <emphasis
+          role="bold">scidbOldVersion</emphasis>to <emphasis
+          role="bold">scidbNewVersion</emphasis>. After you edit the file,
+          copy it to the <literal>/opt/scidb/</literal><emphasis
+          role="bold">scidbNewVersion</emphasis><literal>/etc/</literal>folder.</para>
+
+          <para>For example, if you are upgrading to version is
+          &scidb_version;, you would copy your file to the
+          <literal>/opt/scidb/&scidb_version;/etc/</literal> folder.</para>
+        </listitem>
+
+        <listitem>
+          <para><emphasis role="bold">If you want to set up and use a new
+          config.ini file: </emphasis>Proceed to <xref
+          linkend="ConfiguringSciDB"/>.</para>
+        </listitem>
+      </itemizedlist>
     </step>
 
     <step>
-      <para>If you copied your existing config.ini file, make sure to change
-      all occurrences of <emphasis role="bold">scidbOldVersion </emphasis>to
-      <emphasis role="bold">scidbNewVersion</emphasis>. After you edit the
-      file, copy it to the <literal>/opt/scidb/</literal><emphasis
-      role="bold">scidbNewVersion</emphasis><literal>/etc/
-      </literal>folder.</para>
-
-      <para>For example, if you are upgrading to version is 13.3, you would
-      copy your file to the <literal>/opt/scidb/13.3/etc/</literal>
-      folder.</para>
+      <para>Initialize and restart your SciDB database. Initialization is
+      necessary to avoid errors that you would otherwise receive, based on
+      incompatibilities between your your "old" database and your "new" SciDB
+      version.</para>
     </step>
 
     <step>
@@ -128,4 +156,10 @@
       linkend="opaqueLoad"/>.</para>
     </step>
   </procedure>
+
+  <note>
+    <para>Utilities from different versions of SciDB are not inter-operable.
+    For example, a &scidb_version; client cannot be used with a 13.1 SciDB
+    server.</para>
+  </note>
 </section>

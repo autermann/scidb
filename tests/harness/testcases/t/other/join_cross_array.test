@@ -41,7 +41,7 @@ cross_join(subarray(Media,1,1,2,2),two_dimension_B,a,breadth)
 store(cross_join(subarray(Media,2,2,3,3),two_dimension_B,a,breadth),crossjoin_result)
 cross_join(subarray(Media,2,2,3,3),subarray(Media_A,1,1,2,2))
 --error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "cross_join(subarray(Media,2,2,3,3),subarray(Media_A,1,1,2,2),a,f)"
---error --code=scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_LOGICAL_JOIN_ERROR2 "join(subarray(Media,2,2,3,3),subarray(Media_A,1,1,2,2))"
+join(subarray(Media,2,2,3,3),subarray(Media_A,1,1,2,2))
 cross_join (multiMedia_array_new, Media,O,a)
 cross_join (multiMedia_array_new, Media,P,b)
 cross_join (Media,multiMedia_array_new,b,O)

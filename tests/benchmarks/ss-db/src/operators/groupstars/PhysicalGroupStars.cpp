@@ -58,7 +58,7 @@ boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inpu
     obsArray = redistribute(obsArray, query, psLocalInstance, "", coordinatorID);
     spaceArray = redistribute(spaceArray, query, psLocalInstance, "", coordinatorID);
     if ( query->getInstanceID() != coordinatorID) {
-      return boost::shared_ptr<MemArray>(new MemArray(_schema));
+        return boost::shared_ptr<MemArray>(new MemArray(_schema,query));
     }
   }
 
@@ -125,7 +125,7 @@ boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inpu
   Grouper grouper;
   grouper.loadGroup(allObs,allImages,D2,T);
   LOG4CXX_DEBUG(logger, "Storing the groups: " << grouper.getSize());
-  boost::shared_ptr<MemArray> outputArray = boost::shared_ptr<MemArray>(new MemArray(_schema));
+  boost::shared_ptr<MemArray> outputArray = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
   grouper.storeGroup(outputArray);
   LOG4CXX_DEBUG(logger, "Done, now return.");
   return outputArray;

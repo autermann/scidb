@@ -3,11 +3,20 @@
 # Testing gesvd on the nested between-filter-subarray queries
 
 load_library('dense_linear_algebra')
+
+--start-igdata
+create array s10x10 <s:double null>[i=0:9,32,0, j=0:9,32,0]
 create array M10x10 <x:double null>[i=0:9,32,0, j=0:9,32,0]
-store(build(M10x10, -2*i+13*j), M10x10)
-store(apply(M10x10, y, pow(0.9,i+j)), M2_10x10)
 
+# use a matrix that avoids near-zeros in its results, since
+# the test, as written, uses exact matching, which will not be
+# stable across different math libraries
+store(build(M10x10, sin(i+10*j)*sqrt(2)), s10x10)
+store(project(apply(s10x10,x,s-floor(s)),x), M10x10)
 
+store(apply(M10x10, y, x), M2_10x10)
+
+--stop-igdata
 --test
 --echo test to check the output when all elements are null or zero
 
@@ -19,6 +28,7 @@ gesvd(build(M10x10, null), 'left')
 gesvd(build(M10x10, 0), 'left')
 
 --echo test for gesvd on the subarrays
+subarray(M10x10,0,0, 4,4)
 gesvd(subarray(M10x10,0,0, 4,4), 'values')
 gesvd(subarray(M10x10,0,0, 4,4), 'right')
 gesvd(subarray(M10x10,0,0, 4,4), 'left')
@@ -83,6 +93,7 @@ gesvd(project(M2_10x10, x), 'right')
 
 
 --cleanup
+remove(s10x10)
 remove(M10x10)
 remove(M2_10x10)
 

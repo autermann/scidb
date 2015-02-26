@@ -382,26 +382,10 @@ public:
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+    * @param[out] stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream &str, int indent = 0) const
-    {
-        std::ostringstream spacer;
-        for ( int i = 0; i < indent; i++)
-        {
-            spacer<<" ";
-        }
-
-        str << spacer.str() << "[Expression] resultType " <<  TypeLibrary::getType(_resultType).name() << "\n";
-
-        spacer<<" ";
-        for (size_t i = 0; i < _inputSchemas.size(); i++ )
-        {
-            str<<spacer.str()<<"[in] "<<_inputSchemas[i]<<"\n";
-        }
-        str<<spacer.str()<<"[out] "<<_outputSchema<<"\n";
-    }
+    virtual void toString (std::ostream &out, int indent = 0) const;
 };
 
 

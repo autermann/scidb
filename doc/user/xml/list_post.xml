@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="listOperator">
   <refnamediv>
     <refname>list</refname>
 
     <refpurpose><indexterm>
         <primary>list operator</primary>
-      </indexterm>List contents of SciDB namespace</refpurpose>
+      </indexterm>Lists contents of SciDB namespace.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -26,106 +26,113 @@
         <secondary>arrays</secondary>
       </indexterm>The list operator allows you to get a list of elements in
     the current SciDB instance. The input is one of the following
-    strings:<informaltable frame="all">
-        <tgroup cols="2">
-          <colspec colname="c1" colwidth="20*"/>
+    strings:</para>
 
-          <colspec colname="c2" colwidth="60*"/>
+    <informaltable frame="all">
+      <tgroup cols="2">
+        <colspec colname="c1" colwidth="20*"/>
 
-          <tbody>
-            <row>
-              <entry><indexterm>
-                  <primary>aggregates</primary>
+        <colspec colname="c2" colwidth="60*"/>
 
-                  <secondary>listing</secondary>
-                </indexterm>aggregates</entry>
+        <tbody>
+          <row>
+            <entry><indexterm>
+                <primary>aggregates</primary>
 
-              <entry>Show all operators that take as input a SciDB array and
-              return a scalar.</entry>
-            </row>
+                <secondary>listing</secondary>
+              </indexterm>aggregates</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>arrays</primary>
+            <entry>Show all operators that take as input a SciDB array and
+            return a scalar.</entry>
+          </row>
 
-                  <secondary>listing</secondary>
-                </indexterm>arrays</entry>
+          <row>
+            <entry><indexterm>
+                <primary>arrays</primary>
 
-              <entry>Show all arrays. If
-              <replaceable>version_flag</replaceable> is true, the operator
-              lists all versions of each array. Thus, if an array has n
-              versions, the output will include n+1 rows for that
-              array.</entry>
-            </row>
+                <secondary>listing</secondary>
+              </indexterm>arrays</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>functions</primary>
+            <entry>Show all arrays. If <replaceable>version_flag</replaceable>
+            is true, the operator lists all versions of each array. Thus, if
+            an array has n versions, the output will include n+1 rows for that
+            array.</entry>
+          </row>
 
-                  <secondary>listing</secondary>
-                </indexterm>functions</entry>
+          <row>
+            <entry><indexterm>
+                <primary>functions</primary>
 
-              <entry>Show all functions and the libraries in which they
-              reside.</entry>
-            </row>
+                <secondary>listing</secondary>
+              </indexterm>functions</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>instances</primary>
+            <entry>Show all functions and the libraries in which they
+            reside.</entry>
+          </row>
 
-                  <secondary>listing</secondary>
-                </indexterm>instances</entry>
+          <row>
+            <entry><indexterm>
+                <primary>instances</primary>
 
-              <entry>Show all SciDB instances. Each instance will be listed
-              with its port, id number, and time and date stamps for when it
-              came online.</entry>
-            </row>
+                <secondary>listing</secondary>
+              </indexterm>instances</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>libraries</primary>
+            <entry>Show all SciDB instances. Each instance will be listed with
+            its port, id number, and time and date stamps for when it came
+            online.</entry>
+          </row>
 
-                  <secondary>listing</secondary>
-                </indexterm>libraries</entry>
+          <row>
+            <entry><indexterm>
+                <primary>libraries</primary>
 
-              <entry>Show all libraries that are loaded in the current SciDB
-              session.</entry>
-            </row>
+                <secondary>listing</secondary>
+              </indexterm>libraries</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>operators</primary>
+            <entry>Show all libraries that are loaded in the current SciDB
+            session.</entry>
+          </row>
 
-                  <secondary>listing</secondary>
-                </indexterm>operators</entry>
+          <row>
+            <entry><indexterm>
+                <primary>operators</primary>
 
-              <entry>Show all operators and the libraries in which they
-              reside.</entry>
-            </row>
+                <secondary>listing</secondary>
+              </indexterm>operators</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>data types</primary>
-                </indexterm>types</entry>
+            <entry>Show all operators and the libraries in which they
+            reside.</entry>
+          </row>
 
-              <entry>Show all the datatypes the SciDB supports.</entry>
-            </row>
+          <row>
+            <entry><indexterm>
+                <primary>data types</primary>
+              </indexterm>types</entry>
 
-            <row>
-              <entry><indexterm>
-                  <primary>queries</primary>
+            <entry>Show all the datatypes the SciDB supports.</entry>
+          </row>
 
-                  <secondary>listing active</secondary>
-                </indexterm>queries</entry>
+          <row>
+            <entry><indexterm>
+                <primary>queries</primary>
 
-              <entry>Show all active queries. Each active query will have an
-              id, a time and date when it was queries initiated, an error
-              code, whether it generated any errors, and a status (boolean
-              flag where TRUE means that the query is idle).</entry>
-            </row>
-          </tbody>
-        </tgroup>
-      </informaltable></para>
+                <secondary>listing active</secondary>
+              </indexterm>queries</entry>
+
+            <entry>Show all active queries. Each active query will have an id,
+            a time and date when it was queries initiated, an error code,
+            whether it generated any errors, and a status (boolean flag where
+            TRUE means that the query is idle).</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </informaltable>
+
+    <para>Invoking the list operator without an argument,<literal>
+    list()</literal>, is equivalent to passing in the 'arrays' string. That
+    is, the following statements are equivalent:<programlisting>%AFL list();
+%AFL list('arrays');
+</programlisting></para>
   </refsect1>
 
   <refsect1>
@@ -138,41 +145,35 @@
       <procedure>
         <step>
           <para>List all arrays:<para><programlisting>AFL% list('arrays');  </programlisting><screen>{No} name,id,schema,availability
-{0} "C",3221,"C&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
-{1} "product",3223,"product&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
-{2} "vector0",3440,"vector0&lt;val:double&gt; [i=0:4,5,0]",true
-{3} "vector1",3442,"vector1&lt;val:string&gt; [i=0:4,5,0]",true
+{0} 'vector0',573,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+{1} 'vector1',575,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
         <step>
           <para>List all versions of all arrays:<para><programlisting>AFL% list('arrays',true);  </programlisting><screen>{No} name,id,schema,availability
-{0} "C",3221,"C&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
-{1} "C@1",3222,"C@1&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
-{2} "product",3223,"product&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
-{3} "product@1",3224,"product@1&lt;val:double&gt; [i=0:1,32,0,j=0:1,32,0]",true
-{4} "vector0",3440,"vector0&lt;val:double&gt; [i=0:4,5,0]",true
-{5} "vector0@1",3441,"vector0@1&lt;val:double&gt; [i=0:4,5,0]",true
-{6} "vector1",3442,"vector1&lt;val:string&gt; [i=0:4,5,0]",true
-{7} "vector1@1",3443,"vector1@1&lt;val:string&gt; [i=0:4,5,0]",true
+{0} 'vector0',573,'vector0&lt;val:double&gt; [i=0:4,5,0]',true
+{1} 'vector0@1',574,'vector0@1&lt;val:double&gt; [i=0:4,5,0]',true
+{2} 'vector1',575,'vector1&lt;val:string&gt; [i=0:4,5,0]',true
+{3} 'vector1@1',576,'vector1@1&lt;val:string&gt; [i=0:4,5,0]',true
 </screen></para></para>
         </step>
 
         <step>
           <para>List all SciDB aggregates:<para><programlisting>AFL% list('aggregates');</programlisting><screen>{No} name
-{0} "ApproxDC"
-{1} "avg"
-{2} "count"
-{3} "first"
-{4} "last"
-{5} "mad"
-{6} "max"
-{7} "median"
-{8} "min"
-{9} "stdev"
-{10} "sum"
-{11} "top_five"
-{12} "var"
+{0} 'ApproxDC'
+{1} 'avg'
+{2} 'count'
+{3} 'first'
+{4} 'last'
+{5} 'mad'
+{6} 'max'
+{7} 'median'
+{8} 'min'
+{9} 'stdev'
+{10} 'sum'
+{11} 'top_five'
+{12} 'var'
 </screen></para></para>
         </step>
       </procedure>

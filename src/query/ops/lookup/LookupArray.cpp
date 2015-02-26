@@ -50,12 +50,12 @@ namespace scidb {
             Coordinates pos(nDims);
             for (size_t i = 0; i < nDims; i++) {
                 if (!_converters[i])
-                    pos[i] = sourceArrayDesc.getOrdinalCoordinate(i, templateChunkIterators[i]->getItem(), cmExact, query);
+                    pos[i] = sourceArrayDesc.getOrdinalCoordinate(i, templateChunkIterators[i]->getItem(), cmExact, _query);
                 else {
                     Value val;
                     const Value* v = &templateChunkIterators[i]->getItem();
                     _converters[i](&v, &val, NULL);
-                    pos[i] =  sourceArrayDesc.getOrdinalCoordinate(i, val, cmExact, query);
+                    pos[i] =  sourceArrayDesc.getOrdinalCoordinate(i, val, cmExact, _query);
                 }
             }
             if (sourceArrayIterator->setPosition(pos)) { 
@@ -131,7 +131,7 @@ namespace scidb {
     : DelegateChunkIterator(chunk, mode),
       templateChunkIterators(arrayIterator.templateIterators.size()),
       _converters(templateChunkIterators.size()),
-      query(q),
+      _query(q),
       sourceArrayIterator(arrayIterator.sourceIterator),
       sourceArrayDesc(arrayIterator.sourceArrayDesc),
       iterationMode(mode)
@@ -204,6 +204,7 @@ namespace scidb {
     
     DelegateChunkIterator* LookupArray::createChunkIterator(DelegateChunk const* chunk, int iterationMode) const
     {
+        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         return new LookupChunkIterator((LookupArrayIterator const&)chunk->getArrayIterator(), chunk, iterationMode, query);
     }
 
@@ -212,11 +213,15 @@ namespace scidb {
         return new LookupArrayIterator(*this, attrID);
     }
 
-    LookupArray::LookupArray(ArrayDesc const& desc, boost::shared_ptr<Array> templArr, boost::shared_ptr<Array> srcArr, boost::shared_ptr<Query> const& q)
+    LookupArray::LookupArray(ArrayDesc const& desc,
+                             boost::shared_ptr<Array> templArr,
+                             boost::shared_ptr<Array> srcArr,
+                             boost::shared_ptr<Query> const& query)
     : DelegateArray(desc, templArr, false),
       templateArray(templArr),
-      sourceArray(srcArr),
-      query(q)
+      sourceArray(srcArr)
     {
+        assert(query);
+        _query=query;
     }
 }

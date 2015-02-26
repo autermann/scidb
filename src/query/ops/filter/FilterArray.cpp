@@ -57,13 +57,13 @@ namespace scidb {
                     break;
 
                 case BindInfo::BI_COORDINATE:
-                    if (_mode & TILE_MODE) { 
-                        _iterators[i]->getItem().getTile()->getCoordinates(_array.getInputArray()->getArrayDesc(), _array.bindings[i].resolvedId, _iterators[i]->getChunk().getFirstPosition(false), _iterators[i]->getPosition(), _array._query.lock(), _params[i], !(_mode & IGNORE_OVERLAPS));
+                    if (_mode & TILE_MODE) {
+                        _iterators[i]->getItem().getTile()->getCoordinates(_array.getInputArray()->getArrayDesc(), _array.bindings[i].resolvedId, _iterators[i]->getChunk().getFirstPosition(false), _iterators[i]->getPosition(), _query, _params[i], !(_mode & IGNORE_OVERLAPS));
                     } else {
 
                         _params[i] = _array.getInputArray()->getArrayDesc().getOriginalCoordinate(_array.bindings[i].resolvedId,
                                                                                               inputIterator->getPosition()[_array.bindings[i].resolvedId],
-                                                                                              _array._query.lock());
+                                                                                              _query);
                     }
                     break;
 
@@ -183,7 +183,8 @@ namespace scidb {
       _iterators(_array.bindings.size()),
       _params(*_array.expression),
       _mode(iterationMode),
-      _type(chunk->getAttributeDesc().getType())
+      _type(chunk->getAttributeDesc().getType()),
+      _query(Query::getValidQueryPtr(_array._query))
     {
         for (size_t i = 0, n = _array.bindings.size(); i < n; i++) {
             switch (_array.bindings[i].kind) {
@@ -504,10 +505,12 @@ namespace scidb {
     FilterArray::FilterArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array,
                              boost::shared_ptr< Expression> expr, boost::shared_ptr<Query>& query,
                              bool tileMode)
-    : DelegateArray(desc, array), expression(expr), bindings(expr->getBindings()), _query(query), _tileMode(tileMode),
+    : DelegateArray(desc, array), expression(expr), bindings(expr->getBindings()), _tileMode(tileMode),
       cacheSize(Config::getInstance()->getOption<int>(CONFIG_PREFETCHED_CHUNKS)),
       emptyAttrID(desc.getEmptyBitmapAttribute()->getId())
-    {        
+    {
+        assert(query);
+        _query=query;
     }
 
 }

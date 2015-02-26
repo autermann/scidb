@@ -25,12 +25,16 @@ import org.scidb.client.Result;
 
 import java.sql.SQLException;
 import java.sql.SQLWarning;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Statement implements java.sql.Statement
 {
     private Connection conn;
     private org.scidb.client.Connection scidbConnection;
-    private java.sql.ResultSet result;
+    private int _currentResultNo;
+    private List<String> _batchQueries = new ArrayList<String>();
+    private List<java.sql.ResultSet> _results;
 
     Statement(Connection conn)
     {
@@ -39,21 +43,23 @@ public class Statement implements java.sql.Statement
     }
     
     @Override
+    @SuppressWarnings(value = "unchecked") //While we checking types inside we can safely ignore warnings
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
-        // TODO Auto-generated method stub
+        if (iface == IStatementWrapper.class)
+        {
+            return (T) new StatementWrapper(scidbConnection);
+        }
         return null;
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException
     {
-        // TODO Auto-generated method stub
-        return false;
+        return iface == IResultSetWrapper.class;
     }
 
-    @Override
-    public java.sql.ResultSet executeQuery(String sql) throws SQLException
+    public java.sql.ResultSet executeInternal(String sql) throws SQLException
     {
         try
         {
@@ -72,6 +78,19 @@ public class Statement implements java.sql.Statement
             throw new SQLException(e);
         }
     }
+    @Override
+    public java.sql.ResultSet executeQuery(String sql) throws SQLException
+    {
+        _results = new ArrayList<java.sql.ResultSet>();
+        _currentResultNo = -1;
+        java.sql.ResultSet res = executeInternal(sql);
+        if (res != null)
+        {
+            _results.add(res);
+            _currentResultNo = 0;
+        }
+        return res;
+    }
 
     @Override
     public int executeUpdate(String sql) throws SQLException
@@ -83,8 +102,7 @@ public class Statement implements java.sql.Statement
     @Override
     public void close() throws SQLException
     {
-        // TODO Auto-generated method stub
-        
+        _results = null;
     }
 
     @Override
@@ -167,14 +185,14 @@ public class Statement implements java.sql.Statement
     @Override
     public boolean execute(String sql) throws SQLException
     {
-        // TODO Auto-generated method stub
-        return false;
+        executeQuery(sql);
+        return _results.size() > 0;
     }
 
     @Override
     public java.sql.ResultSet getResultSet() throws SQLException
     {
-        return result;
+        return _results.get(_currentResultNo);
     }
 
     @Override
@@ -187,7 +205,7 @@ public class Statement implements java.sql.Statement
     @Override
     public boolean getMoreResults() throws SQLException
     {
-        return false;
+        return getMoreResults(Statement.KEEP_CURRENT_RESULT);
     }
 
     @Override
@@ -235,22 +253,41 @@ public class Statement implements java.sql.Statement
     @Override
     public void addBatch(String sql) throws SQLException
     {
-        // TODO Auto-generated method stub
-        
+        _batchQueries.add(sql);
     }
 
     @Override
     public void clearBatch() throws SQLException
     {
-        // TODO Auto-generated method stub
-        
+        _batchQueries.clear();
     }
 
     @Override
     public int[] executeBatch() throws SQLException
     {
-        // TODO Auto-generated method stub
-        return null;
+        int[] retCodes = new int[_batchQueries.size()];
+        _results = new ArrayList<java.sql.ResultSet>();
+        _currentResultNo = -1;
+        for (int i = 0; i < _batchQueries.size(); i++)
+        {
+            try
+            {
+                executeInternal(_batchQueries.get(i));
+                java.sql.ResultSet res = executeInternal(_batchQueries.get(i));
+                if (res != null)
+                {
+                    _results.add(res);
+                    _currentResultNo = 0;
+                }
+                retCodes[i] = SUCCESS_NO_INFO;
+            }
+            catch (SQLException e)
+            {
+                retCodes[i] = EXECUTE_FAILED;
+                throw e;
+            }
+        }
+        return retCodes;
     }
 
     @Override
@@ -262,8 +299,29 @@ public class Statement implements java.sql.Statement
     @Override
     public boolean getMoreResults(int current) throws SQLException
     {
-        // TODO Auto-generated method stub
-        return false;
+        switch (current)
+        {
+            case CLOSE_CURRENT_RESULT:
+                _results.set(_currentResultNo, null);
+                break;
+
+            case CLOSE_ALL_RESULTS:
+                for(int i = 0; i <= _currentResultNo; i++)
+                {
+                    _results.set(i, null);
+                }
+                break;
+        }
+
+        _currentResultNo++;
+        if (_currentResultNo < _results.size())
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 
     @Override
@@ -325,8 +383,7 @@ public class Statement implements java.sql.Statement
     @Override
     public boolean isClosed() throws SQLException
     {
-        // TODO Auto-generated method stub
-        return false;
+        return _results == null;
     }
 
     @Override

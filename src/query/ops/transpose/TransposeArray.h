@@ -50,9 +50,10 @@ public:
         _arrayDesc(arrayDesc),
         _inputArray(input),
         _nDimensions(input->getArrayDesc().getDimensions().size()),
-        _outputChunkPositions(new CoordinateSet()),
-        _query(query)
+        _outputChunkPositions(new CoordinateSet())
     {
+        assert(query);
+        _query=query;
         Coordinates outCoords(_nDimensions);
         for (CoordinateSet::const_iterator iter = inputChunkPositions->begin(); iter != inputChunkPositions->end(); ++iter)
         {
@@ -116,7 +117,6 @@ private:
     boost::shared_ptr<Array> _inputArray;
     size_t const _nDimensions;
     boost::shared_ptr<CoordinateSet> _outputChunkPositions;
-    boost::weak_ptr<Query> _query;
 
     class TransposeArrayIterator: public ConstArrayIterator
     {

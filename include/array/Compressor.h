@@ -115,6 +115,7 @@ namespace scidb
         {
             return compressors;
         }
+        ~CompressorFactory();
     };
 
 }

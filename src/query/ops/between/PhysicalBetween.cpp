@@ -88,7 +88,7 @@ public:
    virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                   const std::vector< ArrayDesc> & inputSchemas) const
     {
-       boost::shared_ptr<Query> query(_query.lock());
+       shared_ptr<Query> query(Query::getValidQueryPtr(_query));
        PhysicalBoundaries window(getWindowStart(query), getWindowEnd(query));
        return inputBoundaries[0].intersectWith(window);
     }

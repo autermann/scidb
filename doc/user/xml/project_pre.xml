@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="projectOperator">
   <refnamediv>
     <refname>project</refname>
 
@@ -44,7 +43,7 @@
       <procedure>
         <step>
           <para>Show the source_array:<programlisting language="test">--afl create array winnersFlat &lt;event:string,year:int64,person:string,country:string,time:double&gt;[i=0:*,12,0] --show-query=no --show-output=no
---aql load winnersFlat from '../examples/winnersFew.scidb' --show-query=no --show-output=no
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' --show-query=no --show-output=no
 --afl store(sort(winnersFlat,year),champions) --show-query=no --show-output=no
 --afl scan(champions) --output-format=csv</programlisting></para>
         </step>

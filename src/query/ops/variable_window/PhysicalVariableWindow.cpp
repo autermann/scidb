@@ -407,7 +407,7 @@ public:
 
     void copyEmptyTagAttribute(shared_ptr<Array> & srcArray, shared_ptr<MemArray> & dstArray)
     {
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         assert (srcArray->getArrayDesc().getEmptyBitmapAttribute()!=NULL);
         shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(srcArray->getArrayDesc().getEmptyBitmapAttribute()->getId());
         shared_ptr<ArrayIterator> daiter = dstArray->getIterator(_schema.getEmptyBitmapAttribute()->getId());
@@ -439,7 +439,7 @@ public:
 
     void mergeChunkMap()
     {
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _globalChunkMap.reset( new ChunkInstanceMap(_nDims, _dimNum));
         shared_ptr<SharedBuffer> mapBuf = _localChunkMap->serialize();
         if ( _coordinatorId != INVALID_INSTANCE) //I am NOT the coordinator
@@ -576,7 +576,7 @@ public:
 
     void exchangeMessages(vector<VariableWindowMessage>& inMessages, vector<VariableWindowMessage>& outMessages, size_t nAggs)
     {
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         for(InstanceID i =0; i<_nInstances; i++)
         {
             if(i==_myInstanceId)
@@ -605,7 +605,7 @@ public:
      */
     bool agreeOnBoolean(bool value)
     {
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         if ( _coordinatorId != INVALID_INSTANCE) //I am NOT the coordinator
         {
             shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
@@ -978,7 +978,7 @@ public:
     Coordinates agreeOnNextAxis(vector<Coordinates> const& axesList, size_t& currentAxis)
     {
         Coordinates result(0);
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         if ( _coordinatorId != INVALID_INSTANCE) //I am NOT the coordinator
         {
             shared_ptr<SharedBuffer> buf= BufReceive(_coordinatorId, query);
@@ -1031,7 +1031,7 @@ public:
                                    AggIOMapping const& mapping,
                                    size_t sizeLimit)
     {
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         vector<VariableWindowMessage> outMessages(_nInstances);
         vector<VariableWindowMessage> inMessages(_nInstances);
 
@@ -1136,7 +1136,7 @@ public:
         _nInstances = query->getInstancesCount();
         _query = query;
 
-        shared_ptr<MemArray> dstArray(new MemArray(_schema));
+        shared_ptr<MemArray> dstArray(new MemArray(_schema, query));
         copyEmptyTagAttribute(srcArray, dstArray);
         mergeChunkMap();
         ArrayStats stats = calculateArrayStats();
@@ -1210,7 +1210,7 @@ DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalVariableWindow, "variable_window", "Ph
                               AttributeID outAttId,
                               AggregatePtr &agg)
     {
-        shared_ptr<Query> query = _query.lock();
+        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         ArrayDesc const& srcDesc = srcArray->getArrayDesc();
         shared_ptr<ConstArrayIterator> saiter = srcArray->getIterator(inputAttId);
         shared_ptr<ArrayIterator>daiter = dstArray->getIterator(outAttId);

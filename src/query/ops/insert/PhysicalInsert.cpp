@@ -299,8 +299,12 @@ public:
                                        size_t const nDims)
     {
         size_t nAttrs = _schema.getAttributes().size();
-        shared_ptr<DBArray> dstArray = make_shared<DBArray>(_schema.getName(), query);
+        shared_ptr<DBArray> dstArray(DBArray::newDBArray(_schema.getName(), query));
         SCIDB_ASSERT(dstArray->getArrayDesc().getAttributes(true).size() == inputArray->getArrayDesc().getAttributes(true).size());
+        assert(dstArray->getArrayDesc().getId() == _schema.getId());
+        assert(dstArray->getArrayDesc().getUAId() == _schema.getUAId());
+
+        query->getReplicationContext()->enableInboundQueue(_schema.getId(), dstArray);
 
         PhysicalBoundaries bounds(currentLowBound, currentHiBound);
         if (inputArray->getArrayDesc().getEmptyBitmapAttribute() == NULL && _schema.getEmptyBitmapAttribute())
@@ -363,6 +367,10 @@ public:
         }
 
         SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
+        query->getReplicationContext()->replicationSync(_schema.getId());
+        query->getReplicationContext()->removeInboundQueue(_schema.getId());
+        StorageManager::getInstance().flush();
+
         return dstArray;
     }
 
@@ -397,6 +405,8 @@ public:
            }
         }
 
+        SCIDB_ASSERT(_schema.isImmutable() == false);
+
         size_t nDims = _schema.getDimensions().size();
         Coordinates currentLo(nDims, MAX_COORDINATE);
         Coordinates currentHi(nDims, MIN_COORDINATE);
@@ -408,7 +418,10 @@ public:
             currentHi = SystemCatalog::getInstance()->getHighBoundary(previousDesc->getId());
         }
 
-        return performInsertion(inputArrays[0], query, currentLo, currentHi, nDims);
+        shared_ptr<Array> dstArray =  performInsertion(inputArrays[0], query, currentLo, currentHi, nDims);
+
+        getInjectedErrorListener().check();
+        return dstArray;
     }
 };
 

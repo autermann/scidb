@@ -22,10 +22,10 @@ Query was executed successfully
 {4} 1000
 
 {x} make,model,price,mpg
-{0} "Honda","CRV",26700,23.5
-{1} "Toyota","Prius",31000,48.7
-{2} "Ford","Explorer",42000,19.6
-{3} "Audi","Q5",45000,26.8
+{0} 'Honda','CRV',26700,23.5
+{1} 'Toyota','Prius',31000,48.7
+{2} 'Ford','Explorer',42000,19.6
+{3} 'Audi','Q5',45000,26.8
 
 {i} x,y
 {1} 5.95,null

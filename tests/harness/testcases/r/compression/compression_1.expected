@@ -12,21 +12,21 @@ Query was executed successfully
 
 SCIDB QUERY : <select * from build(Ts,string(x+1)),build(Ti32,x+10),build(Ti64,x+100)>
 {x} a,b,c
-{0} "1",10,100
-{1} "2",11,101
-{2} "3",12,102
+{0} '1',10,100
+{1} '2',11,101
+{2} '3',12,102
 
 SCIDB QUERY : <select * into A from build(Ts,string(x+1)),build(Ti32,x+10),build(Ti64,x+100)>
 {x} a,b,c
-{0} "1",10,100
-{1} "2",11,101
-{2} "3",12,102
+{0} '1',10,100
+{1} '2',11,101
+{2} '3',12,102
 
 SCIDB QUERY : <select * into A from build_sparse(Ts,string(x+1),true),build_sparse(Ti32,x+20,true),build_sparse(Ti64,x+200,true)>
 {x} a,b,c
-{0} "1",20,200
-{1} "2",21,201
-{2} "3",22,202
+{0} '1',20,200
+{1} '2',21,201
+{2} '3',22,202
 
 SCIDB QUERY : <select * into A from build_sparse(Ts,string(x+1),true),build_sparse(Ti32,x+30,true),build_sparse(Ti64,x+300,false)>
 {x} a,b,c
@@ -36,7 +36,7 @@ SCIDB QUERY : <select * into A from build_sparse(Ts,string(x+1),x<>0),build_spar
 
 SCIDB QUERY : <select * into A from build_sparse(Ts,string(x+1),x<>0),build_sparse(Ti32,x+20,x<>0),build_sparse(Ti64,x+200,x<>1)>
 {x} a,b,c
-{2} "3",22,202
+{2} '3',22,202
 
 SCIDB QUERY : <remove(Ts)>
 Query was executed successfully

@@ -85,7 +85,7 @@ public:
                                                                algorithm));
             // Converting the result of multiplication into the RLE format
             // because that is the expected materialized format
-            return  boost::shared_ptr<Array>(new MaterializedArray(multArr, MaterializedArray::RLEFormat));
+            return  boost::shared_ptr<Array>(new MaterializedArray(multArr, query, MaterializedArray::RLEFormat));
 	}
 };
 

@@ -1,13 +1,17 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="multiplyOperator">
   <refnamediv>
     <refname>multiply</refname>
 
     <refpurpose><indexterm>
         <primary>multiply</primary>
       </indexterm><indexterm>
-        <primary>matrices</primary>
+        <primary>matrix</primary>
+
+        <secondary>multiplication</secondary>
+      </indexterm><indexterm>
+        <primary>arrays</primary>
 
         <secondary>multiplication</secondary>
       </indexterm>Produces a result array via matrix multiplication of two
@@ -35,6 +39,14 @@
     <replaceable>right_array</replaceable> must have dimensions
     <replaceable>n</replaceable><symbol role="symbolfont">×</symbol><replaceable>p</replaceable>, and the result
     array will have dimensions <replaceable>m</replaceable><symbol role="symbolfont">×</symbol><replaceable>p</replaceable>.</para>
+
+    <note>
+      <para>If you have dense matrices, and data that has data type of
+      <emphasis role="bold">double</emphasis>, then we recommend that you use
+      <link linkend="gemmOperator">GEMM</link>, rather than multiply, to
+      increase performance. (For the third argument to GEMM, just construct a
+      matrix with all of its values as zeros.)</para>
+    </note>
   </refsect1>
 
   <refsect1>

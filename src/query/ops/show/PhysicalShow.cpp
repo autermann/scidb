@@ -33,6 +33,7 @@
 #include "array/MemArray.h"
 #include "system/SystemCatalog.h"
 #include "query/QueryProcessor.h"
+#include <util/Thread.h>
 
 using namespace std;
 using namespace boost;
@@ -46,7 +47,6 @@ public:
     PhysicalShow(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
     PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
-        _result = boost::shared_ptr<MemArray>(new MemArray(_schema));
     }
 
     virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution>& inputDistributions,
@@ -80,11 +80,13 @@ public:
         	}
 
             boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
-            boost::shared_ptr<Query> innerQuery = Query::createDetached();
-            innerQuery->init(INVALID_QUERY_ID-1,
+            boost::shared_ptr<Query> innerQuery = Query::createFakeQuery(
                              query->mapLogicalToPhysical(query->getCoordinatorID()),
                              query->mapLogicalToPhysical(query->getInstanceID()),
                              query->getCoordinatorLiveness());
+            boost::function<void()> func = boost::bind(&Query::destroyFakeQuery, innerQuery.get());
+            Destructor<boost::function<void()> > fqd(func);
+
             innerQuery->queryString = queryString;
 
             queryProcessor->parseLogical(innerQuery, afl);
@@ -93,6 +95,7 @@ public:
 
         printSchema(ss, desc);
 
+        _result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
         boost::shared_ptr<ArrayIterator> arrIt = _result->getIterator(0);
         Coordinates coords;
         coords.push_back(0);
@@ -109,6 +112,9 @@ public:
         boost::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
+        if (!_result) {
+            _result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
+        }
         return _result;
     }
 

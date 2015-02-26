@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"docbookV4.5/docbookx.dtd">
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd"
+[ <!ENTITY % myents SYSTEM "scidb_ug.ent" > %myents; ]
+>
 <book>
   <title>SciDB User's Guide</title>
 
@@ -17,7 +18,7 @@
       <holder>SciDB, Inc.</holder>
     </copyright>
 
-    <releaseinfo>Version 13.3</releaseinfo>
+    <releaseinfo>Version &scidb_version;.&scidb_revision;</releaseinfo>
 
     <legalnotice>
       <para>SciDB is free software: you can redistribute it and/or modify it
@@ -54,7 +55,7 @@
   <xi:include href="scidb_datatypes_post.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="aggregates_post.xml"
+  <xi:include href="analytics_chapter.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <xi:include href="updating_and_array_versions_post.xml"
@@ -66,17 +67,19 @@
   <xi:include href="jdbc.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
+  <xi:include href="plugin_UDFs.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="basic_linear_algebra_post.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
   <xi:include href="scidb_aggregates_ref.xml"
               xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
-  <xi:include href="scidb_function_reference.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
-  <xi:include href="scidb_operator_ref.xml"
-              xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
+  <xi:include href="scidb_function_reference.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="operator_categories.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+  <xi:include href="scidb_operator_ref.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
   <xi:include href="appendix_A.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
-
   <xi:include href="appendix_B.xml" xmlns:xi="http://www.w3.org/2001/XInclude"/>
 
   <index/>

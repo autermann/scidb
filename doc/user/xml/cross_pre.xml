@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="crossOperator">
   <refnamediv>
     <refname>cross</refname>
 
@@ -57,8 +56,8 @@
         <step>
           <para>Show the first array:<programlisting language="test">
 --afl create array letters &lt;letter:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p S &lt; ../examples/letters.csv &gt; ../examples/letters.scidb --show-query=no --show-output=no
---aql load letters from '../examples/letters.scidb' --show-query=no --show-output=no 
+--shell --command=csv2scidb -s 1 -p S &lt; $DOC_DATA/letters.csv &gt; $DOC_DATA/letters.scidb --show-query=no --show-output=no
+--aql load letters from '../tests/harness/testcases/data/doc/letters.scidb' --show-query=no --show-output=no 
 --afl scan(letters);</programlisting></para>
         </step>
 
@@ -82,8 +81,8 @@
         <step>
           <para>Show the first array:<programlisting language="test">
 --afl create array lettersPlus &lt;letter:string, type:string&gt; [i=0:2,3,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p S &lt; ../examples/lettersPlus.csv &gt; ../examples/lettersPlus.scidb --show-query=no --show-output=no
---aql load lettersPlus from '../examples/lettersPlus.scidb' --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p S &lt; $DOC_DATA/lettersPlus.csv &gt; $DOC_DATA/lettersPlus.scidb --show-query=no --show-output=no
+--aql load lettersPlus from '../tests/harness/testcases/data/doc/lettersPlus.scidb' --show-query=no --show-output=no
 --afl scan(lettersPlus);</programlisting></para>
         </step>
 
@@ -103,8 +102,8 @@
           <para>Show the array containing some null values (where the even
           numbers would be):<programlisting language="test">
 --afl create array oddNumbers &lt;number:int64 null&gt; [i=0:4,5,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p N &lt; ../examples/oddNumbers.csv &gt; ../examples/oddNumbers.scidb --show-query=no --show-output=no
---aql load oddNumbers from '../examples/oddNumbers.scidb' --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p N &lt; $DOC_DATA/oddNumbers.csv &gt; $DOC_DATA/oddNumbers.scidb --show-query=no --show-output=no
+--aql load oddNumbers from '../tests/harness/testcases/data/doc/oddNumbers.scidb' --show-query=no --show-output=no
 --afl scan(oddNumbers);</programlisting></para>
         </step>
 

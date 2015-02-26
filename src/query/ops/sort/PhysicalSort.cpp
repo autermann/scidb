@@ -111,7 +111,7 @@ class PhysicalSort: public PhysicalOperator
                 {
                     buffer->sort(keys);
                     buffer->truncate();
-                    result->push_back(shared_ptr<Array> (new FileArray(buffer)));
+                    result->push_back(shared_ptr<Array> (new FileArray(buffer, getQuery())));
                     buffer.reset(new TupleArray(outputDesc, arrayIterators, 0));
                 }
                 for (size_t j = step-1; j != 0 && !arrayIterators[0]->end(); --j) {
@@ -125,7 +125,7 @@ class PhysicalSort: public PhysicalOperator
             {
                 buffer->sort(keys);
                 buffer->truncate();
-                result->push_back(shared_ptr<Array> (new FileArray(buffer)));
+                result->push_back(shared_ptr<Array> (new FileArray(buffer, getQuery())));
             }
         }
     };
@@ -242,7 +242,7 @@ class PhysicalSort: public PhysicalOperator
         shared_ptr<Array> sortArray(new MergeSortArray(query, _schema, tempArrays, keys, true));
 
         //false means perform a horizontal copy (copy all attributes for chunk 1, all attributes for chunk 2,...)
-        shared_ptr<Array> ret(new MemArray(sortArray,false));
+        shared_ptr<Array> ret(new MemArray(sortArray,query,false));
 
         return ret;
     }

@@ -21,7 +21,7 @@ SCIDB QUERY : <store(repart(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100
 
 SCIDB QUERY : <show(Test1)>
 {i} schema
-{0} "Test1<a1:int64> [x=0:1,1,0,y=0:1,1,0]"
+{0} 'Test1<a1:int64> [x=0:1,1,0,y=0:1,1,0]'
 
 SCIDB QUERY : <join(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true))>
 {x,y} a1,a1
@@ -32,17 +32,17 @@ SCIDB QUERY : <join(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-19
 
 SCIDB QUERY : <join(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),build(<a1:string> [x=0:1,2,0, y=0:1,2,0],'[[(alpha),(beta)],[(gamma),(theta)]]',true))>
 {x,y} a1,a1
-{0,0} 2,"alpha"
-{0,1} -100,"beta"
-{1,0} -199,"gamma"
-{1,1} -1,"theta"
+{0,0} 2,'alpha'
+{0,1} -100,'beta'
+{1,0} -199,'gamma'
+{1,1} -1,'theta'
 
 SCIDB QUERY : <join(build(<a1:int64,b1:char> [x=0:1,2,0, y=0:1,2,0],'[[(2,A),(-100,A)],[(-199,B),(-1,D)]]',true),build(<a1:string> [x=0:1,2,0, y=0:1,2,0],'[[(alpha),(beta)],[(gamma),(theta)]]',true))>
 {x,y} a1,b1,a1
-{0,0} 2,'A',"alpha"
-{0,1} -100,'A',"beta"
-{1,0} -199,'B',"gamma"
-{1,1} -1,'D',"theta"
+{0,0} 2,'A','alpha'
+{0,1} -100,'A','beta'
+{1,0} -199,'B','gamma'
+{1,1} -1,'D','theta'
 
 SCIDB QUERY : <concat(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true))>
 {x,y} a1
@@ -130,9 +130,9 @@ SCIDB QUERY : <select max(a),max(b) from array(<a:double, b:float, c:string> [x=
 
 SCIDB QUERY : <select c+'hi' from array(<a:double, b:float, c:string> [x=0:2,1,0], '[(1.4,inf,Bio)];[(4.6,inf,Phy)];[(0.5,7,Math)]')>
 {x} expr
-{0} "Biohi"
-{1} "Phyhi"
-{2} "Mathhi"
+{0} 'Biohi'
+{1} 'Phyhi'
+{2} 'Mathhi'
 
 SCIDB QUERY : <select sum(a) from array(<a:double, b:float, c:string> [x=0:2,1,0], '[(1.4,inf,Bio)];[(4.6,inf,Phy)];[(0.5,7,Math)]') fixed window W as (partition by x 0 preceding and 1 following)>
 {x} sum

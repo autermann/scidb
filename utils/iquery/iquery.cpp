@@ -214,9 +214,10 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
         else
         {
             scidb::DBLoader::defaultPrecision = cfg->getOption<int>(CONFIG_PRECISION);
-            
+
+            boost::shared_ptr<scidb::Query> emptyQuery; //query is not validated on the client side
             scidb::DBLoader::save(*queryResult.array, cfg->getOption<string>(CONFIG_RESULT_FILE),
-                                  boost::shared_ptr<scidb::Query>(),
+                                  emptyQuery,
                                   format, !iqueryState.firstSaving);
             iqueryState.firstSaving = false;
         }

@@ -2,10 +2,20 @@
 --start-query-logging
 # Tests for gesvd on arrays with overlaps
 
-load_library('dense_linear_algebra')
-create array M5x5 <x:double null>[i=0:4,32,1, j=0:4,32,1]
-store(build(M5x5, -2*i+13*j), M5x5)
 
+load_library('dense_linear_algebra')
+
+--start-igdata
+create array s5x5 <s:double null>[i=0:4,32,1, j=0:4,32,1]
+create array M5x5 <x:double null>[i=0:4,32,1, j=0:4,32,1]
+
+# use a matrix that avoids near-zeros in its results, since
+# the test, as written, uses exact matching, which will not be
+# stable across different math libraries
+store(build(s5x5, sin(i+10*j)*sqrt(2)), s5x5)
+store(project(apply(s5x5,x,s-floor(s)),x), M5x5)
+
+--stop-igdata
 
 --test
 
@@ -25,6 +35,7 @@ gesvd(repart(M5x5, <x:double null>[i=0:4,32,0, j=0:4,32,0]), 'right')
 
 
 --cleanup
+remove(s5x5)
 remove(M5x5)
 remove(M5x5_tempA)
 --stop-query-logging

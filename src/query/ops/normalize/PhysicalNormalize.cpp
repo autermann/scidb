@@ -81,7 +81,7 @@ class PhysicalNormalize: public  PhysicalOperator
             uint64_t coordinatorID = (int64_t)query->getCoordinatorID() == -1 ?  query->getInstanceID() : query->getCoordinatorID();
             inputArray = redistribute(inputArray, query, psLocalInstance, "", coordinatorID);
             if (query->getInstanceID() != coordinatorID) { 
-                return boost::shared_ptr<Array>(new MemArray(_schema));
+                return boost::shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
         double len = 0.0;

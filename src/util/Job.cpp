@@ -45,18 +45,24 @@ namespace scidb
         }
 
         if (!_removed) {
-            const char *err_msg = "Job::execute: unhandled exception in job";
+            const char *err_msg = "Job::execute: unhandled exception";
             try {
                 run();
             } catch (Exception const& x) {
                 _error = x.copy();
-                LOG4CXX_ERROR(logger, err_msg << ": " << x.what());
+                LOG4CXX_ERROR(logger, err_msg << ": " << x.what()  << ", queryID="<<(_query ? _query->getQueryID() : 0));
             } catch (const std::exception& e) {
-                _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-                LOG4CXX_ERROR(logger, err_msg << ": " << e.what());
+                try {
+                    _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << e.what();
+                    LOG4CXX_ERROR(logger, err_msg << ": " << e.what() << ", queryID="<<(_query ? _query->getQueryID() : 0));
+                } catch (...) {}
+                throw;
             } catch (...) {
-                _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << err_msg;
-                LOG4CXX_ERROR(logger, err_msg);
+                try {
+                    _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << err_msg;
+                    LOG4CXX_ERROR(logger, err_msg);
+                } catch (...) {}
+                throw;
             }
         }
         _query.reset();

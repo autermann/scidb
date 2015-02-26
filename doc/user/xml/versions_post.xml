@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="versionsOperator">
   <refnamediv>
     <refname>versions</refname>
 
@@ -8,7 +8,7 @@
         <primary>versions</primary>
 
         <secondary>arrays</secondary>
-      </indexterm>Show array versions</refpurpose>
+      </indexterm>Show array versions.</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -51,8 +51,8 @@
         <step>
           <para>Use the versions command to see the two versions of m1 that
           you created:<para><programlisting>AFL% versions(m1);  </programlisting><screen>{VersionNo} version_id,timestamp
-{1} 1,"2012-12-11 17:17:38"
-{2} 2,"2012-12-11 17:17:38"
+{1} 1,'2013-05-31 14:41:45'
+{2} 2,'2013-05-31 14:41:46'
 </screen></para></para>
         </step>
 

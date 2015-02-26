@@ -107,6 +107,7 @@ target_link_libraries(scalar_proc_lib network_lib util_lib)
 set (qproc_src
     optimizer/Optimizer.cpp
     optimizer/HabilisOptimizer.cpp
+    QueryPlanUtilites.cpp
     QueryPlan.cpp
     OperatorLibrary.cpp
     QueryProcessor.cpp
@@ -115,6 +116,7 @@ set (qproc_src
     executor/SciDBExecutor.cpp
     RemoteArray.cpp
     Operator.cpp
+    SGChunkReceiver.cpp
 )
 
 set_source_files_properties(${query_parser_src} ${aql_scanner_fixed_src} ${afl_scanner_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses")

@@ -26,7 +26,6 @@
 <li><a href="#explain_logical">explain_logical</a></li>
 <li><a href="#explain_physical">explain_physical</a></li>
 <li><a href="#input">input</a></li>
-<li><a href="#inverse">inverse</a></li>
 <li><a href="#filter">filter</a></li>
 <li><a href="#redimension">redimension</a></li>
 <li><a href="#redimension_store">redimension_store</a></li>
@@ -325,15 +324,6 @@ And second case refer to the attribute "y" of second input array.
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "store(input(testarr, 'data.dmp'), testarr2)"</code></dd>
 <dd><code>iquery -aq "store(input(testarr, 'data.binary', -2, '(int32 null,float null,string null)', 10, foo_shadow), testarr2)"</code></dd>
-</dl>
-<h2><a name="inverse">inverse</a></h2>
-<dl>
-<dt><b>Description</b></dt>
-<dd>Build inverse matrix
-<dt><b>Syntax</b></dt>
-<dd><u>inverse</u> ( <i>input-matrix</i> )
-<dt><b>Example</b></dt>
-<dd><code>iquery -aq "inverse(matrixR2)"</code></dd>
 </dl>
 <h2><a name="filter">filter</a></h2>
 <dl>

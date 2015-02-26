@@ -929,7 +929,7 @@ public:
      * @todo move the query parameter into the constructor (and possibly split the client and server interfaces)
      */
     Coordinate getOrdinalCoordinate(size_t dimensionNo, Value const& value, CoordinateMappingMode mode,
-                                    const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()) const;
+                                    const boost::shared_ptr<Query>& query) const;
 
     /**
      * Perform reverse mapping of integer dimension to the original dimension domain
@@ -939,7 +939,7 @@ public:
      * @todo move the query parameter into the constructor (and possibly split the client and server interfaces)
      */
     Value getOriginalCoordinate(size_t dimensionNo, Coordinate pos,
-                                const boost::shared_ptr<Query>& query = boost::shared_ptr<Query>()) const;
+                                const boost::shared_ptr<Query>& query) const;
 
     /**
      * Get descriptor of the array with coordinate index
@@ -978,6 +978,7 @@ public:
         ar & _dimensions;
         ar & _flags;
         ar & _comment;
+        //XXX tigor TODO: add _ps as well
 
         if (Archive::is_loading::value)
         {

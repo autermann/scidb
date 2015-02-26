@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- This document was created with Syntext Serna Free. -->
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "docbookV4.5/docbookx.dtd">
-<refentry>
+<refentry id="attRenameOperator">
   <refnamediv>
     <refname>attribute_rename</refname>
 
@@ -25,9 +24,18 @@
   <refsect1>
     <title>Summary</title>
 
-    <para>The attribute_rename operator produces a result array that is nearly
-    identical to a source array, except that one or more attributes are
-    renamed.</para>
+    <para>The <literal>attribute_rename</literal> operator produces a result
+    array that is nearly identical to a source array, except that one or more
+    attributes are renamed.</para>
+
+    <para>To persist the new attribute names when you use
+    <literal>attribute_rename</literal>, you must store the results to a new
+    array—if you store to the original array, the original attribute names are
+    left in place.</para>
+
+    <para>You can achieve the same functionality (and more) by using the
+    <literal>cast</literal> operator. For details, see <xref
+    linkend="castOperator"/>.</para>
 
     <para>You can use the attribute_rename operator in the FROM clause of an
     AQL SELECT statement, as a stand-alone operator in a AFL statement, or as
@@ -47,9 +55,9 @@
 --afl create array winnersFlat
    &lt;event:string,year:int64,person:string,country:string,time:double&gt;
    [i=0:*,12,0] --show-query=no --show-output=no
---shell --command=csv2scidb -s 1 -p SNSSN &lt; ../examples/winnersFew.csv &gt;
-    ../examples/winnersFew.scidb --show-query=no --show-output=no
---aql load winnersFlat from '../examples/winnersFew.scidb' --show-query=no --show-output=no
+--shell --command=csv2scidb -s 1 -p SNSSN &lt; $DOC_DATA/winnersFew.csv &gt;
+    $DOC_DATA/winnersFew.scidb --show-query=no --show-output=no
+--aql load winnersFlat from '../tests/harness/testcases/data/doc/winnersFew.scidb' --show-query=no --show-output=no
 --afl create array champions
    &lt;person:string,country:string,time:double&gt;
     [year=1996:2008,13,0, event(string)=3,3,0] --show-query=no --show-output=no

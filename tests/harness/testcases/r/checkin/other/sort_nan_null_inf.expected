@@ -19,7 +19,7 @@ Query was executed successfully
 
 SCIDB QUERY : <show(SortNanNullInf)>
 {i} schema
-{0} "SortNanNullInf<I:int64,V:double NULL DEFAULT null> [Line=0:*,6,0]"
+{0} 'SortNanNullInf<I:int64,V:double NULL DEFAULT null> [Line=0:*,6,0]'
 
 SCIDB QUERY : <sort(SortNanNullInf, V)>
 {n} I,V

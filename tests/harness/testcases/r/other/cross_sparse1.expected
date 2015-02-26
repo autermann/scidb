@@ -57,7 +57,7 @@ SCIDB QUERY : <select * into C from A where x=2 or x=3>
 
 SCIDB QUERY : <show(C)>
 {i} schema
-{0} "C<a:int32> [x=0:3,2,0,y=0:3,2,0]"
+{0} 'C<a:int32> [x=0:3,2,0,y=0:3,2,0]'
 
 SCIDB QUERY : <cross(A,C)>
 {x,y,x,y} a,a

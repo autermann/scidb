@@ -139,6 +139,13 @@ namespace scidb
  
     const std::string& SystemCatalog::initializeCluster()
     {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_initializeCluster, this);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+        return _uuid;
+    }
+
+    void SystemCatalog::_initializeCluster()
+    {
         ScopedMutexLock mutexLock(_pgLock);
 
         assert(_connection);
@@ -159,6 +166,10 @@ namespace scidb
 
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -177,8 +188,6 @@ namespace scidb
         }
 
         LOG4CXX_TRACE(logger, "Initialized cluster uuid = " << _uuid << ", metadata version = " << _metadataVersion);
-
-        return _uuid;
     }
 
     bool SystemCatalog::isInitialized() const
@@ -217,11 +226,19 @@ namespace scidb
 
     void SystemCatalog::addArray(ArrayDesc &array_desc, PartitioningSchema ps)
     {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_addArray,
+                this, ref(array_desc), ps);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_addArray(ArrayDesc &array_desc, PartitioningSchema ps)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::addArray ( array_name = " << array_desc.getName() << ")");
         LOG4CXX_TRACE(logger, "New Array    = " << array_desc );
         LOG4CXX_TRACE(logger, "Partitioning = " << ps );
 
         ScopedMutexLock mutexLock(_pgLock);
+
         if (++totalNewArrays > maxTotalNewArrays) { 
             maxTotalNewArrays = totalNewArrays;
         }
@@ -353,6 +370,10 @@ namespace scidb
             LOG4CXX_DEBUG(logger, "Create array " << array_desc.getName() << "(" << arrId << ") in query " << Query::getCurrentQueryID());
             array_desc.setIds(arrId, uaid, vid);
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -373,9 +394,17 @@ namespace scidb
 
     size_t SystemCatalog::countReferences(std::string const& arrayName)
     {
+        boost::function<size_t()> work = boost::bind(&SystemCatalog::_countReferences,
+                this, cref(arrayName));
+        return Query::runRestartableWork<size_t, broken_connection>(work, _reconnectTries);
+    }
+
+    size_t SystemCatalog::_countReferences(std::string const& arrayName)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::countReferences(arrayName=" << arrayName << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
+
         assert(_connection);
         size_t count = 0;
         try
@@ -409,10 +438,18 @@ namespace scidb
 
     void SystemCatalog::updateArray(const ArrayDesc &array_desc)
     {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_updateArray,
+                this, cref(array_desc));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_updateArray(const ArrayDesc &array_desc)
+    {
 
         LOG4CXX_TRACE(logger, "SystemCatalog::updateArray ( old_array_ID = " << array_desc.getId() << ", new array_name = " << array_desc.getName() << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
+
         boost::shared_ptr<ArrayDesc> oldArrayDesc = getArrayDesc(array_desc.getId());
 
         LOG4CXX_TRACE(logger, "Previously = " << *oldArrayDesc);
@@ -534,6 +571,10 @@ namespace scidb
                 query->arrayDescByNameCache.erase(oldArrayDesc->getName());
             }
         } 
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -552,7 +593,14 @@ namespace scidb
         }
     }
 
-    void SystemCatalog::getArrays(std::vector<std::string> &arrays) const
+    void SystemCatalog::getArrays(std::vector<std::string> &arrays)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_getArrays,
+                this, ref(arrays));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_getArrays(std::vector<std::string> &arrays)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrays()");
 
@@ -575,6 +623,10 @@ namespace scidb
 
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -596,7 +648,14 @@ namespace scidb
 
     }
 
-    bool SystemCatalog::containsArray(const ArrayID array_id) const
+    bool SystemCatalog::containsArray(const ArrayID array_id)
+    {
+        boost::function<bool()> work = boost::bind(&SystemCatalog::_containsArray,
+                this, array_id);
+        return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
+    }
+
+    bool SystemCatalog::_containsArray(const ArrayID array_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::containsArray( id = " << array_id << ")");
 
@@ -615,6 +674,10 @@ namespace scidb
             _connection->prepare(sql1, sql1)("bigint", treat_direct);
             result query_res1 = tr.prepared(sql1)(array_id).exec();
             return query_res1.size() != 0;
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -636,13 +699,20 @@ namespace scidb
         return false;
     }
 
-    bool SystemCatalog::containsArray(const string &array_name) const
+    bool SystemCatalog::containsArray(const string &array_name)
     {
         return findArrayByName(array_name) != INVALID_ARRAY_ID;
     }
     
 
-    ArrayID SystemCatalog::findArrayByName(const std::string &array_name) const
+    ArrayID SystemCatalog::findArrayByName(const std::string &array_name)
+    {
+        boost::function<ArrayID()> work = boost::bind(&SystemCatalog::_findArrayByName,
+                this, cref(array_name));
+        return Query::runRestartableWork<ArrayID, broken_connection>(work, _reconnectTries);
+    }
+
+    ArrayID SystemCatalog::_findArrayByName(const std::string &array_name)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::containsArray( name = " << array_name << ")");
 
@@ -661,6 +731,10 @@ namespace scidb
             if (query_res1.size() != 0) { 
                 return query_res1[0].at("id").as(int64_t());
             }
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -724,6 +798,13 @@ namespace scidb
 
     void SystemCatalog::getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException, boost::shared_ptr<Exception> &exception)
     {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_getArrayDesc,
+                this, cref(array_name), ref(array_desc), throwException, ref(exception));
+        return Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException, boost::shared_ptr<Exception> &exception)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( name = " << array_name << ")");
 
         boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false, false);
@@ -737,6 +818,7 @@ namespace scidb
         }
 
         ScopedMutexLock mutexLock(_pgLock);
+
         boost::shared_ptr<const ArrayDesc> dummy;
         boost::shared_ptr<const ArrayDesc>& ad(query ? query->arrayDescByNameCache[array_name] : dummy);
         if (ad) {
@@ -886,6 +968,10 @@ namespace scidb
             ad = newDesc;
             array_desc = *ad;
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -913,6 +999,13 @@ namespace scidb
     }
 
     boost::shared_ptr<ArrayDesc> SystemCatalog::getArrayDesc(const ArrayID array_id)
+    {
+        boost::function<boost::shared_ptr<ArrayDesc>()> work =
+                boost::bind(&SystemCatalog::_getArrayDesc, this, array_id);
+        return Query::runRestartableWork<boost::shared_ptr<ArrayDesc>, broken_connection>(work, _reconnectTries);
+    }
+
+    boost::shared_ptr<ArrayDesc> SystemCatalog::_getArrayDesc(const ArrayID array_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayDesc( id = " << array_id << ")");
         ScopedMutexLock mutexLock(_pgLock);
@@ -1047,6 +1140,10 @@ namespace scidb
                 _arrDescCache[array_id] = newDesc;
             }
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1070,6 +1167,13 @@ namespace scidb
 
     PartitioningSchema SystemCatalog::getPartitioningSchema(const ArrayID array_id)
     {
+        boost::function<PartitioningSchema()> work = boost::bind(&SystemCatalog::_getPartitioningSchema,
+                this, array_id);
+        return Query::runRestartableWork<PartitioningSchema, broken_connection>(work, _reconnectTries);
+    }
+
+    PartitioningSchema SystemCatalog::_getPartitioningSchema(const ArrayID array_id)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::getPartitioningSchema( id = " << array_id << ")");
         ScopedMutexLock mutexLock(_pgLock);
 
@@ -1089,6 +1193,10 @@ namespace scidb
             }
 
             return (PartitioningSchema)query_res[0].at("partitioning_schema").as(int());
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1113,6 +1221,13 @@ namespace scidb
                                                              " and AR.name like '%:%'");
 
     bool SystemCatalog::deleteArray(const string &array_name)
+    {
+        boost::function<bool()> work = boost::bind(&SystemCatalog::_deleteArrayByName,
+                this, cref(array_name));
+        return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
+    }
+
+    bool SystemCatalog::_deleteArrayByName(const string &array_name)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::deleteArray( name = " << array_name << ")");
 
@@ -1148,6 +1263,10 @@ namespace scidb
                 }
             }
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1169,6 +1288,13 @@ namespace scidb
 
     void SystemCatalog::deleteArray(const ArrayID array_id)
     {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_deleteArrayById,
+                this, array_id);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_deleteArrayById(const ArrayID array_id)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::deleteArray( array_id = " << array_id << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
@@ -1184,6 +1310,10 @@ namespace scidb
 
             tr.commit();
             _arrDescCache.erase(array_id);
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1226,7 +1356,7 @@ namespace scidb
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::invlaidateArrayCache( array_name = " << array_name << ")");
         ScopedMutexLock mutexLock(_pgLock);
-        
+
         size_t prefixLen = array_name.size();
         
         for (std::map<ArrayID, boost::shared_ptr<ArrayDesc> >::iterator i = _arrDescCache.begin();
@@ -1242,6 +1372,13 @@ namespace scidb
     } 
 
     VersionID SystemCatalog::createNewVersion(const ArrayID array_id, const ArrayID version_array_id)
+    {
+        boost::function<VersionID()> work = boost::bind(&SystemCatalog::_createNewVersion,
+                this, array_id, version_array_id);
+        return Query::runRestartableWork<VersionID, broken_connection>(work, _reconnectTries);
+    }
+
+    VersionID SystemCatalog::_createNewVersion(const ArrayID array_id, const ArrayID version_array_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::createNewVersion( array_id = " << array_id << ")");
         VersionID version_id = (VersionID)-1;
@@ -1275,6 +1412,10 @@ namespace scidb
 
                 tr.commit();
             }
+            catch (const broken_connection &e)
+            {
+                throw;
+            }
             catch (const sql_error &e)
             {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1298,6 +1439,13 @@ namespace scidb
 
     void SystemCatalog::deleteVersion(const ArrayID array_id, const VersionID version_id)
     {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_deleteVersion,
+                this, array_id, version_id);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_deleteVersion(const ArrayID array_id, const VersionID version_id)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::deleteVersion( array_id = " << array_id << ", version_id = " << version_id << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
@@ -1314,6 +1462,10 @@ namespace scidb
             tr.prepared("delete-version")(array_id)(version_id).exec();
             _connection->unprepare("delete-version");
             tr.commit();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1333,6 +1485,14 @@ namespace scidb
                 "Unknown exception when deleting a version of an updateable array";
         }
     }
+
+    VersionID SystemCatalog::getLastVersion(const ArrayID array_id)
+    {
+        boost::function<VersionID()> work = boost::bind(&SystemCatalog::_getLastVersion,
+                this, array_id);
+        return Query::runRestartableWork<VersionID, broken_connection>(work, _reconnectTries);
+    }
+
 /*
 ** TODO: We will need to rework this so that we only need to go back to the
 **       persistent meta-data store when the local cache is invalidated
@@ -1344,7 +1504,7 @@ namespace scidb
 **       'global', and the local is obliged to check it's local catalogs,
 **       then it can reload meta-data from the persistent store.
 */
-    VersionID SystemCatalog::getLastVersion(const ArrayID array_id)
+    VersionID SystemCatalog::_getLastVersion(const ArrayID array_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getLastVersion( array_id = " << array_id << ")");
 
@@ -1360,6 +1520,10 @@ namespace scidb
             VersionID version_id = query_res[0].at("vid").as(uint64_t());
             tr.commit();
             return version_id;
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1383,6 +1547,13 @@ namespace scidb
 
     VersionID SystemCatalog::lookupVersionByTimestamp(const ArrayID array_id, const uint64_t timestamp)
     {
+        boost::function<VersionID()> work = boost::bind(&SystemCatalog::_lookupVersionByTimestamp,
+                this, array_id, timestamp);
+        return Query::runRestartableWork<VersionID, broken_connection>(work, _reconnectTries);
+    }
+
+    VersionID SystemCatalog::_lookupVersionByTimestamp(const ArrayID array_id, const uint64_t timestamp)
+    {
         LOG4CXX_TRACE(logger, "SystemCatalog::lookupVersionByTimestamp( array_id = " << array_id << ", timestamp = " << timestamp << ")");
 
         ScopedMutexLock mutexLock(_pgLock);
@@ -1399,6 +1570,10 @@ namespace scidb
             VersionID version_id = query_res[0].at("vid").as(uint64_t());
             tr.commit();
             return version_id;
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1420,7 +1595,14 @@ namespace scidb
         return 0;
     }
 
-    std::vector<VersionDesc> SystemCatalog::getArrayVersions(const ArrayID array_id) const
+    std::vector<VersionDesc> SystemCatalog::getArrayVersions(const ArrayID array_id)
+    {
+        boost::function<std::vector<VersionDesc>()> work = boost::bind(&SystemCatalog::_getArrayVersions,
+                this, array_id);
+        return Query::runRestartableWork<std::vector<VersionDesc>, broken_connection>(work, _reconnectTries);
+    }
+
+    std::vector<VersionDesc> SystemCatalog::_getArrayVersions(const ArrayID array_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getArrayVersions( array_id = " << array_id << ")");
 
@@ -1441,6 +1623,10 @@ namespace scidb
             }
             tr.commit();
             return versions;
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1463,6 +1649,13 @@ namespace scidb
     }
 
     Coordinates SystemCatalog::getHighBoundary(const ArrayID array_id)
+    {
+        boost::function<Coordinates()> work = boost::bind(&SystemCatalog::_getHighBoundary,
+                this, array_id);
+        return Query::runRestartableWork<Coordinates, broken_connection>(work, _reconnectTries);
+    }
+
+    Coordinates SystemCatalog::_getHighBoundary(const ArrayID array_id)
     {
 
         LOG4CXX_TRACE(logger, "SystemCatalog::getHighBoundary( array_id = " << array_id << ")");
@@ -1489,6 +1682,10 @@ namespace scidb
             tr.commit();
             return highBoundary;
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1510,6 +1707,13 @@ namespace scidb
     }
 
     Coordinates SystemCatalog::getLowBoundary(const ArrayID array_id)
+    {
+        boost::function<Coordinates()> work = boost::bind(&SystemCatalog::_getLowBoundary,
+                this, array_id);
+        return Query::runRestartableWork<Coordinates, broken_connection>(work, _reconnectTries);
+    }
+
+    Coordinates SystemCatalog::_getLowBoundary(const ArrayID array_id)
     {
 
         LOG4CXX_TRACE(logger, "SystemCatalog::getLowBoundary( array_id = " << array_id << ")");
@@ -1536,6 +1740,10 @@ namespace scidb
             tr.commit();
             return lowBoundary;
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1557,6 +1765,13 @@ namespace scidb
     }
 
     void SystemCatalog::updateArrayBoundaries(ArrayDesc const& desc, PhysicalBoundaries const& bounds)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_updateArrayBoundaries,
+                this, cref(desc), ref(bounds));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_updateArrayBoundaries(ArrayDesc const& desc, PhysicalBoundaries const& bounds)
     {
         PhysicalBoundaries trimmed = bounds.trimToDims(desc.getDimensions());
         Coordinates const& low = trimmed.getStartCoords();
@@ -1587,6 +1802,10 @@ namespace scidb
             tr.commit();
             invalidateArrayCache(array_id);
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1606,7 +1825,14 @@ namespace scidb
         }
     }
 
-    uint32_t SystemCatalog::getNumberOfInstances() const
+    uint32_t SystemCatalog::getNumberOfInstances()
+    {
+        boost::function<uint32_t()> work = boost::bind(&SystemCatalog::_getNumberOfInstances,
+                this);
+        return Query::runRestartableWork<uint32_t, broken_connection>(work, _reconnectTries);
+    }
+
+    uint32_t SystemCatalog::_getNumberOfInstances()
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getNumberOfInstances()");
 
@@ -1621,6 +1847,10 @@ namespace scidb
             result query_res = tr.exec("select count(*) as cnt from \"instance\"");
             n_instances = query_res[0].at("cnt").as(uint32_t());
             tr.commit();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1642,7 +1872,14 @@ namespace scidb
         return n_instances;
     }
 
-    InstanceID SystemCatalog::addInstance(const InstanceDesc &instance) const
+    InstanceID SystemCatalog::addInstance(const InstanceDesc &instance)
+    {
+        boost::function<InstanceID()> work = boost::bind(&SystemCatalog::_addInstance,
+                this, cref(instance));
+        return Query::runRestartableWork<InstanceID, broken_connection>(work, _reconnectTries);
+    }
+
+    InstanceID SystemCatalog::_addInstance(const InstanceDesc &instance)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::addInstance( " << instance << ")");
 
@@ -1668,6 +1905,10 @@ namespace scidb
 
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1687,7 +1928,14 @@ namespace scidb
         return instance_id;
     }
 
-    void SystemCatalog::getInstances(Instances &instances) const
+    void SystemCatalog::getInstances(Instances &instances)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_getInstances,
+                this, ref(instances));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_getInstances(Instances &instances)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getInstances()");
 
@@ -1721,6 +1969,10 @@ namespace scidb
 
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1741,7 +1993,14 @@ namespace scidb
         LOG4CXX_TRACE(logger, "Retrieved " << instances.size() << " instances from catalogs");
     }
 
-    void SystemCatalog::getClusterInstance(const InstanceID instance_id, InstanceDesc &instance) const
+    void SystemCatalog::getClusterInstance(InstanceID instance_id, InstanceDesc &instance)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_getClusterInstance,
+                this, instance_id, ref(instance));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_getClusterInstance(InstanceID instance_id, InstanceDesc &instance)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::getInstance( instance_id = " << instance_id << " InstanceDesc& )");
 
@@ -1770,6 +2029,10 @@ namespace scidb
 
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1789,7 +2052,14 @@ namespace scidb
         LOG4CXX_TRACE(logger, "instance_id = " << instance_id << " is instance " << instance);
     }
 
-    void SystemCatalog::markInstanceOnline(const InstanceID instance_id, const std::string host, const uint16_t port) const
+    void SystemCatalog::markInstanceOnline(InstanceID instance_id, const std::string& host, uint16_t port)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_markInstanceOnline,
+                this, instance_id, cref(host), port);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_markInstanceOnline(InstanceID instance_id, const std::string& host, uint16_t port)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::markInstanceOnline( instance_id = " << instance_id << ", host = " << host << ", port = " << port << ")");
 
@@ -1811,6 +2081,10 @@ namespace scidb
 
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -1829,7 +2103,14 @@ namespace scidb
         }
     }
 
-    void SystemCatalog::markInstanceOffline(const InstanceID instance_id) const
+    void SystemCatalog::markInstanceOffline(InstanceID instance_id)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_markInstanceOffline,
+                this, instance_id);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_markInstanceOffline(InstanceID instance_id)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::markInstanceOffline( instance_id = " << instance_id << ")");
         ScopedMutexLock mutexLock(_pgLock);
@@ -1847,6 +2128,10 @@ namespace scidb
             tr.prepared(sql)(instance_id).exec();
 
             tr.commit();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -1866,8 +2151,18 @@ namespace scidb
         }
     }
 
-    void SystemCatalog::setDefaultCompressionMethod(const ArrayID array_id,
-                                                    const AttributeID attr_id, const int16_t compressionMethod)
+    void SystemCatalog::setDefaultCompressionMethod(ArrayID array_id,
+                                                    AttributeID attr_id,
+                                                    int16_t compressionMethod)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_setDefaultCompressionMethod,
+                this, array_id, attr_id, compressionMethod);
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_setDefaultCompressionMethod(ArrayID array_id,
+                                                    AttributeID attr_id,
+                                                    int16_t compressionMethod)
     {
 
         LOG4CXX_TRACE(logger, "SystemCatalog::setDefaultCompressionMethod( array_id = " << array_id
@@ -1902,6 +2197,10 @@ namespace scidb
 
             tr.commit();
             arrayDesc->invalidate();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -2032,7 +2331,14 @@ namespace scidb
         return false;
     }
 
-    void SystemCatalog::addLibrary(const string& libraryName) const
+    void SystemCatalog::addLibrary(const string& libraryName)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_addLibrary,
+                this, cref(libraryName));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_addLibrary(const string& libraryName)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::addLibrary( libraryName ='" << libraryName << ")");
 
@@ -2058,6 +2364,10 @@ namespace scidb
             _connection->unprepare("addLibrary");
             tr.commit();
         }
+        catch (const broken_connection &e)
+        {
+            throw;
+        }
         catch (const sql_error &e)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -2077,7 +2387,14 @@ namespace scidb
         }
     }
 
-    void SystemCatalog::getLibraries(vector< string >& libraries) const
+    void SystemCatalog::getLibraries(vector<string >& libraries)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_getLibraries,
+                this, ref(libraries));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_getLibraries(vector< string >& libraries)
     {
 
         LOG4CXX_TRACE(logger, "SystemCatalog::getLibraries ( &libraries )");
@@ -2098,6 +2415,10 @@ namespace scidb
             }
             _connection->unprepare("getLibraries");
             tr.commit();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -2120,7 +2441,14 @@ namespace scidb
         LOG4CXX_TRACE(logger, "Loaded " << libraries.size() << " libraries.");
     }
 
-    void SystemCatalog::removeLibrary(const string& libraryName) const
+    void SystemCatalog::removeLibrary(const string& libraryName)
+    {
+        boost::function<void()> work = boost::bind(&SystemCatalog::_removeLibrary,
+                this, cref(libraryName));
+        Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+    }
+
+    void SystemCatalog::_removeLibrary(const string& libraryName)
     {
         LOG4CXX_TRACE(logger, "SystemCatalog::removeLibrary ( " << libraryName << ")");
 
@@ -2138,6 +2466,10 @@ namespace scidb
                 (libraryName).exec();
             _connection->unprepare("removeLibrary");
             tr.commit();
+        }
+        catch (const broken_connection &e)
+        {
+            throw;
         }
         catch (const sql_error &e)
         {
@@ -2163,7 +2495,8 @@ namespace scidb
     _initialized(false),
     _connection(NULL),
     _uuid(""),
-    _metadataVersion(-1)
+    _metadataVersion(-1),
+    _reconnectTries(Config::getInstance()->getOption<int>(CONFIG_CATALOG_RECONNECT_TRIES))
     {
 
     }
@@ -2183,7 +2516,6 @@ namespace scidb
             }
             catch (...)
             {
-                // FIXME: Log this error
                 LOG4CXX_DEBUG(logger, "Error when disconnecting from PostgreSQL.");
             }
         }
@@ -2265,6 +2597,13 @@ std::string SystemCatalog::getLockInsertSql(const boost::shared_ptr<LockDesc>& l
 }
 
 bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, ErrorChecker& errorChecker)
+{
+    boost::function<bool()> work = boost::bind(&SystemCatalog::_lockArray,
+            this, cref(lockDesc), ref(errorChecker));
+    return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
+}
+
+bool SystemCatalog::_lockArray(const boost::shared_ptr<LockDesc>& lockDesc, ErrorChecker& errorChecker)
 {
    assert(lockDesc);
    LOG4CXX_DEBUG(logger, "SystemCatalog::lockArray: "<<lockDesc->toString());
@@ -2470,6 +2809,10 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
          sleep(nsec);
       }
    }
+   catch (const broken_connection &e)
+   {
+       throw;
+   }
    catch (const sql_error &e)
    {
       LOG4CXX_ERROR(logger, "SystemCatalog::lockArray: postgress exception:"<< e.what());
@@ -2496,6 +2839,13 @@ bool SystemCatalog::lockArray(const boost::shared_ptr<LockDesc>& lockDesc, Error
 }
 
 bool SystemCatalog::unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
+{
+    boost::function<bool()> work = boost::bind(&SystemCatalog::_unlockArray,
+            this, cref(lockDesc));
+    return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
+}
+
+bool SystemCatalog::_unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
 {
    assert(lockDesc);
    LOG4CXX_DEBUG(logger, "SystemCatalog::unlockArray: "<<lockDesc->toString());
@@ -2524,6 +2874,10 @@ bool SystemCatalog::unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
          tr.commit();
       }
    }
+   catch (const broken_connection &e)
+   {
+       throw;
+   }
    catch (const sql_error &e)
    {
       LOG4CXX_ERROR(logger, "SystemCatalog::unlockArray: postgress exception:"<< e.what());
@@ -2550,6 +2904,13 @@ bool SystemCatalog::unlockArray(const boost::shared_ptr<LockDesc>& lockDesc)
 }
 
 bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
+{
+    boost::function<bool()> work = boost::bind(&SystemCatalog::_updateArrayLock,
+            this, cref(lockDesc));
+    return Query::runRestartableWork<bool, broken_connection>(work, _reconnectTries);
+}
+
+bool SystemCatalog::_updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
 {
    assert(lockDesc);
    LOG4CXX_TRACE(logger, "SystemCatalog::updateArrayLock: "<<lockDesc->toString());
@@ -2586,6 +2947,10 @@ bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
          tr.commit();
       }
    }
+   catch (const broken_connection &e)
+   {
+       throw;
+   }
    catch (const sql_error &e)
    {
       LOG4CXX_ERROR(logger, "SystemCatalog::updateArrayLock: postgress exception:"<< e.what());
@@ -2612,6 +2977,15 @@ bool SystemCatalog::updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc)
 }
 
 void SystemCatalog::readArrayLocks(const InstanceID instanceId,
+                                   std::list<boost::shared_ptr<LockDesc> >& coordLocks,
+                                   std::list<boost::shared_ptr<LockDesc> >& workerLocks)
+{
+    boost::function<void()> work = boost::bind(&SystemCatalog::_readArrayLocks,
+            this, instanceId, ref(coordLocks), ref(workerLocks));
+    Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+}
+
+void SystemCatalog::_readArrayLocks(const InstanceID instanceId,
                                    std::list<boost::shared_ptr<LockDesc> >& coordLocks,
                                    std::list<boost::shared_ptr<LockDesc> >& workerLocks)
 {
@@ -2652,6 +3026,10 @@ void SystemCatalog::readArrayLocks(const InstanceID instanceId,
       }
       tr.commit();
    }
+   catch (const broken_connection &e)
+   {
+       throw;
+   }
    catch (const sql_error &e)
    {
       LOG4CXX_ERROR(logger, "SystemCatalog::readArrayLocks: postgress exception:"<< e.what());
@@ -2674,18 +3052,26 @@ void SystemCatalog::readArrayLocks(const InstanceID instanceId,
    }
 }
 
-uint32_t SystemCatalog::deleteArrayLocks(const InstanceID& instanceId)
+uint32_t SystemCatalog::deleteArrayLocks(InstanceID instanceId)
 {
     return deleteArrayLocks(instanceId, INVALID_QUERY_ID);
 }
 
-uint32_t SystemCatalog::deleteArrayLocks(const InstanceID& instanceId, const QueryID& queryId)
+uint32_t SystemCatalog::deleteArrayLocks(InstanceID instanceId, QueryID queryId)
+{
+    boost::function<uint32_t()> work = boost::bind(&SystemCatalog::_deleteArrayLocks,
+            this, instanceId, queryId);
+    return Query::runRestartableWork<uint32_t, broken_connection>(work, _reconnectTries);
+}
+
+uint32_t SystemCatalog::_deleteArrayLocks(InstanceID instanceId, QueryID queryId)
 {
     LOG4CXX_DEBUG(logger, "SystemCatalog::deleteArrayLocks instanceId = "
                   << instanceId
                   << " queryId = "<<queryId);
    size_t numLocksDeleted = 0;
    ScopedMutexLock mutexLock(_pgLock);
+
    try
    {
       assert(_connection);
@@ -2715,6 +3101,10 @@ uint32_t SystemCatalog::deleteArrayLocks(const InstanceID& instanceId, const Que
                     <<"locks for instance " << instanceId);
       tr.commit();
    }
+   catch (const broken_connection &e)
+   {
+       throw;
+   }
    catch (const sql_error &e)
    {
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -2736,7 +3126,15 @@ uint32_t SystemCatalog::deleteArrayLocks(const InstanceID& instanceId, const Que
 }
 
 boost::shared_ptr<SystemCatalog::LockDesc>
-SystemCatalog::checkForCoordinatorLock(const string& arrayName, const QueryID& queryId)
+SystemCatalog::checkForCoordinatorLock(const string& arrayName, QueryID queryId)
+{
+    boost::function<boost::shared_ptr<SystemCatalog::LockDesc>()> work = boost::bind(&SystemCatalog::_checkForCoordinatorLock,
+            this, cref(arrayName), queryId);
+    return Query::runRestartableWork<boost::shared_ptr<SystemCatalog::LockDesc>, broken_connection>(work, _reconnectTries);
+}
+
+boost::shared_ptr<SystemCatalog::LockDesc>
+SystemCatalog::_checkForCoordinatorLock(const string& arrayName, QueryID queryId)
 {
    LOG4CXX_TRACE(logger, "SystemCatalog::checkForCoordinatorLock:"
                  << " arrayName = " << arrayName
@@ -2745,6 +3143,7 @@ SystemCatalog::checkForCoordinatorLock(const string& arrayName, const QueryID& q
    boost::shared_ptr<LockDesc> coordLock;
 
    ScopedMutexLock mutexLock(_pgLock);
+
    assert(_connection);
    try
    {
@@ -2777,6 +3176,10 @@ SystemCatalog::checkForCoordinatorLock(const string& arrayName, const QueryID& q
       }
       tr.commit();
    }
+   catch (const broken_connection &e)
+   {
+       throw;
+   }
    catch (const sql_error &e)
    {
       throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query() << e.what();
@@ -2800,6 +3203,13 @@ SystemCatalog::checkForCoordinatorLock(const string& arrayName, const QueryID& q
 
 void SystemCatalog::renameArray(const string &old_array_name, const string &new_array_name)
 {
+    boost::function<void()> work = boost::bind(&SystemCatalog::_renameArray,
+            this, cref(old_array_name), cref(new_array_name));
+    Query::runRestartableWork<void, broken_connection>(work, _reconnectTries);
+}
+
+void SystemCatalog::_renameArray(const string &old_array_name, const string &new_array_name)
+{
    LOG4CXX_TRACE(logger, "SystemCatalog::renameArray( old name = "
                  << old_array_name << ")"
                  << "new name = " << new_array_name << ")");
@@ -2807,6 +3217,7 @@ void SystemCatalog::renameArray(const string &old_array_name, const string &new_
    // replace all AAA, AAA@y with BBB, BBB@y correspondingly
    string renameSql = "update \"array\" set name=regexp_replace(name, '^'||$1::VARCHAR||'(@.+)?$', $2::VARCHAR||E'\\\\1')";
    ScopedMutexLock mutexLock(_pgLock);
+
    assert(_connection);
    try
    {
@@ -2821,6 +3232,10 @@ void SystemCatalog::renameArray(const string &old_array_name, const string &new_
       }
       tr.commit();
       invalidateArrayCache(old_array_name);
+   }
+   catch (const broken_connection &e)
+   {
+       throw;
    }
    catch (const unique_violation& e)
    {

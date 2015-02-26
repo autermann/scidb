@@ -82,13 +82,13 @@ public:
         // bS = blockSize, a multiple of chunkSize
         size_t bSCol = roundUpToMultiple(nCol, cSCol * nInstances) * cSCol ;
         if (!nRow || !nCol || !bSCol)
-            return shared_ptr<Array>(new MemArray(_schema));
+        return shared_ptr<Array>(new MemArray(_schema,query));
 
         // check for participation (may have more instances than array can use)
         size_t usedInstances = roundUpToMultiple(nCol, bSCol);
         if (usedInstances < nInstances) {
             if (query->getInstanceID() >= usedInstances) {
-                return shared_ptr<Array>(new MemArray(_schema));
+                return shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
 

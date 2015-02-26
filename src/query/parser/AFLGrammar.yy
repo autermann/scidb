@@ -105,7 +105,7 @@ statement:
 create_array_statement:
     CREATE immutable_modifier empty_modifier ARRAY identifier_clause schema 
     {
-        $$ = new AstNode(createArray, CONTEXT(@1),
+        $$ = new AstNode(createArray, CONTEXT(@$),
             createArrayArgCount,
             $2,
             $3,
@@ -129,7 +129,7 @@ immutable_modifier:
 empty_modifier:
     NOT EMPTY
     {
-        $$ = new AstNodeBool(emptyable, CONTEXT(@1), false);
+        $$ = new AstNodeBool(emptyable, CONTEXT(@$), false);
     }
     | EMPTY
     {
@@ -171,7 +171,7 @@ array_attribute_list:
 array_attribute:
     identifier_clause ':' typename nullable_modifier default compression reserve
     {
-        $$ = new AstNode(attribute, CONTEXT(@1),
+        $$ = new AstNode(attribute, CONTEXT(@$),
             attributeArgCount, 
             $1,
             $3,
@@ -187,7 +187,7 @@ array_attribute:
 nullable_modifier:
     NOT NULL_VALUE
     {
-        $$ = new AstNodeBool(attributeIsNullable, CONTEXT(@1), false);
+        $$ = new AstNodeBool(attributeIsNullable, CONTEXT(@$), false);
     }
     | NULL_VALUE
     {
@@ -309,7 +309,7 @@ array_dimension:
     }    
     | identifier_clause '(' distinct typename ')' '=' dimension_boundary_end ',' expr ',' expr
     {
-        $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
+        $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
             $3,
@@ -323,7 +323,7 @@ array_dimension:
     }
     | identifier_clause '(' distinct typename ')'
     {
-        $$ = new AstNode(nonIntegerDimension, CONTEXT(@1),
+        $$ = new AstNode(nonIntegerDimension, CONTEXT(@$),
             nIdimensionArgCount,
             $1,
             $3,
@@ -340,7 +340,7 @@ array_dimension:
 dimension_boundaries:
     expr ':' dimension_boundary_end
     {
-        $$ = new AstNode(dimensionBoundaries, CONTEXT(@1),
+        $$ = new AstNode(dimensionBoundaries, CONTEXT(@$),
             dimensionBoundaryArgCount,
             $1,
             $3);        
@@ -378,7 +378,7 @@ typename: identifier_clause;
 function:
     identifier_clause '(' ')' function_alias
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             $1,
             new AstNode(functionArguments, CONTEXT(@2), 0),
@@ -387,7 +387,7 @@ function:
     }
     | identifier_clause '(' function_argument_list ')' function_alias
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             $1,
             $3,
@@ -396,7 +396,7 @@ function:
     }
     | identifier_clause AS identifier_clause
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             new AstNodeString(functionName, CONTEXT(@1), "scan"),
             new AstNode(functionArguments, CONTEXT(@1), 1,            
@@ -415,7 +415,7 @@ function:
     // Little aggregate syntax sugar. Now only COUNT using asterisc to count all attributes.
     | identifier_clause '(' asterisk ')' function_alias
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             $1,
             new AstNode(functionArguments, CONTEXT(@2), 1,
@@ -425,7 +425,7 @@ function:
     }
     | reference AS identifier_clause
     {
-        $$ = new AstNode(function, CONTEXT(@1),
+        $$ = new AstNode(function, CONTEXT(@$),
             functionArgCount,
             new AstNodeString(functionName, CONTEXT(@1), "scan"),
             new AstNode(functionArguments, CONTEXT(@1), 1,
@@ -471,7 +471,7 @@ function_argument:
     }
     | empty_modifier schema
     {
-        $$ = new AstNode(anonymousSchema, CONTEXT(@1), anonymousSchemaArgCount, $1, $2);
+        $$ = new AstNode(anonymousSchema, CONTEXT(@$), anonymousSchemaArgCount, $1, $2);
     }
     ;
     
@@ -683,7 +683,7 @@ constant_NA:
 reference:
     identifier_clause timestamp_clause index_clause sort_quirk
     {
-        $$ = new AstNode(reference, CONTEXT(@1), referenceArgCount,
+        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
             NULL,
             $1,
             $2,
@@ -693,7 +693,7 @@ reference:
     }
     | identifier_clause '.' identifier_clause sort_quirk
     {
-        $$ = new AstNode(reference, CONTEXT(@1), referenceArgCount,
+        $$ = new AstNode(reference, CONTEXT(@$), referenceArgCount,
             $1,
             $3,
             NULL,
@@ -732,7 +732,7 @@ index_clause:
 schema:
     '<' array_attribute_list '>' '[' array_dimension_list ']'
     {
-        $$ = new AstNode(schema, CONTEXT(@1), schemaArgCount,
+        $$ = new AstNode(schema, CONTEXT(@$), schemaArgCount,
             $2,
             $5
         );
@@ -750,9 +750,11 @@ case_expr:
         AstNode* currentIif = NULL;
         AstNode* lastIif = NULL;
         bool first = true;
-        for(size_t i = 0; i < $3->getChildsCount(); ++i)
+        for(size_t i = 0, n = $3->getChildsCount(); i < n; ++i)
         {
             currentIif = $3->getChild(i);
+            $3->setChild(i, NULL);
+
             if (!iifNode)
             {
                 iifNode = currentIif;
@@ -774,6 +776,7 @@ case_expr:
                     glue.error(
                         currentIif->getChild(functionArgParameters)->getChild(0)->getParsingContext(),
                         "Function or scalar operator expected");
+                    delete currentIif;
                     delete $2;
                     delete $3;
                     delete $4;
@@ -790,12 +793,11 @@ case_expr:
             first = false;
         }
 
-        if ($4)
-        {
-            //Filling third parameter of IIF for ELSE clause
-            lastIif->getChild(functionArgParameters)->setChild(2, $4);            
-        }
+        //Filling third parameter of IIF for ELSE clause
+        lastIif->getChild(functionArgParameters)->setChild(2,
+            $4 ? $4 : new AstNodeNull(null, CONTEXT(@4)));            
 
+        delete $3;
         $$ = iifNode;
     }
     ;
@@ -822,14 +824,13 @@ case_when_clause_list:
 case_when_clause:
     WHEN expr THEN expr
     {
-        //$$ = new AstNode(caseWhenClause, CONTEXT(@1), caseWhenClauseArgCount, $2, $4);
         $$ = new AstNode(function, CONTEXT(@$),
                 functionArgCount,
                 new AstNodeString(identifierClause, CONTEXT(@$), "iif"),
                 new AstNode(functionArguments, CONTEXT(@$), 3,
                     $2, //will be updated in case_expr
                     $4,
-                    new AstNodeNull(null, CONTEXT(@$)) //will be filled in case_expr
+                    NULL //will be filled in case_expr
                 ),
                 NULL,
                 new AstNodeBool(boolNode, CONTEXT(@$), false)
@@ -852,9 +853,9 @@ beetween_expr:
     expr BETWEEN reduced_expr AND reduced_expr %prec BETWEEN
     {
         $$ = makeBinaryScalarOp("and",
-                makeBinaryScalarOp(">=", $1, $3, CONTEXT(@1)),
-                makeBinaryScalarOp("<=", $1->clone(), $5, CONTEXT(@1)),
-                CONTEXT(@1)
+                makeBinaryScalarOp(">=", $1, $3, CONTEXT(@$)),
+                makeBinaryScalarOp("<=", $1->clone(), $5, CONTEXT(@$)),
+                CONTEXT(@$)
                 );
     }
     ;

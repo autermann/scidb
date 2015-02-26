@@ -176,7 +176,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
         LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): participating in MPI");
     } else {
         LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): not participating in MPI");
-        return shared_ptr<Array>(new MemArray(_schema));
+        return shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     // REFACTOR: this is a pattern in DLAs
@@ -470,7 +470,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
             // (note that these nodes still participated in the global generation of the S vector, it is merely that
             //  the ScaLAPACK algorithm produces replicas of it due to the way the algorithm works).
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(SIGMA): at process grid ("<<MYPROW<<","<<MYPCOL<<") Creating empty MemArray");
-            result = shared_ptr<Array>(new MemArray(outSchema)); // empty array to return
+            result = shared_ptr<Array>(new MemArray(outSchema,query)); // empty array to return
             assert(resultShmIpcIndx == shmIpc.size());
         }
     }
@@ -517,7 +517,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
             resultShmIpcIndx = BUF_MAT_U;  // this ShmIpc memory cannot be released at the end of the method
         } else {
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(U): participated, but not in output array, creating empty output array: first ("<<first[0]<<","<<first[1]<<"), last(" << last[0] <<"," <<last[1]<<")");
-            result = shared_ptr<Array>(new MemArray(outSchema));   // empty array to return
+            result = shared_ptr<Array>(new MemArray(outSchema,query));   // empty array to return
             assert(resultShmIpcIndx == shmIpc.size());
         }
     }
@@ -557,7 +557,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& redi
             resultShmIpcIndx = BUF_MAT_VT; // this ShmIpc memory cannot be released at the end of the method
         } else {
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(VT): participated, but not in output array, creating empty output array: first ("<<first[0]<<","<<first[1]<<"), last(" << last[0] <<"," <<last[1]<<")");
-            result = shared_ptr<Array>(new MemArray(outSchema));   // empty array to return
+            result = shared_ptr<Array>(new MemArray(outSchema,query));   // empty array to return
             assert(resultShmIpcIndx == shmIpc.size());
         }
     }

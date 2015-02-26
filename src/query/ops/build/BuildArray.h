@@ -84,6 +84,7 @@ public:
     virtual bool setPosition(Coordinates const& pos);
     virtual void reset();
     ConstChunk const& getChunk();
+    virtual boost::shared_ptr<Query> getQuery() { return _query; }
 
     BuildChunkIterator(BuildArray& array, ConstChunk const* chunk, AttributeID attrID, int iterationMode);
 
@@ -101,7 +102,8 @@ public:
     Value _trueValue;
     Expression _expression;
     ExpressionContext _params;
-    bool _nullable;    
+    bool _nullable;
+    boost::shared_ptr<Query> _query;
 };
 
 class BuildArrayIterator : public ConstArrayIterator
@@ -148,7 +150,6 @@ private:
      FunctionPointer _converter;
     size_t nInstances;
     size_t instanceID;
-    boost::weak_ptr<Query> _query;
 };
 
 }

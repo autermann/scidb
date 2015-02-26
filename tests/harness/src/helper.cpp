@@ -879,10 +879,10 @@ int tokenize_commandline (const string str, vector<string> &token_list)
 	LOG4CXX_INFO (logger, "Tokenizing : [" << command << "]");
 
 	int rbytes, exit_code=FAILURE;
-	char buf[BUFSIZ];
+	char buf[BUFSIZ+1];
 	FILE *pipe = 0;
 	string stored_buf;
-	while ((rbytes = ReadOutputOf (command, &pipe, buf, sizeof (buf), &exit_code)) > 0)
+	while ((rbytes = ReadOutputOf (command, &pipe, buf, BUFSIZ, &exit_code)) > 0)
 	{
 		buf[rbytes] = 0;
 

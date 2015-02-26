@@ -12,47 +12,47 @@ Query was executed successfully
 
 SCIDB QUERY : <store(join(build_sparse(T,x,1),build_sparse(TS,string(x+10),1)),A)>
 {x} a,b
-{0} 0,"10"
-{1} 1,"11"
-{2} 2,"12"
+{0} 0,'10'
+{1} 1,'11'
+{2} 2,'12'
 
 SCIDB QUERY : <redimension_store(A,B)>
 {a} b,x
-{0} "10",0
-{1} "11",1
-{2} "12",2
+{0} '10',0
+{1} '11',1
+{2} '12',2
 
 SCIDB QUERY : <select name,schema from list()>
 {No} name,schema
-{0} "A","A<a:int32,b:string> [x=0:2,3,0]"
-{1} "B","B<b:string,x:int64> [a(int32)=3,3,0]"
-{2} "T","T<a:int32> [x=0:2,3,0]"
-{3} "TS","TS<a:string> [x=0:2,3,0]"
+{0} 'A','A<a:int32,b:string> [x=0:2,3,0]'
+{1} 'B','B<b:string,x:int64> [a(int32)=3,3,0]'
+{2} 'T','T<a:int32> [x=0:2,3,0]'
+{3} 'TS','TS<a:string> [x=0:2,3,0]'
 
 SCIDB QUERY : <update B set b = b + '_new' where x=1>
 {a} b,x
-{0} "10",0
-{1} "11_new",1
-{2} "12",2
+{0} '10',0
+{1} '11_new',1
+{2} '12',2
 
 SCIDB QUERY : <select name,schema from list()>
 {No} name,schema
-{0} "A","A<a:int32,b:string> [x=0:2,3,0]"
-{1} "B","B<b:string,x:int64> [a(int32)=3,3,0]"
-{2} "T","T<a:int32> [x=0:2,3,0]"
-{3} "TS","TS<a:string> [x=0:2,3,0]"
+{0} 'A','A<a:int32,b:string> [x=0:2,3,0]'
+{1} 'B','B<b:string,x:int64> [a(int32)=3,3,0]'
+{2} 'T','T<a:int32> [x=0:2,3,0]'
+{3} 'TS','TS<a:string> [x=0:2,3,0]'
 
 SCIDB QUERY : <redimension_store(B,A)>
 {x} a,b
-{0} 0,"10"
-{1} 1,"11_new"
-{2} 2,"12"
+{0} 0,'10'
+{1} 1,'11_new'
+{2} 2,'12'
 
 SCIDB QUERY : <scan(A)>
 {x} a,b
-{0} 0,"10"
-{1} 1,"11_new"
-{2} 2,"12"
+{0} 0,'10'
+{1} 1,'11_new'
+{2} 2,'12'
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

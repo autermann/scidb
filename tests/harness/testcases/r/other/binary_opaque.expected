@@ -31,190 +31,190 @@ SCIDB QUERY : <count(join(join(build(<s: string>[i=1:25,5,0], 'sample-'+string((
 
 SCIDB QUERY : <store(join(join(build(<s: string>[i=1:25,5,0], 'sample-'+string((i-1)%5)), build(<p: string>[i=1:25,5,0], 'probe-'+string((i-1)/5))), build(<val: double>[i=1:25,5,0], 1.01*i*i-i)), expo)>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-0","probe-1",30.36
-{7} "sample-1","probe-1",42.49
-{8} "sample-2","probe-1",56.64
-{9} "sample-3","probe-1",72.81
-{10} "sample-4","probe-1",91
-{11} "sample-0","probe-2",111.21
-{12} "sample-1","probe-2",133.44
-{13} "sample-2","probe-2",157.69
-{14} "sample-3","probe-2",183.96
-{15} "sample-4","probe-2",212.25
-{16} "sample-0","probe-3",242.56
-{17} "sample-1","probe-3",274.89
-{18} "sample-2","probe-3",309.24
-{19} "sample-3","probe-3",345.61
-{20} "sample-4","probe-3",384
-{21} "sample-0","probe-4",424.41
-{22} "sample-1","probe-4",466.84
-{23} "sample-2","probe-4",511.29
-{24} "sample-3","probe-4",557.76
-{25} "sample-4","probe-4",606.25
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-0','probe-1',30.36
+{7} 'sample-1','probe-1',42.49
+{8} 'sample-2','probe-1',56.64
+{9} 'sample-3','probe-1',72.81
+{10} 'sample-4','probe-1',91
+{11} 'sample-0','probe-2',111.21
+{12} 'sample-1','probe-2',133.44
+{13} 'sample-2','probe-2',157.69
+{14} 'sample-3','probe-2',183.96
+{15} 'sample-4','probe-2',212.25
+{16} 'sample-0','probe-3',242.56
+{17} 'sample-1','probe-3',274.89
+{18} 'sample-2','probe-3',309.24
+{19} 'sample-3','probe-3',345.61
+{20} 'sample-4','probe-3',384
+{21} 'sample-0','probe-4',424.41
+{22} 'sample-1','probe-4',466.84
+{23} 'sample-2','probe-4',511.29
+{24} 'sample-3','probe-4',557.76
+{25} 'sample-4','probe-4',606.25
 
 SCIDB QUERY : <show(expo)>
 {i} schema
-{0} "expo<s:string,p:string,val:double> [i=1:25,5,0]"
+{0} 'expo<s:string,p:string,val:double> [i=1:25,5,0]'
 
 SCIDB QUERY : <store(join(join(build(<s: string>[i=1:36,6,0], 'sample-'+string((i-1)%6)), build(<p: string>[i=1:36,6,0], 'probe-'+string((i-1)/6))), build(<val: double>[i=1:36,6,0], 1.01*i*i-i)), expo2)>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-5","probe-0",30.36
-{7} "sample-0","probe-1",42.49
-{8} "sample-1","probe-1",56.64
-{9} "sample-2","probe-1",72.81
-{10} "sample-3","probe-1",91
-{11} "sample-4","probe-1",111.21
-{12} "sample-5","probe-1",133.44
-{13} "sample-0","probe-2",157.69
-{14} "sample-1","probe-2",183.96
-{15} "sample-2","probe-2",212.25
-{16} "sample-3","probe-2",242.56
-{17} "sample-4","probe-2",274.89
-{18} "sample-5","probe-2",309.24
-{19} "sample-0","probe-3",345.61
-{20} "sample-1","probe-3",384
-{21} "sample-2","probe-3",424.41
-{22} "sample-3","probe-3",466.84
-{23} "sample-4","probe-3",511.29
-{24} "sample-5","probe-3",557.76
-{25} "sample-0","probe-4",606.25
-{26} "sample-1","probe-4",656.76
-{27} "sample-2","probe-4",709.29
-{28} "sample-3","probe-4",763.84
-{29} "sample-4","probe-4",820.41
-{30} "sample-5","probe-4",879
-{31} "sample-0","probe-5",939.61
-{32} "sample-1","probe-5",1002.24
-{33} "sample-2","probe-5",1066.89
-{34} "sample-3","probe-5",1133.56
-{35} "sample-4","probe-5",1202.25
-{36} "sample-5","probe-5",1272.96
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-5','probe-0',30.36
+{7} 'sample-0','probe-1',42.49
+{8} 'sample-1','probe-1',56.64
+{9} 'sample-2','probe-1',72.81
+{10} 'sample-3','probe-1',91
+{11} 'sample-4','probe-1',111.21
+{12} 'sample-5','probe-1',133.44
+{13} 'sample-0','probe-2',157.69
+{14} 'sample-1','probe-2',183.96
+{15} 'sample-2','probe-2',212.25
+{16} 'sample-3','probe-2',242.56
+{17} 'sample-4','probe-2',274.89
+{18} 'sample-5','probe-2',309.24
+{19} 'sample-0','probe-3',345.61
+{20} 'sample-1','probe-3',384
+{21} 'sample-2','probe-3',424.41
+{22} 'sample-3','probe-3',466.84
+{23} 'sample-4','probe-3',511.29
+{24} 'sample-5','probe-3',557.76
+{25} 'sample-0','probe-4',606.25
+{26} 'sample-1','probe-4',656.76
+{27} 'sample-2','probe-4',709.29
+{28} 'sample-3','probe-4',763.84
+{29} 'sample-4','probe-4',820.41
+{30} 'sample-5','probe-4',879
+{31} 'sample-0','probe-5',939.61
+{32} 'sample-1','probe-5',1002.24
+{33} 'sample-2','probe-5',1066.89
+{34} 'sample-3','probe-5',1133.56
+{35} 'sample-4','probe-5',1202.25
+{36} 'sample-5','probe-5',1272.96
 
 SCIDB QUERY : <show(expo2)>
 {i} schema
-{0} "expo2<s:string,p:string,val:double> [i=1:36,6,0]"
+{0} 'expo2<s:string,p:string,val:double> [i=1:36,6,0]'
 
 SCIDB QUERY : <save(expo, 'expo.bin', -2, 'opaque')>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-0","probe-1",30.36
-{7} "sample-1","probe-1",42.49
-{8} "sample-2","probe-1",56.64
-{9} "sample-3","probe-1",72.81
-{10} "sample-4","probe-1",91
-{11} "sample-0","probe-2",111.21
-{12} "sample-1","probe-2",133.44
-{13} "sample-2","probe-2",157.69
-{14} "sample-3","probe-2",183.96
-{15} "sample-4","probe-2",212.25
-{16} "sample-0","probe-3",242.56
-{17} "sample-1","probe-3",274.89
-{18} "sample-2","probe-3",309.24
-{19} "sample-3","probe-3",345.61
-{20} "sample-4","probe-3",384
-{21} "sample-0","probe-4",424.41
-{22} "sample-1","probe-4",466.84
-{23} "sample-2","probe-4",511.29
-{24} "sample-3","probe-4",557.76
-{25} "sample-4","probe-4",606.25
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-0','probe-1',30.36
+{7} 'sample-1','probe-1',42.49
+{8} 'sample-2','probe-1',56.64
+{9} 'sample-3','probe-1',72.81
+{10} 'sample-4','probe-1',91
+{11} 'sample-0','probe-2',111.21
+{12} 'sample-1','probe-2',133.44
+{13} 'sample-2','probe-2',157.69
+{14} 'sample-3','probe-2',183.96
+{15} 'sample-4','probe-2',212.25
+{16} 'sample-0','probe-3',242.56
+{17} 'sample-1','probe-3',274.89
+{18} 'sample-2','probe-3',309.24
+{19} 'sample-3','probe-3',345.61
+{20} 'sample-4','probe-3',384
+{21} 'sample-0','probe-4',424.41
+{22} 'sample-1','probe-4',466.84
+{23} 'sample-2','probe-4',511.29
+{24} 'sample-3','probe-4',557.76
+{25} 'sample-4','probe-4',606.25
 
 SCIDB QUERY : <load(expo, 'expo.bin', -2, 'opaque')>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-0","probe-1",30.36
-{7} "sample-1","probe-1",42.49
-{8} "sample-2","probe-1",56.64
-{9} "sample-3","probe-1",72.81
-{10} "sample-4","probe-1",91
-{11} "sample-0","probe-2",111.21
-{12} "sample-1","probe-2",133.44
-{13} "sample-2","probe-2",157.69
-{14} "sample-3","probe-2",183.96
-{15} "sample-4","probe-2",212.25
-{16} "sample-0","probe-3",242.56
-{17} "sample-1","probe-3",274.89
-{18} "sample-2","probe-3",309.24
-{19} "sample-3","probe-3",345.61
-{20} "sample-4","probe-3",384
-{21} "sample-0","probe-4",424.41
-{22} "sample-1","probe-4",466.84
-{23} "sample-2","probe-4",511.29
-{24} "sample-3","probe-4",557.76
-{25} "sample-4","probe-4",606.25
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-0','probe-1',30.36
+{7} 'sample-1','probe-1',42.49
+{8} 'sample-2','probe-1',56.64
+{9} 'sample-3','probe-1',72.81
+{10} 'sample-4','probe-1',91
+{11} 'sample-0','probe-2',111.21
+{12} 'sample-1','probe-2',133.44
+{13} 'sample-2','probe-2',157.69
+{14} 'sample-3','probe-2',183.96
+{15} 'sample-4','probe-2',212.25
+{16} 'sample-0','probe-3',242.56
+{17} 'sample-1','probe-3',274.89
+{18} 'sample-2','probe-3',309.24
+{19} 'sample-3','probe-3',345.61
+{20} 'sample-4','probe-3',384
+{21} 'sample-0','probe-4',424.41
+{22} 'sample-1','probe-4',466.84
+{23} 'sample-2','probe-4',511.29
+{24} 'sample-3','probe-4',557.76
+{25} 'sample-4','probe-4',606.25
 
 SCIDB QUERY : <load(expo, 'expo.bin', -2, 'opaque')>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-0","probe-1",30.36
-{7} "sample-1","probe-1",42.49
-{8} "sample-2","probe-1",56.64
-{9} "sample-3","probe-1",72.81
-{10} "sample-4","probe-1",91
-{11} "sample-0","probe-2",111.21
-{12} "sample-1","probe-2",133.44
-{13} "sample-2","probe-2",157.69
-{14} "sample-3","probe-2",183.96
-{15} "sample-4","probe-2",212.25
-{16} "sample-0","probe-3",242.56
-{17} "sample-1","probe-3",274.89
-{18} "sample-2","probe-3",309.24
-{19} "sample-3","probe-3",345.61
-{20} "sample-4","probe-3",384
-{21} "sample-0","probe-4",424.41
-{22} "sample-1","probe-4",466.84
-{23} "sample-2","probe-4",511.29
-{24} "sample-3","probe-4",557.76
-{25} "sample-4","probe-4",606.25
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-0','probe-1',30.36
+{7} 'sample-1','probe-1',42.49
+{8} 'sample-2','probe-1',56.64
+{9} 'sample-3','probe-1',72.81
+{10} 'sample-4','probe-1',91
+{11} 'sample-0','probe-2',111.21
+{12} 'sample-1','probe-2',133.44
+{13} 'sample-2','probe-2',157.69
+{14} 'sample-3','probe-2',183.96
+{15} 'sample-4','probe-2',212.25
+{16} 'sample-0','probe-3',242.56
+{17} 'sample-1','probe-3',274.89
+{18} 'sample-2','probe-3',309.24
+{19} 'sample-3','probe-3',345.61
+{20} 'sample-4','probe-3',384
+{21} 'sample-0','probe-4',424.41
+{22} 'sample-1','probe-4',466.84
+{23} 'sample-2','probe-4',511.29
+{24} 'sample-3','probe-4',557.76
+{25} 'sample-4','probe-4',606.25
 
 SCIDB QUERY : <load(expo, 'expo.bin', -2, 'opaque')>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-0","probe-1",30.36
-{7} "sample-1","probe-1",42.49
-{8} "sample-2","probe-1",56.64
-{9} "sample-3","probe-1",72.81
-{10} "sample-4","probe-1",91
-{11} "sample-0","probe-2",111.21
-{12} "sample-1","probe-2",133.44
-{13} "sample-2","probe-2",157.69
-{14} "sample-3","probe-2",183.96
-{15} "sample-4","probe-2",212.25
-{16} "sample-0","probe-3",242.56
-{17} "sample-1","probe-3",274.89
-{18} "sample-2","probe-3",309.24
-{19} "sample-3","probe-3",345.61
-{20} "sample-4","probe-3",384
-{21} "sample-0","probe-4",424.41
-{22} "sample-1","probe-4",466.84
-{23} "sample-2","probe-4",511.29
-{24} "sample-3","probe-4",557.76
-{25} "sample-4","probe-4",606.25
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-0','probe-1',30.36
+{7} 'sample-1','probe-1',42.49
+{8} 'sample-2','probe-1',56.64
+{9} 'sample-3','probe-1',72.81
+{10} 'sample-4','probe-1',91
+{11} 'sample-0','probe-2',111.21
+{12} 'sample-1','probe-2',133.44
+{13} 'sample-2','probe-2',157.69
+{14} 'sample-3','probe-2',183.96
+{15} 'sample-4','probe-2',212.25
+{16} 'sample-0','probe-3',242.56
+{17} 'sample-1','probe-3',274.89
+{18} 'sample-2','probe-3',309.24
+{19} 'sample-3','probe-3',345.61
+{20} 'sample-4','probe-3',384
+{21} 'sample-0','probe-4',424.41
+{22} 'sample-1','probe-4',466.84
+{23} 'sample-2','probe-4',511.29
+{24} 'sample-3','probe-4',557.76
+{25} 'sample-4','probe-4',606.25
 
 SCIDB QUERY : <count(versions(expo))>
 {i} count
@@ -222,31 +222,31 @@ SCIDB QUERY : <count(versions(expo))>
 
 SCIDB QUERY : <scan(expo)>
 {i} s,p,val
-{1} "sample-0","probe-0",0.01
-{2} "sample-1","probe-0",2.04
-{3} "sample-2","probe-0",6.09
-{4} "sample-3","probe-0",12.16
-{5} "sample-4","probe-0",20.25
-{6} "sample-0","probe-1",30.36
-{7} "sample-1","probe-1",42.49
-{8} "sample-2","probe-1",56.64
-{9} "sample-3","probe-1",72.81
-{10} "sample-4","probe-1",91
-{11} "sample-0","probe-2",111.21
-{12} "sample-1","probe-2",133.44
-{13} "sample-2","probe-2",157.69
-{14} "sample-3","probe-2",183.96
-{15} "sample-4","probe-2",212.25
-{16} "sample-0","probe-3",242.56
-{17} "sample-1","probe-3",274.89
-{18} "sample-2","probe-3",309.24
-{19} "sample-3","probe-3",345.61
-{20} "sample-4","probe-3",384
-{21} "sample-0","probe-4",424.41
-{22} "sample-1","probe-4",466.84
-{23} "sample-2","probe-4",511.29
-{24} "sample-3","probe-4",557.76
-{25} "sample-4","probe-4",606.25
+{1} 'sample-0','probe-0',0.01
+{2} 'sample-1','probe-0',2.04
+{3} 'sample-2','probe-0',6.09
+{4} 'sample-3','probe-0',12.16
+{5} 'sample-4','probe-0',20.25
+{6} 'sample-0','probe-1',30.36
+{7} 'sample-1','probe-1',42.49
+{8} 'sample-2','probe-1',56.64
+{9} 'sample-3','probe-1',72.81
+{10} 'sample-4','probe-1',91
+{11} 'sample-0','probe-2',111.21
+{12} 'sample-1','probe-2',133.44
+{13} 'sample-2','probe-2',157.69
+{14} 'sample-3','probe-2',183.96
+{15} 'sample-4','probe-2',212.25
+{16} 'sample-0','probe-3',242.56
+{17} 'sample-1','probe-3',274.89
+{18} 'sample-2','probe-3',309.24
+{19} 'sample-3','probe-3',345.61
+{20} 'sample-4','probe-3',384
+{21} 'sample-0','probe-4',424.41
+{22} 'sample-1','probe-4',466.84
+{23} 'sample-2','probe-4',511.29
+{24} 'sample-3','probe-4',557.76
+{25} 'sample-4','probe-4',606.25
 
 SCIDB QUERY : <select count(val), min(val), max(val), avg(val), stdev(val) from expo>
 {i} count,min_1,max_2,avg_3,stdev_4
@@ -254,78 +254,78 @@ SCIDB QUERY : <select count(val), min(val), max(val), avg(val), stdev(val) from 
 
 SCIDB QUERY : <redimension_store(expo, Ds, avg(val) as av)>
 {s} av
-{"sample-0"} 161.71
-{"sample-1"} 183.94
-{"sample-2"} 208.19
-{"sample-3"} 234.46
-{"sample-4"} 262.75
+{'sample-0'} 161.71
+{'sample-1'} 183.94
+{'sample-2'} 208.19
+{'sample-3'} 234.46
+{'sample-4'} 262.75
 
 SCIDB QUERY : <redimension_store(expo, Dp, avg(val) as av)>
 {p} av
-{"probe-0"} 8.11
-{"probe-1"} 58.66
-{"probe-2"} 159.71
-{"probe-3"} 311.26
-{"probe-4"} 513.31
+{'probe-0'} 8.11
+{'probe-1'} 58.66
+{'probe-2'} 159.71
+{'probe-3'} 311.26
+{'probe-4'} 513.31
 
 SCIDB QUERY : <redimension_store(expo, Dsp)>
 {s,p} val
-{"sample-0","probe-0"} 0.01
-{"sample-0","probe-1"} 30.36
-{"sample-0","probe-2"} 111.21
-{"sample-0","probe-3"} 242.56
-{"sample-0","probe-4"} 424.41
-{"sample-1","probe-0"} 2.04
-{"sample-1","probe-1"} 42.49
-{"sample-1","probe-2"} 133.44
-{"sample-1","probe-3"} 274.89
-{"sample-1","probe-4"} 466.84
-{"sample-2","probe-0"} 6.09
-{"sample-2","probe-1"} 56.64
-{"sample-2","probe-2"} 157.69
-{"sample-2","probe-3"} 309.24
-{"sample-2","probe-4"} 511.29
-{"sample-3","probe-0"} 12.16
-{"sample-3","probe-1"} 72.81
-{"sample-3","probe-2"} 183.96
-{"sample-3","probe-3"} 345.61
-{"sample-3","probe-4"} 557.76
-{"sample-4","probe-0"} 20.25
-{"sample-4","probe-1"} 91
-{"sample-4","probe-2"} 212.25
-{"sample-4","probe-3"} 384
-{"sample-4","probe-4"} 606.25
+{'sample-0','probe-0'} 0.01
+{'sample-0','probe-1'} 30.36
+{'sample-0','probe-2'} 111.21
+{'sample-0','probe-3'} 242.56
+{'sample-0','probe-4'} 424.41
+{'sample-1','probe-0'} 2.04
+{'sample-1','probe-1'} 42.49
+{'sample-1','probe-2'} 133.44
+{'sample-1','probe-3'} 274.89
+{'sample-1','probe-4'} 466.84
+{'sample-2','probe-0'} 6.09
+{'sample-2','probe-1'} 56.64
+{'sample-2','probe-2'} 157.69
+{'sample-2','probe-3'} 309.24
+{'sample-2','probe-4'} 511.29
+{'sample-3','probe-0'} 12.16
+{'sample-3','probe-1'} 72.81
+{'sample-3','probe-2'} 183.96
+{'sample-3','probe-3'} 345.61
+{'sample-3','probe-4'} 557.76
+{'sample-4','probe-0'} 20.25
+{'sample-4','probe-1'} 91
+{'sample-4','probe-2'} 212.25
+{'sample-4','probe-3'} 384
+{'sample-4','probe-4'} 606.25
 
 SCIDB QUERY : <redimension_store(expo2, Dsp)>
 [An error expected at this place for the query "redimension_store(expo2, Dsp)". And it failed with error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES. Expected error code = scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TOO_MANY_COORDINATES.]
 
 SCIDB QUERY : <redimension_store(expo, Dsp3)>
 {s,p} val
-{"sample-0","probe-0"} 0.01
-{"sample-0","probe-1"} 30.36
-{"sample-0","probe-2"} 111.21
-{"sample-0","probe-3"} 242.56
-{"sample-0","probe-4"} 424.41
-{"sample-1","probe-0"} 2.04
-{"sample-1","probe-1"} 42.49
-{"sample-1","probe-2"} 133.44
-{"sample-1","probe-3"} 274.89
-{"sample-1","probe-4"} 466.84
-{"sample-2","probe-0"} 6.09
-{"sample-2","probe-1"} 56.64
-{"sample-2","probe-2"} 157.69
-{"sample-2","probe-3"} 309.24
-{"sample-2","probe-4"} 511.29
-{"sample-3","probe-0"} 12.16
-{"sample-3","probe-1"} 72.81
-{"sample-3","probe-2"} 183.96
-{"sample-3","probe-3"} 345.61
-{"sample-3","probe-4"} 557.76
-{"sample-4","probe-0"} 20.25
-{"sample-4","probe-1"} 91
-{"sample-4","probe-2"} 212.25
-{"sample-4","probe-3"} 384
-{"sample-4","probe-4"} 606.25
+{'sample-0','probe-0'} 0.01
+{'sample-0','probe-1'} 30.36
+{'sample-0','probe-2'} 111.21
+{'sample-0','probe-3'} 242.56
+{'sample-0','probe-4'} 424.41
+{'sample-1','probe-0'} 2.04
+{'sample-1','probe-1'} 42.49
+{'sample-1','probe-2'} 133.44
+{'sample-1','probe-3'} 274.89
+{'sample-1','probe-4'} 466.84
+{'sample-2','probe-0'} 6.09
+{'sample-2','probe-1'} 56.64
+{'sample-2','probe-2'} 157.69
+{'sample-2','probe-3'} 309.24
+{'sample-2','probe-4'} 511.29
+{'sample-3','probe-0'} 12.16
+{'sample-3','probe-1'} 72.81
+{'sample-3','probe-2'} 183.96
+{'sample-3','probe-3'} 345.61
+{'sample-3','probe-4'} 557.76
+{'sample-4','probe-0'} 20.25
+{'sample-4','probe-1'} 91
+{'sample-4','probe-2'} 212.25
+{'sample-4','probe-3'} 384
+{'sample-4','probe-4'} 606.25
 
 SCIDB QUERY : <redimension_store(expo2, Dsp3)>
 s,p,val
@@ -372,8 +372,8 @@ i,count
 
 SCIDB QUERY : <dimensions(Dsp3)>
 No,name,start,length,chunk_interval,chunk_overlap,low,high,type
-0,"s",0,4611686018427387903,5,0,0,5,"string"
-1,"p",0,4611686018427387903,5,0,0,5,"string"
+0,'s',0,4611686018427387903,5,0,0,5,'string'
+1,'p',0,4611686018427387903,5,0,0,5,'string'
 
 SCIDB QUERY : <scan(Dsp3)>
 s,p,val
@@ -444,37 +444,37 @@ s,p,val
 
 SCIDB QUERY : <scan(Dsp3@1:s)>
 no,value
-0,"sample-0"
-1,"sample-1"
-2,"sample-2"
-3,"sample-3"
-4,"sample-4"
+0,'sample-0'
+1,'sample-1'
+2,'sample-2'
+3,'sample-3'
+4,'sample-4'
 
 SCIDB QUERY : <scan(Dsp3@2:s)>
 no,value
-0,"sample-0"
-1,"sample-1"
-2,"sample-2"
-3,"sample-3"
-4,"sample-4"
-5,"sample-5"
+0,'sample-0'
+1,'sample-1'
+2,'sample-2'
+3,'sample-3'
+4,'sample-4'
+5,'sample-5'
 
 SCIDB QUERY : <scan(Dsp3@1:p)>
 no,value
-0,"probe-0"
-1,"probe-1"
-2,"probe-2"
-3,"probe-3"
-4,"probe-4"
+0,'probe-0'
+1,'probe-1'
+2,'probe-2'
+3,'probe-3'
+4,'probe-4'
 
 SCIDB QUERY : <scan(Dsp3@2:p)>
 no,value
-0,"probe-0"
-1,"probe-1"
-2,"probe-2"
-3,"probe-3"
-4,"probe-4"
-5,"probe-5"
+0,'probe-0'
+1,'probe-1'
+2,'probe-2'
+3,'probe-3'
+4,'probe-4'
+5,'probe-5'
 
 SCIDB QUERY : <scan(Dsp3)>
 s,p,val
@@ -496,19 +496,19 @@ i,count
 
 SCIDB QUERY : <scan(Dsp:s)>
 no,value
-0,"sample-0"
-1,"sample-1"
-2,"sample-2"
-3,"sample-3"
-4,"sample-4"
+0,'sample-0'
+1,'sample-1'
+2,'sample-2'
+3,'sample-3'
+4,'sample-4'
 
 SCIDB QUERY : <scan(Dsp:p)>
 no,value
-0,"probe-0"
-1,"probe-1"
-2,"probe-2"
-3,"probe-3"
-4,"probe-4"
+0,'probe-0'
+1,'probe-1'
+2,'probe-2'
+3,'probe-3'
+4,'probe-4'
 
 SCIDB QUERY : <store(filter(multiply(Dsp, Dsp), 1), Dsp_mult)>
 s,p,val
@@ -774,7 +774,7 @@ s,p,multiply
 
 SCIDB QUERY : <show(Dsp_mult)>
 i,schema
-0,"Dsp_mult<val:double> [s(string)=*,5,0,p(string)=*,5,0]"
+0,'Dsp_mult<val:double> [s(string)=*,5,0,p(string)=*,5,0]'
 
 SCIDB QUERY : <store(filter(multiply(Dsp3, Dsp3), 1), Dsp_mult)>
 s,p,val
@@ -1691,7 +1691,7 @@ s,p,val
 
 SCIDB QUERY : <show(Dsp_mult)>
 i,schema
-0,"Dsp_mult<val:double> [s(string)=*,5,0,p(string)=*,5,0]"
+0,'Dsp_mult<val:double> [s(string)=*,5,0,p(string)=*,5,0]'
 
 SCIDB QUERY : <scan(Dsp)>
 s,p,val
@@ -1727,19 +1727,19 @@ i,count
 
 SCIDB QUERY : <scan(Dsp:s)>
 no,value
-0,"sample-0"
-1,"sample-1"
-2,"sample-2"
-3,"sample-3"
-4,"sample-4"
+0,'sample-0'
+1,'sample-1'
+2,'sample-2'
+3,'sample-3'
+4,'sample-4'
 
 SCIDB QUERY : <scan(Dsp:p)>
 no,value
-0,"probe-0"
-1,"probe-1"
-2,"probe-2"
-3,"probe-3"
-4,"probe-4"
+0,'probe-0'
+1,'probe-1'
+2,'probe-2'
+3,'probe-3'
+4,'probe-4'
 
 SCIDB QUERY : <update Dsp set val = -100.990 where s = 'sample-0' or p = 'probe-0'>
 s,p,val
@@ -1799,119 +1799,119 @@ s,p,val
 
 SCIDB QUERY : <store(unpack(expo, offset), expo_1d_a)>
 offset,i,s,p,val
-0,1,"sample-0","probe-0",0.01
-1,2,"sample-1","probe-0",2.04
-2,3,"sample-2","probe-0",6.09
-3,4,"sample-3","probe-0",12.16
-4,5,"sample-4","probe-0",20.25
-5,6,"sample-0","probe-1",30.36
-6,7,"sample-1","probe-1",42.49
-7,8,"sample-2","probe-1",56.64
-8,9,"sample-3","probe-1",72.81
-9,10,"sample-4","probe-1",91
-10,11,"sample-0","probe-2",111.21
-11,12,"sample-1","probe-2",133.44
-12,13,"sample-2","probe-2",157.69
-13,14,"sample-3","probe-2",183.96
-14,15,"sample-4","probe-2",212.25
-15,16,"sample-0","probe-3",242.56
-16,17,"sample-1","probe-3",274.89
-17,18,"sample-2","probe-3",309.24
-18,19,"sample-3","probe-3",345.61
-19,20,"sample-4","probe-3",384
-20,21,"sample-0","probe-4",424.41
-21,22,"sample-1","probe-4",466.84
-22,23,"sample-2","probe-4",511.29
-23,24,"sample-3","probe-4",557.76
-24,25,"sample-4","probe-4",606.25
+0,1,'sample-0','probe-0',0.01
+1,2,'sample-1','probe-0',2.04
+2,3,'sample-2','probe-0',6.09
+3,4,'sample-3','probe-0',12.16
+4,5,'sample-4','probe-0',20.25
+5,6,'sample-0','probe-1',30.36
+6,7,'sample-1','probe-1',42.49
+7,8,'sample-2','probe-1',56.64
+8,9,'sample-3','probe-1',72.81
+9,10,'sample-4','probe-1',91
+10,11,'sample-0','probe-2',111.21
+11,12,'sample-1','probe-2',133.44
+12,13,'sample-2','probe-2',157.69
+13,14,'sample-3','probe-2',183.96
+14,15,'sample-4','probe-2',212.25
+15,16,'sample-0','probe-3',242.56
+16,17,'sample-1','probe-3',274.89
+17,18,'sample-2','probe-3',309.24
+18,19,'sample-3','probe-3',345.61
+19,20,'sample-4','probe-3',384
+20,21,'sample-0','probe-4',424.41
+21,22,'sample-1','probe-4',466.84
+22,23,'sample-2','probe-4',511.29
+23,24,'sample-3','probe-4',557.76
+24,25,'sample-4','probe-4',606.25
 
 SCIDB QUERY : <show(expo_1d_a)>
 i,schema
-0,"expo_1d_a<i:int64,s:string,p:string,val:double> [offset=0:*,25,0]"
+0,'expo_1d_a<i:int64,s:string,p:string,val:double> [offset=0:*,25,0]'
 
 SCIDB QUERY : <scan(expo_1d_a)>
 offset,i,s,p,val
-0,1,"sample-0","probe-0",0.01
-1,2,"sample-1","probe-0",2.04
-2,3,"sample-2","probe-0",6.09
-3,4,"sample-3","probe-0",12.16
-4,5,"sample-4","probe-0",20.25
-5,6,"sample-0","probe-1",30.36
-6,7,"sample-1","probe-1",42.49
-7,8,"sample-2","probe-1",56.64
-8,9,"sample-3","probe-1",72.81
-9,10,"sample-4","probe-1",91
-10,11,"sample-0","probe-2",111.21
-11,12,"sample-1","probe-2",133.44
-12,13,"sample-2","probe-2",157.69
-13,14,"sample-3","probe-2",183.96
-14,15,"sample-4","probe-2",212.25
-15,16,"sample-0","probe-3",242.56
-16,17,"sample-1","probe-3",274.89
-17,18,"sample-2","probe-3",309.24
-18,19,"sample-3","probe-3",345.61
-19,20,"sample-4","probe-3",384
-20,21,"sample-0","probe-4",424.41
-21,22,"sample-1","probe-4",466.84
-22,23,"sample-2","probe-4",511.29
-23,24,"sample-3","probe-4",557.76
-24,25,"sample-4","probe-4",606.25
+0,1,'sample-0','probe-0',0.01
+1,2,'sample-1','probe-0',2.04
+2,3,'sample-2','probe-0',6.09
+3,4,'sample-3','probe-0',12.16
+4,5,'sample-4','probe-0',20.25
+5,6,'sample-0','probe-1',30.36
+6,7,'sample-1','probe-1',42.49
+7,8,'sample-2','probe-1',56.64
+8,9,'sample-3','probe-1',72.81
+9,10,'sample-4','probe-1',91
+10,11,'sample-0','probe-2',111.21
+11,12,'sample-1','probe-2',133.44
+12,13,'sample-2','probe-2',157.69
+13,14,'sample-3','probe-2',183.96
+14,15,'sample-4','probe-2',212.25
+15,16,'sample-0','probe-3',242.56
+16,17,'sample-1','probe-3',274.89
+17,18,'sample-2','probe-3',309.24
+18,19,'sample-3','probe-3',345.61
+19,20,'sample-4','probe-3',384
+20,21,'sample-0','probe-4',424.41
+21,22,'sample-1','probe-4',466.84
+22,23,'sample-2','probe-4',511.29
+23,24,'sample-3','probe-4',557.76
+24,25,'sample-4','probe-4',606.25
 
 SCIDB QUERY : <save(unpack(expo, offset), 'expo.bin', -2, '(int64,string,string,double null)')>
 offset,i,s,p,val
-0,1,"sample-0","probe-0",0.01
-1,2,"sample-1","probe-0",2.04
-2,3,"sample-2","probe-0",6.09
-3,4,"sample-3","probe-0",12.16
-4,5,"sample-4","probe-0",20.25
-5,6,"sample-0","probe-1",30.36
-6,7,"sample-1","probe-1",42.49
-7,8,"sample-2","probe-1",56.64
-8,9,"sample-3","probe-1",72.81
-9,10,"sample-4","probe-1",91
-10,11,"sample-0","probe-2",111.21
-11,12,"sample-1","probe-2",133.44
-12,13,"sample-2","probe-2",157.69
-13,14,"sample-3","probe-2",183.96
-14,15,"sample-4","probe-2",212.25
-15,16,"sample-0","probe-3",242.56
-16,17,"sample-1","probe-3",274.89
-17,18,"sample-2","probe-3",309.24
-18,19,"sample-3","probe-3",345.61
-19,20,"sample-4","probe-3",384
-20,21,"sample-0","probe-4",424.41
-21,22,"sample-1","probe-4",466.84
-22,23,"sample-2","probe-4",511.29
-23,24,"sample-3","probe-4",557.76
-24,25,"sample-4","probe-4",606.25
+0,1,'sample-0','probe-0',0.01
+1,2,'sample-1','probe-0',2.04
+2,3,'sample-2','probe-0',6.09
+3,4,'sample-3','probe-0',12.16
+4,5,'sample-4','probe-0',20.25
+5,6,'sample-0','probe-1',30.36
+6,7,'sample-1','probe-1',42.49
+7,8,'sample-2','probe-1',56.64
+8,9,'sample-3','probe-1',72.81
+9,10,'sample-4','probe-1',91
+10,11,'sample-0','probe-2',111.21
+11,12,'sample-1','probe-2',133.44
+12,13,'sample-2','probe-2',157.69
+13,14,'sample-3','probe-2',183.96
+14,15,'sample-4','probe-2',212.25
+15,16,'sample-0','probe-3',242.56
+16,17,'sample-1','probe-3',274.89
+17,18,'sample-2','probe-3',309.24
+18,19,'sample-3','probe-3',345.61
+19,20,'sample-4','probe-3',384
+20,21,'sample-0','probe-4',424.41
+21,22,'sample-1','probe-4',466.84
+22,23,'sample-2','probe-4',511.29
+23,24,'sample-3','probe-4',557.76
+24,25,'sample-4','probe-4',606.25
 
 SCIDB QUERY : <load(expo_1d, 'expo.bin', -2, '(int64,string,string,double null)')>
 offset,i,s,p,val
-1,1,"sample-0","probe-0",0.01
-2,2,"sample-1","probe-0",2.04
-3,3,"sample-2","probe-0",6.09
-4,4,"sample-3","probe-0",12.16
-5,5,"sample-4","probe-0",20.25
-6,6,"sample-0","probe-1",30.36
-7,7,"sample-1","probe-1",42.49
-8,8,"sample-2","probe-1",56.64
-9,9,"sample-3","probe-1",72.81
-10,10,"sample-4","probe-1",91
-11,11,"sample-0","probe-2",111.21
-12,12,"sample-1","probe-2",133.44
-13,13,"sample-2","probe-2",157.69
-14,14,"sample-3","probe-2",183.96
-15,15,"sample-4","probe-2",212.25
-16,16,"sample-0","probe-3",242.56
-17,17,"sample-1","probe-3",274.89
-18,18,"sample-2","probe-3",309.24
-19,19,"sample-3","probe-3",345.61
-20,20,"sample-4","probe-3",384
-21,21,"sample-0","probe-4",424.41
-22,22,"sample-1","probe-4",466.84
-23,23,"sample-2","probe-4",511.29
-24,24,"sample-3","probe-4",557.76
-25,25,"sample-4","probe-4",606.25
+1,1,'sample-0','probe-0',0.01
+2,2,'sample-1','probe-0',2.04
+3,3,'sample-2','probe-0',6.09
+4,4,'sample-3','probe-0',12.16
+5,5,'sample-4','probe-0',20.25
+6,6,'sample-0','probe-1',30.36
+7,7,'sample-1','probe-1',42.49
+8,8,'sample-2','probe-1',56.64
+9,9,'sample-3','probe-1',72.81
+10,10,'sample-4','probe-1',91
+11,11,'sample-0','probe-2',111.21
+12,12,'sample-1','probe-2',133.44
+13,13,'sample-2','probe-2',157.69
+14,14,'sample-3','probe-2',183.96
+15,15,'sample-4','probe-2',212.25
+16,16,'sample-0','probe-3',242.56
+17,17,'sample-1','probe-3',274.89
+18,18,'sample-2','probe-3',309.24
+19,19,'sample-3','probe-3',345.61
+20,20,'sample-4','probe-3',384
+21,21,'sample-0','probe-4',424.41
+22,22,'sample-1','probe-4',466.84
+23,23,'sample-2','probe-4',511.29
+24,24,'sample-3','probe-4',557.76
+25,25,'sample-4','probe-4',606.25
 
 SCIDB QUERY : <redimension_store(expo_1d, Dsp2)>
 s,p,val

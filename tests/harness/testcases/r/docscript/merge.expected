@@ -13,6 +13,28 @@ SCIDB QUERY : <store(build_sparse(right_array,1,i=j),right_array)>
 SCIDB QUERY : <merge(left_array,right_array)>
 [[(1),(1),(1),(1),(1),(1)],[(),(1),(),(),(),()],[(),(),(1),(),(),()]]
 
+SCIDB QUERY : <CREATE ARRAY sparse <val:int32>[i=0:4,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY dense <val:int32>[i=0:4,5,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <store(build_sparse(sparse, i*3 + 1, i%3=0),sparse)>
+[(1),(),(),(10),()]
+
+SCIDB QUERY : <store(build(dense,-i-1),dense)>
+[(-1),(-2),(-3),(-4),(-5)]
+
+SCIDB QUERY : <merge(sparse,dense)>
+[(1),(-2),(-3),(10),(-5)]
+
+SCIDB QUERY : <merge(dense,sparse)>
+[(-1),(-2),(-3),(-4),(-5)]
+
+Query was executed successfully
+
+Query was executed successfully
+
 Query was executed successfully
 
 Query was executed successfully

@@ -59,16 +59,18 @@ namespace scidb {
 
         for (size_t i = 0; i < nBindings; i++) {
             switch (array._bindings[i].kind) {
-              case BindInfo::BI_COORDINATE:
-              _params[i] = array._desc.getOriginalCoordinate(array._bindings[i].resolvedId,
-                                                            currPos[array._bindings[i].resolvedId],
-                                                            array._query.lock());
-                  break;
-              case BindInfo::BI_VALUE:
-                  _params[i] = array._bindings[i].value;
-                  break;
-              default:
-                  assert(false);
+            case BindInfo::BI_COORDINATE:
+            {
+                _params[i] = array._desc.getOriginalCoordinate(array._bindings[i].resolvedId,
+                                                               currPos[array._bindings[i].resolvedId],
+                                                               _query);
+            } break;
+            case BindInfo::BI_VALUE:
+            {
+                _params[i] = array._bindings[i].value;
+            } break;
+            default:
+            assert(false);
             }
         }
         if (_converter) {
@@ -149,7 +151,8 @@ namespace scidb {
         _value(TypeLibrary::getType(aChunk->getAttributeDesc().getType())),
         _expression(*array._expression),
         _params(_expression),
-        _nullable(aChunk->getAttributeDesc().isNullable())
+      _nullable(aChunk->getAttributeDesc().isNullable()),
+      _query(Query::getValidQueryPtr(array._query))
     {
         _trueValue.setBool(true);
         reset();
@@ -230,8 +233,10 @@ namespace scidb {
 
     void BuildArrayIterator::operator ++()
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        Query::getValidQueryPtr(array._query);
         nextChunk();
     }
 
@@ -242,8 +247,9 @@ namespace scidb {
 
     Coordinates const& BuildArrayIterator::getPosition()
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
         return currPos;
     }
 
@@ -269,6 +275,7 @@ namespace scidb {
 
     bool BuildArrayIterator::setPosition(Coordinates const& pos)
     {
+        Query::getValidQueryPtr(array._query);
         for (size_t i = 0, n = currPos.size(); i < n; i++) {
             if (pos[i] < dims[i].getStart() || pos[i] > dims[i].getEndMax()) {
                 return hasCurrent = false;
@@ -282,6 +289,7 @@ namespace scidb {
 
     void BuildArrayIterator::reset()
     {
+        Query::getValidQueryPtr(array._query);
         size_t nDims = currPos.size(); 
         for (size_t i = 0; i < nDims; i++) {
             currPos[i] = dims[i].getStart();
@@ -292,8 +300,10 @@ namespace scidb {
 
     ConstChunk const& BuildArrayIterator::getChunk()
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        }
+        Query::getValidQueryPtr(array._query);
         if (!chunkInitialized) { 
             chunk.setPosition(currPos);
             chunkInitialized = true;
@@ -329,10 +339,10 @@ namespace scidb {
     BuildArray::BuildArray(boost::shared_ptr<Query>& query, ArrayDesc const& desc, boost::shared_ptr< Expression> expression)
     : _desc(desc), _expression(expression), _bindings(_expression->getBindings()), _converter(NULL),
       nInstances(0),
-      instanceID(INVALID_INSTANCE),
-      _query(query)
+      instanceID(INVALID_INSTANCE)
     {
        assert(query);
+       _query=query;
        nInstances = query->getInstancesCount();
        instanceID = query->getInstanceID();
         for (size_t i = 0; i < _bindings.size(); i++) {

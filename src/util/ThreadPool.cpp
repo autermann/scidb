@@ -27,17 +27,18 @@
  *
  * @brief The ThreadPool class
  */
-
 #include "util/Thread.h"
 #include "system/Config.h"
 #include "system/SciDBConfigOptions.h"
-
 
 namespace scidb
 {
 
 ThreadPool::ThreadPool(size_t threadCount, boost::shared_ptr<JobQueue> queue)
-: _queue(queue), _currentJobs(threadCount), _threadCount(threadCount)
+: _queue(queue),
+  _currentJobs(threadCount),
+  _threadCount(threadCount),
+  _terminatedThreads(boost::make_shared<Semaphore>())
 {
     _shutdown = false;
     if (_threadCount <= 0) {
@@ -66,6 +67,7 @@ void ThreadPool::start()
         boost::shared_ptr<Thread> thread(new Thread(*this, i));
         _threads.push_back(thread);
         thread->start();
+        getInjectedErrorListener().check();
     }
 }
 
@@ -94,27 +96,19 @@ void ThreadPool::stop()
         if (_shutdown) {
             return;
         }
-        _shutdown = true;
         threads.swap(_threads);
+        _shutdown = true;
     }
-    int nThreads = (int)threads.size();
-    for (int i = 0; i < nThreads; i++) {
-        _queue->pushJob(boost::shared_ptr<Job>(new FakeJob()));
+    size_t nThreads = threads.size();
+    for (size_t i = 0; i < threads.size(); ++i) {
+        if (threads[i]->isStarted()) {
+            _queue->pushJob(boost::shared_ptr<Job>(new FakeJob()));
+        } else {
+            --nThreads;
+        }
     }
-    _terminatedThreads.enter(nThreads);
+    _terminatedThreads->enter(nThreads);
 }
-
-void ThreadPool::waitCurrentJobs()
-{
-    std::vector< boost::shared_ptr<Job> > jobs;
-    { // scope
-        ScopedMutexLock lock(_mutex);
-        jobs = _currentJobs;
-    }
-    for (size_t i = 0; i < jobs.size(); i++) {
-        if (jobs[i])
-            jobs[i]->wait();
-    }
-}
+InjectedErrorListener<ThreadStartInjectedError> ThreadPool::s_injectedErrorListener;
 
 } //namespace
