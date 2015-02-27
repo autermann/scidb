@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 # Initialize, start and stop scidb in a cluster.
 #

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 '''
 Analyze sample historical data from ftp.nyxdata.com.

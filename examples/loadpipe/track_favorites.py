@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 '''
 Run queries against the nyse_day array to see how our favorite stocks are doing.
